@@ -13,6 +13,13 @@ Dieses Dokument hält fest, was sich aus der Konfiguration **nicht** ablesen lä
 wo die GetCapabilities der Dienste liegen, welche Layer-Namen es dort gibt und
 welche Eigenheiten einzelne Anbieter haben.
 
+Die WMS-Adressen von hier stehen zusätzlich in
+[src/common/knownWmsServices.ts](../src/common/knownWmsServices.ts) und sind beim
+Anlegen einer eigenen Kartenebene direkt auswählbar — **wer hier eine Adresse
+ändert oder ergänzt, gehört dorthin.** Nicht in der Liste: das
+WMTS-Capabilities von basemap.at (die Import-Hilfe liest nur WMS) und der
+WISA-Kachel-Cache (hat keines).
+
 ## Kachelgröße der WMS-Layer
 
 WMS-Kacheln sind 512×512, nicht Leaflets 256. Der Wert steht in der

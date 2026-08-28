@@ -140,6 +140,19 @@ sucht man den Fehler woanders. Gemeldet wird nur, wenn der Layer überhaupt
 Koordinatensysteme nennt; die Angabe ist vererbbar und fehlt in der Praxis oft
 ganz.
 
+### Bekannte Dienste
+
+Die Adressen, die in [kartenlayer.md](kartenlayer.md) ohnehin dokumentiert sind,
+stehen in [src/common/knownWmsServices.ts](../src/common/knownWmsServices.ts)
+auch auswählbar im Dialog. Abgetippt hat sie vorher jeder selbst; ein Dienst aus
+der Liste kostet jetzt zwei Klicks, weil die Auswahl gleich abfragt.
+
+Zwei Dienste aus der Doku fehlen dort mit Absicht: das **WMTS**-Capabilities von
+basemap.at — die Import-Hilfe liest nur WMS — und der WISA-Kachel-Cache, der auf
+jede Capabilities-Anfrage mit `404` antwortet. Ein Test hält die Liste an
+`isPublicHttpsUrl` fest: eine Adresse, die der Server gar nicht abrufen dürfte,
+wäre ein Eintrag, der wortlos nichts tut.
+
 ### Zwei Adressen, nicht eine
 
 `url` und `capabilitiesUrl` sind getrennte Felder, weil sie auseinanderfallen

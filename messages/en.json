@@ -2757,6 +2757,7 @@
       "urlWms": "GetMap endpoint of the service, e.g. https://gisenterprise.bgld.gv.at/arcgis/services/public/Orthofoto/MapServer/WMSServer?",
       "urlWmts": "Tile template with '{z}', '{x}' and '{y}', e.g. https://example.org/tiles/'{z}'/'{x}'/'{y}'.png",
       "capabilitiesUrl": "Optional. Empty means the URL above. Remembered when querying so the layer selection is available again when editing.",
+      "knownService": "Selecting one queries the service right away. Other services via the address below.",
       "wmsLayers": "Value of the LAYERS parameter. Separate multiple layers with commas.",
       "bounds": "Optional, south,west,north,east in degrees — e.g. 46.82,15.98,48.16,17.17. No tiles are requested outside.",
       "attribution": "Plain text. HTML is stripped.",
@@ -2770,6 +2771,7 @@
       "invalidBounds": "Four values expected: south,west,north,east"
     },
     "capabilities": {
+      "known": "Known service",
       "load": "Load layers from the service",
       "loading": "Querying the service …",
       "hint": "WMS only. The request runs through the server because the services do not send CORS headers.",

@@ -80,8 +80,8 @@ Kartenebenen gehören zum Einsatz: alle am Einsatz beteiligten Benutzer sehen si
 4. **Typ** wählen:
    - **WMS** — GetMap-Endpoint eines Kartendienstes
    - **Kachel-URL (WMTS/XYZ)** — Kachel-Template mit `{z}`, `{x}` und `{y}`
-5. **URL** eingeben (nur `https://`)
-6. Bei WMS: "Layer aus dem Dienst laden" klicken — die verfügbaren Layer werden aus dem `GetCapabilities` des Dienstes gelesen und zur Auswahl angeboten. Alternativ den `LAYERS`-Wert direkt eintragen.
+5. Bei WMS: unter **Bekannter Dienst** einen der hinterlegten Kartendienste wählen — Adresse und Layer werden dann sofort geholt. Für alle anderen Dienste die **URL** eingeben (nur `https://`); eine `GetCapabilities`-Adresse darf direkt eingefügt werden, sie wird gemerkt und die Kartenadresse daraus ermittelt.
+6. Bei WMS: "Layer aus dem Dienst laden" klicken — die verfügbaren Layer werden aus dem `GetCapabilities` des Dienstes gelesen. In der Auswahl lassen sich **mehrere Layer anhaken**; Tippen filtert die Liste. Alternativ den `LAYERS`-Wert direkt eintragen.
 7. **Deckkraft** einstellen, damit die Basiskarte durchscheint
 8. Optional **Begrenzung** (`süd,west,nord,ost`), **maxZoom/maxNativeZoom**, **Quellenangabe** und **Reihenfolge** setzen
 9. **Standardmäßig aktiv** einschalten, wenn die Ebene beim Öffnen der Karte sichtbar sein soll

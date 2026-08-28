@@ -80,8 +80,8 @@ Map layers belong to the operation: everyone working on it sees them. Guests usi
 4. Pick the **type**:
    - **WMS** — GetMap endpoint of a map service
    - **Tile URL (WMTS/XYZ)** — tile template containing `{z}`, `{x}` and `{y}`
-5. Enter the **URL** (`https://` only)
-6. For WMS click "Load layers from the service" — the available layers are read from the service's `GetCapabilities` and offered for selection. You may also type the `LAYERS` value directly.
+5. For WMS pick one of the preconfigured services under **Known service** — its address and layers are fetched right away. For any other service enter the **URL** (`https://` only); a `GetCapabilities` address may be pasted directly, it is remembered and the map address is derived from it.
+6. For WMS click "Load layers from the service" — the available layers are read from the service's `GetCapabilities`. The selection lets you **tick several layers**; typing filters the list. You may also type the `LAYERS` value directly.
 7. Set the **opacity** so the base map stays visible underneath
 8. Optionally set **bounds** (`south,west,north,east`), **maxZoom/maxNativeZoom**, **attribution** and **order**
 9. Turn on **on by default** if the layer should be visible when the map opens

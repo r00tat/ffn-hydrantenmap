@@ -2,6 +2,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { KNOWN_WMS_SERVICES } from '../../../common/knownWmsServices';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
 const loadWmsCapabilities = vi.fn();
@@ -285,6 +286,38 @@ describe('MapLayerDialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
     expect(onClose.mock.calls[0][0]).toMatchObject({ wmsLayers: 'hq30,hq100' });
+  });
+
+  it('fragt einen bekannten Dienst ohne Eingabe einer Adresse ab', async () => {
+    loadWmsCapabilities.mockResolvedValue({
+      serviceUrl: 'https://inspire.lfrz.gv.at/000801/wms?',
+      formats: ['image/png'],
+      layers: [
+        { name: 'hq100', title: 'Hochwasser HQ100', crs: ['EPSG:3857'], depth: 0 },
+      ],
+    });
+    const onClose = vi.fn();
+    renderWithIntl(<MapLayerDialog onClose={onClose} />);
+
+    await userEvent.click(screen.getByLabelText('Bekannter Dienst'));
+    await userEvent.click(
+      screen.getByRole('option', { name: /INSPIRE Hochwasser/ })
+    );
+
+    // Die Auswahl fragt sofort ab — kein zusätzlicher Knopfdruck.
+    await waitFor(() =>
+      expect(loadWmsCapabilities).toHaveBeenCalledWith(
+        KNOWN_WMS_SERVICES.find((s) => s.id === 'inspire-hochwasser')
+          ?.capabilitiesUrl
+      )
+    );
+    // Der einzige Layer des Dienstes wird übernommen.
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^Layer \(LAYERS\)/)).toHaveValue('hq100')
+    );
+    expect(screen.getByLabelText(/^URL/)).toHaveValue(
+      'https://inspire.lfrz.gv.at/000801/wms?'
+    );
   });
 
   it('bietet beim Bearbeiten das Löschen an', async () => {

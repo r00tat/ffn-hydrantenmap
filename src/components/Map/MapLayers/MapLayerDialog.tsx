@@ -36,6 +36,10 @@ import {
   validateMapLayer,
 } from '../../../common/mapLayers';
 import type { WmsCapabilitiesLayer } from '../../../common/wmsCapabilities';
+import {
+  KNOWN_WMS_SERVICES,
+  knownWmsServiceByUrl,
+} from '../../../common/knownWmsServices';
 import { deriveMapLayerSettings } from '../../../common/mapLayerFromCapabilities';
 import {
   loadWmsCapabilities,
@@ -210,6 +214,22 @@ export default function MapLayerDialog({
   );
 
   /**
+   * Ein bekannter Dienst aus der Liste.
+   *
+   * Setzt die Adresse und fragt sofort ab — wer aus der Liste wählt, will
+   * nicht anschließend noch einen Knopf suchen.
+   */
+  const selectKnownService = useCallback(
+    (id: string) => {
+      const service = KNOWN_WMS_SERVICES.find((s) => s.id === id);
+      if (!service) return;
+      setLayer((prev) => ({ ...prev, capabilitiesUrl: service.capabilitiesUrl }));
+      void loadCapabilities(service.capabilitiesUrl);
+    },
+    [loadCapabilities]
+  );
+
+  /**
    * Beim Bearbeiten den Dienst gleich abfragen.
    *
    * Ohne das steht die Layer-Auswahl beim zweiten Öffnen leer da: die Liste der
@@ -321,6 +341,34 @@ export default function MapLayerDialog({
           error={!!errorText('url')}
           helperText={errorText('url') ?? t(isWms ? 'help.urlWms' : 'help.urlWmts')}
         />
+
+        {isWms && (
+          <FormControl fullWidth variant="standard" margin="dense">
+            <InputLabel id="map-layer-known-label">
+              {t('capabilities.known')}
+            </InputLabel>
+            <Select
+              labelId="map-layer-known-label"
+              id="map-layer-known"
+              value={knownWmsServiceByUrl(capabilitiesSource)?.id ?? ''}
+              label={t('capabilities.known')}
+              renderValue={(id) =>
+                KNOWN_WMS_SERVICES.find((s) => s.id === id)?.name ?? ''
+              }
+              onChange={(e) => selectKnownService(e.target.value)}
+            >
+              {KNOWN_WMS_SERVICES.map((service) => (
+                <MenuItem key={service.id} value={service.id}>
+                  <ListItemText
+                    primary={service.name}
+                    secondary={service.beschreibung}
+                  />
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>{t('help.knownService')}</FormHelperText>
+          </FormControl>
+        )}
 
         {isWms && (
           <TextField
