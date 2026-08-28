@@ -1,5 +1,16 @@
 import { TileLayerOptions } from 'leaflet';
 import L from 'leaflet';
+import {
+  clampOpacity,
+  isRenderableMapLayer,
+  uniqueOverlayNames,
+  DEFAULT_MAP_OVERLAY_MAX_NATIVE_ZOOM,
+  DEFAULT_MAP_OVERLAY_MAX_ZOOM,
+  FirecallMapLayer,
+  mapLayerOverlayName,
+  parseMapLayerBounds,
+  sanitizeAttribution,
+} from '../../common/mapLayers';
 
 export interface TileOptions extends TileLayerOptions {
   [key: string]: any;
@@ -292,3 +303,89 @@ export const createLayers = (
   });
   return layers;
 };
+
+/**
+ * Eine eigene Kartenebene als `TileConfig`.
+ *
+ * Damit lässt sich eine vom Benutzer angelegte Ebene überall dort einsetzen,
+ * wo bisher nur die fest eingebauten Ebenen aus `availableLayers` und
+ * `overlayLayers` standen — insbesondere in der Textur der 3D-Ansicht.
+ */
+export function mapLayerToTileConfig(layer: FirecallMapLayer): TileConfig {
+  const isWms = layer.overlayType === 'WMS';
+  return {
+    name: mapLayerOverlayName(layer),
+    url: layer.url,
+    type: isWms ? 'WMS' : 'WMTS',
+    enabled: layer.enabled === true,
+    ...(layer.beschreibung ? { description: layer.beschreibung } : {}),
+    options: {
+      maxZoom: layer.maxZoom ?? DEFAULT_MAP_OVERLAY_MAX_ZOOM,
+      maxNativeZoom: layer.maxNativeZoom ?? DEFAULT_MAP_OVERLAY_MAX_NATIVE_ZOOM,
+      attribution: sanitizeAttribution(layer.attribution),
+      opacity: clampOpacity(layer.opacity),
+      bounds: parseMapLayerBounds(layer.bounds),
+      transparent: layer.transparent !== false,
+      ...(isWms
+        ? {
+            layers: layer.wmsLayers ?? '',
+            format: layer.format || 'image/png',
+            uppercase: true,
+          }
+        : {}),
+    },
+  };
+}
+
+/**
+ * Die darstellbaren eigenen Kartenebenen als `TileConfig`, in der Reihenfolge
+ * ihrer Stapelung und mit denselben eindeutigen Namen wie im Layer-Control.
+ *
+ * Karte und 3D-Ansicht müssen dieselben Namen benutzen: die Sichtbarkeit einer
+ * Überlagerung ist in Leaflet nur über ihren Namen zu erfahren.
+ */
+export function mapLayerTileConfigs(
+  layers: FirecallMapLayer[]
+): TileConfig[] {
+  const renderable = layers.filter(isRenderableMapLayer);
+  const names = uniqueOverlayNames(renderable);
+  return renderable.map((layer, index) => ({
+    ...mapLayerToTileConfig(layer),
+    name: names[index],
+  }));
+}
+
+/**
+ * Ein Schlüssel, der sich bei jeder Änderung ändert, die Leaflet an einer
+ * bestehenden Ebene **nicht** mehr übernimmt.
+ *
+ * `react-leaflet` aktualisiert an einer laufenden Kachelebene nur `opacity` und
+ * `zIndex`, bei einer reinen Kachelebene zusätzlich die URL. Ein geänderter
+ * `LAYERS`-Wert, ein anderes Format, eine andere Begrenzung — und bei WMS sogar
+ * eine andere Adresse — würden sonst erst nach einem Neuladen der Seite
+ * sichtbar. Als React-Key sorgt dieser Wert dafür, dass die Ebene stattdessen
+ * neu aufgebaut wird.
+ */
+export function mapLayerConfigKey(config: TileConfig): string {
+  const {
+    layers,
+    format,
+    transparent,
+    bounds,
+    maxZoom,
+    maxNativeZoom,
+    attribution,
+  } = config.options;
+  return JSON.stringify([
+    config.name,
+    config.type,
+    config.url,
+    layers,
+    format,
+    transparent,
+    bounds,
+    maxZoom,
+    maxNativeZoom,
+    attribution,
+  ]);
+}

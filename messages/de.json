@@ -2718,5 +2718,61 @@
     "noSheet": "Keine Rettungskarte hinterlegt",
     "doorsValue": "{doors} Türen",
     "diaryLabel": "Rettungskarte"
+  },
+  "mapLayers": {
+    "title": "Eigene Kartenebenen",
+    "intro": "WMS- und Kachel-Dienste, die über die Basiskarte gelegt werden. Sie erscheinen im Layer-Control der Karte mit dem Präfix „Karte:“ und lassen sich dort ein- und ausschalten.",
+    "empty": "Für diesen Einsatz ist noch keine eigene Kartenebene angelegt.",
+    "add": "Kartenebene hinzufügen",
+    "addTitle": "Kartenebene hinzufügen",
+    "editTitle": "Kartenebene bearbeiten",
+    "deleteTitle": "Kartenebene löschen",
+    "deleteConfirm": "Soll die Kartenebene „{name}“ wirklich gelöscht werden?",
+    "offlineHint": "Eigene Kartenebenen werden nicht für den Offline-Betrieb vorgeladen. Ohne Netz bleiben sie leer.",
+    "defaultOn": "standardmäßig aktiv",
+    "types": {
+      "WMS": "WMS",
+      "WMTS": "Kachel-URL (WMTS/XYZ)"
+    },
+    "fields": {
+      "name": "Name",
+      "beschreibung": "Beschreibung",
+      "overlayType": "Typ",
+      "url": "URL",
+      "wmsLayers": "Layer (LAYERS)",
+      "format": "Format",
+      "transparent": "Transparent",
+      "opacity": "Deckkraft",
+      "maxZoom": "maxZoom",
+      "maxNativeZoom": "maxNativeZoom",
+      "bounds": "Begrenzung",
+      "attribution": "Quellenangabe",
+      "enabled": "Standardmäßig aktiv",
+      "zIndex": "Reihenfolge"
+    },
+    "help": {
+      "urlWms": "GetMap-Endpoint des Dienstes, z. B. https://gisenterprise.bgld.gv.at/arcgis/services/public/Orthofoto/MapServer/WMSServer?",
+      "urlWmts": "Kachel-Template mit '{z}', '{x}' und '{y}', z. B. https://example.org/tiles/'{z}'/'{x}'/'{y}'.png",
+      "wmsLayers": "Wert des LAYERS-Parameters. Mehrere Layer kommasepariert.",
+      "bounds": "Optional, süd,west,nord,ost in Grad — z. B. 46.82,15.98,48.16,17.17. Außerhalb werden keine Kacheln angefragt.",
+      "attribution": "Reiner Text. HTML wird entfernt.",
+      "zIndex": "Stapelung mehrerer eigener Kartenebenen. Kleinere Werte liegen unten."
+    },
+    "errors": {
+      "required": "Pflichtfeld",
+      "httpsRequired": "Nur https-Adressen sind erlaubt",
+      "templateRequired": "Das Template braucht '{z}', '{x}' und '{y}'",
+      "invalidBounds": "Vier Werte erwartet: süd,west,nord,ost"
+    },
+    "capabilities": {
+      "load": "Layer aus dem Dienst laden",
+      "loading": "Dienst wird abgefragt …",
+      "hint": "Nur für WMS. Die Abfrage läuft über den Server, weil die Dienste kein CORS setzen.",
+      "select": "Gefundene Layer",
+      "found": "{count, plural, one {# Layer gefunden} other {# Layer gefunden}}",
+      "invalid-url": "Die Adresse ist keine gültige https-URL.",
+      "unreachable": "Der Dienst hat nicht geantwortet.",
+      "no-layers": "Unter dieser Adresse wurde kein WMS mit anforderbaren Layern gefunden."
+    }
   }
 }

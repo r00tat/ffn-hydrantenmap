@@ -24,7 +24,8 @@ import {
   equidistanceForZoom,
   HOEHENLINIEN_LAYER_NAME,
 } from './layers/hoehenlinien';
-import { availableLayers } from './tiles';
+import { useFirecallMapLayers } from '../../hooks/useFirecallMapLayers';
+import { availableLayers, mapLayerTileConfigs } from './tiles';
 import {
   isOverlayVisible,
   visibleItems,
@@ -113,6 +114,14 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const items3d = useMemo(
     () => visibleItems(firecallItems, firecallLayers, overlays),
     [firecallItems, firecallLayers, overlays]
+  );
+
+  // Die eigenen Kartenebenen gehören in die Textur der 3D-Ansicht, sonst zeigt
+  // sie eine andere Lage als die Karte daneben.
+  const mapLayers = useFirecallMapLayers();
+  const customOverlays = useMemo(
+    () => mapLayerTileConfigs(mapLayers),
+    [mapLayers]
   );
 
   return (
@@ -222,6 +231,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           zoom={map.getZoom()}
           baseLayerName={baseLayerName}
           overlays={overlays}
+          customOverlays={customOverlays}
           items={items3d}
           equidistanceM={equidistanceForZoom(map.getZoom())}
           showContours={isOverlayVisible(

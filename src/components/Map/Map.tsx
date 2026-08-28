@@ -29,6 +29,7 @@ import UpdateMapPosition from './UpdateMapPosition';
 import { DistanceLayer } from './layers/DistanceLayer';
 import FirecallLayer from './layers/FirecallLayer';
 import HoseLineDraftLayer from './layers/HoseLineDraftLayer';
+import CustomMapLayers from './layers/CustomMapLayers';
 import LayerErrorBoundary from './layers/LayerErrorBoundary';
 import HoehenlinienLayer from './layers/HoehenlinienLayer';
 import { HOEHENLINIEN_LAYER_NAME } from './layers/hoehenlinien';
@@ -180,7 +181,7 @@ export default function Map() {
             </LayerErrorBoundary>
           </LayersControl.Overlay>
           {Object.entries(overlayLayers)
-            .filter(([key, layer]) => (layer.type || 'WTMS') == 'WTMS')
+            .filter(([, layer]) => (layer.type || 'WMTS') === 'WMTS')
             .map(([key, layer]) => (
               <LayersControl.Overlay
                 name={layer.name}
@@ -199,7 +200,7 @@ export default function Map() {
               </LayersControl.Overlay>
             ))}
           {Object.entries(overlayLayers)
-            .filter(([key, layer]) => layer.type == 'WMS')
+            .filter(([, layer]) => layer.type === 'WMS')
             .map(([key, layer]) => (
               <LayersControl.Overlay name={layer.name} key={key}>
                 <WMSTileLayer
@@ -218,6 +219,7 @@ export default function Map() {
                 />
               </LayersControl.Overlay>
             ))}
+          <CustomMapLayers />
         </LayersControl>
         <ScaleControl position="bottomright" metric={true} imperial={false} />
         <ScaleRatioControl />

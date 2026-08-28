@@ -11,6 +11,7 @@ Die Karte zeigt Hydranten und andere wichtige Punkte im Einsatzgebiet an. Du kan
 - **Verschiedene Basiskarten** Orthofoto, Basemap, Basemap grau, OpenStreetMap, OpenTopoMap
 - **Overlay-Layer** Einsatzorte, Entfernung, Umkreis, Position, Stromausfälle, Pegelstände, Wetterstationen, Adressen
 - **WMS-Layer** Hochwasser, Risikogebiete, Überflutungsgebiete (bereitgestellt vom Land Burgenland)
+- **Eigene Kartenebenen** Selbst angelegte WMS- und Kachel-Dienste je Einsatz, im Layer-Control unter „Karte: …" (siehe [Ebenen](/docs/ebenen))
 - **Standort suchen** Adresse oder Ort eingeben und auf der Karte anzeigen lassen
 - **Bearbeitungsmodus mit Zeichenwerkzeugen** Elemente auf der Karte platzieren, Linien und Flächen zeichnen
 - **Elemente auf der Karte platzieren** Fahrzeuge, Marker, Linien und Flächen für den aktiven Einsatz hinzufügen

@@ -195,8 +195,9 @@ describe('useExport', () => {
 
       await exportFirecall('test-id');
 
-      // items, chat, layers, history, locations, kostenersatz, auditlog, crew
-      expect(getDocsMock).toHaveBeenCalledTimes(8);
+      // items, chat, layers, mapLayers, history, locations, kostenersatz,
+      // auditlog, crew
+      expect(getDocsMock).toHaveBeenCalledTimes(9);
     });
 
     it('should stamp the backup version', async () => {

@@ -102,8 +102,11 @@ export function findLayerConfig(name?: string): TileConfig | undefined {
  * Pegelstände, Live-Standorte) sind Marken und kein Kartenbild; sie ließen sich
  * nicht in eine Textur zeichnen.
  */
-export function activeOverlays(overlays: OverlayStates): TileConfig[] {
-  return Object.values(overlayLayers).filter((layer) =>
+export function activeOverlays(
+  overlays: OverlayStates,
+  custom: TileConfig[] = []
+): TileConfig[] {
+  return [...Object.values(overlayLayers), ...custom].filter((layer) =>
     isOverlayVisible(layer.name, overlays, layer.enabled === true)
   );
 }
@@ -295,7 +298,11 @@ export async function composeTexture(
   // Parallel gezeichnet läge die Gefahrenkarte mal über und mal unter den
   // Adressen, je nachdem, welche Kachel zuerst da war.
   for (const overlay of overlays) {
+    // Die Deckkraft einer eigenen Kartenebene gehört auch in die Textur, sonst
+    // liegt in 3D undurchsichtig, was in der Karte durchscheint.
+    ctx.globalAlpha = (overlay.options?.opacity as number | undefined) ?? 1;
     await drawLayer(ctx, overlay, grid);
   }
+  ctx.globalAlpha = 1;
   return canvas;
 }

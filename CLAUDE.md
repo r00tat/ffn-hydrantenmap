@@ -32,6 +32,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/wasserstandsmodell.md](docs/wasserstandsmodell.md) | Wasserstandsmodell: Flutfüllung, Bänder am Element, Signatur, Kopplung an den Sandsackrechner |
 | [docs/mcp-server.md](docs/mcp-server.md) | MCP-Server und OAuth 2.1: eigener Authorization Server, DCR und CIMD, Scopes, Tool-Set mit zwei Aufrufern, Signaturschlüssel und Betrieb |
 | [docs/lagekarte-austausch.md](docs/lagekarte-austausch.md) | Import und Export für lagekarte.info: beobachtetes Format, Kupplungsmarker, `ffnd`-Block, Symbolkatalog und seine Lücken |
+| [docs/eigene-kartenebenen.md](docs/eigene-kartenebenen.md) | Eigene WMS-/WMTS-Kartenebenen je Einsatz: Abgrenzung „Kartenebene" gegen „Ebene", Berechtigungen und warum die Firestore-Regeln nichts prüfen, GetCapabilities über den Server, Darstellung im Layer-Control |
 | [docs/rettungskarten.md](docs/rettungskarten.md) | Rettungskarten aus dem Euro-Rescue-Katalog: warum kein Deep Link in die App geht, die offene API von Euro NCAP, Cache, Zuordnung Zulassung → Variante |
 
 ## Commands
@@ -409,7 +410,8 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 - `call` - Emergency calls/operations (Einsätze)
 - `item` - Items within firecalls (hydrants, vehicles, personnel)
 - `history` - Event history entries
-- `layer` - Map layers per firecall
+- `layer` - Element-Gruppierung je Einsatz (**nicht** Kartenebenen)
+- `mapLayer` - Eigene WMS-/WMTS-Kartenebenen je Einsatz (siehe [docs/eigene-kartenebenen.md](docs/eigene-kartenebenen.md))
 - `user` - User profiles with authorization
 - `clusters6` - Geohashed hydrant clusters
 - `bugReport` - In-App Bug-Reports & Feature-Requests (siehe unten)

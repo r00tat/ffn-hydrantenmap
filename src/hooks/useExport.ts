@@ -33,6 +33,10 @@ import {
 import { uploadFile } from '../components/inputs/FileUploader';
 import { ChatMessage } from '../common/chat';
 import {
+  FirecallMapLayer,
+  FIRECALL_MAP_LAYERS_COLLECTION_ID,
+} from '../common/mapLayers';
+import {
   KostenersatzCalculation,
   KOSTENERSATZ_SUBCOLLECTION,
 } from '../common/kostenersatz';
@@ -210,6 +214,11 @@ export interface FirecallExport extends Firecall {
   items: FirecallItem[];
   chat: ChatMessage[];
   layers: FirecallLayer[];
+  /**
+   * Eigene Kartenebenen (WMS/WMTS). Optional, weil Exporte aus der Zeit vor
+   * dem Feature den Schlüssel nicht tragen.
+   */
+  mapLayers?: FirecallMapLayer[];
   history: ExportHistoryEntry[];
   locations: FirecallLocation[];
   kostenersatz: KostenersatzCalculation[];
@@ -379,13 +388,14 @@ export async function exportFirecall(
       snapshot.docs.map((d) => ({ ...d.data(), id: d.id }) as T)
     );
 
-  // Die acht Untersammlungen hängen nicht voneinander ab — nacheinander
-  // abgefragt wären das acht Round-Trips hintereinander.
+  // Die neun Untersammlungen hängen nicht voneinander ab — nacheinander
+  // abgefragt wären das neun Round-Trips hintereinander.
   const [
     firecallSnapshot,
     items,
     chat,
     layers,
+    mapLayers,
     history,
     locations,
     kostenersatz,
@@ -396,6 +406,7 @@ export async function exportFirecall(
     readCollection<FirecallItem>(FIRECALL_ITEMS_COLLECTION_ID),
     readCollection<ChatMessage>('chat'),
     readCollection<FirecallLayer>(FIRECALL_LAYERS_COLLECTION_ID),
+    readCollection<FirecallMapLayer>(FIRECALL_MAP_LAYERS_COLLECTION_ID),
     readCollection<FirecallHistory>(FIRECALL_HISTORY_COLLECTION_ID),
     readCollection<FirecallLocation>(FIRECALL_LOCATIONS_COLLECTION_ID),
     readCollection<KostenersatzCalculation>(KOSTENERSATZ_SUBCOLLECTION),
@@ -478,6 +489,7 @@ export async function exportFirecall(
     items: exportItems,
     chat,
     layers,
+    mapLayers,
     history: exportHistory,
     locations,
     kostenersatz,
@@ -630,6 +642,7 @@ export async function importFirecall(
     items,
     chat,
     layers,
+    mapLayers,
     history,
     locations,
     kostenersatz,
@@ -696,6 +709,10 @@ export async function importFirecall(
   const itemCol = collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID);
   const chatCol = collection(firecallDoc, 'chat');
   const layerCol = collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID);
+  const mapLayerCol = collection(
+    firecallDoc,
+    FIRECALL_MAP_LAYERS_COLLECTION_ID
+  );
   const historyCol = collection(firecallDoc, FIRECALL_HISTORY_COLLECTION_ID);
   const locationCol = collection(firecallDoc, FIRECALL_LOCATIONS_COLLECTION_ID);
   const kostenersatzCol = collection(firecallDoc, KOSTENERSATZ_SUBCOLLECTION);
@@ -765,6 +782,16 @@ export async function importFirecall(
     await commitOps(
       layers.map((l) => ({
         ref: doc(layerCol, l.id || uuid()),
+        data: l as unknown as Record<string, unknown>,
+      }))
+    );
+  }
+
+  // Import own map layers (WMS/WMTS)
+  if (mapLayers?.length) {
+    await commitInBatches(
+      mapLayers.map((l) => ({
+        ref: doc(mapLayerCol, l.id || uuid()),
         data: l as unknown as Record<string, unknown>,
       }))
     );

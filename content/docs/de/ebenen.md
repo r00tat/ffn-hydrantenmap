@@ -65,3 +65,32 @@ Tipp: Nicht zugeordnete Elemente erscheinen in der Spalte "Elemente nicht zugeor
 :::info
 Tipp: Heatmaps eignen sich besonders für Messwerte (z.B. Strahlungswerte, Pegelstände). Die Interpolation berechnet Werte zwischen den Messpunkten.
 :::
+
+## Eigene Kartenebenen (WMS/WMTS)
+
+Neben den Ebenen für Einsatzelemente lassen sich **eigene Kartenebenen** anlegen: externe Kartendienste, die über die Basiskarte gelegt werden — der WMS eines Nachbarbezirks, ein Hochwasserdienst, ein Übungsplan. Sie erscheinen im Layer-Control der Karte mit dem Präfix „Karte:" und lassen sich dort ein- und ausschalten.
+
+Kartenebenen gehören zum Einsatz: alle am Einsatz beteiligten Benutzer sehen sie. Gäste über den Freigabe-Link sehen sie ebenfalls, können sie aber nicht ändern.
+
+### Kartenebene anlegen
+
+1. Auf der Seite "Ebenen" nach unten zum Abschnitt "Eigene Kartenebenen" scrollen
+2. "Kartenebene hinzufügen" klicken
+3. **Name** eingeben — er steht später im Layer-Control
+4. **Typ** wählen:
+   - **WMS** — GetMap-Endpoint eines Kartendienstes
+   - **Kachel-URL (WMTS/XYZ)** — Kachel-Template mit `{z}`, `{x}` und `{y}`
+5. **URL** eingeben (nur `https://`)
+6. Bei WMS: "Layer aus dem Dienst laden" klicken — die verfügbaren Layer werden aus dem `GetCapabilities` des Dienstes gelesen und zur Auswahl angeboten. Alternativ den `LAYERS`-Wert direkt eintragen.
+7. **Deckkraft** einstellen, damit die Basiskarte durchscheint
+8. Optional **Begrenzung** (`süd,west,nord,ost`), **maxZoom/maxNativeZoom**, **Quellenangabe** und **Reihenfolge** setzen
+9. **Standardmäßig aktiv** einschalten, wenn die Ebene beim Öffnen der Karte sichtbar sein soll
+10. Speichern
+
+:::info
+Ein nicht erreichbarer oder fehlerhafter Dienst kann die Karte nicht zerstören: fehlende Kacheln bleiben leer, die Basiskarte bleibt sichtbar.
+:::
+
+:::info
+Eigene Kartenebenen werden **nicht** für den Offline-Betrieb vorgeladen. Ohne Netz bleiben sie leer. Die Quellenangabe wird als reiner Text übernommen — HTML und Links sind dort nicht möglich.
+:::

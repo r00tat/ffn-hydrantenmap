@@ -23,6 +23,11 @@ vi.mock('../firebase/firestoreHooks', () => ({
 vi.mock('../../hooks/useFirecallLayers', () => ({
   useFirecallLayers: () => ({}),
 }));
+// Die eigenen Kartenebenen landen in der Textur der 3D-Ansicht — auch dieser
+// Hook hängt an Firestore.
+vi.mock('../../hooks/useFirecallMapLayers', () => ({
+  useFirecallMapLayers: () => [],
+}));
 
 const { default: MapActionButtons, threeDFabBottom } = await import(
   './MapActionButtons'

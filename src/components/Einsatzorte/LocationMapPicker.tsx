@@ -228,7 +228,7 @@ export default function LocationMapPicker({
               </LayersControl.BaseLayer>
             ))}
             {Object.entries(overlayLayers)
-              .filter(([key, layer]) => (layer.type || 'WTMS') === 'WTMS')
+              .filter(([, layer]) => (layer.type || 'WMTS') === 'WMTS')
               .map(([key, layer]) => (
                 <LayersControl.Overlay
                   name={layer.name}

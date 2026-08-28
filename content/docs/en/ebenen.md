@@ -65,3 +65,32 @@ Tip: Unassigned items appear in the "Items not assigned" column and can be dragg
 :::info
 Tip: Heatmaps are especially useful for measurement values (e.g. radiation levels, water levels). Interpolation estimates values between the measurement points.
 :::
+
+## Custom map layers (WMS/WMTS)
+
+Besides layers for operation elements you can create **custom map layers**: external map services drawn on top of the base map — a neighbouring district's WMS, a flood service, an exercise plan. They appear in the map's layer control with a “Karte:” prefix and can be toggled there.
+
+Map layers belong to the operation: everyone working on it sees them. Guests using the share link see them too but cannot change them.
+
+### Creating a map layer
+
+1. On the "Ebenen" page scroll down to the "Custom map layers" section
+2. Click "Add map layer"
+3. Enter a **name** — it is shown in the layer control
+4. Pick the **type**:
+   - **WMS** — GetMap endpoint of a map service
+   - **Tile URL (WMTS/XYZ)** — tile template containing `{z}`, `{x}` and `{y}`
+5. Enter the **URL** (`https://` only)
+6. For WMS click "Load layers from the service" — the available layers are read from the service's `GetCapabilities` and offered for selection. You may also type the `LAYERS` value directly.
+7. Set the **opacity** so the base map stays visible underneath
+8. Optionally set **bounds** (`south,west,north,east`), **maxZoom/maxNativeZoom**, **attribution** and **order**
+9. Turn on **on by default** if the layer should be visible when the map opens
+10. Save
+
+:::info
+A broken or unreachable service cannot break the map: missing tiles stay empty and the base map remains visible.
+:::
+
+:::info
+Custom map layers are **not** precached for offline use. Without a network they stay empty. The attribution is stored as plain text — HTML and links are not possible there.
+:::
