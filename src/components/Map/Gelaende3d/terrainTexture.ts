@@ -3,6 +3,7 @@ import type { TerrainBoundsLatLng } from '../../../common/terrain/terrainTypes';
 import {
   availableLayers,
   DEFAULT_WMS_TILE_SIZE,
+  isWmsLayer,
   overlayLayers,
   type TileConfig,
 } from '../tiles';
@@ -241,7 +242,7 @@ async function drawLayer(
   config: TileConfig,
   grid: TileGrid
 ): Promise<void> {
-  if (config.type === 'WMS') {
+  if (isWmsLayer(config)) {
     await Promise.all(
       wmsBlocks(grid).map((block) =>
         loadImage(wmsUrl(config, block.box))

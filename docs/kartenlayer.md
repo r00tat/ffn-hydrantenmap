@@ -3,7 +3,11 @@
 Grund- und Overlay-Layer der Karte stehen in
 [src/components/Map/tiles.ts](../src/components/Map/tiles.ts) und werden in
 [Map.tsx](../src/components/Map/Map.tsx) über `TileLayer` (XYZ/WMTS) bzw.
-`WMSTileLayer` (`type: 'WMS'`) gerendert.
+`WMSTileLayer` gerendert. Welcher Weg gilt, entscheidet `isWmsLayer(layer)`:
+`type: 'WMS'` geht an den WMS-Zweig, alles andere — auch ein Layer ganz ohne
+`type` — an den Kachel-Zweig. Die Unterscheidung steht in `tiles.ts` und nicht
+als Bedingung im JSX, damit die beiden Listen im Kartenaufbau nachweislich
+dieselbe Menge aufteilen und kein Layer zwischen ihnen verschwindet.
 
 Dieses Dokument hält fest, was sich aus der Konfiguration **nicht** ablesen lässt:
 wo die GetCapabilities der Dienste liegen, welche Layer-Namen es dort gibt und
