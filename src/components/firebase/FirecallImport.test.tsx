@@ -152,6 +152,40 @@ describe('FirecallImport', () => {
     );
   });
 
+  it('shows the progress of a running import', async () => {
+    let release: () => void = () => {};
+    (importFirecallMock as Mock).mockImplementation(
+      async (
+        _data: unknown,
+        options: { onProgress?: (p: unknown) => void }
+      ) => {
+        options.onProgress?.({
+          phase: 'documents',
+          done: 3,
+          total: 12,
+          label: 'plan.pdf',
+        });
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return { id: 'new-id' };
+      }
+    );
+
+    renderWithIntl(<FirecallImport />);
+    await chooseFile(backupFile());
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Importieren' })
+    );
+
+    const bar = await screen.findByRole('progressbar');
+    expect(bar).toHaveAttribute('aria-valuenow', '25');
+    expect(screen.getByText(/Daten 3\/12 — plan\.pdf/)).toBeInTheDocument();
+
+    release();
+    await waitFor(() => expect(showSnackbarMock).toHaveBeenCalled());
+  });
+
   it('reports a failed import', async () => {
     importFirecallMock.mockRejectedValue(new Error('permission denied'));
 

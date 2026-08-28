@@ -37,6 +37,7 @@ import {
   KOSTENERSATZ_SUBCOLLECTION,
 } from '../common/kostenersatz';
 import { displayFileName, storageFileName } from '../common/attachmentName';
+import { mapWithConcurrency } from '../common/promise';
 
 /**
  * Format des Sicherungs-JSON. Wird beim Export mitgeschrieben, damit ein
@@ -67,18 +68,98 @@ export interface BackupWarning {
 export type BackupWarningHandler = (warning: BackupWarning) => void;
 
 /**
+ * Stand einer laufenden Sicherung.
+ *
+ * `total` ist erst bekannt, wenn die Untersammlungen geladen sind — bis dahin
+ * meldet die Phase `structure` eine Null, und die Oberfläche zeigt einen
+ * unbestimmten Balken. Danach zählt `done` über alle Phasen hinweg monoton
+ * hoch, damit der Balken nie zurückspringt.
+ */
+export interface BackupProgress {
+  phase:
+    | 'structure'
+    | 'drawings'
+    | 'history'
+    | 'attachments'
+    | 'documents';
+  done: number;
+  total: number;
+  /** Was gerade fertig geworden ist — Dateiname, Snapshot-Beschreibung. */
+  label?: string;
+}
+
+export type BackupProgressHandler = (progress: BackupProgress) => void;
+
+/**
+ * Zählt den Fortschritt und meldet ihn weiter.
+ *
+ * Eine eigene kleine Klasse, weil derselbe Zähler von Stellen hochgezählt
+ * wird, die nichts voneinander wissen — dem Anhang-Download, den
+ * History-Einträgen und den Batch-Schreibvorgängen.
+ */
+class ProgressReporter {
+  private done = 0;
+  private total = 0;
+
+  constructor(private readonly onProgress?: BackupProgressHandler) {}
+
+  /** Gesamtzahl der Schritte, sobald sie feststeht. */
+  setTotal(total: number) {
+    this.total = total;
+  }
+
+  /** Meldet den aktuellen Stand, ohne ihn zu verändern. */
+  report(phase: BackupProgress['phase'], label?: string) {
+    this.onProgress?.({
+      phase,
+      done: this.done,
+      total: this.total,
+      label,
+    });
+  }
+
+  /** Schritte abhaken und melden. */
+  advance(phase: BackupProgress['phase'], label?: string, steps = 1) {
+    this.done += steps;
+    this.report(phase, label);
+  }
+}
+
+/**
+ * Wie viele Anhänge gleichzeitig geladen bzw. wie viele History-Einträge
+ * gleichzeitig abgefragt werden.
+ *
+ * Ohne Grenze stößt ein Einsatz mit 200 Auto-Snapshots 400 Abfragen auf einmal
+ * an und ein Export lädt alle Dateien gleichzeitig in den Speicher.
+ */
+const BACKUP_CONCURRENCY = 5;
+
+/**
  * Wie `Promise.allSettled`, meldet Fehlschläge aber nach oben statt sie nur zu
  * protokollieren.
  */
 async function settleReporting<T>(
   tasks: { label: string; run: () => Promise<T> }[],
   code: BackupWarning['code'],
-  onWarning?: BackupWarningHandler
+  onWarning?: BackupWarningHandler,
+  progress?: ProgressReporter
 ): Promise<T[]> {
-  const results = await Promise.allSettled(tasks.map((task) => task.run()));
+  const results = await mapWithConcurrency(
+    tasks,
+    BACKUP_CONCURRENCY,
+    async (task) => {
+      try {
+        return { ok: true as const, value: await task.run() };
+      } catch (reason) {
+        return { ok: false as const, reason };
+      } finally {
+        progress?.advance('attachments', task.label);
+      }
+    }
+  );
 
   return results.flatMap((result, index) => {
-    if (result.status === 'fulfilled') {
+    if (result.ok) {
       return [result.value];
     }
     console.warn(result.reason);
@@ -267,41 +348,71 @@ async function exportHistorySnapshot(
   };
 }
 
+export interface ExportFirecallOptions {
+  onWarning?: BackupWarningHandler;
+  onProgress?: BackupProgressHandler;
+}
+
+/** Anzahl der Anhänge an allen Markern. */
+function countItemAttachments(items: FirecallItem[]): number {
+  return items.reduce(
+    (sum, item) =>
+      sum +
+      (item.type === 'marker' ? ((item as FcMarker).attachments?.length ?? 0) : 0),
+    0
+  );
+}
+
 export async function exportFirecall(
   firecallId: string,
-  onWarning?: BackupWarningHandler
+  options: ExportFirecallOptions = {}
 ): Promise<FirecallExport> {
-  const firecallDoc = doc(firestore, FIRECALL_COLLECTION_ID, firecallId);
-  const firecall = (await getDoc(firecallDoc)).data() as Firecall;
+  const { onWarning, onProgress } = options;
+  const progress = new ProgressReporter(onProgress);
+  // Wie viel zu tun ist, weiß erst der nächste Schritt.
+  progress.report('structure');
 
-  const items = (
-    await getDocs(query(collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as FirecallItem);
-  const chat = (await getDocs(query(collection(firecallDoc, 'chat')))).docs.map(
-    (d) => ({ ...d.data(), id: d.id }) as ChatMessage
+  const firecallDoc = doc(firestore, FIRECALL_COLLECTION_ID, firecallId);
+
+  const readCollection = <T,>(path: string) =>
+    getDocs(query(collection(firecallDoc, path))).then((snapshot) =>
+      snapshot.docs.map((d) => ({ ...d.data(), id: d.id }) as T)
+    );
+
+  // Die acht Untersammlungen hängen nicht voneinander ab — nacheinander
+  // abgefragt wären das acht Round-Trips hintereinander.
+  const [
+    firecallSnapshot,
+    items,
+    chat,
+    layers,
+    history,
+    locations,
+    kostenersatz,
+    auditlog,
+    crew,
+  ] = await Promise.all([
+    getDoc(firecallDoc),
+    readCollection<FirecallItem>(FIRECALL_ITEMS_COLLECTION_ID),
+    readCollection<ChatMessage>('chat'),
+    readCollection<FirecallLayer>(FIRECALL_LAYERS_COLLECTION_ID),
+    readCollection<FirecallHistory>(FIRECALL_HISTORY_COLLECTION_ID),
+    readCollection<FirecallLocation>(FIRECALL_LOCATIONS_COLLECTION_ID),
+    readCollection<KostenersatzCalculation>(KOSTENERSATZ_SUBCOLLECTION),
+    readCollection<AuditLogEntry>(FIRECALL_AUDITLOG_COLLECTION_ID),
+    readCollection<CrewAssignment>(FIRECALL_CREW_COLLECTION_ID),
+  ]);
+
+  const firecall = firecallSnapshot.data() as Firecall;
+
+  const drawings = items.filter((item) => item.type === 'drawing' && item.id);
+  progress.setTotal(
+    drawings.length +
+      history.length +
+      countItemAttachments(items) +
+      (firecall.attachments?.length ?? 0)
   );
-  const layers = (
-    await getDocs(query(collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as FirecallLayer);
-  const history = (
-    await getDocs(query(collection(firecallDoc, FIRECALL_HISTORY_COLLECTION_ID)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as FirecallHistory);
-  const locations = (
-    await getDocs(
-      query(collection(firecallDoc, FIRECALL_LOCATIONS_COLLECTION_ID))
-    )
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as FirecallLocation);
-  const kostenersatz = (
-    await getDocs(query(collection(firecallDoc, KOSTENERSATZ_SUBCOLLECTION)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as KostenersatzCalculation);
-  const auditlog = (
-    await getDocs(
-      query(collection(firecallDoc, FIRECALL_AUDITLOG_COLLECTION_ID))
-    )
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as AuditLogEntry);
-  const crew = (
-    await getDocs(query(collection(firecallDoc, FIRECALL_CREW_COLLECTION_ID)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as CrewAssignment);
+  progress.report('structure');
 
   // Export items with attachments and drawing strokes
   const exportItems = await Promise.all(
@@ -315,7 +426,8 @@ export async function exportFirecall(
               run: () => downloadAttachmentBase64(attachment),
             })),
             'attachmentDownloadFailed',
-            onWarning
+            onWarning,
+            progress
           );
         }
         return m;
@@ -323,6 +435,7 @@ export async function exportFirecall(
 
       if (item.type === 'drawing' && item.id) {
         const strokes = await exportDrawingStrokes(firecallDoc, item.id);
+        progress.advance('drawings', item.name);
         return { ...item, strokes } as ExportDrawingItem;
       }
 
@@ -331,12 +444,18 @@ export async function exportFirecall(
   );
 
   // Export history entries with snapshot data
-  const exportHistory: ExportHistoryEntry[] = await Promise.all(
-    history.map(async (h) => {
-      if (!h.id) return h as ExportHistoryEntry;
+  const exportHistory: ExportHistoryEntry[] = await mapWithConcurrency(
+    history,
+    BACKUP_CONCURRENCY,
+    async (h) => {
+      if (!h.id) {
+        progress.advance('history');
+        return h as ExportHistoryEntry;
+      }
       const snapshot = await exportHistorySnapshot(firecallDoc, h.id);
+      progress.advance('history', h.description);
       return { ...h, ...snapshot } as ExportHistoryEntry;
-    })
+    }
   );
 
   // Export firecall-level attachments
@@ -344,11 +463,12 @@ export async function exportFirecall(
   if (firecall.attachments && firecall.attachments.length > 0) {
     firecallAttachments = await settleReporting<ExportFirecallAttachment>(
       firecall.attachments.map((url) => ({
-        label: url,
+        label: displayFileName(url.split('/').pop() ?? url),
         run: () => downloadFirecallAttachment(url),
       })),
       'attachmentDownloadFailed',
-      onWarning
+      onWarning,
+      progress
     );
   }
 
@@ -385,11 +505,19 @@ type ImportOperation = {
 };
 
 /**
- * `commitInBatches` gegen die Client-Instanz — spart das `firestore`-Argument
- * an den vielen Aufrufstellen unten.
+ * Schreibt gegen die Client-Instanz und hakt die geschriebenen Dokumente beim
+ * Fortschritt ab.
+ *
+ * Als Closure statt als Funktion mit zwei Argumenten, damit die zwölf
+ * Aufrufstellen im Import schlank bleiben.
  */
-function commitOps(operations: ImportOperation[]) {
-  return commitInBatches(firestore, operations);
+function commitOpsWith(progress: ProgressReporter) {
+  return async (operations: ImportOperation[]) => {
+    await commitInBatches(firestore, operations);
+    if (operations.length > 0) {
+      progress.advance('documents', undefined, operations.length);
+    }
+  };
 }
 
 /**
@@ -440,13 +568,64 @@ export interface ImportFirecallOptions {
   /** Zielgruppe. Ohne Angabe bleibt die Gruppe aus der Datei stehen. */
   group?: string;
   onWarning?: BackupWarningHandler;
+  onProgress?: BackupProgressHandler;
+}
+
+/** Striche aller Zeichnungen in `items`. */
+function countStrokes(items: (FirecallItem | ExportDrawingItem)[]): number {
+  return items.reduce(
+    (sum, item) => sum + ((item as ExportDrawingItem).strokes?.length ?? 0),
+    0
+  );
+}
+
+/**
+ * Wie viele Schritte `importFirecall` gleich gehen wird — jedes geschriebene
+ * Dokument einer und jeder hochgeladene Anhang einer.
+ *
+ * Steht bewusst neben dem Import und wird von einem Test dagegen gehalten:
+ * Weicht die Zahl von den tatsächlichen Schreibvorgängen ab, bleibt der Balken
+ * stehen oder läuft über.
+ */
+function countImportSteps(firecall: FirecallExport): number {
+  const history = firecall.history ?? [];
+
+  const documents =
+    firecall.items.length +
+    countStrokes(firecall.items) +
+    (firecall.chat?.length ?? 0) +
+    (firecall.layers?.length ?? 0) +
+    history.length +
+    history.reduce(
+      (sum, entry) =>
+        sum +
+        (entry.snapshotItems?.length ?? 0) +
+        countStrokes(entry.snapshotItems ?? []) +
+        (entry.snapshotLayers?.length ?? 0),
+      0
+    ) +
+    (firecall.locations?.length ?? 0) +
+    (firecall.kostenersatz?.length ?? 0) +
+    (firecall.auditlog?.length ?? 0) +
+    (firecall.crew?.length ?? 0);
+
+  const uploads =
+    (firecall.firecallAttachments?.length ?? 0) +
+    countItemAttachments(firecall.items);
+
+  return documents + uploads;
 }
 
 export async function importFirecall(
   firecall: FirecallExport,
   options: ImportFirecallOptions = {}
 ) {
-  const { group, onWarning } = options;
+  const { group, onWarning, onProgress } = options;
+  const progress = new ProgressReporter(onProgress);
+  progress.setTotal(countImportSteps(firecall));
+  progress.report('documents');
+  const commitOps = commitOpsWith(progress);
+
   const {
     items,
     chat,
@@ -506,7 +685,8 @@ export async function importFirecall(
         },
       })),
       'attachmentUploadFailed',
-      onWarning
+      onWarning,
+      progress
     );
     if (newUrls.length > 0) {
       await updateDoc(firecallDoc, { attachments: newUrls });
@@ -550,7 +730,8 @@ export async function importFirecall(
               },
             })),
             'attachmentUploadFailed',
-            onWarning
+            onWarning,
+            progress
           );
         }
       }

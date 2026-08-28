@@ -70,6 +70,7 @@ vi.mock('../lib/firestoreClient', () => ({
 }));
 
 import {
+  type BackupProgress,
   type BackupWarning,
   type FirecallExport,
   type ExportDrawingItem,
@@ -297,6 +298,70 @@ describe('useExport', () => {
       ]);
     });
 
+    it('should report progress with a total known after the structure phase', async () => {
+      (getDocs as Mock).mockImplementation((col: { path?: string }) => {
+        if (col?.path === 'item') {
+          return Promise.resolve({
+            docs: [
+              {
+                id: 'draw1',
+                data: () => ({ name: 'Skizze', type: 'drawing' }),
+              },
+              {
+                id: 'm1',
+                data: () => ({
+                  name: 'Marker',
+                  type: 'marker',
+                  // schon als Objekt — kein Storage-Zugriff nötig
+                  attachments: [{ name: 'plan.pdf', data: 'AA==' }],
+                }),
+              },
+            ],
+          });
+        }
+        if (col?.path === 'history') {
+          return Promise.resolve({
+            docs: [{ id: 'h1', data: () => ({ description: 'Snapshot' }) }],
+          });
+        }
+        return Promise.resolve({ docs: [] });
+      });
+
+      const progress: BackupProgress[] = [];
+      await exportFirecall('test-id', { onProgress: (p) => progress.push(p) });
+
+      // Solange die Struktur lädt, ist die Gesamtzahl noch unbekannt.
+      expect(progress[0]).toEqual({ phase: 'structure', done: 0, total: 0 });
+
+      // eine Zeichnung + ein History-Eintrag + ein Anhang
+      const last = progress[progress.length - 1];
+      expect(last.total).toBe(3);
+      expect(last.done).toBe(3);
+
+      // der Fortschritt darf nie zurückspringen
+      const withTotal = progress.filter((p) => p.total > 0);
+      const done = withTotal.map((p) => p.done);
+      expect(done).toEqual([...done].sort((a, b) => a - b));
+      expect(withTotal.every((p) => p.done <= p.total)).toBe(true);
+    });
+
+    it('should fetch the top level subcollections in parallel', async () => {
+      let concurrent = 0;
+      let peak = 0;
+      (getDocs as Mock).mockImplementation(async () => {
+        concurrent += 1;
+        peak = Math.max(peak, concurrent);
+        await Promise.resolve();
+        concurrent -= 1;
+        return { docs: [] };
+      });
+
+      await exportFirecall('test-id');
+
+      // acht Untersammlungen, die nicht voneinander abhängen
+      expect(peak).toBe(8);
+    });
+
     it('should warn instead of silently dropping an attachment it cannot download', async () => {
       (getDocs as Mock).mockImplementation((col: { path?: string }) =>
         Promise.resolve({
@@ -321,7 +386,7 @@ describe('useExport', () => {
       });
 
       const warnings: BackupWarning[] = [];
-      await exportFirecall('test-id', (w) => warnings.push(w));
+      await exportFirecall('test-id', { onWarning: (w) => warnings.push(w) });
 
       expect(warnings).toHaveLength(1);
       expect(warnings[0].code).toBe('attachmentDownloadFailed');
@@ -765,6 +830,86 @@ describe('useExport', () => {
       );
       expect(snapshotItem).toBeDefined();
       expect(snapshotItem).not.toHaveProperty('strokes');
+    });
+
+    it('should announce exactly as many steps as it writes', async () => {
+      // Der Nenner der Fortschrittsanzeige wird vorab berechnet. Weicht er von
+      // dem ab, was tatsächlich geschrieben wird, bleibt der Balken stehen
+      // oder springt über 100 % — dieser Test hält beides zusammen.
+      (uploadFile as Mock).mockImplementation((_id: string, name: string) => ({
+        toString: () => `/firecall/new-firecall-id/files/${name}`,
+      }));
+
+      const firecallData: FirecallExport = {
+        name: 'Progress Import',
+        items: [
+          { id: 'm1', name: 'Marker', type: 'marker' },
+          {
+            id: 'draw1',
+            name: 'Skizze',
+            type: 'drawing',
+            strokes: [
+              { color: '#f00', width: 1, points: [[47, 16]], order: 0 },
+              { color: '#0f0', width: 1, points: [[47, 16]], order: 1 },
+            ],
+          } as ExportDrawingItem,
+        ],
+        chat: [{ id: 'c1', message: 'Hallo', uid: 'u1', timestamp: 'x' }],
+        layers: [{ id: 'l1', name: 'Ebene', type: 'layer' }],
+        history: [
+          {
+            id: 'h1',
+            description: 'Snapshot',
+            createdAt: 'x',
+            snapshotItems: [
+              {
+                id: 'draw1',
+                name: 'Skizze',
+                type: 'drawing',
+                strokes: [
+                  { color: '#00f', width: 1, points: [[47, 16]], order: 0 },
+                ],
+              } as ExportDrawingItem,
+            ],
+            snapshotLayers: [{ id: 'l1', name: 'Ebene', type: 'layer' }],
+          } as ExportHistoryEntry,
+        ],
+        locations: [],
+        kostenersatz: [],
+        auditlog: [],
+        crew: [
+          {
+            id: 'crew1',
+            recipientId: 'r1',
+            name: 'Max',
+            vehicleId: null,
+            vehicleName: '',
+            funktion: 'Feuerwehrmann',
+          },
+        ],
+        firecallAttachments: [
+          {
+            name: 'plan.pdf',
+            data: btoa('a'),
+            originalUrl: '/firecall/old/files/uuid-plan.pdf',
+          },
+        ],
+      };
+
+      const progress: BackupProgress[] = [];
+      await importFirecall(firecallData, {
+        onProgress: (p) => progress.push(p),
+      });
+
+      const writtenDocuments = mockCommitInBatches.mock.calls.reduce(
+        (sum, call) => sum + call[1].length,
+        0
+      );
+      const uploads = (uploadFile as Mock).mock.calls.length;
+
+      const last = progress[progress.length - 1];
+      expect(last.total).toBe(writtenDocuments + uploads);
+      expect(last.done).toBe(last.total);
     });
 
     it('should warn about a backup from a newer app version', async () => {

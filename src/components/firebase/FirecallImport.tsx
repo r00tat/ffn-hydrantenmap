@@ -1,8 +1,8 @@
 'use client';
 
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -19,13 +19,18 @@ import { NON_TENANT_GROUP_IDS } from '../../app/groups/groupTypes';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import {
+  type BackupProgress,
   type BackupWarning,
   type FirecallExport,
   importFirecall,
 } from '../../hooks/useExport';
+import LinearProgressWithLabel from '../inputs/LinearProgressWithLabel';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
 import readFileAsText from '../upload/readFile';
+import useBackupProgressText, {
+  backupProgressPercent,
+} from './useBackupProgressText';
 import useBackupWarningText from './useBackupWarningText';
 
 async function readFileAsJson(file: File): Promise<FirecallExport> {
@@ -38,11 +43,13 @@ export default function FirecallImport() {
   const tCommon = useTranslations('common');
   const showSnackbar = useSnackbar();
   const warningText = useBackupWarningText();
+  const progressText = useBackupProgressText();
   const { myGroups } = useFirebaseLogin();
 
   const [pending, setPending] = useState<FirecallExport>();
   const [targetGroup, setTargetGroup] = useState('');
-  const [importInProgress, setImportInProgress] = useState(false);
+  const [progress, setProgress] = useState<BackupProgress>();
+  const importInProgress = progress !== undefined;
 
   // Pseudo-Gruppen wie `allUsers` sind keine Mandanten und dürfen nie als
   // Zielgruppe eines Einsatzes herauskommen, siehe `NON_TENANT_GROUP_IDS`.
@@ -77,7 +84,6 @@ export default function FirecallImport() {
 
   const runImport = useCallback(async () => {
     if (!pending) return;
-    setImportInProgress(true);
     const warnings: BackupWarning[] = [];
     try {
       const name = `${pending.name} Kopie ${formatTimestamp(new Date())}`;
@@ -86,6 +92,7 @@ export default function FirecallImport() {
         {
           group: targetGroup || undefined,
           onWarning: (warning) => warnings.push(warning),
+          onProgress: setProgress,
         }
       );
       setPending(undefined);
@@ -103,7 +110,7 @@ export default function FirecallImport() {
       console.error('firecall import failed', err);
       showSnackbar(t('importFailed', { error: `${err}` }), 'error');
     } finally {
-      setImportInProgress(false);
+      setProgress(undefined);
     }
   }, [pending, targetGroup, showSnackbar, t, warningText]);
 
@@ -163,11 +170,20 @@ export default function FirecallImport() {
             </Select>
             <FormHelperText>{t('targetGroupHelp')}</FormHelperText>
           </FormControl>
-          {importInProgress && (
-            <Typography sx={{ mt: 2 }}>
-              <CircularProgress size={16} sx={{ mr: 1 }} />
-              {t('importing')}
-            </Typography>
+          {progress && (
+            <Box sx={{ mt: 2 }}>
+              <LinearProgressWithLabel
+                variant={
+                  backupProgressPercent(progress) === undefined
+                    ? 'indeterminate'
+                    : 'determinate'
+                }
+                value={backupProgressPercent(progress) ?? 0}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {progressText(progress)}
+              </Typography>
+            </Box>
           )}
         </DialogContent>
         <DialogActions>

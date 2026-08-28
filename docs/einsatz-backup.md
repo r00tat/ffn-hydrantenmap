@@ -99,7 +99,38 @@ liest im History-Modus aus dem Snapshot.
 leer statt mit dem heutigen Stand — die Striche wurden damals schlicht nicht
 gesichert. Nachträglich lässt sich das nicht reparieren.
 
+## Fortschritt und Nebenläufigkeit
+
+Export und Import melden ihren Stand über `onProgress`. Die Gesamtzahl steht
+beim Export erst fest, wenn die Untersammlungen geladen sind — bis dahin meldet
+die Phase `structure` eine Null und die Oberfläche zeigt einen unbestimmten
+Balken. Danach zählt ein einziger Zähler über alle Phasen hinweg hoch, damit die
+Anzeige nie zurückspringt. Eine Einheit ist: eine Zeichnung, ein
+History-Eintrag, ein Anhang.
+
+Beim Import ist die Gesamtzahl von Anfang an bekannt. Sie wird von
+`countImportSteps` vorab berechnet — und weil eine solche Zahl leicht von den
+tatsächlichen Schreibvorgängen abdriftet, hält ein Test in `useExport.test.ts`
+beide gegeneinander („should announce exactly as many steps as it writes").
+
+Zwei Dinge liefen vorher unbegrenzt parallel und laufen jetzt über
+`mapWithConcurrency` mit `BACKUP_CONCURRENCY` Aufgaben gleichzeitig: die
+History-Einträge — ein Einsatz mit 200 Auto-Snapshots stieß sonst über 400
+Firestore-Abfragen auf einmal an — und die Anhänge, die sonst alle gleichzeitig
+im Speicher landeten. Die acht Abfragen der Untersammlungen laufen umgekehrt
+jetzt *gemeinsam* statt nacheinander; sie hängen nicht voneinander ab.
+
+Byte-genauer Fortschritt innerhalb einer großen Datei ist nicht möglich:
+`getBlob` aus dem Firebase-SDK hat kein Fortschrittsereignis, ein Gegenstück zu
+`uploadBytesResumable` gibt es nicht. Das ginge nur über `getDownloadURL` plus
+`fetch` und Lesen aus `response.body` — mit anderem Auth-Pfad und nur den
+Aufwand wert, wenn im Storage einmal wirklich große Dateien liegen.
+
 ## Bekannte Grenzen
 
 - Der Export hält den gesamten Einsatz inklusive aller Anhänge als Base64 im
-  Speicher. Bei sehr vielen Fotos wird die Datei entsprechend groß.
+  Speicher. Bei sehr vielen Fotos wird die Datei entsprechend groß. Ein
+  ZIP-Format wäre die naheliegende Ablösung — `fflate` ist bereits Dependency
+  und wird in `spectrumParser.ts` zum Lesen von Archiven benutzt. Näheres in
+  der Diskussion zu PR #745; heute ist der Druck gering, weil die Masse der
+  Fotos ohnehin im Drive liegt und nicht im Storage.
