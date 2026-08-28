@@ -4,6 +4,7 @@ import type { FirecallMapLayer } from '../../common/mapLayers';
 import {
   DEFAULT_WMS_TILE_SIZE,
   availableLayers,
+  isWmsLayer,
   mapLayerConfigKey,
   mapLayerTileConfigs,
   mapLayerToTileConfig,
@@ -151,9 +152,40 @@ describe('wmsTileSize', () => {
     const wms = [
       ...Object.values(availableLayers),
       ...Object.values(overlayLayers),
-    ].filter((layer) => layer.type === 'WMS');
+    ].filter(isWmsLayer);
 
     expect(wms.length).toBeGreaterThan(0);
     wms.forEach((layer) => expect(wmsTileSize(layer)).toBeGreaterThan(0));
+  });
+});
+
+describe('isWmsLayer', () => {
+  const config = (type?: TileConfig['type']): TileConfig => ({
+    name: 'Test',
+    url: 'https://example.org/',
+    type,
+    options: {},
+  });
+
+  it('erkennt einen WMS-Layer', () => {
+    expect(isWmsLayer(config('WMS'))).toBe(true);
+  });
+
+  it('behandelt einen Layer ohne Typ als Kachel-Layer', () => {
+    expect(isWmsLayer(config())).toBe(false);
+  });
+
+  it('behandelt einen ausdrücklichen WMTS-Layer als Kachel-Layer', () => {
+    expect(isWmsLayer(config('WMTS'))).toBe(false);
+  });
+
+  it('teilt die Overlays lückenlos in zwei Listen', () => {
+    const layers = Object.values(overlayLayers);
+    const wms = layers.filter(isWmsLayer);
+    const kacheln = layers.filter((layer) => !isWmsLayer(layer));
+
+    expect(wms.length + kacheln.length).toBe(layers.length);
+    expect(wms.length).toBeGreaterThan(0);
+    expect(kacheln.length).toBeGreaterThan(0);
   });
 });

@@ -48,6 +48,18 @@ export interface TileConfigs {
  */
 export const DEFAULT_WMS_TILE_SIZE = 512;
 
+/**
+ * Wird der Layer als WMS angefragt?
+ *
+ * Alles ohne `type` ist ein Kachel-Layer (XYZ/WMTS) und geht an `TileLayer`,
+ * `type: 'WMS'` an `WMSTileLayer`. Die Unterscheidung steht hier und nicht als
+ * Bedingung im JSX, damit die beiden Listen im Kartenaufbau nachweislich
+ * dieselbe Menge aufteilen.
+ */
+export function isWmsLayer(config: TileConfig): boolean {
+  return config.type === 'WMS';
+}
+
 /** Kachelgröße eines WMS-Layers: aus der Konfiguration, sonst der Standard. */
 export function wmsTileSize(config: TileConfig): number | L.Point {
   return config.options?.tileSize ?? DEFAULT_WMS_TILE_SIZE;

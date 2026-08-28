@@ -43,7 +43,12 @@ import StreckenkilometerLayer, {
 } from './layers/StreckenkilometerLayer';
 import WetterstationLayer from './layers/WetterstationLayer';
 import PositionMarker from './markers/PositionMarker';
-import { availableLayers, overlayLayers, wmsTileSize } from './tiles';
+import {
+  availableLayers,
+  isWmsLayer,
+  overlayLayers,
+  wmsTileSize,
+} from './tiles';
 
 function ActionButtons() {
   const map = useMap();
@@ -99,7 +104,7 @@ export default function Map() {
               name={layer.name}
               key={key}
             >
-              {layer.type === 'WMS' ? (
+              {isWmsLayer(layer) ? (
                 <WMSTileLayer
                   layers={layer.options.layers}
                   attribution={layer.options.attribution}
@@ -182,7 +187,7 @@ export default function Map() {
             </LayerErrorBoundary>
           </LayersControl.Overlay>
           {Object.entries(overlayLayers)
-            .filter(([, layer]) => (layer.type || 'WMTS') === 'WMTS')
+            .filter(([, layer]) => !isWmsLayer(layer))
             .map(([key, layer]) => (
               <LayersControl.Overlay
                 name={layer.name}
@@ -201,7 +206,7 @@ export default function Map() {
               </LayersControl.Overlay>
             ))}
           {Object.entries(overlayLayers)
-            .filter(([, layer]) => layer.type === 'WMS')
+            .filter(([, layer]) => isWmsLayer(layer))
             .map(([key, layer]) => (
               <LayersControl.Overlay name={layer.name} key={key}>
                 <WMSTileLayer
