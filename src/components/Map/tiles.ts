@@ -1,6 +1,10 @@
 import { TileLayerOptions } from 'leaflet';
 import L from 'leaflet';
 
+// GetCapabilities-URLs der Dienste, Layer-IDs des Landes Burgenland und die
+// Eigenheiten des WISA-Kachel-Caches (kein GetCapabilities, nur 512er-Kacheln,
+// nur WMS 1.1.1/EPSG:3857): docs/kartenlayer.md
+
 export interface TileOptions extends TileLayerOptions {
   [key: string]: any;
 }
@@ -16,6 +20,26 @@ export interface TileConfig {
 
 export interface TileConfigs {
   [name: string]: TileConfig;
+}
+
+/**
+ * Kantenlänge einer WMS-Kachel, wenn die Konfiguration nichts vorgibt.
+ *
+ * Leaflets Vorgabe wäre 256. 512 ist hier die bessere Grundeinstellung: Der
+ * WISA-Cache beantwortet nur 512×512 und quittiert 256 mit `400`, und für die
+ * übrigen WMS-Dienste bedeutet es ein Viertel der Anfragen bei gleicher
+ * Auflösung — die Auflösung hängt am Verhältnis BBOX/Pixel, nicht an der
+ * Kachelgröße, `maxNativeZoom` bleibt also unberührt. Siehe
+ * docs/kartenlayer.md.
+ *
+ * Gilt nur für WMS. XYZ-/WMTS-Kacheln kommen fertig in 256 vom Server; dort
+ * bleibt es bei Leaflets Vorgabe.
+ */
+export const DEFAULT_WMS_TILE_SIZE = 512;
+
+/** Kachelgröße eines WMS-Layers: aus der Konfiguration, sonst der Standard. */
+export function wmsTileSize(config: TileConfig): number | L.Point {
+  return config.options?.tileSize ?? DEFAULT_WMS_TILE_SIZE;
 }
 
 export const availableLayers: TileConfigs = {
@@ -143,6 +167,14 @@ export const overlayLayers: TileConfigs = {
     enabled: true,
   },
 
+  // Die vier WISA-Overlays (oberflaechenwasser, riskareas, floodarea,
+  // floodarea_river) laufen über einen Kachel-Cache, nicht über einen
+  // WMS-Server: nur GetMap, nur VERSION=1.1.1 mit SRS=EPSG:3857, und
+  // ausschließlich 512x512 — jede andere Kantenlänge beantwortet der Dienst
+  // mit `400`. Das `tileSize` steht deshalb an jedem der vier Layer, obwohl es
+  // dem Standard entspricht: Es ist hier eine Zusage des Dienstes, kein
+  // Vorschlag. maxNativeZoom 19 ist ebenso die gemessene Obergrenze des
+  // Caches. Layerkatalog und Messwerte: docs/kartenlayer.md
   oberflaechenwasser: {
     name: 'Hochwasser Oberflächenwasser',
     // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=ofa_maxd&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1876070.7619702,6099063.7000818,1877293.7544226,6100286.6925342&WIDTH=512&HEIGHT=512
@@ -157,6 +189,7 @@ export const overlayLayers: TileConfigs = {
       type: 'normal',
       format: 'image/png',
       layers: 'ofa_maxd',
+      tileSize: 512,
       transparent: true,
       uppercase: true,
       bounds: [
@@ -179,6 +212,7 @@ export const overlayLayers: TileConfigs = {
       type: 'normal',
       format: 'image/png',
       layers: 'hwrisiko_risikobewertung',
+      tileSize: 512,
       transparent: true,
       uppercase: true,
       bounds: [
@@ -203,6 +237,7 @@ export const overlayLayers: TileConfigs = {
       type: 'normal',
       format: 'image/png',
       layers: 'hwrisiko_gefahren_ueff',
+      tileSize: 512,
       transparent: true,
       uppercase: true,
       bounds: [
@@ -272,6 +307,7 @@ export const overlayLayers: TileConfigs = {
       type: 'normal',
       format: 'image/png',
       layers: 'hwrisiko_apsfr',
+      tileSize: 512,
       transparent: true,
       uppercase: true,
       bounds: [

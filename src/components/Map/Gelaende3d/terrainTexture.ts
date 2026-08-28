@@ -1,6 +1,11 @@
 import L from 'leaflet';
 import type { TerrainBoundsLatLng } from '../../../common/terrain/terrainTypes';
-import { availableLayers, overlayLayers, type TileConfig } from '../tiles';
+import {
+  availableLayers,
+  DEFAULT_WMS_TILE_SIZE,
+  overlayLayers,
+  type TileConfig,
+} from '../tiles';
 import { MAX_TEXTURE_PX } from './gelaende3d';
 import { isOverlayVisible, type OverlayStates } from './visibleItems';
 
@@ -123,10 +128,11 @@ export function tileUrl(
 /**
  * Kantenlänge einer WMS-Anfrage.
  *
- * `tileSize: 512` ist das, was die Karte in `Map.tsx` an `WMSTileLayer`
- * übergibt — und der WISA-Dienst (`tiles.lfrz.gv.at`) kennt nichts anderes.
+ * Dieselbe Kantenlänge, die die Karte an `WMSTileLayer` übergibt. Das Mosaik
+ * mischt mehrere Overlays in ein Raster, kann also nur eine Größe haben —
+ * deshalb der Standard aus `tiles.ts` und nicht die Angabe je Layer.
  */
-export const WMS_TILE_PX = 512;
+export const WMS_TILE_PX = DEFAULT_WMS_TILE_SIZE;
 
 /** Ein Mercator-Rechteck. */
 export interface MercBox {

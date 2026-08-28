@@ -42,7 +42,7 @@ import StreckenkilometerLayer, {
 } from './layers/StreckenkilometerLayer';
 import WetterstationLayer from './layers/WetterstationLayer';
 import PositionMarker from './markers/PositionMarker';
-import { availableLayers, overlayLayers } from './tiles';
+import { availableLayers, overlayLayers, wmsTileSize } from './tiles';
 
 function ActionButtons() {
   const map = useMap();
@@ -108,6 +108,7 @@ export default function Map() {
                   bounds={layer.options.bounds}
                   format={layer.options.format}
                   transparent={layer.options.transparent}
+                  tileSize={wmsTileSize(layer)}
                   key={key}
                 />
               ) : (
@@ -213,7 +214,7 @@ export default function Map() {
                   key={key}
                   format={layer.options.format}
                   transparent={layer.options.transparent}
-                  tileSize={512}
+                  tileSize={wmsTileSize(layer)}
                   uppercase={layer.options.uppercase}
                 />
               </LayersControl.Overlay>
