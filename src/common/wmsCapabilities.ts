@@ -145,18 +145,94 @@ export interface WmsCapabilitiesLayer {
   /** Wert für den `LAYERS`-Parameter. */
   name: string;
   title: string;
+  /** `<Abstract>` — die Beschreibung des Dienstes zu diesem Layer. */
+  abstract?: string;
   /** `süd,west,nord,ost`, falls der Dienst eine Ausdehnung meldet. */
   bounds?: string;
+  /** Quellenangabe aus `<Attribution><Title>`, vererbt. */
+  attribution?: string;
+  /** Die gemeldeten Koordinatensysteme (`CRS` bzw. `SRS`), vererbt. */
+  crs: string[];
+  /**
+   * `opaque="1"`: der Dienst sagt, dass der Layer flächendeckend deckt.
+   * Transparenz anzufordern kostet dann nur Bandbreite.
+   */
+  opaque?: boolean;
+  /** Feinste sinnvolle Zoomstufe, aus der Maßstabsgrenze abgeleitet. */
+  maxNativeZoom?: number;
   /** Verschachtelungstiefe — zur Einrückung in der Auswahl. */
   depth: number;
 }
 
 export interface WmsCapabilities {
   title?: string;
+  abstract?: string;
   version?: string;
   /** Vom Dienst angebotene Bildformate für `GetMap`. */
   formats: string[];
   layers: WmsCapabilitiesLayer[];
+}
+
+/**
+ * Der Maßstabsnenner der Zoomstufe 0 in EPSG:3857.
+ *
+ * 156543,034 m je Pixel am Äquator, geteilt durch die von der OGC
+ * festgelegte Pixelgröße von 0,28 mm. Jede Stufe halbiert den Wert.
+ */
+const SCALE_DENOMINATOR_ZOOM_0 = 559_082_264.028_717_8;
+
+/** Auflösung der Zoomstufe 0 in EPSG:3857, in Metern je Pixel. */
+const RESOLUTION_ZOOM_0 = 156_543.033_928_040_97;
+
+/** Weiter als hierhin lässt keine Kachelebene sinnvoll hineinzoomen. */
+const MAX_DERIVABLE_ZOOM = 22;
+
+/**
+ * Zugeständnis an die Rundung der Dienste.
+ *
+ * Abgerundet wird, weil eine zu hoch angesetzte Stufe leere Kacheln bedeutet,
+ * eine zu niedrige nur hochskalierte. Die Dienste veröffentlichen ihre Grenzen
+ * aber gerundet: ein `ScaleHint` von `0.4223` ergibt 18,99986 und fiele damit
+ * auf 18, obwohl Stufe 19 gemeint ist. Ein Zehntel Toleranz fängt das ab, ohne
+ * einen echten Zwischenwert wie 18,5 hochzuziehen.
+ */
+const ZOOM_ROUNDING_TOLERANCE = 0.1;
+
+function clampZoom(zoom: number): number | undefined {
+  if (!Number.isFinite(zoom)) return undefined;
+  const rounded = Math.floor(zoom + ZOOM_ROUNDING_TOLERANCE);
+  if (rounded < 0) return 0;
+  if (rounded > MAX_DERIVABLE_ZOOM) return undefined;
+  return rounded;
+}
+
+/**
+ * Die Zoomstufe zu einem Maßstabsnenner (WMS 1.3.0,
+ * `<MinScaleDenominator>`).
+ *
+ * **Die Grenze heißt `Min`, meint aber die feinste Stufe.** Ein Layer ist
+ * sichtbar, solange der Maßstab zwischen `MinScaleDenominator` und
+ * `MaxScaleDenominator` liegt; der kleinere Nenner ist der größere Maßstab,
+ * also das weitere Hineinzoomen. Aus `Min` wird daher `maxNativeZoom`.
+ */
+export function zoomFromScaleDenominator(
+  denominator: number
+): number | undefined {
+  if (!Number.isFinite(denominator) || denominator <= 0) return undefined;
+  return clampZoom(Math.log2(SCALE_DENOMINATOR_ZOOM_0 / denominator));
+}
+
+/**
+ * Die Zoomstufe zu einem `<ScaleHint min>` (WMS 1.1.1).
+ *
+ * `ScaleHint` ist kein Nenner, sondern die **Diagonale** eines Pixels in
+ * Bodenmetern — deshalb der Faktor √2 zur Auflösung. Ein Wert von 0 heißt
+ * „keine Grenze".
+ */
+export function zoomFromScaleHint(hint: number): number | undefined {
+  if (!Number.isFinite(hint) || hint <= 0) return undefined;
+  const resolution = hint / Math.SQRT2;
+  return clampZoom(Math.log2(RESOLUTION_ZOOM_0 / resolution));
 }
 
 function boundsOf(layer: XmlNode): string | undefined {
@@ -187,12 +263,36 @@ function boundsOf(layer: XmlNode): string | undefined {
   return undefined;
 }
 
+/** Die Quellenangabe eines Layers — `<Attribution><Title>`. */
+function attributionOf(layer: XmlNode): string | undefined {
+  const attribution = childNamed(layer, 'Attribution');
+  return attribution ? childText(attribution, 'Title') : undefined;
+}
+
+/**
+ * Die feinste Zoomstufe, die der Dienst für den Layer zulässt.
+ *
+ * 1.3.0 nennt `<MinScaleDenominator>`, 1.1.1 `<ScaleHint min>`. Beide meinen
+ * dasselbe Ende: so weit darf hineingezoomt werden. Fehlt die Angabe, gibt es
+ * keine Grenze — dann bleibt `maxNativeZoom` die Vorbelegung.
+ */
+function maxNativeZoomOf(layer: XmlNode): number | undefined {
+  const denominator = childText(layer, 'MinScaleDenominator');
+  if (denominator !== undefined) {
+    return zoomFromScaleDenominator(Number(denominator));
+  }
+  const hint = childNamed(layer, 'ScaleHint');
+  if (hint) return zoomFromScaleHint(Number(hint.attributes.min));
+  return undefined;
+}
+
 /**
  * Alle benannten Layer eines Capabilities-Dokuments.
  *
  * Layer sind verschachtelt: der äußere Layer ist meist nur eine Überschrift
- * ohne `<Name>` und damit nicht anforderbar. Ausdehnung und Titel werden nach
- * innen vererbt, so wie es die WMS-Spezifikation vorsieht.
+ * ohne `<Name>` und damit nicht anforderbar. Ausdehnung, Quellenangabe,
+ * Koordinatensysteme und Maßstabsgrenzen werden nach innen vererbt, so wie es
+ * die WMS-Spezifikation vorsieht.
  */
 export function parseWmsCapabilities(xml: string): WmsCapabilities {
   const document = parseXml(xml);
@@ -213,31 +313,70 @@ export function parseWmsCapabilities(xml: string): WmsCapabilities {
         .filter(Boolean)
     : [];
 
+  /** Was der Dienst insgesamt sagt, gilt auch für den einzelnen Layer. */
+  const serviceAttribution = service ? attributionOf(service) : undefined;
+
+  interface Inherited {
+    bounds?: string;
+    attribution?: string;
+    crs: string[];
+    maxNativeZoom?: number;
+  }
+
   const layers: WmsCapabilitiesLayer[] = [];
-  const walk = (
-    node: XmlNode,
-    depth: number,
-    inheritedBounds?: string
-  ): void => {
+  const walk = (node: XmlNode, depth: number, inherited: Inherited): void => {
     for (const layer of childrenNamed(node, 'Layer')) {
-      const bounds = boundsOf(layer) ?? inheritedBounds;
+      // 1.3.0 schreibt `CRS`, 1.1.1 `SRS`. Beide können mehrfach auftreten,
+      // und 1.1.1 packt gelegentlich mehrere durch Leerzeichen getrennt in
+      // dasselbe Element.
+      const own = [
+        ...childrenNamed(layer, 'CRS'),
+        ...childrenNamed(layer, 'SRS'),
+      ]
+        .flatMap((node) => node.text.trim().split(/\s+/))
+        .filter(Boolean);
+
+      const current: Inherited = {
+        bounds: boundsOf(layer) ?? inherited.bounds,
+        attribution: attributionOf(layer) ?? inherited.attribution,
+        crs: [...new Set([...inherited.crs, ...own])],
+        maxNativeZoom: maxNativeZoomOf(layer) ?? inherited.maxNativeZoom,
+      };
+
       const name = childText(layer, 'Name');
       if (name) {
         layers.push({
           name,
           title: childText(layer, 'Title') ?? name,
-          ...(bounds ? { bounds } : {}),
+          ...(childText(layer, 'Abstract')
+            ? { abstract: childText(layer, 'Abstract') }
+            : {}),
+          ...(current.bounds ? { bounds: current.bounds } : {}),
+          ...(current.attribution ? { attribution: current.attribution } : {}),
+          crs: current.crs,
+          ...(layer.attributes.opaque === '1' ? { opaque: true } : {}),
+          ...(current.maxNativeZoom !== undefined
+            ? { maxNativeZoom: current.maxNativeZoom }
+            : {}),
           depth,
         });
       }
-      walk(layer, depth + (name ? 1 : 0), bounds);
+      walk(layer, depth + (name ? 1 : 0), current);
     }
   };
-  if (capability) walk(capability, 0);
+  if (capability) {
+    walk(capability, 0, {
+      crs: [],
+      ...(serviceAttribution ? { attribution: serviceAttribution } : {}),
+    });
+  }
 
   return {
     ...(service && childText(service, 'Title')
       ? { title: childText(service, 'Title') }
+      : {}),
+    ...(service && childText(service, 'Abstract')
+      ? { abstract: childText(service, 'Abstract') }
       : {}),
     ...(root.attributes.version ? { version: root.attributes.version } : {}),
     formats,

@@ -5,6 +5,8 @@ import {
   parseWmsCapabilities,
   parseXml,
   stripWmsRequestParams,
+  zoomFromScaleDenominator,
+  zoomFromScaleHint,
 } from './wmsCapabilities';
 
 const capabilities130 = `<?xml version="1.0" encoding="UTF-8"?>
@@ -126,6 +128,7 @@ describe('parseWmsCapabilities', () => {
         name: 'ofa_maxd',
         title: 'Oberflächenabfluss',
         bounds: '46.35,8.78,49.03,17.18',
+        crs: [],
         depth: 0,
       },
     ]);
@@ -174,5 +177,137 @@ describe('stripWmsRequestParams', () => {
     expect(
       stripWmsRequestParams('https://a.org/wms?map=hochwasser&REQUEST=GetMap')
     ).toBe('https://a.org/wms?map=hochwasser&');
+  });
+});
+
+const capabilitiesRich = `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0">
+  <Service>
+    <Title>Geodaten Burgenland</Title>
+    <Abstract>Offene Geodaten des Landes</Abstract>
+    <Attribution><Title>Land Burgenland (CC BY 4.0)</Title></Attribution>
+  </Service>
+  <Capability>
+    <Request><GetMap>
+      <Format>image/png</Format>
+      <Format>image/jpeg</Format>
+    </GetMap></Request>
+    <Layer>
+      <Title>root</Title>
+      <CRS>EPSG:4326</CRS>
+      <CRS>EPSG:3857</CRS>
+      <EX_GeographicBoundingBox>
+        <westBoundLongitude>15.98</westBoundLongitude>
+        <eastBoundLongitude>17.17</eastBoundLongitude>
+        <southBoundLatitude>46.82</southBoundLatitude>
+        <northBoundLatitude>48.16</northBoundLatitude>
+      </EX_GeographicBoundingBox>
+      <Layer opaque="1">
+        <Name>ortho</Name>
+        <Title>Orthofoto</Title>
+        <Abstract>Luftbild, 20 cm Auflösung</Abstract>
+        <MinScaleDenominator>1066</MinScaleDenominator>
+      </Layer>
+      <Layer>
+        <Name>gefahren</Name>
+        <Title>Naturgefahren</Title>
+        <CRS>EPSG:31256</CRS>
+        <Attribution><Title>Abteilung 5</Title></Attribution>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`;
+
+describe('zoomFromScaleDenominator', () => {
+  // Die Nenner der Standard-Zoomstufen in EPSG:3857.
+  it('rechnet die Nenner der Standardstufen zurück', () => {
+    expect(zoomFromScaleDenominator(559_082_264)).toBe(0);
+    expect(zoomFromScaleDenominator(2_132_729.7)).toBe(8);
+    expect(zoomFromScaleDenominator(1066.36)).toBe(19);
+  });
+
+  it('lässt einen unsinnigen Wert weg', () => {
+    expect(zoomFromScaleDenominator(0)).toBeUndefined();
+    expect(zoomFromScaleDenominator(-1)).toBeUndefined();
+    expect(zoomFromScaleDenominator(Number.NaN)).toBeUndefined();
+  });
+
+  it('verzeiht die Rundung der Dienste', () => {
+    // 18,99986 — gemeint ist Stufe 19, nicht 18.
+    expect(zoomFromScaleDenominator(1066.5)).toBe(19);
+    // Ein echter Zwischenwert wird trotzdem abgerundet.
+    expect(zoomFromScaleDenominator(1508)).toBe(18);
+  });
+
+  it('gibt jenseits der sinnvollen Tiefe nichts zurück', () => {
+    // Ein Dienst, der 1:1 meldet, meint „keine Grenze" — keine Zoomstufe 29.
+    expect(zoomFromScaleDenominator(1)).toBeUndefined();
+  });
+});
+
+describe('zoomFromScaleHint', () => {
+  // ScaleHint ist die Pixeldiagonale in Metern, nicht ein Nenner.
+  it('rechnet die Diagonale in eine Zoomstufe um', () => {
+    // Stufe 19: rund 0,2986 m je Pixel, Diagonale 0,4223 m.
+    expect(zoomFromScaleHint(0.4223)).toBe(19);
+    // Stufe 0: 156543 m je Pixel, Diagonale 221385 m.
+    expect(zoomFromScaleHint(221_384.7)).toBe(0);
+  });
+
+  it('behandelt 0 als „keine Grenze"', () => {
+    expect(zoomFromScaleHint(0)).toBeUndefined();
+  });
+});
+
+describe('parseWmsCapabilities — Einstellungen des Layers', () => {
+  it('liest die Beschreibung des Dienstes und des Layers', () => {
+    const caps = parseWmsCapabilities(capabilitiesRich);
+    expect(caps.abstract).toBe('Offene Geodaten des Landes');
+    expect(caps.layers[0].abstract).toBe('Luftbild, 20 cm Auflösung');
+  });
+
+  it('erbt die Quellenangabe vom Dienst', () => {
+    const caps = parseWmsCapabilities(capabilitiesRich);
+    expect(caps.layers[0].attribution).toBe('Land Burgenland (CC BY 4.0)');
+  });
+
+  it('lässt die eigene Quellenangabe des Layers gewinnen', () => {
+    const caps = parseWmsCapabilities(capabilitiesRich);
+    expect(caps.layers[1].attribution).toBe('Abteilung 5');
+  });
+
+  it('sammelt die Koordinatensysteme und vererbt sie nach innen', () => {
+    const caps = parseWmsCapabilities(capabilitiesRich);
+    expect(caps.layers[0].crs).toEqual(['EPSG:4326', 'EPSG:3857']);
+    expect(caps.layers[1].crs).toEqual([
+      'EPSG:4326',
+      'EPSG:3857',
+      'EPSG:31256',
+    ]);
+  });
+
+  it('merkt sich opaque', () => {
+    const caps = parseWmsCapabilities(capabilitiesRich);
+    expect(caps.layers[0].opaque).toBe(true);
+    expect(caps.layers[1].opaque).toBeUndefined();
+  });
+
+  it('leitet die feinste Zoomstufe aus der Maßstabsgrenze ab', () => {
+    const caps = parseWmsCapabilities(capabilitiesRich);
+    expect(caps.layers[0].maxNativeZoom).toBe(19);
+    expect(caps.layers[1].maxNativeZoom).toBeUndefined();
+  });
+
+  it('liest SRS der Fassung 1.1.1, auch mehrere in einem Element', () => {
+    const caps = parseWmsCapabilities(`<WMT_MS_Capabilities version="1.1.1">
+      <Capability><Layer>
+        <SRS>EPSG:4326 EPSG:3857</SRS>
+        <Layer><Name>a</Name><Title>A</Title>
+          <ScaleHint min="0.4223" max="0"/>
+        </Layer>
+      </Layer></Capability>
+    </WMT_MS_Capabilities>`);
+    expect(caps.layers[0].crs).toEqual(['EPSG:4326', 'EPSG:3857']);
+    expect(caps.layers[0].maxNativeZoom).toBe(19);
   });
 });
