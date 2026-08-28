@@ -1,12 +1,15 @@
 'use client';
 
 import CloseIcon from '@mui/icons-material/Close';
+import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import AddIcon from '@mui/icons-material/Add';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import Alert from '@mui/material/Alert';
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
 import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -17,6 +20,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import FormHelperText from '@mui/material/FormHelperText';
 import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
+import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Slider from '@mui/material/Slider';
@@ -43,6 +47,15 @@ export interface MapLayerDialogProps {
   /** Ohne Vorgabe wird eine neue Kartenebene angelegt. */
   layer?: FirecallMapLayer;
   onClose: (layer?: FirecallMapLayer) => void;
+  /**
+   * Löschen aus dem Dialog heraus. Ohne die Angabe fehlt der Knopf.
+   *
+   * Wer eine Ebene öffnet, um sie zu prüfen, entscheidet oft erst dort, dass
+   * sie weg soll — den Dialog dafür erst zu schließen und in der Liste den
+   * richtigen Eintrag wiederzufinden, ist ein unnötiger Umweg. Die Abfrage
+   * stellt der Aufrufer, nicht dieser Dialog.
+   */
+  onDelete?: () => void;
 }
 
 const EMPTY_LAYER: FirecallMapLayer = {
@@ -65,6 +78,7 @@ function toNumber(value: string): number | undefined {
 export default function MapLayerDialog({
   layer: existing,
   onClose,
+  onDelete,
 }: MapLayerDialogProps) {
   const t = useTranslations('mapLayers');
   const tc = useTranslations('common');
@@ -81,7 +95,12 @@ export default function MapLayerDialog({
     useState<WmsCapabilitiesResult | null>(null);
   /** Layer, die der Dienst führt, aber nicht in EPSG:3857 liefert. */
   const [unsupportedCrs, setUnsupportedCrs] = useState<string[]>([]);
-  const capabilitiesLayers: WmsCapabilitiesLayer[] = capabilities?.layers ?? [];
+  // Stabil halten: die Liste hängt an mehreren `useMemo`, ein jedes Mal neues
+  // Array liesse sie bei jedem Tastendruck im Formular neu rechnen.
+  const capabilitiesLayers: WmsCapabilitiesLayer[] = useMemo(
+    () => capabilities?.layers ?? [],
+    [capabilities]
+  );
 
   const errors = useMemo(() => validateMapLayer(layer), [layer]);
   const isWms = layer.overlayType === 'WMS';
@@ -217,6 +236,21 @@ export default function MapLayerDialog({
     [layer.wmsLayers]
   );
 
+  /**
+   * Dieselbe Auswahl als Objekte für das Autocomplete.
+   *
+   * Ein gespeicherter Name, den der Dienst nicht (mehr) führt, fällt hier
+   * heraus — im Feld `LAYERS` darunter steht er weiterhin und bleibt
+   * änderbar.
+   */
+  const selectedCapabilityOptions = useMemo(
+    () =>
+      selectedCapabilityLayers
+        .map((name) => capabilitiesLayers.find((l) => l.name === name))
+        .filter((l): l is WmsCapabilitiesLayer => !!l),
+    [capabilitiesLayers, selectedCapabilityLayers]
+  );
+
   const onCapabilitySelect = useCallback(
     (names: string[]) => {
       if (capabilities) applySelection(names, capabilities);
@@ -327,42 +361,57 @@ export default function MapLayerDialog({
               </Alert>
             )}
             {capabilitiesLayers.length > 0 && (
-              <FormControl fullWidth variant="standard" margin="dense">
-                <InputLabel id="map-layer-capabilities-label">
-                  {t('capabilities.select')}
-                </InputLabel>
-                <Select
-                  multiple
-                  labelId="map-layer-capabilities-label"
-                  id="map-layer-capabilities"
-                  value={selectedCapabilityLayers}
-                  label={t('capabilities.select')}
-                  onChange={(e) =>
-                    onCapabilitySelect(
-                      typeof e.target.value === 'string'
-                        ? e.target.value.split(',')
-                        : e.target.value
-                    )
-                  }
-                >
-                  {capabilitiesLayers.map((c) => (
-                    <MenuItem
-                      key={c.name}
-                      value={c.name}
-                      sx={{ pl: 2 + c.depth * 2 }}
-                    >
-                      {c.title} ({c.name})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-            {capabilitiesLayers.length > 0 && (
-              <Typography variant="caption" component="div" color="text.secondary">
-                {t('capabilities.found', { count: capabilitiesLayers.length })}
-                {' — '}
-                {t('capabilities.applied')}
-              </Typography>
+              /*
+               * Eine Auswahlliste, kein `Select`: ein Dienst kann Dutzende
+               * Layer führen (der INSPIRE-Dienst des Bundes 64), und in einer
+               * Liste dieser Länge findet man weder den gesuchten Eintrag noch
+               * sieht man, dass sich mehrere anhaken lassen. Das Autocomplete
+               * filtert beim Tippen, hakt sichtbar an und behält die Liste beim
+               * Anklicken offen.
+               */
+              <Autocomplete
+                multiple
+                disableCloseOnSelect
+                openOnFocus
+                limitTags={4}
+                id="map-layer-capabilities"
+                options={capabilitiesLayers}
+                value={selectedCapabilityOptions}
+                getOptionLabel={(option) => `${option.title} (${option.name})`}
+                isOptionEqualToValue={(option, value) =>
+                  option.name === value.name
+                }
+                onChange={(_event, values) =>
+                  onCapabilitySelect(values.map((value) => value.name))
+                }
+                renderOption={({ key, ...props }, option, { selected }) => (
+                  <Box
+                    component="li"
+                    key={key}
+                    {...props}
+                    // Die Verschachtelung des Dienstes bleibt ablesbar.
+                    sx={{ pl: 1 + option.depth * 2 }}
+                  >
+                    <Checkbox size="small" checked={selected} sx={{ mr: 1 }} />
+                    <ListItemText
+                      primary={option.title}
+                      secondary={option.name}
+                    />
+                  </Box>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    variant="standard"
+                    margin="dense"
+                    label={t('capabilities.select')}
+                    placeholder={t('capabilities.filter')}
+                    helperText={`${t('capabilities.found', {
+                      count: capabilitiesLayers.length,
+                    })} — ${t('capabilities.multiHint')}`}
+                  />
+                )}
+              />
             )}
             {unsupportedCrs.length > 0 && (
               <Alert severity="warning" sx={{ mt: 1 }}>
@@ -535,6 +584,16 @@ export default function MapLayerDialog({
         </Alert>
       </DialogContent>
       <DialogActions>
+        {existing?.id && onDelete && (
+          <Button
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={onDelete}
+            sx={{ mr: 'auto' }}
+          >
+            {tc('delete')}
+          </Button>
+        )}
         <Button onClick={() => onClose()}>{tc('cancel')}</Button>
         <Button
           variant="contained"

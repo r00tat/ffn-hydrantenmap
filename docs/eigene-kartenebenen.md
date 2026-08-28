@@ -123,6 +123,16 @@ Drei Ableitungen sind nicht offensichtlich:
   liefert der empfindlichste in den feinsten Stufen nichts mehr) — und nur
   dann, wenn *alle* eine Grenze nennen.
 
+**Die Auswahl ist ein Autocomplete, kein `Select`.** Ein Dienst kann Dutzende
+Layer führen — der INSPIRE-Dienst des Bundes unter
+`https://inspire.lfrz.gv.at/000801/wms` sind es 64. In einer Aufklappliste
+dieser Länge findet man weder den gesuchten Eintrag, noch sieht man, dass sich
+mehrere anhaken lassen: ein `Select multiple` sieht aus wie ein gewöhnliches
+Auswahlfeld. Das Autocomplete filtert beim Tippen, zeigt Häkchen und bleibt beim
+Anklicken offen (`disableCloseOnSelect`), damit der zweite Layer nicht ein
+zweites Aufklappen kostet. Die Einrückung nach `depth` bildet die
+Verschachtelung des Dienstes ab.
+
 **Die Warnung zum Koordinatensystem ist kein Zierrat.** `L.TileLayer.WMS`
 fragt `EPSG:3857` an. Ein Dienst, der das nicht führt, antwortet mit einer
 Fehlermeldung statt einer Kachel — die Ebene bleibt still leer, und im Einsatz
@@ -242,6 +252,13 @@ sein wie jetzt. Der Stand der Lage kommt aus den Elementen, nicht aus dem WMS de
 Nachbarbezirks.
 
 ## Löschen ist endgültig
+
+Gelöscht wird an zwei Stellen: über das Papierkorb-Symbol an der Karte in der
+Liste und über den Knopf im Bearbeiten-Dialog. Beide führen auf **dieselbe**
+Abfrage — der Dialog fragt nicht selbst nach, sondern meldet nur den Wunsch an
+den Aufrufer (`onDelete`). Wer eine Ebene öffnet, um sie zu prüfen, entscheidet
+oft erst dort, dass sie weg soll; den Dialog dafür zu schließen und in der
+Liste den richtigen Eintrag wiederzufinden, ist ein Umweg ohne Gewinn.
 
 Einsatzelemente werden weich gelöscht (`deleted: true`) und lassen sich unter
 `/admin/deleted-items` wiederherstellen. Diese Verwaltung kennt nur die

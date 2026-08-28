@@ -2774,11 +2774,12 @@
       "loading": "Dienst wird abgefragt …",
       "hint": "Nur für WMS. Die Abfrage läuft über den Server, weil die Dienste kein CORS setzen.",
       "select": "Gefundene Layer",
+      "filter": "tippen zum Filtern …",
+      "multiHint": "mehrere wählbar, Auswahl über die Häkchen. Die Einstellungen werden aus dem Dienst übernommen.",
       "found": "{count, plural, one {# Layer gefunden} other {# Layer gefunden}}",
       "invalid-url": "Die Adresse ist keine gültige https-URL.",
       "unreachable": "Der Dienst hat nicht geantwortet.",
       "no-layers": "Unter dieser Adresse wurde kein WMS mit anforderbaren Layern gefunden.",
-      "applied": "Einstellungen aus dem Dienst übernommen",
       "unsupportedCrs": "Diese Layer melden kein EPSG:3857 und bleiben in der Karte vermutlich leer: {layers}"
     }
   }

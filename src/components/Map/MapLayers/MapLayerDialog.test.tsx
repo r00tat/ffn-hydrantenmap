@@ -114,7 +114,7 @@ describe('MapLayerDialog', () => {
     );
     await userEvent.click(screen.getByLabelText('Gefundene Layer'));
     await userEvent.click(
-      screen.getByRole('option', { name: 'Orthofoto aktuell (1)' })
+      screen.getByRole('option', { name: /Orthofoto aktuell/ })
     );
     await userEvent.keyboard('{Escape}');
 
@@ -238,9 +238,7 @@ describe('MapLayerDialog', () => {
     );
     // Die Auswahl steht ohne Zutun bereit und zeigt den gespeicherten Layer.
     await waitFor(() =>
-      expect(screen.getByLabelText('Gefundene Layer')).toHaveTextContent(
-        '2'
-      )
+      expect(screen.getByText('Orthofoto 2020 (2)')).toBeInTheDocument()
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -251,6 +249,71 @@ describe('MapLayerDialog', () => {
       format: 'image/jpeg',
     });
     expect(onClose.mock.calls[0][0].beschreibung).toBeUndefined();
+  });
+
+  it('hakt mehrere Layer an und reiht sie in den LAYERS-Wert', async () => {
+    // Ein Dienst mit vielen Layern: die Liste bleibt beim Anhaken offen, und
+    // das Tippen filtert sie — sonst findet man in 64 Einträgen nichts.
+    loadWmsCapabilities.mockResolvedValue({
+      serviceUrl: 'https://gis.example.at/wms?',
+      formats: ['image/png'],
+      layers: [
+        { name: 'hq30', title: 'Hochwasser HQ30', crs: ['EPSG:3857'], depth: 0 },
+        { name: 'hq100', title: 'Hochwasser HQ100', crs: ['EPSG:3857'], depth: 0 },
+        { name: 'wald', title: 'Waldkataster', crs: ['EPSG:3857'], depth: 0 },
+      ],
+    });
+    const onClose = vi.fn();
+    renderWithIntl(<MapLayerDialog onClose={onClose} />);
+
+    await fill(/^Name/, 'Hochwasser');
+    await fill(/^URL/, 'https://gis.example.at/wms?');
+    await userEvent.click(
+      screen.getByRole('button', { name: /Layer aus dem Dienst laden/ })
+    );
+
+    const auswahl = await screen.findByLabelText('Gefundene Layer');
+    await userEvent.click(auswahl);
+    await userEvent.type(auswahl, 'Hochwasser');
+    // Gefiltert wird auf die beiden Hochwasser-Layer.
+    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(2));
+
+    await userEvent.click(screen.getByRole('option', { name: /HQ30/ }));
+    // Die Liste bleibt offen: der zweite Haken ohne erneutes Aufklappen.
+    await userEvent.click(screen.getByRole('option', { name: /HQ100/ }));
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
+    expect(onClose.mock.calls[0][0]).toMatchObject({ wmsLayers: 'hq30,hq100' });
+  });
+
+  it('bietet beim Bearbeiten das Löschen an', async () => {
+    const onDelete = vi.fn();
+    const onClose = vi.fn();
+    renderWithIntl(
+      <MapLayerDialog
+        onClose={onClose}
+        onDelete={onDelete}
+        layer={{
+          id: 'x',
+          name: 'Alt',
+          overlayType: 'WMTS',
+          url: 'https://a.org/{z}/{x}/{y}.png',
+        }}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    // Der Dialog fragt nicht selbst nach — das tut der Aufrufer.
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('zeigt beim Anlegen keinen Löschen-Knopf', async () => {
+    renderWithIntl(<MapLayerDialog onClose={vi.fn()} onDelete={vi.fn()} />);
+    expect(
+      screen.queryByRole('button', { name: 'Löschen' })
+    ).not.toBeInTheDocument();
   });
 
   it('meldet einen nicht erreichbaren Dienst, ohne die Eingabe zu verlieren', async () => {

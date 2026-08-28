@@ -2774,11 +2774,12 @@
       "loading": "Querying the service …",
       "hint": "WMS only. The request runs through the server because the services do not send CORS headers.",
       "select": "Layers found",
+      "filter": "type to filter …",
+      "multiHint": "select several using the check boxes. Settings are taken from the service.",
       "found": "{count, plural, one {# layer found} other {# layers found}}",
       "invalid-url": "The address is not a valid https URL.",
       "unreachable": "The service did not respond.",
       "no-layers": "No WMS with requestable layers was found at this address.",
-      "applied": "settings taken from the service",
       "unsupportedCrs": "These layers do not advertise EPSG:3857 and will most likely stay empty on the map: {layers}"
     }
   }

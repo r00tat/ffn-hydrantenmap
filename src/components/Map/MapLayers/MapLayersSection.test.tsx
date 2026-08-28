@@ -35,23 +35,28 @@ vi.mock('./MapLayerDialog', () => ({
   default: ({
     layer,
     onClose,
+    onDelete,
   }: {
     layer?: FirecallMapLayer;
     onClose: (l?: FirecallMapLayer) => void;
+    onDelete?: () => void;
   }) => (
-    <button
-      onClick={() =>
-        onClose({
-          ...(layer ?? {
-            overlayType: 'WMTS',
-            url: 'https://a.org/{z}/{x}/{y}.png',
-          }),
-          name: 'Neu',
-        })
-      }
-    >
-      dialog-{layer?.id ?? 'neu'}
-    </button>
+    <>
+      <button
+        onClick={() =>
+          onClose({
+            ...(layer ?? {
+              overlayType: 'WMTS',
+              url: 'https://a.org/{z}/{x}/{y}.png',
+            }),
+            name: 'Neu',
+          })
+        }
+      >
+        dialog-{layer?.id ?? 'neu'}
+      </button>
+      {onDelete && <button onClick={onDelete}>dialog-löschen</button>}
+    </>
   ),
 }));
 
@@ -105,6 +110,32 @@ describe('MapLayersSection', () => {
       id: 'a',
       name: 'Neu',
     });
+  });
+
+  it('löscht auch aus dem Dialog heraus — und fragt trotzdem nach', async () => {
+    renderWithIntl(<MapLayersSection canEdit />);
+
+    await userEvent.click(screen.getByTestId('EditIcon'));
+    await userEvent.click(screen.getByRole('button', { name: 'dialog-löschen' }));
+    // Der Dialog ist zu, die Abfrage steht.
+    expect(
+      screen.queryByRole('button', { name: 'dialog-a' })
+    ).not.toBeInTheDocument();
+    expect(deleteMapLayer).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'ja' }));
+    expect(deleteMapLayer).toHaveBeenCalledWith(layers[0]);
+  });
+
+  it('bietet beim Anlegen kein Löschen an', async () => {
+    renderWithIntl(<MapLayersSection canEdit />);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Kartenebene hinzufügen' })
+    );
+    expect(
+      screen.queryByRole('button', { name: 'dialog-löschen' })
+    ).not.toBeInTheDocument();
   });
 
   it('löscht erst nach Bestätigung', async () => {

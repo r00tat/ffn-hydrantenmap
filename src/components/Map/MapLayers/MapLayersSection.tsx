@@ -175,7 +175,21 @@ export default function MapLayersSection({
       )}
 
       {dialogOpen && (
-        <MapLayerDialog layer={editing} onClose={onDialogClose} />
+        <MapLayerDialog
+          layer={editing}
+          onClose={onDialogClose}
+          onDelete={
+            editing
+              ? () => {
+                  const layer = editing;
+                  setDialogOpen(false);
+                  setEditing(undefined);
+                  // Gefragt wird trotzdem — nur eben hier und nicht im Dialog.
+                  setDeleting(layer);
+                }
+              : undefined
+          }
+        />
       )}
       {deleting && (
         <ConfirmDialog
