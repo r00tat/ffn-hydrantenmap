@@ -13,8 +13,17 @@ import {
   type ImportPlanZeile,
 } from '../../common/atemschutzImport';
 import { readXlsxSheet } from '../../common/xlsx';
-import { actionGroupAdminRequired } from '../../app/auth';
-import { geraeteRef, loadGeraete } from './atemschutzStammdaten';
+import {
+  buildMangelDocument,
+  FAHRTENBUCH_MANGEL_COLLECTION_ID,
+} from '../../common/mangel';
+import {
+  actionGroupAdminRequired,
+  actionUserRequired,
+} from '../../app/auth';
+import { firestore } from '../../server/firebase/admin';
+import { GROUP_COLLECTION_ID } from '../firebase/firestore';
+import { geraeteRef, loadGeraet, loadGeraete } from './atemschutzStammdaten';
 
 export interface AtemschutzActionResult {
   success: boolean;
@@ -334,6 +343,69 @@ export async function importAtemschutzGeraete(
     return { success: true, created, updated };
   } catch (err) {
     console.error('importAtemschutzGeraete failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export interface AtemschutzMangelInput {
+  geraetId: string;
+  description: string;
+  /** Bereits hochgeladene Bilder als Storage-Pfade. */
+  images?: string[];
+}
+
+/**
+ * Meldet einen Mangel an einem Ausrüstungsstück.
+ *
+ * `actionUserRequired()` und **nicht** `actionGroupAdminRequired()`: Am
+ * Sammelplatz fällt der Mangel auf, und wer ihn bemerkt, verwaltet die Gruppe
+ * in aller Regel nicht. Die
+ * Stammdaten bleiben davon unberührt — geschrieben wird nur in die
+ * Mängel-Collection. Die Gruppenzugehörigkeit wird geprüft, sonst könnte ein
+ * beliebiger angemeldeter Benutzer in fremde Gruppen schreiben.
+ */
+export async function createAtemschutzMangel(
+  groupId: string,
+  input: AtemschutzMangelInput,
+): Promise<AtemschutzActionResult> {
+  try {
+    const session = await actionUserRequired();
+    if (!session.user?.groups?.includes(groupId)) {
+      return { success: false, error: 'notInGroup' };
+    }
+
+    // Lädt das Gerät auch, um seinen Namen ins Dokument zu kopieren: Die
+    // Mängelliste soll ohne Join lesbar sein — dieselbe Bauweise wie
+    // `Mangel.vehicleName`.
+    const geraet = await loadGeraet(groupId, input.geraetId);
+    const name = geraet.nummer
+      ? `${geraet.nummer} · ${geraet.bezeichnung}`
+      : geraet.bezeichnung;
+
+    const doc = buildMangelDocument(
+      {
+        itemType: 'atemschutz',
+        itemId: input.geraetId,
+        description: input.description,
+        images: input.images,
+      },
+      { type: 'atemschutz', id: input.geraetId, name },
+      groupId,
+      {
+        userId: session.user.id,
+        userName: session.user.name ?? session.user.email ?? '',
+        now: new Date().toISOString(),
+      },
+    );
+
+    const ref = await firestore
+      .collection(GROUP_COLLECTION_ID)
+      .doc(groupId)
+      .collection(FAHRTENBUCH_MANGEL_COLLECTION_ID)
+      .add(doc);
+    return { success: true, id: ref.id };
+  } catch (err) {
+    console.error('createAtemschutzMangel failed', err);
     return { success: false, error: (err as Error).message };
   }
 }

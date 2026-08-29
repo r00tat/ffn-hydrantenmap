@@ -155,6 +155,43 @@
         "entsendetAnMissing": "Bitte den Gruppenkommandanten eintragen"
       }
     },
+    "ausruestung": {
+      "search": "Suchen",
+      "filterTyp": "Typ",
+      "filterAll": "Alle",
+      "onlyOut": "Nur ausgegebene",
+      "empty": "Keine Ausrüstung in den Stammdaten dieser Gruppe.",
+      "noMatch": "Kein Treffer.",
+      "hint": "Der Bestand kommt aus den Stammdaten der Gruppe und wird in der Administration gepflegt.",
+      "scan": "Barcode scannen",
+      "status": {
+        "amPlatz": "Am Platz",
+        "ausgegeben": "Ausgegeben",
+        "zurueck": "Zurück"
+      },
+      "actions": {
+        "ausgeben": "Ausgeben",
+        "zuruecknehmen": "Zurücknehmen",
+        "mangel": "Mangel melden"
+      },
+      "ausgabeTitle": "Ausrüstung ausgeben",
+      "ruecknahmeTitle": "Ausrüstung zurücknehmen",
+      "ausgegebenAn": "Ausgegeben an",
+      "ausgegebenAnHint": "Trupp oder Feuerwehr",
+      "ausgabeZeit": "Ausgabe",
+      "ruecknahmeZeit": "Rücknahme",
+      "sichtkontrolle": "Sichtkontrolle",
+      "bemerkung": "Bemerkung",
+      "mangelTitle": "Mangel melden",
+      "mangelDescription": "Was ist der Mangel?",
+      "mangelImages": "Bilder",
+      "mangelSaved": "Mangel gemeldet.",
+      "mangelOffen": "{count, plural, one {Ein offener Mangel} other {# offene Mängel}}",
+      "errors": {
+        "ausgegebenAnMissing": "Bitte eintragen, an wen ausgegeben wird",
+        "descriptionMissing": "Bitte den Mangel beschreiben"
+      }
+    },
     "readOnly": "Nur Lesezugriff auf diesen Einsatz.",
     "import": {
       "title": "Ausrüstung importieren",

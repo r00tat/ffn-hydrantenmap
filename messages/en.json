@@ -155,6 +155,43 @@
         "entsendetAnMissing": "Please record the team leader"
       }
     },
+    "ausruestung": {
+      "search": "Search",
+      "filterTyp": "Type",
+      "filterAll": "All",
+      "onlyOut": "Only issued",
+      "empty": "No equipment in this group's master data.",
+      "noMatch": "No match.",
+      "hint": "The inventory comes from the group's master data and is maintained in the administration area.",
+      "scan": "Scan barcode",
+      "status": {
+        "amPlatz": "At the staging area",
+        "ausgegeben": "Issued",
+        "zurueck": "Returned"
+      },
+      "actions": {
+        "ausgeben": "Issue",
+        "zuruecknehmen": "Take back",
+        "mangel": "Report defect"
+      },
+      "ausgabeTitle": "Issue equipment",
+      "ruecknahmeTitle": "Take equipment back",
+      "ausgegebenAn": "Issued to",
+      "ausgegebenAnHint": "Team or brigade",
+      "ausgabeZeit": "Issued at",
+      "ruecknahmeZeit": "Returned at",
+      "sichtkontrolle": "Visual check",
+      "bemerkung": "Note",
+      "mangelTitle": "Report defect",
+      "mangelDescription": "What is the defect?",
+      "mangelImages": "Images",
+      "mangelSaved": "Defect reported.",
+      "mangelOffen": "{count, plural, one {One open defect} other {# open defects}}",
+      "errors": {
+        "ausgegebenAnMissing": "Please record who it is issued to",
+        "descriptionMissing": "Please describe the defect"
+      }
+    },
     "readOnly": "Read-only access to this operation.",
     "import": {
       "title": "Import equipment",

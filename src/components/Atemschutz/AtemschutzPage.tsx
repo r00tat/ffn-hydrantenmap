@@ -14,6 +14,7 @@ import {
   newTruppKey,
   nextBereitstellung,
   sanitizeMitglieder,
+  type AtemschutzGeraet,
   type AtemschutzTrupp,
   type FuellungInput,
   type TruppInput,
@@ -22,6 +23,7 @@ import {
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
+import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
@@ -35,14 +37,18 @@ import {
   type AtemschutzTabKey,
 } from './atemschutzTabs';
 import {
+  addAusgabe,
   addFuellung,
   addTrupp,
   deleteFuellung,
   deleteTrupp,
+  updateAusgabe,
   updateFuellung,
   updateTrupp,
   type AtemschutzActor,
 } from './atemschutzStore';
+import type { AusgabePatch } from './AusgabeDialog';
+import AusruestungTab from './AusruestungTab';
 import FuellprotokollTab from './FuellprotokollTab';
 import TruppsTab from './TruppsTab';
 
@@ -70,9 +76,25 @@ export default function AtemschutzPage() {
   );
 
   const groupId = firecall?.group;
-  const { flaschen, feuerwehren } = useAtemschutzGeraete(groupId);
-  const { fuellungen, flaschenGesamt, trupps } =
+  const { flaschen, activeGeraete, feuerwehren } =
+    useAtemschutzGeraete(groupId);
+  const { fuellungen, flaschenGesamt, trupps, ausgabeByGeraet } =
     useAtemschutzEinsatzdaten(firecallId);
+
+  // Nur die Ausrüstungsmängel: Fahrzeugmängel gehören nicht an diese Liste.
+  const { openCountByGeraet } = useFahrtenbuchMangel(groupId, {
+    itemType: 'atemschutz',
+  });
+
+  const empfaengerVorschlaege = useMemo(() => {
+    const namen = new Set<string>();
+    for (const t of trupps.protokoll) {
+      if (t.truppName?.trim()) namen.add(t.truppName.trim());
+      if (t.feuerwehr?.trim()) namen.add(t.feuerwehr.trim());
+    }
+    for (const fw of feuerwehren) namen.add(fw);
+    return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
+  }, [trupps.protokoll, feuerwehren]);
 
   const suggestions = useAtemschutzPersonSuggestions(groupId, {
     trupps: trupps.protokoll,
@@ -198,6 +220,58 @@ export default function AtemschutzPage() {
     [firecallId],
   );
 
+  const handleAusgabePatch = useCallback(
+    async (geraet: AtemschutzGeraet, patch: AusgabePatch) => {
+      const now = new Date().toISOString();
+      const stamp: AtemschutzActor = { userId: actor.userId, now };
+      const vorhanden = ausgabeByGeraet.get(geraet.id as string);
+      if (vorhanden?.id) {
+        await updateAusgabe(firecallId, vorhanden.id, patch, stamp);
+        return;
+      }
+      // Erst beim ersten Anfassen entsteht ein Dokument — sonst müsste zu
+      // jedem Einsatz der ganze Bestand angelegt werden.
+      await addAusgabe(
+        firecallId,
+        {
+          geraetId: geraet.id as string,
+          geraetName: geraet.nummer
+            ? `${geraet.nummer} · ${geraet.bezeichnung}`
+            : geraet.bezeichnung,
+          ...patch,
+        },
+        stamp,
+      );
+    },
+    [actor.userId, ausgabeByGeraet, firecallId],
+  );
+
+  const handleMangelGemeldet = useCallback(
+    async (geraet: AtemschutzGeraet, mangelId: string) => {
+      const now = new Date().toISOString();
+      const stamp: AtemschutzActor = { userId: actor.userId, now };
+      const vorhanden = ausgabeByGeraet.get(geraet.id as string);
+      const patch = { sichtkontrolle: 'mangel' as const, mangelId };
+      if (vorhanden?.id) {
+        await updateAusgabe(firecallId, vorhanden.id, patch, stamp);
+        return;
+      }
+      await addAusgabe(
+        firecallId,
+        {
+          geraetId: geraet.id as string,
+          geraetName: geraet.nummer
+            ? `${geraet.nummer} · ${geraet.bezeichnung}`
+            : geraet.bezeichnung,
+          status: 'amPlatz',
+          ...patch,
+        },
+        stamp,
+      );
+    },
+    [actor.userId, ausgabeByGeraet, firecallId],
+  );
+
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -258,9 +332,17 @@ export default function AtemschutzPage() {
           onDelete={handleDeleteTrupp}
         />
       )}
-      {/* Stufe 7 */}
       {tab === 'ausruestung' && (
-        <Typography color="text.secondary">—</Typography>
+        <AusruestungTab
+          groupId={groupId ?? ''}
+          geraete={activeGeraete}
+          ausgabeByGeraet={ausgabeByGeraet}
+          empfaengerVorschlaege={empfaengerVorschlaege}
+          openMangelByGeraet={openCountByGeraet}
+          canWrite={canWrite}
+          onPatch={handleAusgabePatch}
+          onMangelGemeldet={handleMangelGemeldet}
+        />
       )}
     </Container>
   );
