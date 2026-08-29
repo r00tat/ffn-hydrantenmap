@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
@@ -9,8 +10,11 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Grid from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import { useTranslations } from 'next-intl';
 import {
   DEFAULT_ENDDRUCK,
@@ -21,6 +25,7 @@ import {
   type Sichtkontrolle,
   validateFuellungInput,
 } from '../../common/atemschutz';
+import BarcodeScannerDialog from './BarcodeScannerDialog';
 import GeraetAutocomplete from './GeraetAutocomplete';
 import PersonAutocomplete from './PersonAutocomplete';
 
@@ -82,6 +87,7 @@ export default function FuellungDialog({
     bemerkung: fuellung?.bemerkung ?? '',
   }));
   const [saving, setSaving] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -133,22 +139,42 @@ export default function FuellungDialog({
       <DialogContent>
         <Grid container spacing={2} sx={{ mt: 0 }}>
           <Grid size={12}>
-            <GeraetAutocomplete
-              label={t('fuellung.flaschenNummer')}
-              value={form.flaschenNummer}
-              geraete={flaschen}
-              onTextChange={(next) =>
-                // Freie Eingabe: Der Bezug auf ein Stammgerät ist damit
-                // aufgehoben — sonst hinge `geraetId` an einer Nummer, die
-                // gar nicht mehr dazu gehört.
-                setForm((prev) => ({
-                  ...prev,
-                  flaschenNummer: next,
-                  geraetId: undefined,
-                }))
-              }
-              onGeraetChange={uebernehmeFlasche}
-            />
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: 'flex-start' }}
+            >
+              <GeraetAutocomplete
+                label={t('fuellung.flaschenNummer')}
+                value={form.flaschenNummer}
+                geraete={flaschen}
+                onTextChange={(next) =>
+                  // Freie Eingabe: Der Bezug auf ein Stammgerät ist damit
+                  // aufgehoben — sonst hinge `geraetId` an einer Nummer, die
+                  // gar nicht mehr dazu gehört.
+                  setForm((prev) => ({
+                    ...prev,
+                    flaschenNummer: next,
+                    geraetId: undefined,
+                  }))
+                }
+                onGeraetChange={uebernehmeFlasche}
+              />
+              <Tooltip title={t('fuellung.scan')}>
+                {/* span, weil ein disabled Button keine Events feuert —
+                    siehe MUI-Regeln in CLAUDE.md. Hier nie disabled, aber
+                    der Wrapper kostet nichts und hält das Muster gleich. */}
+                <span>
+                  <IconButton
+                    aria-label={t('fuellung.scan')}
+                    onClick={() => setScannerOpen(true)}
+                    sx={{ mt: 1 }}
+                  >
+                    <QrCodeScannerIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Stack>
           </Grid>
           <Grid size={{ xs: 12, sm: 8 }}>
             <Autocomplete
@@ -254,6 +280,27 @@ export default function FuellungDialog({
           {tCommon('save')}
         </Button>
       </DialogActions>
+
+      {scannerOpen && (
+        <BarcodeScannerDialog
+          open
+          geraete={flaschen}
+          onClose={() => setScannerOpen(false)}
+          onPicked={(code, treffer) => {
+            if (treffer) {
+              uebernehmeFlasche(treffer);
+              return;
+            }
+            // Kein Stammdatensatz: Der rohe Code wird die Flaschennummer.
+            // Besser eine fremde Nummer im Protokoll als gar keine.
+            setForm((prev) => ({
+              ...prev,
+              flaschenNummer: code,
+              geraetId: undefined,
+            }));
+          }}
+        />
+      )}
     </Dialog>
   );
 }

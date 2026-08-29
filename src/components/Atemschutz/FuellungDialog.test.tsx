@@ -80,6 +80,13 @@ describe('FuellungDialog', () => {
     expect(screen.getByRole('button', { name: /speichern/i })).toBeDisabled();
   });
 
+  it('zeigt den Scan-Knopf', () => {
+    render();
+    expect(
+      screen.getByRole('button', { name: /barcode scannen/i }),
+    ).toBeInTheDocument();
+  });
+
   it('übernimmt beim Bearbeiten die gespeicherten Werte', () => {
     render({
       fuellung: {

@@ -79,6 +79,28 @@
       "druckRange": "{start} → {ende} bar",
       "druckNurEnde": "auf {ende} bar"
     },
+    "qr": {
+      "title": "QR-Etikett",
+      "button": "QR-Etikett",
+      "hint": "Der Code enthält die Flaschennummer. Nach dem Ausdrucken auf die Flasche kleben.",
+      "noNumber": "Dieses Gerät hat keine Flaschennummer — bitte zuerst eine eintragen.",
+      "print": "Drucken",
+      "printBlocked": "Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.",
+      "exportFailed": "Das Etikett ließ sich nicht erzeugen."
+    },
+    "scanner": {
+      "title": "Barcode scannen",
+      "hint": "Barcode in den Rahmen halten.",
+      "starting": "Kamera wird gestartet …",
+      "unsupported": "Dieses Gerät bietet keine Kamera an. Bitte die Nummer von Hand eingeben.",
+      "denied": "Kein Zugriff auf die Kamera. Bitte die Berechtigung erteilen oder die Nummer von Hand eingeben.",
+      "error": "Die Kamera ließ sich nicht starten.",
+      "manual": "Nummer von Hand eingeben",
+      "manualHint": "Flaschennummer, Inventar-Nr., Seriennummer oder Feuerwehr",
+      "noMatch": "Kein Gerät zu „{code}“ gefunden. Der Code wird als Flaschennummer übernommen.",
+      "multiple": "{count} Geräte tragen diesen Code — bitte wählen:",
+      "use": "Übernehmen"
+    },
     "readOnly": "Nur Lesezugriff auf diesen Einsatz.",
     "import": {
       "title": "Ausrüstung importieren",

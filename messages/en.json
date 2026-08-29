@@ -79,6 +79,28 @@
       "druckRange": "{start} → {ende} bar",
       "druckNurEnde": "to {ende} bar"
     },
+    "qr": {
+      "title": "QR label",
+      "button": "QR label",
+      "hint": "The code contains the cylinder number. Print and attach to the cylinder.",
+      "noNumber": "This item has no cylinder number — please enter one first.",
+      "print": "Print",
+      "printBlocked": "The browser blocked the print window. Please allow pop-ups for this page.",
+      "exportFailed": "The label could not be created."
+    },
+    "scanner": {
+      "title": "Scan barcode",
+      "hint": "Hold the barcode inside the frame.",
+      "starting": "Starting camera …",
+      "unsupported": "This device offers no camera. Please enter the number by hand.",
+      "denied": "No access to the camera. Please grant permission or enter the number by hand.",
+      "error": "The camera could not be started.",
+      "manual": "Enter number by hand",
+      "manualHint": "Cylinder number, inventory no., serial number or brigade",
+      "noMatch": "No item found for “{code}”. The code will be used as the cylinder number.",
+      "multiple": "{count} items carry this code — please choose:",
+      "use": "Use"
+    },
     "readOnly": "Read-only access to this operation.",
     "import": {
       "title": "Import equipment",

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -41,6 +42,7 @@ import {
 } from '../atemschutzActions';
 import GeraetDialog from './GeraetDialog';
 import GeraetImportDialog from './GeraetImportDialog';
+import GeraetQrDialog from './GeraetQrDialog';
 
 type TypFilter = AtemschutzGeraetTyp | 'alle';
 
@@ -67,6 +69,7 @@ export default function AtemschutzAdmin() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loeschKandidat, setLoeschKandidat] = useState<AtemschutzGeraet>();
   const [importOpen, setImportOpen] = useState(false);
+  const [qrGeraet, setQrGeraet] = useState<AtemschutzGeraet>();
 
   const gefiltert = useMemo(() => {
     // Die Suche geht über dieselben normalisierten Kennungen wie der Scanner:
@@ -182,6 +185,13 @@ export default function AtemschutzAdmin() {
                     divider
                     secondaryAction={
                       <Stack direction="row" spacing={0.5}>
+                        <Tooltip title={t('qr.button')}>
+                          <span>
+                            <IconButton onClick={() => setQrGeraet(g)}>
+                              <QrCode2Icon />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                         <Tooltip title={t('admin.edit', { name: g.bezeichnung })}>
                           <IconButton
                             edge="end"
@@ -246,6 +256,15 @@ export default function AtemschutzAdmin() {
                 <AddIcon />
               </Fab>
             </Tooltip>
+
+            {qrGeraet && (
+              <GeraetQrDialog
+                key={qrGeraet.id}
+                open
+                geraet={qrGeraet}
+                onClose={() => setQrGeraet(undefined)}
+              />
+            )}
 
             {importOpen && (
               // `onDone` bleibt leer: `useAtemschutzGeraete` hängt an einem

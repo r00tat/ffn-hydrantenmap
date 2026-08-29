@@ -83,6 +83,18 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- Camera access for the barcode scanner at the breathing apparatus
+         staging area (getUserMedia in the WebView). Same path as RECORD_AUDIO
+         above: Capacitor's BridgeWebChromeClient requests this at runtime
+         before granting the WebView's VIDEO_CAPTURE request. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- Declare Bluetooth LE feature; make it optional so the app still installs on non-BLE devices -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+    <!-- Camera is optional, not a requirement: without android:required="false"
+         Google Play filters the app off devices without a camera, and the
+         Einsatzkarte is no camera app. The cylinder number can always be
+         entered by hand. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>
