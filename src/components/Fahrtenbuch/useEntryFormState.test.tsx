@@ -223,7 +223,7 @@ describe('useEntryFormState', () => {
       expect(result.current.firecallName).toBe('');
     });
 
-    it('leert die Uhrzeiten und setzt das Datum auf heute', async () => {
+    it('leert die Abfahrtszeit und setzt das Datum auf heute', async () => {
       // Der Fehler dahinter: Die Zeiten des Einsatzes blieben nach dem Wechsel
       // stehen und sahen aus wie eine Eingabe. Übersehen hieß, eine fremde
       // Uhrzeit als eigene Fahrt zu erfassen.
@@ -235,7 +235,6 @@ describe('useEntryFormState', () => {
       act(() => result.current.changeZweck('sonstiges'));
 
       expect(result.current.abfahrtTimeMissing).toBe(true);
-      expect(result.current.ankunftTimeMissing).toBe(true);
       const today = new Date();
       expect(new Date(result.current.abfahrt).toDateString()).toBe(
         today.toDateString(),
@@ -245,7 +244,24 @@ describe('useEntryFormState', () => {
       );
     });
 
-    it('speichert nicht, solange die Uhrzeit fehlt', async () => {
+    it('hält die Ankunft auf jetzt statt sie zu leeren', () => {
+      // Die Ankunft ist kein fremder Wert, den man nachtragen müsste: Wer den
+      // Zweck wechselt, trägt eine Fahrt ein, die eben zu Ende ist — genau der
+      // Vorschlag, mit dem ein neuer Eintrag ohnehin startet.
+      const { result } = renderForm();
+
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      act(() => result.current.changeZweck('sonstiges'));
+
+      expect(result.current.ankunftTimeMissing).toBe(false);
+      const now = new Date();
+      const ankunft = new Date(result.current.ankunft);
+      expect(ankunft.toDateString()).toBe(now.toDateString());
+      expect(ankunft.getHours()).toBe(now.getHours());
+      expect(ankunft.getMinutes()).toBe(now.getMinutes());
+    });
+
+    it('speichert nicht, solange die Abfahrtszeit fehlt', async () => {
       const { result, onSubmit } = renderForm();
 
       act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
@@ -257,7 +273,7 @@ describe('useEntryFormState', () => {
 
       expect(onSubmit).not.toHaveBeenCalled();
       expect(result.current.errors).toContain('abfahrtTimeMissing');
-      expect(result.current.errors).toContain('ankunftTimeMissing');
+      expect(result.current.errors).not.toContain('ankunftTimeMissing');
     });
 
     it('nimmt die Meldung mit der eingetragenen Uhrzeit zurück', () => {

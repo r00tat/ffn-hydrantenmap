@@ -268,7 +268,9 @@ export function useEntryFormState({
   const [mangel, setMangel] = useState(entry?.mangel ?? '');
   const [errors, setErrors] = useState<string[]>([]);
   /**
-   * Die Uhrzeit wurde beim Zweckwechsel geleert und ist nachzutragen.
+   * Die Uhrzeit wurde geleert und ist nachzutragen — beim Zweckwechsel trifft
+   * das nur die Abfahrt, `ankunftTimeMissing` entsteht erst, wenn jemand das
+   * Ankunftsfeld selbst leer räumt.
    *
    * Der Zeitstempel bleibt dabei ein gültiger Wert (heute, 00:00) — ein
    * `datetime-local`-Feld kennt kein „Datum ja, Uhrzeit nein", und ein leerer
@@ -438,15 +440,20 @@ export function useEntryFormState({
     // eines Einsatzes erfasst, zu dem sie nicht gehörten.
     //
     // Das Datum bleibt und wird auf heute gesetzt: Wer den Zweck wechselt,
-    // trägt fast immer eine Fahrt von heute ein. Nur die Uhrzeit ist zu
+    // trägt fast immer eine Fahrt von heute ein. Nur die Abfahrtszeit ist zu
     // ergänzen, und dass sie fehlt, ist am Feld zu sehen.
+    //
+    // Die Ankunft dagegen bleibt gesetzt und steht auf „jetzt": Eingetragen
+    // wird eine Fahrt, die eben zu Ende ist, also stimmt der Vorschlag, mit
+    // dem auch ein neuer Eintrag startet. Nur die Abfahrt weiß niemand außer
+    // dem Fahrer.
     if (!firecallTimesRef.current) return;
     firecallTimesRef.current = false;
     const today = startOfToday();
     setAbfahrt(today);
-    setAnkunft(today);
+    setAnkunft(arrivalOnDepartureDay(today));
     setAbfahrtTimeMissing(true);
-    setAnkunftTimeMissing(true);
+    setAnkunftTimeMissing(false);
   };
 
   /** Nur den Datumsteil der Abfahrt setzen; die Ankunft zieht wie immer mit. */
