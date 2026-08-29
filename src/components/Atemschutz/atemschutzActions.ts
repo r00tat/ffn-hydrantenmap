@@ -6,8 +6,15 @@ import {
   type AtemschutzGeraet,
   type AtemschutzGeraetTyp,
 } from '../../common/atemschutz';
+import { parse as parseCsv } from 'csv-parse/sync';
+import {
+  abgleich,
+  rowsToGeraete,
+  type ImportPlanZeile,
+} from '../../common/atemschutzImport';
+import { readXlsxSheet } from '../../common/xlsx';
 import { actionGroupAdminRequired } from '../../app/auth';
-import { geraeteRef } from './atemschutzStammdaten';
+import { geraeteRef, loadGeraete } from './atemschutzStammdaten';
 
 export interface AtemschutzActionResult {
   success: boolean;
@@ -188,6 +195,145 @@ export async function addAtemschutzBarcode(
     return { success: true, id: geraetId };
   } catch (err) {
     console.error('addAtemschutzBarcode failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/** Obergrenze der Importdatei — ein Riegel gegen eine manipulierte Anfrage. */
+const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+const IMPORT_MAX_ZEILEN = 5000;
+
+export interface ImportPreviewResult {
+  success: boolean;
+  error?: string;
+  plan?: ImportPlanZeile[];
+}
+
+/**
+ * CSV mit denselben Spaltennamen wie der XLSX-Export.
+ *
+ * `columns: false` ist Absicht: `rowsToGeraete` erwartet ein Raster mit
+ * Kopfzeile, damit XLSX und CSV denselben Weg gehen und die Spaltenerkennung
+ * nur an einer Stelle steht.
+ */
+function readCsvRows(buffer: Uint8Array): string[][] {
+  const text = new TextDecoder('utf-8').decode(buffer);
+  // Der Export einer deutschsprachigen Tabellenkalkulation trennt mit
+  // Semikolon; eine Datei mit Komma kommt trotzdem vor.
+  const delimiter = text.slice(0, 500).includes(';') ? ';' : ',';
+  return parseCsv(text, {
+    delimiter,
+    bom: true,
+    relax_column_count: true,
+    skip_empty_lines: true,
+  }) as string[][];
+}
+
+/**
+ * Liest die hochgeladene Datei und gleicht sie gegen den Bestand ab — ohne zu
+ * schreiben.
+ *
+ * Vorschau und Import sind zwei Actions und nicht eine mit `dryRun`-Flag: Der
+ * Benutzer entscheidet zwischen beiden Aufrufen je Zeile *neu*, *aktualisieren*
+ * oder *überspringen*. Ein einziger Aufruf müsste diese Entscheidung erraten.
+ *
+ * Anders als beim Hydranten-Import wird das Ergebnis **nicht** serverseitig
+ * zwischengespeichert: Der Plan sind einige hundert flache Objekte, die der
+ * Client ohnehin anzeigt und bearbeitet — ein Cache mit Sitzungs-ID wäre hier
+ * nur eine zweite Stelle, an der er veralten kann.
+ */
+export async function previewAtemschutzImport(
+  groupId: string,
+  formData: FormData,
+): Promise<ImportPreviewResult> {
+  try {
+    await actionGroupAdminRequired(groupId);
+
+    const file = formData.get('file');
+    if (!(file instanceof File)) {
+      return { success: false, error: 'fileMissing' };
+    }
+    if (file.size > IMPORT_MAX_BYTES) {
+      return { success: false, error: 'fileTooLarge' };
+    }
+
+    const buffer = new Uint8Array(await file.arrayBuffer());
+    const rows = file.name.toLowerCase().endsWith('.csv')
+      ? readCsvRows(buffer)
+      : readXlsxSheet(buffer);
+
+    if (rows.length > IMPORT_MAX_ZEILEN) {
+      return { success: false, error: 'tooManyRows' };
+    }
+
+    const zeilen = rowsToGeraete(rows);
+    const bestand = await loadGeraete(groupId);
+    return { success: true, plan: abgleich(zeilen, bestand) };
+  } catch (err) {
+    console.error('previewAtemschutzImport failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export interface ImportResult {
+  success: boolean;
+  error?: string;
+  created?: number;
+  updated?: number;
+}
+
+/**
+ * Schreibt die vom Benutzer bestätigten Zeilen.
+ *
+ * Der Client schickt den bearbeiteten Plan zurück — die übersprungenen Zeilen
+ * hat er bereits entfernt. Die Aktion prüft nur noch, dass eine
+ * `update`-Zeile auch tatsächlich eine `existingId` trägt: Ohne diese Schranke
+ * legte ein manipulierter Aufruf mit `status: 'update'` und fehlender ID
+ * stillschweigend Dubletten an.
+ */
+export async function importAtemschutzGeraete(
+  groupId: string,
+  plan: ImportPlanZeile[],
+): Promise<ImportResult> {
+  try {
+    const session = await actionGroupAdminRequired(groupId);
+    if (!Array.isArray(plan) || plan.length > IMPORT_MAX_ZEILEN) {
+      return { success: false, error: 'tooManyRows' };
+    }
+
+    const now = new Date().toISOString();
+    const ref = geraeteRef(groupId);
+    let created = 0;
+    let updated = 0;
+
+    // Firestore begrenzt einen Batch auf 500 Schreibvorgänge.
+    const CHUNK = 400;
+    for (let i = 0; i < plan.length; i += CHUNK) {
+      const batch = ref.firestore.batch();
+      for (const zeile of plan.slice(i, i + CHUNK)) {
+        const payload = {
+          ...buildGeraetPayload(zeile.geraet as GeraetInput),
+          updatedAt: now,
+          updatedBy: session.user.id,
+        };
+        if (zeile.status === 'update' && zeile.existingId) {
+          batch.set(ref.doc(zeile.existingId), payload, { merge: true });
+          updated += 1;
+        } else {
+          batch.set(ref.doc(), {
+            ...payload,
+            createdAt: now,
+            createdBy: session.user.id,
+          });
+          created += 1;
+        }
+      }
+      await batch.commit();
+    }
+
+    return { success: true, created, updated };
+  } catch (err) {
+    console.error('importAtemschutzGeraete failed', err);
     return { success: false, error: (err as Error).message };
   }
 }

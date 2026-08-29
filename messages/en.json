@@ -43,6 +43,26 @@
       "search": "Search",
       "showInactive": "Show retired items"
     },
+    "import": {
+      "title": "Import equipment",
+      "button": "Import",
+      "chooseFile": "Choose file (XLSX or CSV)",
+      "hint": "Article export from FDISK, or a CSV file with the same column names.",
+      "preview": "{count, plural, =0 {No rows} one {One row} other {# rows}} found",
+      "statusNew": "new",
+      "statusUpdate": "update",
+      "statusSkip": "skip",
+      "matchedBy": "Matched by {field}",
+      "duplicateInFile": "Identifier occurs more than once in the file",
+      "withoutIdentifier": "No identifier — cannot be matched again",
+      "summary": "{created} new, {updated} updated, {skipped} skipped",
+      "done": "{created} created, {updated} updated.",
+      "errors": {
+        "fileMissing": "No file chosen",
+        "fileTooLarge": "File is too large (max. 5 MB)",
+        "tooManyRows": "Too many rows (max. 5000)"
+      }
+    },
     "geraet": {
       "typ": "Type",
       "bezeichnung": "Description",

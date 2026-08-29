@@ -43,6 +43,26 @@
       "search": "Suchen",
       "showInactive": "Ausgeschiedene anzeigen"
     },
+    "import": {
+      "title": "Ausrüstung importieren",
+      "button": "Importieren",
+      "chooseFile": "Datei wählen (XLSX oder CSV)",
+      "hint": "Artikelexport aus FDISK oder eine CSV-Datei mit denselben Spaltennamen.",
+      "preview": "{count, plural, =0 {Keine Zeilen} one {Eine Zeile} other {# Zeilen}} gefunden",
+      "statusNew": "neu",
+      "statusUpdate": "aktualisieren",
+      "statusSkip": "überspringen",
+      "matchedBy": "Treffer über {field}",
+      "duplicateInFile": "Kennung kommt in der Datei mehrfach vor",
+      "withoutIdentifier": "Keine Kennung — nicht wieder zuzuordnen",
+      "summary": "{created} neu, {updated} aktualisiert, {skipped} übersprungen",
+      "done": "{created} angelegt, {updated} aktualisiert.",
+      "errors": {
+        "fileMissing": "Keine Datei gewählt",
+        "fileTooLarge": "Datei ist zu groß (max. 5 MB)",
+        "tooManyRows": "Zu viele Zeilen (max. 5000)"
+      }
+    },
     "geraet": {
       "typ": "Typ",
       "bezeichnung": "Bezeichnung",

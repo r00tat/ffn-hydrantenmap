@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
 import Fab from '@mui/material/Fab';
@@ -38,6 +40,7 @@ import {
   type GeraetInput,
 } from '../atemschutzActions';
 import GeraetDialog from './GeraetDialog';
+import GeraetImportDialog from './GeraetImportDialog';
 
 type TypFilter = AtemschutzGeraetTyp | 'alle';
 
@@ -63,6 +66,7 @@ export default function AtemschutzAdmin() {
   const [editGeraet, setEditGeraet] = useState<AtemschutzGeraet | undefined>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loeschKandidat, setLoeschKandidat] = useState<AtemschutzGeraet>();
+  const [importOpen, setImportOpen] = useState(false);
 
   const gefiltert = useMemo(() => {
     // Die Suche geht über dieselben normalisierten Kennungen wie der Scanner:
@@ -160,6 +164,12 @@ export default function AtemschutzAdmin() {
               <Typography variant="body2" color="text.secondary">
                 {t('admin.count', { count: gefiltert.length })}
               </Typography>
+              <Button
+                startIcon={<UploadFileIcon />}
+                onClick={() => setImportOpen(true)}
+              >
+                {t('import.button')}
+              </Button>
             </Stack>
 
             {gefiltert.length === 0 ? (
@@ -236,6 +246,19 @@ export default function AtemschutzAdmin() {
                 <AddIcon />
               </Fab>
             </Tooltip>
+
+            {importOpen && (
+              // `onDone` bleibt leer: `useAtemschutzGeraete` hängt an einem
+              // Firestore-Listener und zieht die neuen Dokumente von selbst
+              // nach — ein Neuladen von Hand wäre ein zweiter Weg, auf dem die
+              // Liste veralten kann.
+              <GeraetImportDialog
+                open
+                groupId={groupId}
+                onClose={() => setImportOpen(false)}
+                onDone={() => undefined}
+              />
+            )}
 
             {dialogOpen && (
               <GeraetDialog
