@@ -104,7 +104,7 @@ export default function TruppCard({
           )}
         </Stack>
 
-        <Typography variant="body1">{trupp.mitglieder.join(' · ')}</Typography>
+        <Typography variant="body2">{trupp.mitglieder.join(' · ')}</Typography>
 
         <Typography variant="body2" color="text.secondary" component="div">
           {trupp.status === 'bereit' &&

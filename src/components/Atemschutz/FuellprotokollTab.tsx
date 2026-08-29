@@ -126,7 +126,7 @@ export default function FuellprotokollTab({
       {fuellungen.length === 0 ? (
         <Typography color="text.secondary">{t('fuellung.empty')}</Typography>
       ) : (
-        <List>
+        <List dense>
           {fuellungen.map((f) => (
             <ListItem
               key={f.id}

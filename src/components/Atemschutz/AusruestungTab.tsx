@@ -169,7 +169,7 @@ export default function AusruestungTab({
       ) : gefiltert.length === 0 ? (
         <Typography color="text.secondary">{t('ausruestung.noMatch')}</Typography>
       ) : (
-        <List>
+        <List dense>
           {gefiltert.map((g) => {
             const ausgabe = ausgabeByGeraet.get(g.id as string);
             const status = ausgabe?.status ?? 'amPlatz';

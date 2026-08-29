@@ -31,9 +31,11 @@ function zusammen(teile?: (string | false | undefined)[]): string {
  *
  * Als gemeinsames Bauteil, weil beide Listen dasselbe zeigen sollen und zuvor
  * auseinanderliefen: Die eine begann die zweite Zeile mit der Bezeichnung, die
- * andere mit der Wehr. Die Größen sind bewusst eine Stufe über dem, was MUI in
- * einer `dense`-Liste vorgibt — gelesen wird das im Stehen, mit Handschuhen,
- * bei Tageslicht.
+ * andere mit der Wehr.
+ *
+ * Die Kennung steht eine Stufe über dem Fließtext und fett — genug, um sie
+ * beim Überfliegen zu finden, ohne dass eine Liste mit dreißig Flaschen zur
+ * Bildschirmseite je Eintrag wird.
  */
 export default function AtemschutzZeile({
   titel,
@@ -53,7 +55,7 @@ export default function AtemschutzZeile({
           spacing={1}
           sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.4 }}>
             {titel}
           </Typography>
           {chips}
@@ -61,7 +63,7 @@ export default function AtemschutzZeile({
       }
       secondary={
         <Box>
-          {infoText && <Typography variant="body1">{infoText}</Typography>}
+          {infoText && <Typography variant="body2">{infoText}</Typography>}
           {detailText && (
             <Typography variant="body2" color="text.secondary">
               {detailText}

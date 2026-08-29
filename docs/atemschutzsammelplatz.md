@@ -145,10 +145,11 @@ dreiteilig — Kennung als Überschrift mit den Chips daneben, darunter die
 **Wehr zuerst**, darunter Namen, Zeiten und Bemerkungen.
 
 Die Wehr steht vorn, weil am Sammelplatz Stücke mehrerer Feuerwehren
-durcheinander liegen und beim Durchsehen genau danach gesucht wird. Die Größen
-liegen bewusst eine Stufe über dem, was MUI in einer `dense`-Liste vorgibt —
-gelesen wird das im Stehen, mit Handschuhen, bei Tageslicht. `dense` ist
-deshalb an beiden Listen weg.
+durcheinander liegen und beim Durchsehen genau danach gesucht wird. Die Kennung
+steht eine Stufe über dem Fließtext und fett: genug, um sie beim Überfliegen zu
+finden, ohne dass eine Liste mit dreißig Flaschen zur Bildschirmseite je Eintrag
+wird. Groß und ausführlich ist die Anzeige nur dort, wo *ein* Stück feststeht —
+in `GeraetBestaetigung` im Dialog.
 
 ## Ein Trupp steht nur einmal auf der Tafel
 
