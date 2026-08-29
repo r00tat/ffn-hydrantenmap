@@ -11,7 +11,10 @@ import {
 } from '../../common/atemschutz';
 import { addDoc, deleteDoc, updateDoc } from '../../lib/firestoreClient';
 import { firestore } from '../firebase/firebase';
-import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  GROUP_COLLECTION_ID,
+} from '../firebase/firestore';
 
 /** Wer geschrieben hat und wann — dieselben vier Felder wie überall sonst. */
 export interface AtemschutzActor {
@@ -26,8 +29,19 @@ function firecallCollection(
   return collection(firestore, FIRECALL_COLLECTION_ID, firecallId, name);
 }
 
-export function fuellungCollection(firecallId: string) {
-  return firecallCollection(firecallId, ATEMSCHUTZ_FUELLUNG_COLLECTION_ID);
+/**
+ * Das Füllprotokoll liegt unter der **Gruppe**, nicht unter dem Einsatz:
+ * Gefüllt wird überwiegend im Feuerwehrhaus, und der Nachweis ist einer über
+ * die Flasche, nicht über den Einsatz. Der Einsatzbezug steht als Feld
+ * `firecallId` am Dokument.
+ */
+export function fuellungCollection(groupId: string): CollectionReference {
+  return collection(
+    firestore,
+    GROUP_COLLECTION_ID,
+    groupId,
+    ATEMSCHUTZ_FUELLUNG_COLLECTION_ID,
+  );
 }
 
 export function truppCollection(firecallId: string) {
@@ -59,11 +73,11 @@ export type NeueFuellung = Omit<
 >;
 
 export async function addFuellung(
-  firecallId: string,
+  groupId: string,
   data: NeueFuellung,
   actor: AtemschutzActor,
 ): Promise<string> {
-  const ref = await addDoc(fuellungCollection(firecallId), {
+  const ref = await addDoc(fuellungCollection(groupId), {
     ...data,
     ...created(actor),
   });
@@ -71,22 +85,22 @@ export async function addFuellung(
 }
 
 export async function updateFuellung(
-  firecallId: string,
+  groupId: string,
   fuellungId: string,
   patch: Partial<NeueFuellung>,
   actor: AtemschutzActor,
 ): Promise<void> {
-  await updateDoc(doc(fuellungCollection(firecallId), fuellungId), {
+  await updateDoc(doc(fuellungCollection(groupId), fuellungId), {
     ...patch,
     ...touched(actor),
   });
 }
 
 export async function deleteFuellung(
-  firecallId: string,
+  groupId: string,
   fuellungId: string,
 ): Promise<void> {
-  await deleteDoc(doc(fuellungCollection(firecallId), fuellungId));
+  await deleteDoc(doc(fuellungCollection(groupId), fuellungId));
 }
 
 export type NeuerTrupp = Omit<

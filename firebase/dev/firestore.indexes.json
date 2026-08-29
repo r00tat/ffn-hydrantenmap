@@ -151,6 +151,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "atemschutzFuellung",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "firecallId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "zeitpunkt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

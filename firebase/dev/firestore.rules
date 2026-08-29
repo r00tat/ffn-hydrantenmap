@@ -291,6 +291,19 @@ service cloud.firestore {
         allow write: if adminUser();
       }
 
+      // Füllprotokoll der Atemluftflaschen. Anders als `atemschutzGeraet`
+      // darf hier *jedes Gruppenmitglied schreiben*: Wer füllt, protokolliert,
+      // und das ist selten ein Admin. Geschrieben wird clientseitig und nicht
+      // über eine Server Action, weil am Sammelplatz die Verbindung schlecht
+      // ist — Firestore stellt Client-Schreibvorgänge offline zurück und
+      // spielt sie nach, eine Server Action scheitert.
+      // Einsatz-Gäste sind keine Gruppenmitglieder und damit außen vor; sie
+      // können die Geräte-Stammdaten ohnehin nicht lesen.
+      match /atemschutzFuellung/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow write: if fahrtenbuchMember();
+      }
+
       match /fahrtenbuch/{doc} {
         allow read: if fahrtenbuchMember();
         allow create, update, delete: if false;
