@@ -1,7 +1,9 @@
 'use server';
 import 'server-only';
 
+import { FieldValue } from 'firebase-admin/firestore';
 import { uniqueArray } from '../../common/arrayUtils';
+import { userSessionCache } from '../../server/auth/userSessionCache';
 import {
   GROUP_COLLECTION_ID,
   USER_COLLECTION_ID,
@@ -20,7 +22,11 @@ export async function getGroupsAction(): Promise<Group[]> {
   return await getGroups();
 }
 
-export async function updateGroupAction(group: Group, assigendUsers: string[]) {
+export async function updateGroupAction(
+  group: Group,
+  assigendUsers: string[],
+  groupAdmins: string[] = []
+) {
   await actionAdminRequired();
 
   console.info(
@@ -88,6 +94,68 @@ export async function updateGroupAction(group: Group, assigendUsers: string[]) {
   );
 
   await batch.commit();
+
+  // Gruppen-Admins. Geschrieben wird mit arrayUnion/arrayRemove statt die
+  // Liste am Benutzerdokument neu zu setzen: Zwei Admins, die gleichzeitig
+  // zwei *verschiedene* Gruppen pflegen, fassen dasselbe Benutzerdokument an
+  // und überschrieben sich sonst gegenseitig.
+  const memberIds = new Set(assigendUsers);
+  // Wer die Gruppe verlässt, verliert dort auch seine Rollen. Ohne das bliebe
+  // eine schlafende Rolle stehen, die beim Wiedereintritt in die Gruppe
+  // unbemerkt wieder wirksam würde.
+  const wantedAdmins = new Set(groupAdmins.filter((uid) => memberIds.has(uid)));
+  const currentAdmins = new Set(
+    users
+      .filter((user) => (user.data().groupAdmin || []).includes(groupId))
+      .map((user) => user.id)
+  );
+  const addAdmins = [...wantedAdmins].filter((uid) => !currentAdmins.has(uid));
+  const removeAdmins = [...currentAdmins].filter(
+    (uid) => !wantedAdmins.has(uid)
+  );
+  const removeGeraetemeister = users
+    .filter(
+      (user) =>
+        (user.data().fahrtenbuchGeraetemeister || []).includes(groupId) &&
+        !memberIds.has(user.id)
+    )
+    .map((user) => user.id);
+
+  if (addAdmins.length || removeAdmins.length || removeGeraetemeister.length) {
+    const roleBatch = firestore.batch();
+    addAdmins.forEach((uid) =>
+      roleBatch.set(
+        userCollection.doc(uid),
+        { groupAdmin: FieldValue.arrayUnion(groupId) },
+        { merge: true }
+      )
+    );
+    removeAdmins.forEach((uid) =>
+      roleBatch.set(
+        userCollection.doc(uid),
+        { groupAdmin: FieldValue.arrayRemove(groupId) },
+        { merge: true }
+      )
+    );
+    removeGeraetemeister.forEach((uid) =>
+      roleBatch.set(
+        userCollection.doc(uid),
+        { fahrtenbuchGeraetemeister: FieldValue.arrayRemove(groupId) },
+        { merge: true }
+      )
+    );
+    await roleBatch.commit();
+  }
+
+  // Ohne Invalidierung bliebe jede Änderung an Mitgliedschaft und Rollen bis
+  // zum Cache-Ablauf wirkungslos — dieselbe Mechanik wie in updateUser.ts.
+  [
+    ...addUsers.map((user) => user.id),
+    ...removeUsers.map((user) => user.id),
+    ...addAdmins,
+    ...removeAdmins,
+    ...removeGeraetemeister,
+  ].forEach((uid) => userSessionCache.invalidate(uid));
 
   // update claims for users
   await Promise.all(

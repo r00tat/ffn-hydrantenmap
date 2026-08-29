@@ -30,6 +30,7 @@ describe('loadMcpUser', () => {
       isAdmin: true,
       groups: ['allUsers', 'ffnd'],
       fahrtenbuchGeraetemeister: [],
+      groupAdmin: [],
     });
   });
 

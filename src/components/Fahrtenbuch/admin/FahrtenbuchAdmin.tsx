@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
+import { isGroupAdmin } from '../../../common/groupPermissions';
 import FahrtenbuchAdminGuard from './FahrtenbuchAdminGuard';
 import FahrtenbuchImport from './FahrtenbuchImport';
 import GeraetemeisterSettings from './GeraetemeisterSettings';
@@ -31,8 +32,9 @@ type AdminTabKey =
   | 'pdfImport';
 
 /**
- * Nur Admins sehen alle Reiter. Ein Gerätemeister pflegt Fahrzeuge und
- * Personen; Einstellungen, Share-Links und PDF-Import bleiben admin-only.
+ * Admins und Gruppen-Admins sehen alle Reiter. Ein Gerätemeister pflegt
+ * Fahrzeuge und Personen; Einstellungen, Share-Links und PDF-Import bleiben
+ * der Gruppenadministration vorbehalten.
  */
 const MANAGER_TABS: AdminTabKey[] = ['vehicles', 'persons'];
 const ADMIN_TABS: AdminTabKey[] = [
@@ -59,19 +61,41 @@ const TAB_LABEL_KEYS = {
 export default function FahrtenbuchAdmin() {
   const t = useTranslations('fahrtenbuch');
   const { groups: allGroups, groupId, setGroupId } = useFahrtenbuchGroup();
-  const { isAdmin, fahrtenbuchGeraetemeister } = useFirebaseLogin();
-  // Ein Gerätemeister verwaltet nur die Gruppen, in denen er eingetragen ist.
-  // Das ist keine Sicherheitsgrenze — die ist
-  // `actionFahrtenbuchManagerRequired` in den Server Actions.
+  const {
+    isAdmin,
+    fahrtenbuchGeraetemeister,
+    groupAdmin,
+    groups: userGroups,
+  } = useFirebaseLogin();
+  // Ein Gerätemeister oder Gruppen-Admin verwaltet nur die Gruppen, in denen
+  // er eingetragen ist. Das ist keine Sicherheitsgrenze — die ist
+  // `actionFahrtenbuchManagerRequired` bzw. `actionGroupAdminRequired` in den
+  // Server Actions.
   const groups = useMemo(
     () =>
       isAdmin
         ? allGroups
-        : allGroups.filter((g) => fahrtenbuchGeraetemeister?.includes(g.id)),
-    [allGroups, isAdmin, fahrtenbuchGeraetemeister],
+        : allGroups.filter(
+            (g) =>
+              fahrtenbuchGeraetemeister?.includes(g.id) ||
+              groupAdmin?.includes(g.id),
+          ),
+    [allGroups, isAdmin, fahrtenbuchGeraetemeister, groupAdmin],
   );
-  const tabs = isAdmin ? ADMIN_TABS : MANAGER_TABS;
+  // Die Reiter hängen an der *gewählten* Gruppe: Wer in einer Gruppe
+  // Gruppen-Admin und in einer anderen nur Gerätemeister ist, sieht beim
+  // Umschalten unterschiedliche Reiter.
+  const tabs = isGroupAdmin(groupId ?? '', {
+    isAdmin,
+    groups: userGroups,
+    groupAdmin,
+  })
+    ? ADMIN_TABS
+    : MANAGER_TABS;
   const [tab, setTab] = useState<AdminTabKey>('vehicles');
+  // Beim Wechsel auf eine Gruppe mit weniger Reitern zeigte `tab` sonst auf
+  // einen, den es dort nicht gibt — die Seite bliebe leer.
+  const activeTab = tabs.includes(tab) ? tab : tabs[0];
   // Fällt eine Gruppe aus den Claims, ohne dass die Auswahl nachzieht, ist die
   // ID immer noch besser als ein leerer Name.
   const groupName = groups.find((g) => g.id === groupId)?.name ?? groupId ?? '';
@@ -114,7 +138,7 @@ export default function FahrtenbuchAdmin() {
         ) : (
           <>
             <Tabs
-              value={tab}
+              value={activeTab}
               onChange={(_, value: AdminTabKey) => setTab(value)}
               sx={{ mb: 2 }}
             >
@@ -125,14 +149,14 @@ export default function FahrtenbuchAdmin() {
 
             {/* `key` verwirft Dialog- und Meldungszustand beim Gruppenwechsel,
                 damit keine Meldung der vorigen Gruppe stehen bleibt. */}
-            {tab === 'vehicles' && (
+            {activeTab === 'vehicles' && (
               <VehicleAdmin
                 key={groupId}
                 groupId={groupId}
                 groupName={groupName}
               />
             )}
-            {tab === 'persons' && (
+            {activeTab === 'persons' && (
               <PersonAdmin
                 key={groupId}
                 groupId={groupId}
@@ -145,7 +169,7 @@ export default function FahrtenbuchAdmin() {
 
                 Die Breite steuert dieser Container und nicht die Karte: So
                 füllen sie ihre Spalte, statt in ihr zu schwimmen. */}
-            {tab === 'settings' && (
+            {activeTab === 'settings' && (
               <Box
                 key={groupId}
                 sx={{
@@ -182,14 +206,14 @@ export default function FahrtenbuchAdmin() {
                 <MangelMigration groupId={groupId} />
               </Box>
             )}
-            {tab === 'shareLink' && (
+            {activeTab === 'shareLink' && (
               <ShareLinkSection
                 key={groupId}
                 groupId={groupId}
                 groupName={groupName}
               />
             )}
-            {tab === 'pdfImport' && (
+            {activeTab === 'pdfImport' && (
               <FahrtenbuchImport
                 key={groupId}
                 groupId={groupId}

@@ -64,6 +64,8 @@ declare module 'next-auth' {
       groups: string[];
       /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
       fahrtenbuchGeraetemeister?: string[];
+      /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
+      groupAdmin?: string[];
       /** Einsatz-Gast: der einzige Einsatz, auf den dieser Benutzer Zugriff hat. */
       firecall?: string;
       /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
@@ -162,6 +164,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.groups = userData.groups;
           session.user.fahrtenbuchGeraetemeister =
             userData.fahrtenbuchGeraetemeister;
+          session.user.groupAdmin = userData.groupAdmin;
           session.user.firecall = userData.firecall;
           session.user.firecallWrite = userData.firecallWrite;
           session.user.firecallExpiresAt = userData.firecallExpiresAt;
@@ -230,6 +233,13 @@ export async function actionAdminRequired() {
 
   return session;
 }
+
+/**
+ * Der Guard für gruppenbezogene Administration. Er steht in einem eigenen
+ * Modul, damit er sich ohne NextAuth und Firebase Admin testen lässt, und wird
+ * hier nur weitergereicht — Aufrufer holen alle Guards aus `app/auth`.
+ */
+export { actionGroupAdminRequired } from './groups/groupAdminGuard';
 
 export interface FirecallAuthorizationOptions {
   /**

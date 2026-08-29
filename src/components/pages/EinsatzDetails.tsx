@@ -32,6 +32,7 @@ import { useAuditLog } from '../../hooks/useAuditLog';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
+import { isGroupAdmin } from '../../common/groupPermissions';
 import FirecallExport from '../firebase/FirecallExport';
 import LagekarteExport from '../firebase/LagekarteExport';
 import { firestore } from '../firebase/firebase';
@@ -63,7 +64,8 @@ export default function EinsatzDetails() {
   const tFahrtenbuch = useTranslations('fahrtenbuch');
   const firecallId = useFirecallId();
   const setFirecallId = useFirecallSelect();
-  const { isAdmin, email, myGroups } = useFirebaseLogin();
+  const { isAdmin, email, myGroups, groups, groupAdmin } =
+    useFirebaseLogin();
   const logChange = useAuditLog();
   const showSnackbar = useSnackbar();
   const { displayItems } = useVehicles();
@@ -247,7 +249,13 @@ export default function EinsatzDetails() {
             </IconButton>
           </Tooltip>
         )}
-        {isAdmin && (
+        {/* Löschen darf, wer die Gruppe des Einsatzes administriert —
+            globaler Admin oder Gruppen-Admin. */}
+        {isGroupAdmin(firecall.group ?? '', {
+          isAdmin,
+          groups,
+          groupAdmin,
+        }) && (
           <Tooltip title={tCommon('delete')}>
             <IconButton
               size="small"

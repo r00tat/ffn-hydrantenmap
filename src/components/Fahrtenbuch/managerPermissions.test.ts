@@ -70,3 +70,33 @@ describe('hasAnyFahrtenbuchManagerRole', () => {
     expect(hasAnyFahrtenbuchManagerRole({})).toBe(false);
   });
 });
+
+describe('Gruppen-Admin', () => {
+  it('ist Fahrtenbuch-Manager seiner Gruppe', () => {
+    expect(
+      isFahrtenbuchManager('ffnd', {
+        groups: ['ffnd'],
+        groupAdmin: ['ffnd'],
+      }),
+    ).toBe(true);
+  });
+
+  it('ist es nicht in einer anderen Gruppe', () => {
+    expect(
+      isFahrtenbuchManager('ffxy', {
+        groups: ['ffnd', 'ffxy'],
+        groupAdmin: ['ffnd'],
+      }),
+    ).toBe(false);
+  });
+
+  it('braucht wie der Gerätemeister die Mitgliedschaft', () => {
+    expect(
+      isFahrtenbuchManager('ffnd', { groups: [], groupAdmin: ['ffnd'] }),
+    ).toBe(false);
+  });
+
+  it('öffnet die Verwaltungsseite', () => {
+    expect(hasAnyFahrtenbuchManagerRole({ groupAdmin: ['ffnd'] })).toBe(true);
+  });
+});

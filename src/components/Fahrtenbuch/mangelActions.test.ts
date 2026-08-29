@@ -14,7 +14,7 @@ const {
   batchSetMock,
   batchCommitMock,
   actionUserRequiredMock,
-  actionAdminRequiredMock,
+  actionGroupAdminRequiredMock,
   deleteMangelImagesMock,
   signMangelImagesMock,
 } = vi.hoisted(() => ({
@@ -31,12 +31,12 @@ const {
   batchSetMock: vi.fn(),
   batchCommitMock: vi.fn(),
   actionUserRequiredMock: vi.fn(),
-  actionAdminRequiredMock: vi.fn(),
+  actionGroupAdminRequiredMock: vi.fn(),
 }));
 
 vi.mock('../../app/auth', () => ({
   actionUserRequired: actionUserRequiredMock,
-  actionAdminRequired: actionAdminRequiredMock,
+  actionGroupAdminRequired: actionGroupAdminRequiredMock,
 }));
 
 vi.mock('./mangelImageStore', () => ({
@@ -147,7 +147,7 @@ function openMangel(statuses: string[]) {
 beforeEach(() => {
   vi.clearAllMocks();
   actionUserRequiredMock.mockResolvedValue(SESSION);
-  actionAdminRequiredMock.mockResolvedValue(ADMIN_SESSION);
+  actionGroupAdminRequiredMock.mockResolvedValue(ADMIN_SESSION);
   vehicleGetMock.mockResolvedValue({
     exists: true,
     id: 'v1',
@@ -627,7 +627,7 @@ describe('migrateDefectsToMangel', () => {
   });
 
   it('verlangt Admin-Rechte', async () => {
-    actionAdminRequiredMock.mockRejectedValue(new Error('admin required'));
+    actionGroupAdminRequiredMock.mockRejectedValue(new Error('group admin required'));
     const result = await migrateDefectsToMangel('ffnd');
     expect(result.success).toBe(false);
     expect(batchCommitMock).not.toHaveBeenCalled();

@@ -28,13 +28,13 @@ describe('assertFahrtenbuchGroup', () => {
 
   it('lehnt die Pseudo-Gruppe allUsers ab', () => {
     expect(() => assertFahrtenbuchGroup('allUsers')).toThrow(
-      /allUsers is not a valid Fahrtenbuch group/,
+      /allUsers is not a valid group/,
     );
   });
 
   it('lehnt die Berechtigungsgruppe kostenersatz ab', () => {
     expect(() => assertFahrtenbuchGroup('kostenersatz')).toThrow(
-      /kostenersatz is not a valid Fahrtenbuch group/,
+      /kostenersatz is not a valid group/,
     );
   });
 

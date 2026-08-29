@@ -2,20 +2,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const { actionAdminRequiredMock, actionUserRequiredMock, sendMock } = vi.hoisted(
+const { actionGroupAdminRequiredMock, actionUserRequiredMock, sendMock } = vi.hoisted(
   () => ({
-    actionAdminRequiredMock: vi.fn(),
+    actionGroupAdminRequiredMock: vi.fn(),
     actionUserRequiredMock: vi.fn(),
     sendMock: vi.fn(),
   }),
 );
 
-vi.mock('../../app/auth', () => ({
-  actionAdminRequired: () => actionAdminRequiredMock(),
-  // `authGuards` importiert diese Funktion; sie wird hier nicht aufgerufen,
-  // muss aber vorhanden sein, damit der Named Import nicht scheitert.
-  actionUserRequired: () => actionUserRequiredMock(),
-}));
+// Der Guard ist gemockt, seine Mandanten-Sperre bleibt aber echt.
+vi.mock('../../app/auth', async () => {
+  const { assertTenantGroup } = await vi.importActual<
+    typeof import('../../app/groups/groupTypes')
+  >('../../app/groups/groupTypes');
+  return {
+    actionGroupAdminRequired: (groupId: string) => {
+      assertTenantGroup(groupId);
+      return actionGroupAdminRequiredMock(groupId);
+    },
+    // `authGuards` importiert diese Funktion; sie wird hier nicht aufgerufen,
+    // muss aber vorhanden sein, damit der Named Import nicht scheitert.
+    actionUserRequired: () => actionUserRequiredMock(),
+  };
+});
 
 vi.mock('./sendWeeklyReports', () => ({
   sendWeeklyReportForGroup: (options: unknown) => sendMock(options),
@@ -36,7 +45,7 @@ const sentResult = {
 describe('sendWeeklyReportNow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    actionAdminRequiredMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    actionGroupAdminRequiredMock.mockResolvedValue({ user: { id: 'admin-1' } });
     sendMock.mockResolvedValue(sentResult);
   });
 
@@ -48,7 +57,7 @@ describe('sendWeeklyReportNow', () => {
       recipients: ['kommandant@example.at'],
     });
 
-    expect(actionAdminRequiredMock).toHaveBeenCalled();
+    expect(actionGroupAdminRequiredMock).toHaveBeenCalled();
     expect(result).toEqual({ success: true, result: sentResult });
     expect(sendMock).toHaveBeenCalledWith({
       groupId: 'ffnd',

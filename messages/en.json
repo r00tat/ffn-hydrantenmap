@@ -515,6 +515,7 @@
       "counterEndBeforeStart": "{counter}: final reading is below the starting reading.",
       "notAllowed": "Only the author, an equipment officer or an admin may change this entry.",
       "notInGroup": "You are not a member of this group.",
+      "notGroupAdmin": "You are not allowed to administer this group.",
       "notLoggedIn": "Not signed in, or your authorisation was revoked. Please sign in again.",
       "entryDeleted": "This entry was deleted and cannot be edited.",
       "tooManyEntries": "Too many trips at once. Please save in smaller batches.",
@@ -2047,7 +2048,9 @@
       "description": "Description"
     },
     "fahrtenbuchLinkHint": "The logbook link and its QR codes are managed in the logbook administration.",
-    "fahrtenbuchLinkAction": "Go to logbook administration"
+    "fahrtenbuchLinkAction": "Go to logbook administration",
+    "groupAdmins": "Group admins",
+    "groupAdminsHint": "Group admins handle all administrative tasks within this group — logbook administration including equipment managers, group settings and deleting the group's operations. Only group members can be selected."
   },
   "tokens": {
     "title": "API tokens",

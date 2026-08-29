@@ -2,13 +2,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const actionAdminRequiredMock = vi.fn();
+const actionGroupAdminRequiredMock = vi.fn();
 // `actionFahrtenbuchManagerRequired` läuft hier echt und ruft `actionUserRequired`.
 const actionUserRequiredMock = vi.fn();
-vi.mock('../../app/auth', () => ({
-  actionAdminRequired: () => actionAdminRequiredMock(),
-  actionUserRequired: () => actionUserRequiredMock(),
-}));
+// Der Guard ist gemockt, seine Mandanten-Sperre bleibt aber echt: Die Tests
+// unten prüfen weiterhin, dass eine Pseudo-Gruppe abgelehnt wird.
+vi.mock('../../app/auth', async () => {
+  const { assertTenantGroup } = await vi.importActual<
+    typeof import('../../app/groups/groupTypes')
+  >('../../app/groups/groupTypes');
+  return {
+    actionGroupAdminRequired: (groupId: string) => {
+      assertTenantGroup(groupId);
+      return actionGroupAdminRequiredMock(groupId);
+    },
+    actionUserRequired: () => actionUserRequiredMock(),
+  };
+});
 
 const {
   setMock,
@@ -53,7 +63,7 @@ const adminSession = { user: { id: 'admin1', isAdmin: true } };
 describe('saveFahrtenbuchGroupStandort', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    actionAdminRequiredMock.mockResolvedValue(adminSession);
+    actionGroupAdminRequiredMock.mockResolvedValue(adminSession);
     actionUserRequiredMock.mockResolvedValue({
       user: { id: 'admin1', isAdmin: true, groups: ['allUsers'] },
     });
@@ -62,15 +72,15 @@ describe('saveFahrtenbuchGroupStandort', () => {
     collectionMock.mockReturnValue({ doc: docMock });
   });
 
-  it('gibt einen Fehler zurück, statt zu werfen, wenn der Admin-Guard scheitert', async () => {
-    actionAdminRequiredMock.mockRejectedValueOnce(new Error('kein Admin'));
+  it('gibt einen Fehler zurück, statt zu werfen, wenn der Gruppen-Admin-Guard scheitert', async () => {
+    actionGroupAdminRequiredMock.mockRejectedValueOnce(new Error('kein Gruppen-Admin'));
 
     const result = await saveFahrtenbuchGroupStandort('ffnd', {
       lat: 47.94,
       lng: 16.84,
     });
 
-    expect(result).toEqual({ success: false, error: 'kein Admin' });
+    expect(result).toEqual({ success: false, error: 'kein Gruppen-Admin' });
     expect(setMock).not.toHaveBeenCalled();
   });
 
@@ -116,7 +126,7 @@ describe('saveFahrtenbuchGroupStandort', () => {
 describe('Mangel-Empfänger', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    actionAdminRequiredMock.mockResolvedValue(adminSession);
+    actionGroupAdminRequiredMock.mockResolvedValue(adminSession);
     actionUserRequiredMock.mockResolvedValue({
       user: { id: 'admin1', isAdmin: true, groups: ['allUsers'] },
     });
@@ -160,11 +170,11 @@ describe('Mangel-Empfänger', () => {
   });
 
   it('gibt beim Lesen einen Fehler zurück, statt zu werfen', async () => {
-    actionAdminRequiredMock.mockRejectedValueOnce(new Error('kein Admin'));
+    actionGroupAdminRequiredMock.mockRejectedValueOnce(new Error('kein Gruppen-Admin'));
 
     const result = await getFahrtenbuchMangelEmails('ffnd');
 
-    expect(result).toEqual({ success: false, emails: [], error: 'kein Admin' });
+    expect(result).toEqual({ success: false, emails: [], error: 'kein Gruppen-Admin' });
   });
 
   it('lehnt das Lesen für eine Nicht-Mandanten-Gruppe ab', async () => {
@@ -217,14 +227,14 @@ describe('Mangel-Empfänger', () => {
     expect(setMock).not.toHaveBeenCalled();
   });
 
-  it('schreibt nicht, wenn der Admin-Guard scheitert', async () => {
-    actionAdminRequiredMock.mockRejectedValueOnce(new Error('kein Admin'));
+  it('schreibt nicht, wenn der Gruppen-Admin-Guard scheitert', async () => {
+    actionGroupAdminRequiredMock.mockRejectedValueOnce(new Error('kein Gruppen-Admin'));
 
     const result = await saveFahrtenbuchMangelEmails('ffnd', [
       'zeugwart@example.at',
     ]);
 
-    expect(result).toEqual({ success: false, error: 'kein Admin' });
+    expect(result).toEqual({ success: false, error: 'kein Gruppen-Admin' });
     expect(setMock).not.toHaveBeenCalled();
   });
 });
@@ -296,7 +306,7 @@ describe('Gerätemeister-Zugriff auf die Stammdaten', () => {
   it('lässt den Gerätemeister nicht an die Mangel-Empfänger', async () => {
     // Die Einstellungen bleiben admin-only — sonst könnte sich ein
     // Gerätemeister selbst aus der Benachrichtigung nehmen.
-    actionAdminRequiredMock.mockRejectedValue(new Error('kein Admin'));
+    actionGroupAdminRequiredMock.mockRejectedValue(new Error('kein Gruppen-Admin'));
     actionUserRequiredMock.mockResolvedValue({
       user: {
         id: 'g1',
@@ -330,7 +340,7 @@ describe('proposePersonUserLinks', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    actionAdminRequiredMock.mockResolvedValue(adminSession);
+    actionGroupAdminRequiredMock.mockResolvedValue(adminSession);
     actionUserRequiredMock.mockResolvedValue(adminSession);
     batchCommitMock.mockResolvedValue(undefined);
   });
@@ -350,7 +360,7 @@ describe('proposePersonUserLinks', () => {
   it('zeigt dem Gerätemeister nur Konten seiner Gruppe', async () => {
     // Er darf zuordnen, aber die Konten anderer Feuerwehren sind nicht seine
     // Sache — die Personen seiner Gruppe kennt er ohnehin namentlich.
-    actionAdminRequiredMock.mockRejectedValue(new Error('kein Admin'));
+    actionGroupAdminRequiredMock.mockRejectedValue(new Error('kein Gruppen-Admin'));
     actionUserRequiredMock.mockResolvedValue({
       user: {
         id: 'g1',
@@ -486,7 +496,7 @@ describe('proposePersonUserLinks', () => {
 describe('savePersonUserLinks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    actionAdminRequiredMock.mockResolvedValue(adminSession);
+    actionGroupAdminRequiredMock.mockResolvedValue(adminSession);
     actionUserRequiredMock.mockResolvedValue(adminSession);
     batchCommitMock.mockResolvedValue(undefined);
     docMock.mockReturnValue({
@@ -512,7 +522,7 @@ describe('savePersonUserLinks', () => {
   });
 
   it('lässt den Gerätemeister ein Konto seiner Gruppe zuordnen', async () => {
-    actionAdminRequiredMock.mockRejectedValue(new Error('kein Admin'));
+    actionGroupAdminRequiredMock.mockRejectedValue(new Error('kein Gruppen-Admin'));
     actionUserRequiredMock.mockResolvedValue({
       user: {
         id: 'g1',
@@ -536,7 +546,7 @@ describe('savePersonUserLinks', () => {
   it('weist dem Gerätemeister ein gruppenfremdes Konto ab', async () => {
     // Der Filter im Vorschlag allein genügt nicht — die Nutzlast kommt vom
     // Client und kann jede Kennung nennen.
-    actionAdminRequiredMock.mockRejectedValue(new Error('kein Admin'));
+    actionGroupAdminRequiredMock.mockRejectedValue(new Error('kein Gruppen-Admin'));
     actionUserRequiredMock.mockResolvedValue({
       user: {
         id: 'g1',

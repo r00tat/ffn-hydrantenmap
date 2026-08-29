@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 
-import { actionAdminRequired } from '../../app/auth';
+import { actionGroupAdminRequired } from '../../app/auth';
 import {
   FAHRTENBUCH_CONFIG_COLLECTION_ID,
   FAHRTENBUCH_PERSON_COLLECTION_ID,
@@ -25,7 +25,6 @@ import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import {
   actionFahrtenbuchManagerRequired,
-  assertFahrtenbuchGroup,
 } from './authGuards';
 import { planInactivePersons } from './fahrtenbuchImportPlan';
 import {
@@ -520,8 +519,7 @@ export async function saveFahrtenbuchGroupStandort(
   standort: GeoPositionObject | undefined,
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionGroupAdminRequired(groupId);
 
     const sanitized = sanitizeStandort(standort);
     // Kein Standort ist erlaubt (Zurücksetzen); ein übergebener, aber
@@ -571,8 +569,7 @@ export async function getFahrtenbuchMangelEmails(
   groupId: string,
 ): Promise<MangelEmailsQueryResult> {
   try {
-    await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    await actionGroupAdminRequired(groupId);
 
     const doc = await configRef(groupId).get();
     if (!doc.exists) return { success: true, emails: [] };
@@ -601,8 +598,7 @@ export async function saveFahrtenbuchMangelEmails(
   emails: string[],
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionGroupAdminRequired(groupId);
 
     const { emails: sanitized, error } = sanitizeMangelEmails(emails);
     if (error) return { success: false, error };

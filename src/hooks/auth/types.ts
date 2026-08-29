@@ -35,6 +35,8 @@ export interface LoginData {
   groups?: string[];
   /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
   fahrtenbuchGeraetemeister?: string[];
+  /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
+  groupAdmin?: string[];
   isRefreshing?: boolean;
   myGroups: Group[];
   needsReLogin?: boolean;

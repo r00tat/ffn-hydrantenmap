@@ -1,8 +1,7 @@
 'use server';
 import 'server-only';
 
-import { actionAdminRequired } from '../../app/auth';
-import { assertFahrtenbuchGroup } from './authGuards';
+import { actionGroupAdminRequired } from '../../app/auth';
 import {
   sendWeeklyReportForGroup,
   type WeeklyReportResult,
@@ -50,8 +49,7 @@ export async function sendWeeklyReportNow({
   dryRun = false,
 }: SendWeeklyReportNowInput): Promise<SendWeeklyReportNowResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionGroupAdminRequired(groupId);
 
     // Dieselbe Prüfung wie beim Pflegen der Empfänger: gleiche Höchstzahl,
     // gleiche Fehlerschlüssel, gleiches Entdoppeln.

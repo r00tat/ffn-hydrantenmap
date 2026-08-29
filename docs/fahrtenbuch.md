@@ -601,11 +601,13 @@ Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{nam
 
 ## Gerätemeister
 
-Ein Admin trägt je Gruppe Gerätemeister ein (Einstellungen-Tab der
-Fahrtenbuch-Verwaltung). Sie dürfen zusätzlich zum Admin jeden Eintrag ihrer
-Gruppe korrigieren und die Fahrzeuge und Personen pflegen — nicht aber die
-Gruppeneinstellungen, die Share-Links, den PDF-Import oder das Löschen von
-Mängeln.
+Ein Admin oder Gruppen-Admin trägt je Gruppe Gerätemeister ein
+(Einstellungen-Tab der Fahrtenbuch-Verwaltung). Sie dürfen zusätzlich jeden
+Eintrag ihrer Gruppe korrigieren und die Fahrzeuge und Personen pflegen — nicht
+aber die Gruppeneinstellungen, die Share-Links, den PDF-Import oder das Löschen
+von Mängeln. Für die bleibt es beim Admin oder Gruppen-Admin, der die
+Gerätemeister-Rechte ohnehin einschließt; die Rollen im Überblick stehen in
+[berechtigungen.md](berechtigungen.md).
 
 Die Rolle steht als Liste von Gruppen-IDs **am Benutzerdokument**
 (`user/{uid}.fahrtenbuchGeraetemeister`) und nicht an `fahrtenbuchConfig`, wo
@@ -636,6 +638,8 @@ Drei Dinge, die daran hängen:
 Die Entscheidung fällt an genau einer Stelle:
 `isFahrtenbuchManager(groupId, user)` in
 [managerPermissions.ts](../src/components/Fahrtenbuch/managerPermissions.ts).
+Sie gibt auch für den Gruppen-Admin `true` zurück und holt sich diesen Teil aus
+`isGroupAdmin` in [groupPermissions.ts](../src/common/groupPermissions.ts).
 Sie liegt bewusst nicht in `entryLogic.ts` — auch der Drawer braucht sie, und
 der zöge sonst das Eintrags-Validierungsmodul in sein Bundle. Die Asymmetrie
 darin ist Absicht: Der Gerätemeister braucht die Mitgliedschaft in der Gruppe,

@@ -71,8 +71,9 @@ interface DrawerLink {
   href: string;
   admin?: boolean;
   /**
-   * Sichtbar für Admins *und* Fahrtenbuch-Gerätemeister. Nicht über `admin`
-   * abbildbar, weil dieses Flag ein Dutzend anderer Einträge steuert.
+   * Sichtbar für Admins, Gruppen-Admins *und* Fahrtenbuch-Gerätemeister. Nicht
+   * über `admin` abbildbar, weil dieses Flag ein Dutzend anderer Einträge
+   * steuert.
    */
   fahrtenbuchAdmin?: boolean;
   signedInOnly?: boolean;
@@ -175,7 +176,7 @@ export default function AppDrawer({
     },
     [setIsOpen],
   );
-  const { isAdmin, isSignedIn, fahrtenbuchGeraetemeister } =
+  const { isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin } =
     useFirebaseLogin();
   const firecallId = useFirecallId();
   const pathname = usePathname();
@@ -502,9 +503,13 @@ export default function AppDrawer({
     (item: DrawerLink) =>
       (isAdmin || !item.admin) &&
       (!item.fahrtenbuchAdmin ||
-        hasAnyFahrtenbuchManagerRole({ isAdmin, fahrtenbuchGeraetemeister })) &&
+        hasAnyFahrtenbuchManagerRole({
+          isAdmin,
+          fahrtenbuchGeraetemeister,
+          groupAdmin,
+        })) &&
       (isSignedIn || !item.signedInOnly),
-    [isAdmin, isSignedIn, fahrtenbuchGeraetemeister],
+    [isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin],
   );
 
   const renderLink = (item: DrawerLink, groupText?: string) => {

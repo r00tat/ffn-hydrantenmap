@@ -19,8 +19,9 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/releases.md](docs/releases.md) | Ein Release erstellen |
 | [docs/service-worker-pwa.md](docs/service-worker-pwa.md) | Änderungen unter `src/worker/`, Push, Precaching |
 | [docs/auth-und-origins.md](docs/auth-und-origins.md) | Basis-URL, WebAuthn-Origins, Cron-Aufrufer |
+| [docs/berechtigungen.md](docs/berechtigungen.md) | Rollen: globaler Admin, Gruppen-Admin, Gerätemeister, Gruppenmitglied, Einsatz-Gast; wer was vergibt, warum kein Custom Claim, die Guards |
 | [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Screenshot-Aufnahme |
-| [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle |
+| [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle (Rollen allgemein: docs/berechtigungen.md) |
 | [docs/einsatz-drive-fotos.md](docs/einsatz-drive-fotos.md) | Einsatz-Fotos im Google Shared Drive |
 | [docs/einsatz-backup.md](docs/einsatz-backup.md) | Einsatz sichern und zurückspielen: Umfang, was bewusst fehlt, Gruppenwahl beim Import, Dateinamen von Anhängen |
 | [docs/strassen-routing.md](docs/strassen-routing.md) | Routing über Straße für Leitungen und Linien |
@@ -381,6 +382,7 @@ Prefer Next.js Server Actions (`'use server'`) over API route handlers (`src/app
 **All server actions must be protected** with the appropriate auth guard from `src/app/auth.ts`:
 
 - `actionAdminRequired()` — admin-only operations (user management, system config)
+- `actionGroupAdminRequired(groupId)` — administrative operations within *one* group (Fahrtenbuch administration, group settings); see [docs/berechtigungen.md](docs/berechtigungen.md)
 - `actionUserRequired()` — any authorized/logged-in user
 - `actionUserAuthorizedForFirecall(firecallId)` — user authorized for a specific firecall
 
