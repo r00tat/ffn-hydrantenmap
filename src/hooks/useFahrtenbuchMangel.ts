@@ -5,7 +5,10 @@ import { orderBy, where, type QueryConstraint } from 'firebase/firestore';
 import {
   FAHRTENBUCH_MANGEL_COLLECTION_ID,
   isOpenMangel,
+  mangelItemId,
+  mangelItemType,
   type Mangel,
+  type MangelItemType,
 } from '../common/mangel';
 import { GROUP_COLLECTION_ID } from '../components/firebase/firestore';
 import useFirebaseCollection from './useFirebaseCollection';
@@ -16,6 +19,13 @@ export interface UseFahrtenbuchMangelOptions {
    * Regelfall: Die Mängelseite ist die Arbeitsliste über alle Fahrzeuge.
    */
   vehicleId?: string;
+  /**
+   * Nur Mängel eines Typs. Wird **im Speicher** gefiltert und nicht als
+   * `where`-Bedingung: Dokumente aus der Zeit vor dem Feld tragen kein
+   * `itemType`, und eine Firestore-Abfrage auf ein fehlendes Feld findet sie
+   * nicht — `mangelItemType()` kennt dagegen die Vorgabe.
+   */
+  itemType?: MangelItemType;
 }
 
 export interface UseFahrtenbuchMangelResult {
@@ -23,6 +33,8 @@ export interface UseFahrtenbuchMangelResult {
   openMangel: Mangel[];
   /** Anzahl offener Mängel je Fahrzeug-ID. */
   openCountByVehicle: Map<string, number>;
+  /** Anzahl offener Mängel je Ausrüstungs-ID. */
+  openCountByGeraet: Map<string, number>;
 }
 
 /**
@@ -37,7 +49,7 @@ export default function useFahrtenbuchMangel(
   groupId?: string,
   options: UseFahrtenbuchMangelOptions = {},
 ): UseFahrtenbuchMangelResult {
-  const { vehicleId } = options;
+  const { vehicleId, itemType } = options;
 
   const queryConstraints = useMemo<QueryConstraint[]>(() => {
     const constraints: QueryConstraint[] = [];
@@ -56,15 +68,23 @@ export default function useFahrtenbuchMangel(
   });
 
   return useMemo(() => {
-    const list = groupId ? (mangel ?? []) : [];
+    const alle = groupId ? (mangel ?? []) : [];
+    const list = itemType
+      ? alle.filter((m) => mangelItemType(m) === itemType)
+      : alle;
     const openMangel = list.filter(isOpenMangel);
+
     const openCountByVehicle = new Map<string, number>();
+    const openCountByGeraet = new Map<string, number>();
     for (const item of openMangel) {
-      openCountByVehicle.set(
-        item.vehicleId,
-        (openCountByVehicle.get(item.vehicleId) ?? 0) + 1,
-      );
+      const ziel =
+        mangelItemType(item) === 'vehicle'
+          ? openCountByVehicle
+          : openCountByGeraet;
+      const key = mangelItemId(item);
+      if (!key) continue;
+      ziel.set(key, (ziel.get(key) ?? 0) + 1);
     }
-    return { mangel: list, openMangel, openCountByVehicle };
-  }, [groupId, mangel]);
+    return { mangel: list, openMangel, openCountByVehicle, openCountByGeraet };
+  }, [groupId, mangel, itemType]);
 }

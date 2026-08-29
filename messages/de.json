@@ -4,6 +4,241 @@
     "title": "Einsatzkarte",
     "backAgainToExit": "Zum Beenden erneut Zurück drücken"
   },
+  "atemschutz": {
+    "title": "Atemschutzsammelplatz",
+    "typ": {
+      "flasche": "Atemluftflasche",
+      "maske": "Atemmaske",
+      "pressluftatmer": "Pressluftatmer",
+      "zubehoer": "Zubehör"
+    },
+    "sichtkontrolle": {
+      "offen": "offen",
+      "ok": "in Ordnung",
+      "mangel": "Mangel"
+    },
+    "errors": {
+      "identifierMissing": "Flaschennummer oder Feuerwehr muss angegeben sein",
+      "anzahlInvalid": "Anzahl muss zwischen 1 und 99 liegen",
+      "enddruckInvalid": "Enddruck muss größer als 0 sein",
+      "startdruckAboveEnddruck": "Startdruck liegt über dem Enddruck",
+      "gefuelltVonMissing": "Bitte eintragen, wer gefüllt hat",
+      "descriptionMissing": "Bitte den Mangel beschreiben",
+      "saveFailed": "Speichern fehlgeschlagen",
+      "codeMissing": "Kein Code angegeben",
+      "geraetNotFound": "Gerät nicht gefunden"
+    },
+    "admin": {
+      "title": "Atemschutz-Ausrüstung",
+      "group": "Gruppe",
+      "noGroups": "Keiner Gruppe zugeordnet.",
+      "noPermission": "Keine Berechtigung. Die Atemschutz-Stammdaten pflegt ein Gruppen-Admin.",
+      "add": "Gerät anlegen",
+      "edit": "{name} bearbeiten",
+      "delete": "{name} löschen",
+      "deleteConfirm": "Soll „{name}“ wirklich gelöscht werden?",
+      "empty": "Noch keine Ausrüstung erfasst.",
+      "count": "{count, plural, =0 {Keine Geräte} one {Ein Gerät} other {# Geräte}}",
+      "filterTyp": "Typ",
+      "filterAll": "Alle",
+      "search": "Suchen",
+      "showInactive": "Ausgeschiedene anzeigen"
+    },
+    "tabs": {
+      "fuellprotokoll": "Füllprotokoll",
+      "trupps": "Trupps",
+      "ausruestung": "Ausrüstung"
+    },
+    "header": {
+      "leiter": "ASSP-Leiter",
+      "fuellpersonal": "Füllpersonal",
+      "fuellpersonalHint": "Namen eintippen und mit Enter übernehmen; Komma trennt ebenfalls.",
+      "niemand": "nicht eingetragen",
+      "edit": "Leitung und Füllpersonal bearbeiten",
+      "dialogTitle": "ASSP-Leitung"
+    },
+    "fuellung": {
+      "add": "Füllung erfassen",
+      "dialogTitleNew": "Füllung erfassen",
+      "dialogTitleEdit": "Füllung bearbeiten",
+      "empty": "Noch keine Füllung erfasst.",
+      "total": "{count, plural, =0 {Keine Flasche} one {Eine Flasche} other {# Flaschen}} gefüllt",
+      "flaschenNummer": "Flaschennummer",
+      "feuerwehr": "Feuerwehr",
+      "anzahl": "Anzahl",
+      "anzahlHint": "Nur für Flaschen ohne Nummer",
+      "startdruck": "Startdruck (bar)",
+      "enddruck": "Enddruck (bar)",
+      "gefuelltVon": "Gefüllt von",
+      "zeitpunkt": "Zeitpunkt",
+      "sichtkontrolle": "Sichtkontrolle",
+      "mangelOhneGeraet": "Ein Mangel lässt sich nur an einer Flasche aus den Stammdaten erfassen. Diese Flasche gehört zu keinem Eintrag — bitte den Zustand in der Bemerkung festhalten.",
+      "mangelBereitsGemeldet": "Zu dieser Füllung ist bereits ein Mangel gemeldet.",
+      "bemerkung": "Bemerkung",
+      "scan": "Barcode scannen",
+      "delete": "Füllung löschen",
+      "deleteConfirm": "Soll diese Füllung wirklich gelöscht werden?",
+      "unbekannteFlaschen": "{count} Flaschen ohne Nummer",
+      "druckRange": "{start} → {ende} bar",
+      "druckNurEnde": "auf {ende} bar"
+    },
+    "qr": {
+      "title": "QR-Etikett",
+      "button": "QR-Etikett",
+      "hint": "Der Code enthält die Flaschennummer. Nach dem Ausdrucken auf die Flasche kleben.",
+      "noNumber": "Dieses Gerät hat keine Flaschennummer — bitte zuerst eine eintragen.",
+      "print": "Drucken",
+      "printBlocked": "Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.",
+      "exportFailed": "Das Etikett ließ sich nicht erzeugen."
+    },
+    "scanner": {
+      "title": "Barcode scannen",
+      "hint": "Barcode in den Rahmen halten.",
+      "starting": "Kamera wird gestartet …",
+      "unsupported": "Dieses Gerät bietet keine Kamera an. Bitte die Nummer von Hand eingeben.",
+      "denied": "Kein Zugriff auf die Kamera. Bitte die Berechtigung erteilen oder die Nummer von Hand eingeben.",
+      "error": "Die Kamera ließ sich nicht starten.",
+      "manual": "Nummer von Hand eingeben",
+      "manualHint": "Flaschennummer, Inventar-Nr., Seriennummer oder Feuerwehr — mit Enter übernehmen",
+      "noMatch": "Kein Gerät zu „{code}“ gefunden. Der Code wird als Flaschennummer übernommen.",
+      "multiple": "{count} Geräte tragen diesen Code — bitte wählen:",
+      "use": "Übernehmen"
+    },
+    "trupp": {
+      "add": "Trupp erfassen",
+      "dialogTitleNew": "Trupp erfassen",
+      "dialogTitleEdit": "Trupp bearbeiten",
+      "name": "Truppname",
+      "nameHint": "Optional, z.B. „Trupp 1“",
+      "feuerwehr": "Feuerwehr",
+      "mitglieder": "Truppmitglieder",
+      "mitgliederHint": "Namen eintippen und mit Enter übernehmen.",
+      "mitgliederVoll": "Höchstens {max} Namen je Trupp.",
+      "bemerkung": "Bemerkung",
+      "laufendeNummer": "{n}. Einsatz",
+      "status": {
+        "bereit": "In Bereitschaft",
+        "imEinsatz": "Im Einsatz",
+        "zurueck": "Zurück & Regeneration",
+        "abgemeldet": "Abgemeldet"
+      },
+      "sections": {
+        "bereit": "In Bereitschaft",
+        "imEinsatz": "Im Einsatz",
+        "zurueck": "Zurück & Regeneration",
+        "protokoll": "Protokoll"
+      },
+      "empty": {
+        "bereit": "Kein Trupp in Bereitschaft.",
+        "imEinsatz": "Kein Trupp im Einsatz.",
+        "zurueck": "Kein Trupp zurück.",
+        "protokoll": "Noch kein Trupp erfasst."
+      },
+      "actions": {
+        "entsenden": "Entsenden",
+        "rueckkehr": "Rückkehr",
+        "wiederBereit": "Wieder bereitstellen",
+        "abmelden": "Abmelden"
+      },
+      "entsendetAn": "Entsendet an",
+      "entsendetAnHint": "Fahrzeug oder taktische Einheit — optional",
+      "abmarschZeit": "Abmarsch",
+      "rueckkehrZeit": "Rückkehr",
+      "druckAbmarsch": "Geringster Druck beim Abmarsch (bar)",
+      "druckRueckkehr": "Geringster Druck bei Rückkehr (bar)",
+      "entsendenTitle": "Trupp entsenden",
+      "rueckkehrTitle": "Rückkehr protokollieren",
+      "seit": "seit {zeit}",
+      "delete": "Trupp löschen",
+      "deleteConfirm": "Soll diese Zeile wirklich gelöscht werden? Frühere Bereitstellungen desselben Trupps bleiben bestehen.",
+      "abmeldenConfirm": "Trupp abmelden? Die Zeile wird geschlossen.",
+      "errors": {
+        "feuerwehrMissing": "Feuerwehr muss angegeben sein",
+        "mitgliederMissing": "Mindestens ein Truppmitglied muss angegeben sein"
+      }
+    },
+    "ausruestung": {
+      "search": "Suchen",
+      "searchHint": "Scannen oder tippen, mit Enter übernehmen",
+      "filterTyp": "Typ",
+      "filterAll": "Alle",
+      "onlyOut": "Nur ausgegebene",
+      "empty": "Keine Ausrüstung in den Stammdaten dieser Gruppe.",
+      "noMatch": "Kein Treffer.",
+      "hint": "Der Bestand kommt aus den Stammdaten der Gruppe und wird in der Administration gepflegt.",
+      "scan": "Barcode scannen",
+      "status": {
+        "amPlatz": "Am Platz",
+        "ausgegeben": "Ausgegeben",
+        "zurueck": "Zurück"
+      },
+      "actions": {
+        "ausgeben": "Ausgeben",
+        "zuruecknehmen": "Zurücknehmen",
+        "mangel": "Mangel melden"
+      },
+      "ausgabeTitle": "Ausrüstung ausgeben",
+      "ruecknahmeTitle": "Ausrüstung zurücknehmen",
+      "ausgegebenAn": "Ausgegeben an",
+      "ausgegebenAnHint": "Trupp oder Feuerwehr",
+      "ausgabeZeit": "Ausgabe",
+      "ruecknahmeZeit": "Rücknahme",
+      "sichtkontrolle": "Sichtkontrolle",
+      "bemerkung": "Bemerkung",
+      "mangelTitle": "Mangel melden",
+      "mangelDescription": "Was ist der Mangel?",
+      "mangelImages": "Bilder",
+      "mangelInlineHint": "Wird als Mangel in der Mängelliste der Gruppe angelegt.",
+      "mangelSaved": "Mangel gemeldet.",
+      "mangelOffen": "{count, plural, one {Ein offener Mangel} other {# offene Mängel}}",
+      "errors": {
+        "ausgegebenAnMissing": "Bitte eintragen, an wen ausgegeben wird",
+        "descriptionMissing": "Bitte den Mangel beschreiben"
+      }
+    },
+    "readOnly": "Nur Lesezugriff auf diesen Einsatz.",
+    "import": {
+      "title": "Ausrüstung importieren",
+      "button": "Importieren",
+      "chooseFile": "Datei wählen (XLSX oder CSV)",
+      "hint": "Artikelexport aus FDISK oder eine CSV-Datei mit denselben Spaltennamen.",
+      "preview": "{count, plural, =0 {Keine Zeilen} one {Eine Zeile} other {# Zeilen}} gefunden",
+      "statusNew": "neu",
+      "statusUpdate": "aktualisieren",
+      "statusSkip": "überspringen",
+      "matchedBy": "Treffer über {field}",
+      "duplicateInFile": "Kennung kommt in der Datei mehrfach vor",
+      "withoutIdentifier": "Keine Kennung — nicht wieder zuzuordnen",
+      "summary": "{created} neu, {updated} aktualisiert, {skipped} übersprungen",
+      "done": "{created} angelegt, {updated} aktualisiert.",
+      "errors": {
+        "fileMissing": "Keine Datei gewählt",
+        "fileTooLarge": "Datei ist zu groß (max. 5 MB)",
+        "tooManyRows": "Zu viele Zeilen (max. 5000)"
+      }
+    },
+    "geraet": {
+      "typ": "Typ",
+      "bezeichnung": "Bezeichnung",
+      "feuerwehr": "Feuerwehr",
+      "nummer": "Flaschennummer",
+      "inventarNr": "Inventar-Nr.",
+      "zusatzInventarNr": "Zusatz-Inventar-Nr.",
+      "seriennummer": "Seriennummer",
+      "externeId": "Externe ID",
+      "barcodes": "Barcodes",
+      "barcodesHint": "Mehrere Codes mit Komma trennen",
+      "nenndruck": "Nenndruck (bar)",
+      "volumenLiter": "Volumen (l)",
+      "material": "Material",
+      "hersteller": "Hersteller",
+      "baujahr": "Baujahr",
+      "active": "In Verwendung",
+      "bemerkung": "Bemerkung",
+      "dialogTitleNew": "Gerät anlegen",
+      "dialogTitleEdit": "Gerät bearbeiten"
+    }
+  },
   "common": {
     "save": "Speichern",
     "saving": "Speichern...",
@@ -352,6 +587,8 @@
     "menuAria": "Menü"
   },
   "drawer": {
+    "atemschutz": "Atemschutzsammelplatz",
+    "adminAtemschutz": "Atemschutz-Ausrüstung",
     "about": "Über",
     "admin": "Administration",
     "adminActions": "Admin Actions",
@@ -929,8 +1166,14 @@
       "delete": "Mangel löschen",
       "deleteConfirm": "Diesen Mangel wirklich endgültig löschen? Für einen behobenen Mangel ist „Behoben“ der richtige Weg — gelöscht gehört nur, was versehentlich angelegt wurde.",
       "actions": "Aktionen",
+      "itemTypes": {
+        "all": "Alle",
+        "vehicle": "Fahrzeuge",
+        "atemschutz": "Atemschutz"
+      },
       "filters": {
         "status": "Status",
+        "itemType": "Art",
         "vehicle": "Fahrzeug",
         "all": "Alle",
         "openAll": "Offen und in Arbeit"

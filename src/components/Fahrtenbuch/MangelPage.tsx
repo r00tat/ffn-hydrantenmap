@@ -18,6 +18,7 @@ import {
   MANGEL_STATUSES,
   isOpenMangel,
   type Mangel,
+  type MangelItemType,
   type MangelStatus,
 } from '../../common/mangel';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
@@ -75,7 +76,12 @@ export default function MangelPage() {
   const { isAuthorized, isAdmin } = useFirebaseLogin();
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { vehicles, activeVehicles } = useFahrtenbuchVehicles(groupId);
-  const { mangel } = useFahrtenbuchMangel(groupId);
+  const [itemTypeFilter, setItemTypeFilter] = useState<MangelItemType | 'alle'>(
+    'alle',
+  );
+  const { mangel } = useFahrtenbuchMangel(groupId, {
+    itemType: itemTypeFilter === 'alle' ? undefined : itemTypeFilter,
+  });
   const searchParams = useSearchParams();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('openAll');
@@ -191,6 +197,20 @@ export default function MangelPage() {
               {t(statusFilterLabelKey(f) as 'statuses.open')}
             </MenuItem>
           ))}
+        </TextField>
+        <TextField
+          select
+          size="small"
+          label={t('filters.itemType')}
+          value={itemTypeFilter}
+          onChange={(e) =>
+            setItemTypeFilter(e.target.value as MangelItemType | 'alle')
+          }
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="alle">{t('itemTypes.all')}</MenuItem>
+          <MenuItem value="vehicle">{t('itemTypes.vehicle')}</MenuItem>
+          <MenuItem value="atemschutz">{t('itemTypes.atemschutz')}</MenuItem>
         </TextField>
         <TextField
           select

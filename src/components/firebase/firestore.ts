@@ -559,6 +559,19 @@ export interface Firecall {
    * dort Mitglied ist.
    */
   fahrtenbuchEntryCount?: number;
+  /**
+   * Leiter des Atemschutzsammelplatzes und das Füllpersonal.
+   *
+   * Zwei Felder am Einsatz und keine eigene Collection: Es sind zwei Angaben,
+   * die auf allen drei Reitern der ASSP-Seite sichtbar sein sollen, und sie
+   * ändern sich während eines Einsatzes ein- bis zweimal. Eine eigene
+   * Collection wäre ein zusätzlicher Listener für zwei Strings.
+   *
+   * Das Füllpersonal speist die Vorschlagsliste des Feldes „Gefüllt von" im
+   * Füllprotokoll.
+   */
+  asspLeiter?: string;
+  asspFuellpersonal?: string[];
   attachments?: string[];
   /**
    * Ordner dieses Einsatzes im Google Drive der Gruppe. Wird beim ersten

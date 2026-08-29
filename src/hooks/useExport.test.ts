@@ -196,8 +196,8 @@ describe('useExport', () => {
       await exportFirecall('test-id');
 
       // items, chat, layers, mapLayers, history, locations, kostenersatz,
-      // auditlog, crew
-      expect(getDocsMock).toHaveBeenCalledTimes(9);
+      // auditlog, crew, atemschutzFuellung, atemschutzTrupp, atemschutzAusgabe
+      expect(getDocsMock).toHaveBeenCalledTimes(12);
     });
 
     it('should stamp the backup version', async () => {
@@ -359,8 +359,8 @@ describe('useExport', () => {
 
       await exportFirecall('test-id');
 
-      // neun Untersammlungen, die nicht voneinander abhängen
-      expect(peak).toBe(9);
+      // zwölf Untersammlungen, die nicht voneinander abhängen
+      expect(peak).toBe(12);
     });
 
     it('should warn instead of silently dropping an attachment it cannot download', async () => {

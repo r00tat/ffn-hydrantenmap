@@ -148,6 +148,8 @@ export async function createMangelForEntry({
 }: CreateMangelForEntryArgs): Promise<string> {
   const doc = buildMangelDocument(
     {
+      itemType: 'vehicle',
+      itemId: entry.vehicleId,
       vehicleId: entry.vehicleId,
       // Einträge ohne eigenen Mangeltext gibt es nur aus der Zeit vor dem Feld
       // — heute erzwingt `validateEntryInput` ihn zusammen mit dem Häkchen.
@@ -157,7 +159,7 @@ export async function createMangelForEntry({
       reportedBy: entry.createdBy,
       reportedByName: entry.driverName,
     },
-    vehicle,
+    { type: 'vehicle', id: entry.vehicleId, name: vehicle.name ?? '' },
     groupId,
     actor,
   );

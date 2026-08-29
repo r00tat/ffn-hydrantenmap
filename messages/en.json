@@ -4,6 +4,241 @@
     "title": "Operations Map",
     "backAgainToExit": "Press back again to exit"
   },
+  "atemschutz": {
+    "title": "Breathing apparatus staging area",
+    "typ": {
+      "flasche": "Air cylinder",
+      "maske": "Face mask",
+      "pressluftatmer": "Breathing apparatus",
+      "zubehoer": "Accessory"
+    },
+    "sichtkontrolle": {
+      "offen": "open",
+      "ok": "OK",
+      "mangel": "defect"
+    },
+    "errors": {
+      "identifierMissing": "Cylinder number or brigade is required",
+      "anzahlInvalid": "Count must be between 1 and 99",
+      "enddruckInvalid": "Final pressure must be greater than 0",
+      "startdruckAboveEnddruck": "Initial pressure exceeds final pressure",
+      "gefuelltVonMissing": "Please record who filled the cylinder",
+      "descriptionMissing": "Please describe the defect",
+      "saveFailed": "Saving failed",
+      "codeMissing": "No code given",
+      "geraetNotFound": "Item not found"
+    },
+    "admin": {
+      "title": "Breathing apparatus equipment",
+      "group": "Group",
+      "noGroups": "Not assigned to any group.",
+      "noPermission": "No permission. Breathing apparatus master data is maintained by a group admin.",
+      "add": "Add item",
+      "edit": "Edit {name}",
+      "delete": "Delete {name}",
+      "deleteConfirm": "Really delete “{name}”?",
+      "empty": "No equipment recorded yet.",
+      "count": "{count, plural, =0 {No items} one {One item} other {# items}}",
+      "filterTyp": "Type",
+      "filterAll": "All",
+      "search": "Search",
+      "showInactive": "Show retired items"
+    },
+    "tabs": {
+      "fuellprotokoll": "Filling log",
+      "trupps": "Teams",
+      "ausruestung": "Equipment"
+    },
+    "header": {
+      "leiter": "Staging area officer",
+      "fuellpersonal": "Filling crew",
+      "fuellpersonalHint": "Type a name and press Enter; a comma separates as well.",
+      "niemand": "not recorded",
+      "edit": "Edit officer and filling crew",
+      "dialogTitle": "Staging area leadership"
+    },
+    "fuellung": {
+      "add": "Record filling",
+      "dialogTitleNew": "Record filling",
+      "dialogTitleEdit": "Edit filling",
+      "empty": "No filling recorded yet.",
+      "total": "{count, plural, =0 {No cylinders} one {One cylinder} other {# cylinders}} filled",
+      "flaschenNummer": "Cylinder number",
+      "feuerwehr": "Brigade",
+      "anzahl": "Count",
+      "anzahlHint": "Only for cylinders without a number",
+      "startdruck": "Initial pressure (bar)",
+      "enddruck": "Final pressure (bar)",
+      "gefuelltVon": "Filled by",
+      "zeitpunkt": "Time",
+      "sichtkontrolle": "Visual check",
+      "mangelOhneGeraet": "A defect can only be recorded for a cylinder from the master data. This cylinder has no record — please note its condition in the note field.",
+      "mangelBereitsGemeldet": "A defect has already been reported for this filling.",
+      "bemerkung": "Note",
+      "scan": "Scan barcode",
+      "delete": "Delete filling",
+      "deleteConfirm": "Really delete this filling?",
+      "unbekannteFlaschen": "{count} cylinders without a number",
+      "druckRange": "{start} → {ende} bar",
+      "druckNurEnde": "to {ende} bar"
+    },
+    "qr": {
+      "title": "QR label",
+      "button": "QR label",
+      "hint": "The code contains the cylinder number. Print and attach to the cylinder.",
+      "noNumber": "This item has no cylinder number — please enter one first.",
+      "print": "Print",
+      "printBlocked": "The browser blocked the print window. Please allow pop-ups for this page.",
+      "exportFailed": "The label could not be created."
+    },
+    "scanner": {
+      "title": "Scan barcode",
+      "hint": "Hold the barcode inside the frame.",
+      "starting": "Starting camera …",
+      "unsupported": "This device offers no camera. Please enter the number by hand.",
+      "denied": "No access to the camera. Please grant permission or enter the number by hand.",
+      "error": "The camera could not be started.",
+      "manual": "Enter number by hand",
+      "manualHint": "Cylinder number, inventory no., serial number or brigade — confirm with Enter",
+      "noMatch": "No item found for “{code}”. The code will be used as the cylinder number.",
+      "multiple": "{count} items carry this code — please choose:",
+      "use": "Use"
+    },
+    "trupp": {
+      "add": "Add team",
+      "dialogTitleNew": "Add team",
+      "dialogTitleEdit": "Edit team",
+      "name": "Team name",
+      "nameHint": "Optional, e.g. “Team 1”",
+      "feuerwehr": "Brigade",
+      "mitglieder": "Team members",
+      "mitgliederHint": "Type a name and press Enter.",
+      "mitgliederVoll": "At most {max} names per team.",
+      "bemerkung": "Note",
+      "laufendeNummer": "Deployment {n}",
+      "status": {
+        "bereit": "Standing by",
+        "imEinsatz": "Deployed",
+        "zurueck": "Back & recovering",
+        "abgemeldet": "Signed off"
+      },
+      "sections": {
+        "bereit": "Standing by",
+        "imEinsatz": "Deployed",
+        "zurueck": "Back & recovering",
+        "protokoll": "Log"
+      },
+      "empty": {
+        "bereit": "No team standing by.",
+        "imEinsatz": "No team deployed.",
+        "zurueck": "No team back yet.",
+        "protokoll": "No team recorded yet."
+      },
+      "actions": {
+        "entsenden": "Deploy",
+        "rueckkehr": "Return",
+        "wiederBereit": "Stand by again",
+        "abmelden": "Sign off"
+      },
+      "entsendetAn": "Deployed to",
+      "entsendetAnHint": "Vehicle or tactical unit — optional",
+      "abmarschZeit": "Departure",
+      "rueckkehrZeit": "Return",
+      "druckAbmarsch": "Lowest pressure at departure (bar)",
+      "druckRueckkehr": "Lowest pressure on return (bar)",
+      "entsendenTitle": "Deploy team",
+      "rueckkehrTitle": "Record return",
+      "seit": "since {zeit}",
+      "delete": "Delete team",
+      "deleteConfirm": "Really delete this row? Earlier deployments of the same team remain.",
+      "abmeldenConfirm": "Sign off team? The row will be closed.",
+      "errors": {
+        "feuerwehrMissing": "Brigade is required",
+        "mitgliederMissing": "At least one team member is required"
+      }
+    },
+    "ausruestung": {
+      "search": "Search",
+      "searchHint": "Scan or type, confirm with Enter",
+      "filterTyp": "Type",
+      "filterAll": "All",
+      "onlyOut": "Only issued",
+      "empty": "No equipment in this group's master data.",
+      "noMatch": "No match.",
+      "hint": "The inventory comes from the group's master data and is maintained in the administration area.",
+      "scan": "Scan barcode",
+      "status": {
+        "amPlatz": "At the staging area",
+        "ausgegeben": "Issued",
+        "zurueck": "Returned"
+      },
+      "actions": {
+        "ausgeben": "Issue",
+        "zuruecknehmen": "Take back",
+        "mangel": "Report defect"
+      },
+      "ausgabeTitle": "Issue equipment",
+      "ruecknahmeTitle": "Take equipment back",
+      "ausgegebenAn": "Issued to",
+      "ausgegebenAnHint": "Team or brigade",
+      "ausgabeZeit": "Issued at",
+      "ruecknahmeZeit": "Returned at",
+      "sichtkontrolle": "Visual check",
+      "bemerkung": "Note",
+      "mangelTitle": "Report defect",
+      "mangelDescription": "What is the defect?",
+      "mangelImages": "Images",
+      "mangelInlineHint": "Recorded as a defect in the group's defect list.",
+      "mangelSaved": "Defect reported.",
+      "mangelOffen": "{count, plural, one {One open defect} other {# open defects}}",
+      "errors": {
+        "ausgegebenAnMissing": "Please record who it is issued to",
+        "descriptionMissing": "Please describe the defect"
+      }
+    },
+    "readOnly": "Read-only access to this operation.",
+    "import": {
+      "title": "Import equipment",
+      "button": "Import",
+      "chooseFile": "Choose file (XLSX or CSV)",
+      "hint": "Article export from FDISK, or a CSV file with the same column names.",
+      "preview": "{count, plural, =0 {No rows} one {One row} other {# rows}} found",
+      "statusNew": "new",
+      "statusUpdate": "update",
+      "statusSkip": "skip",
+      "matchedBy": "Matched by {field}",
+      "duplicateInFile": "Identifier occurs more than once in the file",
+      "withoutIdentifier": "No identifier — cannot be matched again",
+      "summary": "{created} new, {updated} updated, {skipped} skipped",
+      "done": "{created} created, {updated} updated.",
+      "errors": {
+        "fileMissing": "No file chosen",
+        "fileTooLarge": "File is too large (max. 5 MB)",
+        "tooManyRows": "Too many rows (max. 5000)"
+      }
+    },
+    "geraet": {
+      "typ": "Type",
+      "bezeichnung": "Description",
+      "feuerwehr": "Brigade",
+      "nummer": "Cylinder number",
+      "inventarNr": "Inventory no.",
+      "zusatzInventarNr": "Additional inventory no.",
+      "seriennummer": "Serial number",
+      "externeId": "External ID",
+      "barcodes": "Barcodes",
+      "barcodesHint": "Separate multiple codes with commas",
+      "nenndruck": "Nominal pressure (bar)",
+      "volumenLiter": "Volume (l)",
+      "material": "Material",
+      "hersteller": "Manufacturer",
+      "baujahr": "Year built",
+      "active": "In service",
+      "bemerkung": "Note",
+      "dialogTitleNew": "Add item",
+      "dialogTitleEdit": "Edit item"
+    }
+  },
   "common": {
     "save": "Save",
     "saving": "Saving...",
@@ -352,6 +587,8 @@
     "menuAria": "Menu"
   },
   "drawer": {
+    "atemschutz": "Breathing apparatus",
+    "adminAtemschutz": "Breathing apparatus equipment",
     "about": "About",
     "admin": "Administration",
     "adminActions": "Admin actions",
@@ -929,8 +1166,14 @@
       "delete": "Delete defect",
       "deleteConfirm": "Really delete this defect permanently? For a fixed defect use “Resolved” — deleting is only for entries created by mistake.",
       "actions": "Actions",
+      "itemTypes": {
+        "all": "All",
+        "vehicle": "Vehicles",
+        "atemschutz": "Breathing apparatus"
+      },
       "filters": {
         "status": "Status",
+        "itemType": "Kind",
         "vehicle": "Vehicle",
         "all": "All",
         "openAll": "Open and in progress"

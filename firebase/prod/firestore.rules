@@ -279,6 +279,18 @@ service cloud.firestore {
         allow write: if adminUser();
       }
 
+      // Atemschutz-Ausrüstung der Gruppe — Flaschen, Masken, Pressluftatmer.
+      // Wörtlich wie `vehicle`: Jedes Gruppenmitglied liest sie (der
+      // Sammelplatz braucht sie zum Nachschlagen und Scannen), geschrieben
+      // wird ausschließlich über Server Actions. Dass hier `adminUser()` steht
+      // und nicht der Gruppen-Admin, ist deshalb ohne Wirkung: Die Rolle steckt
+      // in keinem Custom Claim und ist für Regeln nicht sichtbar; wer schreiben
+      // darf, entscheidet `actionGroupAdminRequired(groupId)`.
+      match /atemschutzGeraet/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow write: if adminUser();
+      }
+
       match /fahrtenbuch/{doc} {
         allow read: if fahrtenbuchMember();
         allow create, update, delete: if false;

@@ -11,6 +11,14 @@ import { getBlob, getMetadata, getStorage, ref } from 'firebase/storage';
 import { v4 as uuid } from 'uuid';
 import app, { firestore } from '../components/firebase/firebase';
 import {
+  ATEMSCHUTZ_AUSGABE_COLLECTION_ID,
+  ATEMSCHUTZ_FUELLUNG_COLLECTION_ID,
+  ATEMSCHUTZ_TRUPP_COLLECTION_ID,
+  type AtemschutzAusgabe,
+  type AtemschutzFuellung,
+  type AtemschutzTrupp,
+} from '../common/atemschutz';
+import {
   AuditLogEntry,
   CrewAssignment,
   DrawingStroke,
@@ -225,6 +233,12 @@ export interface FirecallExport extends Firecall {
   auditlog: AuditLogEntry[];
   /** Besatzung je Fahrzeug — `call/{id}/crew`. */
   crew?: CrewAssignment[];
+  /** Füllprotokoll des Atemschutzsammelplatzes — `call/{id}/atemschutzFuellung`. */
+  atemschutzFuellungen?: AtemschutzFuellung[];
+  /** Bereitstellungen der Atemschutztrupps — `call/{id}/atemschutzTrupp`. */
+  atemschutzTrupps?: AtemschutzTrupp[];
+  /** Ausgabe und Rücknahme der Ausrüstung — `call/{id}/atemschutzAusgabe`. */
+  atemschutzAusgaben?: AtemschutzAusgabe[];
   firecallAttachments?: ExportFirecallAttachment[];
 }
 
@@ -388,8 +402,8 @@ export async function exportFirecall(
       snapshot.docs.map((d) => ({ ...d.data(), id: d.id }) as T)
     );
 
-  // Die neun Untersammlungen hängen nicht voneinander ab — nacheinander
-  // abgefragt wären das neun Round-Trips hintereinander.
+  // Die zwölf Untersammlungen hängen nicht voneinander ab — nacheinander
+  // abgefragt wären das zwölf Round-Trips hintereinander.
   const [
     firecallSnapshot,
     items,
@@ -401,6 +415,9 @@ export async function exportFirecall(
     kostenersatz,
     auditlog,
     crew,
+    atemschutzFuellungen,
+    atemschutzTrupps,
+    atemschutzAusgaben,
   ] = await Promise.all([
     getDoc(firecallDoc),
     readCollection<FirecallItem>(FIRECALL_ITEMS_COLLECTION_ID),
@@ -412,6 +429,9 @@ export async function exportFirecall(
     readCollection<KostenersatzCalculation>(KOSTENERSATZ_SUBCOLLECTION),
     readCollection<AuditLogEntry>(FIRECALL_AUDITLOG_COLLECTION_ID),
     readCollection<CrewAssignment>(FIRECALL_CREW_COLLECTION_ID),
+    readCollection<AtemschutzFuellung>(ATEMSCHUTZ_FUELLUNG_COLLECTION_ID),
+    readCollection<AtemschutzTrupp>(ATEMSCHUTZ_TRUPP_COLLECTION_ID),
+    readCollection<AtemschutzAusgabe>(ATEMSCHUTZ_AUSGABE_COLLECTION_ID),
   ]);
 
   const firecall = firecallSnapshot.data() as Firecall;
@@ -495,6 +515,9 @@ export async function exportFirecall(
     kostenersatz,
     auditlog,
     crew,
+    atemschutzFuellungen,
+    atemschutzTrupps,
+    atemschutzAusgaben,
     firecallAttachments,
   };
 }
@@ -619,7 +642,10 @@ function countImportSteps(firecall: FirecallExport): number {
     (firecall.locations?.length ?? 0) +
     (firecall.kostenersatz?.length ?? 0) +
     (firecall.auditlog?.length ?? 0) +
-    (firecall.crew?.length ?? 0);
+    (firecall.crew?.length ?? 0) +
+    (firecall.atemschutzFuellungen?.length ?? 0) +
+    (firecall.atemschutzTrupps?.length ?? 0) +
+    (firecall.atemschutzAusgaben?.length ?? 0);
 
   const uploads =
     (firecall.firecallAttachments?.length ?? 0) +
@@ -648,6 +674,9 @@ export async function importFirecall(
     kostenersatz,
     auditlog,
     crew,
+    atemschutzFuellungen,
+    atemschutzTrupps,
+    atemschutzAusgaben,
     firecallAttachments,
     id,
     backupVersion,
@@ -721,6 +750,18 @@ export async function importFirecall(
     FIRECALL_AUDITLOG_COLLECTION_ID
   );
   const crewCol = collection(firecallDoc, FIRECALL_CREW_COLLECTION_ID);
+  const atemschutzFuellungCol = collection(
+    firecallDoc,
+    ATEMSCHUTZ_FUELLUNG_COLLECTION_ID,
+  );
+  const atemschutzTruppCol = collection(
+    firecallDoc,
+    ATEMSCHUTZ_TRUPP_COLLECTION_ID,
+  );
+  const atemschutzAusgabeCol = collection(
+    firecallDoc,
+    ATEMSCHUTZ_AUSGABE_COLLECTION_ID,
+  );
 
   // Upload marker attachments
   const importItems = await Promise.all(
@@ -885,6 +926,35 @@ export async function importFirecall(
       crew.map((c) => ({
         ref: doc(crewCol, c.id || uuid()),
         data: c as unknown as Record<string, unknown>,
+      }))
+    );
+  }
+
+  // Atemschutzsammelplatz: Füllprotokoll, Trupps, Ausgaben.
+  // Die IDs bleiben erhalten — `atemschutzAusgabe.geraetId` und
+  // `atemschutzTrupp.truppKey` zeigen auf Stammdaten bzw. aufeinander, und ein
+  // neu vergebener Schlüssel risse beide Bezüge auf.
+  if (atemschutzFuellungen?.length) {
+    await commitOps(
+      atemschutzFuellungen.map((f) => ({
+        ref: doc(atemschutzFuellungCol, f.id || uuid()),
+        data: f as unknown as Record<string, unknown>,
+      }))
+    );
+  }
+  if (atemschutzTrupps?.length) {
+    await commitOps(
+      atemschutzTrupps.map((t) => ({
+        ref: doc(atemschutzTruppCol, t.id || uuid()),
+        data: t as unknown as Record<string, unknown>,
+      }))
+    );
+  }
+  if (atemschutzAusgaben?.length) {
+    await commitOps(
+      atemschutzAusgaben.map((a) => ({
+        ref: doc(atemschutzAusgabeCol, a.id || uuid()),
+        data: a as unknown as Record<string, unknown>,
       }))
     );
   }
