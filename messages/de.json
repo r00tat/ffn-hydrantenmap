@@ -43,6 +43,43 @@
       "search": "Suchen",
       "showInactive": "Ausgeschiedene anzeigen"
     },
+    "tabs": {
+      "fuellprotokoll": "Füllprotokoll",
+      "trupps": "Trupps",
+      "ausruestung": "Ausrüstung"
+    },
+    "header": {
+      "leiter": "ASSP-Leiter",
+      "fuellpersonal": "Füllpersonal",
+      "niemand": "nicht eingetragen",
+      "edit": "Leitung und Füllpersonal bearbeiten",
+      "dialogTitle": "ASSP-Leitung",
+      "addPerson": "Person hinzufügen"
+    },
+    "fuellung": {
+      "add": "Füllung erfassen",
+      "dialogTitleNew": "Füllung erfassen",
+      "dialogTitleEdit": "Füllung bearbeiten",
+      "empty": "Noch keine Füllung erfasst.",
+      "total": "{count, plural, =0 {Keine Flasche} one {Eine Flasche} other {# Flaschen}} gefüllt",
+      "flaschenNummer": "Flaschennummer",
+      "feuerwehr": "Feuerwehr",
+      "anzahl": "Anzahl",
+      "anzahlHint": "Mehr als 1 für Flaschen ohne Nummern",
+      "startdruck": "Startdruck (bar)",
+      "enddruck": "Enddruck (bar)",
+      "gefuelltVon": "Gefüllt von",
+      "zeitpunkt": "Zeitpunkt",
+      "sichtkontrolle": "Sichtkontrolle",
+      "bemerkung": "Bemerkung",
+      "scan": "Barcode scannen",
+      "delete": "Füllung löschen",
+      "deleteConfirm": "Soll diese Füllung wirklich gelöscht werden?",
+      "unbekannteFlaschen": "{count} Flaschen ohne Nummer",
+      "druckRange": "{start} → {ende} bar",
+      "druckNurEnde": "auf {ende} bar"
+    },
+    "readOnly": "Nur Lesezugriff auf diesen Einsatz.",
     "import": {
       "title": "Ausrüstung importieren",
       "button": "Importieren",

@@ -231,6 +231,12 @@ export default function AppDrawer({
           einsatzSection: 'einsatzorte',
         },
         {
+          text: t('atemschutz'),
+          icon: <AirIcon />,
+          href: '/atemschutz',
+          einsatzSection: 'atemschutz',
+        },
+        {
           // Neben der Karte und nicht darin: Die Frage „Leitung legen oder
           // pendeln?" kommt vor dem Zeichnen. Die Seite bringt ihre eigene
           // schmale Karte mit.

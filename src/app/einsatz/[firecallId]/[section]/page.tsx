@@ -21,6 +21,7 @@ const SECTIONS: Record<
     import('../../../../components/pages/LoeschwasserversorgungWrapper'),
   dammbau: () => import('../../../../components/pages/DammbauWrapper'),
   hochwasser: () => import('../../../../components/pages/HochwasserWrapper'),
+  atemschutz: () => import('../../../../components/pages/AtemschutzWrapper'),
 };
 
 export default async function EinsatzSectionPage({

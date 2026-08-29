@@ -43,6 +43,43 @@
       "search": "Search",
       "showInactive": "Show retired items"
     },
+    "tabs": {
+      "fuellprotokoll": "Filling log",
+      "trupps": "Teams",
+      "ausruestung": "Equipment"
+    },
+    "header": {
+      "leiter": "Staging area officer",
+      "fuellpersonal": "Filling crew",
+      "niemand": "not recorded",
+      "edit": "Edit officer and filling crew",
+      "dialogTitle": "Staging area leadership",
+      "addPerson": "Add person"
+    },
+    "fuellung": {
+      "add": "Record filling",
+      "dialogTitleNew": "Record filling",
+      "dialogTitleEdit": "Edit filling",
+      "empty": "No filling recorded yet.",
+      "total": "{count, plural, =0 {No cylinders} one {One cylinder} other {# cylinders}} filled",
+      "flaschenNummer": "Cylinder number",
+      "feuerwehr": "Brigade",
+      "anzahl": "Count",
+      "anzahlHint": "More than 1 for cylinders without numbers",
+      "startdruck": "Initial pressure (bar)",
+      "enddruck": "Final pressure (bar)",
+      "gefuelltVon": "Filled by",
+      "zeitpunkt": "Time",
+      "sichtkontrolle": "Visual check",
+      "bemerkung": "Note",
+      "scan": "Scan barcode",
+      "delete": "Delete filling",
+      "deleteConfirm": "Really delete this filling?",
+      "unbekannteFlaschen": "{count} cylinders without a number",
+      "druckRange": "{start} → {ende} bar",
+      "druckNurEnde": "to {ende} bar"
+    },
+    "readOnly": "Read-only access to this operation.",
     "import": {
       "title": "Import equipment",
       "button": "Import",
