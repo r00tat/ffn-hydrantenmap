@@ -85,12 +85,89 @@ Behauptung — im Vorschaudialog ist jeder Wert änderbar. Ebenso die
 Bezirksreserve: Im Export steht bei diesen 25 Flaschen als Dienststelle
 trotzdem „Neusiedl am See", nur die Bezeichnung verrät sie.
 
+## Warum das Füllprotokoll unter der Gruppe liegt
+
+Trupps und Ausrüstungsausgabe hängen am Einsatz — sie beginnen mit ihm und
+enden mit ihm. Das Füllprotokoll nicht: Gefüllt wird überwiegend im
+Feuerwehrhaus, zwischen den Einsätzen, und der Nachweis ist einer über die
+**Flasche**, nicht über den Einsatz. Es liegt deshalb unter
+`groups/{groupId}/atemschutzFuellung`, mit einem eigenen Menüpunkt
+`/atemschutz/fuellprotokoll` unter „Fahrzeuge". Der Reiter am Sammelplatz zeigt
+dieselbe Komponente, nur auf den laufenden Einsatz gefiltert.
+
+Zwei Felder stehen **immer** am Dokument, auch wenn sie leer bzw. `false` sind:
+
+- **`firecallId`** — `''` heißt „an der Station, ohne Einsatz". Firestore kann
+  nicht auf „Feld fehlt" abfragen; wäre das Feld bei Stationsfüllungen
+  weggelassen, ließe sich *Ohne Einsatz* nicht als gewöhnlicher Filter bauen.
+  Dazu gehört der zusammengesetzte Index `firecallId ASC, zeitpunkt DESC`.
+- **`verrechnen`** — aus demselben Grund: `where('verrechnen','==',true)` würde
+  sonst jede Zeile übersehen, an der das Feld fehlt. (Die Rechnungsstellung
+  selbst ist ein eigenes Vorhaben, siehe Issue #754.)
+
+`firecallName` und `fuellstationName` sind Kopien: Die Zeile soll ohne Join
+lesbar bleiben.
+
+### Die Füllstation ist ein Gerätetyp
+
+Ein Kompressor ist Ausrüstung der Feuerwehr und steht deshalb als
+`typ: 'fuellstation'` in denselben Stammdaten wie die Flaschen — statt einer
+eigenen Sammlung, die dieselben Felder noch einmal hätte. Dazu kommen
+`standort` (`fix` = Feuerwehrhaus, `mobil` = auf einem Fahrzeug) und bei
+`mobil` der Fahrzeugbezug; der Neusiedler Kompressor ist auf dem
+Atemschutzanhänger verladen.
+
+Im Ausrüstungsreiter sind Füllstationen ausgeblendet: Eine Station wird nicht
+ausgegeben und nicht zurückgenommen.
+
+Der Dialog verhält sich nach `waehleFuellstation`:
+
+| Stationen | Verhalten |
+| --- | --- |
+| keine | kein Feld — am Tag der Auslieferung hat keine Wehr einen Kompressor angelegt, daran darf nichts hängen |
+| genau eine | fest zugeordnet, nur als Text angezeigt; ein Auswahlfeld mit einem Eintrag wäre eine Klickfalle |
+| mehrere | Auswahlfeld, die letzte Wahl aus dem `localStorage` vorweggenommen |
+
+### Wann „zu verrechnen" vorbelegt ist
+
+`verrechnenVorgabe` entscheidet beim *Anlegen*:
+
+- **Im Einsatz immer aus.** Dort ist es Nachbarschaftshilfe, keine
+  Dienstleistung.
+- **An der Station an**, wenn die Feuerwehr der Flasche nicht die eigene ist.
+  Verglichen wird über `normalizeCode` — „Neusiedl am See" und
+  „neusiedl-am-see" sind dieselbe Wehr.
+
+Die eigene Wehr steht als `feuerwehrName` am Gruppendokument, gepflegt unter
+`/admin/fahrtenbuch` (`saveFahrtenbuchGroupFeuerwehrName`, Gruppen-Admin).
+Bewusst getrennt vom Gruppennamen: Der ist ein Verwaltungsbegriff („FF Neusiedl
+am See"), die `feuerwehr`-Felder der Stammdaten tragen die Schreibweise des
+FDISK-Exports. Ein Vergleich über `name` ginge still schief und markierte jede
+eigene Füllung als zu verrechnen. Ohne gepflegten Wert bleibt der Schalter aus.
+
+Die Vorbelegung zieht nach, solange der Benutzer den Schalter nicht selbst
+angefasst hat: Das Feuerwehr-Feld ist beim Öffnen leer und wird erst danach
+ausgefüllt oder durch einen Scan gesetzt. Beim Bearbeiten einer gespeicherten
+Füllung gilt der Schalter als angefasst — der gespeicherte Wert ist eine
+getroffene Entscheidung.
+
 ## Berechtigungen
 
-- **Protokolle** (`call/{id}/atemschutz*`): Wer den Einsatz bearbeiten darf,
-  führt hier Protokoll. Dafür ist **keine eigene Firestore-Regel nötig** — die
-  bestehende `match /{subitem=**}` unter `call/{doc}` deckt jede neue
-  Untersammlung ab.
+- **Protokolle am Einsatz** (`call/{id}/atemschutzTrupp`,
+  `call/{id}/atemschutzAusgabe`): Wer den Einsatz bearbeiten darf, führt hier
+  Protokoll. Dafür ist **keine eigene Firestore-Regel nötig** — die bestehende
+  `match /{subitem=**}` unter `call/{doc}` deckt jede neue Untersammlung ab.
+- **Füllprotokoll** (`groups/{groupId}/atemschutzFuellung`): lesen *und
+  schreiben* jedes Gruppenmitglied (`fahrtenbuchMember()`). Anders als bei den
+  Stammdaten schreibt hier der **Client** und nicht eine Server Action: Am
+  Sammelplatz ist die Verbindung schlecht, und Firestore stellt
+  Client-Schreibvorgänge offline zurück und spielt sie nach — eine Server
+  Action scheitert. Und anders als beim Anlegen eines Geräts ist Schreiben hier
+  kein Verwaltungsakt: Wer füllt, protokolliert, und das ist selten ein Admin.
+  **Einsatz-Gäste** (Zugang über einen Share-Link) sind damit außen vor; sie
+  sind keine Gruppenmitglieder. Der Reiter zeigt ihnen statt der Liste einen
+  Hinweis — ein verschwundener Reiter würde als Fehler gelesen. Sie könnten die
+  Geräte-Stammdaten ohnehin nicht lesen.
 - **Stammdaten** (`groups/{groupId}/atemschutzGeraet`): lesen jedes
   Gruppenmitglied, schreiben `actionGroupAdminRequired(groupId)` — also der
   globale Admin *oder* der Gruppen-Admin dieser Feuerwehr (Rolle aus PR #752,
