@@ -10,7 +10,8 @@
       "flasche": "Atemluftflasche",
       "maske": "Atemmaske",
       "pressluftatmer": "Pressluftatmer",
-      "zubehoer": "Zubehör"
+      "zubehoer": "Zubehör",
+      "fuellstation": "Füllstation"
     },
     "sichtkontrolle": {
       "offen": "offen",
@@ -80,7 +81,9 @@
       "deleteConfirm": "Soll diese Füllung wirklich gelöscht werden?",
       "unbekannteFlaschen": "{count} Flaschen ohne Nummer",
       "druckRange": "{start} → {ende} bar",
-      "druckNurEnde": "auf {ende} bar"
+      "druckNurEnde": "auf {ende} bar",
+      "fuellstation": "Füllstation",
+      "verrechnen": "Zu verrechnen"
     },
     "qr": {
       "title": "QR-Etikett",
@@ -236,7 +239,28 @@
       "active": "In Verwendung",
       "bemerkung": "Bemerkung",
       "dialogTitleNew": "Gerät anlegen",
-      "dialogTitleEdit": "Gerät bearbeiten"
+      "dialogTitleEdit": "Gerät bearbeiten",
+      "standort": "Standort",
+      "standortWerte": {
+        "fix": "Fix (Feuerwehrhaus)",
+        "mobil": "Mobil (Fahrzeug)"
+      },
+      "fahrzeug": "Fahrzeug"
+    },
+    "fuellprotokoll": {
+      "title": "Füllprotokoll",
+      "group": "Gruppe",
+      "gastHinweis": "Das Füllprotokoll ist den Mitgliedern der Feuerwehr vorbehalten."
+    },
+    "filter": {
+      "einsatz": "Einsatz",
+      "alle": "Alle",
+      "ohneEinsatz": "Ohne Einsatz"
+    },
+    "verrechnen": {
+      "nurZuVerrechnende": "Nur zu verrechnende",
+      "chip": "zu verrechnen",
+      "summe": "davon {count} zu verrechnen"
     }
   },
   "common": {
@@ -640,7 +664,8 @@
     "units": "Einsatzmittel",
     "users": "Users",
     "connectedApps": "Verbundene Anwendungen",
-    "adminMcp": "MCP-Zugänge"
+    "adminMcp": "MCP-Zugänge",
+    "fuellprotokoll": "Füllprotokoll"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -1228,6 +1253,12 @@
       "unlink": "Verknüpfung lösen",
       "close": "Schließen",
       "takenBy": "Ein passendes Konto ist schon zugeordnet zu: {names}"
+    },
+    "groupSettings": {
+      "feuerwehrName": "Eigene Feuerwehr",
+      "feuerwehrNameHelp": "Schreibweise wie in den Atemschutz-Stammdaten, z.B. „Neusiedl am See“. Steuert, ob eine Füllung als zu verrechnen vorbelegt wird.",
+      "feuerwehrNameSaved": "Feuerwehr gespeichert",
+      "saveFeuerwehrName": "Feuerwehr speichern"
     }
   },
   "fahrtenbuchShare": {

@@ -3,8 +3,10 @@ import 'server-only';
 
 import {
   ATEMSCHUTZ_GERAET_TYPEN,
+  FUELLSTATION_STANDORTE,
   type AtemschutzGeraet,
   type AtemschutzGeraetTyp,
+  type FuellstationStandort,
 } from '../../common/atemschutz';
 import { parse as parseCsv } from 'csv-parse/sync';
 import {
@@ -50,6 +52,9 @@ export type GeraetInput = Pick<
   | 'baujahr'
   | 'active'
   | 'bemerkung'
+  | 'standort'
+  | 'vehicleId'
+  | 'vehicleName'
 >;
 
 function trimmed(value: unknown): string | undefined {
@@ -94,6 +99,8 @@ function buildGeraetPayload(input: GeraetInput): Record<string, unknown> {
     'material',
     'hersteller',
     'bemerkung',
+    'vehicleId',
+    'vehicleName',
   ];
   for (const key of optionalStrings) {
     const value = trimmed(input[key]);
@@ -117,6 +124,15 @@ function buildGeraetPayload(input: GeraetInput): Record<string, unknown> {
   if (volumen) payload.volumenLiter = volumen;
   const baujahr = positiveNumber(input.baujahr);
   if (baujahr) payload.baujahr = baujahr;
+
+  // Nur ein gültiger Wert wird übernommen. Ein Standort an einer Maske wäre
+  // ebenso sinnlos wie ein erfundener String im Feld.
+  if (
+    typ === 'fuellstation' &&
+    FUELLSTATION_STANDORTE.includes(input.standort as FuellstationStandort)
+  ) {
+    payload.standort = input.standort;
+  }
 
   return payload;
 }

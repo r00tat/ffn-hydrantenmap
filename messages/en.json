@@ -10,7 +10,8 @@
       "flasche": "Air cylinder",
       "maske": "Face mask",
       "pressluftatmer": "Breathing apparatus",
-      "zubehoer": "Accessory"
+      "zubehoer": "Accessory",
+      "fuellstation": "Filling station"
     },
     "sichtkontrolle": {
       "offen": "open",
@@ -80,7 +81,9 @@
       "deleteConfirm": "Really delete this filling?",
       "unbekannteFlaschen": "{count} cylinders without a number",
       "druckRange": "{start} → {ende} bar",
-      "druckNurEnde": "to {ende} bar"
+      "druckNurEnde": "to {ende} bar",
+      "fuellstation": "Filling station",
+      "verrechnen": "To be billed"
     },
     "qr": {
       "title": "QR label",
@@ -236,7 +239,28 @@
       "active": "In service",
       "bemerkung": "Note",
       "dialogTitleNew": "Add item",
-      "dialogTitleEdit": "Edit item"
+      "dialogTitleEdit": "Edit item",
+      "standort": "Location",
+      "standortWerte": {
+        "fix": "Fixed (fire station)",
+        "mobil": "Mobile (vehicle)"
+      },
+      "fahrzeug": "Vehicle"
+    },
+    "fuellprotokoll": {
+      "title": "Filling log",
+      "group": "Group",
+      "gastHinweis": "The filling log is reserved for members of the fire brigade."
+    },
+    "filter": {
+      "einsatz": "Operation",
+      "alle": "All",
+      "ohneEinsatz": "Without operation"
+    },
+    "verrechnen": {
+      "nurZuVerrechnende": "Billable only",
+      "chip": "to be billed",
+      "summe": "{count} of them to be billed"
     }
   },
   "common": {
@@ -640,7 +664,8 @@
     "units": "Resources",
     "users": "Users",
     "connectedApps": "Connected applications",
-    "adminMcp": "MCP access"
+    "adminMcp": "MCP access",
+    "fuellprotokoll": "Filling log"
   },
   "fahrtenbuch": {
     "title": "Trip log",
@@ -1228,6 +1253,12 @@
       "unlink": "Remove link",
       "close": "Close",
       "takenBy": "A matching account is already linked to: {names}"
+    },
+    "groupSettings": {
+      "feuerwehrName": "Own fire brigade",
+      "feuerwehrNameHelp": "Spelled as in the breathing apparatus master data, e.g. \"Neusiedl am See\". Determines whether a filling is pre-set as billable.",
+      "feuerwehrNameSaved": "Fire brigade saved",
+      "saveFeuerwehrName": "Save fire brigade"
     }
   },
   "fahrtenbuchShare": {

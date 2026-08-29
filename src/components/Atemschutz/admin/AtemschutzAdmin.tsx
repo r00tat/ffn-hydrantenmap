@@ -285,6 +285,7 @@ export default function AtemschutzAdmin() {
                 open={dialogOpen}
                 geraet={editGeraet}
                 feuerwehren={feuerwehren}
+                groupId={groupId}
                 onClose={() => setDialogOpen(false)}
                 onSave={handleSave}
               />

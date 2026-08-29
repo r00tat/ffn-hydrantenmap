@@ -14,6 +14,8 @@ export interface UseAtemschutzGeraeteResult {
   geraete: AtemschutzGeraet[];
   activeGeraete: AtemschutzGeraet[];
   flaschen: AtemschutzGeraet[];
+  /** Die aktiven Füllstationen — Grundlage von `waehleFuellstation`. */
+  fuellstationen: AtemschutzGeraet[];
   geraeteById: Map<string, AtemschutzGeraet>;
   /** Alle vorkommenden Feuerwehren, alphabetisch — für die Autovervollständigung. */
   feuerwehren: string[];
@@ -54,6 +56,7 @@ export default function useAtemschutzGeraete(
       geraete: byNummer,
       activeGeraete,
       flaschen: activeGeraete.filter(isTyp('flasche')),
+      fuellstationen: activeGeraete.filter(isTyp('fuellstation')),
       geraeteById: new Map(byNummer.map((g) => [g.id as string, g])),
       feuerwehren: [
         ...new Set(byNummer.map((g) => g.feuerwehr).filter(Boolean)),

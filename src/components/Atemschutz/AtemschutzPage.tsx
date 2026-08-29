@@ -22,11 +22,14 @@ import {
   type TruppInput,
   type TruppPatch,
 } from '../../common/atemschutz';
+import { isFirecallGuest } from '../../common/firecallGuest';
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
+import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
 import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useVehicles from '../../hooks/useVehicles';
@@ -51,6 +54,7 @@ import {
   type AtemschutzActor,
 } from './atemschutzStore';
 import type { AusgabePatch } from './AusgabeDialog';
+import { buildFuellungDocument } from './fuellungErfassung';
 import AusruestungTab from './AusruestungTab';
 import FuellprotokollTab from './FuellprotokollTab';
 import TruppsTab from './TruppsTab';
@@ -60,7 +64,12 @@ export default function AtemschutzPage() {
   const firecallId = useFirecallId();
   const firecall = useFirecall();
   const canWrite = useFirecallWriteAccess();
-  const { email, displayName, uid } = useFirebaseLogin();
+  const { email, displayName, uid, firecall: gastFirecall } = useFirebaseLogin();
+  // Ein Einsatz-Gast ist kein Gruppenmitglied und darf das Füllprotokoll unter
+  // der Gruppe weder lesen noch schreiben — auch dann nicht, wenn sein Token
+  // Schreibrecht am Einsatz trägt. Deshalb `isFirecallGuest` und nicht
+  // `useIsReadOnlyFirecallGuest`.
+  const istGast = isFirecallGuest({ firecall: gastFirecall });
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,10 +88,15 @@ export default function AtemschutzPage() {
   );
 
   const groupId = firecall?.group;
-  const { flaschen, activeGeraete, feuerwehren } =
+  const { flaschen, activeGeraete, fuellstationen, feuerwehren } =
     useAtemschutzGeraete(groupId);
-  const { fuellungen, flaschenGesamt, trupps, ausgabeByGeraet } =
-    useAtemschutzEinsatzdaten(firecallId);
+  const { trupps, ausgabeByGeraet } = useAtemschutzEinsatzdaten(firecallId);
+  // Das Füllprotokoll liegt unter der Gruppe; hier wird es auf diesen Einsatz
+  // eingeschränkt.
+  const { fuellungen, flaschenGesamt } = useAtemschutzFuellungen(groupId, {
+    firecallId,
+  });
+  const eigeneFeuerwehr = useGroupFeuerwehrName(groupId);
 
   // Nur die Ausrüstungsmängel: Fahrzeugmängel gehören nicht an diese Liste.
   const { openCountByGeraet } = useFahrtenbuchMangel(groupId, {
@@ -151,38 +165,26 @@ export default function AtemschutzPage() {
 
   const handleSaveFuellung = useCallback(
     async (input: FuellungInput, id?: string) => {
+      if (!groupId) return;
       const now = new Date().toISOString();
-      const data = {
-        // Nur setzen, was einen Wert hat: Firestore lehnt `undefined` ab.
-        ...(input.geraetId ? { geraetId: input.geraetId } : {}),
-        ...(input.flaschenNummer?.trim()
-          ? { flaschenNummer: input.flaschenNummer.trim() }
-          : {}),
-        ...(input.feuerwehr?.trim() ? { feuerwehr: input.feuerwehr.trim() } : {}),
-        anzahl: input.anzahl,
-        ...(typeof input.startdruck === 'number'
-          ? { startdruck: input.startdruck }
-          : {}),
-        enddruck: input.enddruck,
-        gefuelltVon: input.gefuelltVon.trim(),
-        zeitpunkt: input.zeitpunkt ?? now,
-        ...(input.sichtkontrolle ? { sichtkontrolle: input.sichtkontrolle } : {}),
-        ...(input.mangelId ? { mangelId: input.mangelId } : {}),
-        ...(input.bemerkung?.trim() ? { bemerkung: input.bemerkung.trim() } : {}),
-      };
+      const data = buildFuellungDocument(input, {
+        firecallId,
+        firecallName: firecall?.name,
+        now,
+      });
       const stamp: AtemschutzActor = { userId: actor.userId, now };
       if (id) {
-        await updateFuellung(firecallId, id, data, stamp);
+        await updateFuellung(groupId, id, data, stamp);
       } else {
-        await addFuellung(firecallId, data, stamp);
+        await addFuellung(groupId, data, stamp);
       }
     },
-    [actor.userId, firecallId],
+    [actor.userId, firecall?.name, firecallId, groupId],
   );
 
   const handleDeleteFuellung = useCallback(
-    (id: string) => deleteFuellung(firecallId, id),
-    [firecallId],
+    (id: string) => deleteFuellung(groupId ?? '', id),
+    [groupId],
   );
 
   const handleSaveTrupp = useCallback(
@@ -331,20 +333,28 @@ export default function AtemschutzPage() {
         ))}
       </Tabs>
 
-      {tab === 'fuellprotokoll' && (
-        <FuellprotokollTab
-          groupId={groupId ?? ''}
-          fuellungen={fuellungen}
-          flaschenGesamt={flaschenGesamt}
-          flaschen={flaschen}
-          feuerwehren={feuerwehren}
-          personSuggestions={suggestions}
-          defaultGefuelltVon={benutzerName}
-          canWrite={canWrite}
-          onSave={handleSaveFuellung}
-          onDelete={handleDeleteFuellung}
-        />
-      )}
+      {tab === 'fuellprotokoll' &&
+        (istGast ? (
+          // Statt eines fehlenden Reiters ein Hinweis: Ein verschwundener
+          // Reiter würde als Fehler gelesen.
+          <Alert severity="info">{t('fuellprotokoll.gastHinweis')}</Alert>
+        ) : (
+          <FuellprotokollTab
+            groupId={groupId ?? ''}
+            fuellungen={fuellungen}
+            flaschenGesamt={flaschenGesamt}
+            flaschen={flaschen}
+            fuellstationen={fuellstationen}
+            firecallId={firecallId}
+            eigeneFeuerwehr={eigeneFeuerwehr}
+            feuerwehren={feuerwehren}
+            personSuggestions={suggestions}
+            defaultGefuelltVon={benutzerName}
+            canWrite={canWrite}
+            onSave={handleSaveFuellung}
+            onDelete={handleDeleteFuellung}
+          />
+        ))}
 
       {tab === 'trupps' && (
         <TruppsTab
