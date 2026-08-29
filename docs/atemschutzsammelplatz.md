@@ -114,11 +114,17 @@ stammen:
   `freeSolo` den offenen Text, sobald das Feld verlassen wird — der zuletzt
   getippte Name ginge beim Klick auf „Speichern" verloren. Betrifft
   Füllpersonal und Truppmitglieder.
-- **„Entsendet an" ist optional** und schlägt die **Fahrzeuge des Einsatzes**
-  vor, danach die Gruppenkommandanten. Der Trupp wird einem Fahrzeug
-  unterstellt, nicht einer Person; und am Sammelplatz steht oft nur fest,
-  *dass* er abmarschiert. Ein Pflichtfeld führte hier zu einem erfundenen
-  Eintrag oder zu gar keiner Protokollzeile.
+- **„Entsendet an" ist optional** und schlägt **Fahrzeuge und taktische
+  Einheiten** des Einsatzes vor — bewusst **keine Personen**. Ein Trupp wird
+  einer Einheit unterstellt, nicht einem Menschen; wer sie gerade führt, steht
+  an der Einheit und kann wechseln, während der Trupp draußen ist. Ein
+  Personenname im Protokoll wäre dann falsch, ohne dass es auffällt. Und am
+  Sammelplatz steht oft nur fest, *dass* der Trupp abmarschiert — ein
+  Pflichtfeld führte zu einem erfundenen Eintrag oder zu gar keiner Zeile.
+- **Die Anzahl ist nur für Flaschen ohne Nummer da.** Sobald eine Nummer
+  dasteht — getippt oder aus dem Bestand gewählt —, verschwindet das Feld und
+  die Zeile zählt genau eine Flasche. Sichtbar bleibt es für die
+  Sammelerfassung, bei der niemand einzelne Nummern aufnimmt.
 - **Ein Scan in der Ausrüstung öffnet sofort Ausgabe oder Rücknahme** — welches
   von beiden, ergibt der Zustand des Stücks. Die Liste danach zu filtern war
   ein Zwischenschritt, den niemand mit Handschuhen tippt. Ohne Stammdatensatz
@@ -129,6 +135,52 @@ stammen:
   CFK 6,8 l" im Protokoll und war von der Nachbarflasche desselben Typs nicht
   zu unterscheiden. Welche Flasche gewählt ist, steht als `geraetDetails` unter
   dem Feld.
+
+## Ein Trupp steht nur einmal auf der Tafel
+
+`gruppiereTrupps` zeigt in den drei Abschnitten oben je Trupp **nur die jüngste
+Bereitstellung**. Ein Trupp, der zurückgekommen, wieder bereitgestellt und
+erneut hinausgegangen ist, hat zwei Zeilen: die alte auf `zurueck`, die neue auf
+`imEinsatz`. Ohne diese Regel stünde er gleichzeitig unter „Im Einsatz" und
+unter „Zurück & Regeneration", und wer auf die Tafel schaut, zählt einen Trupp
+zu viel. Entschieden wird über `laufendeNummer`, nicht über die Sortierung —
+zwei Bereitstellungen können in derselben Sekunde entstehen. Die alte Zeile
+bleibt im Protokoll, wo sie als Nachweis hingehört.
+
+## Externer Handscanner
+
+Neben der Kamera wird ein **Handscanner als Tastatur** (HID) benutzt: Er tippt
+den Code in das gerade fokussierte Feld und schickt ein Enter hinterher. Enter
+muss deshalb überall dort etwas Sinnvolles tun, wo ein Code eingegeben werden
+kann — an drei Stellen mit bewusst unterschiedlicher Schärfe:
+
+| Feld | Enter |
+| --- | --- |
+| „Nummer von Hand eingeben" im Scanner-Dialog | Exakter Treffer → gewohnter Weg (klärt auch mehrere Treffer); sonst **der oberste Vorschlag** |
+| Flaschennummer im Füllprotokoll | **Nur** ein exakter Treffer wird übernommen |
+| Suche im Ausrüstungsreiter | Öffnet Ausgabe/Rücknahme, wenn genau ein Stück übrig bleibt |
+
+Der Unterschied ist Absicht. Im Scanner-Dialog ist ein Code das einzige, was
+eingegeben wird — dort darf der oberste Vorschlag gewinnen. Im Füllprotokoll
+und in der Suche tippen auch Menschen, und ein zufällig angerissener Vorschlag
+dürfte weder eine Fremdflasche überschreiben noch einen Dialog aufreißen.
+
+`autoHighlight` von MUI hilft hier **nicht**: `useAutocomplete` schaltet die
+Enter-Auswahl einer automatischen Vorauswahl bei `freeSolo` ausdrücklich ab,
+sobald der Benutzer getippt hat (`shouldCommitFreeSoloOverProgrammaticHighlight`)
+— sonst ließe sich kein freier Wert mehr eingeben. Deshalb reicht
+`GeraetAutocomplete` die angezeigten Vorschläge an `onSubmit` weiter und der
+Aufrufer entscheidet.
+
+## Warum die Kennung aus den Stammdaten kommt
+
+Die Anzeige einer Füllzeile nimmt die Kennung des **verknüpften Geräts** und
+erst dann die beim Erfassen eingetragene `flaschenNummer`. Grund ist eine Zeile
+aus dem Betrieb: Über die Kamera erfasste Flaschen standen als „Atemluftflasche
+CFK 6,8 l" im Protokoll, weil der Dialog damals die Bezeichnung ins Feld
+schrieb. Die Verknüpfung (`geraetId`) war richtig — nur der eingefrorene Text
+war es nicht. Wer die Kennung aus den Stammdaten liest, ist gegen solche
+Altlasten und gegen spätere Korrekturen der Stammdaten immun.
 
 ## Mangel direkt aus der Sichtkontrolle
 
@@ -150,6 +202,12 @@ Drei Festlegungen dazu:
   keins. Der Dialog sagt das und verweist auf die Bemerkung, statt das
   Speichern zu blockieren. Ebenso wird beim Bearbeiten einer Zeile, die schon
   einen `mangelId` trägt, kein zweiter Mangel angelegt.
+
+Ist ein Stück gewählt, steht es als `GeraetBestaetigung` im Dialog: Kennung in
+Überschriftgröße, Bezeichnung und Wehr darunter. Vorher war das ein grauer
+Hilfstext unter dem Feld — am Sammelplatz wird mit Handschuhen bei Tageslicht
+auf ein Handy geschaut, und die Verwechslung zweier Flaschen desselben Typs ist
+genau der Fehler, den das Protokoll verhindern soll.
 
 `saveAtemschutzMangel` und `useMangelFehlerText` in `mangelErfassung.ts` sind
 der gemeinsame Weg aller drei Stellen. Bildfehler tragen die Schlüssel des

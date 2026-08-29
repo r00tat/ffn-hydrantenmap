@@ -19,7 +19,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { useTranslations } from 'next-intl';
 import {
   DEFAULT_ENDDRUCK,
-  geraetDetails,
+  findByCode,
   geraetKennung,
   SICHTKONTROLLE_WERTE,
   type AtemschutzFuellung,
@@ -30,6 +30,7 @@ import {
 } from '../../common/atemschutz';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 import GeraetAutocomplete from './GeraetAutocomplete';
+import GeraetBestaetigung from './GeraetBestaetigung';
 import MangelFelder from './MangelFelder';
 import {
   hatMangelEingabe,
@@ -113,6 +114,10 @@ export default function FuellungDialog({
   const gewaehlt = form.geraetId
     ? flaschen.find((f) => f.id === form.geraetId)
     : undefined;
+  // Die Anzahl ist die Sammelerfassung für Flaschen ohne Nummer. Sobald eine
+  // Nummer dasteht — getippt oder aus dem Bestand gewählt —, ist es genau eine
+  // Flasche, und das Feld wäre nur eine Gelegenheit für einen Zahlendreher.
+  const hatFlaschennummer = form.flaschenNummer.trim().length > 0;
   const istMangel = form.sichtkontrolle === 'mangel';
   // Beim Bearbeiten einer Zeile, die schon einen Mangel trägt, wird kein
   // zweiter angelegt — sonst entstünde bei jedem Öffnen ein weiterer Eintrag
@@ -126,7 +131,7 @@ export default function FuellungDialog({
     geraetId: form.geraetId,
     flaschenNummer: form.flaschenNummer,
     feuerwehr: form.feuerwehr,
-    anzahl: Number(form.anzahl) || 0,
+    anzahl: hatFlaschennummer ? 1 : Number(form.anzahl) || 0,
     startdruck: toNumber(form.startdruck),
     enddruck: toNumber(form.enddruck) ?? 0,
     gefuelltVon: form.gefuelltVon,
@@ -193,9 +198,6 @@ export default function FuellungDialog({
                 label={t('fuellung.flaschenNummer')}
                 value={form.flaschenNummer}
                 geraete={flaschen}
-                // Zeigt unter dem Feld, *welche* Flasche gewählt ist: Die
-                // Nummer allein sagt nicht, ob 6-l-Stahl oder 6,8-l-CFK.
-                helperText={gewaehlt ? geraetDetails(gewaehlt) : undefined}
                 onTextChange={(next) =>
                   // Freie Eingabe: Der Bezug auf ein Stammgerät ist damit
                   // aufgehoben — sonst hinge `geraetId` an einer Nummer, die
@@ -207,6 +209,14 @@ export default function FuellungDialog({
                   }))
                 }
                 onGeraetChange={uebernehmeFlasche}
+                // Ein externer Handscanner tippt den Code und schickt ein
+                // Enter hinterher. Nur ein *exakter* Treffer wird übernommen:
+                // Ein Mensch, der hier eine Fremdflasche einträgt, soll seinen
+                // Text behalten, auch wenn er zufällig einen Vorschlag anreißt.
+                onSubmit={(value) => {
+                  const exakt = findByCode(flaschen, value);
+                  if (exakt.length === 1) uebernehmeFlasche(exakt[0]);
+                }}
               />
               <Tooltip title={t('fuellung.scan')}>
                 {/* span, weil ein disabled Button keine Events feuert —
@@ -224,7 +234,12 @@ export default function FuellungDialog({
               </Tooltip>
             </Stack>
           </Grid>
-          <Grid size={{ xs: 12, sm: 8 }}>
+          {gewaehlt && (
+            <Grid size={12}>
+              <GeraetBestaetigung bestaetigt geraet={gewaehlt} />
+            </Grid>
+          )}
+          <Grid size={{ xs: 12, sm: hatFlaschennummer ? 12 : 8 }}>
             <Autocomplete
               freeSolo
               fullWidth
@@ -239,17 +254,21 @@ export default function FuellungDialog({
               )}
             />
           </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField
-              fullWidth
-              type="number"
-              label={t('fuellung.anzahl')}
-              value={form.anzahl}
-              helperText={t('fuellung.anzahlHint')}
-              slotProps={{ htmlInput: { min: 1, max: 99, inputMode: 'numeric' } }}
-              onChange={(e) => set('anzahl', e.target.value)}
-            />
-          </Grid>
+          {!hatFlaschennummer && (
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField
+                fullWidth
+                type="number"
+                label={t('fuellung.anzahl')}
+                value={form.anzahl}
+                helperText={t('fuellung.anzahlHint')}
+                slotProps={{
+                  htmlInput: { min: 1, max: 99, inputMode: 'numeric' },
+                }}
+                onChange={(e) => set('anzahl', e.target.value)}
+              />
+            </Grid>
+          )}
           <Grid size={6}>
             <TextField
               fullWidth

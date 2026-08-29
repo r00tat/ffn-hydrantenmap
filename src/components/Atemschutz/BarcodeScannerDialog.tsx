@@ -14,7 +14,12 @@ import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { findByCode, type AtemschutzGeraet } from '../../common/atemschutz';
+import {
+  findByCode,
+  geraetKennung,
+  geraetLabel,
+  type AtemschutzGeraet,
+} from '../../common/atemschutz';
 import useBarcodeScanner from '../../hooks/useBarcodeScanner';
 import GeraetAutocomplete from './GeraetAutocomplete';
 
@@ -135,10 +140,24 @@ export default function BarcodeScannerDialog({
                 // Aus der Liste gewählt: Es gibt nichts mehr aufzulösen, das
                 // Gerät steht fest.
                 onGeraetChange={(g) => {
-                  onPicked(g.nummer ?? g.bezeichnung, g);
+                  onPicked(geraetKennung(g) ?? g.bezeichnung, g);
                   onClose();
                 }}
-                onSubmit={(value) => setCode(value)}
+                // Ein externer Handscanner tippt den Code in dieses Feld und
+                // schickt ein Enter hinterher. Trifft der Code eine Kennung
+                // exakt, geht es den gewohnten Weg — der klärt auch den Fall,
+                // dass mehrere Stücke denselben Code tragen. Sonst wird der
+                // oberste Vorschlag genommen: Er ist das, was am Bildschirm
+                // ganz oben steht, und ein zweiter Handgriff mit Handschuhen
+                // ist genau das, was der Scanner ersparen soll.
+                onSubmit={(value, vorschlaege) => {
+                  if (findByCode(geraete, value).length > 0 || vorschlaege.length === 0) {
+                    setCode(value);
+                    return;
+                  }
+                  onPicked(value, vorschlaege[0]);
+                  onClose();
+                }}
               />
             </>
           )}
@@ -156,8 +175,9 @@ export default function BarcodeScannerDialog({
                 {treffer.map((g) => (
                   <ListItemButton key={g.id} onClick={() => uebernehmen(g)}>
                     <ListItemText
-                      primary={`${g.nummer ? `${g.nummer} · ` : ''}${g.bezeichnung}`}
+                      primary={geraetLabel(g)}
                       secondary={g.feuerwehr}
+                      slotProps={{ primary: { variant: 'h6' } }}
                     />
                   </ListItemButton>
                 ))}

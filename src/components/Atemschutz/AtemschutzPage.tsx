@@ -98,7 +98,7 @@ export default function AtemschutzPage() {
     return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
   }, [trupps.protokoll, feuerwehren]);
 
-  const { vehicles } = useVehicles();
+  const { vehicles, tacticalUnits } = useVehicles();
 
   const suggestions = useAtemschutzPersonSuggestions(groupId, {
     trupps: trupps.protokoll,
@@ -107,9 +107,13 @@ export default function AtemschutzPage() {
   });
 
   /**
-   * Wohin ein Trupp entsendet wird: meist ein Fahrzeug des Einsatzes, sonst
-   * ein Gruppenkommandant. Die Fahrzeuge stehen vorn, weil sie der Regelfall
-   * sind — der Trupp wird einem Fahrzeug unterstellt, nicht einer Person.
+   * Wohin ein Trupp entsendet wird: an ein Fahrzeug oder an eine taktische
+   * Einheit des Einsatzes.
+   *
+   * Bewusst **keine Personen**. Ein Trupp wird einer Einheit unterstellt, nicht
+   * einem Menschen — wer die Einheit gerade führt, steht an der Einheit und
+   * kann wechseln, während der Trupp draußen ist. Ein Personenname im
+   * Protokoll wäre dann falsch, ohne dass es jemandem auffällt.
    */
   const entsendetAnVorschlaege = useMemo(() => {
     const namen: string[] = [];
@@ -121,9 +125,9 @@ export default function AtemschutzPage() {
       namen.push(v);
     };
     for (const fzg of vehicles) add(fzg.name);
-    for (const name of suggestions.gruppenkommandanten) add(name);
+    for (const einheit of tacticalUnits) add(einheit.name);
     return namen;
-  }, [vehicles, suggestions.gruppenkommandanten]);
+  }, [vehicles, tacticalUnits]);
 
   const actor: AtemschutzActor = useMemo(
     () => ({ userId: uid ?? '', now: new Date().toISOString() }),
@@ -307,7 +311,7 @@ export default function AtemschutzPage() {
       <AtemschutzHeader
         leiter={firecall?.asspLeiter}
         fuellpersonal={firecall?.asspFuellpersonal}
-        suggestions={suggestions.alle}
+        suggestions={suggestions}
         canWrite={canWrite}
         onSave={handleSaveLeitung}
       />
@@ -332,7 +336,7 @@ export default function AtemschutzPage() {
           flaschenGesamt={flaschenGesamt}
           flaschen={flaschen}
           feuerwehren={feuerwehren}
-          personSuggestions={suggestions.alle}
+          personSuggestions={suggestions}
           defaultGefuelltVon={benutzerName}
           canWrite={canWrite}
           onSave={handleSaveFuellung}
@@ -344,7 +348,7 @@ export default function AtemschutzPage() {
         <TruppsTab
           trupps={trupps}
           feuerwehren={feuerwehren}
-          personSuggestions={suggestions.alle}
+          personSuggestions={suggestions}
           entsendetAnVorschlaege={entsendetAnVorschlaege}
           canWrite={canWrite}
           onSave={handleSaveTrupp}

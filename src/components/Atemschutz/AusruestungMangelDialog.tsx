@@ -9,9 +9,9 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { geraetLabel, type AtemschutzGeraet } from '../../common/atemschutz';
+import type { AtemschutzGeraet } from '../../common/atemschutz';
+import GeraetBestaetigung from './GeraetBestaetigung';
 import MangelFelder from './MangelFelder';
 import {
   hatMangelEingabe,
@@ -69,9 +69,7 @@ export default function AusruestungMangelDialog({
       <DialogContent>
         {busy && <LinearProgress sx={{ mb: 2 }} />}
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            {geraetLabel(geraet)}
-          </Typography>
+          <GeraetBestaetigung geraet={geraet} />
           <MangelFelder required value={eingabe} onChange={setEingabe} />
           {fehler && <Alert severity="error">{fehler}</Alert>}
         </Stack>

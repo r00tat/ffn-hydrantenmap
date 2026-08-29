@@ -20,6 +20,7 @@ import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import {
   ATEMSCHUTZ_GERAET_TYPEN,
+  findByCode,
   geraetKennung,
   geraetLabel,
   matchGeraete,
@@ -83,6 +84,18 @@ export default function AusruestungTab({
     });
   }, [geraete, suche, typFilter, nurAusgegeben, ausgabeByGeraet]);
 
+  /**
+   * Öffnet für ein Stück den passenden Dialog: Was draußen ist, kommt zurück,
+   * alles andere geht hinaus.
+   */
+  const oeffneFuerGeraet = (g: AtemschutzGeraet) => {
+    const status = ausgabeByGeraet.get(g.id as string)?.status ?? 'amPlatz';
+    setAusgabeDialog({
+      geraet: g,
+      modus: status === 'ausgegeben' ? 'zuruecknehmen' : 'ausgeben',
+    });
+  };
+
   const uhrzeit = (iso?: string) =>
     iso
       ? format.dateTime(new Date(iso), { hour: '2-digit', minute: '2-digit' })
@@ -98,8 +111,21 @@ export default function AusruestungTab({
         <TextField
           size="small"
           label={t('ausruestung.search')}
+          helperText={t('ausruestung.searchHint')}
           value={suche}
           onChange={(e) => setSuche(e.target.value)}
+          // Ein externer Handscanner tippt den Code in dieses Feld und schickt
+          // ein Enter hinterher. Bleibt genau ein Stück übrig, geht es direkt
+          // weiter — die Liste bis auf eine Zeile zu filtern und dann noch zu
+          // klicken ist der Handgriff, den der Scanner ersparen soll.
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || !canWrite) return;
+            const exakt = findByCode(geraete, suche);
+            const ziel = exakt.length === 1 ? exakt[0] : gefiltert[0];
+            if (ziel && (exakt.length === 1 || gefiltert.length === 1)) {
+              oeffneFuerGeraet(ziel);
+            }
+          }}
           sx={{ minWidth: 200 }}
         />
         <Tooltip title={t('ausruestung.scan')}>
@@ -246,12 +272,7 @@ export default function AusruestungTab({
             // mit Handschuhen tippen will. Welcher der beiden Wege es ist,
             // ergibt sich aus dem Zustand: Was draußen ist, kommt zurück.
             if (treffer && canWrite) {
-              const status =
-                ausgabeByGeraet.get(treffer.id as string)?.status ?? 'amPlatz';
-              setAusgabeDialog({
-                geraet: treffer,
-                modus: status === 'ausgegeben' ? 'zuruecknehmen' : 'ausgeben',
-              });
+              oeffneFuerGeraet(treffer);
               return;
             }
             // Kein Stammdatensatz oder nur Lesezugriff: Dann bleibt die

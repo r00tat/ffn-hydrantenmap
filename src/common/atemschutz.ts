@@ -446,18 +446,40 @@ export interface TruppGruppen {
 /**
  * Teilt die Zeilen in die drei Abschnitte der Oberfläche und das Protokoll.
  *
- * Abgemeldete Trupps stehen nur im Protokoll: Sie sind heimgefahren, und eine
- * vierte Karte am Sammelplatz für Leute, die nicht mehr da sind, hilft
- * niemandem.
+ * Zwei Regeln, die verhindern, dass ein Trupp doppelt am Sammelplatz steht:
+ *
+ * - **Je Trupp zählt oben nur die jüngste Bereitstellung.** Ein Trupp, der
+ *   zurückgekommen und danach erneut hinausgegangen ist, hat zwei Zeilen: die
+ *   alte auf `zurueck`, die neue auf `imEinsatz`. Ohne diese Regel stünde er
+ *   gleichzeitig unter „Im Einsatz" und unter „Zurück & Regeneration" — und
+ *   wer auf die Tafel schaut, zählt einen Trupp zu viel. Die alte Zeile bleibt
+ *   im Protokoll, wo sie als Nachweis hingehört.
+ * - **Abgemeldete stehen nur im Protokoll.** Sie sind heimgefahren, und eine
+ *   vierte Karte für Leute, die nicht mehr da sind, hilft niemandem.
  */
 export function gruppiereTrupps(trupps: AtemschutzTrupp[]): TruppGruppen {
   const protokoll = [...trupps].sort((a, b) =>
     (b.bereitSeit ?? '').localeCompare(a.bereitSeit ?? ''),
   );
+
+  // `laufendeNummer` entscheidet und nicht die Reihenfolge der Liste: Zwei
+  // Bereitstellungen können in derselben Sekunde angelegt worden sein.
+  const juengste = new Map<string, AtemschutzTrupp>();
+  for (const t of protokoll) {
+    const key = t.truppKey || (t.id ?? '');
+    const bisher = juengste.get(key);
+    if (!bisher || (t.laufendeNummer ?? 0) > (bisher.laufendeNummer ?? 0)) {
+      juengste.set(key, t);
+    }
+  }
+  const aktuell = protokoll.filter(
+    (t) => juengste.get(t.truppKey || (t.id ?? '')) === t,
+  );
+
   return {
-    bereit: protokoll.filter((t) => t.status === 'bereit'),
-    imEinsatz: protokoll.filter((t) => t.status === 'imEinsatz'),
-    zurueck: protokoll.filter((t) => t.status === 'zurueck'),
+    bereit: aktuell.filter((t) => t.status === 'bereit'),
+    imEinsatz: aktuell.filter((t) => t.status === 'imEinsatz'),
+    zurueck: aktuell.filter((t) => t.status === 'zurueck'),
     protokoll,
   };
 }

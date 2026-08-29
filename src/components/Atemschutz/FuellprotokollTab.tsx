@@ -16,6 +16,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import {
+  geraetKennung,
   type AtemschutzFuellung,
   type AtemschutzGeraet,
   type FuellungInput,
@@ -69,10 +70,31 @@ export default function FuellprotokollTab({
     [flaschen],
   );
 
+  /**
+   * Die Kennung der Flasche.
+   *
+   * Zuerst aus den Stammdaten und erst dann aus dem, was beim Erfassen ins
+   * Feld geschrieben wurde: Ist die Flasche verknüpft, ist die Kennung der
+   * Stammdaten die richtige — auch für Zeilen, die entstanden sind, als der
+   * Dialog noch die Bezeichnung eingetragen hat.
+   */
+  const kennung = (f: AtemschutzFuellung) => {
+    const g = f.geraetId ? flaschenById.get(f.geraetId) : undefined;
+    return (g && geraetKennung(g)) || f.flaschenNummer;
+  };
+
   const titel = (f: AtemschutzFuellung) => {
-    if (f.flaschenNummer) return f.flaschenNummer;
+    const k = kennung(f);
+    if (k) return k;
     if (f.anzahl > 1) return t('fuellung.unbekannteFlaschen', { count: f.anzahl });
     return f.feuerwehr ?? '';
+  };
+
+  /** Die Bezeichnung — aber nicht, wenn sie schon die Überschrift ist. */
+  const bezeichnung = (f: AtemschutzFuellung) => {
+    const g = f.geraetId ? flaschenById.get(f.geraetId) : undefined;
+    if (!g || g.bezeichnung === titel(f)) return undefined;
+    return g.bezeichnung;
   };
 
   const druck = (f: AtemschutzFuellung) =>
@@ -153,9 +175,7 @@ export default function FuellprotokollTab({
                   </Box>
                 }
                 secondary={[
-                  f.geraetId
-                    ? flaschenById.get(f.geraetId)?.bezeichnung
-                    : undefined,
+                  bezeichnung(f),
                   f.feuerwehr,
                   f.gefuelltVon,
                   format.dateTime(new Date(f.zeitpunkt), {

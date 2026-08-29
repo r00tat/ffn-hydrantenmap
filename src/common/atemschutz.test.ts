@@ -405,10 +405,12 @@ describe('nextBereitstellung', () => {
 
 describe('gruppiereTrupps', () => {
   it('teilt nach Status und lässt Abgemeldete aus den Abschnitten heraus', () => {
-    const bereit = trupp({ id: 'a', status: 'bereit' });
-    const imEinsatz = trupp({ id: 'b', status: 'imEinsatz' });
-    const zurueck = trupp({ id: 'c', status: 'zurueck' });
-    const abgemeldet = trupp({ id: 'd', status: 'abgemeldet' });
+    // Vier verschiedene Trupps: Gleicher `truppKey` hieße, es wäre viermal
+    // derselbe, und dann zählte nur die jüngste Bereitstellung.
+    const bereit = trupp({ id: 'a', truppKey: 'ka', status: 'bereit' });
+    const imEinsatz = trupp({ id: 'b', truppKey: 'kb', status: 'imEinsatz' });
+    const zurueck = trupp({ id: 'c', truppKey: 'kc', status: 'zurueck' });
+    const abgemeldet = trupp({ id: 'd', truppKey: 'kd', status: 'abgemeldet' });
 
     const gruppen = gruppiereTrupps([abgemeldet, zurueck, imEinsatz, bereit]);
     expect(gruppen.bereit.map((t) => t.id)).toEqual(['a']);
@@ -425,12 +427,55 @@ describe('gruppiereTrupps', () => {
   });
 
   it('sortiert das Protokoll neueste Bereitstellung zuerst', () => {
-    const alt = trupp({ id: 'alt', bereitSeit: '2026-08-29T09:00:00.000Z' });
-    const neu = trupp({ id: 'neu', bereitSeit: '2026-08-29T11:00:00.000Z' });
+    const alt = trupp({
+      id: 'alt',
+      truppKey: 'ka',
+      bereitSeit: '2026-08-29T09:00:00.000Z',
+    });
+    const neu = trupp({
+      id: 'neu',
+      truppKey: 'kb',
+      bereitSeit: '2026-08-29T11:00:00.000Z',
+    });
     expect(gruppiereTrupps([alt, neu]).protokoll.map((t) => t.id)).toEqual([
       'neu',
       'alt',
     ]);
+  });
+
+  it('zeigt einen erneut entsendeten Trupp nur einmal', () => {
+    // Der gemeldete Fall: Trupp 1 kommt zurück, wird wieder bereitgestellt und
+    // geht erneut hinaus. Die alte Zeile steht auf `zurueck` — er darf nicht
+    // gleichzeitig unter „Im Einsatz" und unter „Zurück & Regeneration"
+    // stehen, sonst zählt die Tafel einen Trupp zu viel.
+    const erste = trupp({
+      id: '1',
+      laufendeNummer: 1,
+      status: 'zurueck',
+      bereitSeit: '2026-08-29T10:00:00.000Z',
+    });
+    const zweite = trupp({
+      id: '2',
+      laufendeNummer: 2,
+      status: 'imEinsatz',
+      bereitSeit: '2026-08-29T11:00:00.000Z',
+    });
+
+    const gruppen = gruppiereTrupps([erste, zweite]);
+    expect(gruppen.imEinsatz.map((t) => t.id)).toEqual(['2']);
+    expect(gruppen.zurueck).toEqual([]);
+    // Als Nachweis bleiben beide Zeilen im Protokoll stehen.
+    expect(gruppen.protokoll.map((t) => t.id)).toEqual(['2', '1']);
+  });
+
+  it('entscheidet über die laufende Nummer, nicht über die Reihenfolge', () => {
+    // Zwei Bereitstellungen in derselben Sekunde — dann trägt nur die
+    // laufende Nummer.
+    const erste = trupp({ id: '1', laufendeNummer: 1, status: 'zurueck' });
+    const zweite = trupp({ id: '2', laufendeNummer: 2, status: 'bereit' });
+    const gruppen = gruppiereTrupps([zweite, erste]);
+    expect(gruppen.bereit.map((t) => t.id)).toEqual(['2']);
+    expect(gruppen.zurueck).toEqual([]);
   });
 });
 

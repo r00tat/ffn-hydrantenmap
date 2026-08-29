@@ -14,11 +14,11 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
 import {
-  geraetLabel,
   SICHTKONTROLLE_WERTE,
   type AtemschutzGeraet,
   type Sichtkontrolle,
 } from '../../common/atemschutz';
+import GeraetBestaetigung from './GeraetBestaetigung';
 import MangelFelder from './MangelFelder';
 import {
   hatMangelEingabe,
@@ -143,12 +143,7 @@ export default function AusgabeDialog({
       <DialogContent>
         {saving && <LinearProgress sx={{ mb: 2 }} />}
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            fullWidth
-            disabled
-            label={t('geraet.bezeichnung')}
-            value={geraetLabel(geraet)}
-          />
+          <GeraetBestaetigung geraet={geraet} />
           {istAusgabe && (
             <Autocomplete
               freeSolo

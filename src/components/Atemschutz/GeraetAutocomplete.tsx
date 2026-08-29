@@ -24,8 +24,17 @@ export interface GeraetAutocompleteProps {
   onTextChange: (value: string) => void;
   /** Ein Gerät aus der Liste wurde gewählt. */
   onGeraetChange: (geraet: AtemschutzGeraet) => void;
-  /** Optional: Enter auf einer freien Eingabe. */
-  onSubmit?: (value: string) => void;
+  /**
+   * Enter auf einer freien Eingabe.
+   *
+   * `vorschlaege` sind die gerade angezeigten Treffer. Sie gehen mit, weil ein
+   * externer Handscanner den Code eintippt und ein Enter hinterherschickt —
+   * der Aufrufer entscheidet dann, ob er den obersten Vorschlag übernimmt oder
+   * den rohen Code weiterreicht. MUI selbst tut das bei `freeSolo` bewusst
+   * nicht: Dort gewinnt der getippte Text immer gegen eine automatische
+   * Vorauswahl, sonst ließe sich kein freier Wert mehr eingeben.
+   */
+  onSubmit?: (value: string, vorschlaege: AtemschutzGeraet[]) => void;
 }
 
 export default function GeraetAutocomplete({
@@ -99,7 +108,7 @@ export default function GeraetAutocomplete({
           helperText={helperText}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && onSubmit && value.trim()) {
-              onSubmit(value.trim());
+              onSubmit(value.trim(), options);
             }
           }}
         />

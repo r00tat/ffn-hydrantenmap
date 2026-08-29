@@ -66,7 +66,7 @@
       "flaschenNummer": "Cylinder number",
       "feuerwehr": "Brigade",
       "anzahl": "Count",
-      "anzahlHint": "More than 1 for cylinders without numbers",
+      "anzahlHint": "Only for cylinders without a number",
       "startdruck": "Initial pressure (bar)",
       "enddruck": "Final pressure (bar)",
       "gefuelltVon": "Filled by",
@@ -99,7 +99,7 @@
       "denied": "No access to the camera. Please grant permission or enter the number by hand.",
       "error": "The camera could not be started.",
       "manual": "Enter number by hand",
-      "manualHint": "Cylinder number, inventory no., serial number or brigade",
+      "manualHint": "Cylinder number, inventory no., serial number or brigade — confirm with Enter",
       "noMatch": "No item found for “{code}”. The code will be used as the cylinder number.",
       "multiple": "{count} items carry this code — please choose:",
       "use": "Use"
@@ -141,7 +141,7 @@
         "abmelden": "Sign off"
       },
       "entsendetAn": "Deployed to",
-      "entsendetAnHint": "Vehicle or team leader — optional",
+      "entsendetAnHint": "Vehicle or tactical unit — optional",
       "abmarschZeit": "Departure",
       "rueckkehrZeit": "Return",
       "druckAbmarsch": "Lowest pressure at departure (bar)",
@@ -159,6 +159,7 @@
     },
     "ausruestung": {
       "search": "Search",
+      "searchHint": "Scan or type, confirm with Enter",
       "filterTyp": "Type",
       "filterAll": "All",
       "onlyOut": "Only issued",

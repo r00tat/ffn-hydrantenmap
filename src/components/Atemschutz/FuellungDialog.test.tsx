@@ -161,12 +161,44 @@ describe('FuellungDialog — gewählte Flasche', () => {
     expect(screen.getByLabelText(/Flaschennummer/)).toHaveValue('2016-FL-003');
   });
 
-  it('zeigt Bezeichnung und Feuerwehr der gewählten Flasche unter dem Feld', () => {
+  it('zeigt die gewählte Flasche groß mit Kennung, Bezeichnung und Wehr', () => {
     render();
     waehleFlasche('2.16');
+    // Die Kennung als Überschrift, darunter Bezeichnung und Feuerwehr — am
+    // Sammelplatz muss das im Stehen lesbar sein.
     expect(
-      screen.getByText(/Atemluftflasche Stahl 6 l · Neusiedl am See/),
+      screen.getByRole('heading', { name: '2.16.19' }),
     ).toBeInTheDocument();
+    expect(screen.getByText('Atemluftflasche Stahl 6 l')).toBeInTheDocument();
+    expect(screen.getByText(/Neusiedl am See/)).toBeInTheDocument();
+  });
+
+  it('blendet die Anzahl aus, sobald eine Flaschennummer dasteht', () => {
+    // Die Anzahl ist die Sammelerfassung für Flaschen ohne Nummer.
+    render();
+    expect(screen.getByLabelText(/Anzahl/)).toBeInTheDocument();
+    waehleFlasche('2.16');
+    expect(screen.queryByLabelText(/Anzahl/)).not.toBeInTheDocument();
+  });
+
+  it('speichert eine benannte Flasche als genau eine', async () => {
+    const { onSave } = render();
+    waehleFlasche('2.16');
+    fireEvent.click(screen.getByRole('button', { name: /speichern/i }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ anzahl: 1, flaschenNummer: '2.16.19' }),
+      ),
+    );
+  });
+
+  it('übernimmt bei Enter einen exakt getroffenen Code', () => {
+    // Der externe Handscanner tippt den Code und schickt ein Enter hinterher.
+    render();
+    const feld = screen.getByLabelText(/Flaschennummer/);
+    fireEvent.change(feld, { target: { value: '2.16.19' } });
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    expect(screen.getByRole('heading', { name: '2.16.19' })).toBeInTheDocument();
   });
 });
 

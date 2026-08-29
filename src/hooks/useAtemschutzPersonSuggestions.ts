@@ -13,17 +13,6 @@ export interface PersonSuggestionSources {
   asspFuellpersonal?: string[];
 }
 
-export interface PersonSuggestions {
-  /** Alle bekannten Namen — für Truppmitglieder, Füllpersonal, ASSP-Leiter. */
-  alle: string[];
-  /**
-   * Die als Gruppenkommandant eingeteilten Namen zuerst, dann alle übrigen.
-   * Für das Feld „Entsendet an": Der Trupp geht zu einem Gruppenkommandanten,
-   * und der steht in der Einsatzmannschaft schon so eingeteilt.
-   */
-  gruppenkommandanten: string[];
-}
-
 /**
  * Namensvorschläge aus drei Quellen: die gepflegten Personen der Gruppe, die
  * Einsatzmannschaft und alles, was in diesem Einsatz bereits eingetippt wurde.
@@ -36,7 +25,7 @@ export interface PersonSuggestions {
 export default function useAtemschutzPersonSuggestions(
   groupId: string | undefined,
   sources: PersonSuggestionSources,
-): PersonSuggestions {
+): string[] {
   const { activePersons } = useFahrtenbuchPersons(groupId);
   const { crewAssignments } = useCrewAssignments();
 
@@ -55,20 +44,6 @@ export default function useAtemschutzPersonSuggestions(
     add(asspLeiter);
     for (const p of asspFuellpersonal ?? []) add(p);
 
-    const grkdt = new Set<string>();
-    for (const c of crewAssignments ?? []) {
-      if (c.funktion === 'Gruppenkommandant' && c.name?.trim()) {
-        grkdt.add(c.name.trim());
-      }
-    }
-
-    const alle = [...namen].sort((a, b) => a.localeCompare(b, 'de'));
-    return {
-      alle,
-      gruppenkommandanten: [
-        ...[...grkdt].sort((a, b) => a.localeCompare(b, 'de')),
-        ...alle.filter((n) => !grkdt.has(n)),
-      ],
-    };
+    return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
   }, [activePersons, crewAssignments, trupps, asspLeiter, asspFuellpersonal]);
 }
