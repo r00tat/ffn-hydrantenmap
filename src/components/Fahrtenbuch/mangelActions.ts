@@ -89,11 +89,13 @@ export async function createMangel(
 
     const doc = buildMangelDocument(
       {
+        itemType: 'vehicle',
+        itemId: input.vehicleId,
         vehicleId: input.vehicleId,
         description: input.description,
         images: input.images,
       },
-      vehicle,
+      { type: 'vehicle', id: input.vehicleId, name: vehicle.name ?? '' },
       groupId,
       actorFrom(session),
     );
@@ -158,7 +160,11 @@ export async function updateMangel(
     // Erst nach dem Schreiben: Scheitert das Speichern, zeigt das Dokument
     // weiterhin auf Dateien, die es noch gibt.
     if (removed.length > 0) await deleteMangelImages(removed);
-    await refreshVehicleCache(groupId, mangel.vehicleId);
+    // Ein Ausrüstungsmangel hat kein Fahrzeug — für ihn gibt es keinen Cache
+    // zu erneuern.
+    if (mangel.vehicleId) {
+      await refreshVehicleCache(groupId, mangel.vehicleId);
+    }
     return { success: true, id: mangelId };
   } catch (err) {
     console.error('updateMangel failed', err);
@@ -251,7 +257,11 @@ export async function changeMangelStatus(
             },
         { merge: true },
       );
-    await refreshVehicleCache(groupId, mangel.vehicleId);
+    // Ein Ausrüstungsmangel hat kein Fahrzeug — für ihn gibt es keinen Cache
+    // zu erneuern.
+    if (mangel.vehicleId) {
+      await refreshVehicleCache(groupId, mangel.vehicleId);
+    }
     return { success: true, id: mangelId };
   } catch (err) {
     console.error('changeMangelStatus failed', err);
@@ -302,7 +312,11 @@ export async function deleteMangel(
     // Dateien sind seine Anhänge. Umgekehrt bliebe bei einem Fehler ein Mangel
     // stehen, dessen Bilder schon weg sind.
     await deleteMangelImages(sanitizeMangelImages(mangel.images, groupId));
-    await refreshVehicleCache(groupId, mangel.vehicleId);
+    // Ein Ausrüstungsmangel hat kein Fahrzeug — für ihn gibt es keinen Cache
+    // zu erneuern.
+    if (mangel.vehicleId) {
+      await refreshVehicleCache(groupId, mangel.vehicleId);
+    }
     return { success: true, id: mangelId };
   } catch (err) {
     console.error('deleteMangel failed', err);
@@ -368,6 +382,8 @@ export async function migrateDefectsToMangel(
 
       const mangel = buildMangelDocument(
         {
+          itemType: 'vehicle',
+          itemId: entry.vehicleId,
           vehicleId: entry.vehicleId,
           // Reihenfolge nach Aussagekraft: der eigene Mangeltext, sonst die
           // Hinweise (dort stand die Beschreibung vor dem eigenen Feld),
@@ -381,7 +397,11 @@ export async function migrateDefectsToMangel(
           reportedBy: entry.createdBy,
           reportedByName: entry.driverName,
         },
-        { name: entry.vehicleName },
+        {
+          type: 'vehicle',
+          id: entry.vehicleId,
+          name: entry.vehicleName ?? '',
+        },
         groupId,
         actor,
       );

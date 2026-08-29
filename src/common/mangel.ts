@@ -25,6 +25,25 @@ export const MANGEL_STATUSES: MangelStatus[] = [
 export const OPEN_MANGEL_STATUSES: MangelStatus[] = ['open', 'inProgress'];
 
 /**
+ * Woran der Mangel hängt.
+ *
+ * Ein Feld und keine getrennte Collection: Lebenszyklus, Verlauf, Bilder und
+ * Arbeitsliste sind für ein defektes Fahrzeug und eine undichte Maske
+ * dieselben. Eine zweite Collection wäre dieselbe Logik ein zweites Mal — und
+ * eine zweite Stelle, an der ein Statuswechsel seine Spur verlieren kann.
+ */
+export type MangelItemType = 'vehicle' | 'atemschutz';
+
+export const MANGEL_ITEM_TYPES: MangelItemType[] = ['vehicle', 'atemschutz'];
+
+/** Der Gegenstand, an dem ein Mangel gemeldet wird. */
+export interface MangelItem {
+  type: MangelItemType;
+  id: string;
+  name: string;
+}
+
+/**
  * Ein Eintrag im Verlauf. Append-only: Was einmal notiert wurde, bleibt stehen.
  * Der Verlauf einer Reparatur („Werkstatttermin 12.8.", „Ersatzteil bestellt")
  * ist genau das, was ein einzelnes überschreibbares Notizfeld verlöre.
@@ -41,13 +60,28 @@ export interface MangelNote {
 
 export interface Mangel {
   id?: string;
-  vehicleId: string;
+  /**
+   * Woran der Mangel hängt. **Fehlt bei Dokumenten aus der Zeit vor diesem
+   * Feld** — die sind alle Fahrzeugmängel. Nie direkt lesen, immer über
+   * `mangelItemType()`.
+   */
+  itemType?: MangelItemType;
+  /** Wie `itemType`: über `mangelItemId()` lesen. */
+  itemId?: string;
+  /** Wie `itemType`: über `mangelItemName()` lesen. */
+  itemName?: string;
+  /**
+   * Das Fahrzeug. Bleibt bei Fahrzeugmängeln gesetzt — daran hängen die
+   * Fahrzeugkarte, ihr Zähler und die Abfrage `where('vehicleId', '==', …)`.
+   * Bei einem Ausrüstungsmangel fehlt es.
+   */
+  vehicleId?: string;
   /**
    * Kopie des Fahrzeugnamens. Die gruppenweite Mängelliste soll ohne einen
    * Join über alle Fahrzeuge lesbar sein — dieselbe Bauweise wie
    * `FahrtenbuchEntry.vehicleName`.
    */
-  vehicleName: string;
+  vehicleName?: string;
   /** Die meldende Fahrt; fehlt bei direkt am Fahrzeug gemeldeten Mängeln. */
   entryId?: string;
   description: string;
@@ -84,7 +118,15 @@ export interface Mangel {
 
 /** Die Eingabe des Clients. Systemfelder stehen bewusst nicht darin. */
 export interface MangelInput {
-  vehicleId: string;
+  /**
+   * Woran der Mangel hängt. Ohne Angabe `'vehicle'` — damit bleibt jeder
+   * bestehende Aufruf gültig.
+   */
+  itemType?: MangelItemType;
+  /** Der Gegenstand. Ohne Angabe gilt `vehicleId`. */
+  itemId?: string;
+  /** Nur bei `itemType: 'vehicle'` (oder ohne Angabe). */
+  vehicleId?: string;
   description: string;
   /** Muss einer der Werte aus `MANGEL_STATUSES` sein; Vorgabe `'open'`. */
   status?: string;
@@ -110,8 +152,23 @@ export interface MangelActor {
   now: string;
 }
 
-export interface MangelVehicle {
-  name?: string;
+/**
+ * Woran dieser Mangel hängt.
+ *
+ * Ein fehlendes `itemType` heißt `'vehicle'`: Alle Dokumente aus der Zeit vor
+ * dem Feld sind Fahrzeugmängel, und eine Migration über den Bestand wäre für
+ * eine Vorgabe, die sich aus dem Feld selbst ergibt, unnötiges Risiko.
+ */
+export function mangelItemType(m: Mangel): MangelItemType {
+  return m.itemType ?? 'vehicle';
+}
+
+export function mangelItemId(m: Mangel): string {
+  return m.itemId ?? m.vehicleId ?? '';
+}
+
+export function mangelItemName(m: Mangel): string {
+  return m.itemName ?? m.vehicleName ?? '';
 }
 
 function isMangelStatus(value: unknown): value is MangelStatus {
@@ -227,7 +284,11 @@ export function sanitizeMangelImages(
  */
 export function validateMangelInput(input: MangelInput): string[] {
   const errors: string[] = [];
-  if (!input.vehicleId?.trim()) errors.push('vehicleMissing');
+  // Der Gegenstand: bei einem Ausrüstungsmangel `itemId`, bei einem
+  // Fahrzeugmangel weiterhin `vehicleId`. Der Fehlerschlüssel bleibt
+  // `vehicleMissing` — er steht bereits in beiden Locale-Dateien, und der Fall
+  // ist derselbe.
+  if (!(input.itemId ?? input.vehicleId)?.trim()) errors.push('vehicleMissing');
   // Ein Mangel ohne Beschreibung sagt niemandem, was kaputt ist — dieselbe
   // Begründung wie beim Defekt-Häkchen am Fahrtenbuch-Eintrag.
   if (!input.description?.trim()) errors.push('descriptionMissing');
@@ -255,7 +316,7 @@ export function validateMangelInput(input: MangelInput): string[] {
  */
 export function buildMangelDocument(
   input: MangelInput,
-  vehicle: MangelVehicle,
+  item: MangelItem,
   group: string,
   actor: MangelActor,
 ): Mangel {
@@ -265,8 +326,9 @@ export function buildMangelDocument(
   }
 
   const doc: Mangel = {
-    vehicleId: input.vehicleId.trim(),
-    vehicleName: vehicle.name ?? '',
+    itemType: item.type,
+    itemId: item.id,
+    itemName: item.name,
     description: input.description.trim(),
     status: isMangelStatus(input.status) ? input.status : 'open',
     notes: [],
@@ -279,6 +341,14 @@ export function buildMangelDocument(
     updatedAt: actor.now,
     updatedBy: actor.userId,
   };
+  // Bei Fahrzeugmängeln bleiben die alten Felder gesetzt: Daran hängen die
+  // Fahrzeugkarte, ihr Zähler und `where('vehicleId', '==', …)`. Sie zu
+  // streichen hieße, alle drei gleichzeitig umzubauen.
+  if (item.type === 'vehicle') {
+    doc.vehicleId = item.id;
+    doc.vehicleName = item.name;
+  }
+
   // Nicht `doc.entryId = input.entryId`: Firestore lehnt `undefined` ab.
   if (input.entryId) doc.entryId = input.entryId;
   // Ohne Bilder bleibt das Feld weg statt als leeres Array dazustehen — ein
@@ -408,7 +478,13 @@ export function isOpenMangel(mangel: Pick<Mangel, 'status'>): boolean {
   return mangel.status !== 'resolved';
 }
 
-/** Der Zähler für den Fahrzeug-Cache `openMangelCount`. */
+/**
+ * Der Zähler für den Fahrzeug-Cache `openMangelCount`.
+ *
+ * Braucht keine Typprüfung: Der einzige Aufrufer (`refreshVehicleCache`)
+ * füttert ihn aus `where('vehicleId', '==', …)`, und ein Ausrüstungsmangel
+ * trägt dieses Feld gar nicht — er kann dort nie mitgezählt werden.
+ */
 export function openMangelCount(mangel: Pick<Mangel, 'status'>[]): number {
   return mangel.filter(isOpenMangel).length;
 }

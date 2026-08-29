@@ -10,6 +10,9 @@ import {
   MANGEL_MAX_IMAGE_BYTES,
   MANGEL_MAX_IMAGES,
   mangelImagePath,
+  mangelItemId,
+  mangelItemName,
+  mangelItemType,
   openMangelCount,
   sanitizeMangelFileName,
   sanitizeMangelImages,
@@ -88,7 +91,7 @@ describe('buildMangelDocument', () => {
   it('takes the vehicle name from the vehicle document, not the input', () => {
     const doc = buildMangelDocument(
       { vehicleId: 'v1', description: '  Blinker defekt  ' },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -99,7 +102,7 @@ describe('buildMangelDocument', () => {
   it('defaults to status open and an empty note history', () => {
     const doc = buildMangelDocument(
       { vehicleId: 'v1', description: 'Blinker defekt' },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -111,7 +114,7 @@ describe('buildMangelDocument', () => {
   it('sets the system fields from the actor', () => {
     const doc = buildMangelDocument(
       { vehicleId: 'v1', description: 'Blinker defekt' },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -135,7 +138,7 @@ describe('buildMangelDocument', () => {
         reportedAt: '2026-07-01T06:00:00.000Z',
         reportedByName: 'Bernd Beispiel',
       },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -150,7 +153,7 @@ describe('buildMangelDocument', () => {
   it('keeps the reporting entry when given', () => {
     const doc = buildMangelDocument(
       { vehicleId: 'v1', description: 'x', entryId: 'e1' },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -160,7 +163,7 @@ describe('buildMangelDocument', () => {
   it('omits entryId instead of writing undefined — Firestore rejects it', () => {
     const doc = buildMangelDocument(
       { vehicleId: 'v1', description: 'x' },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -171,7 +174,7 @@ describe('buildMangelDocument', () => {
     expect(() =>
       buildMangelDocument(
         { vehicleId: 'v1', description: '   ' },
-        { name: 'TLF-A' },
+        { type: 'vehicle', id: 'v1', name: 'TLF-A' },
         'ffn',
         actor,
       ),
@@ -185,7 +188,7 @@ describe('buildMangelDocument', () => {
         description: 'x',
         images: ['groups/ffn/mangel/m1/foto.jpg'],
       },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -199,7 +202,7 @@ describe('buildMangelDocument', () => {
         description: 'x',
         images: ['groups/andere/mangel/m1/foto.jpg', 'bugReports/r1/shot.png'],
       },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -209,7 +212,7 @@ describe('buildMangelDocument', () => {
   it('omits images instead of writing an empty array', () => {
     const doc = buildMangelDocument(
       { vehicleId: 'v1', description: 'x' },
-      { name: 'TLF-A' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A' },
       'ffn',
       actor,
     );
@@ -484,5 +487,103 @@ describe('Bild-Schranken spiegeln die storage.rules', () => {
     expect(isAllowedMangelImageType('')).toBe(false);
     // Kein Teiltreffer: Die Regel prüft die ganze Zeichenkette.
     expect(isAllowedMangelImageType('application/image/jpeg')).toBe(false);
+  });
+});
+
+function altesDokument(over: Partial<Mangel> = {}): Mangel {
+  // Ein Dokument aus der Zeit vor `itemType` — genau so liegen sie in
+  // Firestore.
+  return {
+    vehicleId: 'v1',
+    vehicleName: 'TLF-A 2000',
+    description: 'Bremse quietscht',
+    status: 'open',
+    notes: [],
+    reportedAt: '2026-08-01T08:00:00.000Z',
+    reportedBy: 'u1',
+    reportedByName: 'Max Muster',
+    group: 'ffnd',
+    createdAt: '2026-08-01T08:00:00.000Z',
+    createdBy: 'u1',
+    updatedAt: '2026-08-01T08:00:00.000Z',
+    updatedBy: 'u1',
+    ...over,
+  };
+}
+
+describe('mangelItemType / mangelItemId / mangelItemName', () => {
+  it('liest ein Dokument ohne itemType als Fahrzeugmangel', () => {
+    const alt = altesDokument();
+    expect(mangelItemType(alt)).toBe('vehicle');
+    expect(mangelItemId(alt)).toBe('v1');
+    expect(mangelItemName(alt)).toBe('TLF-A 2000');
+  });
+
+  it('bevorzugt die neuen Felder', () => {
+    const neu = altesDokument({
+      itemType: 'atemschutz',
+      itemId: 'g9',
+      itemName: 'Atemluftflasche 2.16.19',
+      vehicleId: undefined,
+      vehicleName: undefined,
+    });
+    expect(mangelItemType(neu)).toBe('atemschutz');
+    expect(mangelItemId(neu)).toBe('g9');
+    expect(mangelItemName(neu)).toBe('Atemluftflasche 2.16.19');
+  });
+
+  it('liefert leere Strings, wenn gar nichts gesetzt ist', () => {
+    const leer = altesDokument({ vehicleId: undefined, vehicleName: undefined });
+    expect(mangelItemId(leer)).toBe('');
+    expect(mangelItemName(leer)).toBe('');
+  });
+});
+
+describe('buildMangelDocument mit MangelItem', () => {
+  const actor = {
+    userId: 'u1',
+    userName: 'Max Muster',
+    now: '2026-08-29T10:00:00.000Z',
+  };
+
+  it('schreibt bei einem Fahrzeugmangel beide Feldpaare', () => {
+    const doc = buildMangelDocument(
+      { vehicleId: 'v1', description: 'Bremse' },
+      { type: 'vehicle', id: 'v1', name: 'TLF-A 2000' },
+      'ffnd',
+      actor,
+    );
+    expect(doc).toMatchObject({
+      itemType: 'vehicle',
+      itemId: 'v1',
+      itemName: 'TLF-A 2000',
+      vehicleId: 'v1',
+      vehicleName: 'TLF-A 2000',
+    });
+  });
+
+  it('lässt bei einem Ausrüstungsmangel die Fahrzeugfelder weg', () => {
+    // Firestore lehnt `undefined` ab — die Felder dürfen gar nicht erst
+    // entstehen.
+    const doc = buildMangelDocument(
+      { itemType: 'atemschutz', itemId: 'g9', description: 'Ventil undicht' },
+      { type: 'atemschutz', id: 'g9', name: 'Atemluftflasche 2.16.19' },
+      'ffnd',
+      actor,
+    );
+    expect(doc.itemType).toBe('atemschutz');
+    expect(doc).not.toHaveProperty('vehicleId');
+    expect(doc).not.toHaveProperty('vehicleName');
+  });
+
+  it('wirft bei einer Eingabe ohne Gegenstand', () => {
+    expect(() =>
+      buildMangelDocument(
+        { description: 'irgendwas' },
+        { type: 'atemschutz', id: 'g9', name: 'X' },
+        'ffnd',
+        actor,
+      ),
+    ).toThrow(/vehicleMissing/);
   });
 });

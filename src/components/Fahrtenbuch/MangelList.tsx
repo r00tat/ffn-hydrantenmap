@@ -18,7 +18,7 @@ import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
-import type { Mangel } from '../../common/mangel';
+import { mangelItemName, type Mangel } from '../../common/mangel';
 import { mangelStatusColor } from './mangelStatus';
 
 export interface MangelListProps {
@@ -87,7 +87,7 @@ export default function MangelList({
                 />
               </TableCell>
               {!hideVehicle && (
-                <TableCell sx={tightCell}>{item.vehicleName}</TableCell>
+                <TableCell sx={tightCell}>{mangelItemName(item)}</TableCell>
               )}
               {/* Die Beschreibung öffnet die Bearbeitung: Der Stiftknopf am
                   Zeilenende ist ein kleines Ziel, und die Beschreibung ist die

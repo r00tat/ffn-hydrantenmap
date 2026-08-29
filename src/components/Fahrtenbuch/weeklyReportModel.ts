@@ -14,7 +14,12 @@ import {
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
-import { isOpenMangel, type Mangel } from '../../common/mangel';
+import {
+  isOpenMangel,
+  mangelItemName,
+  mangelItemType,
+  type Mangel,
+} from '../../common/mangel';
 import {
   counterDefinitions,
   formatDate,
@@ -402,23 +407,33 @@ export function buildWeeklyReportModel(
     };
   });
 
-  const mangel = openMangel.filter(isOpenMangel).map<WeeklyReportMangel>((m) => {
-    // `isOpenMangel` lässt alles außer `resolved` durch — auch einen Status, den
-    // es heute noch nicht gibt. Der Bericht führt ihn dann wie einen offenen
-    // Mangel, statt ihn per Cast als etwas auszugeben, was er nicht ist:
-    // sichtbar bleiben ist wichtiger als genau beschriftet zu sein, und ein
-    // stiller Verlust wäre das Schlechteste von allem.
-    const status = m.status === 'inProgress' ? 'inProgress' : 'open';
-    return {
-      vehicleName: m.vehicleName,
-      status,
-      statusLabel: OPEN_MANGEL_STATUS_LABELS[status],
-      description: m.description,
-      reportedAt: formatDate(m.reportedAt, timeZone),
-      reportedByName: m.reportedByName,
-      imageCount: m.images?.length ?? 0,
-    };
-  });
+  // Nur Fahrzeugmängel: Der Wochenbericht ist der Bericht über die Fahrzeuge —
+  // er listet sie, ihre Fahrten und ihre Warnungen. Ein Mangel an der
+  // Atemschutzausrüstung hat dort keine Fahrzeugspalte zu füllen und steht
+  // stattdessen auf der Mängelseite unter seinem eigenen Typfilter. Dokumente
+  // ohne `itemType` sind Fahrzeugmängel, `mangelItemType` kennt die Vorgabe.
+  const mangel = openMangel
+    .filter(isOpenMangel)
+    .filter((m) => mangelItemType(m) === 'vehicle')
+    .map<WeeklyReportMangel>((m) => {
+      // `isOpenMangel` lässt alles außer `resolved` durch — auch einen Status,
+      // den es heute noch nicht gibt. Der Bericht führt ihn dann wie einen
+      // offenen Mangel, statt ihn per Cast als etwas auszugeben, was er nicht
+      // ist: sichtbar bleiben ist wichtiger als genau beschriftet zu sein, und
+      // ein stiller Verlust wäre das Schlechteste von allem.
+      const status = m.status === 'inProgress' ? 'inProgress' : 'open';
+      return {
+        // Über den Helfer statt `m.vehicleName`: Das Feld ist seit der
+        // Verallgemeinerung optional, und der Helfer kennt den Rückfall.
+        vehicleName: mangelItemName(m),
+        status,
+        statusLabel: OPEN_MANGEL_STATUS_LABELS[status],
+        description: m.description,
+        reportedAt: formatDate(m.reportedAt, timeZone),
+        reportedByName: m.reportedByName,
+        imageCount: m.images?.length ?? 0,
+      };
+    });
 
   return {
     groupId,

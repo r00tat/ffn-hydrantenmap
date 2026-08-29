@@ -1125,8 +1125,14 @@
       "delete": "Delete defect",
       "deleteConfirm": "Really delete this defect permanently? For a fixed defect use “Resolved” — deleting is only for entries created by mistake.",
       "actions": "Actions",
+      "itemTypes": {
+        "all": "All",
+        "vehicle": "Vehicles",
+        "atemschutz": "Breathing apparatus"
+      },
       "filters": {
         "status": "Status",
+        "itemType": "Kind",
         "vehicle": "Vehicle",
         "all": "All",
         "openAll": "Open and in progress"

@@ -1125,8 +1125,14 @@
       "delete": "Mangel löschen",
       "deleteConfirm": "Diesen Mangel wirklich endgültig löschen? Für einen behobenen Mangel ist „Behoben“ der richtige Weg — gelöscht gehört nur, was versehentlich angelegt wurde.",
       "actions": "Aktionen",
+      "itemTypes": {
+        "all": "Alle",
+        "vehicle": "Fahrzeuge",
+        "atemschutz": "Atemschutz"
+      },
       "filters": {
         "status": "Status",
+        "itemType": "Art",
         "vehicle": "Fahrzeug",
         "all": "Alle",
         "openAll": "Offen und in Arbeit"

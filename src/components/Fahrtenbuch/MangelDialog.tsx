@@ -20,6 +20,7 @@ import type { FahrtenbuchVehicle } from '../../common/fahrtenbuch';
 import {
   MANGEL_MAX_IMAGE_BYTES,
   MANGEL_STATUSES,
+  mangelItemName,
   type Mangel,
   type MangelStatus,
 } from '../../common/mangel';
@@ -233,7 +234,7 @@ export default function MangelDialog({
           )}
 
           {isEdit ? (
-            <Typography variant="subtitle1">{mangel.vehicleName}</Typography>
+            <Typography variant="subtitle1">{mangelItemName(mangel)}</Typography>
           ) : (
             <TextField
               select
