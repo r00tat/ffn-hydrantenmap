@@ -35,6 +35,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/mcp-server.md](docs/mcp-server.md) | MCP-Server und OAuth 2.1: eigener Authorization Server, DCR und CIMD, Scopes, Tool-Set mit zwei Aufrufern, Signaturschlüssel und Betrieb |
 | [docs/lagekarte-austausch.md](docs/lagekarte-austausch.md) | Import und Export für lagekarte.info: beobachtetes Format, Kupplungsmarker, `ffnd`-Block, Symbolkatalog und seine Lücken |
 | [docs/eigene-kartenebenen.md](docs/eigene-kartenebenen.md) | Eigene WMS-/WMTS-Kartenebenen je Einsatz: Abgrenzung „Kartenebene" gegen „Ebene", Berechtigungen und warum die Firestore-Regeln nichts prüfen, GetCapabilities über den Server, Darstellung im Layer-Control |
+| [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md) | Atemschutzsammelplatz: warum jede Bereitstellung eines Trupps eine eigene Zeile ist, die sechs Kennungen der Flaschensuche und warum die Barcode-Spalte des FDISK-Exports nicht allein trägt, Dublettenbehandlung im Import, Berechtigungen, Kamera in der Android-App, Mangel-Verallgemeinerung |
 | [docs/rettungskarten.md](docs/rettungskarten.md) | Rettungskarten aus dem Euro-Rescue-Katalog: warum kein Deep Link in die App geht, die offene API von Euro NCAP, Cache, Zuordnung Zulassung → Variante |
 
 ## Commands
@@ -419,6 +420,8 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 - `clusters6` - Geohashed hydrant clusters
 - `bugReport` - In-App Bug-Reports & Feature-Requests (siehe unten)
 - `appConfig` - App-weite Konfiguration (u.a. Dokument `bugReport` mit Empfänger-E-Mails)
+- `atemschutzGeraet` - Atemschutz-Ausrüstung je Gruppe (`groups/{groupId}/atemschutzGeraet`, siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
+- `atemschutzFuellung`, `atemschutzTrupp`, `atemschutzAusgabe` - Protokolle des Atemschutzsammelplatzes je Einsatz
 - `oauthClients`, `oauthAuthCodes`, `oauthRefreshTokens`, `oauthConsents` - OAuth-Authorization-Server des MCP-Zugangs, rein serverseitig (siehe [docs/mcp-server.md](docs/mcp-server.md))
 
 ## Bug Reports / Feedback
@@ -441,6 +444,9 @@ Key domain terms used throughout the codebase:
 - **Lageführung** - Situation management
 - **Hydranten** - Fire hydrants
 - **Kostenersatz** - Cost recovery (billing for fire department services per tariff ordinance)
+- **Atemschutzsammelplatz (ASSP)** - Breathing apparatus staging area
+- **Füllprotokoll** - Cylinder filling log
+- **Atemschutztrupp** - Breathing apparatus team (usually three)
 
 ## Environment Configuration
 

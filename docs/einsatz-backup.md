@@ -22,6 +22,9 @@ Das Einsatz-Dokument selbst plus alle Untersammlungen unter `call/{id}`:
 | `auditlog` | `auditlog` | |
 | `chat` | `chat` | |
 | `crew` | `crew` | Besatzung je Fahrzeug |
+| `atemschutzFuellung` | `atemschutzFuellungen` | Füllprotokoll, s. [atemschutzsammelplatz.md](atemschutzsammelplatz.md) |
+| `atemschutzTrupp` | `atemschutzTrupps` | je Zeile eine Bereitstellung; `truppKey` bindet sie zusammen und bleibt erhalten |
+| `atemschutzAusgabe` | `atemschutzAusgaben` | Ausgabe der Ausrüstung; `geraetId` zeigt auf `groups/{groupId}/atemschutzGeraet` |
 
 Anhänge — die des Einsatzes und die an Markern — werden aus dem Storage geladen
 und als Base64 in die Datei geschrieben. Der Import lädt sie wieder hoch.
@@ -41,6 +44,16 @@ kennt.
   Kopie zeigt absichtlich auf denselben Ordner.
 - **Fahrtenbuch-Einträge**: Sie liegen unter `groups/{groupId}/fahrtenbuch` und
   verweisen auf den Einsatz, gehören aber nicht zum Einsatz.
+- **Atemschutz-Stammdaten** (`groups/{groupId}/atemschutzGeraet`): Sie gehören
+  der Gruppe, nicht dem Einsatz — wie die Fahrtenbuch-Fahrzeuge. Die Kopie
+  eines Einsatzes zeigt mit `atemschutzAusgabe.geraetId` weiterhin auf
+  denselben Bestand. Wird ein Einsatz in eine *andere* Gruppe importiert,
+  laufen diese Verweise ins Leere; der Ausrüstungsreiter zeigt die Zeile dann
+  nicht mehr an, das Füllprotokoll bleibt vollständig (es trägt die
+  Flaschennummer im Klartext).
+- **Ausrüstungsmängel** (`groups/{groupId}/mangel` mit
+  `itemType: 'atemschutz'`): Sie liegen wie die Fahrzeugmängel bei der Gruppe
+  und überdauern den Einsatz — genau dafür sind sie da.
 
 ## Was der Import ändert
 
