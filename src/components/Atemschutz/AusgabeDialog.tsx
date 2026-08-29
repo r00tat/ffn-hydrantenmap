@@ -14,6 +14,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
 import {
+  DEFAULT_SICHTKONTROLLE,
   SICHTKONTROLLE_WERTE,
   type AtemschutzGeraet,
   type Sichtkontrolle,
@@ -86,7 +87,9 @@ export default function AusgabeDialog({
   const istAusgabe = modus === 'ausgeben';
   const [empfaenger, setEmpfaenger] = useState(ausgegebenAn ?? '');
   const [zeit, setZeit] = useState(() => toLocalInput(new Date()));
-  const [sichtkontrolle, setSichtkontrolle] = useState<Sichtkontrolle>('offen');
+  const [sichtkontrolle, setSichtkontrolle] = useState<Sichtkontrolle>(
+    DEFAULT_SICHTKONTROLLE,
+  );
   const [bemerkung, setBemerkung] = useState('');
   const [mangel, setMangel] = useState<MangelEingabe>(LEERE_MANGEL_EINGABE);
   const [saving, setSaving] = useState(false);
@@ -113,7 +116,7 @@ export default function AusgabeDialog({
             ausgabeZeit: iso,
           }
         : { status: 'zurueck', ruecknahmeZeit: iso };
-      if (sichtkontrolle !== 'offen') patch.sichtkontrolle = sichtkontrolle;
+      patch.sichtkontrolle = sichtkontrolle;
       if (bemerkung.trim()) patch.bemerkung = bemerkung.trim();
 
       // Der Mangel zuerst: Schlägt er fehl, soll die Ausgabe nicht mit einem

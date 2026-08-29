@@ -207,6 +207,13 @@ Altlasten und gegen spätere Korrekturen der Stammdaten immun.
 
 ## Mangel direkt aus der Sichtkontrolle
 
+Die Sichtkontrolle ist mit **„in Ordnung"** vorbelegt
+(`DEFAULT_SICHTKONTROLLE`). Wer eine Flasche in die Hand nimmt, um sie zu
+füllen oder auszugeben, sieht sie dabei an — der Regelfall ist die unauffällige
+Flasche. Stünde „offen" vorbelegt, wären am Ende des Einsatzes fast alle Zeilen
+„offen" und die Angabe damit wertlos. „Offen" bleibt wählbar für den Fall, dass
+wirklich niemand hingesehen hat.
+
 Steht die Sichtkontrolle im Füll- oder im Ausgabedialog auf „Mangel", erscheint
 dort dieselbe Eingabe wie im eigenen Mangel-Dialog (`MangelFelder`:
 Beschreibung und Bilder) und der Mangel wird mitgespeichert. Zuvor setzte der

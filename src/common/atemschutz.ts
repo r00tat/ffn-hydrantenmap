@@ -44,6 +44,17 @@ export type Sichtkontrolle = 'offen' | 'ok' | 'mangel';
 
 export const SICHTKONTROLLE_WERTE: Sichtkontrolle[] = ['offen', 'ok', 'mangel'];
 
+/**
+ * Vorbelegung der Sichtkontrolle.
+ *
+ * „In Ordnung" und nicht „offen": Wer eine Flasche in die Hand nimmt, um sie zu
+ * füllen oder auszugeben, sieht sie dabei an — der Regelfall ist die
+ * unauffällige Flasche. Stünde „offen" vorbelegt, wären am Ende des Einsatzes
+ * fast alle Zeilen „offen" und die Angabe damit wertlos. „Offen" bleibt
+ * wählbar für den Fall, dass wirklich niemand hingesehen hat.
+ */
+export const DEFAULT_SICHTKONTROLLE: Sichtkontrolle = 'ok';
+
 export interface AtemschutzGeraet {
   id?: string;
   typ: AtemschutzGeraetTyp;

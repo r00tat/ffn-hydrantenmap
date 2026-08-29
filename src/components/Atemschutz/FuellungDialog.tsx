@@ -19,6 +19,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { useTranslations } from 'next-intl';
 import {
   DEFAULT_ENDDRUCK,
+  DEFAULT_SICHTKONTROLLE,
   findByCode,
   geraetKennung,
   SICHTKONTROLLE_WERTE,
@@ -98,7 +99,7 @@ export default function FuellungDialog({
     startdruck: fuellung?.startdruck != null ? String(fuellung.startdruck) : '',
     enddruck: String(fuellung?.enddruck ?? DEFAULT_ENDDRUCK),
     gefuelltVon: fuellung?.gefuelltVon ?? defaultGefuelltVon,
-    sichtkontrolle: fuellung?.sichtkontrolle ?? 'offen',
+    sichtkontrolle: fuellung?.sichtkontrolle ?? DEFAULT_SICHTKONTROLLE,
     bemerkung: fuellung?.bemerkung ?? '',
   }));
   const [mangel, setMangel] = useState<MangelEingabe>(LEERE_MANGEL_EINGABE);

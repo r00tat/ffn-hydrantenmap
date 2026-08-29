@@ -75,6 +75,15 @@ describe('FuellungDialog', () => {
     expect(screen.getByLabelText(/Enddruck/)).toHaveValue(300);
   });
 
+  it('belegt die Sichtkontrolle mit „in Ordnung“ vor', () => {
+    // Wer eine Flasche in die Hand nimmt, sieht sie dabei an. Stünde „offen“
+    // vorbelegt, wären am Ende fast alle Zeilen „offen“.
+    render();
+    expect(screen.getByLabelText(/Sichtkontrolle/)).toHaveTextContent(
+      'in Ordnung',
+    );
+  });
+
   it('trägt den angemeldeten Benutzer als Füller ein', () => {
     render();
     expect(screen.getByLabelText(/Gefüllt von/)).toHaveValue('Max Muster');
