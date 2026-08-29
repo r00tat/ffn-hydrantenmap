@@ -523,10 +523,17 @@ Zeiten des Einsatzes blieben aber stehen und sahen aus wie eine Eingabe. Sie zu
 übersehen hieß, eine fremde Uhrzeit als eigene Fahrt zu erfassen.
 
 Deshalb setzt der Zweckwechsel das Datum auf **heute** und leert die
-**Uhrzeiten** von Abfahrt und Ankunft. Der Tag bleibt, weil wer den Zweck
-wechselt fast immer eine Fahrt von heute einträgt; nur die Uhrzeit ist zu
-ergänzen, und dass sie fehlt, ist am Feld zu sehen und blockiert das Speichern
-(`abfahrtTimeMissing` / `ankunftTimeMissing`).
+**Uhrzeit der Abfahrt**. Der Tag bleibt, weil wer den Zweck wechselt fast immer
+eine Fahrt von heute einträgt; nur die Uhrzeit ist zu ergänzen, und dass sie
+fehlt, ist am Feld zu sehen und blockiert das Speichern (`abfahrtTimeMissing`).
+
+**Die Ankunft wird nicht geleert, sondern auf „jetzt" gestellt** — derselbe
+Vorschlag, mit dem ein neuer Eintrag ohnehin startet
+(`arrivalOnDepartureDay`). Wer den Zweck wechselt, trägt eine Fahrt ein, die
+eben zu Ende ist; die Ankunft ist damit keine fremde Uhrzeit, die man übersehen
+könnte, sondern die richtige. Nur wann losgefahren wurde, weiß außer dem Fahrer
+niemand. `ankunftTimeMissing` gibt es weiterhin, entsteht aber nur noch, wenn
+jemand das Ankunftsfeld selbst leer räumt.
 
 Daran hängen drei Entscheidungen:
 
@@ -539,12 +546,12 @@ Daran hängen drei Entscheidungen:
   dass seine Uhrzeit nichts behauptet: das Feld zeigt sie nicht, und `submit`
   verweigert. Die Prüfung ist rein clientseitig — der Server kann den
   Unterschied nicht sehen und muss es nicht.
-- **Nur ein vorbelegter Zeitvorschlag wird geleert**, gemerkt in
+- **Nur ein vorbelegter Zeitvorschlag wird angefasst**, gemerkt in
   `firecallTimesRef`. Beim Bearbeiten eines bestehenden Eintrags und nach einer
-  Eingabe von Hand stehen echte Zeiten im Formular; die zu leeren zerstörte eine
-  Angabe, die niemand nachtragen kann. Das Datum zu korrigieren trägt die
-  Uhrzeit übrigens nicht nach — wer den Tag ändert, hat noch nicht gesagt, wann
-  er losgefahren ist.
+  Eingabe von Hand stehen echte Zeiten im Formular; die zu überschreiben
+  zerstörte eine Angabe, die niemand nachtragen kann. Das Datum zu korrigieren
+  trägt die Uhrzeit übrigens nicht nach — wer den Tag ändert, hat noch nicht
+  gesagt, wann er losgefahren ist.
 
 ## Mangel-Bilder
 
