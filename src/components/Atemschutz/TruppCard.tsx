@@ -1,0 +1,170 @@
+'use client';
+
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardActions from '@mui/material/CardActions';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import { useFormatter, useTranslations } from 'next-intl';
+import { type AtemschutzTrupp } from '../../common/atemschutz';
+
+export interface TruppCardProps {
+  trupp: AtemschutzTrupp;
+  canWrite: boolean;
+  onEntsenden: () => void;
+  onRueckkehr: () => void;
+  onWiederBereit: () => void;
+  onAbmelden: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+const STATUS_FARBE: Record<
+  AtemschutzTrupp['status'],
+  'success' | 'warning' | 'info' | 'default'
+> = {
+  bereit: 'success',
+  imEinsatz: 'warning',
+  zurueck: 'info',
+  abgemeldet: 'default',
+};
+
+export default function TruppCard({
+  trupp,
+  canWrite,
+  onEntsenden,
+  onRueckkehr,
+  onWiederBereit,
+  onAbmelden,
+  onEdit,
+  onDelete,
+}: TruppCardProps) {
+  const t = useTranslations('atemschutz');
+  const tCommon = useTranslations('common');
+  const format = useFormatter();
+
+  const uhrzeit = (iso?: string) =>
+    iso
+      ? format.dateTime(new Date(iso), { hour: '2-digit', minute: '2-digit' })
+      : '';
+
+  return (
+    <Card variant="outlined">
+      <CardContent sx={{ pb: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.5 }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            {trupp.truppName || trupp.feuerwehr}
+          </Typography>
+          <Chip
+            size="small"
+            color={STATUS_FARBE[trupp.status]}
+            label={t(`trupp.status.${trupp.status}`)}
+          />
+          {trupp.laufendeNummer > 1 && (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={t('trupp.laufendeNummer', { n: trupp.laufendeNummer })}
+            />
+          )}
+          <Box sx={{ flexGrow: 1 }} />
+          {canWrite && (
+            <>
+              <IconButton size="small" aria-label={tCommon('edit')} onClick={onEdit}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                size="small"
+                color="warning"
+                aria-label={t('trupp.delete')}
+                onClick={onDelete}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </>
+          )}
+        </Stack>
+
+        <Typography variant="body2">{trupp.mitglieder.join(' · ')}</Typography>
+
+        <Typography variant="body2" color="text.secondary" component="div">
+          {trupp.truppName ? `${trupp.feuerwehr} · ` : ''}
+          {trupp.status === 'bereit' &&
+            t('trupp.seit', { zeit: uhrzeit(trupp.bereitSeit) })}
+          {trupp.status === 'imEinsatz' && (
+            <>
+              {t('trupp.entsendetAn')}: {trupp.entsendetAn} ·{' '}
+              {t('trupp.abmarschZeit')} {uhrzeit(trupp.abmarschZeit)}
+              {trupp.druckAbmarsch != null && ` · ${trupp.druckAbmarsch} bar`}
+            </>
+          )}
+          {(trupp.status === 'zurueck' || trupp.status === 'abgemeldet') && (
+            <>
+              {trupp.abmarschZeit && (
+                <>
+                  {uhrzeit(trupp.abmarschZeit)}
+                  {trupp.druckAbmarsch != null && ` (${trupp.druckAbmarsch} bar)`}
+                  {' → '}
+                </>
+              )}
+              {trupp.rueckkehrZeit && (
+                <>
+                  {uhrzeit(trupp.rueckkehrZeit)}
+                  {trupp.druckRueckkehr != null &&
+                    ` (${trupp.druckRueckkehr} bar)`}
+                </>
+              )}
+              {trupp.entsendetAn && ` · ${trupp.entsendetAn}`}
+            </>
+          )}
+        </Typography>
+
+        {trupp.bemerkung && (
+          <Typography variant="body2" color="text.secondary">
+            {trupp.bemerkung}
+          </Typography>
+        )}
+      </CardContent>
+
+      {canWrite && trupp.status !== 'abgemeldet' && (
+        <CardActions>
+          {trupp.status === 'bereit' && (
+            <>
+              <Button size="small" variant="contained" onClick={onEntsenden}>
+                {t('trupp.actions.entsenden')}
+              </Button>
+              <Button size="small" onClick={onAbmelden}>
+                {t('trupp.actions.abmelden')}
+              </Button>
+            </>
+          )}
+          {trupp.status === 'imEinsatz' && (
+            <Button size="small" variant="contained" onClick={onRueckkehr}>
+              {t('trupp.actions.rueckkehr')}
+            </Button>
+          )}
+          {trupp.status === 'zurueck' && (
+            <>
+              <Button size="small" variant="contained" onClick={onWiederBereit}>
+                {t('trupp.actions.wiederBereit')}
+              </Button>
+              <Button size="small" onClick={onAbmelden}>
+                {t('trupp.actions.abmelden')}
+              </Button>
+            </>
+          )}
+        </CardActions>
+      )}
+    </Card>
+  );
+}

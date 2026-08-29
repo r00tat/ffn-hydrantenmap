@@ -423,3 +423,50 @@ export function gruppiereTrupps(trupps: AtemschutzTrupp[]): TruppGruppen {
     protokoll,
   };
 }
+
+/** Die Eingabe des Trupp-Dialogs. */
+export interface TruppInput {
+  truppName?: string;
+  feuerwehr: string;
+  mitglieder: string[];
+  bemerkung?: string;
+}
+
+/**
+ * Bereinigt die Namensliste: Randleerzeichen weg, leere Zeilen raus, auf die
+ * Höchstzahl gekürzt. Das Formular hält immer eine leere Zeile bereit — die
+ * darf nicht als Mitglied gespeichert werden.
+ */
+export function sanitizeMitglieder(mitglieder: string[]): string[] {
+  return (mitglieder ?? [])
+    .map((m) => (m ?? '').trim())
+    .filter(Boolean)
+    .slice(0, MAX_TRUPP_MITGLIEDER);
+}
+
+/**
+ * Harte Validierung des Trupps.
+ *
+ * Bewusst *keine* Forderung nach genau drei Namen: Ein Sicherheitstrupp aus
+ * zweien und ein einzelner Melder kommen vor, und ein Formular, das den
+ * Regelfall zur Vorschrift macht, zwingt am Sammelplatz zu Falscheingaben.
+ */
+export function validateTruppInput(input: TruppInput): string[] {
+  const errors: string[] = [];
+  if (!input.feuerwehr?.trim()) errors.push('feuerwehrMissing');
+  if (sanitizeMitglieder(input.mitglieder).length === 0) {
+    errors.push('mitgliederMissing');
+  }
+  return errors;
+}
+
+/**
+ * Ein neuer `truppKey`. `crypto.randomUUID` ist im Browser und in Node 19+
+ * vorhanden; der Fallback deckt einen alten WebView ab, in dem der Wert nur
+ * innerhalb eines Einsatzes eindeutig sein muss.
+ */
+export function newTruppKey(): string {
+  const c = (globalThis as { crypto?: Crypto }).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  return `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}

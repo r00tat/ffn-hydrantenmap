@@ -9,7 +9,16 @@ import Typography from '@mui/material/Typography';
 import { doc } from 'firebase/firestore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { type FuellungInput } from '../../common/atemschutz';
+import {
+  canTransition,
+  newTruppKey,
+  nextBereitstellung,
+  sanitizeMitglieder,
+  type AtemschutzTrupp,
+  type FuellungInput,
+  type TruppInput,
+  type TruppPatch,
+} from '../../common/atemschutz';
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
@@ -27,11 +36,15 @@ import {
 } from './atemschutzTabs';
 import {
   addFuellung,
+  addTrupp,
   deleteFuellung,
+  deleteTrupp,
   updateFuellung,
+  updateTrupp,
   type AtemschutzActor,
 } from './atemschutzStore';
 import FuellprotokollTab from './FuellprotokollTab';
+import TruppsTab from './TruppsTab';
 
 export default function AtemschutzPage() {
   const t = useTranslations('atemschutz');
@@ -120,6 +133,71 @@ export default function AtemschutzPage() {
     [firecallId],
   );
 
+  const handleSaveTrupp = useCallback(
+    async (input: TruppInput, trupp?: AtemschutzTrupp) => {
+      const now = new Date().toISOString();
+      const stamp: AtemschutzActor = { userId: actor.userId, now };
+      const basis = {
+        feuerwehr: input.feuerwehr.trim(),
+        mitglieder: sanitizeMitglieder(input.mitglieder),
+        ...(input.truppName?.trim()
+          ? { truppName: input.truppName.trim() }
+          : {}),
+        ...(input.bemerkung?.trim()
+          ? { bemerkung: input.bemerkung.trim() }
+          : {}),
+      };
+
+      if (trupp?.id) {
+        await updateTrupp(firecallId, trupp.id, basis, stamp);
+        return;
+      }
+      await addTrupp(
+        firecallId,
+        {
+          ...basis,
+          truppKey: newTruppKey(),
+          laufendeNummer: 1,
+          status: 'bereit',
+          bereitSeit: now,
+        },
+        stamp,
+      );
+    },
+    [actor.userId, firecallId],
+  );
+
+  const handlePatchTrupp = useCallback(
+    async (trupp: AtemschutzTrupp, patch: TruppPatch) => {
+      // Die Schranke hier und nicht nur in der Oberfläche: Zwei Leute am
+      // Sammelplatz sehen dieselbe Karte, und wer sie eine Sekunde später
+      // drückt, arbeitet auf einem überholten Zustand.
+      if (!trupp.id || !canTransition(trupp.status, patch.status)) return;
+      await updateTrupp(firecallId, trupp.id, patch, {
+        userId: actor.userId,
+        now: new Date().toISOString(),
+      });
+    },
+    [actor.userId, firecallId],
+  );
+
+  const handleWiederBereit = useCallback(
+    async (trupp: AtemschutzTrupp) => {
+      const now = new Date().toISOString();
+      // Eine *neue* Zeile: Die alte bleibt als Nachweis unverändert stehen.
+      await addTrupp(firecallId, nextBereitstellung(trupp, now), {
+        userId: actor.userId,
+        now,
+      });
+    },
+    [actor.userId, firecallId],
+  );
+
+  const handleDeleteTrupp = useCallback(
+    (id: string) => deleteTrupp(firecallId, id),
+    [firecallId],
+  );
+
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -167,8 +245,19 @@ export default function AtemschutzPage() {
         />
       )}
 
-      {/* Stufe 5 */}
-      {tab === 'trupps' && <Typography color="text.secondary">—</Typography>}
+      {tab === 'trupps' && (
+        <TruppsTab
+          trupps={trupps}
+          feuerwehren={feuerwehren}
+          personSuggestions={suggestions.alle}
+          grkdtSuggestions={suggestions.gruppenkommandanten}
+          canWrite={canWrite}
+          onSave={handleSaveTrupp}
+          onPatch={handlePatchTrupp}
+          onWiederBereit={handleWiederBereit}
+          onDelete={handleDeleteTrupp}
+        />
+      )}
       {/* Stufe 7 */}
       {tab === 'ausruestung' && (
         <Typography color="text.secondary">—</Typography>

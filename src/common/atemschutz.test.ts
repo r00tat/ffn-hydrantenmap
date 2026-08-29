@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_TRUPP_MITGLIEDER,
   type AtemschutzGeraet,
   type AtemschutzTrupp,
   type FuellungInput,
+  type TruppInput,
   canTransition,
   entsendePatch,
   findByCode,
@@ -12,7 +14,9 @@ import {
   nextBereitstellung,
   normalizeCode,
   rueckkehrPatch,
+  sanitizeMitglieder,
   validateFuellungInput,
+  validateTruppInput,
 } from './atemschutz';
 
 function geraet(over: Partial<AtemschutzGeraet> = {}): AtemschutzGeraet {
@@ -424,5 +428,52 @@ describe('gruppiereTrupps', () => {
       'neu',
       'alt',
     ]);
+  });
+});
+
+describe('validateTruppInput', () => {
+  const gueltig: TruppInput = {
+    feuerwehr: 'Neusiedl am See',
+    mitglieder: ['Anna Beispiel', 'Bernd Beispiel', 'Clara Beispiel'],
+  };
+
+  it('akzeptiert einen vollständigen Trupp', () => {
+    expect(validateTruppInput(gueltig)).toEqual([]);
+  });
+
+  it('akzeptiert einen Trupp mit nur einem Mitglied', () => {
+    // Ein Sicherheitstrupp aus zweien und ein einzelner Melder kommen vor —
+    // die Zahl drei ist der Regelfall, keine Vorschrift für dieses Formular.
+    expect(validateTruppInput({ ...gueltig, mitglieder: ['Anna'] })).toEqual([]);
+  });
+
+  it('lehnt einen Trupp ohne Feuerwehr ab', () => {
+    expect(validateTruppInput({ ...gueltig, feuerwehr: ' ' })).toEqual([
+      'feuerwehrMissing',
+    ]);
+  });
+
+  it('lehnt einen Trupp ohne Mitglieder ab', () => {
+    expect(validateTruppInput({ ...gueltig, mitglieder: [] })).toEqual([
+      'mitgliederMissing',
+    ]);
+    expect(
+      validateTruppInput({ ...gueltig, mitglieder: ['', '  '] }),
+    ).toEqual(['mitgliederMissing']);
+  });
+});
+
+describe('sanitizeMitglieder', () => {
+  it('entfernt Leerzeilen und Randleerzeichen', () => {
+    expect(sanitizeMitglieder([' Anna ', '', '  ', 'Bernd'])).toEqual([
+      'Anna',
+      'Bernd',
+    ]);
+  });
+
+  it('begrenzt auf die Höchstzahl', () => {
+    expect(
+      sanitizeMitglieder(['a', 'b', 'c', 'd', 'e', 'f']),
+    ).toHaveLength(MAX_TRUPP_MITGLIEDER);
   });
 });

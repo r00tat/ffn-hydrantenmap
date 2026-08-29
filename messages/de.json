@@ -101,6 +101,60 @@
       "multiple": "{count} Geräte tragen diesen Code — bitte wählen:",
       "use": "Übernehmen"
     },
+    "trupp": {
+      "add": "Trupp erfassen",
+      "dialogTitleNew": "Trupp erfassen",
+      "dialogTitleEdit": "Trupp bearbeiten",
+      "name": "Truppname",
+      "nameHint": "Optional, z.B. „Trupp 1“",
+      "feuerwehr": "Feuerwehr",
+      "mitglieder": "Truppmitglieder",
+      "mitglied": "Name {index}",
+      "addMitglied": "Weiteres Mitglied",
+      "bemerkung": "Bemerkung",
+      "laufendeNummer": "{n}. Einsatz",
+      "status": {
+        "bereit": "In Bereitschaft",
+        "imEinsatz": "Im Einsatz",
+        "zurueck": "Zurück & Regeneration",
+        "abgemeldet": "Abgemeldet"
+      },
+      "sections": {
+        "bereit": "In Bereitschaft",
+        "imEinsatz": "Im Einsatz",
+        "zurueck": "Zurück & Regeneration",
+        "protokoll": "Protokoll"
+      },
+      "empty": {
+        "bereit": "Kein Trupp in Bereitschaft.",
+        "imEinsatz": "Kein Trupp im Einsatz.",
+        "zurueck": "Kein Trupp zurück.",
+        "protokoll": "Noch kein Trupp erfasst."
+      },
+      "actions": {
+        "entsenden": "Entsenden",
+        "rueckkehr": "Rückkehr",
+        "wiederBereit": "Wieder bereitstellen",
+        "abmelden": "Abmelden"
+      },
+      "entsendetAn": "Entsendet an",
+      "entsendetAnHint": "Gruppenkommandant",
+      "abmarschZeit": "Abmarsch",
+      "rueckkehrZeit": "Rückkehr",
+      "druckAbmarsch": "Geringster Druck beim Abmarsch (bar)",
+      "druckRueckkehr": "Geringster Druck bei Rückkehr (bar)",
+      "entsendenTitle": "Trupp entsenden",
+      "rueckkehrTitle": "Rückkehr protokollieren",
+      "seit": "seit {zeit}",
+      "delete": "Trupp löschen",
+      "deleteConfirm": "Soll diese Zeile wirklich gelöscht werden? Frühere Bereitstellungen desselben Trupps bleiben bestehen.",
+      "abmeldenConfirm": "Trupp abmelden? Die Zeile wird geschlossen.",
+      "errors": {
+        "feuerwehrMissing": "Feuerwehr muss angegeben sein",
+        "mitgliederMissing": "Mindestens ein Truppmitglied muss angegeben sein",
+        "entsendetAnMissing": "Bitte den Gruppenkommandanten eintragen"
+      }
+    },
     "readOnly": "Nur Lesezugriff auf diesen Einsatz.",
     "import": {
       "title": "Ausrüstung importieren",

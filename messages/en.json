@@ -101,6 +101,60 @@
       "multiple": "{count} items carry this code — please choose:",
       "use": "Use"
     },
+    "trupp": {
+      "add": "Add team",
+      "dialogTitleNew": "Add team",
+      "dialogTitleEdit": "Edit team",
+      "name": "Team name",
+      "nameHint": "Optional, e.g. “Team 1”",
+      "feuerwehr": "Brigade",
+      "mitglieder": "Team members",
+      "mitglied": "Name {index}",
+      "addMitglied": "Another member",
+      "bemerkung": "Note",
+      "laufendeNummer": "Deployment {n}",
+      "status": {
+        "bereit": "Standing by",
+        "imEinsatz": "Deployed",
+        "zurueck": "Back & recovering",
+        "abgemeldet": "Signed off"
+      },
+      "sections": {
+        "bereit": "Standing by",
+        "imEinsatz": "Deployed",
+        "zurueck": "Back & recovering",
+        "protokoll": "Log"
+      },
+      "empty": {
+        "bereit": "No team standing by.",
+        "imEinsatz": "No team deployed.",
+        "zurueck": "No team back yet.",
+        "protokoll": "No team recorded yet."
+      },
+      "actions": {
+        "entsenden": "Deploy",
+        "rueckkehr": "Return",
+        "wiederBereit": "Stand by again",
+        "abmelden": "Sign off"
+      },
+      "entsendetAn": "Deployed to",
+      "entsendetAnHint": "Team leader",
+      "abmarschZeit": "Departure",
+      "rueckkehrZeit": "Return",
+      "druckAbmarsch": "Lowest pressure at departure (bar)",
+      "druckRueckkehr": "Lowest pressure on return (bar)",
+      "entsendenTitle": "Deploy team",
+      "rueckkehrTitle": "Record return",
+      "seit": "since {zeit}",
+      "delete": "Delete team",
+      "deleteConfirm": "Really delete this row? Earlier deployments of the same team remain.",
+      "abmeldenConfirm": "Sign off team? The row will be closed.",
+      "errors": {
+        "feuerwehrMissing": "Brigade is required",
+        "mitgliederMissing": "At least one team member is required",
+        "entsendetAnMissing": "Please record the team leader"
+      }
+    },
     "readOnly": "Read-only access to this operation.",
     "import": {
       "title": "Import equipment",
