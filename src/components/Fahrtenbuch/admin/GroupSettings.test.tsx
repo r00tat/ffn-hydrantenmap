@@ -7,12 +7,15 @@ import { renderWithIntl } from '../../../test-utils/intlRender';
 
 // `stammdatenActions` ist eine 'use server'/'server-only'-Datei und lässt sich
 // im Test nicht laden.
-const { saveFahrtenbuchGroupStandort } = vi.hoisted(() => ({
-  saveFahrtenbuchGroupStandort: vi.fn(),
-}));
+const { saveFahrtenbuchGroupStandort, saveFahrtenbuchGroupFeuerwehrName } =
+  vi.hoisted(() => ({
+    saveFahrtenbuchGroupStandort: vi.fn(),
+    saveFahrtenbuchGroupFeuerwehrName: vi.fn(),
+  }));
 
 vi.mock('../stammdatenActions', () => ({
   saveFahrtenbuchGroupStandort,
+  saveFahrtenbuchGroupFeuerwehrName,
 }));
 
 const { useFahrtenbuchGroupStandort } = vi.hoisted(() => ({
@@ -21,6 +24,16 @@ const { useFahrtenbuchGroupStandort } = vi.hoisted(() => ({
 
 vi.mock('../../../hooks/useFahrtenbuchGroupStandort', () => ({
   default: useFahrtenbuchGroupStandort,
+}));
+
+// Abonniert das Gruppendokument und initialisiert damit Firebase, das im Test
+// keine Konfiguration hat.
+const { useGroupFeuerwehrName } = vi.hoisted(() => ({
+  useGroupFeuerwehrName: vi.fn(),
+}));
+
+vi.mock('../../../hooks/useGroupFeuerwehrName', () => ({
+  default: useGroupFeuerwehrName,
 }));
 
 // Leaflet braucht ein echtes Layout und lädt Kartenkacheln; hier zählt nur, mit
@@ -54,6 +67,8 @@ describe('GroupSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saveFahrtenbuchGroupStandort.mockResolvedValue({ success: true });
+    saveFahrtenbuchGroupFeuerwehrName.mockResolvedValue({ success: true });
+    useGroupFeuerwehrName.mockReturnValue(undefined);
     useFahrtenbuchGroupStandort.mockReturnValue({
       standort: { lat: 47.94, lng: 16.84 },
       configured: true,

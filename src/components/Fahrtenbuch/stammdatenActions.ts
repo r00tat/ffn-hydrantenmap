@@ -547,6 +547,43 @@ export async function saveFahrtenbuchGroupStandort(
   }
 }
 
+/**
+ * Speichert den Namen der eigenen Feuerwehr. Nur für echte Mandanten.
+ *
+ * Getrennt von `saveFahrtenbuchGroupStandort`, weil beide Felder in derselben
+ * Karte, aber unabhängig voneinander gespeichert werden — ein Tippfehler im
+ * Namen soll nicht den Standort zurücksetzen.
+ */
+export async function saveFahrtenbuchGroupFeuerwehrName(
+  groupId: string,
+  feuerwehrName: string,
+): Promise<StammdatenResult> {
+  try {
+    const session = await actionGroupAdminRequired(groupId);
+
+    const now = new Date().toISOString();
+    await firestore
+      .collection(GROUP_COLLECTION_ID)
+      .doc(groupId)
+      // Leerer Name heißt „bewusst zurückgesetzt" — dieselbe Bedeutung wie
+      // `null` beim Standort, hier als leerer String, weil das Feld ein
+      // String ist und `verrechnenVorgabe` beides gleich behandelt.
+      .set(
+        {
+          feuerwehrName: feuerwehrName.trim(),
+          updatedAt: now,
+          updatedBy: session.user.id,
+        },
+        { merge: true },
+      );
+
+    return { success: true, id: groupId };
+  } catch (err) {
+    console.error('saveFahrtenbuchGroupFeuerwehrName failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
 function configRef(groupId: string) {
   return firestore.collection(FAHRTENBUCH_CONFIG_COLLECTION_ID).doc(groupId);
 }
