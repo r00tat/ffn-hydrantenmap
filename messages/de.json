@@ -4,6 +4,67 @@
     "title": "Einsatzkarte",
     "backAgainToExit": "Zum Beenden erneut Zurück drücken"
   },
+  "atemschutz": {
+    "title": "Atemschutzsammelplatz",
+    "typ": {
+      "flasche": "Atemluftflasche",
+      "maske": "Atemmaske",
+      "pressluftatmer": "Pressluftatmer",
+      "zubehoer": "Zubehör"
+    },
+    "sichtkontrolle": {
+      "offen": "offen",
+      "ok": "in Ordnung",
+      "mangel": "Mangel"
+    },
+    "errors": {
+      "identifierMissing": "Flaschennummer oder Feuerwehr muss angegeben sein",
+      "anzahlInvalid": "Anzahl muss zwischen 1 und 99 liegen",
+      "enddruckInvalid": "Enddruck muss größer als 0 sein",
+      "startdruckAboveEnddruck": "Startdruck liegt über dem Enddruck",
+      "gefuelltVonMissing": "Bitte eintragen, wer gefüllt hat",
+      "saveFailed": "Speichern fehlgeschlagen",
+      "codeMissing": "Kein Code angegeben",
+      "geraetNotFound": "Gerät nicht gefunden"
+    },
+    "admin": {
+      "title": "Atemschutz-Ausrüstung",
+      "group": "Gruppe",
+      "noGroups": "Keiner Gruppe zugeordnet.",
+      "noPermission": "Keine Berechtigung. Die Atemschutz-Stammdaten pflegt ein Gruppen-Admin.",
+      "add": "Gerät anlegen",
+      "edit": "{name} bearbeiten",
+      "delete": "{name} löschen",
+      "deleteConfirm": "Soll „{name}“ wirklich gelöscht werden?",
+      "empty": "Noch keine Ausrüstung erfasst.",
+      "count": "{count, plural, =0 {Keine Geräte} one {Ein Gerät} other {# Geräte}}",
+      "filterTyp": "Typ",
+      "filterAll": "Alle",
+      "search": "Suchen",
+      "showInactive": "Ausgeschiedene anzeigen"
+    },
+    "geraet": {
+      "typ": "Typ",
+      "bezeichnung": "Bezeichnung",
+      "feuerwehr": "Feuerwehr",
+      "nummer": "Flaschennummer",
+      "inventarNr": "Inventar-Nr.",
+      "zusatzInventarNr": "Zusatz-Inventar-Nr.",
+      "seriennummer": "Seriennummer",
+      "externeId": "Externe ID",
+      "barcodes": "Barcodes",
+      "barcodesHint": "Mehrere Codes mit Komma trennen",
+      "nenndruck": "Nenndruck (bar)",
+      "volumenLiter": "Volumen (l)",
+      "material": "Material",
+      "hersteller": "Hersteller",
+      "baujahr": "Baujahr",
+      "active": "In Verwendung",
+      "bemerkung": "Bemerkung",
+      "dialogTitleNew": "Gerät anlegen",
+      "dialogTitleEdit": "Gerät bearbeiten"
+    }
+  },
   "common": {
     "save": "Speichern",
     "saving": "Speichern...",
@@ -352,6 +413,8 @@
     "menuAria": "Menü"
   },
   "drawer": {
+    "atemschutz": "Atemschutzsammelplatz",
+    "adminAtemschutz": "Atemschutz-Ausrüstung",
     "about": "Über",
     "admin": "Administration",
     "adminActions": "Admin Actions",

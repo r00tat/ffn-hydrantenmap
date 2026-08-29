@@ -4,6 +4,67 @@
     "title": "Operations Map",
     "backAgainToExit": "Press back again to exit"
   },
+  "atemschutz": {
+    "title": "Breathing apparatus staging area",
+    "typ": {
+      "flasche": "Air cylinder",
+      "maske": "Face mask",
+      "pressluftatmer": "Breathing apparatus",
+      "zubehoer": "Accessory"
+    },
+    "sichtkontrolle": {
+      "offen": "open",
+      "ok": "OK",
+      "mangel": "defect"
+    },
+    "errors": {
+      "identifierMissing": "Cylinder number or brigade is required",
+      "anzahlInvalid": "Count must be between 1 and 99",
+      "enddruckInvalid": "Final pressure must be greater than 0",
+      "startdruckAboveEnddruck": "Initial pressure exceeds final pressure",
+      "gefuelltVonMissing": "Please record who filled the cylinder",
+      "saveFailed": "Saving failed",
+      "codeMissing": "No code given",
+      "geraetNotFound": "Item not found"
+    },
+    "admin": {
+      "title": "Breathing apparatus equipment",
+      "group": "Group",
+      "noGroups": "Not assigned to any group.",
+      "noPermission": "No permission. Breathing apparatus master data is maintained by a group admin.",
+      "add": "Add item",
+      "edit": "Edit {name}",
+      "delete": "Delete {name}",
+      "deleteConfirm": "Really delete “{name}”?",
+      "empty": "No equipment recorded yet.",
+      "count": "{count, plural, =0 {No items} one {One item} other {# items}}",
+      "filterTyp": "Type",
+      "filterAll": "All",
+      "search": "Search",
+      "showInactive": "Show retired items"
+    },
+    "geraet": {
+      "typ": "Type",
+      "bezeichnung": "Description",
+      "feuerwehr": "Brigade",
+      "nummer": "Cylinder number",
+      "inventarNr": "Inventory no.",
+      "zusatzInventarNr": "Additional inventory no.",
+      "seriennummer": "Serial number",
+      "externeId": "External ID",
+      "barcodes": "Barcodes",
+      "barcodesHint": "Separate multiple codes with commas",
+      "nenndruck": "Nominal pressure (bar)",
+      "volumenLiter": "Volume (l)",
+      "material": "Material",
+      "hersteller": "Manufacturer",
+      "baujahr": "Year built",
+      "active": "In service",
+      "bemerkung": "Note",
+      "dialogTitleNew": "Add item",
+      "dialogTitleEdit": "Edit item"
+    }
+  },
   "common": {
     "save": "Save",
     "saving": "Saving...",
@@ -352,6 +413,8 @@
     "menuAria": "Menu"
   },
   "drawer": {
+    "atemschutz": "Breathing apparatus",
+    "adminAtemschutz": "Breathing apparatus equipment",
     "about": "About",
     "admin": "Administration",
     "adminActions": "Admin actions",

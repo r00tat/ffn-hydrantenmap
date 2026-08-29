@@ -2,6 +2,7 @@ import { mdiBiohazard } from '@mdi/js';
 import Icon from '@mdi/react';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import AirIcon from '@mui/icons-material/Air';
 import ApiIcon from '@mui/icons-material/Api';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -61,6 +62,7 @@ import { usePathname } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
+import { hasAnyGroupAdminRole } from '../../common/groupPermissions';
 import { hasAnyFahrtenbuchManagerRole } from '../Fahrtenbuch/managerPermissions';
 import { useBugReport } from '../bugReport/BugReportProvider';
 
@@ -76,6 +78,12 @@ interface DrawerLink {
    * steuert.
    */
   fahrtenbuchAdmin?: boolean;
+  /**
+   * Sichtbar für Admins und Gruppen-Admins. Wie `fahrtenbuchAdmin` ein eigenes
+   * Flag, weil `admin` ein Dutzend anderer Einträge steuert — nur ohne den
+   * Gerätemeister, der mit der Atemschutz-Ausrüstung nichts zu tun hat.
+   */
+  groupAdminOnly?: boolean;
   signedInOnly?: boolean;
   /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
   einsatzSection?: string;
@@ -417,6 +425,12 @@ export default function AppDrawer({
           fahrtenbuchAdmin: true,
         },
         {
+          text: t('adminAtemschutz'),
+          icon: <AirIcon />,
+          href: '/admin/atemschutz',
+          groupAdminOnly: true,
+        },
+        {
           text: t('adminDrive'),
           icon: <FolderSharedIcon />,
           href: '/admin/drive',
@@ -508,6 +522,7 @@ export default function AppDrawer({
           fahrtenbuchGeraetemeister,
           groupAdmin,
         })) &&
+      (!item.groupAdminOnly || hasAnyGroupAdminRole({ isAdmin, groupAdmin })) &&
       (isSignedIn || !item.signedInOnly),
     [isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin],
   );
