@@ -11,6 +11,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -18,6 +19,8 @@ import Tooltip from '@mui/material/Tooltip';
 import { useTranslations } from 'next-intl';
 import {
   DEFAULT_ENDDRUCK,
+  geraetDetails,
+  geraetKennung,
   SICHTKONTROLLE_WERTE,
   type AtemschutzFuellung,
   type AtemschutzGeraet,
@@ -27,10 +30,20 @@ import {
 } from '../../common/atemschutz';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 import GeraetAutocomplete from './GeraetAutocomplete';
+import MangelFelder from './MangelFelder';
+import {
+  hatMangelEingabe,
+  LEERE_MANGEL_EINGABE,
+  saveAtemschutzMangel,
+  useMangelFehlerText,
+  type MangelEingabe,
+} from './mangelErfassung';
 import PersonAutocomplete from './PersonAutocomplete';
 
 export interface FuellungDialogProps {
   open: boolean;
+  /** Für den Mangel, der aus der Sichtkontrolle entstehen kann. */
+  groupId: string;
   /** Fehlt beim Anlegen. */
   fuellung?: AtemschutzFuellung;
   /** Die Flaschen der Gruppe, für Autovervollständigung und Nenndruck. */
@@ -64,6 +77,7 @@ function toNumber(value: string): number | undefined {
 
 export default function FuellungDialog({
   open,
+  groupId,
   fuellung,
   flaschen,
   feuerwehren,
@@ -86,11 +100,27 @@ export default function FuellungDialog({
     sichtkontrolle: fuellung?.sichtkontrolle ?? 'offen',
     bemerkung: fuellung?.bemerkung ?? '',
   }));
+  const [mangel, setMangel] = useState<MangelEingabe>(LEERE_MANGEL_EINGABE);
   const [saving, setSaving] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [fehlermeldung, setFehlermeldung] = useState<string>();
+  const fehlerText = useMangelFehlerText();
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  // Die gewählte Flasche, sofern es zu ihr einen Stammdatensatz gibt.
+  const gewaehlt = form.geraetId
+    ? flaschen.find((f) => f.id === form.geraetId)
+    : undefined;
+  const istMangel = form.sichtkontrolle === 'mangel';
+  // Beim Bearbeiten einer Zeile, die schon einen Mangel trägt, wird kein
+  // zweiter angelegt — sonst entstünde bei jedem Öffnen ein weiterer Eintrag
+  // in der Mängelliste.
+  const bereitsGemeldet = !!fuellung?.mangelId;
+  // Ein Mangel hängt an einem Gerät. Zu einer frei getippten Fremdflasche gibt
+  // es keins — dort bleibt nur die Bemerkung.
+  const mangelGeraet = istMangel && !bereitsGemeldet ? gewaehlt : undefined;
 
   const input: FuellungInput = {
     geraetId: form.geraetId,
@@ -104,6 +134,9 @@ export default function FuellungDialog({
     bemerkung: form.bemerkung,
   };
   const fehler = validateFuellungInput(input);
+  if (mangelGeraet && !hatMangelEingabe(mangel)) {
+    fehler.push('descriptionMissing');
+  }
 
   /**
    * Wird eine bekannte Flasche gewählt, folgen Nummer, Feuerwehr und Enddruck.
@@ -114,7 +147,10 @@ export default function FuellungDialog({
   const uebernehmeFlasche = (treffer: AtemschutzGeraet) => {
     setForm((prev) => ({
       ...prev,
-      flaschenNummer: treffer.nummer ?? treffer.bezeichnung,
+      // Die führende Kennung und nicht die Bezeichnung: Sonst stünde bei einer
+      // Flasche ohne eigene Nummer „Atemluftflasche CFK 6,8 l" im Feld — im
+      // Protokoll später nicht von der Nachbarflasche zu unterscheiden.
+      flaschenNummer: geraetKennung(treffer) ?? treffer.bezeichnung,
       geraetId: treffer.id,
       feuerwehr: treffer.feuerwehr || prev.feuerwehr,
       enddruck: treffer.nenndruck ? String(treffer.nenndruck) : prev.enddruck,
@@ -123,9 +159,17 @@ export default function FuellungDialog({
 
   const handleSave = async () => {
     setSaving(true);
+    setFehlermeldung(undefined);
     try {
-      await onSave(input);
+      // Der Mangel zuerst: Schlägt er fehl, soll im Protokoll nicht „Mangel"
+      // stehen, ohne dass er in der Mängelliste angekommen ist.
+      const mangelId = mangelGeraet
+        ? await saveAtemschutzMangel(groupId, mangelGeraet.id as string, mangel)
+        : undefined;
+      await onSave(mangelId ? { ...input, mangelId } : input);
       onClose();
+    } catch (err) {
+      setFehlermeldung(fehlerText(err));
     } finally {
       setSaving(false);
     }
@@ -137,6 +181,7 @@ export default function FuellungDialog({
         {fuellung ? t('fuellung.dialogTitleEdit') : t('fuellung.dialogTitleNew')}
       </DialogTitle>
       <DialogContent>
+        {saving && <LinearProgress sx={{ mb: 2 }} />}
         <Grid container spacing={2} sx={{ mt: 0 }}>
           <Grid size={12}>
             <Stack
@@ -148,6 +193,9 @@ export default function FuellungDialog({
                 label={t('fuellung.flaschenNummer')}
                 value={form.flaschenNummer}
                 geraete={flaschen}
+                // Zeigt unter dem Feld, *welche* Flasche gewählt ist: Die
+                // Nummer allein sagt nicht, ob 6-l-Stahl oder 6,8-l-CFK.
+                helperText={gewaehlt ? geraetDetails(gewaehlt) : undefined}
                 onTextChange={(next) =>
                   // Freie Eingabe: Der Bezug auf ein Stammgerät ist damit
                   // aufgehoben — sonst hinge `geraetId` an einer Nummer, die
@@ -249,6 +297,25 @@ export default function FuellungDialog({
               ))}
             </TextField>
           </Grid>
+          {istMangel && !bereitsGemeldet && (
+            <Grid size={12}>
+              {mangelGeraet ? (
+                <MangelFelder
+                  required
+                  value={mangel}
+                  helperText={t('ausruestung.mangelInlineHint')}
+                  onChange={setMangel}
+                />
+              ) : (
+                <Alert severity="info">{t('fuellung.mangelOhneGeraet')}</Alert>
+              )}
+            </Grid>
+          )}
+          {istMangel && bereitsGemeldet && (
+            <Grid size={12}>
+              <Alert severity="info">{t('fuellung.mangelBereitsGemeldet')}</Alert>
+            </Grid>
+          )}
           <Grid size={12}>
             <TextField
               fullWidth
@@ -266,6 +333,11 @@ export default function FuellungDialog({
                   .map((key) => t(`errors.${key}` as 'errors.saveFailed'))
                   .join(' · ')}
               </Alert>
+            </Grid>
+          )}
+          {fehlermeldung && (
+            <Grid size={12}>
+              <Alert severity="error">{fehlermeldung}</Alert>
             </Grid>
           )}
         </Grid>

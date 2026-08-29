@@ -23,6 +23,7 @@
       "enddruckInvalid": "Final pressure must be greater than 0",
       "startdruckAboveEnddruck": "Initial pressure exceeds final pressure",
       "gefuelltVonMissing": "Please record who filled the cylinder",
+      "descriptionMissing": "Please describe the defect",
       "saveFailed": "Saving failed",
       "codeMissing": "No code given",
       "geraetNotFound": "Item not found"
@@ -51,10 +52,10 @@
     "header": {
       "leiter": "Staging area officer",
       "fuellpersonal": "Filling crew",
+      "fuellpersonalHint": "Type a name and press Enter; a comma separates as well.",
       "niemand": "not recorded",
       "edit": "Edit officer and filling crew",
-      "dialogTitle": "Staging area leadership",
-      "addPerson": "Add person"
+      "dialogTitle": "Staging area leadership"
     },
     "fuellung": {
       "add": "Record filling",
@@ -71,6 +72,8 @@
       "gefuelltVon": "Filled by",
       "zeitpunkt": "Time",
       "sichtkontrolle": "Visual check",
+      "mangelOhneGeraet": "A defect can only be recorded for a cylinder from the master data. This cylinder has no record — please note its condition in the note field.",
+      "mangelBereitsGemeldet": "A defect has already been reported for this filling.",
       "bemerkung": "Note",
       "scan": "Scan barcode",
       "delete": "Delete filling",
@@ -109,8 +112,8 @@
       "nameHint": "Optional, e.g. “Team 1”",
       "feuerwehr": "Brigade",
       "mitglieder": "Team members",
-      "mitglied": "Name {index}",
-      "addMitglied": "Another member",
+      "mitgliederHint": "Type a name and press Enter.",
+      "mitgliederVoll": "At most {max} names per team.",
       "bemerkung": "Note",
       "laufendeNummer": "Deployment {n}",
       "status": {
@@ -138,7 +141,7 @@
         "abmelden": "Sign off"
       },
       "entsendetAn": "Deployed to",
-      "entsendetAnHint": "Team leader",
+      "entsendetAnHint": "Vehicle or team leader — optional",
       "abmarschZeit": "Departure",
       "rueckkehrZeit": "Return",
       "druckAbmarsch": "Lowest pressure at departure (bar)",
@@ -151,8 +154,7 @@
       "abmeldenConfirm": "Sign off team? The row will be closed.",
       "errors": {
         "feuerwehrMissing": "Brigade is required",
-        "mitgliederMissing": "At least one team member is required",
-        "entsendetAnMissing": "Please record the team leader"
+        "mitgliederMissing": "At least one team member is required"
       }
     },
     "ausruestung": {
@@ -185,6 +187,7 @@
       "mangelTitle": "Report defect",
       "mangelDescription": "What is the defect?",
       "mangelImages": "Images",
+      "mangelInlineHint": "Recorded as a defect in the group's defect list.",
       "mangelSaved": "Defect reported.",
       "mangelOffen": "{count, plural, one {One open defect} other {# open defects}}",
       "errors": {

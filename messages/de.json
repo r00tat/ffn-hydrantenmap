@@ -23,6 +23,7 @@
       "enddruckInvalid": "Enddruck muss größer als 0 sein",
       "startdruckAboveEnddruck": "Startdruck liegt über dem Enddruck",
       "gefuelltVonMissing": "Bitte eintragen, wer gefüllt hat",
+      "descriptionMissing": "Bitte den Mangel beschreiben",
       "saveFailed": "Speichern fehlgeschlagen",
       "codeMissing": "Kein Code angegeben",
       "geraetNotFound": "Gerät nicht gefunden"
@@ -51,10 +52,10 @@
     "header": {
       "leiter": "ASSP-Leiter",
       "fuellpersonal": "Füllpersonal",
+      "fuellpersonalHint": "Namen eintippen und mit Enter übernehmen; Komma trennt ebenfalls.",
       "niemand": "nicht eingetragen",
       "edit": "Leitung und Füllpersonal bearbeiten",
-      "dialogTitle": "ASSP-Leitung",
-      "addPerson": "Person hinzufügen"
+      "dialogTitle": "ASSP-Leitung"
     },
     "fuellung": {
       "add": "Füllung erfassen",
@@ -71,6 +72,8 @@
       "gefuelltVon": "Gefüllt von",
       "zeitpunkt": "Zeitpunkt",
       "sichtkontrolle": "Sichtkontrolle",
+      "mangelOhneGeraet": "Ein Mangel lässt sich nur an einer Flasche aus den Stammdaten erfassen. Diese Flasche gehört zu keinem Eintrag — bitte den Zustand in der Bemerkung festhalten.",
+      "mangelBereitsGemeldet": "Zu dieser Füllung ist bereits ein Mangel gemeldet.",
       "bemerkung": "Bemerkung",
       "scan": "Barcode scannen",
       "delete": "Füllung löschen",
@@ -109,8 +112,8 @@
       "nameHint": "Optional, z.B. „Trupp 1“",
       "feuerwehr": "Feuerwehr",
       "mitglieder": "Truppmitglieder",
-      "mitglied": "Name {index}",
-      "addMitglied": "Weiteres Mitglied",
+      "mitgliederHint": "Namen eintippen und mit Enter übernehmen.",
+      "mitgliederVoll": "Höchstens {max} Namen je Trupp.",
       "bemerkung": "Bemerkung",
       "laufendeNummer": "{n}. Einsatz",
       "status": {
@@ -138,7 +141,7 @@
         "abmelden": "Abmelden"
       },
       "entsendetAn": "Entsendet an",
-      "entsendetAnHint": "Gruppenkommandant",
+      "entsendetAnHint": "Fahrzeug oder Gruppenkommandant — optional",
       "abmarschZeit": "Abmarsch",
       "rueckkehrZeit": "Rückkehr",
       "druckAbmarsch": "Geringster Druck beim Abmarsch (bar)",
@@ -151,8 +154,7 @@
       "abmeldenConfirm": "Trupp abmelden? Die Zeile wird geschlossen.",
       "errors": {
         "feuerwehrMissing": "Feuerwehr muss angegeben sein",
-        "mitgliederMissing": "Mindestens ein Truppmitglied muss angegeben sein",
-        "entsendetAnMissing": "Bitte den Gruppenkommandanten eintragen"
+        "mitgliederMissing": "Mindestens ein Truppmitglied muss angegeben sein"
       }
     },
     "ausruestung": {
@@ -185,6 +187,7 @@
       "mangelTitle": "Mangel melden",
       "mangelDescription": "Was ist der Mangel?",
       "mangelImages": "Bilder",
+      "mangelInlineHint": "Wird als Mangel in der Mängelliste der Gruppe angelegt.",
       "mangelSaved": "Mangel gemeldet.",
       "mangelOffen": "{count, plural, one {Ein offener Mangel} other {# offene Mängel}}",
       "errors": {

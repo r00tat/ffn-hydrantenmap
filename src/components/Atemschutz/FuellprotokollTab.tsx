@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Fab from '@mui/material/Fab';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import {
@@ -22,6 +24,7 @@ import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FuellungDialog from './FuellungDialog';
 
 export interface FuellprotokollTabProps {
+  groupId: string;
   fuellungen: AtemschutzFuellung[];
   flaschenGesamt: number;
   flaschen: AtemschutzGeraet[];
@@ -34,6 +37,7 @@ export interface FuellprotokollTabProps {
 }
 
 export default function FuellprotokollTab({
+  groupId,
   fuellungen,
   flaschenGesamt,
   flaschen,
@@ -52,6 +56,19 @@ export default function FuellprotokollTab({
   const [edit, setEdit] = useState<AtemschutzFuellung | undefined>();
   const [loeschKandidat, setLoeschKandidat] = useState<AtemschutzFuellung>();
 
+  const neu = () => {
+    setEdit(undefined);
+    setDialogOpen(true);
+  };
+
+  // Die Bezeichnung steht nicht am Protokolleintrag, sondern nur die Nummer.
+  // Für die zweite Zeile wird sie aus den Stammdaten nachgeschlagen — ein
+  // zweites Feld im Dokument liefe mit einer umbenannten Flasche auseinander.
+  const flaschenById = useMemo(
+    () => new Map(flaschen.map((f) => [f.id as string, f])),
+    [flaschen],
+  );
+
   const titel = (f: AtemschutzFuellung) => {
     if (f.flaschenNummer) return f.flaschenNummer;
     if (f.anzahl > 1) return t('fuellung.unbekannteFlaschen', { count: f.anzahl });
@@ -65,9 +82,24 @@ export default function FuellprotokollTab({
 
   return (
     <Box sx={{ pb: 10 }}>
-      <Typography variant="subtitle1" sx={{ mb: 1 }}>
-        {t('fuellung.total', { count: flaschenGesamt })}
-      </Typography>
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}
+      >
+        <Typography variant="subtitle1">
+          {t('fuellung.total', { count: flaschenGesamt })}
+        </Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        {/* Derselbe Weg wie über den Fab unten rechts. Der Knopf steht hier
+            zusätzlich, weil am Rechner niemand in die Ecke des Fensters
+            zielt — auf dem Handy bleibt der Fab der schnellere Griff. */}
+        {canWrite && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={neu}>
+            {t('fuellung.add')}
+          </Button>
+        )}
+      </Stack>
 
       {fuellungen.length === 0 ? (
         <Typography color="text.secondary">{t('fuellung.empty')}</Typography>
@@ -121,6 +153,9 @@ export default function FuellprotokollTab({
                   </Box>
                 }
                 secondary={[
+                  f.geraetId
+                    ? flaschenById.get(f.geraetId)?.bezeichnung
+                    : undefined,
                   f.feuerwehr,
                   f.gefuelltVon,
                   format.dateTime(new Date(f.zeitpunkt), {
@@ -142,10 +177,7 @@ export default function FuellprotokollTab({
           color="primary"
           sx={{ position: 'fixed', bottom: 24, right: 24 }}
           aria-label={t('fuellung.add')}
-          onClick={() => {
-            setEdit(undefined);
-            setDialogOpen(true);
-          }}
+          onClick={neu}
         >
           <AddIcon />
         </Fab>
@@ -155,6 +187,7 @@ export default function FuellprotokollTab({
         <FuellungDialog
           key={edit?.id ?? 'new'}
           open
+          groupId={groupId}
           fuellung={edit}
           flaschen={flaschen}
           feuerwehren={feuerwehren}

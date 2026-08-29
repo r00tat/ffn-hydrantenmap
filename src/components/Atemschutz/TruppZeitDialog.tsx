@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Alert from '@mui/material/Alert';
+import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -15,17 +15,16 @@ import {
   rueckkehrPatch,
   type TruppPatch,
 } from '../../common/atemschutz';
-import PersonAutocomplete from './PersonAutocomplete';
 
 export type TruppZeitModus = 'entsenden' | 'rueckkehr';
 
 export interface TruppZeitDialogProps {
   open: boolean;
   modus: TruppZeitModus;
-  /** Vorbelegung des Gruppenkommandanten aus der vorigen Bereitstellung. */
+  /** Vorbelegung aus der vorigen Bereitstellung desselben Trupps. */
   entsendetAnVorschlag?: string;
-  /** Vorschläge, Gruppenkommandanten zuerst. */
-  personSuggestions: string[];
+  /** Fahrzeuge des Einsatzes zuerst, dann die Gruppenkommandanten. */
+  entsendetAnVorschlaege: string[];
   onClose: () => void;
   onConfirm: (patch: TruppPatch) => Promise<void>;
 }
@@ -55,7 +54,7 @@ export default function TruppZeitDialog({
   open,
   modus,
   entsendetAnVorschlag,
-  personSuggestions,
+  entsendetAnVorschlaege,
   onClose,
   onConfirm,
 }: TruppZeitDialogProps) {
@@ -69,8 +68,6 @@ export default function TruppZeitDialog({
 
   const istEntsenden = modus === 'entsenden';
   const druckWert = druck.trim() ? Number(druck.trim().replace(',', '.')) : undefined;
-  const fehler =
-    istEntsenden && !entsendetAn.trim() ? ['entsendetAnMissing'] : [];
 
   const handleConfirm = async () => {
     setSaving(true);
@@ -100,12 +97,25 @@ export default function TruppZeitDialog({
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {istEntsenden && (
-            <PersonAutocomplete
-              label={t('trupp.entsendetAn')}
+            // Freitext mit Vorschlägen: Der Trupp geht meist zu einem
+            // Fahrzeug, manchmal zu einem Gruppenkommandanten und
+            // gelegentlich zu einem Abschnitt, den es in keiner Liste gibt.
+            <Autocomplete
+              freeSolo
+              fullWidth
+              options={entsendetAnVorschlaege}
               value={entsendetAn}
-              options={personSuggestions}
-              required
-              onChange={setEntsendetAn}
+              onInputChange={(_, next) => setEntsendetAn(next ?? '')}
+              onChange={(_, next) =>
+                setEntsendetAn(typeof next === 'string' ? next : '')
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={t('trupp.entsendetAn')}
+                  helperText={t('trupp.entsendetAnHint')}
+                />
+              )}
             />
           )}
           <TextField
@@ -126,20 +136,11 @@ export default function TruppZeitDialog({
             slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             onChange={(e) => setDruck(e.target.value)}
           />
-          {fehler.length > 0 && (
-            <Alert severity="warning">
-              {t('trupp.errors.entsendetAnMissing')}
-            </Alert>
-          )}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{tCommon('cancel')}</Button>
-        <Button
-          variant="contained"
-          disabled={saving || fehler.length > 0}
-          onClick={handleConfirm}
-        >
+        <Button variant="contained" disabled={saving} onClick={handleConfirm}>
           {istEntsenden ? t('trupp.actions.entsenden') : t('trupp.actions.rueckkehr')}
         </Button>
       </DialogActions>

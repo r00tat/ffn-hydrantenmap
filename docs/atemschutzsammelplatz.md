@@ -102,6 +102,60 @@ trotzdem „Neusiedl am See", nur die Bezeichnung verrät sie.
   `actionGroupAdminRequired()`: Am Sammelplatz fällt der Mangel auf, und wer
   ihn bemerkt, verwaltet die Gruppe in aller Regel nicht.
 
+## Bedienung am Sammelplatz
+
+Vier Entscheidungen, die von der ersten Fassung abweichen und aus der Erprobung
+stammen:
+
+- **Namenslisten sind Chip-Felder** (`PersonChipsInput`), nicht eine Zeile je
+  Person mit „Hinzufügen" darunter. Getippt, Enter, nächster Name; Komma und
+  Strichpunkt trennen ebenfalls, weil Listen oft aus einer Nachricht kopiert
+  werden. `autoSelect` ist dabei kein Detail: Ohne es verwirft MUI bei
+  `freeSolo` den offenen Text, sobald das Feld verlassen wird — der zuletzt
+  getippte Name ginge beim Klick auf „Speichern" verloren. Betrifft
+  Füllpersonal und Truppmitglieder.
+- **„Entsendet an" ist optional** und schlägt die **Fahrzeuge des Einsatzes**
+  vor, danach die Gruppenkommandanten. Der Trupp wird einem Fahrzeug
+  unterstellt, nicht einer Person; und am Sammelplatz steht oft nur fest,
+  *dass* er abmarschiert. Ein Pflichtfeld führte hier zu einem erfundenen
+  Eintrag oder zu gar keiner Protokollzeile.
+- **Ein Scan in der Ausrüstung öffnet sofort Ausgabe oder Rücknahme** — welches
+  von beiden, ergibt der Zustand des Stücks. Die Liste danach zu filtern war
+  ein Zwischenschritt, den niemand mit Handschuhen tippt. Ohne Stammdatensatz
+  oder ohne Schreibrecht bleibt es beim Setzen der Suche.
+- **Die Flaschennummer im Füllprotokoll ist die führende Kennung**
+  (`geraetKennung`: Nummer → Inventar-Nr. → Seriennummer), nicht die
+  Bezeichnung. Eine Flasche ohne eigene Nummer stand sonst als „Atemluftflasche
+  CFK 6,8 l" im Protokoll und war von der Nachbarflasche desselben Typs nicht
+  zu unterscheiden. Welche Flasche gewählt ist, steht als `geraetDetails` unter
+  dem Feld.
+
+## Mangel direkt aus der Sichtkontrolle
+
+Steht die Sichtkontrolle im Füll- oder im Ausgabedialog auf „Mangel", erscheint
+dort dieselbe Eingabe wie im eigenen Mangel-Dialog (`MangelFelder`:
+Beschreibung und Bilder) und der Mangel wird mitgespeichert. Zuvor setzte der
+Zustand nur ein Feld, und der Mangel musste an anderer Stelle noch einmal
+erfasst werden — was in der Praxis unterblieb.
+
+Drei Festlegungen dazu:
+
+- **Der Mangel wird vor dem Protokolleintrag angelegt.** Schlägt er fehl, soll
+  im Protokoll nicht „Mangel" stehen, ohne dass er in der Mängelliste
+  angekommen ist.
+- **„Mangel" ohne Beschreibung ist gesperrt.** Sonst entstünde ein Zustand, zu
+  dem niemand mehr findet, was war.
+- **Zu einer Fremdflasche geht es nicht.** `createAtemschutzMangel` hängt den
+  Mangel an ein Gerät der Stammdaten; eine frei getippte Flaschennummer hat
+  keins. Der Dialog sagt das und verweist auf die Bemerkung, statt das
+  Speichern zu blockieren. Ebenso wird beim Bearbeiten einer Zeile, die schon
+  einen `mangelId` trägt, kein zweiter Mangel angelegt.
+
+`saveAtemschutzMangel` und `useMangelFehlerText` in `mangelErfassung.ts` sind
+der gemeinsame Weg aller drei Stellen. Bildfehler tragen die Schlüssel des
+Fahrtenbuchs (`fahrtenbuch.maengel.errors.*`) samt Dateiname und Höchstgröße —
+ein zweiter Satz derselben Meldungen liefe auseinander.
+
 ## Kamera
 
 Der Scanner nutzt `BarcodeDetector`, wo es das gibt (Chrome, Android-WebView),

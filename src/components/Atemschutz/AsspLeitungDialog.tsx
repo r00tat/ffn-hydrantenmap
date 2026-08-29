@@ -1,17 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import { useTranslations } from 'next-intl';
+import { sanitizePersonen } from '../../common/atemschutz';
 import PersonAutocomplete from './PersonAutocomplete';
+import PersonChipsInput from './PersonChipsInput';
 
 export interface AsspLeitungDialogProps {
   open: boolean;
@@ -33,22 +32,15 @@ export default function AsspLeitungDialog({
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
   const [leiterValue, setLeiterValue] = useState(leiter);
-  // Eine leere Zeile am Ende, damit immer ein freies Feld sichtbar ist.
-  const [personal, setPersonal] = useState<string[]>(
-    fuellpersonal.length > 0 ? fuellpersonal : [''],
+  const [personal, setPersonal] = useState<string[]>(() =>
+    sanitizePersonen(fuellpersonal),
   );
   const [saving, setSaving] = useState(false);
-
-  const setAt = (index: number, value: string) =>
-    setPersonal((prev) => prev.map((p, i) => (i === index ? value : p)));
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(
-        leiterValue.trim(),
-        personal.map((p) => p.trim()).filter(Boolean),
-      );
+      await onSave(leiterValue.trim(), sanitizePersonen(personal));
       onClose();
     } finally {
       setSaving(false);
@@ -66,35 +58,13 @@ export default function AsspLeitungDialog({
             options={suggestions}
             onChange={setLeiterValue}
           />
-          {personal.map((person, index) => (
-            <Stack
-              key={index}
-              direction="row"
-              spacing={1}
-              sx={{ alignItems: 'center' }}
-            >
-              <PersonAutocomplete
-                label={t('header.fuellpersonal')}
-                value={person}
-                options={suggestions}
-                onChange={(value) => setAt(index, value)}
-              />
-              <IconButton
-                aria-label={tCommon('delete')}
-                onClick={() =>
-                  setPersonal((prev) => prev.filter((_, i) => i !== index))
-                }
-              >
-                <DeleteIcon />
-              </IconButton>
-            </Stack>
-          ))}
-          <Button
-            startIcon={<AddIcon />}
-            onClick={() => setPersonal((prev) => [...prev, ''])}
-          >
-            {t('header.addPerson')}
-          </Button>
+          <PersonChipsInput
+            label={t('header.fuellpersonal')}
+            helperText={t('header.fuellpersonalHint')}
+            value={personal}
+            options={suggestions}
+            onChange={setPersonal}
+          />
         </Stack>
       </DialogContent>
       <DialogActions>

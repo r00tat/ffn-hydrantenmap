@@ -90,6 +90,9 @@ export interface AtemschutzFuellung {
   gefuelltVon: string;
   zeitpunkt: string;
   sichtkontrolle?: Sichtkontrolle;
+  /** Verweis in `groups/{groupId}/mangel` — gesetzt, wenn die Sichtkontrolle
+   *  einen Mangel ergab und er gleich hier erfasst wurde. */
+  mangelId?: string;
   bemerkung?: string;
   createdAt: string;
   createdBy: string;
@@ -246,10 +249,35 @@ export function matchGeraete(
   return treffer.slice(0, limit);
 }
 
+/**
+ * Die führende Kennung eines Geräts — die, unter der es am Sammelplatz
+ * angesprochen wird.
+ *
+ * Die Reihenfolge ist die der Lesbarkeit am Stück: Die Flaschennummer steht
+ * groß auf der Flasche, die Inventarnummer klein auf dem Etikett, die
+ * Seriennummer eingeprägt am Hals. Fehlt alles drei, gibt es keine Kennung —
+ * dann bleibt nur die Bezeichnung, und die ist Sache des Aufrufers.
+ */
+export function geraetKennung(g: AtemschutzGeraet): string | undefined {
+  return g.nummer ?? g.inventarNr ?? g.seriennummer ?? undefined;
+}
+
 /** Einzeiliges Etikett eines Geräts für Auswahllisten. */
 export function geraetLabel(g: AtemschutzGeraet): string {
-  const kopf = g.nummer ?? g.inventarNr ?? g.seriennummer ?? '';
+  const kopf = geraetKennung(g);
   return kopf ? `${kopf} · ${g.bezeichnung}` : g.bezeichnung;
+}
+
+/**
+ * Die Zeile unter dem Etikett: woran man erkennt, dass es *dieses* Stück ist.
+ *
+ * Die Bezeichnung steht vorn, weil eine Nummer allein nicht sagt, ob eine
+ * 6-Liter-Stahlflasche oder eine 6,8-Liter-CFK gemeint ist.
+ */
+export function geraetDetails(g: AtemschutzGeraet): string {
+  return [g.bezeichnung, g.feuerwehr, g.inventarNr, g.seriennummer]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** Die Eingabe des Dialogs. Systemfelder stehen bewusst nicht darin. */
@@ -262,6 +290,8 @@ export interface FuellungInput {
   enddruck: number;
   gefuelltVon: string;
   sichtkontrolle?: Sichtkontrolle;
+  /** Der bei der Sichtkontrolle gleich mit erfasste Mangel. */
+  mangelId?: string;
   bemerkung?: string;
   /** Ohne Angabe setzt der Aufrufer die aktuelle Zeit. */
   zeitpunkt?: string;
@@ -329,7 +359,14 @@ export function canTransition(from: TruppStatus, to: TruppStatus): boolean {
 }
 
 export interface EntsendeInput {
-  entsendetAn: string;
+  /**
+   * Fahrzeug oder Gruppenkommandant, dem der Trupp unterstellt wird.
+   *
+   * Optional: Am Sammelplatz steht oft nur fest, *dass* der Trupp abmarschiert
+   * — wohin, klärt sich auf dem Weg. Ein Pflichtfeld führte hier zu einem
+   * erfundenen Eintrag oder zu gar keiner Protokollzeile.
+   */
+  entsendetAn?: string;
   abmarschZeit: string;
   /** Geringster Druck im Trupp; fehlt, wenn niemand abgelesen hat. */
   druckAbmarsch?: number;
@@ -340,9 +377,10 @@ export type TruppPatch = Partial<AtemschutzTrupp> & { status: TruppStatus };
 export function entsendePatch(input: EntsendeInput): TruppPatch {
   const patch: TruppPatch = {
     status: 'imEinsatz',
-    entsendetAn: input.entsendetAn.trim(),
     abmarschZeit: input.abmarschZeit,
   };
+  const ziel = input.entsendetAn?.trim();
+  if (ziel) patch.entsendetAn = ziel;
   // Nicht `patch.druckAbmarsch = input.druckAbmarsch`: Firestore lehnt
   // `undefined` ab — dieselbe Vorsicht wie in `buildMangelDocument`.
   if (typeof input.druckAbmarsch === 'number') {
@@ -433,15 +471,33 @@ export interface TruppInput {
 }
 
 /**
- * Bereinigt die Namensliste: Randleerzeichen weg, leere Zeilen raus, auf die
- * Höchstzahl gekürzt. Das Formular hält immer eine leere Zeile bereit — die
- * darf nicht als Mitglied gespeichert werden.
+ * Bereinigt eine Namensliste: Randleerzeichen weg, Leeres raus, Dubletten raus,
+ * auf `max` gekürzt.
+ *
+ * Die Dublettenprüfung vergleicht ohne Rücksicht auf Groß- und Kleinschreibung,
+ * behält aber die zuerst eingegebene Schreibweise: Wer denselben Namen zweimal
+ * in das Chip-Feld tippt, meint eine Person, nicht zwei.
+ */
+export function sanitizePersonen(namen: string[], max?: number): string[] {
+  const gesehen = new Set<string>();
+  const result: string[] = [];
+  for (const roh of namen ?? []) {
+    const name = (roh ?? '').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (gesehen.has(key)) continue;
+    gesehen.add(key);
+    result.push(name);
+    if (max != null && result.length >= max) break;
+  }
+  return result;
+}
+
+/**
+ * Wie `sanitizePersonen`, mit der Höchstzahl eines Trupps.
  */
 export function sanitizeMitglieder(mitglieder: string[]): string[] {
-  return (mitglieder ?? [])
-    .map((m) => (m ?? '').trim())
-    .filter(Boolean)
-    .slice(0, MAX_TRUPP_MITGLIEDER);
+  return sanitizePersonen(mitglieder, MAX_TRUPP_MITGLIEDER);
 }
 
 /**

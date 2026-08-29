@@ -20,6 +20,7 @@ import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import {
   ATEMSCHUTZ_GERAET_TYPEN,
+  geraetKennung,
   geraetLabel,
   matchGeraete,
   type AtemschutzAusgabe,
@@ -240,12 +241,25 @@ export default function AusruestungTab({
           geraete={geraete}
           onClose={() => setScannerOpen(false)}
           onPicked={(code, treffer) => {
-            // Ein Treffer springt in die Liste, indem er die Suche setzt —
-            // das ist ehrlicher als ein Sprung zu einer Zeile, die durch den
-            // Typfilter gar nicht sichtbar ist.
+            // Wer scannt, will das Stück ausgeben oder zurücknehmen — die
+            // Liste danach zu filtern wäre ein Zwischenschritt, den niemand
+            // mit Handschuhen tippen will. Welcher der beiden Wege es ist,
+            // ergibt sich aus dem Zustand: Was draußen ist, kommt zurück.
+            if (treffer && canWrite) {
+              const status =
+                ausgabeByGeraet.get(treffer.id as string)?.status ?? 'amPlatz';
+              setAusgabeDialog({
+                geraet: treffer,
+                modus: status === 'ausgegeben' ? 'zuruecknehmen' : 'ausgeben',
+              });
+              return;
+            }
+            // Kein Stammdatensatz oder nur Lesezugriff: Dann bleibt die
+            // Liste — und die Filter müssen weg, sonst führt der Scan auf
+            // eine Zeile, die gar nicht sichtbar ist.
             setTypFilter('alle');
             setNurAusgegeben(false);
-            setSuche(treffer?.nummer ?? treffer?.bezeichnung ?? code);
+            setSuche(treffer ? (geraetKennung(treffer) ?? treffer.bezeichnung) : code);
           }}
         />
       )}
@@ -255,6 +269,7 @@ export default function AusruestungTab({
           key={`${ausgabeDialog.geraet.id}-${ausgabeDialog.modus}`}
           open
           modus={ausgabeDialog.modus}
+          groupId={groupId}
           geraet={ausgabeDialog.geraet}
           empfaengerVorschlaege={empfaengerVorschlaege}
           ausgegebenAn={

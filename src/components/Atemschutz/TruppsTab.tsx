@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Fab from '@mui/material/Fab';
 import Stack from '@mui/material/Stack';
@@ -23,8 +24,8 @@ export interface TruppsTabProps {
   trupps: TruppGruppen;
   feuerwehren: string[];
   personSuggestions: string[];
-  /** Gruppenkommandanten zuerst — für das Feld „Entsendet an". */
-  grkdtSuggestions: string[];
+  /** Fahrzeuge des Einsatzes und Gruppenkommandanten — für „Entsendet an". */
+  entsendetAnVorschlaege: string[];
   canWrite: boolean;
   onSave: (input: TruppInput, trupp?: AtemschutzTrupp) => Promise<void>;
   onPatch: (trupp: AtemschutzTrupp, patch: TruppPatch) => Promise<void>;
@@ -39,7 +40,7 @@ export default function TruppsTab({
   trupps,
   feuerwehren,
   personSuggestions,
-  grkdtSuggestions,
+  entsendetAnVorschlaege,
   canWrite,
   onSave,
   onPatch,
@@ -57,6 +58,11 @@ export default function TruppsTab({
   }>();
   const [loeschKandidat, setLoeschKandidat] = useState<AtemschutzTrupp>();
   const [abmeldeKandidat, setAbmeldeKandidat] = useState<AtemschutzTrupp>();
+
+  const neu = () => {
+    setEdit(undefined);
+    setDialogOpen(true);
+  };
 
   const karte = (trupp: AtemschutzTrupp) => (
     <TruppCard
@@ -77,6 +83,17 @@ export default function TruppsTab({
 
   return (
     <Box sx={{ pb: 10 }}>
+      {/* Zusätzlich zum Fab unten rechts: Am Rechner zielt niemand in die
+          Ecke des Fensters, auf dem Handy bleibt der Fab der schnellere
+          Griff. */}
+      {canWrite && (
+        <Stack direction="row" sx={{ mb: 2, justifyContent: 'flex-end' }}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={neu}>
+            {t('trupp.add')}
+          </Button>
+        </Stack>
+      )}
+
       {ABSCHNITTE.map((abschnitt) => (
         <Box key={abschnitt} sx={{ mb: 3 }}>
           <Typography variant="h6" gutterBottom>
@@ -113,10 +130,7 @@ export default function TruppsTab({
           color="primary"
           sx={{ position: 'fixed', bottom: 24, right: 24 }}
           aria-label={t('trupp.add')}
-          onClick={() => {
-            setEdit(undefined);
-            setDialogOpen(true);
-          }}
+          onClick={neu}
         >
           <AddIcon />
         </Fab>
@@ -140,11 +154,7 @@ export default function TruppsTab({
           open
           modus={zeitDialog.modus}
           entsendetAnVorschlag={zeitDialog.trupp.entsendetAn}
-          personSuggestions={
-            zeitDialog.modus === 'entsenden'
-              ? grkdtSuggestions
-              : personSuggestions
-          }
+          entsendetAnVorschlaege={entsendetAnVorschlaege}
           onClose={() => setZeitDialog(undefined)}
           onConfirm={(patch) => onPatch(zeitDialog.trupp, patch)}
         />

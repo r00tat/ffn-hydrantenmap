@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   canTransition,
+  geraetLabel,
   newTruppKey,
   nextBereitstellung,
   sanitizeMitglieder,
@@ -27,6 +28,7 @@ import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
+import useVehicles from '../../hooks/useVehicles';
 import { updateDoc } from '../../lib/firestoreClient';
 import { firestore } from '../firebase/firebase';
 import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
@@ -96,11 +98,32 @@ export default function AtemschutzPage() {
     return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
   }, [trupps.protokoll, feuerwehren]);
 
+  const { vehicles } = useVehicles();
+
   const suggestions = useAtemschutzPersonSuggestions(groupId, {
     trupps: trupps.protokoll,
     asspLeiter: firecall?.asspLeiter,
     asspFuellpersonal: firecall?.asspFuellpersonal,
   });
+
+  /**
+   * Wohin ein Trupp entsendet wird: meist ein Fahrzeug des Einsatzes, sonst
+   * ein Gruppenkommandant. Die Fahrzeuge stehen vorn, weil sie der Regelfall
+   * sind — der Trupp wird einem Fahrzeug unterstellt, nicht einer Person.
+   */
+  const entsendetAnVorschlaege = useMemo(() => {
+    const namen: string[] = [];
+    const gesehen = new Set<string>();
+    const add = (value?: string) => {
+      const v = value?.trim();
+      if (!v || gesehen.has(v.toLowerCase())) return;
+      gesehen.add(v.toLowerCase());
+      namen.push(v);
+    };
+    for (const fzg of vehicles) add(fzg.name);
+    for (const name of suggestions.gruppenkommandanten) add(name);
+    return namen;
+  }, [vehicles, suggestions.gruppenkommandanten]);
 
   const actor: AtemschutzActor = useMemo(
     () => ({ userId: uid ?? '', now: new Date().toISOString() }),
@@ -138,6 +161,7 @@ export default function AtemschutzPage() {
         gefuelltVon: input.gefuelltVon.trim(),
         zeitpunkt: input.zeitpunkt ?? now,
         ...(input.sichtkontrolle ? { sichtkontrolle: input.sichtkontrolle } : {}),
+        ...(input.mangelId ? { mangelId: input.mangelId } : {}),
         ...(input.bemerkung?.trim() ? { bemerkung: input.bemerkung.trim() } : {}),
       };
       const stamp: AtemschutzActor = { userId: actor.userId, now };
@@ -235,9 +259,7 @@ export default function AtemschutzPage() {
         firecallId,
         {
           geraetId: geraet.id as string,
-          geraetName: geraet.nummer
-            ? `${geraet.nummer} · ${geraet.bezeichnung}`
-            : geraet.bezeichnung,
+          geraetName: geraetLabel(geraet),
           ...patch,
         },
         stamp,
@@ -260,9 +282,7 @@ export default function AtemschutzPage() {
         firecallId,
         {
           geraetId: geraet.id as string,
-          geraetName: geraet.nummer
-            ? `${geraet.nummer} · ${geraet.bezeichnung}`
-            : geraet.bezeichnung,
+          geraetName: geraetLabel(geraet),
           status: 'amPlatz',
           ...patch,
         },
@@ -307,6 +327,7 @@ export default function AtemschutzPage() {
 
       {tab === 'fuellprotokoll' && (
         <FuellprotokollTab
+          groupId={groupId ?? ''}
           fuellungen={fuellungen}
           flaschenGesamt={flaschenGesamt}
           flaschen={flaschen}
@@ -324,7 +345,7 @@ export default function AtemschutzPage() {
           trupps={trupps}
           feuerwehren={feuerwehren}
           personSuggestions={suggestions.alle}
-          grkdtSuggestions={suggestions.gruppenkommandanten}
+          entsendetAnVorschlaege={entsendetAnVorschlaege}
           canWrite={canWrite}
           onSave={handleSaveTrupp}
           onPatch={handlePatchTrupp}

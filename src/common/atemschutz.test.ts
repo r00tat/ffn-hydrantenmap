@@ -8,6 +8,8 @@ import {
   canTransition,
   entsendePatch,
   findByCode,
+  geraetDetails,
+  geraetKennung,
   gruppiereTrupps,
   lookupKeys,
   matchGeraete,
@@ -15,6 +17,7 @@ import {
   normalizeCode,
   rueckkehrPatch,
   sanitizeMitglieder,
+  sanitizePersonen,
   validateFuellungInput,
   validateTruppInput,
 } from './atemschutz';
@@ -475,5 +478,78 @@ describe('sanitizeMitglieder', () => {
     expect(
       sanitizeMitglieder(['a', 'b', 'c', 'd', 'e', 'f']),
     ).toHaveLength(MAX_TRUPP_MITGLIEDER);
+  });
+});
+
+describe('geraetKennung', () => {
+  it('nimmt die Flaschennummer', () => {
+    expect(geraetKennung(geraet({ nummer: '2.16.03' }))).toBe('2.16.03');
+  });
+
+  it('fällt auf die Inventarnummer zurück', () => {
+    expect(
+      geraetKennung(
+        geraet({ nummer: undefined, inventarNr: '2016-FL-003' }),
+      ),
+    ).toBe('2016-FL-003');
+  });
+
+  it('fällt auf die Seriennummer zurück', () => {
+    expect(
+      geraetKennung(
+        geraet({
+          nummer: undefined,
+          inventarNr: undefined,
+          seriennummer: 'BA66937',
+        }),
+      ),
+    ).toBe('BA66937');
+  });
+
+  it('liefert nichts, wenn keine Kennung gepflegt ist', () => {
+    expect(
+      geraetKennung(
+        geraet({ nummer: undefined, inventarNr: undefined, seriennummer: undefined }),
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe('geraetDetails', () => {
+  it('stellt die Bezeichnung voran und lässt Leeres weg', () => {
+    expect(
+      geraetDetails(
+        geraet({
+          bezeichnung: 'Atemluftflasche CFK 6,8 l',
+          feuerwehr: 'Bezirksreserve',
+          inventarNr: '2901-FL-001',
+          seriennummer: undefined,
+        }),
+      ),
+    ).toBe('Atemluftflasche CFK 6,8 l · Bezirksreserve · 2901-FL-001');
+  });
+});
+
+describe('sanitizePersonen', () => {
+  it('entfernt Leeres und Randleerzeichen', () => {
+    expect(sanitizePersonen([' Anna ', '', '  ', 'Bernd'])).toEqual([
+      'Anna',
+      'Bernd',
+    ]);
+  });
+
+  it('wirft Dubletten ohne Rücksicht auf die Schreibweise weg', () => {
+    expect(sanitizePersonen(['Anna Huber', 'anna huber', 'Bernd'])).toEqual([
+      'Anna Huber',
+      'Bernd',
+    ]);
+  });
+
+  it('kürzt auf die Höchstzahl', () => {
+    expect(sanitizePersonen(['a', 'b', 'c'], 2)).toEqual(['a', 'b']);
+  });
+
+  it('lässt ohne Höchstzahl alles stehen', () => {
+    expect(sanitizePersonen(['a', 'b', 'c', 'd', 'e'])).toHaveLength(5);
   });
 });
