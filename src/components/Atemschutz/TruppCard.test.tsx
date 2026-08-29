@@ -22,11 +22,12 @@ function trupp(over: Partial<AtemschutzTrupp> = {}): AtemschutzTrupp {
   };
 }
 
-function render(t: AtemschutzTrupp, canWrite = true) {
+function render(t: AtemschutzTrupp, canWrite = true, istAktuell = true) {
   renderWithIntl(
     <TruppCard
       trupp={t}
       canWrite={canWrite}
+      istAktuell={istAktuell}
       onEntsenden={vi.fn()}
       onRueckkehr={vi.fn()}
       onWiederBereit={vi.fn()}
@@ -85,5 +86,30 @@ describe('TruppCard', () => {
     expect(
       screen.getByText('Anna Beispiel · Bernd Beispiel · Clara Beispiel'),
     ).toBeInTheDocument();
+  });
+
+  it('nennt die Feuerwehr vor dem Truppnamen', () => {
+    // „Trupp 1" gibt es am Sammelplatz mehrfach — die Wehr gehört davor.
+    render(trupp({ truppName: 'Trupp 1' }));
+    expect(
+      screen.getByRole('heading', { name: 'Neusiedl am See Trupp 1' }),
+    ).toBeInTheDocument();
+  });
+
+  it('nennt ohne Truppnamen nur die Feuerwehr', () => {
+    render(trupp({ truppName: undefined }));
+    expect(
+      screen.getByRole('heading', { name: 'Neusiedl am See' }),
+    ).toBeInTheDocument();
+  });
+
+  it('bietet an einer älteren Bereitstellung keine Aktion an', () => {
+    // Der gemeldete Fall: Der Trupp ist längst abgemeldet, die ältere Zeile im
+    // Protokoll bot trotzdem weiter „Abmelden" an.
+    render(trupp({ status: 'zurueck' }), true, false);
+    expect(screen.queryByRole('button', { name: 'Abmelden' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Wieder bereitstellen' }),
+    ).toBeNull();
   });
 });

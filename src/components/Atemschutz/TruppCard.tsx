@@ -12,11 +12,19 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
-import { type AtemschutzTrupp } from '../../common/atemschutz';
+import { truppLabel, type AtemschutzTrupp } from '../../common/atemschutz';
 
 export interface TruppCardProps {
   trupp: AtemschutzTrupp;
   canWrite: boolean;
+  /**
+   * Ob dies die jüngste Bereitstellung dieses Trupps ist.
+   *
+   * Nur dort darf der Zustand geändert werden. Eine ältere Zeile im Protokoll
+   * bot sonst weiterhin „Abmelden" an, obwohl der Trupp längst abgemeldet ist
+   * — und ein Klick darauf öffnete eine zweite Wahrheit über denselben Trupp.
+   */
+  istAktuell: boolean;
   onEntsenden: () => void;
   onRueckkehr: () => void;
   onWiederBereit: () => void;
@@ -38,6 +46,7 @@ const STATUS_FARBE: Record<
 export default function TruppCard({
   trupp,
   canWrite,
+  istAktuell,
   onEntsenden,
   onRueckkehr,
   onWiederBereit,
@@ -62,8 +71,8 @@ export default function TruppCard({
           spacing={1}
           sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.5 }}
         >
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            {trupp.truppName || trupp.feuerwehr}
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            {truppLabel(trupp)}
           </Typography>
           <Chip
             size="small"
@@ -95,10 +104,9 @@ export default function TruppCard({
           )}
         </Stack>
 
-        <Typography variant="body2">{trupp.mitglieder.join(' · ')}</Typography>
+        <Typography variant="body1">{trupp.mitglieder.join(' · ')}</Typography>
 
         <Typography variant="body2" color="text.secondary" component="div">
-          {trupp.truppName ? `${trupp.feuerwehr} · ` : ''}
           {trupp.status === 'bereit' &&
             t('trupp.seit', { zeit: uhrzeit(trupp.bereitSeit) })}
           {trupp.status === 'imEinsatz' && (
@@ -136,7 +144,7 @@ export default function TruppCard({
         )}
       </CardContent>
 
-      {canWrite && trupp.status !== 'abgemeldet' && (
+      {canWrite && istAktuell && trupp.status !== 'abgemeldet' && (
         <CardActions>
           {trupp.status === 'bereit' && (
             <>

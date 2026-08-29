@@ -64,11 +64,16 @@ export default function TruppsTab({
     setDialogOpen(true);
   };
 
+  // Nur an der jüngsten Bereitstellung eines Trupps darf der Zustand noch
+  // geändert werden — im Protokoll stehen auch ältere Zeilen desselben Trupps.
+  const aktuellIds = new Set(trupps.aktuell.map((t) => t.id));
+
   const karte = (trupp: AtemschutzTrupp) => (
     <TruppCard
       key={trupp.id}
       trupp={trupp}
       canWrite={canWrite}
+      istAktuell={aktuellIds.has(trupp.id)}
       onEntsenden={() => setZeitDialog({ trupp, modus: 'entsenden' })}
       onRueckkehr={() => setZeitDialog({ trupp, modus: 'rueckkehr' })}
       onWiederBereit={() => void onWiederBereit(trupp)}

@@ -439,8 +439,24 @@ export interface TruppGruppen {
   bereit: AtemschutzTrupp[];
   imEinsatz: AtemschutzTrupp[];
   zurueck: AtemschutzTrupp[];
+  /**
+   * Je Trupp die jüngste Bereitstellung — auch die abgemeldeten. Nur an diesen
+   * Zeilen darf der Zustand noch geändert werden: Eine ältere Zeile im
+   * Protokoll ist Nachweis und kein Trupp, der noch irgendwo steht.
+   */
+  aktuell: AtemschutzTrupp[];
   /** Alle Zeilen, neueste Bereitstellung zuerst. */
   protokoll: AtemschutzTrupp[];
+}
+
+/**
+ * Wie ein Trupp genannt wird: Feuerwehr zuerst, dann sein Name.
+ *
+ * Am Sammelplatz stehen Trupps mehrerer Wehren, und „Trupp 1" gibt es dann
+ * mehrfach. Die Wehr steht deshalb vorn und nicht klein darunter.
+ */
+export function truppLabel(trupp: AtemschutzTrupp): string {
+  return [trupp.feuerwehr, trupp.truppName].filter(Boolean).join(' ').trim();
 }
 
 /**
@@ -480,6 +496,7 @@ export function gruppiereTrupps(trupps: AtemschutzTrupp[]): TruppGruppen {
     bereit: aktuell.filter((t) => t.status === 'bereit'),
     imEinsatz: aktuell.filter((t) => t.status === 'imEinsatz'),
     zurueck: aktuell.filter((t) => t.status === 'zurueck'),
+    aktuell,
     protokoll,
   };
 }

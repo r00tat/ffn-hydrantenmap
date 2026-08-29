@@ -15,6 +15,7 @@ import {
   newTruppKey,
   nextBereitstellung,
   sanitizeMitglieder,
+  truppLabel,
   type AtemschutzGeraet,
   type AtemschutzTrupp,
   type FuellungInput,
@@ -91,7 +92,8 @@ export default function AtemschutzPage() {
   const empfaengerVorschlaege = useMemo(() => {
     const namen = new Set<string>();
     for (const t of trupps.protokoll) {
-      if (t.truppName?.trim()) namen.add(t.truppName.trim());
+      const label = truppLabel(t);
+      if (label) namen.add(label);
       if (t.feuerwehr?.trim()) namen.add(t.feuerwehr.trim());
     }
     for (const fw of feuerwehren) namen.add(fw);

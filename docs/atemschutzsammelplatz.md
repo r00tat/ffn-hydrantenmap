@@ -136,6 +136,20 @@ stammen:
   zu unterscheiden. Welche Flasche gewählt ist, steht als `geraetDetails` unter
   dem Feld.
 
+## Die Listen sehen gleich aus
+
+Füllprotokoll und Ausrüstung rendern ihre Zeilen über dasselbe Bauteil
+(`AtemschutzZeile`), weil sie zuvor auseinanderliefen: Die eine begann die
+zweite Zeile mit der Bezeichnung, die andere mit der Wehr. Der Aufbau ist
+dreiteilig — Kennung als Überschrift mit den Chips daneben, darunter die
+**Wehr zuerst**, darunter Namen, Zeiten und Bemerkungen.
+
+Die Wehr steht vorn, weil am Sammelplatz Stücke mehrerer Feuerwehren
+durcheinander liegen und beim Durchsehen genau danach gesucht wird. Die Größen
+liegen bewusst eine Stufe über dem, was MUI in einer `dense`-Liste vorgibt —
+gelesen wird das im Stehen, mit Handschuhen, bei Tageslicht. `dense` ist
+deshalb an beiden Listen weg.
+
 ## Ein Trupp steht nur einmal auf der Tafel
 
 `gruppiereTrupps` zeigt in den drei Abschnitten oben je Trupp **nur die jüngste
@@ -146,6 +160,15 @@ unter „Zurück & Regeneration", und wer auf die Tafel schaut, zählt einen Tru
 zu viel. Entschieden wird über `laufendeNummer`, nicht über die Sortierung —
 zwei Bereitstellungen können in derselben Sekunde entstehen. Die alte Zeile
 bleibt im Protokoll, wo sie als Nachweis hingehört.
+
+Aus demselben Grund trägt `TruppCard` ein `istAktuell`: Nur an der jüngsten
+Bereitstellung darf der Zustand geändert werden. Eine ältere Zeile im Protokoll
+bot sonst weiterhin „Abmelden" an, obwohl der Trupp längst abgemeldet ist — ein
+Klick darauf öffnete eine zweite Wahrheit über denselben Trupp.
+
+Genannt wird ein Trupp über `truppLabel`: **Feuerwehr zuerst**, dann sein Name
+(„Neusiedl am See Trupp 1"). „Trupp 1" allein gibt es am Sammelplatz mehrfach,
+sobald mehr als eine Wehr da ist.
 
 ## Externer Handscanner
 

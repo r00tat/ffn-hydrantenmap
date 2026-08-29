@@ -11,7 +11,6 @@ import Fab from '@mui/material/Fab';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
@@ -22,6 +21,7 @@ import {
   type FuellungInput,
 } from '../../common/atemschutz';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import AtemschutzZeile from './AtemschutzZeile';
 import FuellungDialog from './FuellungDialog';
 
 export interface FuellprotokollTabProps {
@@ -126,7 +126,7 @@ export default function FuellprotokollTab({
       {fuellungen.length === 0 ? (
         <Typography color="text.secondary">{t('fuellung.empty')}</Typography>
       ) : (
-        <List dense>
+        <List>
           {fuellungen.map((f) => (
             <ListItem
               key={f.id}
@@ -154,13 +154,10 @@ export default function FuellprotokollTab({
                 ) : undefined
               }
             >
-              <ListItemText
-                primary={
-                  <Box
-                    component="span"
-                    sx={{ display: 'flex', gap: 1, alignItems: 'center' }}
-                  >
-                    {titel(f)}
+              <AtemschutzZeile
+                titel={titel(f)}
+                chips={
+                  <>
                     <Chip size="small" label={druck(f)} />
                     {f.anzahl > 1 && f.flaschenNummer && (
                       <Chip size="small" label={`×${f.anzahl}`} />
@@ -172,20 +169,17 @@ export default function FuellprotokollTab({
                         label={t('sichtkontrolle.mangel')}
                       />
                     )}
-                  </Box>
+                  </>
                 }
-                secondary={[
-                  bezeichnung(f),
-                  f.feuerwehr,
+                info={[f.feuerwehr, bezeichnung(f)]}
+                details={[
                   f.gefuelltVon,
                   format.dateTime(new Date(f.zeitpunkt), {
                     hour: '2-digit',
                     minute: '2-digit',
                   }),
                   f.bemerkung,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+                ]}
               />
             </ListItem>
           ))}

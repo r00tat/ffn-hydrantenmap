@@ -10,7 +10,6 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
@@ -32,6 +31,7 @@ import AusgabeDialog, {
   type AusgabeModus,
   type AusgabePatch,
 } from './AusgabeDialog';
+import AtemschutzZeile from './AtemschutzZeile';
 import AusruestungMangelDialog from './AusruestungMangelDialog';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 
@@ -169,7 +169,7 @@ export default function AusruestungTab({
       ) : gefiltert.length === 0 ? (
         <Typography color="text.secondary">{t('ausruestung.noMatch')}</Typography>
       ) : (
-        <List dense>
+        <List>
           {gefiltert.map((g) => {
             const ausgabe = ausgabeByGeraet.get(g.id as string);
             const status = ausgabe?.status ?? 'amPlatz';
@@ -218,13 +218,10 @@ export default function AusruestungTab({
                   ) : undefined
                 }
               >
-                <ListItemText
-                  primary={
-                    <Box
-                      component="span"
-                      sx={{ display: 'flex', gap: 1, alignItems: 'center' }}
-                    >
-                      {geraetLabel(g)}
+                <AtemschutzZeile
+                  titel={geraetLabel(g)}
+                  chips={
+                    <>
                       <Chip
                         size="small"
                         color={status === 'ausgegeben' ? 'warning' : 'default'}
@@ -237,19 +234,16 @@ export default function AusruestungTab({
                           label={t('ausruestung.mangelOffen', { count: offene })}
                         />
                       )}
-                    </Box>
+                    </>
                   }
-                  secondary={[
-                    g.feuerwehr,
+                  info={[g.feuerwehr]}
+                  details={[
                     ausgabe?.ausgegebenAn,
                     ausgabe?.ausgabeZeit && uhrzeit(ausgabe.ausgabeZeit),
                     ausgabe?.ruecknahmeZeit &&
                       `→ ${uhrzeit(ausgabe.ruecknahmeZeit)}`,
                     ausgabe?.bemerkung,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                  slotProps={{ secondary: { component: 'div' } }}
+                  ]}
                 />
               </ListItem>
             );
