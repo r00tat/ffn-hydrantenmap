@@ -91,6 +91,11 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     ? (session.user.fahrtenbuchGeraetemeister ??
       loginStatus.fahrtenbuchGeraetemeister)
     : loginStatus.fahrtenbuchGeraetemeister;
+  // Wie der Gerätemeister: Die Rolle steht nur in der Session, nicht in den
+  // Token-Claims — der Firestore-Fallback unten kennt sie deshalb nicht.
+  const derivedGroupAdmin = hasSessionAuth
+    ? (session.user.groupAdmin ?? loginStatus.groupAdmin)
+    : loginStatus.groupAdmin;
 
   const serverLogin = useCallback(async () => {
     const token = await auth.currentUser?.getIdToken();
@@ -400,6 +405,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     firecall: derivedFirecall,
     firecallWrite: derivedFirecallWrite,
     fahrtenbuchGeraetemeister: derivedGeraetemeister,
+    groupAdmin: derivedGroupAdmin,
     myGroups,
     refresh,
     signOut: fbSignOut,

@@ -3,11 +3,10 @@ import 'server-only';
 
 import { FieldValue } from 'firebase-admin/firestore';
 import { listUsers } from '../../app/api/users/listUsers';
-import { actionAdminRequired } from '../../app/auth';
+import { actionGroupAdminRequired } from '../../app/auth';
 import { userSessionCache } from '../../server/auth/userSessionCache';
 import { firestore } from '../../server/firebase/admin';
 import { USER_COLLECTION_ID } from '../firebase/firestore';
-import { assertFahrtenbuchGroup } from './authGuards';
 
 /** Ein wählbarer Benutzer für das Gerätemeister-Formular. */
 export interface GeraetemeisterCandidate {
@@ -36,14 +35,15 @@ export interface GeraetemeisterSaveResult {
  * Die Rolle steht am Benutzerdokument, es gibt also keine Liste je Gruppe, die
  * man direkt lesen könnte — sie entsteht aus `listUsers()`. Das ist vertretbar:
  * Die Benutzerliste wird für die Auswahl ohnehin gebraucht, und das Formular
- * ist admin-only.
+ * steht nur Admins und Gruppen-Admins der Gruppe offen. Gefiltert wird
+ * anschließend auf Mitglieder der Gruppe — ein Gruppen-Admin sieht damit
+ * ausschließlich Kandidaten seiner eigenen Gruppe.
  */
 export async function getFahrtenbuchGeraetemeisterOptions(
   groupId: string,
 ): Promise<GeraetemeisterOptionsResult> {
   try {
-    await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    await actionGroupAdminRequired(groupId);
 
     const users = await listUsers();
     const members = users.filter((user) => user.groups?.includes(groupId));
@@ -76,6 +76,10 @@ export async function getFahrtenbuchGeraetemeisterOptions(
  * Setzt die Gerätemeister der Gruppe. Eine leere Liste entfernt alle — es gibt
  * bewusst kein zusätzliches Abschalt-Flag.
  *
+ * Ein Gruppen-Admin darf die Gerätemeister seiner Gruppe eintragen; nur die
+ * Gruppen-Admin-Rolle selbst bleibt dem globalen Admin vorbehalten, sonst
+ * vermehrte sie sich ohne dessen Zutun.
+ *
  * Geschrieben wird mit `arrayUnion`/`arrayRemove` statt die Liste am
  * Benutzerdokument neu zu setzen: Zwei Admins, die gleichzeitig zwei
  * *verschiedene* Gruppen pflegen, fassen dasselbe Benutzerdokument an und
@@ -86,8 +90,7 @@ export async function saveFahrtenbuchGeraetemeister(
   uids: string[],
 ): Promise<GeraetemeisterSaveResult> {
   try {
-    await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    await actionGroupAdminRequired(groupId);
 
     const users = await listUsers();
     const memberIds = new Set(

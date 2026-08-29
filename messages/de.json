@@ -515,6 +515,7 @@
       "counterEndBeforeStart": "{counter}: Endstand liegt unter dem Startstand.",
       "notAllowed": "Nur der Ersteller, ein Gerätemeister oder ein Admin darf diesen Eintrag ändern.",
       "notInGroup": "Du bist kein Mitglied dieser Gruppe.",
+      "notGroupAdmin": "Du darfst diese Gruppe nicht verwalten.",
       "notLoggedIn": "Nicht angemeldet oder Freigabe entzogen. Bitte neu anmelden.",
       "entryDeleted": "Dieser Eintrag wurde gelöscht und kann nicht bearbeitet werden.",
       "tooManyEntries": "Zu viele Fahrten auf einmal. Bitte in kleineren Schritten speichern.",
@@ -2047,7 +2048,9 @@
       "description": "Beschreibung"
     },
     "fahrtenbuchLinkHint": "Der Fahrtenbuch-Link samt QR-Codes wird in der Fahrtenbuch-Verwaltung gepflegt.",
-    "fahrtenbuchLinkAction": "Zur Fahrtenbuch-Verwaltung"
+    "fahrtenbuchLinkAction": "Zur Fahrtenbuch-Verwaltung",
+    "groupAdmins": "Gruppen-Admins",
+    "groupAdminsHint": "Gruppen-Admins übernehmen alle administrativen Aufgaben innerhalb dieser Gruppe — Fahrtenbuch-Verwaltung samt Gerätemeistern, Gruppeneinstellungen und das Löschen von Einsätzen der Gruppe. Wählbar sind nur Mitglieder der Gruppe."
   },
   "tokens": {
     "title": "API Token",

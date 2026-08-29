@@ -8,9 +8,9 @@ import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import { hasAnyFahrtenbuchManagerRole } from '../managerPermissions';
 
 /**
- * Wie `AdminGuard`, aber lässt auch Gerätemeister durch. Eigene Komponente und
- * keine Erweiterung von `AdminGuard`: Der schützt ein Dutzend anderer Seiten,
- * für die die Fahrtenbuch-Rolle nichts bedeutet.
+ * Wie `AdminGuard`, aber lässt auch Gruppen-Admins und Gerätemeister durch.
+ * Eigene Komponente und keine Erweiterung von `AdminGuard`: Der schützt ein
+ * Dutzend anderer Seiten, für die die Gruppenrollen nichts bedeuten.
  */
 export default function FahrtenbuchAdminGuard({
   children,
@@ -18,12 +18,16 @@ export default function FahrtenbuchAdminGuard({
   children: ReactNode;
 }) {
   const t = useTranslations('fahrtenbuch');
-  const { isAuthorized, isAdmin, fahrtenbuchGeraetemeister } =
+  const { isAuthorized, isAdmin, fahrtenbuchGeraetemeister, groupAdmin } =
     useFirebaseLogin();
 
   if (
     !isAuthorized ||
-    !hasAnyFahrtenbuchManagerRole({ isAdmin, fahrtenbuchGeraetemeister })
+    !hasAnyFahrtenbuchManagerRole({
+      isAdmin,
+      fahrtenbuchGeraetemeister,
+      groupAdmin,
+    })
   ) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>

@@ -2,7 +2,7 @@
 import 'server-only';
 
 import { FieldValue } from 'firebase-admin/firestore';
-import { actionAdminRequired } from '../../app/auth';
+import { actionGroupAdminRequired } from '../../app/auth';
 import {
   FAHRTENBUCH_COLLECTION_ID,
   type FahrtenbuchEntry,
@@ -20,7 +20,7 @@ import {
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import { actionErrorKey } from './actionErrorKey';
-import { actionGroupMemberRequired, assertFahrtenbuchGroup } from './authGuards';
+import { actionGroupMemberRequired } from './authGuards';
 import { deleteMangelImages, signMangelImages } from './mangelImageStore';
 import {
   entriesRef,
@@ -334,8 +334,7 @@ export async function migrateDefectsToMangel(
   groupId: string,
 ): Promise<MigrateDefectsResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionGroupAdminRequired(groupId);
     const actor = actorFrom(session);
 
     const [entrySnapshot, mangelSnapshot] = await Promise.all([

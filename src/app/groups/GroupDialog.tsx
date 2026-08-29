@@ -12,6 +12,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import FormControl from '@mui/material/FormControl';
+import FormHelperText from '@mui/material/FormHelperText';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import InputLabel from '@mui/material/InputLabel';
@@ -39,7 +40,11 @@ import {
 import { Group } from './groupTypes';
 
 export interface GroupDialoggOptions {
-  onClose: (item?: Group, assigendUsers?: string[]) => void;
+  onClose: (
+    item?: Group,
+    assigendUsers?: string[],
+    groupAdmins?: string[]
+  ) => void;
   group: Group;
   users: UserRecordExtended[];
 }
@@ -119,6 +124,21 @@ export default function GroupDialogg({
   );
   const [assigendUsers, setAssigendUsers] = useState<string[]>(initialUsers);
 
+  const initialAdmins = useMemo(
+    () =>
+      users
+        .filter((user) => group.id && user.groupAdmin?.includes(group.id))
+        .map((user) => user.uid),
+    [group.id, users]
+  );
+  const [groupAdmins, setGroupAdmins] = useState<string[]>(initialAdmins);
+  // Nur Mitglieder können Gruppen-Admin sein. Wer im Dialog aus der
+  // Mitgliederliste genommen wird, fällt damit auch hier heraus, ohne dass
+  // man den Haken zusätzlich entfernen müsste.
+  const selectedAdmins = groupAdmins.filter((uid) =>
+    assigendUsers.includes(uid)
+  );
+
   const onChange =
     (field: string) =>
     (event: React.ChangeEvent<HTMLInputElement> | SelectChangeEvent) => {
@@ -160,7 +180,7 @@ export default function GroupDialogg({
       setSaving(false);
     }
     setOpen(false);
-    onClose(group, assigendUsers);
+    onClose(group, assigendUsers, selectedAdmins);
   };
 
   return (
@@ -219,6 +239,47 @@ export default function GroupDialogg({
               </MenuItem>
             ))}
           </Select>
+        </FormControl>
+
+        <FormControl fullWidth variant="standard" sx={{ mt: 2 }}>
+          <InputLabel id="group-admins-label">
+            {tGroups('groupAdmins')}
+          </InputLabel>
+          <Select
+            labelId="group-admins-label"
+            id="group-admins"
+            multiple={true}
+            value={selectedAdmins}
+            input={<OutlinedInput label={tGroups('groupAdmins')} />}
+            MenuProps={MenuProps}
+            renderValue={(selected) =>
+              selected
+                .map((key) => userMap[key])
+                .filter((v) => v)
+                .map((user) => `${user.displayName || user.email}`)
+                .join(', ')
+            }
+            onChange={(event) => {
+              const {
+                target: { value },
+              } = event;
+              setGroupAdmins(
+                typeof value === 'string' ? value.split(',') : value
+              );
+            }}
+          >
+            {users
+              .filter((user) => assigendUsers.includes(user.uid))
+              .map((user) => (
+                <MenuItem key={`group-admin-${user.uid}`} value={user.uid}>
+                  <Checkbox checked={selectedAdmins.indexOf(user.uid) > -1} />
+                  <ListItemText
+                    primary={`${user.displayName || ''} (${user.email})`}
+                  />
+                </MenuItem>
+              ))}
+          </Select>
+          <FormHelperText>{tGroups('groupAdminsHint')}</FormHelperText>
         </FormControl>
 
         {groupId && (

@@ -22,6 +22,7 @@ export interface McpUser {
   isAdmin: boolean;
   groups: string[];
   fahrtenbuchGeraetemeister: string[];
+  groupAdmin: string[];
 }
 
 export class McpUserAccessError extends Error {
@@ -54,5 +55,6 @@ export async function loadMcpUser(uid: string): Promise<McpUser> {
     isAdmin: !!data.isAdmin,
     groups: uniqueArray(['allUsers', ...(data.groups || [])]),
     fahrtenbuchGeraetemeister: data.fahrtenbuchGeraetemeister ?? [],
+    groupAdmin: data.groupAdmin ?? [],
   };
 }

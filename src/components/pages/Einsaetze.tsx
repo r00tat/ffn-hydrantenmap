@@ -36,6 +36,7 @@ import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
+import { isGroupAdmin } from '../../common/groupPermissions';
 import FirecallExport from '../firebase/FirecallExport';
 import LagekarteExport from '../firebase/LagekarteExport';
 import FirecallImport from '../firebase/FirecallImport';
@@ -83,7 +84,7 @@ function EinsatzCard({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [kostenersatzOpen, setKostenersatzOpen] = useState(false);
   const updateFirecall = useFirecallUpdate();
-  const { isAdmin } = useFirebaseLogin();
+  const { isAdmin, groups, groupAdmin } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
   const router = useRouter();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -178,7 +179,13 @@ function EinsatzCard({
               <EditIcon />
             </IconButton>
           </Tooltip>
-          {isAdmin && (
+          {/* Löschen darf, wer die Gruppe des Einsatzes administriert —
+              globaler Admin oder Gruppen-Admin. */}
+          {isGroupAdmin(einsatz.group ?? '', {
+            isAdmin,
+            groups,
+            groupAdmin,
+          }) && (
             <Tooltip title={t('common.delete')}>
               <IconButton
                 size="small"

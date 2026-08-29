@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const {
-  actionAdminRequiredMock,
+  actionGroupAdminRequiredMock,
   listUsersMock,
   batchSetMock,
   batchCommitMock,
@@ -11,7 +11,7 @@ const {
   collectionMock,
   invalidateMock,
 } = vi.hoisted(() => ({
-  actionAdminRequiredMock: vi.fn(),
+  actionGroupAdminRequiredMock: vi.fn(),
   listUsersMock: vi.fn(),
   batchSetMock: vi.fn(),
   batchCommitMock: vi.fn(),
@@ -20,9 +20,19 @@ const {
   invalidateMock: vi.fn(),
 }));
 
-vi.mock('../../app/auth', () => ({
-  actionAdminRequired: () => actionAdminRequiredMock(),
-}));
+// Der Guard ist gemockt, seine Mandanten-Sperre bleibt aber echt: Die Tests
+// unten prüfen weiterhin, dass eine Pseudo-Gruppe abgelehnt wird.
+vi.mock('../../app/auth', async () => {
+  const { assertTenantGroup } = await vi.importActual<
+    typeof import('../../app/groups/groupTypes')
+  >('../../app/groups/groupTypes');
+  return {
+    actionGroupAdminRequired: (groupId: string) => {
+      assertTenantGroup(groupId);
+      return actionGroupAdminRequiredMock(groupId);
+    },
+  };
+});
 vi.mock('../../app/api/users/listUsers', () => ({
   listUsers: () => listUsersMock(),
 }));
@@ -71,7 +81,7 @@ const USERS = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  actionAdminRequiredMock.mockResolvedValue({
+  actionGroupAdminRequiredMock.mockResolvedValue({
     user: { id: 'admin1', isAdmin: true },
   });
   listUsersMock.mockResolvedValue(USERS);
@@ -95,8 +105,8 @@ describe('getFahrtenbuchGeraetemeisterOptions', () => {
     expect(result.success).toBe(false);
   });
 
-  it('gibt einen Fehler zurück, statt zu werfen, wenn der Admin-Guard scheitert', async () => {
-    actionAdminRequiredMock.mockRejectedValueOnce(new Error('kein Admin'));
+  it('gibt einen Fehler zurück, statt zu werfen, wenn der Gruppen-Admin-Guard scheitert', async () => {
+    actionGroupAdminRequiredMock.mockRejectedValueOnce(new Error('kein Gruppen-Admin'));
 
     const result = await getFahrtenbuchGeraetemeisterOptions('ffnd');
 
@@ -104,7 +114,7 @@ describe('getFahrtenbuchGeraetemeisterOptions', () => {
       success: false,
       members: [],
       selected: [],
-      error: 'kein Admin',
+      error: 'kein Gruppen-Admin',
     });
   });
 });

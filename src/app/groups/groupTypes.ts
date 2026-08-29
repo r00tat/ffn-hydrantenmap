@@ -1,4 +1,5 @@
 import type { GeoPositionObject } from '../../common/geo';
+import { ApiException } from '../api/errors';
 
 export interface Group {
   id?: string;
@@ -31,6 +32,33 @@ export const ALL_USERS_GROUP_ID = 'allUsers';
  * recognised as belonging to the same category.
  */
 export const NON_TENANT_GROUP_IDS: string[] = [ALL_USERS_GROUP_ID, 'kostenersatz'];
+
+/**
+ * Prüft, ob die Gruppen-ID ein echter Mandant ist — die Sperre für jeden
+ * gruppenbezogenen Guard.
+ *
+ * Abgelehnt wird jede ID aus `NON_TENANT_GROUP_IDS`:
+ * - `allUsers` steht in den Claims jedes Benutzers und in denen von
+ *   Einsatz-Gasttokens (die nur für einen einzigen Einsatz gelten). Ein
+ *   „Admin von allUsers" wäre Admin für jeden, ein Fahrtenbuch darunter für
+ *   jeden Empfänger eines Gastlinks lesbar.
+ * - `kostenersatz` ist eine Berechtigungsgruppe („Zugang zur
+ *   Kostenersatz-Funktion") und keine Feuerwehr.
+ *
+ * Steht in diesem reinen Datenmodul und nicht bei den Guards, damit sowohl
+ * `actionGroupAdminRequired` (src/app/auth.ts) als auch
+ * `assertFahrtenbuchGroup` (Fahrtenbuch) dieselbe Regel benutzen, ohne dass
+ * eines der beiden das andere importieren muss. Dieselbe Sperre steht in
+ * `fahrtenbuchMember()` in den Firestore-Regeln.
+ */
+export function assertTenantGroup(groupId: string) {
+  if (!groupId) {
+    throw new ApiException('groupId missing', { status: 400 });
+  }
+  if (NON_TENANT_GROUP_IDS.includes(groupId)) {
+    throw new ApiException(`${groupId} is not a valid group`, { status: 400 });
+  }
+}
 
 /**
  * Known groups with predefined IDs

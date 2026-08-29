@@ -14,6 +14,7 @@ const user = {
   isAdmin: false,
   groups: ['allUsers', 'ffnd'],
   fahrtenbuchGeraetemeister: [],
+  groupAdmin: [],
 };
 
 function auth(scopes: McpScope[]): McpAuthContext {

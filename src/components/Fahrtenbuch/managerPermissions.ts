@@ -6,10 +6,14 @@
  * über `entryLogic` das gesamte Eintrags-Validierungsmodul in sein Bundle.
  */
 
+import {
+  hasAnyGroupAdminRole,
+  isGroupAdmin,
+  type GroupRoleUser,
+} from '../../common/groupPermissions';
+
 /** Die Felder der Session, an denen die Entscheidung hängt. */
-export interface FahrtenbuchManagerUser {
-  isAdmin?: boolean;
-  groups?: string[];
+export interface FahrtenbuchManagerUser extends GroupRoleUser {
   fahrtenbuchGeraetemeister?: string[];
 }
 
@@ -17,15 +21,19 @@ export interface FahrtenbuchManagerUser {
  * Darf der Benutzer das Fahrtenbuch dieser Gruppe verwalten — also jeden
  * Eintrag korrigieren und Fahrzeuge und Personen pflegen?
  *
+ * Der Gruppen-Admin schließt den Gerätemeister ein: Er darf alles, was
+ * gruppenbezogen administrativ ist, und das Fahrtenbuch gehört dazu.
+ *
  * Die Asymmetrie ist Absicht: Der Gerätemeister braucht die Mitgliedschaft,
  * der Admin nicht. Verlangte man sie auch vom Admin, nähme man ihm ein Recht,
  * das er heute unter `actionAdminRequired()` in den Stammdaten-Actions hat.
+ * Für den Gruppen-Admin steckt dieselbe Regel in `isGroupAdmin`.
  */
 export function isFahrtenbuchManager(
   groupId: string,
   user: FahrtenbuchManagerUser,
 ): boolean {
-  if (user.isAdmin) return true;
+  if (isGroupAdmin(groupId, user)) return true;
   return (
     !!user.groups?.includes(groupId) &&
     !!user.fahrtenbuchGeraetemeister?.includes(groupId)
@@ -33,12 +41,15 @@ export function isFahrtenbuchManager(
 }
 
 /**
- * Ist der Benutzer irgendwo Gerätemeister? Für die Stellen, die nur wissen
- * müssen, *ob* die Verwaltungsseite erreichbar sein soll, nicht für welche
- * Gruppe — Drawer-Eintrag und Seitenschutz.
+ * Ist der Benutzer irgendwo Gerätemeister oder Gruppen-Admin? Für die Stellen,
+ * die nur wissen müssen, *ob* die Verwaltungsseite erreichbar sein soll, nicht
+ * für welche Gruppe — Drawer-Eintrag und Seitenschutz.
  */
 export function hasAnyFahrtenbuchManagerRole(
   user: FahrtenbuchManagerUser,
 ): boolean {
-  return !!user.isAdmin || (user.fahrtenbuchGeraetemeister?.length ?? 0) > 0;
+  return (
+    hasAnyGroupAdminRole(user) ||
+    (user.fahrtenbuchGeraetemeister?.length ?? 0) > 0
+  );
 }
