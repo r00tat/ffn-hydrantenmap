@@ -2,16 +2,16 @@
  * Atemschutzsammelplatz — Typen und Entscheidungslogik.
  *
  * Alles hier ist rein und ohne Firestore: dieselbe Bauweise wie
- * `common/fahrtenbuch.ts`. Die Stammdaten liegen je Gruppe, die Protokolle je
- * Einsatz — beide Seiten brauchen dieselben Typen, und der Client soll für
- * eine Codesuche keinen Serverpfad ziehen müssen.
+ * `common/fahrtenbuch.ts`. Stammdaten und Füllprotokoll liegen je Gruppe,
+ * Trupps und Ausgaben je Einsatz — beide Seiten brauchen dieselben Typen, und
+ * der Client soll für eine Codesuche keinen Serverpfad ziehen müssen.
  */
 
-/** Subcollection unter `groups/{groupId}` — wie `vehicle` und `person`. */
+/** Subcollections unter `groups/{groupId}` — wie `vehicle` und `person`. */
 export const ATEMSCHUTZ_GERAET_COLLECTION_ID = 'atemschutzGeraet';
+export const ATEMSCHUTZ_FUELLUNG_COLLECTION_ID = 'atemschutzFuellung';
 
 /** Subcollections unter `call/{firecallId}`. */
-export const ATEMSCHUTZ_FUELLUNG_COLLECTION_ID = 'atemschutzFuellung';
 export const ATEMSCHUTZ_TRUPP_COLLECTION_ID = 'atemschutzTrupp';
 export const ATEMSCHUTZ_AUSGABE_COLLECTION_ID = 'atemschutzAusgabe';
 
@@ -31,14 +31,21 @@ export type AtemschutzGeraetTyp =
   | 'flasche'
   | 'maske'
   | 'pressluftatmer'
-  | 'zubehoer';
+  | 'zubehoer'
+  | 'fuellstation';
 
 export const ATEMSCHUTZ_GERAET_TYPEN: AtemschutzGeraetTyp[] = [
   'flasche',
   'maske',
   'pressluftatmer',
   'zubehoer',
+  'fuellstation',
 ];
+
+/** Wo eine Füllstation steht. `mobil` heißt: auf einem Fahrzeug verladen. */
+export type FuellstationStandort = 'fix' | 'mobil';
+
+export const FUELLSTATION_STANDORTE: FuellstationStandort[] = ['fix', 'mobil'];
 
 export type Sichtkontrolle = 'offen' | 'ok' | 'mangel';
 
@@ -82,6 +89,12 @@ export interface AtemschutzGeraet {
   baujahr?: number;
   active: boolean;
   bemerkung?: string;
+  /** Nur bei `typ === 'fuellstation'`. */
+  standort?: FuellstationStandort;
+  /** Nur bei `standort === 'mobil'` — der Atemschutzanhänger. */
+  vehicleId?: string;
+  /** Kopie, damit die Anzeige ohne Join auskommt. */
+  vehicleName?: string;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -105,6 +118,23 @@ export interface AtemschutzFuellung {
    *  einen Mangel ergab und er gleich hier erfasst wurde. */
   mangelId?: string;
   bemerkung?: string;
+  /**
+   * Einsatzbezug. `''` heißt: an der Station gefüllt, ohne Einsatz.
+   *
+   * Immer gesetzt, leer statt fehlend: Firestore kann nicht auf „Feld fehlt"
+   * abfragen, und *Ohne Einsatz* soll ein gewöhnlicher Filter sein.
+   */
+  firecallId: string;
+  /** Kopie des Einsatznamens — die Zeile soll ohne Join lesbar bleiben. */
+  firecallName?: string;
+  fuellstationId?: string;
+  /** Kopie, aus demselben Grund. */
+  fuellstationName?: string;
+  /**
+   * Ist diese Füllung der Feuerwehr zu verrechnen? Immer gesetzt, damit
+   * `where('verrechnen','==',true)` nichts übersieht.
+   */
+  verrechnen: boolean;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -306,6 +336,11 @@ export interface FuellungInput {
   bemerkung?: string;
   /** Ohne Angabe setzt der Aufrufer die aktuelle Zeit. */
   zeitpunkt?: string;
+  fuellstationId?: string;
+  fuellstationName?: string;
+  /** Pflichtfeld ohne Vorgabe im Typ: Der Dialog leitet den Wert aus
+   *  `verrechnenVorgabe` ab und schickt ihn immer mit. */
+  verrechnen: boolean;
 }
 
 /**
@@ -347,6 +382,59 @@ export function validateFuellungInput(input: FuellungInput): string[] {
 /** Wie viele Flaschen die Liste insgesamt ausweist — `anzahl` je Zeile. */
 export function fuellungenGesamt(fuellungen: AtemschutzFuellung[]): number {
   return fuellungen.reduce((sum, f) => sum + (f.anzahl || 1), 0);
+}
+
+export interface FuellstationAuswahl {
+  /** `keine` = das Feld entfällt im Dialog. */
+  modus: 'keine' | 'fest' | 'auswahl';
+  station?: AtemschutzGeraet;
+  optionen: AtemschutzGeraet[];
+}
+
+/**
+ * Welche Füllstation der Dialog anbietet.
+ *
+ * Der Fall „keine" ist der wichtigste: Solange niemand einen Kompressor
+ * angelegt hat — der Zustand jeder Feuerwehr am Tag der Auslieferung — darf
+ * das Füllprotokoll nicht an einem leeren Pflichtfeld hängen.
+ */
+export function waehleFuellstation(
+  stationen: AtemschutzGeraet[],
+  letzteWahlId?: string,
+): FuellstationAuswahl {
+  const optionen = stationen.filter((s) => s.active !== false);
+  if (optionen.length === 0) return { modus: 'keine', optionen: [] };
+  if (optionen.length === 1) {
+    return { modus: 'fest', station: optionen[0], optionen };
+  }
+  const letzte = letzteWahlId
+    ? optionen.find((s) => s.id === letzteWahlId)
+    : undefined;
+  return { modus: 'auswahl', station: letzte ?? optionen[0], optionen };
+}
+
+/**
+ * Vorbelegung des Verrechnen-Schalters beim *Anlegen* einer Füllung.
+ *
+ * Im Einsatz immer aus: Dort ist das Nachbarschaftshilfe, keine
+ * Dienstleistung. An der Station wird verrechnet, was für eine andere
+ * Feuerwehr gefüllt wurde.
+ *
+ * Der Vergleich läuft über `normalizeCode` — dieselbe Vereinheitlichung wie
+ * bei den Gerätekennungen. „Neusiedl am See" und „neusiedl-am-see" sind
+ * dieselbe Feuerwehr; sie unterschiedlich zu behandeln wäre für den Benutzer
+ * nicht nachvollziehbar.
+ */
+export function verrechnenVorgabe(args: {
+  feuerwehr?: string;
+  firecallId: string;
+  eigeneFeuerwehr?: string;
+}): boolean {
+  if (args.firecallId) return false;
+  const fremd = args.feuerwehr?.trim();
+  const eigen = args.eigeneFeuerwehr?.trim();
+  if (!fremd || !eigen) return false;
+  return normalizeCode(fremd) !== normalizeCode(eigen);
 }
 
 /**

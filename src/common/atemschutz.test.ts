@@ -20,6 +20,8 @@ import {
   sanitizePersonen,
   validateFuellungInput,
   validateTruppInput,
+  verrechnenVorgabe,
+  waehleFuellstation,
 } from './atemschutz';
 
 function geraet(over: Partial<AtemschutzGeraet> = {}): AtemschutzGeraet {
@@ -202,6 +204,7 @@ describe('validateFuellungInput', () => {
     startdruck: 50,
     enddruck: 300,
     gefuelltVon: 'Max Muster',
+    verrechnen: false,
   };
 
   it('akzeptiert eine vollständige Eingabe', () => {
@@ -596,5 +599,108 @@ describe('sanitizePersonen', () => {
 
   it('lässt ohne Höchstzahl alles stehen', () => {
     expect(sanitizePersonen(['a', 'b', 'c', 'd', 'e'])).toHaveLength(5);
+  });
+});
+
+describe('waehleFuellstation', () => {
+  const station = (id: string, active = true): AtemschutzGeraet => ({
+    id,
+    typ: 'fuellstation',
+    bezeichnung: `Kompressor ${id}`,
+    feuerwehr: 'Neusiedl am See',
+    active,
+    createdAt: '',
+    createdBy: '',
+    updatedAt: '',
+    updatedBy: '',
+  });
+
+  it('meldet "keine" bei leerer Liste', () => {
+    const r = waehleFuellstation([], undefined);
+    expect(r.modus).toBe('keine');
+    expect(r.station).toBeUndefined();
+    expect(r.optionen).toEqual([]);
+  });
+
+  it('ordnet eine einzige Station fest zu', () => {
+    const a = station('a');
+    const r = waehleFuellstation([a], undefined);
+    expect(r.modus).toBe('fest');
+    expect(r.station?.id).toBe('a');
+  });
+
+  it('zählt inaktive Stationen nicht mit', () => {
+    const r = waehleFuellstation([station('a'), station('b', false)], undefined);
+    expect(r.modus).toBe('fest');
+    expect(r.station?.id).toBe('a');
+  });
+
+  it('bietet bei mehreren zur Auswahl und nimmt die letzte Wahl vorweg', () => {
+    const r = waehleFuellstation([station('a'), station('b')], 'b');
+    expect(r.modus).toBe('auswahl');
+    expect(r.station?.id).toBe('b');
+    expect(r.optionen).toHaveLength(2);
+  });
+
+  it('fällt bei unbekannter letzter Wahl auf die erste Station zurück', () => {
+    const r = waehleFuellstation([station('a'), station('b')], 'weg');
+    expect(r.modus).toBe('auswahl');
+    expect(r.station?.id).toBe('a');
+  });
+});
+
+describe('verrechnenVorgabe', () => {
+  const eigene = 'Neusiedl am See';
+
+  it('ist im Einsatz immer aus, auch bei fremder Feuerwehr', () => {
+    expect(
+      verrechnenVorgabe({
+        feuerwehr: 'FF Weiden',
+        firecallId: 'abc',
+        eigeneFeuerwehr: eigene,
+      }),
+    ).toBe(false);
+  });
+
+  it('ist ohne Feuerwehr aus', () => {
+    expect(verrechnenVorgabe({ firecallId: '', eigeneFeuerwehr: eigene })).toBe(
+      false,
+    );
+  });
+
+  it('ist ohne gepflegte eigene Feuerwehr aus', () => {
+    expect(verrechnenVorgabe({ feuerwehr: 'FF Weiden', firecallId: '' })).toBe(
+      false,
+    );
+  });
+
+  it('ist bei der eigenen Feuerwehr aus', () => {
+    expect(
+      verrechnenVorgabe({
+        feuerwehr: eigene,
+        firecallId: '',
+        eigeneFeuerwehr: eigene,
+      }),
+    ).toBe(false);
+  });
+
+  it('ist bei fremder Feuerwehr an der Station an', () => {
+    expect(
+      verrechnenVorgabe({
+        feuerwehr: 'FF Weiden',
+        firecallId: '',
+        eigeneFeuerwehr: eigene,
+      }),
+    ).toBe(true);
+  });
+
+  it('behandelt abweichende Schreibweisen als dieselbe Feuerwehr', () => {
+    expect(
+      verrechnenVorgabe({
+        feuerwehr: 'neusiedl-am-see',
+        firecallId: '',
+        eigeneFeuerwehr: eigene,
+      }),
+    ).toBe(false);
   });
 });
