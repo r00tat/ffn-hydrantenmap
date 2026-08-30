@@ -14,7 +14,7 @@ function fakeWindow(
 ): AuthProxyWindow & { stored: string | null } {
   const win = {
     stored,
-    location: { search, host },
+    location: { search, host, protocol: 'https:' },
     localStorage: {
       getItem: (key: string) =>
         key === AUTH_PROXY_STORAGE_KEY ? win.stored : null,
@@ -94,6 +94,29 @@ describe('resolveAuthDomain', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
     expect(resolveAuthDomain('ffn-utils.firebaseapp.com', undefined)).toBe(
       'ffn-utils.firebaseapp.com',
+    );
+  });
+});
+
+describe('resolveAuthDomain: nur unter https', () => {
+  it('ignoriert den Proxy auf einer http-Origin', () => {
+    // Das Firebase-SDK baut die Handler-URL immer als `https://<authDomain>`.
+    // Auf `http://localhost:3000` zeigte der Proxy damit auf einen Port, an
+    // dem kein TLS lauscht — der Login liefe ins Leere.
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
+    const win = fakeWindow();
+    win.location.protocol = 'http:';
+    expect(resolveAuthDomain('ffn-utils.firebaseapp.com', win)).toBe(
+      'ffn-utils.firebaseapp.com',
+    );
+  });
+
+  it('greift auf einer https-Origin', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
+    const win = fakeWindow();
+    win.location.protocol = 'https:';
+    expect(resolveAuthDomain('ffn-utils.firebaseapp.com', win)).toBe(
+      'einsatz-dev.ffnd.at',
     );
   });
 });

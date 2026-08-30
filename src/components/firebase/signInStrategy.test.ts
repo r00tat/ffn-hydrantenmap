@@ -30,7 +30,7 @@ function win(
     [SIGN_IN_FLOW_STORAGE_KEY]: storedFlow,
   };
   return {
-    location: { search, host: 'einsatz-dev.ffnd.at' },
+    location: { search, host: 'einsatz-dev.ffnd.at', protocol: 'https:' },
     localStorage: {
       getItem: (key: string) => values[key] ?? null,
       setItem: (key: string, value: string) => {

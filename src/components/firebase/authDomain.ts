@@ -31,6 +31,8 @@
  * Damit laesst sich der neue Weg auf einem einzelnen Geraet ausprobieren,
  * ohne fuer alle anderen etwas zu aendern.
  *
+ * **Nur unter https.** Siehe `resolveAuthDomain`.
+ *
  * **Jede Origin, die den Handler ausliefert, muss beim OAuth-Client in der
  * Google Cloud Console als Redirect-URI eingetragen sein**
  * (`https://<origin>/__/auth/handler`). Fehlt sie, antwortet Google mit
@@ -45,7 +47,7 @@ export const AUTH_PROXY_QUERY_PARAM = 'authProxy';
  * Entscheidung ohne DOM testbar.
  */
 export interface AuthProxyWindow {
-  location: { search: string; host: string };
+  location: { search: string; host: string; protocol: string };
   localStorage: Pick<Storage, 'getItem' | 'setItem'>;
 }
 
@@ -112,6 +114,21 @@ export function resolveAuthDomain(
   configured: string | undefined,
   win: AuthProxyWindow | undefined = currentWindow(),
 ): string | undefined {
-  if (win && isAuthProxyEnabled(win)) return win.location.host;
-  return configured;
+  if (!win || !isAuthProxyEnabled(win)) return configured;
+
+  // Das Firebase-SDK baut die Handler-URL immer als `https://<authDomain>/…`
+  // — das Schema der Seite spielt dabei keine Rolle. Auf einer http-Origin
+  // zeigte der Proxy damit auf einen Port, an dem kein TLS lauscht: Das
+  // versteckte `/__/auth/iframe` scheitert, und der Login bleibt haengen,
+  // ohne dass ein Fehler in der Oberflaeche ankommt. `npm run dev` laeuft
+  // ueber http — dort braucht es `npm run dev:https`.
+  if (win.location.protocol !== 'https:') {
+    console.warn(
+      '[authDomain] Proxy uebersprungen: Der erst-party Auth-Handler braucht' +
+        ' eine https-Origin (npm run dev:https).',
+    );
+    return configured;
+  }
+
+  return win.location.host;
 }

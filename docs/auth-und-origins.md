@@ -119,9 +119,15 @@ Auch er wird im `localStorage` gemerkt (`firebaseSignInFlow`);
 erzwungener Redirect auf die fremde Handler-Domain wäre schlechter als das
 Popup, nicht besser.
 
-Für `localhost` gilt der Console-Schritt unten genauso, und zwar mit dem Schema,
-unter dem der Entwicklungsserver läuft: `npm run dev` braucht
-`http://localhost:3000/__/auth/handler`, `npm run dev:https` dagegen
+**Der Proxy braucht https.** Das Firebase-SDK baut die Handler-URL immer als
+`https://<authDomain>/…`, unabhängig vom Schema der Seite. Auf einer
+http-Origin zeigte sie damit auf einen Port, an dem kein TLS lauscht: Das
+versteckte `/__/auth/iframe` scheitert und der Login bleibt hängen, ohne dass
+in der Oberfläche ein Fehler ankommt. `resolveAuthDomain` überspringt den
+Proxy deshalb auf http und schreibt eine Warnung in die Konsole — für die
+lokale Entwicklung also `npm run dev:https` statt `npm run dev`.
+
+Der Console-Schritt unten gilt für `localhost` genauso:
 `https://localhost:3000/__/auth/handler`.
 
 ### Welche Anmeldeoberfläche eigentlich läuft
