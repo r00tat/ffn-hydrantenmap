@@ -26,12 +26,7 @@ export const FUELLUNG_TARIF_IDS: string[] = [TARIF_BIS_6L, TARIF_UEBER_6L];
 
 export type FuellungRechnungStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
 
-export const RECHNUNG_STATUSES: FuellungRechnungStatus[] = [
-  'draft',
-  'sent',
-  'paid',
-  'cancelled',
-];
+export const RECHNUNG_STATUSES: FuellungRechnungStatus[] = ['draft', 'sent', 'paid', 'cancelled'];
 
 export interface AtemschutzEmpfaenger {
   id?: string;
@@ -148,8 +143,7 @@ export interface AtemschutzRechnungConfig {
  */
 export const DEFAULT_RECHNUNG_CONFIG: AtemschutzRechnungConfig = {
   ccEmail: '',
-  subjectTemplate:
-    'Rechnung {{ rechnung.nummer }} — Füllen von Pressluftflaschen',
+  subjectTemplate: 'Rechnung {{ rechnung.nummer }} — Füllen von Pressluftflaschen',
   bodyTemplate: `Sehr geehrte Kameraden,
 
 anbei die Rechnung {{ rechnung.nummer }} über {{ rechnung.flaschen }} Flaschenfüllungen im Zeitraum {{ rechnung.zeitraum }}.
@@ -173,10 +167,7 @@ Mit kameradschaftlichen Grüßen`,
  *
  * Rein, damit PDF und Vorschau dasselbe Datum zeigen.
  */
-export function zahlungszielDatum(
-  rechnungsdatum: string,
-  tage: number,
-): string | undefined {
+export function zahlungszielDatum(rechnungsdatum: string, tage: number): string | undefined {
   if (!rechnungsdatum || !tage || tage <= 0) return undefined;
   const datum = new Date(rechnungsdatum);
   if (Number.isNaN(datum.getTime())) return undefined;
@@ -211,9 +202,7 @@ export function rechnungConfigLuecken(
 }
 
 /** Zu verrechnen und noch keiner Rechnung zugeordnet. */
-export function offeneFuellungen(
-  fuellungen: AtemschutzFuellung[],
-): AtemschutzFuellung[] {
+export function offeneFuellungen(fuellungen: AtemschutzFuellung[]): AtemschutzFuellung[] {
   return fuellungen.filter((f) => f.verrechnen && !f.rechnungId);
 }
 
@@ -268,9 +257,7 @@ export function fuellungenNachFeuerwehr(
     if (fuellung.zeitpunkt > vorhanden.bis) vorhanden.bis = fuellung.zeitpunkt;
   }
 
-  return [...buendel.values()].sort((a, b) =>
-    a.feuerwehr.localeCompare(b.feuerwehr, 'de'),
-  );
+  return [...buendel.values()].sort((a, b) => a.feuerwehr.localeCompare(b.feuerwehr, 'de'));
 }
 
 export interface PositionEingabe {
@@ -311,9 +298,7 @@ export function rechnungPositionen(
   });
 }
 
-export function rechnungSumme(
-  positionen: AtemschutzRechnungPosition[],
-): number {
+export function rechnungSumme(positionen: AtemschutzRechnungPosition[]): number {
   return runde(positionen.reduce((sum, p) => sum + p.summe, 0));
 }
 
@@ -331,14 +316,10 @@ export function empfaengerFuerFeuerwehr(
 ): AtemschutzEmpfaenger | undefined {
   const needle = normalizeCode(feuerwehr ?? '');
   if (!needle) return undefined;
-  return empfaenger.find(
-    (e) => e.active && normalizeCode(e.feuerwehr) === needle,
-  );
+  return empfaenger.find((e) => e.active && normalizeCode(e.feuerwehr) === needle);
 }
 
-export function empfaengerKopie(
-  empfaenger: AtemschutzEmpfaenger,
-): EmpfaengerKopie {
+export function empfaengerKopie(empfaenger: AtemschutzEmpfaenger): EmpfaengerKopie {
   const kopie: EmpfaengerKopie = {
     feuerwehr: empfaenger.feuerwehr,
     name: empfaenger.name,

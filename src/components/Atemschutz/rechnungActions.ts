@@ -82,10 +82,7 @@ function trimmed(value: unknown): string | undefined {
 }
 
 async function loadGroupFeuerwehrName(groupId: string): Promise<string> {
-  const doc = await firestore
-    .collection(GROUP_COLLECTION_ID)
-    .doc(groupId)
-    .get();
+  const doc = await firestore.collection(GROUP_COLLECTION_ID).doc(groupId).get();
   const data = doc.data();
   return trimmed(data?.feuerwehrName) ?? trimmed(data?.name) ?? '';
 }
@@ -148,9 +145,7 @@ export async function createFuellungRechnung(
         }
         eingaben.push({
           fuellung,
-          volumenLiter: fuellung.geraetId
-            ? volumen[fuellung.geraetId]
-            : undefined,
+          volumenLiter: fuellung.geraetId ? volumen[fuellung.geraetId] : undefined,
           tarifId: FUELLUNG_TARIF_IDS.includes(positionen[index].tarifId ?? '')
             ? positionen[index].tarifId
             : undefined,
@@ -219,12 +214,8 @@ interface RechnungKontext {
   feuerwehr: { name: string };
 }
 
-function baueKontext(
-  rechnung: AtemschutzRechnung,
-  feuerwehrName: string,
-): RechnungKontext {
-  const tag = (iso: string) =>
-    iso ? new Date(iso).toLocaleDateString('de-AT') : '';
+function baueKontext(rechnung: AtemschutzRechnung, feuerwehrName: string): RechnungKontext {
+  const tag = (iso: string) => (iso ? new Date(iso).toLocaleDateString('de-AT') : '');
   return {
     rechnung: {
       nummer: rechnung.nummer,
@@ -242,8 +233,7 @@ function baueKontext(
 }
 
 function pdfDateiname(rechnung: AtemschutzRechnung): string {
-  const empfaenger =
-    rechnung.empfaenger.name.replace(/[^a-zA-Z0-9]+/g, '_') || 'Rechnung';
+  const empfaenger = rechnung.empfaenger.name.replace(/[^a-zA-Z0-9]+/g, '_') || 'Rechnung';
   return `${rechnung.nummer}_${empfaenger}.pdf`;
 }
 
@@ -315,10 +305,7 @@ export async function buildFuellungRechnungMail(request: {
         config.subjectTemplate || DEFAULT_RECHNUNG_CONFIG.subjectTemplate,
         kontext,
       ),
-      body: renderTemplate(
-        config.bodyTemplate || DEFAULT_RECHNUNG_CONFIG.bodyTemplate,
-        kontext,
-      ),
+      body: renderTemplate(config.bodyTemplate || DEFAULT_RECHNUNG_CONFIG.bodyTemplate, kontext),
     };
   } catch (err) {
     console.error('buildFuellungRechnungMail failed', err);
@@ -404,12 +391,14 @@ export async function setFuellungRechnungBezahlt(request: {
       return { success: false, error: 'rechnungStatusInvalid' };
     }
     const now = new Date().toISOString();
-    await rechnungRef(groupId).doc(rechnungId).update({
-      status: 'paid',
-      bezahltAm: now,
-      updatedAt: now,
-      updatedBy: session.user.email ?? session.user.name ?? 'unbekannt',
-    });
+    await rechnungRef(groupId)
+      .doc(rechnungId)
+      .update({
+        status: 'paid',
+        bezahltAm: now,
+        updatedAt: now,
+        updatedBy: session.user.email ?? session.user.name ?? 'unbekannt',
+      });
     return { success: true, id: rechnungId };
   } catch (err) {
     console.error('setFuellungRechnungBezahlt failed', err);
@@ -465,13 +454,7 @@ export async function cancelFuellungRechnung(request: {
 
 export type EmpfaengerInput = Pick<
   AtemschutzEmpfaenger,
-  | 'feuerwehr'
-  | 'name'
-  | 'ansprechpartner'
-  | 'adresse'
-  | 'email'
-  | 'telefon'
-  | 'active'
+  'feuerwehr' | 'name' | 'ansprechpartner' | 'adresse' | 'email' | 'telefon' | 'active'
 >;
 
 /**
@@ -517,9 +500,7 @@ export async function saveAtemschutzEmpfaenger(request: {
     if (trimmed(input.telefon)) payload.telefon = trimmed(input.telefon);
 
     if (empfaengerId) {
-      await empfaengerRef(groupId)
-        .doc(empfaengerId)
-        .set(payload, { merge: true });
+      await empfaengerRef(groupId).doc(empfaengerId).set(payload, { merge: true });
       return { success: true, id: empfaengerId };
     }
 
@@ -557,10 +538,7 @@ export async function deleteAtemschutzEmpfaenger(request: {
  */
 export async function saveAtemschutzRechnungConfig(request: {
   groupId: string;
-  config: Omit<
-    AtemschutzRechnungConfig,
-    'nummernkreis' | 'updatedAt' | 'updatedBy'
-  >;
+  config: Omit<AtemschutzRechnungConfig, 'nummernkreis' | 'updatedAt' | 'updatedBy'>;
 }): Promise<RechnungActionResult> {
   try {
     const { groupId, config } = request;
@@ -569,24 +547,19 @@ export async function saveAtemschutzRechnungConfig(request: {
     await rechnungConfigRef(groupId).set(
       {
         ccEmail: trimmed(config.ccEmail) ?? '',
-        subjectTemplate:
-          trimmed(config.subjectTemplate) ??
-          DEFAULT_RECHNUNG_CONFIG.subjectTemplate,
-        bodyTemplate:
-          trimmed(config.bodyTemplate) ?? DEFAULT_RECHNUNG_CONFIG.bodyTemplate,
+        subjectTemplate: trimmed(config.subjectTemplate) ?? DEFAULT_RECHNUNG_CONFIG.subjectTemplate,
+        bodyTemplate: trimmed(config.bodyTemplate) ?? DEFAULT_RECHNUNG_CONFIG.bodyTemplate,
         absenderName: trimmed(config.absenderName) ?? '',
         absenderAdresse: trimmed(config.absenderAdresse) ?? '',
         absenderKontakt: trimmed(config.absenderKontakt) ?? '',
-        leistungstext:
-          trimmed(config.leistungstext) ?? DEFAULT_RECHNUNG_CONFIG.leistungstext,
+        leistungstext: trimmed(config.leistungstext) ?? DEFAULT_RECHNUNG_CONFIG.leistungstext,
         kontoinhaber: trimmed(config.kontoinhaber) ?? '',
         // Leerzeichen in der IBAN sind üblich und beim Abtippen hilfreich —
         // gespeichert wird die Eingabe, nur ohne Rand.
         iban: trimmed(config.iban) ?? '',
         bic: trimmed(config.bic) ?? '',
         zahlungszielTage:
-          Number.isFinite(config.zahlungszielTage) &&
-          config.zahlungszielTage >= 0
+          Number.isFinite(config.zahlungszielTage) && config.zahlungszielTage >= 0
             ? Math.floor(config.zahlungszielTage)
             : DEFAULT_RECHNUNG_CONFIG.zahlungszielTage,
         ustHinweis: trimmed(config.ustHinweis) ?? '',

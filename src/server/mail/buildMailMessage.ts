@@ -29,9 +29,7 @@ export interface MailMessage {
  */
 export function buildMailMessage(message: MailMessage): string {
   const { to, from, replyTo, cc, subject, body, attachments = [] } = message;
-  const boundary = `boundary_${Date.now()}_${Math.random()
-    .toString(36)
-    .substring(2)}`;
+  const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
   const headers = [
     `From: ${from}`,
@@ -62,7 +60,5 @@ export function buildMailMessage(message: MailMessage): string {
     ].join('\r\n'),
   );
 
-  return [headers, '', textPart, ...attachmentParts, `--${boundary}--`].join(
-    '\r\n',
-  );
+  return [headers, '', textPart, ...attachmentParts, `--${boundary}--`].join('\r\n');
 }

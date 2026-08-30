@@ -1,11 +1,4 @@
-import {
-  Document,
-  Image,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-} from '@react-pdf/renderer';
+import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import moment from 'moment';
 import {
   zahlungszielDatum,
@@ -147,8 +140,7 @@ export default function FuellungRechnungPdf({
         <View style={[styles.block, styles.meta]}>
           <Text>Rechnungsdatum: {formatDate(rechnung.datum)}</Text>
           <Text>
-            Zeitraum: {formatDate(rechnung.zeitraumVon)} –{' '}
-            {formatDate(rechnung.zeitraumBis)}
+            Zeitraum: {formatDate(rechnung.zeitraumVon)} – {formatDate(rechnung.zeitraumBis)}
           </Text>
         </View>
 
@@ -176,9 +168,7 @@ export default function FuellungRechnungPdf({
             </Text>
             <Text style={styles.colEinsatz}>{position.firecallName ?? ''}</Text>
             <Text style={styles.colAnzahl}>{position.anzahl}</Text>
-            <Text style={styles.colPreis}>
-              {formatCurrency(position.einzelpreis)}
-            </Text>
+            <Text style={styles.colPreis}>{formatCurrency(position.einzelpreis)}</Text>
             <Text style={styles.colSumme}>{formatCurrency(position.summe)}</Text>
           </View>
         ))}
@@ -196,9 +186,7 @@ export default function FuellungRechnungPdf({
 
         {hatBankdaten && (
           <View style={styles.zahlung}>
-            <Text style={styles.zahlungTitel}>
-              {faelligText(faellig)}
-            </Text>
+            <Text style={styles.zahlungTitel}>{faelligText(faellig)}</Text>
             <View style={styles.zahlungZeile}>
               <Text style={styles.zahlungLabel}>Empfänger</Text>
               <Text>{kontoinhaber}</Text>
@@ -227,8 +215,8 @@ export default function FuellungRechnungPdf({
         )}
 
         <Text style={styles.rechtsgrundlage}>
-          Verrechnet nach dem Tarif für das Füllen von Pressluftflaschen,
-          Landesgesetzblatt Burgenland ({rechnung.rateVersion}).
+          Verrechnet nach dem Tarif für das Füllen von Pressluftflaschen, Landesgesetzblatt
+          Burgenland ({rechnung.rateVersion}).
         </Text>
 
         {!!config.absenderKontakt && (

@@ -39,9 +39,7 @@ function fuellung(over: Partial<AtemschutzFuellung> = {}): AtemschutzFuellung {
   };
 }
 
-function empfaenger(
-  over: Partial<AtemschutzEmpfaenger> = {},
-): AtemschutzEmpfaenger {
+function empfaenger(over: Partial<AtemschutzEmpfaenger> = {}): AtemschutzEmpfaenger {
   return {
     id: 'e1',
     feuerwehr: 'Winden am See',
@@ -155,9 +153,7 @@ describe('rechnungPositionen', () => {
   });
 
   it('wirft, wenn der Tarif keinen Preis hat', () => {
-    expect(() =>
-      rechnungPositionen([{ fuellung: fuellung() }], {}, TARIF_BIS_6L),
-    ).toThrow(/5\.01/);
+    expect(() => rechnungPositionen([{ fuellung: fuellung() }], {}, TARIF_BIS_6L)).toThrow(/5\.01/);
   });
 });
 
@@ -180,10 +176,16 @@ describe('zeitraumDerPositionen', () => {
     const positionen = rechnungPositionen(
       [
         {
-          fuellung: fuellung({ id: 'a', zeitpunkt: '2026-03-12T09:00:00.000Z' }),
+          fuellung: fuellung({
+            id: 'a',
+            zeitpunkt: '2026-03-12T09:00:00.000Z',
+          }),
         },
         {
-          fuellung: fuellung({ id: 'b', zeitpunkt: '2026-03-01T09:00:00.000Z' }),
+          fuellung: fuellung({
+            id: 'b',
+            zeitpunkt: '2026-03-01T09:00:00.000Z',
+          }),
         },
       ],
       PREISE,
@@ -269,18 +271,14 @@ describe('rechnungStatusFarbe', () => {
 
 describe('zahlungszielDatum', () => {
   it('rechnet die Tage auf das Rechnungsdatum', () => {
-    expect(zahlungszielDatum('2026-03-05T00:00:00.000Z', 14)).toBe(
-      '2026-03-19T00:00:00.000Z',
-    );
+    expect(zahlungszielDatum('2026-03-05T00:00:00.000Z', 14)).toBe('2026-03-19T00:00:00.000Z');
   });
 
   it('verschiebt sich an der Zeitumstellung nicht', () => {
     // 20.03. + 14 Tage überspringt den Beginn der Sommerzeit. In Ortszeit
     // gerechnet käme hier 02.04. 23:00 UTC heraus — auf einem UTC-Server
     // stünde dann der 2. statt des 3. April auf der Rechnung.
-    expect(zahlungszielDatum('2026-03-20T00:00:00.000Z', 14)).toBe(
-      '2026-04-03T00:00:00.000Z',
-    );
+    expect(zahlungszielDatum('2026-03-20T00:00:00.000Z', 14)).toBe('2026-04-03T00:00:00.000Z');
   });
 
   it('lässt das Ziel weg, wenn keine Frist gesetzt ist', () => {
@@ -306,12 +304,9 @@ describe('rechnungConfigLuecken', () => {
   });
 
   it('nimmt den Gruppennamen als Absender an', () => {
-    expect(
-      rechnungConfigLuecken(
-        { ...vollstaendig, absenderName: '' },
-        'Neusiedl am See',
-      ),
-    ).toEqual([]);
+    expect(rechnungConfigLuecken({ ...vollstaendig, absenderName: '' }, 'Neusiedl am See')).toEqual(
+      [],
+    );
   });
 
   it('benennt die fehlenden Felder', () => {
@@ -324,10 +319,6 @@ describe('rechnungConfigLuecken', () => {
 
   it('stürzt an einem Dokument ohne die neuen Felder nicht ab', () => {
     const alt = { vorgabeTarif: TARIF_BIS_6L } as never;
-    expect(rechnungConfigLuecken(alt)).toEqual([
-      'absenderName',
-      'absenderAdresse',
-      'iban',
-    ]);
+    expect(rechnungConfigLuecken(alt)).toEqual(['absenderName', 'absenderAdresse', 'iban']);
   });
 });

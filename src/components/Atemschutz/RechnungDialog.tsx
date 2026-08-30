@@ -30,10 +30,7 @@ import {
 } from '../../common/atemschutzRechnung';
 import { formatCurrency } from '../../common/kostenersatz';
 import EmpfaengerDialog from './EmpfaengerDialog';
-import {
-  createFuellungRechnung,
-  type RechnungPositionWahl,
-} from './rechnungActions';
+import { createFuellungRechnung, type RechnungPositionWahl } from './rechnungActions';
 
 export interface RechnungDialogProps {
   open: boolean;
@@ -95,9 +92,7 @@ export default function RechnungDialog({
     return rechnungPositionen(
       gewaehlteFuellungen.map((fuellung) => ({
         fuellung,
-        volumenLiter: fuellung.geraetId
-          ? volumen[fuellung.geraetId]
-          : undefined,
+        volumenLiter: fuellung.geraetId ? volumen[fuellung.geraetId] : undefined,
         tarifId: tarife[fuellung.id as string],
       })),
       preise,
@@ -148,11 +143,7 @@ export default function RechnungDialog({
         <Stack spacing={2} sx={{ mt: 1 }}>
           {fehler && <Alert severity="error">{t(`errors.${fehler}` as 'errors.saveFailed')}</Alert>}
 
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{ flexWrap: 'wrap', alignItems: 'center' }}
-          >
+          <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
             <TextField
               select
               label={t('rechnung.empfaenger')}
@@ -169,9 +160,7 @@ export default function RechnungDialog({
                   </MenuItem>
                 ))}
             </TextField>
-            <Button onClick={() => setEmpfaengerOffen(true)}>
-              {t('rechnung.empfaengerNeu')}
-            </Button>
+            <Button onClick={() => setEmpfaengerOffen(true)}>{t('rechnung.empfaengerNeu')}</Button>
             <TextField
               label={t('rechnung.datum')}
               type="date"
@@ -181,19 +170,11 @@ export default function RechnungDialog({
             />
           </Stack>
 
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{ alignItems: 'center', flexWrap: 'wrap' }}
-          >
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <Typography variant="body2">{t('rechnung.alleAufTarif')}</Typography>
             <ToggleButtonGroup size="small" exclusive value={null}>
               {FUELLUNG_TARIF_IDS.map((tarifId) => (
-                <ToggleButton
-                  key={tarifId}
-                  value={tarifId}
-                  onClick={() => alleAufTarif(tarifId)}
-                >
+                <ToggleButton key={tarifId} value={tarifId} onClick={() => alleAufTarif(tarifId)}>
                   {tarifId}
                 </ToggleButton>
               ))}
@@ -218,17 +199,13 @@ export default function RechnungDialog({
                 const id = fuellung.id as string;
                 const tarifId = tarife[id] ?? vorgabeTarif;
                 const preis = preise[tarifId] ?? 0;
-                const liter = fuellung.geraetId
-                  ? volumen[fuellung.geraetId]
-                  : undefined;
+                const liter = fuellung.geraetId ? volumen[fuellung.geraetId] : undefined;
                 return (
                   <TableRow key={id}>
                     <TableCell padding="checkbox">
                       <Checkbox
                         checked={!!gewaehlt[id]}
-                        onChange={(e) =>
-                          setGewaehlt((v) => ({ ...v, [id]: e.target.checked }))
-                        }
+                        onChange={(e) => setGewaehlt((v) => ({ ...v, [id]: e.target.checked }))}
                       />
                     </TableCell>
                     <TableCell>
@@ -247,9 +224,7 @@ export default function RechnungDialog({
                         select
                         size="small"
                         value={tarifId}
-                        onChange={(e) =>
-                          setTarife((v) => ({ ...v, [id]: e.target.value }))
-                        }
+                        onChange={(e) => setTarife((v) => ({ ...v, [id]: e.target.value }))}
                         sx={{ minWidth: 100 }}
                       >
                         {FUELLUNG_TARIF_IDS.map((option) => (
@@ -260,9 +235,7 @@ export default function RechnungDialog({
                       </TextField>
                     </TableCell>
                     <TableCell align="right">{formatCurrency(preis)}</TableCell>
-                    <TableCell align="right">
-                      {formatCurrency(preis * fuellung.anzahl)}
-                    </TableCell>
+                    <TableCell align="right">{formatCurrency(preis * fuellung.anzahl)}</TableCell>
                   </TableRow>
                 );
               })}

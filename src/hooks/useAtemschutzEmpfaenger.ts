@@ -9,13 +9,8 @@ import {
 import { GROUP_COLLECTION_ID } from '../components/firebase/firestore';
 import useFirebaseCollection from './useFirebaseCollection';
 
-export default function useAtemschutzEmpfaenger(
-  groupId?: string,
-): AtemschutzEmpfaenger[] {
-  const queryConstraints = useMemo<QueryConstraint[]>(
-    () => [orderBy('name', 'asc')],
-    [],
-  );
+export default function useAtemschutzEmpfaenger(groupId?: string): AtemschutzEmpfaenger[] {
+  const queryConstraints = useMemo<QueryConstraint[]>(() => [orderBy('name', 'asc')], []);
 
   const empfaenger = useFirebaseCollection<AtemschutzEmpfaenger>({
     collectionName: groupId ? GROUP_COLLECTION_ID : '',
@@ -23,8 +18,5 @@ export default function useAtemschutzEmpfaenger(
     queryConstraints,
   });
 
-  return useMemo(
-    () => (groupId ? (empfaenger ?? []) : []),
-    [groupId, empfaenger],
-  );
+  return useMemo(() => (groupId ? (empfaenger ?? []) : []), [groupId, empfaenger]);
 }

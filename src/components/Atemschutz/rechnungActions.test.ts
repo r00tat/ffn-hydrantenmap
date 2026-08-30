@@ -91,7 +91,9 @@ vi.mock('../../server/firebase/admin', () => ({
   firestore: {
     collection: () => ({
       doc: () => ({
-        get: async () => ({ data: () => ({ feuerwehrName: 'Neusiedl am See' }) }),
+        get: async () => ({
+          data: () => ({ feuerwehrName: 'Neusiedl am See' }),
+        }),
       }),
     }),
     batch: () => ({ update: batchUpdateMock, commit: batchCommitMock }),
@@ -146,9 +148,7 @@ describe('sendFuellungRechnung', () => {
     expect(raw).toContain('To: kdo@ff-winden.at');
     expect(raw).toContain('Cc: kassier@ff-nsee.at');
     expect(raw).toContain('filename="ATS-2026-001_FF_Winden.pdf"');
-    expect(updateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'sent' }),
-    );
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'sent' }));
   });
 
   it('weist einen Aufrufer ohne Berechtigung ab, ohne zu verschicken', async () => {

@@ -17,9 +17,7 @@ import { GROUP_COLLECTION_ID } from '../components/firebase/firestore';
  * Ohne gepflegtes Dokument gelten `DEFAULT_RECHNUNG_CONFIG` — vor allem der
  * Vorgabetarif `5.01`, ohne den der Dialog keinen Preis anzeigen könnte.
  */
-export default function useAtemschutzRechnungConfig(
-  groupId?: string,
-): AtemschutzRechnungConfig {
+export default function useAtemschutzRechnungConfig(groupId?: string): AtemschutzRechnungConfig {
   const [geladen, setGeladen] = useState<{
     groupId: string;
     config: AtemschutzRechnungConfig;

@@ -1,0 +1,13 @@
+# Erzeugt oder fremd — nichts davon wird von Hand gepflegt.
+.next/
+out/
+build/
+coverage/
+node_modules/
+android/
+public/
+next-env.d.ts
+package-lock.json
+
+# Inhalte, in denen der Umbruch Bedeutung trägt.
+content/docs/

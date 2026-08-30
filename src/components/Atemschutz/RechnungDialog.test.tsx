@@ -2,10 +2,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AtemschutzFuellung } from '../../common/atemschutz';
-import type {
-  AtemschutzEmpfaenger,
-  FeuerwehrBuendel,
-} from '../../common/atemschutzRechnung';
+import type { AtemschutzEmpfaenger, FeuerwehrBuendel } from '../../common/atemschutzRechnung';
 
 const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }));
 

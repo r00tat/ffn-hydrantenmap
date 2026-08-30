@@ -43,13 +43,9 @@ export default function EmpfaengerDialog({
   onSaved,
 }: EmpfaengerDialogProps) {
   const t = useTranslations('atemschutz');
-  const [feuerwehr, setFeuerwehr] = useState(
-    empfaenger?.feuerwehr ?? feuerwehrVorgabe ?? '',
-  );
+  const [feuerwehr, setFeuerwehr] = useState(empfaenger?.feuerwehr ?? feuerwehrVorgabe ?? '');
   const [name, setName] = useState(empfaenger?.name ?? '');
-  const [ansprechpartner, setAnsprechpartner] = useState(
-    empfaenger?.ansprechpartner ?? '',
-  );
+  const [ansprechpartner, setAnsprechpartner] = useState(empfaenger?.ansprechpartner ?? '');
   const [adresse, setAdresse] = useState(empfaenger?.adresse ?? '');
   const [email, setEmail] = useState(empfaenger?.email ?? '');
   const [telefon, setTelefon] = useState(empfaenger?.telefon ?? '');
@@ -97,9 +93,7 @@ export default function EmpfaengerDialog({
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>
-        {empfaenger
-          ? t('empfaenger.editTitle')
-          : t('empfaenger.createTitle')}
+        {empfaenger ? t('empfaenger.editTitle') : t('empfaenger.createTitle')}
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -161,23 +155,14 @@ export default function EmpfaengerDialog({
             fullWidth
           />
           <FormControlLabel
-            control={
-              <Switch
-                checked={active}
-                onChange={(e) => setActive(e.target.checked)}
-              />
-            }
+            control={<Switch checked={active} onChange={(e) => setActive(e.target.checked)} />}
             label={t('empfaenger.active')}
           />
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t('empfaenger.cancel')}</Button>
-        <Button
-          variant="contained"
-          onClick={handleSave}
-          disabled={unvollstaendig || speichert}
-        >
+        <Button variant="contained" onClick={handleSave} disabled={unvollstaendig || speichert}>
           {t('empfaenger.save')}
         </Button>
       </DialogActions>

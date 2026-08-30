@@ -156,9 +156,7 @@ describe('VerrechnungPage', () => {
 
     renderWithIntl(<VerrechnungPage />);
 
-    expect(
-      screen.getByText(/setzt die Kostenersatz-Freischaltung voraus/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/setzt die Kostenersatz-Freischaltung voraus/)).toBeInTheDocument();
     expect(screen.queryByText('Offene Füllungen')).not.toBeInTheDocument();
   });
 
@@ -179,9 +177,7 @@ describe('VerrechnungPage', () => {
 
     renderWithIntl(<VerrechnungPage />);
 
-    expect(
-      screen.getByText('Keine offenen Füllungen zu verrechnen.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Keine offenen Füllungen zu verrechnen.')).toBeInTheDocument();
   });
 
   it('zeigt den Status einer Rechnung als Chip', () => {

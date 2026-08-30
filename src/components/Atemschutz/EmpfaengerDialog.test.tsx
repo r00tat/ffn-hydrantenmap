@@ -11,9 +11,7 @@ vi.mock('./rechnungActions', () => ({
 import { renderWithIntl } from '../../test-utils/intlRender';
 import EmpfaengerDialog from './EmpfaengerDialog';
 
-function render(
-  over: Partial<React.ComponentProps<typeof EmpfaengerDialog>> = {},
-) {
+function render(over: Partial<React.ComponentProps<typeof EmpfaengerDialog>> = {}) {
   return renderWithIntl(
     <EmpfaengerDialog
       open
@@ -37,9 +35,7 @@ describe('EmpfaengerDialog', () => {
     // Genau der Fall aus der Praxis: An der Flasche steht „Podersdorf", im
     // Empfänger „FF Podersdorf" — der Abgleich über `normalizeCode` greift
     // dann nicht, und ohne Hinweis fiele das erst bei der Rechnung auf.
-    expect(
-      screen.getByText(/steht an keiner Flasche/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/steht an keiner Flasche/)).toBeInTheDocument();
   });
 
   it('schweigt, wenn die Schreibweise passt', () => {
@@ -49,9 +45,7 @@ describe('EmpfaengerDialog', () => {
       target: { value: 'Podersdorf' },
     });
 
-    expect(
-      screen.queryByText(/steht an keiner Flasche/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/steht an keiner Flasche/)).not.toBeInTheDocument();
   });
 
   it('übernimmt einen vorhandenen Eintrag zum Ändern', () => {
@@ -72,8 +66,6 @@ describe('EmpfaengerDialog', () => {
 
     expect(screen.getByDisplayValue('FF Podersdorf')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Podersdorf')).toBeInTheDocument();
-    expect(
-      screen.getByDisplayValue('kdo@ff-podersdorf.at'),
-    ).toBeInTheDocument();
+    expect(screen.getByDisplayValue('kdo@ff-podersdorf.at')).toBeInTheDocument();
   });
 });

@@ -12,9 +12,7 @@ import useFirebaseCollection from './useFirebaseCollection';
 /** Schranke wie beim Füllprotokoll — keine Blätterfunktion. */
 export const RECHNUNG_LIMIT = 200;
 
-export default function useAtemschutzRechnungen(
-  groupId?: string,
-): AtemschutzRechnung[] {
+export default function useAtemschutzRechnungen(groupId?: string): AtemschutzRechnung[] {
   const queryConstraints = useMemo<QueryConstraint[]>(
     () => [orderBy('datum', 'desc'), limit(RECHNUNG_LIMIT)],
     [],
@@ -29,8 +27,5 @@ export default function useAtemschutzRechnungen(
     queryConstraints,
   });
 
-  return useMemo(
-    () => (groupId ? (rechnungen ?? []) : []),
-    [groupId, rechnungen],
-  );
+  return useMemo(() => (groupId ? (rechnungen ?? []) : []), [groupId, rechnungen]);
 }

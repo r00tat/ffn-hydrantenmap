@@ -1,9 +1,6 @@
 import 'server-only';
 
-import {
-  ATEMSCHUTZ_FUELLUNG_COLLECTION_ID,
-  type AtemschutzGeraet,
-} from '../../common/atemschutz';
+import { ATEMSCHUTZ_FUELLUNG_COLLECTION_ID, type AtemschutzGeraet } from '../../common/atemschutz';
 import {
   ATEMSCHUTZ_CONFIG_COLLECTION_ID,
   ATEMSCHUTZ_EMPFAENGER_COLLECTION_ID,
@@ -57,9 +54,7 @@ export function rechnungConfigRef(groupId: string) {
     .doc(ATEMSCHUTZ_RECHNUNG_CONFIG_DOC);
 }
 
-export async function loadRechnungConfig(
-  groupId: string,
-): Promise<AtemschutzRechnungConfig> {
+export async function loadRechnungConfig(groupId: string): Promise<AtemschutzRechnungConfig> {
   const doc = await rechnungConfigRef(groupId).get();
   if (!doc.exists) return { ...DEFAULT_RECHNUNG_CONFIG };
   return { ...DEFAULT_RECHNUNG_CONFIG, ...doc.data() };
@@ -129,9 +124,7 @@ export async function loadFuellungTarife(): Promise<FuellungTarife> {
 }
 
 /** `geraetId` → Volumen, für die informative Spalte in der Position. */
-export async function loadVolumen(
-  groupId: string,
-): Promise<Record<string, number>> {
+export async function loadVolumen(groupId: string): Promise<Record<string, number>> {
   const geraete: AtemschutzGeraet[] = await loadGeraete(groupId);
   const volumen: Record<string, number> = {};
   for (const geraet of geraete) {

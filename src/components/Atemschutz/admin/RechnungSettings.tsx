@@ -29,9 +29,7 @@ export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
   const config = useAtemschutzRechnungConfig(groupId);
 
   const [ccEmail, setCcEmail] = useState(config.ccEmail);
-  const [subjectTemplate, setSubjectTemplate] = useState(
-    config.subjectTemplate,
-  );
+  const [subjectTemplate, setSubjectTemplate] = useState(config.subjectTemplate);
   const [bodyTemplate, setBodyTemplate] = useState(config.bodyTemplate);
   const [absenderName, setAbsenderName] = useState(config.absenderName);
   const [absenderAdresse, setAbsenderAdresse] = useState(config.absenderAdresse);
@@ -40,9 +38,7 @@ export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
   const [kontoinhaber, setKontoinhaber] = useState(config.kontoinhaber);
   const [iban, setIban] = useState(config.iban);
   const [bic, setBic] = useState(config.bic);
-  const [zahlungszielTage, setZahlungszielTage] = useState(
-    String(config.zahlungszielTage),
-  );
+  const [zahlungszielTage, setZahlungszielTage] = useState(String(config.zahlungszielTage));
   const [ustHinweis, setUstHinweis] = useState(config.ustHinweis);
   const [vorgabeTarif, setVorgabeTarif] = useState(config.vorgabeTarif);
   const [fehler, setFehler] = useState<string>();
@@ -102,12 +98,8 @@ export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
       </Typography>
       <Stack spacing={2} sx={{ maxWidth: 700 }}>
         {fehler && <Alert severity="error">{t(`errors.${fehler}` as 'errors.saveFailed')}</Alert>}
-        {gespeichert && (
-          <Alert severity="success">{t('rechnung.settingsSaved')}</Alert>
-        )}
-        <Typography variant="subtitle2">
-          {t('rechnung.gruppeAbsender')}
-        </Typography>
+        {gespeichert && <Alert severity="success">{t('rechnung.settingsSaved')}</Alert>}
+        <Typography variant="subtitle2">{t('rechnung.gruppeAbsender')}</Typography>
         <TextField
           label={t('rechnung.absenderName')}
           value={absenderName}

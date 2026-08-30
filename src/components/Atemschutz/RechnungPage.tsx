@@ -84,13 +84,8 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
     const result = await renderFuellungRechnungPdf({ groupId, rechnungId });
     setLaeuft(false);
     if (result.success && result.pdfBase64 && result.fileName) {
-      const bytes = Uint8Array.from(atob(result.pdfBase64), (c) =>
-        c.charCodeAt(0),
-      );
-      await downloadBlob(
-        new Blob([bytes], { type: 'application/pdf' }),
-        result.fileName,
-      );
+      const bytes = Uint8Array.from(atob(result.pdfBase64), (c) => c.charCodeAt(0));
+      await downloadBlob(new Blob([bytes], { type: 'application/pdf' }), result.fileName);
       return;
     }
     setFehler(result.error ?? 'saveFailed');
@@ -115,11 +110,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
-      <Stack
-        direction="row"
-        spacing={2}
-        sx={{ alignItems: 'center', mb: 2, flexWrap: 'wrap' }}
-      >
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
         <Typography variant="h4">{rechnung.nummer}</Typography>
         <Chip
           color={rechnungStatusFarbe(rechnung.status)}
@@ -136,9 +127,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
       <Stack spacing={0.5} sx={{ mb: 2 }}>
         <Typography variant="subtitle1">{rechnung.empfaenger.name}</Typography>
         {!!rechnung.empfaenger.ansprechpartner && (
-          <Typography variant="body2">
-            {rechnung.empfaenger.ansprechpartner}
-          </Typography>
+          <Typography variant="body2">{rechnung.empfaenger.ansprechpartner}</Typography>
         )}
         <Typography variant="body2">{rechnung.empfaenger.adresse}</Typography>
         <Typography variant="body2">{rechnung.empfaenger.email}</Typography>
@@ -184,12 +173,8 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
               <TableCell>{position.firecallName ?? ''}</TableCell>
               <TableCell align="right">{position.anzahl}</TableCell>
               <TableCell>{position.rateId}</TableCell>
-              <TableCell align="right">
-                {formatCurrency(position.einzelpreis)}
-              </TableCell>
-              <TableCell align="right">
-                {formatCurrency(position.summe)}
-              </TableCell>
+              <TableCell align="right">{formatCurrency(position.einzelpreis)}</TableCell>
+              <TableCell align="right">{formatCurrency(position.summe)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -204,11 +189,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
           {t('rechnung.pdf')}
         </Button>
         {rechnung.status === 'draft' && (
-          <Button
-            variant="contained"
-            onClick={() => setMailOffen(true)}
-            disabled={laeuft}
-          >
+          <Button variant="contained" onClick={() => setMailOffen(true)} disabled={laeuft}>
             {t('rechnung.send')}
           </Button>
         )}
@@ -218,11 +199,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
           </Button>
         )}
         {rechnung.status !== 'cancelled' && (
-          <Button
-            color="error"
-            onClick={() => setStornoOffen(true)}
-            disabled={laeuft}
-          >
+          <Button color="error" onClick={() => setStornoOffen(true)} disabled={laeuft}>
             {t('rechnung.storno')}
           </Button>
         )}
@@ -244,9 +221,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
           <DialogContentText>{t('rechnung.stornoConfirm')}</DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setStornoOffen(false)}>
-            {t('rechnung.cancel')}
-          </Button>
+          <Button onClick={() => setStornoOffen(false)}>{t('rechnung.cancel')}</Button>
           <Button color="error" onClick={handleStorno}>
             {t('rechnung.storno')}
           </Button>

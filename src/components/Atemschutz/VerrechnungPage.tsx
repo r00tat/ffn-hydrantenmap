@@ -60,7 +60,10 @@ const STATUS_LABEL = {
 } as const;
 
 /** Wie STATUS_LABEL: fester Schlüssel, sonst greift die next-intl-Typisierung. */
-const LUECKE_LABEL: Record<string, 'rechnung.absenderName' | 'rechnung.absenderAdresse' | 'rechnung.iban'> = {
+const LUECKE_LABEL: Record<
+  string,
+  'rechnung.absenderName' | 'rechnung.absenderAdresse' | 'rechnung.iban'
+> = {
   absenderName: 'rechnung.absenderName',
   absenderAdresse: 'rechnung.absenderAdresse',
   iban: 'rechnung.iban',
@@ -117,11 +120,7 @@ export default function VerrechnungPage() {
   const buendel = useMemo(
     () =>
       Object.keys(preise).length
-        ? fuellungenNachFeuerwehr(
-            offeneFuellungen(fuellungen),
-            preise,
-            config.vorgabeTarif,
-          )
+        ? fuellungenNachFeuerwehr(offeneFuellungen(fuellungen), preise, config.vorgabeTarif)
         : [],
     [fuellungen, preise, config.vorgabeTarif],
   );
@@ -153,11 +152,7 @@ export default function VerrechnungPage() {
         {t('rechnung.title')}
       </Typography>
 
-      <Stack
-        direction="row"
-        spacing={2}
-        sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}
-      >
+      <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
         {groups.length > 1 && (
           <TextField
             select
@@ -174,9 +169,7 @@ export default function VerrechnungPage() {
             ))}
           </TextField>
         )}
-        <Button onClick={() => setEmpfaengerOffen(true)}>
-          {t('rechnung.empfaengerNeu')}
-        </Button>
+        <Button onClick={() => setEmpfaengerOffen(true)}>{t('rechnung.empfaengerNeu')}</Button>
       </Stack>
 
       {luecken.length > 0 && (
@@ -210,9 +203,7 @@ export default function VerrechnungPage() {
           <TableHead>
             <TableRow>
               <TableCell>{t('rechnung.spalteFeuerwehr')}</TableCell>
-              <TableCell align="right">
-                {t('rechnung.spalteFlaschen')}
-              </TableCell>
+              <TableCell align="right">{t('rechnung.spalteFlaschen')}</TableCell>
               <TableCell>{t('rechnung.spalteZeitraum')}</TableCell>
               <TableCell align="right">{t('rechnung.spalteSumme')}</TableCell>
               <TableCell>{t('rechnung.spalteEmpfaenger')}</TableCell>
@@ -222,9 +213,7 @@ export default function VerrechnungPage() {
           <TableBody>
             {buendel.map((b) => (
               <TableRow key={b.feuerwehr || '__ohne__'}>
-                <TableCell>
-                  {b.feuerwehr || t('rechnung.ohneFeuerwehr')}
-                </TableCell>
+                <TableCell>{b.feuerwehr || t('rechnung.ohneFeuerwehr')}</TableCell>
                 <TableCell align="right">{b.flaschen}</TableCell>
                 <TableCell>
                   {format.dateTime(new Date(b.von), { dateStyle: 'short' })} –{' '}
@@ -233,11 +222,7 @@ export default function VerrechnungPage() {
                 <TableCell align="right">{formatCurrency(b.summe)}</TableCell>
                 <TableCell>
                   {empfaengerFuerFeuerwehr(empfaenger, b.feuerwehr)?.name ?? (
-                    <Chip
-                      size="small"
-                      color="warning"
-                      label={t('rechnung.keinEmpfaenger')}
-                    />
+                    <Chip size="small" color="warning" label={t('rechnung.keinEmpfaenger')} />
                   )}
                 </TableCell>
                 <TableCell align="right">
@@ -271,9 +256,7 @@ export default function VerrechnungPage() {
             {rechnungen.map((rechnung) => (
               <TableRow key={rechnung.id} hover>
                 <TableCell>
-                  <Link href={`/atemschutz/verrechnung/${rechnung.id}`}>
-                    {rechnung.nummer}
-                  </Link>
+                  <Link href={`/atemschutz/verrechnung/${rechnung.id}`}>{rechnung.nummer}</Link>
                 </TableCell>
                 <TableCell>{rechnung.empfaenger.name}</TableCell>
                 <TableCell>
@@ -281,9 +264,7 @@ export default function VerrechnungPage() {
                     dateStyle: 'short',
                   })}
                 </TableCell>
-                <TableCell align="right">
-                  {formatCurrency(rechnung.summe)}
-                </TableCell>
+                <TableCell align="right">{formatCurrency(rechnung.summe)}</TableCell>
                 <TableCell>
                   <Chip
                     size="small"
@@ -319,15 +300,10 @@ export default function VerrechnungPage() {
                 <TableCell>{e.name}</TableCell>
                 <TableCell>{e.feuerwehr}</TableCell>
                 <TableCell>{e.email}</TableCell>
-                <TableCell>
-                  {e.active ? t('empfaenger.ja') : t('empfaenger.nein')}
-                </TableCell>
+                <TableCell>{e.active ? t('empfaenger.ja') : t('empfaenger.nein')}</TableCell>
                 <TableCell align="right">
                   <Tooltip title={t('empfaenger.edit')}>
-                    <IconButton
-                      size="small"
-                      onClick={() => setEmpfaengerEdit(e)}
-                    >
+                    <IconButton size="small" onClick={() => setEmpfaengerEdit(e)}>
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
