@@ -5,6 +5,7 @@ import AlertTitle from '@mui/material/AlertTitle';
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
+  onAuthStateChanged,
   sendEmailVerification,
 } from 'firebase/auth';
 import * as firebaseui from 'firebaseui';
@@ -12,11 +13,49 @@ import 'firebaseui/dist/firebaseui.css';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { auth } from './firebase';
+import { collectAuthDiagnostics, storageKeys } from './authDiagnostics';
 import { shouldUseRedirectSignIn } from './signInStrategy';
 
 export default function FirebaseUiLogin() {
   const t = useTranslations('login');
   const [error, setError] = useState<string | undefined>(undefined);
+
+  // Diagnose des Redirect-Wegs.
+  //
+  // Nach der Rueckkehr von Google laedt die Seite neu. Bleibt die Anmeldung
+  // dann aus, sagt allein der Browserspeicher, wie weit sie gekommen ist —
+  // die Deutung der Schluessel steht in authDiagnostics.ts. Zweimal
+  // protokolliert, weil das Einloesen des Ergebnisses asynchron laeuft: Der
+  // Zustand beim Aufbau der Seite ist noch nicht der endgueltige.
+  useEffect(() => {
+    const flow = shouldUseRedirectSignIn() ? 'redirect' : 'popup';
+    const snapshot = (phase: string) =>
+      console.info(
+        '[FirebaseUiLogin] Anmeldezustand',
+        collectAuthDiagnostics({
+          phase,
+          signInFlow: flow,
+          authDomain: auth.app?.options?.authDomain,
+          currentUser: auth.currentUser?.uid ?? null,
+          href: window.location.href,
+          sessionKeys: storageKeys(window.sessionStorage),
+          localKeys: storageKeys(window.localStorage),
+        }),
+      );
+
+    snapshot('Seitenaufbau');
+    const timer = setTimeout(() => snapshot('3s nach Aufbau'), 3000);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.info(
+        `[FirebaseUiLogin] onAuthStateChanged: ${user ? `angemeldet als ${user.uid}` : 'kein Benutzer'}`,
+      );
+    });
+
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const ui =
@@ -26,7 +65,13 @@ export default function FirebaseUiLogin() {
       callbacks: {
         signInSuccessWithAuthResult: (authResult, redirectUrl) => {
           // Action if the user is authenticated successfully
-          console.info(`signInSuccess`);
+          console.info('signInSuccess', {
+            uid: authResult?.user?.uid,
+            providerId: authResult?.additionalUserInfo?.providerId,
+            isNewUser: authResult?.additionalUserInfo?.isNewUser,
+            operationType: authResult?.operationType,
+            redirectUrl,
+          });
           if (authResult.additionalUserInfo?.isNewUser) {
             console.info(`register successfull!`);
             sendEmailVerification(auth.currentUser!);

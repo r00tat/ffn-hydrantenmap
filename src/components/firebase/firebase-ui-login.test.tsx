@@ -16,13 +16,19 @@ vi.mock('firebaseui', () => ({
   },
 }));
 vi.mock('firebaseui/dist/firebaseui.css', () => ({}));
-vi.mock('./firebase', () => ({ auth: {} }));
+vi.mock('./firebase', () => ({
+  auth: {
+    app: { options: { authDomain: 'localhost:3000' } },
+    currentUser: null,
+  },
+}));
 vi.mock('firebase/auth', () => ({
   EmailAuthProvider: {
     PROVIDER_ID: 'password',
     EMAIL_LINK_SIGN_IN_METHOD: 'emailLink',
   },
   GoogleAuthProvider: { PROVIDER_ID: 'google.com' },
+  onAuthStateChanged: vi.fn(() => () => {}),
   sendEmailVerification: vi.fn(),
 }));
 
