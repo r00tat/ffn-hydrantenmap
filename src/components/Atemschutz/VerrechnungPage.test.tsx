@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AtemschutzFuellung } from '../../common/atemschutz';
 import type { AtemschutzRechnung } from '../../common/atemschutzRechnung';
@@ -7,14 +7,15 @@ import type { AtemschutzRechnung } from '../../common/atemschutzRechnung';
 // Wie in `FuellprotokollPage.test.tsx`: alles gemockt, was eine Firestore-
 // Subscription aufmachen würde. Geprüft wird die Bündelung und die
 // Zugangsprüfung, nicht das Laden.
-const { fuellungenMock, rechnungenMock, loginMock } = vi.hoisted(() => ({
+const { fuellungenMock, rechnungenMock, loginMock, pushMock } = vi.hoisted(() => ({
   fuellungenMock: vi.fn(),
   rechnungenMock: vi.fn(),
   loginMock: vi.fn(),
+  pushMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
 }));
 
 vi.mock('../../hooks/useAtemschutzFuellungen', () => ({
@@ -149,6 +150,7 @@ describe('VerrechnungPage', () => {
       flaschenGesamt: 3,
     });
     rechnungenMock.mockReturnValue([]);
+    pushMock.mockReset();
   });
 
   it('weist einen Benutzer ohne Kostenersatz-Freigabe ab', () => {
@@ -187,5 +189,36 @@ describe('VerrechnungPage', () => {
 
     expect(screen.getByText('ATS-2026-001')).toBeInTheDocument();
     expect(screen.getByText('Verschickt')).toBeInTheDocument();
+  });
+});
+
+describe('VerrechnungPage — Navigation', () => {
+  beforeEach(() => {
+    loginMock.mockReturnValue({
+      isAuthorized: true,
+      groups: ['ffnd', 'kostenersatz'],
+    });
+    fuellungenMock.mockReturnValue({ fuellungen: [], flaschenGesamt: 0 });
+    rechnungenMock.mockReturnValue([rechnung()]);
+    pushMock.mockReset();
+  });
+
+  it('führt vom Klick auf die Zeile zur Rechnung', () => {
+    renderWithIntl(<VerrechnungPage />);
+
+    // Die ganze Zeile ist das Ziel, nicht nur die Nummer — ein Link auf
+    // einem vierstelligen Text war kaum zu treffen.
+    fireEvent.click(screen.getByText('ATS-2026-001'));
+
+    expect(pushMock).toHaveBeenCalledWith('/atemschutz/verrechnung/r1');
+  });
+
+  it('bietet den Weg zurück ins Füllprotokoll', () => {
+    renderWithIntl(<VerrechnungPage />);
+
+    expect(screen.getByRole('link', { name: /Füllprotokoll/ })).toHaveAttribute(
+      'href',
+      '/atemschutz/fuellprotokoll',
+    );
   });
 });

@@ -1,5 +1,7 @@
 'use client';
 
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Alert from '@mui/material/Alert';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -148,6 +150,15 @@ export default function VerrechnungPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Button
+        component={Link}
+        href="/atemschutz/fuellprotokoll"
+        startIcon={<ArrowBackIcon />}
+        sx={{ mb: 1 }}
+      >
+        {t('rechnung.zumFuellprotokoll')}
+      </Button>
+
       <Typography variant="h4" gutterBottom>
         {t('rechnung.title')}
       </Typography>
@@ -250,14 +261,21 @@ export default function VerrechnungPage() {
               <TableCell>{t('rechnung.spalteDatum')}</TableCell>
               <TableCell align="right">{t('rechnung.spalteSumme')}</TableCell>
               <TableCell>{t('rechnung.spalteStatus')}</TableCell>
+              <TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
             {rechnungen.map((rechnung) => (
-              <TableRow key={rechnung.id} hover>
-                <TableCell>
-                  <Link href={`/atemschutz/verrechnung/${rechnung.id}`}>{rechnung.nummer}</Link>
-                </TableCell>
+              // Die ganze Zeile führt zur Rechnung, nicht nur die Nummer:
+              // Ein Link auf einem vierstelligen Text ist als Ziel kaum zu
+              // treffen und war als solcher nicht zu erkennen.
+              <TableRow
+                key={rechnung.id}
+                hover
+                onClick={() => router.push(`/atemschutz/verrechnung/${rechnung.id}`)}
+                sx={{ cursor: 'pointer' }}
+              >
+                <TableCell>{rechnung.nummer}</TableCell>
                 <TableCell>{rechnung.empfaenger.name}</TableCell>
                 <TableCell>
                   {format.dateTime(new Date(rechnung.datum), {
@@ -271,6 +289,11 @@ export default function VerrechnungPage() {
                     color={rechnungStatusFarbe(rechnung.status)}
                     label={t(STATUS_LABEL[rechnung.status])}
                   />
+                </TableCell>
+                <TableCell align="right">
+                  <Tooltip title={t('rechnung.oeffnen')}>
+                    <ChevronRightIcon fontSize="small" color="action" />
+                  </Tooltip>
                 </TableCell>
               </TableRow>
             ))}

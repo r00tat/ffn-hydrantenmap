@@ -1,5 +1,7 @@
 'use client';
 
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditIcon from '@mui/icons-material/Edit';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -16,14 +18,18 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
+import Link from 'next/link';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { rechnungStatusFarbe } from '../../common/atemschutzRechnung';
 import { KOSTENERSATZ_GROUP, formatCurrency } from '../../common/kostenersatz';
+import useAtemschutzEmpfaenger from '../../hooks/useAtemschutzEmpfaenger';
 import useAtemschutzRechnungen from '../../hooks/useAtemschutzRechnungen';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { downloadBlob } from '../firebase/download';
+import { fehlerText } from './rechnungFehler';
+import RechnungEditDialog from './RechnungEditDialog';
 import RechnungMailDialog from './RechnungMailDialog';
 import {
   cancelFuellungRechnung,
@@ -52,6 +58,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
   // abonniert, und ein zweites Abonnement auf dasselbe Dokument brächte nur
   // eine weitere Fehlerquelle beim Rechteentzug.
   const rechnungen = useAtemschutzRechnungen(groupId);
+  const empfaenger = useAtemschutzEmpfaenger(groupId);
   const rechnung = useMemo(
     () => rechnungen.find((r) => r.id === rechnungId),
     [rechnungen, rechnungId],
@@ -61,6 +68,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
   const [laeuft, setLaeuft] = useState(false);
   const [mailOffen, setMailOffen] = useState(false);
   const [stornoOffen, setStornoOffen] = useState(false);
+  const [editOffen, setEditOffen] = useState(false);
 
   if (!isAuthorized || !freigaben?.includes(KOSTENERSATZ_GROUP)) {
     return (
@@ -110,6 +118,15 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Button
+        component={Link}
+        href="/atemschutz/verrechnung"
+        startIcon={<ArrowBackIcon />}
+        sx={{ mb: 1 }}
+      >
+        {t('rechnung.zurueckZurListe')}
+      </Button>
+
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
         <Typography variant="h4">{rechnung.nummer}</Typography>
         <Chip
@@ -120,7 +137,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
 
       {fehler && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {t(`errors.${fehler}` as 'errors.saveFailed')}
+          {fehlerText(t, fehler)}
         </Alert>
       )}
 
@@ -189,6 +206,16 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
           {t('rechnung.pdf')}
         </Button>
         {rechnung.status === 'draft' && (
+          <Button
+            variant="outlined"
+            startIcon={<EditIcon />}
+            onClick={() => setEditOffen(true)}
+            disabled={laeuft}
+          >
+            {t('rechnung.bearbeiten')}
+          </Button>
+        )}
+        {rechnung.status === 'draft' && (
           <Button variant="contained" onClick={() => setMailOffen(true)} disabled={laeuft}>
             {t('rechnung.send')}
           </Button>
@@ -204,6 +231,17 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
           </Button>
         )}
       </Stack>
+
+      {editOffen && (
+        <RechnungEditDialog
+          open
+          groupId={groupId}
+          rechnung={rechnung}
+          empfaenger={empfaenger}
+          onClose={() => setEditOffen(false)}
+          onSaved={() => setEditOffen(false)}
+        />
+      )}
 
       {mailOffen && (
         <RechnungMailDialog

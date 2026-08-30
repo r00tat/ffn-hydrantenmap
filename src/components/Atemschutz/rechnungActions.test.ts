@@ -110,6 +110,7 @@ import {
   cancelFuellungRechnung,
   sendFuellungRechnung,
   setFuellungRechnungBezahlt,
+  updateFuellungRechnung,
 } from './rechnungActions';
 
 beforeEach(() => {
@@ -195,5 +196,44 @@ describe('cancelFuellungRechnung', () => {
     const patch = batchUpdateMock.mock.calls.at(-1)?.[1];
     expect(patch).toMatchObject({ rechnungId: '__delete__' });
     expect(patch).not.toHaveProperty('verrechnen');
+  });
+});
+
+describe('updateFuellungRechnung', () => {
+  const request = {
+    groupId: 'ffnd',
+    rechnungId: 'r1',
+    empfaengerId: 'e1',
+  };
+
+  it('ändert nur einen Entwurf', async () => {
+    rechnungDaten.status = 'sent';
+    const result = await updateFuellungRechnung(request);
+    rechnungDaten.status = 'draft';
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'rechnungNurEntwurf',
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('verlangt einen Empfänger', async () => {
+    const result = await updateFuellungRechnung({
+      ...request,
+      empfaengerId: '',
+    });
+    expect(result).toMatchObject({
+      success: false,
+      error: 'rechnungNoRecipient',
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('weist einen Aufrufer ohne Berechtigung ab', async () => {
+    guardMock.mockRejectedValueOnce(new Error('forbidden'));
+    const result = await updateFuellungRechnung(request);
+    expect(result.success).toBe(false);
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });
