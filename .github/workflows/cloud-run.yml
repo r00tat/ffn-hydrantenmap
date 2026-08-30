@@ -77,6 +77,10 @@ jobs:
       NEXT_PUBLIC_OAUTH_CLIENT_ID: ${{ vars.NEXT_PUBLIC_OAUTH_CLIENT_ID }}
       NEXT_PUBLIC_FIRESTORE_DB: ${{ vars.NEXT_PUBLIC_FIRESTORE_DB }}
       NEXT_PUBLIC_RECAPTCHA_KEY: ${{ vars.NEXT_PUBLIC_RECAPTCHA_KEY }}
+      # Erst-party Firebase-Auth-Handler (docs/auth-und-origins.md). Leer
+      # gelassen bleibt der Login auf firebaseapp.com; "true" schaltet ihn fuer
+      # alle Benutzer der jeweiligen Umgebung auf die eigene Domain um.
+      NEXT_PUBLIC_FIREBASE_AUTH_PROXY: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_PROXY }}
       GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
       RUN_SERVICE: ${{ vars.RUN_SERVICE }}
       RUN_REGION: ${{ vars.RUN_REGION }}
@@ -159,6 +163,7 @@ jobs:
           NEXT_PUBLIC_OAUTH_CLIENT_ID='${NEXT_PUBLIC_OAUTH_CLIENT_ID}'
           NEXT_PUBLIC_FIRESTORE_DB="${NEXT_PUBLIC_FIRESTORE_DB}"
           NEXT_PUBLIC_RECAPTCHA_KEY="${NEXT_PUBLIC_RECAPTCHA_KEY}"
+          NEXT_PUBLIC_FIREBASE_AUTH_PROXY="${NEXT_PUBLIC_FIREBASE_AUTH_PROXY}"
           NEXTAUTH_URL_INTERNAL=http://localhost:8080
           EOF
 
@@ -225,6 +230,7 @@ jobs:
             NEXT_PUBLIC_OAUTH_CLIENT_ID=${{ env.NEXT_PUBLIC_OAUTH_CLIENT_ID }}
             NEXT_PUBLIC_RECAPTCHA_KEY=${{ env.NEXT_PUBLIC_RECAPTCHA_KEY }}
             NEXT_PUBLIC_BUILD_ID=${{ steps.env.outputs.VERSION }}
+            NEXT_PUBLIC_FIREBASE_AUTH_PROXY=${{ env.NEXT_PUBLIC_FIREBASE_AUTH_PROXY }}
           # Lesen darf der PR-Build aus der Registry, schreiben nicht — der
           # Inline-Cache steckt im gepushten Image und entsteht ohne Push nicht.
           cache-from: ${{ env.workload_identity_provider != '' && format('type=registry,ref={0}:cache', env.IMAGE) || '' }}

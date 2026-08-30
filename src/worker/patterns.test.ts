@@ -287,3 +287,18 @@ describe('MCP- und OAuth-Endpunkte', () => {
     expect(ownRuleFor(`${APP_ORIGIN}/api/hydranten`)).toBeUndefined();
   });
 });
+
+describe('Firebase-Auth-Handler', () => {
+  it('kommt nie aus dem Cache', () => {
+    for (const path of [
+      '/__/auth/handler',
+      '/__/auth/handler?apiKey=x&authType=signInViaRedirect',
+      '/__/auth/iframe',
+      '/__/auth/iframe.js',
+    ]) {
+      expect(ownRuleFor(`${APP_ORIGIN}${path}`)?.handler).toBeInstanceOf(
+        NetworkOnly,
+      );
+    }
+  });
+});

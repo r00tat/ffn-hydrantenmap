@@ -1255,7 +1255,8 @@
     "intro": "Für die Nutzung der Einsatzkarte ist eine Anmeldung und manuelle Freischaltung erforderlich. Bitte melde dich an.",
     "capacitorDebug": "Capacitor Debug",
     "alreadySignedIn": "Du bist bereits angemeldet.",
-    "goToProfile": "Zum Profil"
+    "goToProfile": "Zum Profil",
+    "signInFailed": "Anmeldung fehlgeschlagen"
   },
   "profile": {
     "pageTitle": "Profil",

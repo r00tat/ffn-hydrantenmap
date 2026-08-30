@@ -8,6 +8,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
 } from 'firebase/firestore';
+import { resolveAuthDomain } from './authDomain';
 
 // Your web app's Firebase configuration
 const firebaseConfig = JSON.parse(
@@ -15,7 +16,17 @@ const firebaseConfig = JSON.parse(
 );
 
 // Initialize Firebase
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+//
+// `authDomain` wird ueberschrieben, sobald der erst-party Auth-Handler aktiv
+// ist — dann liegt `/__/auth/*` unter der eigenen Domain statt auf
+// firebaseapp.com. Begruendung und Schalter: authDomain.ts.
+const app =
+  getApps().length > 0
+    ? getApp()
+    : initializeApp({
+        ...firebaseConfig,
+        authDomain: resolveAuthDomain(firebaseConfig.authDomain),
+      });
 export default app;
 export { app as firebaseApp };
 // export const analytics: Analytics = getAnalytics(app);

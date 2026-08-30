@@ -63,6 +63,25 @@ export const isWorkerBootstrap = (url: URL): boolean =>
  *   kein Regex.
  */
 export const cachePatterns: RuntimeCaching[] = [
+  // Der Firebase-Auth-Handler unter `/__/auth/*` liegt nur scheinbar bei uns:
+  // `next.config.js` spiegelt ihn per Rewrite von der Firebase-Hosting-Domain
+  // hierher, damit der Google-Login same-origin ablaufen kann (siehe
+  // src/components/firebase/authDomain.ts).
+  //
+  // Für Serwist ist `/__/auth/handler` damit eine gewöhnliche Navigation der
+  // eigenen Origin — und die beantwortet `defaultCache` mit NetworkFirst, also
+  // mit Cache. Eine zwischengespeicherte Handler-Antwort trägt aber die
+  // OAuth-Parameter genau eines Anmeldeversuchs; beim nächsten Login käme sie
+  // erneut und der Ablauf bliebe stehen, ohne dass irgendwo ein Fehler
+  // auftaucht.
+  //
+  // Diese Regel steht deshalb ganz vorne: Die erste passende entscheidet.
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith('/__/auth/'),
+    handler: new NetworkOnly(),
+  },
+
   // MCP- und OAuth-Endpunkte dürfen nie aus dem Cache kommen — und auch nicht
   // in ihn hinein.
   //

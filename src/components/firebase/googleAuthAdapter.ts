@@ -5,8 +5,10 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
   signInWithPopup,
+  signInWithRedirect,
   UserCredential,
 } from 'firebase/auth';
+import { shouldUseRedirectSignIn } from './signInStrategy';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -115,6 +117,16 @@ export async function signInWithGoogle(auth: Auth): Promise<UserCredential> {
       auth,
       GoogleAuthProvider.credential(idToken, result.credential?.accessToken)
     );
+  }
+  // Achtung: Der Weg hierher gilt nur fuer Aufrufer, die den Google-Login
+  // selbst ausloesen. Die Anmeldeseite im Browser tut das nicht — dort
+  // rendert LoginUi FirebaseUI, das seinen eigenen Ablauf mitbringt und den
+  // Popup-/Redirect-Weg in firebase-ui-login.tsx waehlt.
+  if (shouldUseRedirectSignIn()) {
+    // Gibt `Promise<never>` zurueck: die Seite navigiert weg. Das Ergebnis
+    // holt das SDK beim naechsten Laden selbst aus dem Redirect ab.
+    console.info('[googleAuthAdapter] using signInWithRedirect (web)');
+    return signInWithRedirect(auth, googleProvider);
   }
   console.info('[googleAuthAdapter] falling back to signInWithPopup (web)');
   return signInWithPopup(auth, googleProvider);

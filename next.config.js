@@ -4,6 +4,54 @@ const createNextIntlPlugin = require('next-intl/plugin');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
+/**
+ * Die Firebase-Hosting-Domain, die den Auth-Handler ausliefert.
+ *
+ * Der Rewrite darunter spiegelt `/__/auth/*` unter die eigene Domain, damit
+ * der Google-Login same-origin ablaufen kann (Begruendung ausfuehrlich in
+ * src/components/firebase/authDomain.ts). Der Proxy ist **immer** aktiv, auch
+ * wenn die App ihn per Voreinstellung noch nicht benutzt — nur so laesst er
+ * sich mit `?authProxy=1` auf einem einzelnen Geraet ausprobieren.
+ *
+ * Steht in der Konfiguration bereits eine eigene Domain, gibt es hier nichts
+ * zu spiegeln: Der Rewrite zeigte sonst auf sich selbst.
+ *
+ * Die Antwort kommt unveraendert vom Upstream — `headers()` unten greift auf
+ * einem Rewrite zu einer fremden URL nicht mit. Das ist hier erwuenscht: Das
+ * Firebase-SDK haengt `/__/auth/iframe` als verstecktes iframe in die Seite,
+ * unser `X-Frame-Options: DENY` wuerde das Laden verhindern und den Login
+ * stehenlassen. Firebase Hosting setzt fuer diesen Pfad selbst keins.
+ */
+function firebaseAuthUpstream() {
+  try {
+    const config = JSON.parse(process.env.NEXT_PUBLIC_FIREBASE_APIKEY || '{}');
+    const domain =
+      config.authDomain ||
+      (config.projectId ? `${config.projectId}.firebaseapp.com` : '');
+    return /\.(firebaseapp\.com|web\.app)$/.test(domain) ? domain : undefined;
+  } catch {
+    // Eine kaputte Konfiguration meldet der Browser deutlich genug; der Build
+    // soll daran nicht scheitern.
+    return undefined;
+  }
+}
+
+/** Sicherheitskopfzeilen, die fuer jeden Pfad gelten. */
+const commonSecurityHeaders = [
+  {
+    key: 'X-Content-Type-Options',
+    value: 'nosniff',
+  },
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  },
+  {
+    key: 'Referrer-Policy',
+    value: 'strict-origin-when-cross-origin',
+  },
+];
+
 /** @type {(phase: string, defaultConfig: import("next").NextConfig) => Promise<import("next").NextConfig>} */
 module.exports = async () => {
   /** @type {import("next").NextConfig} */
@@ -49,26 +97,25 @@ module.exports = async () => {
     },
     serverExternalPackages: ['@google-cloud/secret-manager', 'protobufjs'],
     allowedDevOrigins: ['192.168.*.*', '127.0.0*', 'localhost', '*.nip.io'],
+    async rewrites() {
+      const upstream = firebaseAuthUpstream();
+      if (!upstream) return [];
+      return [
+        {
+          source: '/__/auth/:path*',
+          destination: `https://${upstream}/__/auth/:path*`,
+        },
+      ];
+    },
     async headers() {
       return [
         {
           source: '/(.*)',
           headers: [
+            ...commonSecurityHeaders,
             {
               key: 'X-Frame-Options',
               value: 'DENY',
-            },
-            {
-              key: 'X-Content-Type-Options',
-              value: 'nosniff',
-            },
-            {
-              key: 'Strict-Transport-Security',
-              value: 'max-age=63072000; includeSubDomains; preload',
-            },
-            {
-              key: 'Referrer-Policy',
-              value: 'strict-origin-when-cross-origin',
             },
           ],
         },
