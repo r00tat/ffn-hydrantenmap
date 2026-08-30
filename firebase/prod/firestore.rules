@@ -304,6 +304,34 @@ service cloud.firestore {
         allow write: if fahrtenbuchMember();
       }
 
+      // Verrechnung der Füllungen. Lesen setzt beides voraus: Mitgliedschaft
+      // in dieser Feuerwehr *und* die Kostenersatz-Freischaltung — wörtlich
+      // derselbe Satz wie `actionFuellungRechnungRequired(groupId)` in den
+      // Server Actions. Dass hier zwei Bedingungen stehen, ist der Grund für
+      // diesen Zuschnitt: Regel und Action können nicht auseinanderlaufen.
+      //
+      // Geschrieben wird ausschließlich serverseitig. `adminUser()` steht hier
+      // wie bei `atemschutzGeraet` nur der Form halber — die Rolle des
+      // Gruppen-Admins steckt in keinem Custom Claim und ist für Regeln nicht
+      // sichtbar.
+      match /atemschutzRechnung/{doc} {
+        allow read: if fahrtenbuchMember() && kostenersatzUser();
+        allow write: if adminUser();
+      }
+
+      match /atemschutzEmpfaenger/{doc} {
+        allow read: if fahrtenbuchMember() && kostenersatzUser();
+        allow write: if adminUser();
+      }
+
+      // Betreff- und Textvorlage, CC-Adresse, Bankverbindung, Vorgabetarif und
+      // der Nummernkreis. Ein eigenes Dokument und nicht das Gruppen-Dokument:
+      // Dessen Felder liest jedes Gruppenmitglied.
+      match /atemschutzConfig/{doc} {
+        allow read: if fahrtenbuchMember() && kostenersatzUser();
+        allow write: if adminUser();
+      }
+
       match /fahrtenbuch/{doc} {
         allow read: if fahrtenbuchMember();
         allow create, update, delete: if false;

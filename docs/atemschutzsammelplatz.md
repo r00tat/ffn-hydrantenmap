@@ -202,6 +202,84 @@ ausgefüllt oder durch einen Scan gesetzt. Beim Bearbeiten einer gespeicherten
 Füllung gilt der Schalter als angefasst — der gespeicherte Wert ist eine
 getroffene Entscheidung.
 
+## Verrechnung der Füllungen
+
+Was `verrechnen` markiert, wird unter `/atemschutz/verrechnung` je Feuerwehr
+gebündelt, zu einer Rechnung gemacht und per Mail mit PDF verschickt. Die
+Rechnungen, das Adressbuch und die Konfiguration liegen als
+`atemschutzRechnung`, `atemschutzEmpfaenger` und `atemschutzConfig/rechnung`
+unter der Gruppe — aus demselben Grund wie das Füllprotokoll selbst.
+
+### Der Tarif kommt nicht aus dem Volumen
+
+Vorgabe ist `5.01` („bis 6 Liter") für **jede** Position, unabhängig von der
+Flasche. In der Praxis wird auch für eine 6,8-l-CFK der 6-l-Preis verrechnet.
+Das Volumen steht in der Position nur zur Information; wer `5.02` braucht,
+stellt es je Zeile oder über „Alle auf Tarif" um.
+
+### Die Preise kommen aus dem Kostenersatz-Katalog
+
+`5.01` und `5.02` stehen als Tarife der Kategorie 5 bereits im
+Kostenersatz-Katalog (LGBl. Nr. 77/2023). Eine eigene, in der Gruppe pflegbare
+Zahl wäre eine zweite Quelle für denselben Betrag und würde driften — das
+Landesgesetzblatt gilt landesweit gleich.
+
+Der Dialog zeigt die Preise über `useKostenersatzRates()`, also aus derselben
+Firestore-Collection, die auch der Kostenersatz liest. Verbindlich ist
+trotzdem nur, was der Server auflöst: `loadFuellungTarife()` liest den Katalog
+über das Admin SDK noch einmal und friert Preis und `rateVersion` in die
+Position ein. Ein vom Client geschickter Betrag wird nie geglaubt, und eine
+gestellte Rechnung ändert sich nicht mehr, wenn der Katalog später gepflegt
+wird.
+
+### Warum Kostenersatz-Freigabe und nicht Gerätemeister
+
+`actionFuellungRechnungRequired(groupId)` verlangt **Gruppenmitglied und
+Kostenersatz-Freischaltung**. Wer den Kostenersatz der Feuerwehr macht, macht
+auch diese Rechnungen, und das ist nicht zwangsläufig der Gerätemeister — die
+Rolle wäre hier die falsche Grenze.
+
+Der Zuschnitt hat einen zweiten Grund: Die Firestore-Regel trägt wörtlich
+denselben Satz (`fahrtenbuchMember() && kostenersatzUser()`). Regel und Action
+können damit nicht auseinanderlaufen, und der Client darf den Tarifkatalog
+selbst lesen — sonst bräuchte die Vorschau eine eigene Server Action.
+
+Die Konfiguration (Betreff, Text, CC, Bankverbindung, Vorgabetarif) hängt
+dagegen an `actionGroupAdminRequired`: Sie gilt für alle Rechnungen der Gruppe
+und ist keine Tagesarbeit.
+
+### Der Empfänger wird in die Rechnung kopiert
+
+Die Rechnung trägt Name, Anschrift und E-Mail als eingebettete Kopie, nicht als
+Verweis ins Adressbuch. `empfaengerId` bleibt nur als Herkunftsnachweis stehen
+und wird nie nachgelesen. Sonst änderte eine gepflegte Adresse rückwirkend
+eine bereits verschickte Rechnung.
+
+### Was das Storno mit `verrechnen` macht: nichts
+
+Storniert wird aus jedem Status außer dem Storno selbst; heraus führt kein Weg.
+Dabei verschwindet ausschließlich `rechnungId` an den Füllungen — `verrechnen`
+bleibt unangetastet. Die Aussage „das ist zu verrechnen" hat sich nicht
+geändert, nur die Rechnung ist weg, und die Zeilen stehen sofort wieder unter
+den offenen.
+
+### Warum `rechnungId` optional ist
+
+`verrechnen` und `firecallId` sind an jeder Füllung gesetzt, `rechnungId` nicht.
+Die Übersicht fragt `where('verrechnen','==',true)` serverseitig ab und filtert
+`rechnungId` clientseitig — das erspart die Migration aller Bestandszeilen und
+einen weiteren zusammengesetzten Index. Serverseitig gefiltert wird nur, was
+die Liste selbst ausmacht.
+
+### Offener Punkt
+
+`atemschutzFuellung` bleibt clientseitig schreibbar — das ist die
+Offlinefähigkeit am Sammelplatz, an der sich nichts ändern soll. Ein
+Gruppenmitglied könnte damit `rechnungId` von Hand entfernen und eine Füllung
+ein zweites Mal abrechnen. Dieselbe Vertrauensebene wie beim
+`verrechnen`-Schalter selbst; wer sie enger zieht, verliert das Nachtragen bei
+schlechter Verbindung.
+
 ## Berechtigungen
 
 - **Protokolle am Einsatz** (`call/{id}/atemschutzTrupp`,
