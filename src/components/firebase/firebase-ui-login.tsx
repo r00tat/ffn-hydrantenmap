@@ -13,7 +13,11 @@ import 'firebaseui/dist/firebaseui.css';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { auth } from './firebase';
-import { collectAuthDiagnostics, storageKeys } from './authDiagnostics';
+import {
+  collectAuthDiagnostics,
+  formatAuthDiagnostics,
+  storageKeys,
+} from './authDiagnostics';
 import { shouldUseRedirectSignIn } from './signInStrategy';
 
 export default function FirebaseUiLogin() {
@@ -25,23 +29,42 @@ export default function FirebaseUiLogin() {
   // Nach der Rueckkehr von Google laedt die Seite neu. Bleibt die Anmeldung
   // dann aus, sagt allein der Browserspeicher, wie weit sie gekommen ist —
   // die Deutung der Schluessel steht in authDiagnostics.ts. Zweimal
-  // protokolliert, weil das Einloesen des Ergebnisses asynchron laeuft: Der
-  // Zustand beim Aufbau der Seite ist noch nicht der endgueltige.
+  // protokolliert, weil das Einloesen asynchron laeuft: Der Zustand beim
+  // Aufbau der Seite ist noch nicht der endgueltige.
   useEffect(() => {
-    const flow = shouldUseRedirectSignIn() ? 'redirect' : 'popup';
-    const snapshot = (phase: string) =>
+    const flow: 'popup' | 'redirect' = shouldUseRedirectSignIn()
+      ? 'redirect'
+      : 'popup';
+
+    // Die beiden Speicher getrennt ausgeben. FirebaseUIs Wegwerf-App gehoert
+    // in die sessionStorage; steht ihr Benutzer in der localStorage, ist es
+    // eine Altlast aus einem frueheren Versuch — und die fuehrt bei der
+    // Deutung in die Irre.
+    const snapshot = (phase: string) => {
+      const common = {
+        phase,
+        signInFlow: flow,
+        authDomain: auth.app?.options?.authDomain,
+        currentUser: auth.currentUser?.uid ?? null,
+        href: window.location.href,
+      };
+      const session = collectAuthDiagnostics({
+        ...common,
+        sessionKeys: storageKeys(window.sessionStorage),
+        localKeys: [],
+      });
+      const local = collectAuthDiagnostics({
+        ...common,
+        sessionKeys: [],
+        localKeys: storageKeys(window.localStorage),
+      });
       console.info(
-        '[FirebaseUiLogin] Anmeldezustand',
-        collectAuthDiagnostics({
-          phase,
-          signInFlow: flow,
-          authDomain: auth.app?.options?.authDomain,
-          currentUser: auth.currentUser?.uid ?? null,
-          href: window.location.href,
-          sessionKeys: storageKeys(window.sessionStorage),
-          localKeys: storageKeys(window.localStorage),
-        }),
+        `[FirebaseUiLogin] session · ${formatAuthDiagnostics(session)}`,
       );
+      console.info(
+        `[FirebaseUiLogin] local   · ${formatAuthDiagnostics(local)}`,
+      );
+    };
 
     snapshot('Seitenaufbau');
     const timer = setTimeout(() => snapshot('3s nach Aufbau'), 3000);

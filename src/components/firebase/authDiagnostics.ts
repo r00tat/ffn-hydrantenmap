@@ -75,3 +75,25 @@ export function collectAuthDiagnostics(params: {
     ...classifyAuthStorage([...params.sessionKeys, ...params.localKeys]),
   };
 }
+
+/**
+ * Als **eine Zeile**, nicht als Objekt.
+ *
+ * Ein `console.info` mit einem Objekt zeigt die Konsole zugeklappt und mit
+ * `…` abgeschnitten — genau die Schluessellisten, auf die es ankommt, sind
+ * dann nicht zu sehen, und in einer kopierten Ausgabe fehlen sie ganz.
+ */
+export function formatAuthDiagnostics(d: AuthDiagnostics): string {
+  const list = (label: string, keys: string[]) =>
+    `${label}=${keys.length}${keys.length ? ` [${keys.join(' | ')}]` : ''}`;
+  return [
+    d.phase,
+    `authDomain=${d.authDomain ?? '-'}`,
+    `flow=${d.signInFlow}`,
+    `user=${d.currentUser ?? '-'}`,
+    list('pendingRedirect', d.pendingRedirect),
+    list('authUser', d.authUser),
+    list('handoff', d.handoff),
+    list('firebaseui', d.firebaseui),
+  ].join(' · ');
+}
