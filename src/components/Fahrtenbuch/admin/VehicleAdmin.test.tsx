@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -135,6 +135,44 @@ describe('VehicleAdmin', () => {
     expect(
       screen.queryByText(/entsprechen keiner Vorlage/),
     ).not.toBeInTheDocument();
+  });
+
+  it('leitet die Kategorie eines Anhängers aus dem Namen ab', async () => {
+    // Die gewachsenen Fahrzeuge haben das Feld nicht. Ohne Ableitung stünde im
+    // Dialog „Fahrzeug", und ein Speichern schriebe das falsch fest.
+    const user = userEvent.setup();
+    setVehicles([vehicle({ id: 'v1', name: 'ATS-Anhänger' })]);
+    renderWithIntl(<VehicleAdmin groupId="g1" groupName="g1" />);
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Fahrzeug bearbeiten: ATS-Anhänger',
+      }),
+    );
+
+    expect(screen.getByLabelText('Kategorie')).toHaveTextContent('Anhänger');
+  });
+
+  it('speichert die gewählte Kategorie', async () => {
+    const user = userEvent.setup();
+    setVehicles([vehicle({ id: 'v1', name: 'Mehrzweckboot' })]);
+    renderWithIntl(<VehicleAdmin groupId="g1" groupName="g1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Fahrzeug bearbeiten: Mehrzweckboot' }),
+    );
+    await user.click(screen.getByLabelText('Kategorie'));
+    await user.click(await screen.findByRole('option', { name: 'Fahrzeug' }));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Die ausdrückliche Wahl schlägt die Ableitung aus dem Namen.
+    await waitFor(() =>
+      expect(saveFahrtenbuchVehicle).toHaveBeenCalledWith(
+        'g1',
+        'v1',
+        expect.objectContaining({ kategorie: 'fahrzeug' }),
+      ),
+    );
   });
 
   it('wählt für ein neues Fahrzeug die Fahrzeug-Vorlage vor', async () => {

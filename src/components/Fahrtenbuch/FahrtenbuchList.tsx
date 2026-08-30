@@ -44,6 +44,7 @@ import {
 import { browserTimeZone } from '../../common/fahrtenbuchStats';
 import { counterLines, fuelLines, type CounterLine } from './entrySummary';
 import { isShareLinkEntry, wasEntryEdited } from './entryPermissions';
+import { vehicleSelectItems } from './vehicleSelectItems';
 
 export interface FahrtenbuchListProps {
   entries: FahrtenbuchEntry[];
@@ -305,13 +306,10 @@ export default function FahrtenbuchList({
               sx={{ minWidth: 180 }}
             >
               <MenuItem value="">{t('filters.all')}</MenuItem>
-              {vehicles
-                .filter((v) => v.active !== false)
-                .map((v) => (
-                  <MenuItem key={v.id} value={v.id}>
-                    {v.name}
-                  </MenuItem>
-                ))}
+              {vehicleSelectItems(
+                vehicles.filter((v) => v.active !== false),
+                (k) => t(`vehicleKategorie.${k}`),
+              )}
             </TextField>
           )}
           <TextField

@@ -4,6 +4,7 @@ import 'server-only';
 import { getTranslations } from 'next-intl/server';
 import type { Group } from '../../app/groups/groupTypes';
 import {
+  compareVehicles,
   FAHRTENBUCH_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
   type FahrtenbuchEntry,
@@ -99,11 +100,8 @@ async function loadSelectedVehicles(
   return snapshot.docs
     .map((d) => ({ id: d.id, ...d.data() }) as FahrtenbuchVehicle)
     .filter((v) => selected.has(v.id as string))
-    .sort(
-      (a, b) =>
-        (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
-        (a.name ?? '').localeCompare(b.name ?? ''),
-    );
+    // Dieselbe Ordnung wie in der App: Kategorie, darin alphabetisch.
+    .sort(compareVehicles);
 }
 
 /**

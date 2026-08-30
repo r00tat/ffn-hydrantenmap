@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  compareVehicles,
   FAHRTENBUCH_PERSON_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
   type FahrtenbuchPerson,
@@ -53,10 +54,8 @@ export async function loadShareFormData(
     // Feld gilt als aktiv. Mit `vehicle.active` wäre es in der App sichtbar,
     // auf der Gastseite aber nicht — und dem Gast fiele es nie auf.
     .filter((vehicle) => vehicle.active !== false)
-    .sort(
-      (a, b) =>
-        (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name),
-    )
+    // Dieselbe Ordnung wie in der App: Kategorie, darin alphabetisch.
+    .sort(compareVehicles)
     .map(toShareLinkVehicle);
 
   const persons = personSnapshot.docs

@@ -182,7 +182,9 @@ describe('loadShareFormData', () => {
     expect(data.groupName).toBe('');
   });
 
-  it('sortiert Fahrzeuge nach sortOrder und Namen', async () => {
+  it('sortiert Fahrzeuge nach Kategorie und darin alphabetisch', async () => {
+    // Wie in der App: `sortOrder` spielt für die Anzeige keine Rolle mehr,
+    // sonst stünde die Gastseite anders sortiert da als das Fahrtenbuch.
     vehicleGetMock.mockResolvedValue(
       snapshot([
         {
@@ -192,6 +194,16 @@ describe('loadShareFormData', () => {
           counters: [],
           fuelTypes: [],
           sortOrder: 2,
+          ...AUDIT,
+        },
+        {
+          id: 'v4',
+          name: 'ATS-Anhänger',
+          active: true,
+          counters: [],
+          fuelTypes: [],
+          kategorie: 'anhaenger',
+          sortOrder: 0,
           ...AUDIT,
         },
         {
@@ -215,7 +227,15 @@ describe('loadShareFormData', () => {
       ]),
     );
     const data = await loadShareFormData('ffnd');
-    expect(data.vehicles.map((v) => v.name)).toEqual(['KDO', 'TLF', 'MTF']);
+    expect(data.vehicles.map((v) => v.name)).toEqual([
+      'KDO',
+      'MTF',
+      'TLF',
+      'ATS-Anhänger',
+    ]);
+    // Die Kategorie geht mit auf die Gastseite, damit dort dieselbe
+    // Gruppierung möglich ist.
+    expect(data.vehicles.at(-1)?.kategorie).toBe('anhaenger');
   });
 
   it('gibt von Einsätzen nur Name und Zeiten weiter', async () => {

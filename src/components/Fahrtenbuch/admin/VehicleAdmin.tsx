@@ -32,10 +32,13 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
+  FAHRTENBUCH_VEHICLE_KATEGORIEN,
   FUEL_TYPES,
   VEHICLE_PRESETS,
+  vehicleKategorie,
   type CounterDefinition,
   type FahrtenbuchVehicle,
+  type FahrtenbuchVehicleKategorie,
   type FuelType,
   type VehiclePresetId,
 } from '../../../common/fahrtenbuch';
@@ -91,6 +94,8 @@ export default function VehicleAdmin({
   const [active, setActive] = useState(true);
   const [preset, setPreset] = useState<VehiclePresetId>('fahrzeug');
   const [fuelTypes, setFuelTypes] = useState<FuelType[]>([]);
+  const [kategorie, setKategorie] =
+    useState<FahrtenbuchVehicleKategorie>('fahrzeug');
 
   const openDialog = (vehicle?: FahrtenbuchVehicle) => {
     setEditing(vehicle ?? ({} as FahrtenbuchVehicle));
@@ -102,6 +107,10 @@ export default function VehicleAdmin({
     // Ohne Fahrzeug ist die Zählerliste leer und würde auf „ohne Zähler"
     // passen — neue Fahrzeuge starten trotzdem als Straßenfahrzeug.
     setPreset(vehicle ? (presetForCounters(vehicle.counters) ?? 'fahrzeug') : 'fahrzeug');
+    // Beim Bearbeiten die gepflegte, sonst die aus dem Namen abgeleitete —
+    // dieselbe Regel wie in der Anzeige. Beim Anlegen ist der Name noch leer
+    // und `vehicleKategorie` liefert „Fahrzeug".
+    setKategorie(vehicleKategorie(vehicle ?? { name: '' }));
   };
 
   // Abgeleitet, daher während des Renderns berechnet (kein Effekt).
@@ -119,6 +128,7 @@ export default function VehicleAdmin({
         active,
         counters: VEHICLE_PRESETS[preset],
         fuelTypes,
+        kategorie,
         kostenersatzVehicleId: editing?.kostenersatzVehicleId,
         // Importierte Fahrzeuge tragen die Kostenersatz-Werte (dreistellig) —
         // ein `vehicles.length + 1` würde jedes neue Fahrzeug vor die gesamte
@@ -180,6 +190,7 @@ export default function VehicleAdmin({
               <TableRow>
                 <TableCell>{t('admin.name')}</TableCell>
                 <TableCell>{t('kennzeichen')}</TableCell>
+                <TableCell>{t('admin.kategorie')}</TableCell>
                 <TableCell>{t('admin.counters')}</TableCell>
                 <TableCell>{t('admin.active')}</TableCell>
                 <TableCell />
@@ -190,6 +201,9 @@ export default function VehicleAdmin({
                 <TableRow key={vehicle.id}>
                   <TableCell>{vehicle.name}</TableCell>
                   <TableCell>{vehicle.kennzeichen}</TableCell>
+                  <TableCell>
+                    {t(`vehicleKategorie.${vehicleKategorie(vehicle)}`)}
+                  </TableCell>
                   <TableCell>
                     {(vehicle.counters ?? [])
                       .map((def) =>
@@ -273,6 +287,21 @@ export default function VehicleAdmin({
               onChange={(e) => setKennzeichen(e.target.value)}
               fullWidth
             />
+            <TextField
+              select
+              label={t('admin.kategorie')}
+              value={kategorie}
+              onChange={(e) =>
+                setKategorie(e.target.value as FahrtenbuchVehicleKategorie)
+              }
+              fullWidth
+            >
+              {FAHRTENBUCH_VEHICLE_KATEGORIEN.map((k) => (
+                <MenuItem key={k} value={k}>
+                  {t(`vehicleKategorie.${k}`)}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               select
               label={t('admin.preset')}

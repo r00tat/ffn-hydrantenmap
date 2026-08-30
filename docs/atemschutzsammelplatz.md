@@ -161,6 +161,10 @@ keines führen — genau der Atemschutzanhänger wäre also nicht eintragbar. Wi
 ein Fahrzeug der Gruppe gewählt, bleibt der Bezug über `vehicleId` erhalten;
 bei freiem Text steht nur `vehicleName`. Deshalb sind beide Felder optional.
 
+Wird der Anhänger als Fahrzeug der Gruppe gepflegt, steht er in der Auswahl
+unter der Überschrift „Anhänger" — siehe „Kategorie und Anzeigereihenfolge der
+Fahrzeuge" in [fahrtenbuch.md](fahrtenbuch.md).
+
 Aus dem Sybos-Export kommt der Träger nicht — der Artikelexport kennt keine
 Verlastung. Er wird im Gerätedialog gesetzt.
 

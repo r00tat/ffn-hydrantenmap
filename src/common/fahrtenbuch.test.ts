@@ -13,6 +13,9 @@ import {
   findEntryForFirecallVehicle,
   overlappingVehicleEntries,
   matchVehicleByName,
+  compareVehicles,
+  FAHRTENBUCH_VEHICLE_KATEGORIEN,
+  kategorieAusName,
   normalizeName,
   normalizePersonName,
   personDisplayName,
@@ -146,6 +149,91 @@ describe('requiresDriver', () => {
       const preset = suggestPresetForVehicleName(name);
       expect(requiresDriver(VEHICLE_PRESETS[preset])).toBe(false);
     }
+  });
+});
+
+describe('kategorieAusName', () => {
+  it('erkennt Anhänger', () => {
+    expect(kategorieAusName('ATS-Anhänger')).toBe('anhaenger');
+    expect(kategorieAusName('Öl Einachsanhänger')).toBe('anhaenger');
+    // WLA-Aufbauten laufen wie Anhänger — sie fahren nicht selbst, genau wie
+    // in `suggestPresetForVehicleName`.
+    expect(kategorieAusName('WLA-Bergung')).toBe('anhaenger');
+  });
+
+  it('erkennt Boote', () => {
+    expect(kategorieAusName('Mehrzweckboot')).toBe('boot');
+    expect(kategorieAusName('MZB')).toBe('boot');
+  });
+
+  it('nimmt sonst Fahrzeug an', () => {
+    expect(kategorieAusName('TLFA 4000')).toBe('fahrzeug');
+    expect(kategorieAusName('WLF-K')).toBe('fahrzeug');
+    expect(kategorieAusName('')).toBe('fahrzeug');
+  });
+
+  it('hält einen Bootsanhänger für einen Anhänger', () => {
+    // Beide Wörter stecken im Namen; der Anhänger gewinnt, weil das Gespann
+    // gezogen wird und kein Boot fährt.
+    expect(kategorieAusName('Bootsanhänger')).toBe('anhaenger');
+  });
+});
+
+describe('compareVehicles', () => {
+  const v = (name: string, kategorie?: string) =>
+    ({ name, kategorie }) as Parameters<typeof compareVehicles>[0];
+
+  it('sortiert nach Kategorie und darin alphabetisch', () => {
+    const liste = [
+      v('TLFA 4000', 'fahrzeug'),
+      v('ATS-Anhänger', 'anhaenger'),
+      v('Mehrzweckboot', 'boot'),
+      v('KRF-S', 'fahrzeug'),
+    ];
+    expect([...liste].sort(compareVehicles).map((x) => x.name)).toEqual([
+      'KRF-S',
+      'TLFA 4000',
+      'Mehrzweckboot',
+      'ATS-Anhänger',
+    ]);
+  });
+
+  it('hält die Reihenfolge der Kategorien ein', () => {
+    expect(FAHRTENBUCH_VEHICLE_KATEGORIEN).toEqual([
+      'fahrzeug',
+      'boot',
+      'anhaenger',
+    ]);
+  });
+
+  it('leitet eine fehlende Kategorie aus dem Namen ab', () => {
+    // Die elf gewachsenen Fahrzeuge haben das Feld nicht; ohne Rückfall
+    // stünde das Mehrzweckboot zwischen den Fahrzeugen.
+    const liste = [v('Mehrzweckboot'), v('ATS-Anhänger'), v('TLFA 4000')];
+    expect([...liste].sort(compareVehicles).map((x) => x.name)).toEqual([
+      'TLFA 4000',
+      'Mehrzweckboot',
+      'ATS-Anhänger',
+    ]);
+  });
+
+  it('lässt die gepflegte Kategorie vor der Ableitung gehen', () => {
+    // Ein Fahrzeug, dessen Name nach Anhänger klingt, aber ausdrücklich als
+    // Fahrzeug gepflegt ist.
+    const liste = [v('Anhänger-Zugmaschine', 'fahrzeug'), v('Zille', 'boot')];
+    expect([...liste].sort(compareVehicles).map((x) => x.name)).toEqual([
+      'Anhänger-Zugmaschine',
+      'Zille',
+    ]);
+  });
+
+  it('sortiert Umlaute wie im Deutschen einsortiert', () => {
+    // "Ölwehr" gehört zwischen O und P, nicht ans Ende der Liste.
+    const liste = [v('Zille', 'fahrzeug'), v('Ölwehr', 'fahrzeug')];
+    expect([...liste].sort(compareVehicles).map((x) => x.name)).toEqual([
+      'Ölwehr',
+      'Zille',
+    ]);
   });
 });
 

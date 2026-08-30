@@ -1119,7 +1119,8 @@
         "errorEmailInvalid": "At least one address is not a valid email address.",
         "errorTooManyEmails": "At most {max} addresses.",
         "errorInvalidWeek": "Not a valid calendar week of this year."
-      }
+      },
+      "kategorie": "Category"
     },
     "shareLink": {
       "heading": "Logbook link",
@@ -1259,6 +1260,11 @@
       "feuerwehrNameHelp": "Spelled as in the breathing apparatus master data, e.g. \"Neusiedl am See\". Determines whether a filling is pre-set as billable.",
       "feuerwehrNameSaved": "Fire brigade saved",
       "saveFeuerwehrName": "Save fire brigade"
+    },
+    "vehicleKategorie": {
+      "fahrzeug": "Vehicle",
+      "boot": "Boat",
+      "anhaenger": "Trailer"
     }
   },
   "fahrtenbuchShare": {

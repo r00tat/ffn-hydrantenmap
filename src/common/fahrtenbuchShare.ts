@@ -2,6 +2,7 @@ import type {
   CounterDefinition,
   FahrtenbuchPerson,
   FahrtenbuchVehicle,
+  FahrtenbuchVehicleKategorie,
   FuelType,
 } from './fahrtenbuch';
 
@@ -45,6 +46,7 @@ export interface ShareLinkVehicle {
   counters: CounterDefinition[];
   fuelTypes: FuelType[];
   lastCounters?: Record<string, number>;
+  kategorie?: FahrtenbuchVehicleKategorie;
 }
 
 /** Person auf der Gastseite: nur Anzeigename und ID, nie Kontaktdaten. */
@@ -162,6 +164,9 @@ export function toShareLinkVehicle(vehicle: FahrtenbuchVehicle): ShareLinkVehicl
   };
   if (vehicle.kennzeichen) projected.kennzeichen = vehicle.kennzeichen;
   if (vehicle.lastCounters) projected.lastCounters = vehicle.lastCounters;
+  // Die Kategorie gruppiert die Auswahl auch auf der Gastseite. Sie verrät
+  // nichts, was der Name nicht ohnehin sagt.
+  if (vehicle.kategorie) projected.kategorie = vehicle.kategorie;
   return projected;
 }
 

@@ -20,6 +20,7 @@ import {
   type AtemschutzGeraetTyp,
   type FuellstationStandort,
 } from '../../../common/atemschutz';
+import { vehicleKategorie } from '../../../common/fahrtenbuch';
 import useFahrtenbuchVehicles from '../../../hooks/useFahrtenbuchVehicles';
 import type { GeraetInput } from '../atemschutzActions';
 
@@ -113,6 +114,7 @@ export default function GeraetDialog({
 }: GeraetDialogProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
+  const tFahrtenbuch = useTranslations('fahrtenbuch');
   const { activeVehicles } = useFahrtenbuchVehicles(groupId);
   // `key={geraet?.id ?? 'new'}` am Aufrufer sorgt dafür, dass der Zustand beim
   // Wechsel des bearbeiteten Geräts neu aufgebaut wird — kein Effekt nötig.
@@ -236,6 +238,15 @@ export default function GeraetDialog({
                     options={activeVehicles}
                     getOptionLabel={(option) =>
                       typeof option === 'string' ? option : option.name
+                    }
+                    // Die Liste steht ohnehin nach Kategorie sortiert; die
+                    // Überschriften machen sichtbar, wo die Anhänger anfangen.
+                    groupBy={(option) =>
+                      typeof option === 'string'
+                        ? ''
+                        : tFahrtenbuch(
+                            `vehicleKategorie.${vehicleKategorie(option)}`,
+                          )
                     }
                     inputValue={form.vehicleName ?? ''}
                     onInputChange={(_, value) => {

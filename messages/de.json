@@ -1119,7 +1119,8 @@
         "errorEmailInvalid": "Mindestens eine Adresse ist keine gültige E-Mail-Adresse.",
         "errorTooManyEmails": "Höchstens {max} Adressen.",
         "errorInvalidWeek": "Keine gültige Kalenderwoche dieses Jahres."
-      }
+      },
+      "kategorie": "Kategorie"
     },
     "shareLink": {
       "heading": "Fahrtenbuch-Link",
@@ -1259,6 +1260,11 @@
       "feuerwehrNameHelp": "Schreibweise wie in den Atemschutz-Stammdaten, z.B. „Neusiedl am See“. Steuert, ob eine Füllung als zu verrechnen vorbelegt wird.",
       "feuerwehrNameSaved": "Feuerwehr gespeichert",
       "saveFeuerwehrName": "Feuerwehr speichern"
+    },
+    "vehicleKategorie": {
+      "fahrzeug": "Fahrzeug",
+      "boot": "Boot",
+      "anhaenger": "Anhänger"
     }
   },
   "fahrtenbuchShare": {

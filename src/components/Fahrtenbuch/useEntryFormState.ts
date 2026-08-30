@@ -13,6 +13,7 @@ import {
   type CounterReading,
   type FahrtenbuchDriverRef,
   type FahrtenbuchEntry,
+  type FahrtenbuchVehicleKategorie,
   type FahrtZweck,
   type FuelType,
 } from '../../common/fahrtenbuch';
@@ -41,6 +42,8 @@ export interface EntryFormVehicle {
   counters: CounterDefinition[];
   fuelTypes: FuelType[];
   lastCounters?: Record<string, number>;
+  /** Gruppiert die Auswahlliste; fehlt sie, zählt der Name. */
+  kategorie?: FahrtenbuchVehicleKategorie;
 }
 
 export interface EntryFormPerson {

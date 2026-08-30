@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { orderBy } from 'firebase/firestore';
 import {
+  compareVehicles,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
   type FahrtenbuchVehicle,
 } from '../common/fahrtenbuch';
@@ -32,9 +33,10 @@ export default function useFahrtenbuchVehicles(
 
   return useMemo(() => {
     const list = groupId ? (vehicles ?? []) : [];
-    const sorted = [...list].sort(
-      (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
-    );
+    // Nach Kategorie und darin alphabetisch, nicht nach `sortOrder`: Ein Name
+    // ist schneller zu finden als eine Zahl, die niemand sieht, und Anhänger
+    // stehen so beisammen am Ende statt zwischen den Fahrzeugen.
+    const sorted = [...list].sort(compareVehicles);
     return {
       vehicles: sorted,
       activeVehicles: sorted.filter((v) => v.active !== false),
