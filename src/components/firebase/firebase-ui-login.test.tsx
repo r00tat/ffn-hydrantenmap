@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { render } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderWithIntl } from '../../test-utils/intlRender';
 
 const startMock = vi.fn();
 
@@ -37,10 +38,15 @@ function setUserAgent(userAgent: string) {
   });
 }
 
+interface UiConfig {
+  signInFlow: string;
+  callbacks: { signInFailure: (error: unknown) => unknown };
+}
+
 async function renderLogin() {
   const { default: FirebaseUiLogin } = await import('./firebase-ui-login');
-  render(<FirebaseUiLogin />);
-  return startMock.mock.calls.at(-1)?.[1] as { signInFlow: string };
+  renderWithIntl(<FirebaseUiLogin />);
+  return startMock.mock.calls.at(-1)?.[1] as UiConfig;
 }
 
 beforeEach(() => {
@@ -71,5 +77,26 @@ describe('FirebaseUiLogin', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
     setUserAgent(IPHONE);
     expect((await renderLogin()).signInFlow).toBe('redirect');
+  });
+});
+
+describe('FirebaseUiLogin: gescheiterte Anmeldung', () => {
+  it('zeigt den Fehler an, statt ihn nur zu protokollieren', async () => {
+    // Beim Redirect-Weg kommt die Seite neu hoch; ohne sichtbare Meldung
+    // saehe man nur wieder das Anmeldeformular.
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
+    setUserAgent(IPHONE);
+    const config = await renderLogin();
+
+    config.callbacks.signInFailure({
+      code: 'auth/credential-already-in-use',
+      message: 'Bereits vergeben',
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/auth\/credential-already-in-use: Bereits vergeben/),
+      ).toBeInTheDocument();
+    });
   });
 });

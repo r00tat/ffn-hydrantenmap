@@ -12,7 +12,6 @@ import {
   Auth,
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
-  getRedirectResult,
   sendEmailVerification,
   sendPasswordResetEmail,
   sendSignInLinkToEmail,
@@ -163,19 +162,6 @@ export default function StyledLoginButton({
       setError((err as any).message || `${err}`);
     }
   }, [auth, email]);
-
-  // Rueckkehr aus `signInWithRedirect` (iOS, siehe signInStrategy.ts).
-  //
-  // Angemeldet wird der Benutzer dabei ohnehin — das erledigt das SDK beim
-  // Initialisieren. Ohne diesen Aufruf bliebe aber ein **Fehler** auf dem
-  // Rueckweg unsichtbar: Die Seite kaeme wortlos wieder als Login-Formular
-  // hoch, und niemand wuesste warum.
-  useEffect(() => {
-    getRedirectResult(auth).catch((err) => {
-      console.error(`google redirect login failed`, err);
-      setError((err as any).message || `${err}`);
-    });
-  }, [auth]);
 
   useEffect(() => {
     (async () => {

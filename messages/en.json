@@ -1255,7 +1255,8 @@
     "intro": "Using the operations map requires a sign-in and manual account activation. Please sign in.",
     "capacitorDebug": "Capacitor debug",
     "alreadySignedIn": "You are already signed in.",
-    "goToProfile": "Go to profile"
+    "goToProfile": "Go to profile",
+    "signInFailed": "Sign-in failed"
   },
   "profile": {
     "pageTitle": "Profile",

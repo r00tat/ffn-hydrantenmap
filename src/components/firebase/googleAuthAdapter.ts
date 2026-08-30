@@ -124,7 +124,7 @@ export async function signInWithGoogle(auth: Auth): Promise<UserCredential> {
   // Popup-/Redirect-Weg in firebase-ui-login.tsx waehlt.
   if (shouldUseRedirectSignIn()) {
     // Gibt `Promise<never>` zurueck: die Seite navigiert weg. Das Ergebnis
-    // holt `getRedirectResult` beim naechsten Laden — siehe StyledLogin.
+    // holt das SDK beim naechsten Laden selbst aus dem Redirect ab.
     console.info('[googleAuthAdapter] using signInWithRedirect (web)');
     return signInWithRedirect(auth, googleProvider);
   }

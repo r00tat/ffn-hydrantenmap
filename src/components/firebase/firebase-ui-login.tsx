@@ -1,5 +1,7 @@
 'use client';
 
+import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
@@ -7,11 +9,15 @@ import {
 } from 'firebase/auth';
 import * as firebaseui from 'firebaseui';
 import 'firebaseui/dist/firebaseui.css';
-import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
 import { auth } from './firebase';
 import { shouldUseRedirectSignIn } from './signInStrategy';
 
 export default function FirebaseUiLogin() {
+  const t = useTranslations('login');
+  const [error, setError] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     const ui =
       firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth);
@@ -31,8 +37,19 @@ export default function FirebaseUiLogin() {
           // This is what should happen when the form is full loaded. In this example, I hide the loader element.
           document.getElementById('loader')!.style.display = 'none';
         },
+        // Ein Fehler hier darf nicht nur in der Konsole landen.
+        //
+        // Beim Redirect-Weg kommt die Seite nach dem Ausflug zu Google neu
+        // hoch. Scheitert dabei das Einloesen, sieht man ohne diese Meldung
+        // wieder das Anmeldeformular — als waere nichts geschehen, und ohne
+        // jeden Hinweis, woran es lag.
         signInFailure: function (error) {
-          console.warn('signInFailure', error);
+          console.error('[FirebaseUiLogin] signInFailure', error);
+          setError(
+            [error?.code, error?.message].filter(Boolean).join(': ') ||
+              `${error}`,
+          );
+          return Promise.resolve();
         },
       },
       // Popup ist der angenehmere Weg und bleibt ueberall dort, wo er
@@ -82,6 +99,12 @@ export default function FirebaseUiLogin() {
 
   return (
     <>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          <AlertTitle>{t('signInFailed')}</AlertTitle>
+          {error}
+        </Alert>
+      )}
       <div id="firebaseui-auth-container"></div>
       <div id="loader" className="text-center">
         Lade Login...
