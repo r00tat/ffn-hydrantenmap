@@ -7,13 +7,27 @@ import {
   View,
 } from '@react-pdf/renderer';
 import moment from 'moment';
-import type { AtemschutzRechnung } from '../../common/atemschutzRechnung';
+import {
+  zahlungszielDatum,
+  type AtemschutzRechnung,
+  type AtemschutzRechnungConfig,
+} from '../../common/atemschutzRechnung';
 import { formatCurrency } from '../../common/kostenersatz';
 
 function formatDate(iso?: string): string {
   if (!iso) return '';
   const m = moment(iso);
   return m.isValid() ? m.format('DD.MM.YYYY') : iso;
+}
+
+/**
+ * Überschrift des Zahlungsblocks. Ohne gepflegtes Zahlungsziel bleibt es bei
+ * der Aufforderung — ein erfundenes Datum wäre schlimmer als keines.
+ */
+function faelligText(faellig?: string): string {
+  return faellig
+    ? `Zahlbar bis ${formatDate(faellig)} auf folgendes Konto:`
+    : 'Bitte überweisen Sie den Betrag auf folgendes Konto:';
 }
 
 const styles = StyleSheet.create({
@@ -61,16 +75,34 @@ const styles = StyleSheet.create({
   },
   summeLabel: { fontFamily: 'Helvetica-Bold', marginRight: 12 },
   summeWert: { fontFamily: 'Helvetica-Bold' },
-  fuss: { marginTop: 28, fontSize: 9, color: '#444' },
+  absender: { fontSize: 9, color: '#444', marginBottom: 2 },
+  leistung: { marginBottom: 14 },
+  zahlung: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#f4f4f4',
+  },
+  zahlungTitel: { fontFamily: 'Helvetica-Bold', marginBottom: 4 },
+  zahlungZeile: { flexDirection: 'row', marginBottom: 2 },
+  zahlungLabel: { width: 110, color: '#444' },
+  fuss: { marginTop: 20, fontSize: 9, color: '#444' },
   rechtsgrundlage: { marginTop: 10, fontSize: 8, color: '#666' },
+  fusszeile: {
+    marginTop: 16,
+    paddingTop: 6,
+    borderTop: 0.5,
+    borderTopColor: '#ccc',
+    fontSize: 8,
+    color: '#666',
+  },
 });
 
 export interface FuellungRechnungPdfProps {
   rechnung: AtemschutzRechnung;
-  /** Absendende Feuerwehr — der Name aus dem Gruppendokument. */
+  /** Name aus dem Gruppendokument — Rückfall, wenn kein Absender gepflegt ist. */
   feuerwehrName: string;
-  /** Bankverbindung aus der Gruppen-Konfiguration; leer wird weggelassen. */
-  bankText: string;
+  /** Absender, Zahlungsdaten und Leistungstext der Gruppe. */
+  config: AtemschutzRechnungConfig;
   /** Absoluter Pfad zum Logo; `undefined` lässt den Kopf ohne Bild. */
   logoPath?: string;
 }
@@ -78,9 +110,14 @@ export interface FuellungRechnungPdfProps {
 export default function FuellungRechnungPdf({
   rechnung,
   feuerwehrName,
-  bankText,
+  config,
   logoPath,
 }: FuellungRechnungPdfProps) {
+  const absender = config.absenderName.trim() || feuerwehrName;
+  const kontoinhaber = config.kontoinhaber.trim() || absender;
+  const faellig = zahlungszielDatum(rechnung.datum, config.zahlungszielTage);
+  const hatBankdaten = !!config.iban.trim();
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -89,7 +126,13 @@ export default function FuellungRechnungPdf({
           {logoPath && <Image style={styles.logo} src={logoPath} />}
           <View>
             <Text style={styles.title}>Rechnung {rechnung.nummer}</Text>
-            <Text>{feuerwehrName}</Text>
+            <Text style={styles.absender}>{absender}</Text>
+            {!!config.absenderAdresse && (
+              <Text style={styles.absender}>{config.absenderAdresse}</Text>
+            )}
+            {!!config.absenderKontakt && (
+              <Text style={styles.absender}>{config.absenderKontakt}</Text>
+            )}
           </View>
         </View>
 
@@ -108,6 +151,12 @@ export default function FuellungRechnungPdf({
             {formatDate(rechnung.zeitraumBis)}
           </Text>
         </View>
+
+        {!!config.leistungstext && (
+          <View style={styles.leistung}>
+            <Text>{config.leistungstext}</Text>
+          </View>
+        )}
 
         <View style={styles.tableHead}>
           <Text style={styles.colDatum}>Datum</Text>
@@ -145,9 +194,35 @@ export default function FuellungRechnungPdf({
           </View>
         )}
 
-        {!!bankText && (
+        {hatBankdaten && (
+          <View style={styles.zahlung}>
+            <Text style={styles.zahlungTitel}>
+              {faelligText(faellig)}
+            </Text>
+            <View style={styles.zahlungZeile}>
+              <Text style={styles.zahlungLabel}>Empfänger</Text>
+              <Text>{kontoinhaber}</Text>
+            </View>
+            <View style={styles.zahlungZeile}>
+              <Text style={styles.zahlungLabel}>IBAN</Text>
+              <Text>{config.iban}</Text>
+            </View>
+            {!!config.bic.trim() && (
+              <View style={styles.zahlungZeile}>
+                <Text style={styles.zahlungLabel}>BIC</Text>
+                <Text>{config.bic}</Text>
+              </View>
+            )}
+            <View style={styles.zahlungZeile}>
+              <Text style={styles.zahlungLabel}>Verwendungszweck</Text>
+              <Text>{rechnung.nummer}</Text>
+            </View>
+          </View>
+        )}
+
+        {!!config.ustHinweis && (
           <View style={styles.fuss}>
-            <Text>{bankText}</Text>
+            <Text>{config.ustHinweis}</Text>
           </View>
         )}
 
@@ -155,6 +230,14 @@ export default function FuellungRechnungPdf({
           Verrechnet nach dem Tarif für das Füllen von Pressluftflaschen,
           Landesgesetzblatt Burgenland ({rechnung.rateVersion}).
         </Text>
+
+        {!!config.absenderKontakt && (
+          <Text style={styles.fusszeile}>
+            {absender}
+            {config.absenderAdresse ? ` · ${config.absenderAdresse}` : ''}
+            {` · ${config.absenderKontakt}`}
+          </Text>
+        )}
       </Page>
     </Document>
   );

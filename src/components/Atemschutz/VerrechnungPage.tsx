@@ -1,7 +1,12 @@
 'use client';
 
+import SettingsIcon from '@mui/icons-material/Settings';
+import Alert from '@mui/material/Alert';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
 import Container from '@mui/material/Container';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
@@ -11,6 +16,7 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -18,9 +24,12 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
   FUELLUNG_TARIF_IDS,
+  empfaengerFuerFeuerwehr,
   fuellungenNachFeuerwehr,
   offeneFuellungen,
+  rechnungConfigLuecken,
   rechnungStatusFarbe,
+  type AtemschutzEmpfaenger,
   type FeuerwehrBuendel,
 } from '../../common/atemschutzRechnung';
 import { KOSTENERSATZ_GROUP, formatCurrency } from '../../common/kostenersatz';
@@ -31,9 +40,12 @@ import useAtemschutzRechnungConfig from '../../hooks/useAtemschutzRechnungConfig
 import useAtemschutzRechnungen from '../../hooks/useAtemschutzRechnungen';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
 import { useKostenersatzRates } from '../../hooks/useKostenersatz';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
 import EmpfaengerDialog from './EmpfaengerDialog';
 import RechnungDialog from './RechnungDialog';
+import { deleteAtemschutzEmpfaenger } from './rechnungActions';
 
 /**
  * Statuslabel als feste Abbildung: Ein aus dem Status zusammengesetzter
@@ -47,8 +59,16 @@ const STATUS_LABEL = {
   cancelled: 'rechnung.status.cancelled',
 } as const;
 
+/** Wie STATUS_LABEL: fester Schlüssel, sonst greift die next-intl-Typisierung. */
+const LUECKE_LABEL: Record<string, 'rechnung.absenderName' | 'rechnung.absenderAdresse' | 'rechnung.iban'> = {
+  absenderName: 'rechnung.absenderName',
+  absenderAdresse: 'rechnung.absenderAdresse',
+  iban: 'rechnung.iban',
+};
+
 export default function VerrechnungPage() {
   const t = useTranslations('atemschutz');
+  const tCommon = useTranslations('common');
   const format = useFormatter();
   const router = useRouter();
   const { isAuthorized, groups: freigaben } = useFirebaseLogin();
@@ -60,11 +80,14 @@ export default function VerrechnungPage() {
   const rechnungen = useAtemschutzRechnungen(groupId);
   const empfaenger = useAtemschutzEmpfaenger(groupId);
   const config = useAtemschutzRechnungConfig(groupId);
-  const { geraeteById } = useAtemschutzGeraete(groupId);
+  const { geraeteById, feuerwehren } = useAtemschutzGeraete(groupId);
+  const feuerwehrName = useGroupFeuerwehrName(groupId);
   const { rates } = useKostenersatzRates();
 
   const [buendelOffen, setBuendelOffen] = useState<FeuerwehrBuendel>();
   const [empfaengerOffen, setEmpfaengerOffen] = useState(false);
+  const [empfaengerEdit, setEmpfaengerEdit] = useState<AtemschutzEmpfaenger>();
+  const [loeschKandidat, setLoeschKandidat] = useState<AtemschutzEmpfaenger>();
 
   const preise = useMemo(() => {
     const map: Record<string, number> = {};
@@ -83,6 +106,13 @@ export default function VerrechnungPage() {
     }
     return map;
   }, [geraeteById]);
+
+  // Ohne Absender und Bankverbindung ist die Rechnung ein Zettel: Der
+  // Empfänger weiß weder von wem sie kommt noch wohin er überweisen soll.
+  const luecken = useMemo(
+    () => rechnungConfigLuecken(config, feuerwehrName),
+    [config, feuerwehrName],
+  );
 
   const buendel = useMemo(
     () =>
@@ -149,6 +179,27 @@ export default function VerrechnungPage() {
         </Button>
       </Stack>
 
+      {luecken.length > 0 && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3 }}
+          action={
+            <Button
+              component={Link}
+              href="/admin/atemschutz"
+              size="small"
+              startIcon={<SettingsIcon />}
+            >
+              {t('rechnung.zuDenEinstellungen')}
+            </Button>
+          }
+        >
+          {t('rechnung.configUnvollstaendig', {
+            felder: luecken.map((f) => t(LUECKE_LABEL[f])).join(', '),
+          })}
+        </Alert>
+      )}
+
       <Typography variant="h6" gutterBottom>
         {t('rechnung.offene')}
       </Typography>
@@ -164,6 +215,7 @@ export default function VerrechnungPage() {
               </TableCell>
               <TableCell>{t('rechnung.spalteZeitraum')}</TableCell>
               <TableCell align="right">{t('rechnung.spalteSumme')}</TableCell>
+              <TableCell>{t('rechnung.spalteEmpfaenger')}</TableCell>
               <TableCell />
             </TableRow>
           </TableHead>
@@ -179,6 +231,15 @@ export default function VerrechnungPage() {
                   {format.dateTime(new Date(b.bis), { dateStyle: 'short' })}
                 </TableCell>
                 <TableCell align="right">{formatCurrency(b.summe)}</TableCell>
+                <TableCell>
+                  {empfaengerFuerFeuerwehr(empfaenger, b.feuerwehr)?.name ?? (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      label={t('rechnung.keinEmpfaenger')}
+                    />
+                  )}
+                </TableCell>
                 <TableCell align="right">
                   <Button size="small" onClick={() => setBuendelOffen(b)}>
                     {t('rechnung.create')}
@@ -236,6 +297,52 @@ export default function VerrechnungPage() {
         </Table>
       )}
 
+      <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+        {t('empfaenger.title')}
+      </Typography>
+      {empfaenger.length === 0 ? (
+        <Typography>{t('empfaenger.keine')}</Typography>
+      ) : (
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>{t('empfaenger.name')}</TableCell>
+              <TableCell>{t('empfaenger.feuerwehrKurz')}</TableCell>
+              <TableCell>{t('empfaenger.email')}</TableCell>
+              <TableCell>{t('empfaenger.active')}</TableCell>
+              <TableCell />
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {empfaenger.map((e) => (
+              <TableRow key={e.id}>
+                <TableCell>{e.name}</TableCell>
+                <TableCell>{e.feuerwehr}</TableCell>
+                <TableCell>{e.email}</TableCell>
+                <TableCell>
+                  {e.active ? t('empfaenger.ja') : t('empfaenger.nein')}
+                </TableCell>
+                <TableCell align="right">
+                  <Tooltip title={t('empfaenger.edit')}>
+                    <IconButton
+                      size="small"
+                      onClick={() => setEmpfaengerEdit(e)}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={t('empfaenger.delete')}>
+                    <IconButton size="small" onClick={() => setLoeschKandidat(e)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
       {buendelOffen && groupId && (
         <RechnungDialog
           open
@@ -245,6 +352,7 @@ export default function VerrechnungPage() {
           preise={preise}
           vorgabeTarif={config.vorgabeTarif}
           volumen={volumen}
+          feuerwehren={feuerwehren}
           onClose={() => setBuendelOffen(undefined)}
           onCreated={(rechnungId) => {
             setBuendelOffen(undefined);
@@ -257,8 +365,41 @@ export default function VerrechnungPage() {
         <EmpfaengerDialog
           open
           groupId={groupId}
+          feuerwehren={feuerwehren}
           onClose={() => setEmpfaengerOffen(false)}
           onSaved={() => setEmpfaengerOffen(false)}
+        />
+      )}
+
+      {/* `key` erzwingt einen frischen Dialog je Eintrag — die Felder stehen
+          im State und würden sonst den vorigen Empfänger weiterzeigen. */}
+      {empfaengerEdit && groupId && (
+        <EmpfaengerDialog
+          open
+          key={empfaengerEdit.id}
+          groupId={groupId}
+          empfaenger={empfaengerEdit}
+          feuerwehren={feuerwehren}
+          onClose={() => setEmpfaengerEdit(undefined)}
+          onSaved={() => setEmpfaengerEdit(undefined)}
+        />
+      )}
+
+      {loeschKandidat && groupId && (
+        <ConfirmDialog
+          title={tCommon('confirmTitle')}
+          text={t('empfaenger.deleteConfirm', { name: loeschKandidat.name })}
+          yes={tCommon('yes')}
+          no={tCommon('no')}
+          onConfirm={(confirmed) => {
+            if (confirmed && loeschKandidat.id) {
+              void deleteAtemschutzEmpfaenger({
+                groupId,
+                empfaengerId: loeschKandidat.id,
+              });
+            }
+            setLoeschKandidat(undefined);
+          }}
         />
       )}
     </Container>

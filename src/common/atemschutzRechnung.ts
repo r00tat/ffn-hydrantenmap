@@ -111,8 +111,29 @@ export interface AtemschutzRechnungConfig {
   ccEmail: string;
   subjectTemplate: string;
   bodyTemplate: string;
-  /** Bankverbindung im Fuß des PDF — jede Wehr hat ihre eigene. */
-  bankText: string;
+  /**
+   * Absender auf der Rechnung. Leer heißt: der `feuerwehrName` aus dem
+   * Gruppendokument. Eigenes Feld, weil auf einer Rechnung der volle Name
+   * stehen soll („Freiwillige Feuerwehr …"), während `feuerwehrName` die
+   * Schreibweise der Stammdaten trägt.
+   */
+  absenderName: string;
+  absenderAdresse: string;
+  /** Telefon, Web, E-Mail — eine Zeile im Fuß. */
+  absenderKontakt: string;
+  /** Wofür die Rechnung ausgestellt wird, als Satz über der Tabelle. */
+  leistungstext: string;
+  kontoinhaber: string;
+  iban: string;
+  bic: string;
+  /** Tage ab Rechnungsdatum. 0 heißt: kein Zahlungsziel angeben. */
+  zahlungszielTage: number;
+  /**
+   * Hinweis zur Umsatzsteuer. Bewusst ohne Vorgabetext: Ob und wie eine
+   * Feuerwehr hier unternehmerisch tätig wird, ist ihre eigene steuerliche
+   * Beurteilung und gehört nicht als Behauptung in den Code.
+   */
+  ustHinweis: string;
   vorgabeTarif: string;
   /** Laufende Nummer je Jahr, in einer Transaktion hochgezählt. */
   nummernkreis?: Record<string, number>;
@@ -134,9 +155,60 @@ export const DEFAULT_RECHNUNG_CONFIG: AtemschutzRechnungConfig = {
 anbei die Rechnung {{ rechnung.nummer }} über {{ rechnung.flaschen }} Flaschenfüllungen im Zeitraum {{ rechnung.zeitraum }}.
 
 Mit kameradschaftlichen Grüßen`,
-  bankText: '',
+  absenderName: '',
+  absenderAdresse: '',
+  absenderKontakt: '',
+  leistungstext:
+    'Für das Füllen von Pressluftflaschen Ihrer Feuerwehr verrechnen wir die folgenden Positionen.',
+  kontoinhaber: '',
+  iban: '',
+  bic: '',
+  zahlungszielTage: 14,
+  ustHinweis: '',
   vorgabeTarif: TARIF_BIS_6L,
 };
+
+/**
+ * Zahlungsziel als ISO-Datum, oder `undefined` bei `tage <= 0`.
+ *
+ * Rein, damit PDF und Vorschau dasselbe Datum zeigen.
+ */
+export function zahlungszielDatum(
+  rechnungsdatum: string,
+  tage: number,
+): string | undefined {
+  if (!rechnungsdatum || !tage || tage <= 0) return undefined;
+  const datum = new Date(rechnungsdatum);
+  if (Number.isNaN(datum.getTime())) return undefined;
+  // `setUTCDate` und nicht `setDate`: In Ortszeit verschiebt die
+  // Zeitumstellung das Ergebnis um eine Stunde, und auf einem UTC-Server
+  // (Cloud Run rendert das PDF) fiele das Zahlungsziel dann einen Tag zu
+  // früh aus.
+  datum.setUTCDate(datum.getUTCDate() + tage);
+  return datum.toISOString();
+}
+
+/**
+ * Fehlt etwas, ohne das die Rechnung unbrauchbar ist? Absender und
+ * Bankverbindung sind der Unterschied zwischen einem Beleg und einem Zettel.
+ */
+export function rechnungConfigLuecken(
+  config: AtemschutzRechnungConfig,
+  feuerwehrName?: string,
+): string[] {
+  // Nachsichtig gegenüber fehlenden Feldern: Ein Dokument aus der Zeit vor
+  // diesen Feldern trägt sie nicht, und ein Absturz beim Prüfen auf
+  // Vollständigkeit wäre das Gegenteil des Zwecks.
+  const gefuellt = (wert?: string) => !!wert?.trim();
+
+  const luecken: string[] = [];
+  if (!gefuellt(config.absenderName) && !gefuellt(feuerwehrName)) {
+    luecken.push('absenderName');
+  }
+  if (!gefuellt(config.absenderAdresse)) luecken.push('absenderAdresse');
+  if (!gefuellt(config.iban)) luecken.push('iban');
+  return luecken;
+}
 
 /** Zu verrechnen und noch keiner Rechnung zugeordnet. */
 export function offeneFuellungen(

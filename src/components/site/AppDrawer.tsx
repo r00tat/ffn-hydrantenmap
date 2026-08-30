@@ -64,7 +64,6 @@ import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { hasAnyGroupAdminRole } from '../../common/groupPermissions';
-import { KOSTENERSATZ_GROUP } from '../../common/kostenersatz';
 import { hasAnyFahrtenbuchManagerRole } from '../Fahrtenbuch/managerPermissions';
 import { useBugReport } from '../bugReport/BugReportProvider';
 
@@ -86,12 +85,6 @@ interface DrawerLink {
    * Gerätemeister, der mit der Atemschutz-Ausrüstung nichts zu tun hat.
    */
   groupAdminOnly?: boolean;
-  /**
-   * Sichtbar nur mit der Kostenersatz-Freischaltung. Eigenes Flag wie
-   * `groupAdminOnly`: Die Verrechnung der Füllungen hängt an derselben
-   * Berechtigung wie der Kostenersatz, nicht an einer Admin-Rolle.
-   */
-  kostenersatzOnly?: boolean;
   signedInOnly?: boolean;
   /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
   einsatzSection?: string;
@@ -192,15 +185,8 @@ export default function AppDrawer({
     },
     [setIsOpen],
   );
-  const {
-    isAdmin,
-    isSignedIn,
-    fahrtenbuchGeraetemeister,
-    groupAdmin,
-    // `groups` heißt in dieser Datei bereits die Menüstruktur — die Freigaben
-    // des Benutzers brauchen deshalb einen eigenen Namen.
-    groups: userGroups,
-  } = useFirebaseLogin();
+  const { isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin } =
+    useFirebaseLogin();
   const firecallId = useFirecallId();
   const pathname = usePathname();
   const t = useTranslations('drawer');
@@ -345,16 +331,6 @@ export default function AppDrawer({
           text: t('fuellprotokoll'),
           icon: <PropaneTankIcon />,
           href: '/atemschutz/fuellprotokoll',
-        },
-        {
-          // Neben dem Füllprotokoll und nicht unter „Verwaltung": Die
-          // Verrechnung ist die Fortsetzung derselben Arbeit — was gefüllt
-          // wurde, wird abgerechnet. Sichtbar nur mit der
-          // Kostenersatz-Freischaltung.
-          text: t('verrechnung'),
-          icon: <ReceiptLongIcon />,
-          href: '/atemschutz/verrechnung',
-          kostenersatzOnly: true,
         },
       ],
     },
@@ -565,9 +541,8 @@ export default function AppDrawer({
           groupAdmin,
         })) &&
       (!item.groupAdminOnly || hasAnyGroupAdminRole({ isAdmin, groupAdmin })) &&
-      (!item.kostenersatzOnly || !!userGroups?.includes(KOSTENERSATZ_GROUP)) &&
       (isSignedIn || !item.signedInOnly),
-    [isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin, userGroups],
+    [isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin],
   );
 
   const renderLink = (item: DrawerLink, groupText?: string) => {

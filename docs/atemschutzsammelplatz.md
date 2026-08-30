@@ -248,12 +248,47 @@ Die Konfiguration (Betreff, Text, CC, Bankverbindung, Vorgabetarif) hängt
 dagegen an `actionGroupAdminRequired`: Sie gilt für alle Rechnungen der Gruppe
 und ist keine Tagesarbeit.
 
+### Wo die Rechnungsstammdaten stehen
+
+Absender, Anschrift, Kontakt, Kontoinhaber, IBAN, BIC, Zahlungsziel,
+Umsatzsteuerhinweis und der Leistungstext liegen in
+`atemschutzConfig/rechnung` und werden unter `/admin/atemschutz` gepflegt
+(Gruppen-Admin). Fest verdrahtet wie im Kostenersatz-PDF, das Absender und
+IBAN der FF Neusiedl am See im Code trägt, geht hier nicht: Die Füllrechnung
+stellt jede Gruppe unter ihrem eigenen Namen.
+
+Fehlen Absender, Anschrift oder IBAN, steht auf der Verrechnungsseite ein
+Hinweis mit Sprung in die Einstellungen — ohne diese Angaben weiß der
+Empfänger weder, von wem die Rechnung kommt, noch wohin er überweisen soll.
+
+Zum Umsatzsteuerhinweis gibt es **bewusst keinen Vorgabetext**: Ob und wie eine
+Feuerwehr hier unternehmerisch tätig wird, ist ihre eigene steuerliche
+Beurteilung und gehört nicht als Behauptung in den Code.
+
+Das Zahlungsziel wird in **UTC** gerechnet (`setUTCDate`). In Ortszeit
+verschöbe die Zeitumstellung das Ergebnis um eine Stunde, und da das PDF
+serverseitig auf einem UTC-Host entsteht, fiele das Fälligkeitsdatum dann
+einen Tag zu früh aus.
+
 ### Der Empfänger wird in die Rechnung kopiert
 
 Die Rechnung trägt Name, Anschrift und E-Mail als eingebettete Kopie, nicht als
 Verweis ins Adressbuch. `empfaengerId` bleibt nur als Herkunftsnachweis stehen
 und wird nie nachgelesen. Sonst änderte eine gepflegte Adresse rückwirkend
 eine bereits verschickte Rechnung.
+
+### Die Feuerwehr am Empfänger ist der Zuordnungsschlüssel
+
+`empfaengerFuerFeuerwehr` vergleicht über `normalizeCode` gegen die
+`feuerwehr` an der Flasche. „FF Podersdorf" trifft „Podersdorf" damit *nicht*.
+Deshalb ist das Feld im Empfängerdialog eine Auswahl über die Schreibweisen,
+die tatsächlich in den Gerätestammdaten stehen, und warnt bei einem Wert, der
+zu keiner davon passt.
+
+Bewusst **kein** unscharfer Vergleich, der ein vorangestelltes „FF" oder
+„Freiwillige Feuerwehr" wegschneidet: Das wäre geraten und könnte zwei
+verschiedene Wehren zusammenwerfen. Die Auswahl macht das Problem stattdessen
+unmöglich.
 
 ### Was das Storno mit `verrechnen` macht: nichts
 

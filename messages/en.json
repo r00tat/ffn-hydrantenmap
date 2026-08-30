@@ -324,14 +324,34 @@
       "subjectTemplate": "Subject template",
       "bodyTemplate": "Message template",
       "platzhalter": "Placeholders, each to be wrapped in double curly braces: rechnung.nummer, rechnung.summe, rechnung.flaschen, rechnung.zeitraum, rechnung.datum, empfaenger.name, feuerwehr.name",
-      "bankText": "Bank details in the PDF",
-      "bankTextHelp": "Appears in the footer of every invoice.",
       "status": {
         "draft": "Draft",
         "sent": "Sent",
         "paid": "Paid",
         "cancelled": "Cancelled"
-      }
+      },
+      "keinEmpfaenger": "No recipient",
+      "gruppeAbsender": "Sender on the invoice",
+      "gruppeZahlung": "Payment",
+      "gruppeText": "Texts",
+      "absenderName": "Sender",
+      "absenderNameHelp": "Full name, e.g. \"Freiwillige Feuerwehr Neusiedl am See\". Empty: the name from the group document.",
+      "absenderAdresse": "Address",
+      "absenderKontakt": "Contact",
+      "absenderKontaktHelp": "A single footer line, e.g. phone, email and website.",
+      "kontoinhaber": "Account holder",
+      "kontoinhaberHelp": "Empty: the sender.",
+      "iban": "IBAN",
+      "ibanHelp": "Without an IBAN the invoice carries no payment block.",
+      "bic": "BIC",
+      "zahlungszielTage": "Payment term in days",
+      "zahlungszielTageHelp": "0: state no payment term.",
+      "ustHinweis": "VAT note",
+      "ustHinweisHelp": "Shown below the payment block. No default — the fire brigade makes its own tax assessment.",
+      "leistungstext": "Service description",
+      "leistungstextHelp": "Appears above the line items and states what the invoice is for.",
+      "configUnvollstaendig": "The invoice master data is incomplete: {felder}. Without it the recipient has no sender and no payment details.",
+      "zuDenEinstellungen": "Settings"
     },
     "empfaenger": {
       "createTitle": "Add recipient",
@@ -345,7 +365,16 @@
       "telefon": "Phone",
       "active": "Active",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "title": "Recipients",
+      "keine": "No recipient created yet.",
+      "feuerwehrKurz": "Fire brigade on the cylinder",
+      "feuerwehrKeinTreffer": "No cylinder carries this spelling — the match will not work. Please pick one from the list.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteConfirm": "Really delete the recipient \"{name}\"?",
+      "ja": "Yes",
+      "nein": "No"
     }
   },
   "common": {
@@ -750,8 +779,7 @@
     "users": "Users",
     "connectedApps": "Connected applications",
     "adminMcp": "MCP access",
-    "fuellprotokoll": "Filling log",
-    "verrechnung": "Invoicing"
+    "fuellprotokoll": "Filling log"
   },
   "fahrtenbuch": {
     "title": "Trip log",

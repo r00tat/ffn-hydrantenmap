@@ -75,6 +75,7 @@ function render(over: Partial<React.ComponentProps<typeof RechnungDialog>> = {})
       preise={PREISE}
       vorgabeTarif="5.01"
       volumen={{}}
+      feuerwehren={['Winden am See']}
       onClose={vi.fn()}
       onCreated={vi.fn()}
       {...over}

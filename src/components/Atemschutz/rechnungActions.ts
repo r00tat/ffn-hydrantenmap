@@ -257,7 +257,7 @@ async function baueRechnungPdf(
     FuellungRechnungPdf({
       rechnung,
       feuerwehrName,
-      bankText: config.bankText,
+      config,
       logoPath: LOGO_PATH,
     }),
   );
@@ -574,7 +574,22 @@ export async function saveAtemschutzRechnungConfig(request: {
           DEFAULT_RECHNUNG_CONFIG.subjectTemplate,
         bodyTemplate:
           trimmed(config.bodyTemplate) ?? DEFAULT_RECHNUNG_CONFIG.bodyTemplate,
-        bankText: trimmed(config.bankText) ?? '',
+        absenderName: trimmed(config.absenderName) ?? '',
+        absenderAdresse: trimmed(config.absenderAdresse) ?? '',
+        absenderKontakt: trimmed(config.absenderKontakt) ?? '',
+        leistungstext:
+          trimmed(config.leistungstext) ?? DEFAULT_RECHNUNG_CONFIG.leistungstext,
+        kontoinhaber: trimmed(config.kontoinhaber) ?? '',
+        // Leerzeichen in der IBAN sind üblich und beim Abtippen hilfreich —
+        // gespeichert wird die Eingabe, nur ohne Rand.
+        iban: trimmed(config.iban) ?? '',
+        bic: trimmed(config.bic) ?? '',
+        zahlungszielTage:
+          Number.isFinite(config.zahlungszielTage) &&
+          config.zahlungszielTage >= 0
+            ? Math.floor(config.zahlungszielTage)
+            : DEFAULT_RECHNUNG_CONFIG.zahlungszielTage,
+        ustHinweis: trimmed(config.ustHinweis) ?? '',
         vorgabeTarif: FUELLUNG_TARIF_IDS.includes(config.vorgabeTarif)
           ? config.vorgabeTarif
           : DEFAULT_RECHNUNG_CONFIG.vorgabeTarif,

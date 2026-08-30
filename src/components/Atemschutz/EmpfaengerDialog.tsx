@@ -1,6 +1,7 @@
 'use client';
 
 import Alert from '@mui/material/Alert';
+import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -12,6 +13,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { normalizeCode } from '../../common/atemschutz';
 import type { AtemschutzEmpfaenger } from '../../common/atemschutzRechnung';
 import { saveAtemschutzEmpfaenger } from './rechnungActions';
 
@@ -22,6 +24,11 @@ export interface EmpfaengerDialogProps {
   empfaenger?: AtemschutzEmpfaenger;
   /** Vorbelegung der Feuerwehr beim Anlegen aus einem Bündel heraus. */
   feuerwehrVorgabe?: string;
+  /**
+   * Die Schreibweisen, die an den Flaschen stehen. Der Zuordnungsschlüssel
+   * ist genau dieses Feld — deshalb zur Auswahl statt als Freitext.
+   */
+  feuerwehren: string[];
   onClose: () => void;
   onSaved: (empfaengerId: string) => void;
 }
@@ -31,6 +38,7 @@ export default function EmpfaengerDialog({
   groupId,
   empfaenger,
   feuerwehrVorgabe,
+  feuerwehren,
   onClose,
   onSaved,
 }: EmpfaengerDialogProps) {
@@ -52,6 +60,14 @@ export default function EmpfaengerDialog({
   // Dieselbe Prüfung wie in der Action — der Fehler soll vor dem Absenden
   // auffallen, nicht erst als Rückmeldung vom Server.
   const unvollstaendig = !feuerwehr.trim() || !name.trim() || !email.trim();
+
+  // Der Abgleich läuft über `normalizeCode` gegen die Feuerwehr an der
+  // Flasche. „FF Podersdorf" trifft „Podersdorf" damit *nicht* — ohne diesen
+  // Hinweis fiele das erst auf, wenn die Rechnung keinen Empfänger findet.
+  const passtZuKeiner =
+    !!feuerwehr.trim() &&
+    feuerwehren.length > 0 &&
+    !feuerwehren.some((f) => normalizeCode(f) === normalizeCode(feuerwehr));
 
   const handleSave = async () => {
     setSpeichert(true);
@@ -88,13 +104,26 @@ export default function EmpfaengerDialog({
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {fehler && <Alert severity="error">{t(`errors.${fehler}` as 'errors.saveFailed')}</Alert>}
-          <TextField
-            label={t('empfaenger.feuerwehr')}
+          <Autocomplete
+            freeSolo
+            options={feuerwehren}
             value={feuerwehr}
-            onChange={(e) => setFeuerwehr(e.target.value)}
-            required
-            fullWidth
-            helperText={t('empfaenger.feuerwehrHelp')}
+            onChange={(_, wert) => setFeuerwehr(wert ?? '')}
+            onInputChange={(_, wert) => setFeuerwehr(wert)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t('empfaenger.feuerwehr')}
+                required
+                fullWidth
+                error={passtZuKeiner}
+                helperText={
+                  passtZuKeiner
+                    ? t('empfaenger.feuerwehrKeinTreffer')
+                    : t('empfaenger.feuerwehrHelp')
+                }
+              />
+            )}
           />
           <TextField
             label={t('empfaenger.name')}

@@ -11,8 +11,10 @@ import {
   offeneFuellungen,
   rechnungPositionen,
   rechnungStatusErlaubt,
+  rechnungConfigLuecken,
   rechnungStatusFarbe,
   rechnungSumme,
+  zahlungszielDatum,
   zeitraumDerPositionen,
   type AtemschutzEmpfaenger,
 } from './atemschutzRechnung';
@@ -262,5 +264,70 @@ describe('rechnungStatusFarbe', () => {
     expect(rechnungStatusFarbe('sent')).toBe('primary');
     expect(rechnungStatusFarbe('paid')).toBe('success');
     expect(rechnungStatusFarbe('cancelled')).toBe('error');
+  });
+});
+
+describe('zahlungszielDatum', () => {
+  it('rechnet die Tage auf das Rechnungsdatum', () => {
+    expect(zahlungszielDatum('2026-03-05T00:00:00.000Z', 14)).toBe(
+      '2026-03-19T00:00:00.000Z',
+    );
+  });
+
+  it('verschiebt sich an der Zeitumstellung nicht', () => {
+    // 20.03. + 14 Tage überspringt den Beginn der Sommerzeit. In Ortszeit
+    // gerechnet käme hier 02.04. 23:00 UTC heraus — auf einem UTC-Server
+    // stünde dann der 2. statt des 3. April auf der Rechnung.
+    expect(zahlungszielDatum('2026-03-20T00:00:00.000Z', 14)).toBe(
+      '2026-04-03T00:00:00.000Z',
+    );
+  });
+
+  it('lässt das Ziel weg, wenn keine Frist gesetzt ist', () => {
+    expect(zahlungszielDatum('2026-03-20T00:00:00.000Z', 0)).toBeUndefined();
+  });
+
+  it('erfindet kein Datum aus einer unlesbaren Eingabe', () => {
+    expect(zahlungszielDatum('kein Datum', 14)).toBeUndefined();
+    expect(zahlungszielDatum('', 14)).toBeUndefined();
+  });
+});
+
+describe('rechnungConfigLuecken', () => {
+  const vollstaendig = {
+    ...DEFAULT_RECHNUNG_CONFIG,
+    absenderName: 'FF Neusiedl am See',
+    absenderAdresse: 'Satzgasse 9',
+    iban: 'AT40 3300 0000 0202 0402',
+  };
+
+  it('meldet nichts, wenn Absender und Konto stehen', () => {
+    expect(rechnungConfigLuecken(vollstaendig)).toEqual([]);
+  });
+
+  it('nimmt den Gruppennamen als Absender an', () => {
+    expect(
+      rechnungConfigLuecken(
+        { ...vollstaendig, absenderName: '' },
+        'Neusiedl am See',
+      ),
+    ).toEqual([]);
+  });
+
+  it('benennt die fehlenden Felder', () => {
+    expect(rechnungConfigLuecken(DEFAULT_RECHNUNG_CONFIG)).toEqual([
+      'absenderName',
+      'absenderAdresse',
+      'iban',
+    ]);
+  });
+
+  it('stürzt an einem Dokument ohne die neuen Felder nicht ab', () => {
+    const alt = { vorgabeTarif: TARIF_BIS_6L } as never;
+    expect(rechnungConfigLuecken(alt)).toEqual([
+      'absenderName',
+      'absenderAdresse',
+      'iban',
+    ]);
   });
 });

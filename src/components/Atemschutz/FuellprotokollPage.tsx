@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
@@ -8,9 +10,11 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import type { FuellungInput } from '../../common/atemschutz';
+import { KOSTENERSATZ_GROUP } from '../../common/kostenersatz';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useFahrtenbuchFirecalls from '../../hooks/useFahrtenbuchFirecalls';
@@ -37,7 +41,9 @@ export default function FuellprotokollPage() {
   const t = useTranslations('atemschutz');
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { email, displayName, uid } = useFirebaseLogin();
+  // `groups` heißt hier bereits die Gruppenauswahl des Umschalters — die
+  // Freigaben des Benutzers brauchen deshalb einen eigenen Namen.
+  const { email, displayName, uid, groups: freigaben } = useFirebaseLogin();
 
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const eigeneFeuerwehr = useGroupFeuerwehrName(groupId);
@@ -145,9 +151,29 @@ export default function FuellprotokollPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        {t('fuellprotokoll.title')}
-      </Typography>
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ mb: 1, alignItems: 'center', flexWrap: 'wrap' }}
+      >
+        <Typography variant="h4" sx={{ flexGrow: 1 }}>
+          {t('fuellprotokoll.title')}
+        </Typography>
+        {/* Die Verrechnung steht hier und nicht im Menü: Sie ist die
+            Fortsetzung derselben Arbeit — was gefüllt wurde, wird
+            abgerechnet — und unter „Fahrzeuge" war sie nicht zu finden.
+            Sichtbar nur mit der Kostenersatz-Freischaltung, derselben
+            Bedingung wie auf der Zielseite. */}
+        {freigaben?.includes(KOSTENERSATZ_GROUP) && (
+          <Button
+            component={Link}
+            href="/atemschutz/verrechnung"
+            startIcon={<ReceiptLongIcon />}
+          >
+            {t('rechnung.title')}
+          </Button>
+        )}
+      </Stack>
 
       <Stack
         direction="row"

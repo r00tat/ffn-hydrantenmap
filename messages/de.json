@@ -324,14 +324,34 @@
       "subjectTemplate": "Betreffvorlage",
       "bodyTemplate": "Textvorlage",
       "platzhalter": "Platzhalter, jeweils in doppelte geschweifte Klammern zu setzen: rechnung.nummer, rechnung.summe, rechnung.flaschen, rechnung.zeitraum, rechnung.datum, empfaenger.name, feuerwehr.name",
-      "bankText": "Bankverbindung im PDF",
-      "bankTextHelp": "Erscheint im Fuß jeder Rechnung.",
       "status": {
         "draft": "Entwurf",
         "sent": "Verschickt",
         "paid": "Bezahlt",
         "cancelled": "Storniert"
-      }
+      },
+      "keinEmpfaenger": "Kein Empfänger",
+      "gruppeAbsender": "Absender auf der Rechnung",
+      "gruppeZahlung": "Zahlung",
+      "gruppeText": "Texte",
+      "absenderName": "Absender",
+      "absenderNameHelp": "Voller Name, z.B. „Freiwillige Feuerwehr Neusiedl am See\". Leer: der Name aus dem Gruppendokument.",
+      "absenderAdresse": "Anschrift",
+      "absenderKontakt": "Kontakt",
+      "absenderKontaktHelp": "Eine Zeile für den Fuß, z.B. Telefon, E-Mail und Website.",
+      "kontoinhaber": "Kontoinhaber",
+      "kontoinhaberHelp": "Leer: der Absender.",
+      "iban": "IBAN",
+      "ibanHelp": "Ohne IBAN steht auf der Rechnung kein Zahlungsblock.",
+      "bic": "BIC",
+      "zahlungszielTage": "Zahlungsziel in Tagen",
+      "zahlungszielTageHelp": "0: kein Zahlungsziel angeben.",
+      "ustHinweis": "Hinweis zur Umsatzsteuer",
+      "ustHinweisHelp": "Erscheint unter dem Zahlungsblock. Ohne Vorgabe — die steuerliche Beurteilung trifft die Feuerwehr selbst.",
+      "leistungstext": "Leistungstext",
+      "leistungstextHelp": "Steht über der Positionstabelle und sagt, wofür die Rechnung ausgestellt wird.",
+      "configUnvollstaendig": "Die Rechnungsstammdaten sind unvollständig: {felder}. Ohne sie fehlen dem Empfänger Absender und Überweisungsdaten.",
+      "zuDenEinstellungen": "Einstellungen"
     },
     "empfaenger": {
       "createTitle": "Empfänger anlegen",
@@ -345,7 +365,16 @@
       "telefon": "Telefon",
       "active": "Aktiv",
       "save": "Speichern",
-      "cancel": "Abbrechen"
+      "cancel": "Abbrechen",
+      "title": "Empfänger",
+      "keine": "Noch kein Empfänger angelegt.",
+      "feuerwehrKurz": "Feuerwehr an der Flasche",
+      "feuerwehrKeinTreffer": "Diese Schreibweise steht an keiner Flasche — die Zuordnung greift dann nicht. Bitte aus der Liste wählen.",
+      "edit": "Ändern",
+      "delete": "Löschen",
+      "deleteConfirm": "Soll der Empfänger „{name}“ wirklich gelöscht werden?",
+      "ja": "Ja",
+      "nein": "Nein"
     }
   },
   "common": {
@@ -750,8 +779,7 @@
     "users": "Users",
     "connectedApps": "Verbundene Anwendungen",
     "adminMcp": "MCP-Zugänge",
-    "fuellprotokoll": "Füllprotokoll",
-    "verrechnung": "Verrechnung"
+    "fuellprotokoll": "Füllprotokoll"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",

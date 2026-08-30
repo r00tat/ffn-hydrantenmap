@@ -43,6 +43,8 @@ export interface RechnungDialogProps {
   preise: Record<string, number>;
   vorgabeTarif: string;
   volumen: Record<string, number>;
+  /** Schreibweisen an den Flaschen — für das Feuerwehr-Feld im Empfänger. */
+  feuerwehren: string[];
   onClose: () => void;
   onCreated: (rechnungId: string) => void;
 }
@@ -59,6 +61,7 @@ export default function RechnungDialog({
   preise,
   vorgabeTarif,
   volumen,
+  feuerwehren,
   onClose,
   onCreated,
 }: RechnungDialogProps) {
@@ -296,6 +299,7 @@ export default function RechnungDialog({
           open
           groupId={groupId}
           feuerwehrVorgabe={buendel.feuerwehr}
+          feuerwehren={feuerwehren}
           onClose={() => setEmpfaengerOffen(false)}
           onSaved={(id) => setEmpfaengerId(id)}
         />

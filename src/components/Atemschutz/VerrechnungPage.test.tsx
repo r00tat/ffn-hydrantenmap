@@ -34,7 +34,15 @@ vi.mock('../../hooks/useAtemschutzRechnungConfig', () => ({
     ccEmail: '',
     subjectTemplate: 'Rechnung',
     bodyTemplate: 'Text',
-    bankText: '',
+    absenderName: 'Freiwillige Feuerwehr Neusiedl am See',
+    absenderAdresse: 'Satzgasse 9, 7100 Neusiedl am See',
+    absenderKontakt: '',
+    leistungstext: 'Für das Füllen von Pressluftflaschen',
+    kontoinhaber: '',
+    iban: 'AT40 3300 0000 0202 0402',
+    bic: '',
+    zahlungszielTage: 14,
+    ustHinweis: '',
     vorgabeTarif: '5.01',
   }),
 }));
@@ -60,6 +68,10 @@ vi.mock('../../hooks/useFahrtenbuchGroup', () => ({
 
 vi.mock('../../hooks/useFirebaseLogin', () => ({
   default: loginMock,
+}));
+
+vi.mock('../../hooks/useGroupFeuerwehrName', () => ({
+  default: () => 'Neusiedl am See',
 }));
 
 vi.mock('../../hooks/useKostenersatz', () => ({
