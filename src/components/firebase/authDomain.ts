@@ -25,6 +25,9 @@
  *    Geraet um und merkt sich die Wahl,
  * 3. der gemerkte Wert im `localStorage`.
  *
+ * Ob dann Popup oder Redirect gewaehlt wird, entscheidet signInStrategy.ts —
+ * das ist eine eigene Frage und hat mit `?signInFlow=` einen eigenen Schalter.
+ *
  * Damit laesst sich der neue Weg auf einem einzelnen Geraet ausprobieren,
  * ohne fuer alle anderen etwas zu aendern.
  *
@@ -46,35 +49,45 @@ export interface AuthProxyWindow {
   localStorage: Pick<Storage, 'getItem' | 'setItem'>;
 }
 
-function currentWindow(): AuthProxyWindow | undefined {
+export function currentWindow(): AuthProxyWindow | undefined {
   return typeof window === 'undefined'
     ? undefined
     : (window as unknown as AuthProxyWindow);
 }
 
-function parseFlag(value: string | null): boolean | undefined {
+function parseFlag(value: string | undefined): boolean | undefined {
   if (value === '1' || value === 'true') return true;
   if (value === '0' || value === 'false') return false;
   return undefined;
 }
 
 /**
+ * Ein geraetelokaler Schalter: steht er in der URL, gilt er und wird gemerkt;
+ * sonst zaehlt der gemerkte Wert. `undefined` heisst „nichts gewaehlt" — dann
+ * entscheidet der Aufrufer.
+ *
  * `localStorage` wirft im privaten Modus und wenn Website-Daten gesperrt sind.
- * Ein Fehler beim Merken darf den Login nicht mitnehmen.
+ * Ein Fehler beim Lesen oder Merken darf den Login nicht mitnehmen.
  */
-function readStored(win: AuthProxyWindow): boolean | undefined {
+export function readDeviceSwitch(
+  win: AuthProxyWindow,
+  queryParam: string,
+  storageKey: string,
+): string | undefined {
+  const fromQuery = new URLSearchParams(win.location.search).get(queryParam);
+  if (fromQuery !== null) {
+    try {
+      win.localStorage.setItem(storageKey, fromQuery);
+    } catch {
+      // Dann gilt die Wahl eben nur fuer diesen Seitenaufruf.
+    }
+    return fromQuery;
+  }
+
   try {
-    return parseFlag(win.localStorage.getItem(AUTH_PROXY_STORAGE_KEY));
+    return win.localStorage.getItem(storageKey) ?? undefined;
   } catch {
     return undefined;
-  }
-}
-
-function writeStored(win: AuthProxyWindow, enabled: boolean): void {
-  try {
-    win.localStorage.setItem(AUTH_PROXY_STORAGE_KEY, String(enabled));
-  } catch {
-    // Dann gilt die Wahl eben nur fuer diesen Seitenaufruf.
   }
 }
 
@@ -83,16 +96,10 @@ export function isAuthProxyEnabled(
 ): boolean {
   if (!win) return false;
 
-  const fromQuery = parseFlag(
-    new URLSearchParams(win.location.search).get(AUTH_PROXY_QUERY_PARAM),
+  const chosen = parseFlag(
+    readDeviceSwitch(win, AUTH_PROXY_QUERY_PARAM, AUTH_PROXY_STORAGE_KEY),
   );
-  if (fromQuery !== undefined) {
-    writeStored(win, fromQuery);
-    return fromQuery;
-  }
-
-  const stored = readStored(win);
-  if (stored !== undefined) return stored;
+  if (chosen !== undefined) return chosen;
 
   return process.env.NEXT_PUBLIC_FIREBASE_AUTH_PROXY === 'true';
 }

@@ -46,16 +46,18 @@ describe('isAuthProxyEnabled', () => {
   });
 
   it('wird per Query-Parameter eingeschaltet und gemerkt', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', '');
     const win = fakeWindow(`?${AUTH_PROXY_QUERY_PARAM}=1`);
     expect(isAuthProxyEnabled(win)).toBe(true);
-    expect(win.stored).toBe('true');
+    // Gemerkt heisst: beim naechsten Aufruf ohne den Parameter gilt sie noch.
+    expect(isAuthProxyEnabled(fakeWindow('', win.stored))).toBe(true);
   });
 
   it('wird per Query-Parameter wieder abgeschaltet', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
     const win = fakeWindow(`?${AUTH_PROXY_QUERY_PARAM}=0`, 'true');
     expect(isAuthProxyEnabled(win)).toBe(false);
-    expect(win.stored).toBe('false');
+    expect(isAuthProxyEnabled(fakeWindow('', win.stored))).toBe(false);
   });
 
   it('schlaegt die Umgebungsvariable mit dem gemerkten Wert', () => {

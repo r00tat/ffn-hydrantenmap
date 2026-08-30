@@ -3,6 +3,8 @@ import { AUTH_PROXY_STORAGE_KEY, type AuthProxyWindow } from './authDomain';
 import {
   isIosWebKit,
   shouldUseRedirectSignIn,
+  SIGN_IN_FLOW_QUERY_PARAM,
+  SIGN_IN_FLOW_STORAGE_KEY,
   type SignInNavigator,
 } from './signInStrategy';
 
@@ -18,13 +20,22 @@ function nav(userAgent: string, maxTouchPoints = 0): SignInNavigator {
   return { userAgent, maxTouchPoints };
 }
 
-function win(stored: string | null = null): AuthProxyWindow {
+function win(
+  stored: string | null = null,
+  search = '',
+  storedFlow: string | null = null,
+): AuthProxyWindow {
+  const values: Record<string, string | null> = {
+    [AUTH_PROXY_STORAGE_KEY]: stored,
+    [SIGN_IN_FLOW_STORAGE_KEY]: storedFlow,
+  };
   return {
-    location: { search: '', host: 'einsatz-dev.ffnd.at' },
+    location: { search, host: 'einsatz-dev.ffnd.at' },
     localStorage: {
-      getItem: (key: string) =>
-        key === AUTH_PROXY_STORAGE_KEY ? stored : null,
-      setItem: () => {},
+      getItem: (key: string) => values[key] ?? null,
+      setItem: (key: string, value: string) => {
+        values[key] = value;
+      },
     },
   };
 }
@@ -75,5 +86,48 @@ describe('shouldUseRedirectSignIn', () => {
   it('ist ohne Navigator (SSR) aus', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
     expect(shouldUseRedirectSignIn(undefined, win())).toBe(false);
+  });
+});
+
+describe('shouldUseRedirectSignIn: ausdruecklich gewaehlter Ablauf', () => {
+  it('erzwingt den Redirect auch auf dem Desktop', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
+    const w = win(null, `?${SIGN_IN_FLOW_QUERY_PARAM}=redirect`);
+    expect(shouldUseRedirectSignIn(nav(DESKTOP_CHROME), w)).toBe(true);
+  });
+
+  it('merkt sich die Wahl fuer die naechsten Aufrufe', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
+    const w = win(null, `?${SIGN_IN_FLOW_QUERY_PARAM}=redirect`);
+    shouldUseRedirectSignIn(nav(DESKTOP_CHROME), w);
+    expect(w.localStorage.getItem(SIGN_IN_FLOW_STORAGE_KEY)).toBe('redirect');
+  });
+
+  it('erzwingt das Popup auch auf iOS', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
+    const w = win(null, `?${SIGN_IN_FLOW_QUERY_PARAM}=popup`);
+    expect(shouldUseRedirectSignIn(nav(IPHONE_SAFARI), w)).toBe(false);
+  });
+
+  it('folgt dem gemerkten Ablauf ohne Query-Parameter', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
+    expect(
+      shouldUseRedirectSignIn(nav(DESKTOP_CHROME), win(null, '', 'redirect')),
+    ).toBe(true);
+  });
+
+  it('braucht trotzdem den erst-party Handler', () => {
+    // Ohne ihn scheitert der Redirect an der Third-Party-Storage — ein
+    // erzwungener Redirect waere dann schlechter als das Popup.
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', '');
+    const w = win(null, `?${SIGN_IN_FLOW_QUERY_PARAM}=redirect`);
+    expect(shouldUseRedirectSignIn(nav(DESKTOP_CHROME), w)).toBe(false);
+  });
+
+  it('ignoriert einen unbekannten Wert', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
+    const w = win(null, `?${SIGN_IN_FLOW_QUERY_PARAM}=unsinn`);
+    expect(shouldUseRedirectSignIn(nav(DESKTOP_CHROME), w)).toBe(false);
+    expect(shouldUseRedirectSignIn(nav(IPHONE_SAFARI), w)).toBe(true);
   });
 });

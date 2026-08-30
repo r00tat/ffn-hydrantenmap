@@ -96,9 +96,33 @@ Es gewinnt jeweils das Nähere:
    und merkt sich die Wahl.
 3. der gemerkte Wert im `localStorage` (`firebaseAuthProxy`).
 
+Davon getrennt steht die Frage, ob Popup oder Redirect verwendet wird:
+Voreinstellung ist die Geräteerkennung (Redirect nur auf iOS),
+`?signInFlow=redirect` bzw. `?signInFlow=popup` übergeht sie.
+
 Zum Ausprobieren genügt daher ein Aufruf von
 `https://einsatz-dev.ffnd.at/login?authProxy=1`; für alle anderen Benutzer
 ändert sich nichts.
+
+**`?authProxy=1` allein bringt auf einem Rechner noch kein anderes Verhalten
+zu sehen.** Es verlegt nur den Handler; ob Popup oder Redirect verwendet wird,
+entscheidet danach die Geräteerkennung, und die sagt auf allem außer iOS
+„Popup". Zum Prüfen am Entwicklungsrechner gibt es deshalb einen zweiten
+Schalter, der die Erkennung übergeht:
+
+```text
+https://localhost:3000/login?authProxy=1&signInFlow=redirect
+```
+
+Auch er wird im `localStorage` gemerkt (`firebaseSignInFlow`);
+`?signInFlow=popup` nimmt ihn zurück. Er wirkt nur bei aktivem Proxy — ein
+erzwungener Redirect auf die fremde Handler-Domain wäre schlechter als das
+Popup, nicht besser.
+
+Für `localhost` gilt der Console-Schritt unten genauso, und zwar mit dem Schema,
+unter dem der Entwicklungsserver läuft: `npm run dev` braucht
+`http://localhost:3000/__/auth/handler`, `npm run dev:https` dagegen
+`https://localhost:3000/__/auth/handler`.
 
 ### Welche Anmeldeoberfläche eigentlich läuft
 

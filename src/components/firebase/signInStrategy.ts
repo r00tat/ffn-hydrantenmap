@@ -1,4 +1,9 @@
-import { AuthProxyWindow, isAuthProxyEnabled } from './authDomain';
+import {
+  AuthProxyWindow,
+  currentWindow,
+  isAuthProxyEnabled,
+  readDeviceSwitch,
+} from './authDomain';
 
 /**
  * Popup oder Redirect?
@@ -17,6 +22,9 @@ import { AuthProxyWindow, isAuthProxyEnabled } from './authDomain';
  * Proxy-Schalter aus authDomain.ts — ohne ihn waere er schlechter als das
  * Popup, nicht besser.
  */
+
+export const SIGN_IN_FLOW_STORAGE_KEY = 'firebaseSignInFlow';
+export const SIGN_IN_FLOW_QUERY_PARAM = 'signInFlow';
 
 /** Nur die Teile von `navigator`, die hier gebraucht werden. */
 export interface SignInNavigator {
@@ -40,9 +48,23 @@ export function isIosWebKit(
 
 export function shouldUseRedirectSignIn(
   nav: SignInNavigator | undefined = currentNavigator(),
-  win?: AuthProxyWindow,
+  win: AuthProxyWindow | undefined = currentWindow(),
 ): boolean {
   if (!nav) return false;
+
+  // Der Redirect steht und faellt mit dem erst-party Handler — auch ein von
+  // Hand erzwungener. Ohne ihn braeuchte er Third-Party-Storage und waere
+  // schlechter als das Popup, nicht besser.
   if (!isAuthProxyEnabled(win)) return false;
+
+  // `?signInFlow=redirect` bzw. `=popup` uebergeht die Geraeteerkennung.
+  // Ohne diesen Schalter liesse sich der Redirect-Weg nur auf einem iPhone
+  // ausprobieren — also genau dort nicht, wo man beim Entwickeln sitzt.
+  const chosen = win
+    ? readDeviceSwitch(win, SIGN_IN_FLOW_QUERY_PARAM, SIGN_IN_FLOW_STORAGE_KEY)
+    : undefined;
+  if (chosen === 'redirect') return true;
+  if (chosen === 'popup') return false;
+
   return isIosWebKit(nav);
 }
