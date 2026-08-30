@@ -82,7 +82,7 @@ Ablauf same-origin — ohne Popup, ohne Third-Party-Storage. Beteiligt sind:
 | --- | --- |
 | [next.config.js](../next.config.js) | Rewrite `/__/auth/:path*` → `https://<authDomain>/__/auth/:path*`. **Immer aktiv**, unabhängig vom Schalter — nur so lässt sich der Weg auf einem einzelnen Gerät ausprobieren. |
 | [authDomain.ts](../src/components/firebase/authDomain.ts) | Entscheidet, ob `initializeApp` die eigene Domain als `authDomain` bekommt. |
-| [signInStrategy.ts](../src/components/firebase/signInStrategy.ts) | Popup oder Redirect. Redirect nur auf iOS **und** nur bei aktivem Proxy. |
+| [signInStrategy.ts](../src/components/firebase/signInStrategy.ts) | Popup oder Redirect. Bei aktivem Proxy **immer** Redirect, auf jedem Gerät. |
 | [firebase-ui-login.tsx](../src/components/firebase/firebase-ui-login.tsx) | wendet das auf den Web-Login an (`signInFlow`) |
 | [patterns.ts](../src/worker/patterns.ts) | `NetworkOnly` für `/__/auth/*` — der Service Worker darf den Handler nicht zwischenspeichern. |
 
@@ -96,48 +96,42 @@ Es gewinnt jeweils das Nähere:
    und merkt sich die Wahl.
 3. der gemerkte Wert im `localStorage` (`firebaseAuthProxy`).
 
-Davon getrennt steht die Frage, ob Popup oder Redirect verwendet wird:
-Voreinstellung ist die Geräteerkennung (Redirect nur auf iOS),
-`?signInFlow=redirect` bzw. `?signInFlow=popup` übergeht sie.
+Davon getrennt steht die Frage, ob Popup oder Redirect verwendet wird: Bei
+aktivem Proxy gilt **immer** Redirect. `?signInFlow=popup` ist der Notausstieg
+zurück auf den alten Weg, `?signInFlow=redirect` nimmt ihn wieder zurück; auch
+diese Wahl wird im `localStorage` gemerkt (`firebaseSignInFlow`) und wirkt nur
+bei aktivem Proxy — ein Redirect auf die fremde Handler-Domain wäre schlechter
+als das Popup, nicht besser.
 
 Zum Ausprobieren genügt daher ein Aufruf von
 `https://einsatz-dev.ffnd.at/login?authProxy=1`; für alle anderen Benutzer
 ändert sich nichts.
 
-**`?authProxy=1` allein bringt auf einem Rechner noch kein anderes Verhalten
-zu sehen.** Es verlegt nur den Handler; ob Popup oder Redirect verwendet wird,
-entscheidet danach die Geräteerkennung, und die sagt auf allem außer iOS
-„Popup". Zum Prüfen am Entwicklungsrechner gibt es deshalb einen zweiten
-Schalter, der die Erkennung übergeht:
+### Warum keine Geräteerkennung
 
-```text
-https://localhost:3000/login?authProxy=1&signInFlow=redirect
-```
+Zuerst stand hier eine: Redirect nur auf iOS, sonst das angenehmere Popup. Das
+war der falsche Ansatz. iPadOS meldet sich seit Version 13 als `Macintosh` und
+ist nur an `navigator.maxTouchPoints` vom echten Mac zu unterscheiden;
+WKWebView-Browser bringen eigene Kennungen mit, und mit jedem iOS-Update kann
+sich das wieder ändern. Greift die Erkennung nicht, fällt der Login lautlos auf
+genau den Popup-Weg zurück, der in WebKit kaputt ist — ohne Fehler, ohne
+Hinweis. Eine Weiche, deren Fehlerfall der Fehler selbst ist, taugt nicht.
 
-Auch er wird im `localStorage` gemerkt (`firebaseSignInFlow`);
-`?signInFlow=popup` nimmt ihn zurück.
+Mit erst-party Handler ist der Redirect überall unterstützt, und auf der
+Anmeldeseite kostet der Seitenneuaufbau nichts — es gibt kein Formular, das
+dabei verloren geht. Deshalb: ein Weg statt zwei.
 
-**Beide Schalter gelten pro Origin — inklusive Port.** Ein `?authProxy=1` auf
-`https://localhost:3000` wirkt auf `https://localhost:3001` nicht, und weil
-die Voreinstellung „aus" ist, läuft dort der erste Aufruf wieder über
-`firebaseapp.com`. Wer beim Testen den Port wechselt, muss den Parameter
-erneut mitgeben. Sichtbar wird das an der Diagnosezeile: `authDomain=` nennt
-die Domain, mit der die Firebase-App tatsächlich angelegt wurde, und die
-steht **für die Lebensdauer der Seite fest** — sie wird beim Laden des
-Moduls entschieden, nicht bei jedem Anmeldeversuch neu. Er wirkt nur bei aktivem Proxy — ein
-erzwungener Redirect auf die fremde Handler-Domain wäre schlechter als das
-Popup, nicht besser.
+### Die Schalter gelten pro Origin — inklusive Port
 
-**Der Proxy braucht https.** Das Firebase-SDK baut die Handler-URL immer als
-`https://<authDomain>/…`, unabhängig vom Schema der Seite. Auf einer
-http-Origin zeigte sie damit auf einen Port, an dem kein TLS lauscht: Das
-versteckte `/__/auth/iframe` scheitert und der Login bleibt hängen, ohne dass
-in der Oberfläche ein Fehler ankommt. `resolveAuthDomain` überspringt den
-Proxy deshalb auf http und schreibt eine Warnung in die Konsole — für die
-lokale Entwicklung also `npm run dev:https` statt `npm run dev`.
+Ein `?authProxy=1` auf `https://localhost:3000` wirkt auf
+`https://localhost:3001` nicht, und weil die Voreinstellung „aus" ist, läuft
+dort der erste Aufruf wieder über `firebaseapp.com`. Wer beim Testen den Port
+wechselt, muss den Parameter erneut mitgeben.
 
-Der Console-Schritt unten gilt für `localhost` genauso:
-`https://localhost:3000/__/auth/handler`.
+Sichtbar wird das an der Diagnosezeile: `authDomain=` nennt die Domain, mit
+der die Firebase-App tatsächlich angelegt wurde, und die steht **für die
+Lebensdauer der Seite fest** — sie wird beim Laden des Moduls entschieden,
+nicht bei jedem Anmeldeversuch neu.
 
 ### Welche Anmeldeoberfläche eigentlich läuft
 
