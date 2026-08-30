@@ -19,6 +19,7 @@ import {
   storageKeys,
 } from './authDiagnostics';
 import { shouldUseRedirectSignIn } from './signInStrategy';
+import { claimWidgetContainer } from './widgetGuard';
 
 export default function FirebaseUiLogin() {
   const t = useTranslations('login');
@@ -81,10 +82,26 @@ export default function FirebaseUiLogin() {
   }, []);
 
   useEffect(() => {
+    const container = document.getElementById('firebaseui-auth-container');
+    if (!container) return;
+
+    // Ein zweiter Start bricht ein laufendes Einloesen ab — Begruendung in
+    // widgetGuard.ts. React ruft diesen Effekt im StrictMode zweimal auf.
+    if (!claimWidgetContainer(container)) {
+      console.info(
+        '[FirebaseUiLogin] ui.start uebersprungen (Widget laeuft bereits)',
+      );
+      return;
+    }
+
     const ui =
       firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth);
 
-    ui.start('#firebaseui-auth-container', {
+    console.info(
+      `[FirebaseUiLogin] ui.start · isPendingRedirect=${ui.isPendingRedirect()}`,
+    );
+
+    ui.start(container, {
       callbacks: {
         signInSuccessWithAuthResult: (authResult, redirectUrl) => {
           // Action if the user is authenticated successfully

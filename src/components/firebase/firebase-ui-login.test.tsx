@@ -10,6 +10,7 @@ vi.mock('firebaseui', () => ({
     AuthUI: Object.assign(
       class {
         start = startMock;
+        isPendingRedirect = () => false;
       },
       { getInstance: () => null },
     ),

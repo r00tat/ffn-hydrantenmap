@@ -141,6 +141,19 @@ bringt seinen eigenen Ablauf mit — der Popup-/Redirect-Weg wird ihm über
 `StyledLogin.tsx` sieht wie die Anmeldeseite aus, ist aber **nirgends
 importiert**. Wer dort etwas ändert, ändert nichts an der laufenden App.
 
+**FirebaseUI darf je Container nur einmal gestartet werden.** `ui.start()`
+setzt die zuvor gestartete Instanz zurück (`if (In) { … In.reset() }` in
+FirebaseUIs Render-Funktion), und `reset()` verwirft ein **laufendes**
+Einlösen: Ergebnis auf `{user: null, credential: null}`, `redirectStatus`
+gelöscht. Beim Redirect-Weg beginnt das Einlösen sofort beim Seitenaufbau —
+ein zweiter Start dazwischen lässt die Anmeldung auf FirebaseUIs Wegwerf-App
+`[DEFAULT]-firebaseui-temp` hängen, wo sie unsere App nie erreicht, und zwar
+ohne Fehler und ohne Rückmeldung. Genau zwei Aufrufe passieren aber
+regelmäßig, weil React Effekte im StrictMode doppelt aufruft; beim Popup
+fällt es nicht auf, weil zwischen Seitenaufbau und Klick Sekunden liegen.
+Dagegen steht [widgetGuard.ts](../src/components/firebase/widgetGuard.ts) —
+bewusst ohne Gegenstück zum Freigeben, siehe dort.
+
 Daraus folgt auch, dass FirebaseUI die Kontenverknüpfung bestimmt: Zu einer
 Adresse, die schon ein Google-Konto hat, verweigert es den E-Mail-Weg mit
 „You've already used … Sign in with Google to continue". Ein Login per
