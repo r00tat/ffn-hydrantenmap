@@ -77,7 +77,6 @@ vi.mock('./rechnungStore', () => ({
     ccEmail: 'kassier@ff-nsee.at',
     subjectTemplate: 'Rechnung {{ rechnung.nummer }}',
     bodyTemplate: 'Summe {{ rechnung.summe }}',
-    bankText: 'AT40 3300',
     vorgabeTarif: '5.01',
   }),
   loadFuellungTarife: async () => ({
@@ -85,6 +84,27 @@ vi.mock('./rechnungStore', () => ({
     rateVersion: 'LGBl_77_2023',
   }),
   loadVolumen: async () => ({}),
+}));
+
+// Absender und Bankverbindung stehen seit den Gruppen-Stammdaten nicht mehr
+// in der Rechnungskonfiguration; der Guard davor ist eigen getestet.
+vi.mock('../../server/groups/requireStammdaten', () => ({
+  requireGroupStammdaten: async (groupId: string) => ({
+    groupId,
+    feuerwehrName: 'Neusiedl am See',
+    stammdaten: {
+      absenderName: 'Freiwillige Feuerwehr Neusiedl am See',
+      absenderAdresse: 'Satzgasse 9',
+      absenderKontakt: '',
+      kontoinhaber: '',
+      iban: 'AT40 3300 0000 0202 0402',
+      bic: '',
+    },
+  }),
+}));
+
+vi.mock('../../server/groups/stammdatenStore', () => ({
+  loadStammdatenLogo: async () => undefined,
 }));
 
 vi.mock('../../server/firebase/admin', () => ({

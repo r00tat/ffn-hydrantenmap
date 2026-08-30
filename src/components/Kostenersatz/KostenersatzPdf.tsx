@@ -17,8 +17,12 @@ import {
 } from '../../common/kostenersatz';
 import { timeFormats } from '../../common/time-format';
 import { Firecall } from '../firebase/firestore';
-import qrcodegen from 'nayuki-qr-code-generator';
-import { qrCodePath } from '../../common/epcQr';
+import { epcQrCode } from '../../common/epcQr';
+import {
+  absenderNameOf,
+  type GroupStammdaten,
+  type PdfLogo,
+} from '../../common/groupStammdaten';
 
 // Format date as dd.mm.YYYY
 function formatDate(dateStr?: string): string {
@@ -165,15 +169,21 @@ export interface KostenersatzPdfProps {
   calculation: KostenersatzCalculation;
   firecall: Firecall;
   rates: KostenersatzRate[];
-  /** Logo path - defaults to '/FFND_logo.png' for client, pass absolute path for server */
-  logoPath?: string;
+  /** Absender und Bankverbindung der Gruppe des Einsatzes. */
+  stammdaten: GroupStammdaten;
+  /** Name aus dem Gruppendokument — Rückfall für den Absender. */
+  feuerwehrName: string;
+  /** Logo der Gruppe; `undefined` lässt den Kopf ohne Bild. */
+  logo?: PdfLogo;
 }
 
 export default function KostenersatzPdf({
   calculation,
   firecall,
   rates,
-  logoPath = '/FFND_logo.png',
+  stammdaten,
+  feuerwehrName,
+  logo,
 }: KostenersatzPdfProps) {
   // Group items by category
   const itemsByCategory = new Map<
@@ -212,26 +222,20 @@ export default function KostenersatzPdf({
   const nameWithoutTime = firecall.name.replace(/\s\d{1,2}:\d{2}(:\d{2})?$/, '');
   const paymentReference = `Kostenersatz ${nameWithoutTime}`.substring(0, 35);
 
-  // EPC QR Code (SEPA)
-  // Format: BCD\nVersion\nCharset\nIdentification\nBIC\nRecipient\nIBAN\nEURAmount\nPurposeCode\nReference\nRemittance\nHint
-  const epcData = [
-    'BCD',
-    '002',
-    '1',
-    'SCT',
-    'RLBBAT2E',
-    'Freiwillige Feuerwehr Neusiedl am See',
-    'AT403300000002020402',
-    `EUR${calculation.totalSum.toFixed(2)}`,
-    '', // Purpose Code (optional)
-    '', // Reference (Structured, optional, max 35)
-    paymentReference, // Remittance (Unstructured / Verwendungszweck, max 140)
-    '', // Hint (optional)
-  ].join('\n');
+  const absender = absenderNameOf(stammdaten, feuerwehrName);
 
-  // Generate QR Code locally
-  const qr = qrcodegen.QrCode.encodeText(epcData, qrcodegen.QrCode.Ecc.MEDIUM);
-  const qrPath = qrCodePath(qr);
+  // Derselbe EPC-Datensatz wie auf der Füllungsrechnung — `epcQr.ts` kürzt
+  // die Felder auf die Längen der EPC069-12, nimmt die Leerzeichen aus der
+  // IBAN und liefert gar keinen Code, wenn die Angaben nicht tragen. Ein
+  // QR-Code zu einer unvollständigen Überweisung sieht aus, als könnte man
+  // ihm vertrauen.
+  const qr = epcQrCode({
+    kontoinhaber: stammdaten.kontoinhaber.trim() || absender,
+    iban: stammdaten.iban,
+    bic: stammdaten.bic,
+    betrag: calculation.totalSum,
+    verwendungszweck: paymentReference,
+  });
 
   return (
     <Document>
@@ -239,12 +243,10 @@ export default function KostenersatzPdf({
         {/* Header */}
         <View style={styles.header}>
           {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image doesn't support alt */}
-          <Image style={styles.headerLogo} src={logoPath} />
+          {logo && <Image style={styles.headerLogo} src={logo} />}
           <View style={styles.headerText}>
             <Text style={styles.title}>Kostenersatz-Berechnung</Text>
-            <Text style={styles.subtitle}>
-              Freiwillige Feuerwehr Neusiedl am See
-            </Text>
+            <Text style={styles.subtitle}>{absender}</Text>
           </View>
         </View>
 
@@ -422,19 +424,27 @@ export default function KostenersatzPdf({
         {/* Payment Section in Body */}
         <View style={styles.paymentSection}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>Zahlungsinformationen</Text>
+            <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>
+              Zahlungsinformationen
+            </Text>
             <Text style={{ marginBottom: 3 }}>Bitte überweisen Sie den Betrag auf:</Text>
-            <Text style={{ fontWeight: 'bold' }}>Freiwillige Feuerwehr Neusiedl am See</Text>
-            <Text>IBAN: AT40 3300 0000 0202 0402</Text>
-            <Text>BIC: RLBBAT2E</Text>
-            <Text style={{ marginTop: 5, fontSize: 8, color: '#666' }}>Verwendungszweck: {paymentReference}</Text>
+            <Text style={{ fontWeight: 'bold' }}>
+              {stammdaten.kontoinhaber.trim() || absender}
+            </Text>
+            <Text>IBAN: {stammdaten.iban}</Text>
+            {!!stammdaten.bic.trim() && <Text>BIC: {stammdaten.bic}</Text>}
+            <Text style={{ marginTop: 5, fontSize: 8, color: '#666' }}>
+              Verwendungszweck: {paymentReference}
+            </Text>
           </View>
-          <View style={{ alignItems: 'center', width: 100 }}>
-            <Text style={{ fontSize: 8, marginBottom: 4 }}>Bezahlen mit Code</Text>
-            <Svg viewBox={`0 0 ${qr.size} ${qr.size}`} style={{ width: 80, height: 80 }}>
-              <Path d={qrPath} fill="#000000" />
-            </Svg>
-          </View>
+          {qr && (
+            <View style={{ alignItems: 'center', width: 100 }}>
+              <Text style={{ fontSize: 8, marginBottom: 4 }}>Bezahlen mit Code</Text>
+              <Svg viewBox={`0 0 ${qr.size} ${qr.size}`} style={{ width: 80, height: 80 }}>
+                <Path d={qr.path} fill="#000000" />
+              </Svg>
+            </View>
+          )}
         </View>
 
         {/* Footer */}
@@ -443,12 +453,17 @@ export default function KostenersatzPdf({
             Die Berechnung erfolgt laut Landesgesetzblatt Nr. 77/2023, siehe
             https://www.ris.bka.gv.at/eli/lgbl/BU/2023/77/20231107
           </Text>
+          {!!stammdaten.iban.trim() && (
+            <Text style={styles.footerText}>
+              Bankverbindung: IBAN: {stammdaten.iban}
+              {stammdaten.bic.trim() ? `, BIC: ${stammdaten.bic}` : ''}
+            </Text>
+          )}
           <Text style={styles.footerText}>
-            Bankverbindung: IBAN: AT40 3300 0000 0202 0402, BIC: RLBBAT2E
-          </Text>
-          <Text style={styles.footerText}>
-            Freiwillige Feuerwehr Neusiedl/See, A-7100 Neusiedl/See Satzgasse 9,
-            +43 2167 2250, https://www.ff-neusiedlamsee.at
+            {[absender, stammdaten.absenderAdresse, stammdaten.absenderKontakt]
+              .map((teil) => teil.replace(/\s*\n\s*/g, ', ').trim())
+              .filter(Boolean)
+              .join(', ')}
           </Text>
         </View>
       </Page>

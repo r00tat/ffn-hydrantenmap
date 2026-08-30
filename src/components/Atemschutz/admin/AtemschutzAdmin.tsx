@@ -46,6 +46,7 @@ import {
 import GeraetDialog from './GeraetDialog';
 import GeraetImportDialog from './GeraetImportDialog';
 import GeraetQrDialog from './GeraetQrDialog';
+import StammdatenSettings from '../../groups/StammdatenSettings';
 import RechnungSettings from './RechnungSettings';
 import {
   ATEMSCHUTZ_ADMIN_TABS,
@@ -166,6 +167,8 @@ export default function AtemschutzAdmin() {
             </Tabs>
 
             {tab === 'rechnung' && <RechnungSettings groupId={groupId} />}
+
+            {tab === 'stammdaten' && <StammdatenSettings groupId={groupId} />}
 
             {tab === 'geraete' && (
               <>

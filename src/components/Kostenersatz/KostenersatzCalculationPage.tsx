@@ -1,5 +1,6 @@
 'use client';
 
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
@@ -9,6 +10,7 @@ import Typography from '@mui/material/Typography';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useTranslations } from 'next-intl';
 import { SyntheticEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   calculateDurationHours,
@@ -32,7 +34,10 @@ import {
   useKostenersatzUpdate,
   useKostenersatzDuplicate,
 } from '../../hooks/useKostenersatzMutations';
+import { stammdatenLuecken } from '../../common/groupStammdaten';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
+import useGroupStammdaten from '../../hooks/useGroupStammdaten';
 import KostenersatzEinsatzTab from './KostenersatzEinsatzTab';
 import KostenersatzBerechnungTab from './KostenersatzBerechnungTab';
 import KostenersatzEmpfaengerTab from './KostenersatzEmpfaengerTab';
@@ -93,6 +98,7 @@ export default function KostenersatzCalculationPage({
 }: KostenersatzCalculationPageProps) {
   const t = useTranslations('kostenersatz');
   const tCommon = useTranslations('common');
+  const tStammdaten = useTranslations('stammdaten');
   const router = useRouter();
   const [tabValue, setTabValue] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -110,6 +116,16 @@ export default function KostenersatzCalculationPage({
   const addCalculation = useKostenersatzAdd(firecallId);
   const updateCalculation = useKostenersatzUpdate(firecallId);
   const duplicateCalculation = useKostenersatzDuplicate(firecallId);
+
+  const stammdaten = useGroupStammdaten(firecall.group);
+  const feuerwehrName = useGroupFeuerwehrName(firecall.group);
+
+  // Ohne diese Angaben verweigern PDF und Mailversand den Dienst. Der Hinweis
+  // steht hier, damit der Stopp nicht als kaputter Knopf ankommt.
+  const luecken = useMemo(
+    () => (firecall.group ? stammdatenLuecken(stammdaten, feuerwehrName) : ['group']),
+    [firecall.group, stammdaten, feuerwehrName],
+  );
 
   // Calculate initial duration from firecall for new calculations
   const initialDuration = useMemo(() => {
@@ -665,6 +681,24 @@ export default function KostenersatzCalculationPage({
           </Button>
         )}
       </Box>
+
+      {luecken.length > 0 && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            <Button
+              component={Link}
+              href="/admin/kostenersatz?tab=stammdaten"
+              size="small"
+            >
+              {tStammdaten('zuDenStammdaten')}
+            </Button>
+          }
+        >
+          {tStammdaten('unvollstaendig', { felder: luecken.join(', ') })}
+        </Alert>
+      )}
 
       <Paper sx={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 200px)' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>

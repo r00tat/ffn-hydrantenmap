@@ -11,6 +11,7 @@ import {
   loadRatesForVersion,
   generatePdfBuffer,
 } from '../../../../../components/Kostenersatz/completePaymentAndNotify';
+import { StammdatenUnvollstaendigError } from '../../../../../server/groups/requireStammdaten';
 
 function timingSafeTokenEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, 'utf-8');
@@ -86,6 +87,13 @@ export async function GET(
   } catch (error: any) {
     if (isDynamicServerError(error)) {
       throw error;
+    }
+    // 409 und nicht 500: Der Server ist in Ordnung, es fehlen Stammdaten.
+    if (error instanceof StammdatenUnvollstaendigError) {
+      return NextResponse.json(
+        { error: 'stammdatenUnvollstaendig' },
+        { status: 409 }
+      );
     }
     console.error('Error generating public PDF:', error);
     return NextResponse.json(

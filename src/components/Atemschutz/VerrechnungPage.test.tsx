@@ -30,18 +30,25 @@ vi.mock('../../hooks/useAtemschutzEmpfaenger', () => ({
   default: () => [],
 }));
 
+// Der Hook zieht beim Import den Firebase-Client nach, den es im Test nicht
+// gibt — und die Lücken-Anzeige hängt an seinem Ergebnis.
+vi.mock('../../hooks/useGroupStammdaten', () => ({
+  default: () => ({
+    absenderName: 'FF Musterdorf',
+    absenderAdresse: 'Hauptstraße 1',
+    absenderKontakt: '',
+    kontoinhaber: '',
+    iban: 'AT40 3300 0000 0202 0402',
+    bic: '',
+  }),
+}));
+
 vi.mock('../../hooks/useAtemschutzRechnungConfig', () => ({
   default: () => ({
     ccEmail: '',
     subjectTemplate: 'Rechnung',
     bodyTemplate: 'Text',
-    absenderName: 'Freiwillige Feuerwehr Neusiedl am See',
-    absenderAdresse: 'Satzgasse 9, 7100 Neusiedl am See',
-    absenderKontakt: '',
     leistungstext: 'Für das Füllen von Pressluftflaschen',
-    kontoinhaber: '',
-    iban: 'AT40 3300 0000 0202 0402',
-    bic: '',
     zahlungszielTage: 14,
     ustHinweis: '',
     vorgabeTarif: '5.01',

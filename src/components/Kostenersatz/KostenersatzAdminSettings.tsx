@@ -15,6 +15,7 @@ import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import MenuItem from '@mui/material/MenuItem';
 import Tab from '@mui/material/Tab';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -55,6 +56,8 @@ import {
   useKostenersatzVersionSetActive,
 } from '../../hooks/useKostenersatzMutations';
 import { useKostenersatzEmailConfig } from '../../hooks/useKostenersatzEmailConfig';
+import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
+import StammdatenSettings from '../groups/StammdatenSettings';
 import KostenersatzTemplateDialog from './KostenersatzTemplateDialog';
 import SumUpTransactionList from './SumUpTransactionList';
 import KostenersatzVehicleTab from './KostenersatzVehicleTab';
@@ -63,10 +66,12 @@ import Alert from '@mui/material/Alert';
 export default function KostenersatzAdminSettings() {
   const t = useTranslations('kostenersatz.admin');
   const tCommon = useTranslations('common');
+  const tStammdaten = useTranslations('stammdaten');
+  const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { versions, activeVersion, loading: versionsLoading } = useKostenersatzVersions();
   const { rates, loading: ratesLoading } = useKostenersatzRates(activeVersion?.id);
   const { sharedTemplates, loading: templatesLoading } = useKostenersatzTemplates();
-  const { config: emailConfig, loading: emailConfigLoading, saveConfig: saveEmailConfig } = useKostenersatzEmailConfig();
+  const { config: emailConfig, loading: emailConfigLoading, saveConfig: saveEmailConfig } = useKostenersatzEmailConfig(groupId);
   const seedDefaultRates = useKostenersatzSeedDefaultRates();
   const setVersionActive = useKostenersatzVersionSetActive();
   const deleteTemplate = useKostenersatzTemplateDelete();
@@ -341,6 +346,7 @@ export default function KostenersatzAdminSettings() {
           <Tab label={t('tabTemplates')} />
           <Tab label={t('tabEmail')} />
           <Tab label={t('tabSumup')} />
+          <Tab label={t('tabStammdaten')} />
         </Tabs>
       </Box>
 
@@ -558,6 +564,30 @@ export default function KostenersatzAdminSettings() {
                 <Alert severity="error">{emailConfigError}</Alert>
               )}
 
+              {/* Die Vorlage gilt je Gruppe, seit sie über
+                  `{{ absender.* }}` deren Bankverbindung nennt. Ohne diese
+                  Auswahl bliebe offen, wessen Text hier bearbeitet wird. */}
+              {groups.length === 0 || !groupId ? (
+                <Alert severity="warning">{tStammdaten('noGroup')}</Alert>
+              ) : (
+                groups.length > 1 && (
+                  <TextField
+                    select
+                    size="small"
+                    label={tStammdaten('group')}
+                    value={groupId}
+                    onChange={(e) => setGroupId(e.target.value)}
+                    sx={{ minWidth: 200 }}
+                  >
+                    {groups.map((g) => (
+                      <MenuItem key={g.id} value={g.id}>
+                        {g.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )
+              )}
+
               <TextField
                 label={t('emailFrom')}
                 value={emailFromEdit}
@@ -601,7 +631,11 @@ export default function KostenersatzAdminSettings() {
                   {'{{ recipient.name }}'} - {t('varRecipientName')}<br />
                   {'{{ firecall.name }}'} - {t('varFirecallName')}<br />
                   {'{{ firecall.date }}'} - {t('varFirecallDate')}<br />
-                  {'{{ calculation.totalSum }}'} - {t('varCalcTotal')}
+                  {'{{ calculation.totalSum }}'} - {t('varCalcTotal')}<br />
+                  {'{{ absender.name }}'} - {t('varAbsenderName')}<br />
+                  {'{{ absender.kontoinhaber }}'} - {t('varAbsenderKontoinhaber')}<br />
+                  {'{{ absender.iban }}'} - {t('varAbsenderIban')}<br />
+                  {'{{ absender.bic }}'} - {t('varAbsenderBic')}
                 </Typography>
               </Box>
 
@@ -609,7 +643,7 @@ export default function KostenersatzAdminSettings() {
                 <Button
                   variant="contained"
                   onClick={handleSaveEmailConfig}
-                  disabled={savingEmailConfig}
+                  disabled={savingEmailConfig || !groupId}
                 >
                   {savingEmailConfig ? <CircularProgress size={20} /> : t('save')}
                 </Button>
@@ -622,6 +656,41 @@ export default function KostenersatzAdminSettings() {
 
       {/* Tab 4: SumUp Transaktionen */}
       {activeTab === 4 && <SumUpTransactionList />}
+
+      {/* Tab 5: Stammdaten der Gruppe — dieselbe Komponente wie in der
+          Atemschutz-Verwaltung. Wer hier einen Beleg prüft, soll den
+          Absender nicht in einem anderen Menü suchen müssen. */}
+      {activeTab === 5 && (
+        <Card>
+          <CardContent>
+            {groups.length === 0 || !groupId ? (
+              <Typography color="text.secondary">
+                {tStammdaten('noGroup')}
+              </Typography>
+            ) : (
+              <>
+                {groups.length > 1 && (
+                  <TextField
+                    select
+                    size="small"
+                    label={tStammdaten('group')}
+                    value={groupId}
+                    onChange={(e) => setGroupId(e.target.value)}
+                    sx={{ minWidth: 200 }}
+                  >
+                    {groups.map((g) => (
+                      <MenuItem key={g.id} value={g.id}>
+                        {g.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+                <StammdatenSettings groupId={groupId} />
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Seed Dialog */}
       <Dialog open={seedDialogOpen} onClose={() => setSeedDialogOpen(false)}>

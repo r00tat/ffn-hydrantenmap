@@ -171,12 +171,6 @@ service cloud.firestore {
         (resource.data.createdBy == request.auth.token.email || adminUser());
     }
 
-    // Kostenersatz config (email settings) - read for kostenersatz group, write for admin
-    match /kostenersatzConfig/{doc=**} {
-      allow read: if kostenersatzUser();
-      allow write: if adminUser();
-    }
-
     // Kostenersatz vehicles - read for any authorized user (the vehicle
     // list powers einsatz-side autocomplete via EinsatzortEditDialog and
     // is needed by every FF member), write for admin.
@@ -328,6 +322,26 @@ service cloud.firestore {
       // der Nummernkreis. Ein eigenes Dokument und nicht das Gruppen-Dokument:
       // Dessen Felder liest jedes Gruppenmitglied.
       match /atemschutzConfig/{doc} {
+        allow read: if fahrtenbuchMember() && kostenersatzUser();
+        allow write: if adminUser();
+      }
+
+      // Absender, Bankverbindung und Logo der Gruppe. Ein eigenes Dokument
+      // und nicht das Gruppen-Dokument: Dessen Felder liest jedes
+      // Gruppenmitglied.
+      //
+      // Lesen ohne `kostenersatzUser()` — anders als bei `atemschutzConfig`:
+      // Die Kostenersatz-Oberfläche zeigt die Stammdaten-Lücken auch dem, der
+      // nur rechnet. Geschrieben wird über `saveGroupStammdaten`; die echte
+      // Grenze ist `actionGroupAdminRequired`.
+      match /groupConfig/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow write: if adminUser();
+      }
+
+      // Mailvorlagen des Kostenersatzes, je Gruppe. Vorher ein einzelnes
+      // Dokument auf Wurzelebene.
+      match /kostenersatzConfig/{doc} {
         allow read: if fahrtenbuchMember() && kostenersatzUser();
         allow write: if adminUser();
       }

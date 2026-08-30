@@ -37,7 +37,8 @@
       "rechnungFuellungGone": "One of the fillings no longer exists.",
       "rechnungFuellungTaken": "One of the fillings has already been invoiced.",
       "rechnungEmpfaengerIncomplete": "Fire brigade, name and email are required.",
-      "rechnungNurEntwurf": "Only a draft can be changed."
+      "rechnungNurEntwurf": "Only a draft can be changed.",
+      "stammdatenUnvollstaendig": "The group has no sender or bank details. Please fill in the master data first."
     },
     "admin": {
       "title": "Breathing apparatus equipment",
@@ -56,7 +57,8 @@
       "showInactive": "Show retired items",
       "tabs": {
         "geraete": "Equipment",
-        "rechnung": "Invoicing"
+        "rechnung": "Invoicing",
+        "stammdaten": "Master data"
       }
     },
     "tabs": {
@@ -363,7 +365,9 @@
       "zurueckZurListe": "Back to invoicing",
       "zumFuellprotokoll": "To the filling log",
       "oeffnen": "Open",
-      "tarifNeuBerechnet": "The total is recalculated with the current rates on save."
+      "tarifNeuBerechnet": "The total is recalculated with the current rates on save.",
+      "zuDenStammdaten": "Go to master data",
+      "absenderInStammdaten": "Sender, bank details and logo live in the “Master data” tab and also apply to cost recovery."
     },
     "empfaenger": {
       "createTitle": "Add recipient",
@@ -2013,7 +2017,12 @@
       "customItemDescriptionPlaceholder": "e.g. Special equipment XY",
       "customItemUnit": "Unit",
       "customItemUnitPlaceholder": "flat",
-      "standard": "Standard"
+      "standard": "Standard",
+      "tabStammdaten": "Master data",
+      "varAbsenderName": "Sender from master data",
+      "varAbsenderKontoinhaber": "Account holder",
+      "varAbsenderIban": "IBAN",
+      "varAbsenderBic": "BIC"
     },
     "emailDialog": {
       "title": "Send email",
@@ -3194,5 +3203,39 @@
       "no-layers": "No WMS with requestable layers was found at this address.",
       "unsupportedCrs": "These layers do not advertise EPSG:3857 and will most likely stay empty on the map: {layers}"
     }
+  },
+  "stammdaten": {
+    "title": "Group master data",
+    "intro": "Sender, bank details and logo appear on every invoice and cost recovery document of this group.",
+    "group": "Group",
+    "absender": "Sender",
+    "absenderName": "Name on the document",
+    "absenderNameHelp": "Full name, e.g. “Freiwillige Feuerwehr Musterdorf”. Empty: the group name.",
+    "absenderAdresse": "Address",
+    "absenderAdresseHelp": "Street and town, multiple lines.",
+    "absenderKontakt": "Contact",
+    "absenderKontaktHelp": "Phone, web and email — a single line in the document footer.",
+    "zahlung": "Bank details",
+    "kontoinhaber": "Account holder",
+    "kontoinhaberHelp": "Empty: same as the sender.",
+    "iban": "IBAN",
+    "ibanHelp": "Enter with spaces — they are omitted from the QR code.",
+    "bic": "BIC",
+    "bicHelp": "Not required within the EEA.",
+    "logo": "Logo",
+    "logoHelp": "PNG or JPEG, at most 2 MB. Appears in the header of every document.",
+    "logoUpload": "Choose logo",
+    "logoRemove": "Remove logo",
+    "logoNone": "No logo stored.",
+    "logoTooLarge": "The file is too large. At most 2 MB.",
+    "logoWrongType": "PNG or JPEG only. SVG cannot be placed into the PDF.",
+    "logoUploadFailed": "The logo could not be uploaded.",
+    "logoLoadFailed": "The preview could not be loaded.",
+    "save": "Save",
+    "saved": "Master data saved.",
+    "saveFailed": "Saving failed.",
+    "noGroup": "No group available.",
+    "unvollstaendig": "Without these entries no document can be created: {felder}.",
+    "zuDenStammdaten": "Go to master data"
   }
 }

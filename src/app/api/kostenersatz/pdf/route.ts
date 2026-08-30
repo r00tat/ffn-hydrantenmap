@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 import userRequired from '../../../../server/auth/userRequired';
@@ -14,8 +13,11 @@ import {
 } from '../../../../common/kostenersatz';
 import { FIRECALL_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { getDefaultRatesWithVersion } from '../../../../common/defaultKostenersatzRates';
-
-const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
+import {
+  requireStammdatenForFirecall,
+  StammdatenUnvollstaendigError,
+} from '../../../../server/groups/requireStammdaten';
+import { loadStammdatenLogo } from '../../../../server/groups/stammdatenStore';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +43,12 @@ export async function GET(request: NextRequest) {
       authData,
       firecallId
     );
+
+    // Ohne Absender und Bankverbindung entstünde ein Blatt, das aussieht wie
+    // ein Beleg und keiner ist — der Fehler fiele erst beim
+    // Zahlungspflichtigen auf.
+    const { stammdaten, feuerwehrName } = await requireStammdatenForFirecall(firecall);
+    const logo = await loadStammdatenLogo(stammdaten);
 
     // Load calculation
     const calculationDoc = await firestore
@@ -87,7 +95,9 @@ export async function GET(request: NextRequest) {
         calculation,
         rates,
         firecall,
-        logoPath,
+        stammdaten,
+        feuerwehrName,
+        logo,
       })
     );
 
@@ -106,6 +116,18 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     if (isDynamicServerError(error)) {
       throw error;
+    }
+    // 409 und nicht 500: Der Server ist in Ordnung, es fehlen Stammdaten. Die
+    // Oberfläche kann daraus einen Hinweis auf die Verwaltung machen.
+    if (error instanceof StammdatenUnvollstaendigError) {
+      return NextResponse.json(
+        {
+          error: 'stammdatenUnvollstaendig',
+          luecken: error.luecken,
+          groupId: error.groupId,
+        },
+        { status: 409 }
+      );
     }
     console.error('Error generating PDF:', error);
     return NextResponse.json(

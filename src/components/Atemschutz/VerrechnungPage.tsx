@@ -29,11 +29,11 @@ import {
   empfaengerFuerFeuerwehr,
   fuellungenNachFeuerwehr,
   offeneFuellungen,
-  rechnungConfigLuecken,
   rechnungStatusFarbe,
   type AtemschutzEmpfaenger,
   type FeuerwehrBuendel,
 } from '../../common/atemschutzRechnung';
+import { stammdatenLuecken } from '../../common/groupStammdaten';
 import { KOSTENERSATZ_GROUP, formatCurrency } from '../../common/kostenersatz';
 import useAtemschutzEmpfaenger from '../../hooks/useAtemschutzEmpfaenger';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
@@ -43,6 +43,7 @@ import useAtemschutzRechnungen from '../../hooks/useAtemschutzRechnungen';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
+import useGroupStammdaten from '../../hooks/useGroupStammdaten';
 import { useKostenersatzRates } from '../../hooks/useKostenersatz';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import EmpfaengerDialog from './EmpfaengerDialog';
@@ -87,6 +88,7 @@ export default function VerrechnungPage() {
   const config = useAtemschutzRechnungConfig(groupId);
   const { geraeteById, feuerwehren } = useAtemschutzGeraete(groupId);
   const feuerwehrName = useGroupFeuerwehrName(groupId);
+  const stammdaten = useGroupStammdaten(groupId);
   const { rates } = useKostenersatzRates();
 
   const [buendelOffen, setBuendelOffen] = useState<FeuerwehrBuendel>();
@@ -114,9 +116,11 @@ export default function VerrechnungPage() {
 
   // Ohne Absender und Bankverbindung ist die Rechnung ein Zettel: Der
   // Empfänger weiß weder von wem sie kommt noch wohin er überweisen soll.
+  // Deshalb wird hier nicht nur gewarnt, sondern das Erstellen gesperrt —
+  // dieselbe Schranke steht in `createFuellungRechnung`.
   const luecken = useMemo(
-    () => rechnungConfigLuecken(config, feuerwehrName),
-    [config, feuerwehrName],
+    () => stammdatenLuecken(stammdaten, feuerwehrName),
+    [stammdaten, feuerwehrName],
   );
 
   const buendel = useMemo(
@@ -185,16 +189,16 @@ export default function VerrechnungPage() {
 
       {luecken.length > 0 && (
         <Alert
-          severity="warning"
+          severity="error"
           sx={{ mb: 3 }}
           action={
             <Button
               component={Link}
-              href="/admin/atemschutz"
+              href="/admin/atemschutz?tab=stammdaten"
               size="small"
               startIcon={<SettingsIcon />}
             >
-              {t('rechnung.zuDenEinstellungen')}
+              {t('rechnung.zuDenStammdaten')}
             </Button>
           }
         >
@@ -237,7 +241,11 @@ export default function VerrechnungPage() {
                   )}
                 </TableCell>
                 <TableCell align="right">
-                  <Button size="small" onClick={() => setBuendelOffen(b)}>
+                  <Button
+                    size="small"
+                    onClick={() => setBuendelOffen(b)}
+                    disabled={luecken.length > 0}
+                  >
                     {t('rechnung.create')}
                   </Button>
                 </TableCell>

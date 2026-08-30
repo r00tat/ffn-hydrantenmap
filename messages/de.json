@@ -37,7 +37,8 @@
       "rechnungFuellungGone": "Eine der Füllungen gibt es nicht mehr.",
       "rechnungFuellungTaken": "Eine der Füllungen ist bereits abgerechnet.",
       "rechnungEmpfaengerIncomplete": "Feuerwehr, Name und E-Mail sind Pflicht.",
-      "rechnungNurEntwurf": "Nur ein Entwurf lässt sich ändern."
+      "rechnungNurEntwurf": "Nur ein Entwurf lässt sich ändern.",
+      "stammdatenUnvollstaendig": "Absender und Bankverbindung der Gruppe fehlen. Bitte zuerst die Stammdaten pflegen."
     },
     "admin": {
       "title": "Atemschutz-Ausrüstung",
@@ -56,7 +57,8 @@
       "showInactive": "Ausgeschiedene anzeigen",
       "tabs": {
         "geraete": "Ausrüstung",
-        "rechnung": "Rechnungen"
+        "rechnung": "Rechnungen",
+        "stammdaten": "Stammdaten"
       }
     },
     "tabs": {
@@ -363,7 +365,9 @@
       "zurueckZurListe": "Zurück zur Verrechnung",
       "zumFuellprotokoll": "Zum Füllprotokoll",
       "oeffnen": "Öffnen",
-      "tarifNeuBerechnet": "Die Summe wird beim Speichern mit den aktuellen Tarifen neu berechnet."
+      "tarifNeuBerechnet": "Die Summe wird beim Speichern mit den aktuellen Tarifen neu berechnet.",
+      "zuDenStammdaten": "Zu den Stammdaten",
+      "absenderInStammdaten": "Absender, Bankverbindung und Logo stehen im Reiter „Stammdaten“ und gelten auch für den Kostenersatz."
     },
     "empfaenger": {
       "createTitle": "Empfänger anlegen",
@@ -2013,7 +2017,12 @@
       "customItemDescriptionPlaceholder": "z.B. Spezialgerät XY",
       "customItemUnit": "Einheit",
       "customItemUnitPlaceholder": "pauschal",
-      "standard": "Standard"
+      "standard": "Standard",
+      "tabStammdaten": "Stammdaten",
+      "varAbsenderName": "Absender laut Stammdaten",
+      "varAbsenderKontoinhaber": "Kontoinhaber",
+      "varAbsenderIban": "IBAN",
+      "varAbsenderBic": "BIC"
     },
     "emailDialog": {
       "title": "E-Mail senden",
@@ -3194,5 +3203,39 @@
       "no-layers": "Unter dieser Adresse wurde kein WMS mit anforderbaren Layern gefunden.",
       "unsupportedCrs": "Diese Layer melden kein EPSG:3857 und bleiben in der Karte vermutlich leer: {layers}"
     }
+  },
+  "stammdaten": {
+    "title": "Stammdaten der Gruppe",
+    "intro": "Absender, Bankverbindung und Logo stehen auf jeder Rechnung und jedem Kostenersatz-Beleg dieser Gruppe.",
+    "group": "Gruppe",
+    "absender": "Absender",
+    "absenderName": "Name auf dem Beleg",
+    "absenderNameHelp": "Voller Name, z.B. „Freiwillige Feuerwehr Musterdorf“. Leer: der Name der Gruppe.",
+    "absenderAdresse": "Anschrift",
+    "absenderAdresseHelp": "Straße und Ort, mehrzeilig.",
+    "absenderKontakt": "Kontakt",
+    "absenderKontaktHelp": "Telefon, Web und E-Mail — eine Zeile im Fuß des Belegs.",
+    "zahlung": "Bankverbindung",
+    "kontoinhaber": "Kontoinhaber",
+    "kontoinhaberHelp": "Leer: derselbe wie der Absender.",
+    "iban": "IBAN",
+    "ibanHelp": "Mit Leerzeichen eingeben — im QR-Code stehen sie nicht.",
+    "bic": "BIC",
+    "bicHelp": "Innerhalb des EWR entbehrlich.",
+    "logo": "Logo",
+    "logoHelp": "PNG oder JPEG, höchstens 2 MB. Steht im Kopf jedes Belegs.",
+    "logoUpload": "Logo auswählen",
+    "logoRemove": "Logo entfernen",
+    "logoNone": "Kein Logo hinterlegt.",
+    "logoTooLarge": "Die Datei ist zu groß. Höchstens 2 MB.",
+    "logoWrongType": "Nur PNG oder JPEG. SVG lässt sich nicht ins PDF setzen.",
+    "logoUploadFailed": "Das Logo konnte nicht hochgeladen werden.",
+    "logoLoadFailed": "Die Vorschau konnte nicht geladen werden.",
+    "save": "Speichern",
+    "saved": "Stammdaten gespeichert.",
+    "saveFailed": "Speichern fehlgeschlagen.",
+    "noGroup": "Keine Gruppe zur Auswahl.",
+    "unvollstaendig": "Ohne diese Angaben lässt sich kein Beleg erstellen: {felder}.",
+    "zuDenStammdaten": "Zu den Stammdaten"
   }
 }
