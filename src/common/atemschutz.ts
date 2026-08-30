@@ -135,6 +135,17 @@ export interface AtemschutzFuellung {
    * `where('verrechnen','==',true)` nichts übersieht.
    */
   verrechnen: boolean;
+  /**
+   * Verweis in `groups/{groupId}/atemschutzRechnung` — gesetzt heißt
+   * abgerechnet.
+   *
+   * Anders als `verrechnen` **optional** und nicht immer gesetzt: Die
+   * Verrechnungsübersicht fragt `where('verrechnen','==',true)` ab und filtert
+   * `rechnungId` clientseitig. Das erspart eine Migration aller Bestandszeilen
+   * und einen weiteren zusammengesetzten Index — dieselbe Abwägung wie beim
+   * Verrechnen-Filter im Füllprotokoll.
+   */
+  rechnungId?: string;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
