@@ -18,27 +18,13 @@ import {
 import { timeFormats } from '../../common/time-format';
 import { Firecall } from '../firebase/firestore';
 import qrcodegen from 'nayuki-qr-code-generator';
+import { qrCodePath } from '../../common/epcQr';
 
 // Format date as dd.mm.YYYY
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '';
   const m = moment(dateStr, timeFormats, 'de');
   return m.isValid() ? m.format('DD.MM.YYYY') : dateStr;
-}
-
-/**
- * Generate a SVG path string for a QR code
- */
-function generateQrPath(qr: qrcodegen.QrCode): string {
-  const parts: string[] = [];
-  for (let y = 0; y < qr.size; y++) {
-    for (let x = 0; x < qr.size; x++) {
-      if (qr.getModule(x, y)) {
-        parts.push(`M${x},${y}h1v1h-1z`);
-      }
-    }
-  }
-  return parts.join(' ');
 }
 
 const styles = StyleSheet.create({
@@ -245,7 +231,7 @@ export default function KostenersatzPdf({
 
   // Generate QR Code locally
   const qr = qrcodegen.QrCode.encodeText(epcData, qrcodegen.QrCode.Ecc.MEDIUM);
-  const qrPath = generateQrPath(qr);
+  const qrPath = qrCodePath(qr);
 
   return (
     <Document>

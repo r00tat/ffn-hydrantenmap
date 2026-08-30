@@ -15,6 +15,14 @@ export interface Group {
    * übersteht und „nie gesetzt“ von „bewusst geleert“ unterscheidbar macht.
    */
   standort?: GeoPositionObject | null;
+  /**
+   * Name der eigenen Feuerwehr, z.B. „Neusiedl am See" — bewusst getrennt von
+   * `name`. Der Gruppenname ist ein Verwaltungsbegriff („FF Neusiedl am See",
+   * „Neusiedl"), die `feuerwehr`-Felder der Atemschutz-Stammdaten tragen die
+   * Schreibweise des Sybos-Exports. Ein Vergleich über `name` ginge still
+   * schief und markierte jede eigene Füllung als zu verrechnen.
+   */
+  feuerwehrName?: string;
 }
 
 /**

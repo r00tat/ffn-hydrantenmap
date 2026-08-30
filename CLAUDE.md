@@ -21,7 +21,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/auth-und-origins.md](docs/auth-und-origins.md) | Basis-URL, WebAuthn-Origins, Cron-Aufrufer |
 | [docs/berechtigungen.md](docs/berechtigungen.md) | Rollen: globaler Admin, Gruppen-Admin, Gerätemeister, Gruppenmitglied, Einsatz-Gast; wer was vergibt, warum kein Custom Claim, die Guards |
 | [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Screenshot-Aufnahme |
-| [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle (Rollen allgemein: docs/berechtigungen.md) |
+| [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle (Rollen allgemein: docs/berechtigungen.md), Fahrzeugkategorie und Anzeigereihenfolge |
 | [docs/einsatz-drive-fotos.md](docs/einsatz-drive-fotos.md) | Einsatz-Fotos im Google Shared Drive |
 | [docs/einsatz-backup.md](docs/einsatz-backup.md) | Einsatz sichern und zurückspielen: Umfang, was bewusst fehlt, Gruppenwahl beim Import, Dateinamen von Anhängen |
 | [docs/strassen-routing.md](docs/strassen-routing.md) | Routing über Straße für Leitungen und Linien |
@@ -35,7 +35,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/mcp-server.md](docs/mcp-server.md) | MCP-Server und OAuth 2.1: eigener Authorization Server, DCR und CIMD, Scopes, Tool-Set mit zwei Aufrufern, Signaturschlüssel und Betrieb |
 | [docs/lagekarte-austausch.md](docs/lagekarte-austausch.md) | Import und Export für lagekarte.info: beobachtetes Format, Kupplungsmarker, `ffnd`-Block, Symbolkatalog und seine Lücken |
 | [docs/eigene-kartenebenen.md](docs/eigene-kartenebenen.md) | Eigene WMS-/WMTS-Kartenebenen je Einsatz: Abgrenzung „Kartenebene" gegen „Ebene", Berechtigungen und warum die Firestore-Regeln nichts prüfen, GetCapabilities über den Server, Darstellung im Layer-Control |
-| [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md) | Atemschutzsammelplatz: warum jede Bereitstellung eines Trupps eine eigene Zeile ist, die sechs Kennungen der Flaschensuche und warum die Barcode-Spalte des FDISK-Exports nicht allein trägt, Dublettenbehandlung im Import, Berechtigungen, Kamera in der Android-App, Mangel-Verallgemeinerung |
+| [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md) | Atemschutzsammelplatz: warum jede Bereitstellung eines Trupps eine eigene Zeile ist, die sechs Kennungen der Flaschensuche und warum die Barcode-Spalte des Sybos-Exports nicht allein trägt, Dublettenbehandlung im Import, Berechtigungen, Kamera in der Android-App, Mangel-Verallgemeinerung, warum das Füllprotokoll unter der Gruppe liegt, Füllstation als Gerätetyp, Vorbelegung von `verrechnen`, Verrechnung der Füllungen: Tarifwahl, Berechtigung, Storno |
 | [docs/rettungskarten.md](docs/rettungskarten.md) | Rettungskarten aus dem Euro-Rescue-Katalog: warum kein Deep Link in die App geht, die offene API von Euro NCAP, Cache, Zuordnung Zulassung → Variante |
 
 ## Commands
@@ -421,7 +421,9 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 - `bugReport` - In-App Bug-Reports & Feature-Requests (siehe unten)
 - `appConfig` - App-weite Konfiguration (u.a. Dokument `bugReport` mit Empfänger-E-Mails)
 - `atemschutzGeraet` - Atemschutz-Ausrüstung je Gruppe (`groups/{groupId}/atemschutzGeraet`, siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
-- `atemschutzFuellung`, `atemschutzTrupp`, `atemschutzAusgabe` - Protokolle des Atemschutzsammelplatzes je Einsatz
+- `atemschutzFuellung` - Füllprotokoll je Gruppe (`groups/{groupId}/atemschutzFuellung`), mit `firecallId` als Einsatzbezug
+- `atemschutzRechnung`, `atemschutzEmpfaenger`, `atemschutzConfig` - Verrechnung der Flaschenfüllungen je Gruppe (siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
+- `atemschutzTrupp`, `atemschutzAusgabe` - Protokolle des Atemschutzsammelplatzes je Einsatz
 - `oauthClients`, `oauthAuthCodes`, `oauthRefreshTokens`, `oauthConsents` - OAuth-Authorization-Server des MCP-Zugangs, rein serverseitig (siehe [docs/mcp-server.md](docs/mcp-server.md))
 
 ## Bug Reports / Feedback

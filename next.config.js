@@ -95,7 +95,18 @@ module.exports = async () => {
       turbopackFileSystemCacheForBuild:
         process.env.DISABLE_TURBOPACK_BUILD_CACHE !== '1',
     },
-    serverExternalPackages: ['@google-cloud/secret-manager', 'protobufjs'],
+    // `@googleapis/gmail` zieht ueber `googleapis-common` ein `node-fetch`,
+    // das `node:util` per require holt. Gebuendelt scheitert das zur Laufzeit
+    // mit "module factory is not available" — die Pakete muessen extern
+    // bleiben. Betrifft jeden Mailversand (Rechnung, Mangel, Bug-Report).
+    serverExternalPackages: [
+      '@google-cloud/secret-manager',
+      'protobufjs',
+      '@googleapis/gmail',
+      'googleapis-common',
+      'gaxios',
+      'google-auth-library',
+    ],
     allowedDevOrigins: ['192.168.*.*', '127.0.0*', 'localhost', '*.nip.io'],
     async rewrites() {
       const upstream = firebaseAuthUpstream();

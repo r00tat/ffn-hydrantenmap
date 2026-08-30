@@ -10,7 +10,8 @@
       "flasche": "Air cylinder",
       "maske": "Face mask",
       "pressluftatmer": "Breathing apparatus",
-      "zubehoer": "Accessory"
+      "zubehoer": "Accessory",
+      "fuellstation": "Filling station"
     },
     "sichtkontrolle": {
       "offen": "open",
@@ -26,7 +27,17 @@
       "descriptionMissing": "Please describe the defect",
       "saveFailed": "Saving failed",
       "codeMissing": "No code given",
-      "geraetNotFound": "Item not found"
+      "geraetNotFound": "Item not found",
+      "rechnungNoPositions": "No filling selected.",
+      "rechnungNoRecipient": "No recipient selected.",
+      "rechnungNoEmail": "The recipient has no email address.",
+      "rechnungNoText": "Subject and message must not be empty.",
+      "rechnungMailNotConfigured": "Sending mail is not configured.",
+      "rechnungStatusInvalid": "Not possible in this status.",
+      "rechnungFuellungGone": "One of the fillings no longer exists.",
+      "rechnungFuellungTaken": "One of the fillings has already been invoiced.",
+      "rechnungEmpfaengerIncomplete": "Fire brigade, name and email are required.",
+      "rechnungNurEntwurf": "Only a draft can be changed."
     },
     "admin": {
       "title": "Breathing apparatus equipment",
@@ -42,7 +53,11 @@
       "filterTyp": "Type",
       "filterAll": "All",
       "search": "Search",
-      "showInactive": "Show retired items"
+      "showInactive": "Show retired items",
+      "tabs": {
+        "geraete": "Equipment",
+        "rechnung": "Invoicing"
+      }
     },
     "tabs": {
       "fuellprotokoll": "Filling log",
@@ -80,7 +95,9 @@
       "deleteConfirm": "Really delete this filling?",
       "unbekannteFlaschen": "{count} cylinders without a number",
       "druckRange": "{start} → {ende} bar",
-      "druckNurEnde": "to {ende} bar"
+      "druckNurEnde": "to {ende} bar",
+      "fuellstation": "Filling station",
+      "verrechnen": "To be billed"
     },
     "qr": {
       "title": "QR label",
@@ -201,7 +218,7 @@
       "title": "Import equipment",
       "button": "Import",
       "chooseFile": "Choose file (XLSX or CSV)",
-      "hint": "Article export from FDISK, or a CSV file with the same column names.",
+      "hint": "Article export from Sybos, or a CSV file with the same column names.",
       "preview": "{count, plural, =0 {No rows} one {One row} other {# rows}} found",
       "statusNew": "new",
       "statusUpdate": "update",
@@ -236,7 +253,140 @@
       "active": "In service",
       "bemerkung": "Note",
       "dialogTitleNew": "Add item",
-      "dialogTitleEdit": "Edit item"
+      "dialogTitleEdit": "Edit item",
+      "standort": "Location",
+      "standortWerte": {
+        "fix": "Fixed (fire station)",
+        "mobil": "Mobile (vehicle/trailer)"
+      },
+      "fahrzeug": "Vehicle or trailer"
+    },
+    "fuellprotokoll": {
+      "title": "Filling log",
+      "group": "Group",
+      "gastHinweis": "The filling log is reserved for members of the fire brigade."
+    },
+    "filter": {
+      "einsatz": "Operation",
+      "alle": "All",
+      "ohneEinsatz": "Without operation"
+    },
+    "verrechnen": {
+      "nurZuVerrechnende": "Billable only",
+      "chip": "to be billed",
+      "summe": "{count} of them to be billed"
+    },
+    "rechnung": {
+      "title": "Invoicing",
+      "loginRequired": "Please sign in.",
+      "noPermission": "Not permitted. Invoicing cylinder fillings requires the cost recovery permission.",
+      "nichtGefunden": "Invoice not found.",
+      "offene": "Open fillings",
+      "keineOffenen": "No open fillings to invoice.",
+      "rechnungen": "Invoices",
+      "keineRechnungen": "No invoice created yet.",
+      "ohneFeuerwehr": "No fire brigade",
+      "create": "Invoice",
+      "createTitle": "Invoice to {feuerwehr}",
+      "cancel": "Cancel",
+      "empfaenger": "Recipient",
+      "empfaengerNeu": "Add recipient",
+      "datum": "Invoice date",
+      "bemerkung": "Note",
+      "summe": "Total",
+      "alleAufTarif": "Set all selected items to rate:",
+      "spalteFeuerwehr": "Fire brigade",
+      "spalteFlaschen": "Cylinders",
+      "spalteZeitraum": "Period",
+      "spalteSumme": "Total",
+      "spalteNummer": "Number",
+      "spalteEmpfaenger": "Recipient",
+      "spalteDatum": "Date",
+      "spalteStatus": "Status",
+      "spalteFlasche": "Cylinder",
+      "spalteEinsatz": "Operation",
+      "spalteAnzahl": "Quantity",
+      "spalteTarif": "Rate",
+      "spaltePreis": "Unit price",
+      "pdf": "Download PDF",
+      "send": "Send",
+      "bezahlt": "Mark as paid",
+      "storno": "Cancel invoice",
+      "stornoConfirm": "Really cancel this invoice? Its fillings will show up as open again afterwards.",
+      "mailTitle": "Send invoice",
+      "mailTo": "To",
+      "mailCc": "CC",
+      "mailCcHelp": "Separate several addresses with commas.",
+      "mailSubject": "Subject",
+      "mailBody": "Message",
+      "settingsTitle": "Invoice settings",
+      "settingsSave": "Save",
+      "settingsSaved": "Saved.",
+      "ccEmail": "CC address",
+      "ccEmailHelp": "Receives a copy of every invoice sent, e.g. the treasurer.",
+      "vorgabeTarif": "Default rate",
+      "vorgabeTarifHelp": "Applies to every new item. In practice a 6.8 l cylinder is billed at the 6 l rate as well.",
+      "subjectTemplate": "Subject template",
+      "bodyTemplate": "Message template",
+      "platzhalter": "Placeholders, each to be wrapped in double curly braces: rechnung.nummer, rechnung.summe, rechnung.flaschen, rechnung.zeitraum, rechnung.zeitraumSatz, rechnung.datum, empfaenger.name, feuerwehr.name. Here zeitraum yields just the date or range, zeitraumSatz a ready-made phrase (\"am 30.08.2026\" or \"von … bis …\").",
+      "status": {
+        "draft": "Draft",
+        "sent": "Sent",
+        "paid": "Paid",
+        "cancelled": "Cancelled"
+      },
+      "keinEmpfaenger": "No recipient",
+      "gruppeAbsender": "Sender on the invoice",
+      "gruppeZahlung": "Payment",
+      "gruppeText": "Texts",
+      "absenderName": "Sender",
+      "absenderNameHelp": "Full name, e.g. \"Freiwillige Feuerwehr Neusiedl am See\". Empty: the name from the group document.",
+      "absenderAdresse": "Address",
+      "absenderKontakt": "Contact",
+      "absenderKontaktHelp": "A single footer line, e.g. phone, email and website.",
+      "kontoinhaber": "Account holder",
+      "kontoinhaberHelp": "Empty: the sender.",
+      "iban": "IBAN",
+      "ibanHelp": "Without an IBAN the invoice carries no payment block.",
+      "bic": "BIC",
+      "zahlungszielTage": "Payment term in days",
+      "zahlungszielTageHelp": "0: state no payment term.",
+      "ustHinweis": "VAT note",
+      "ustHinweisHelp": "Shown below the payment block. No default — the fire brigade makes its own tax assessment.",
+      "leistungstext": "Service description",
+      "leistungstextHelp": "Appears above the line items and states what the invoice is for.",
+      "configUnvollstaendig": "The invoice master data is incomplete: {felder}. Without it the recipient has no sender and no payment details.",
+      "zuDenEinstellungen": "Settings",
+      "bearbeiten": "Edit",
+      "bearbeitenTitle": "Edit draft",
+      "speichern": "Save",
+      "zurueckZurListe": "Back to invoicing",
+      "zumFuellprotokoll": "To the filling log",
+      "oeffnen": "Open",
+      "tarifNeuBerechnet": "The total is recalculated with the current rates on save."
+    },
+    "empfaenger": {
+      "createTitle": "Add recipient",
+      "editTitle": "Edit recipient",
+      "feuerwehr": "Fire brigade (as spelled in the equipment records)",
+      "feuerwehrHelp": "Must match the fire brigade on the cylinder — that is how they are matched up.",
+      "name": "Name on the invoice",
+      "ansprechpartner": "Contact person",
+      "adresse": "Address",
+      "email": "Email",
+      "telefon": "Phone",
+      "active": "Active",
+      "save": "Save",
+      "cancel": "Cancel",
+      "title": "Recipients",
+      "keine": "No recipient created yet.",
+      "feuerwehrKurz": "Fire brigade on the cylinder",
+      "feuerwehrKeinTreffer": "No cylinder carries this spelling — the match will not work. Please pick one from the list.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteConfirm": "Really delete the recipient \"{name}\"?",
+      "ja": "Yes",
+      "nein": "No"
     }
   },
   "common": {
@@ -640,7 +790,8 @@
     "units": "Resources",
     "users": "Users",
     "connectedApps": "Connected applications",
-    "adminMcp": "MCP access"
+    "adminMcp": "MCP access",
+    "fuellprotokoll": "Filling log"
   },
   "fahrtenbuch": {
     "title": "Trip log",
@@ -1094,7 +1245,8 @@
         "errorEmailInvalid": "At least one address is not a valid email address.",
         "errorTooManyEmails": "At most {max} addresses.",
         "errorInvalidWeek": "Not a valid calendar week of this year."
-      }
+      },
+      "kategorie": "Category"
     },
     "shareLink": {
       "heading": "Logbook link",
@@ -1228,6 +1380,17 @@
       "unlink": "Remove link",
       "close": "Close",
       "takenBy": "A matching account is already linked to: {names}"
+    },
+    "groupSettings": {
+      "feuerwehrName": "Own fire brigade",
+      "feuerwehrNameHelp": "Spelled as in the breathing apparatus master data, e.g. \"Neusiedl am See\". Determines whether a filling is pre-set as billable.",
+      "feuerwehrNameSaved": "Fire brigade saved",
+      "saveFeuerwehrName": "Save fire brigade"
+    },
+    "vehicleKategorie": {
+      "fahrzeug": "Vehicle",
+      "boot": "Boat",
+      "anhaenger": "Trailer"
     }
   },
   "fahrtenbuchShare": {

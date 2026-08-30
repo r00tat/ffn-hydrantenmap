@@ -17,6 +17,7 @@ import {
   type FahrtZweck,
 } from '../../common/fahrtenbuch';
 import CounterFields from './CounterFields';
+import { vehicleSelectItems } from './vehicleSelectItems';
 import {
   toDateInput,
   toTimeInput,
@@ -77,11 +78,9 @@ export default function FahrtenbuchEntryFields({
             value={form.selectedVehicleId}
             onChange={(e) => form.changeVehicle(e.target.value)}
           >
-            {form.vehicles.map((v) => (
-              <MenuItem key={v.id} value={v.id}>
-                {v.name}
-              </MenuItem>
-            ))}
+            {vehicleSelectItems(form.vehicles, (k) =>
+              t(`vehicleKategorie.${k}`),
+            )}
           </TextField>
         </Grid>
         {/* Alles Weitere hängt am Fahrzeug: Zähler und Betriebsmittel kommen

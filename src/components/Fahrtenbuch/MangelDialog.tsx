@@ -33,6 +33,7 @@ import {
 } from './mangelActions';
 import { mangelStatusColor } from './mangelStatus';
 import { uploadMangelImage } from './uploadMangelImage';
+import { vehicleSelectItems } from './vehicleSelectItems';
 
 export interface MangelDialogProps {
   open: boolean;
@@ -243,11 +244,9 @@ export default function MangelDialog({
               onChange={(e) => setVehicle(e.target.value)}
               fullWidth
             >
-              {vehicles.map((v) => (
-                <MenuItem key={v.id} value={v.id}>
-                  {v.name}
-                </MenuItem>
-              ))}
+              {vehicleSelectItems(vehicles, (k) =>
+                tFahrtenbuch(`vehicleKategorie.${k}`),
+              )}
             </TextField>
           )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
@@ -9,25 +9,31 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import {
   DEFAULT_ENDDRUCK,
   DEFAULT_SICHTKONTROLLE,
   findByCode,
   geraetKennung,
+  geraetLabel,
   SICHTKONTROLLE_WERTE,
   type AtemschutzFuellung,
   type AtemschutzGeraet,
   type FuellungInput,
   type Sichtkontrolle,
   validateFuellungInput,
+  verrechnenVorgabe,
+  waehleFuellstation,
 } from '../../common/atemschutz';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 import GeraetAutocomplete from './GeraetAutocomplete';
@@ -54,6 +60,16 @@ export interface FuellungDialogProps {
   personSuggestions: string[];
   /** Vorgabe für „Gefüllt von" — der angemeldete Benutzer. */
   defaultGefuelltVon: string;
+  /** Die aktiven Füllstationen der Gruppe. Leer = kein Feld im Dialog. */
+  fuellstationen: AtemschutzGeraet[];
+  /** Zuletzt gewählte Station, aus dem localStorage. */
+  letzteFuellstationId?: string;
+  /** `''` = an der Station. Bestimmt die Vorbelegung von `verrechnen`. */
+  firecallId: string;
+  /** Name der eigenen Feuerwehr, für dieselbe Vorbelegung. */
+  eigeneFeuerwehr?: string;
+  /** Meldet die gewählte Station zurück, damit sie gemerkt werden kann. */
+  onFuellstationChange?: (id: string) => void;
   onClose: () => void;
   onSave: (input: FuellungInput) => Promise<void>;
 }
@@ -68,6 +84,8 @@ interface FormState {
   gefuelltVon: string;
   sichtkontrolle: Sichtkontrolle;
   bemerkung: string;
+  fuellstationId?: string;
+  verrechnen: boolean;
 }
 
 function toNumber(value: string): number | undefined {
@@ -85,11 +103,21 @@ export default function FuellungDialog({
   feuerwehren,
   personSuggestions,
   defaultGefuelltVon,
+  fuellstationen,
+  letzteFuellstationId,
+  firecallId,
+  eigeneFeuerwehr,
+  onFuellstationChange,
   onClose,
   onSave,
 }: FuellungDialogProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
+
+  const auswahl = useMemo(
+    () => waehleFuellstation(fuellstationen, letzteFuellstationId),
+    [fuellstationen, letzteFuellstationId],
+  );
 
   const [form, setForm] = useState<FormState>(() => ({
     geraetId: fuellung?.geraetId,
@@ -101,7 +129,21 @@ export default function FuellungDialog({
     gefuelltVon: fuellung?.gefuelltVon ?? defaultGefuelltVon,
     sichtkontrolle: fuellung?.sichtkontrolle ?? DEFAULT_SICHTKONTROLLE,
     bemerkung: fuellung?.bemerkung ?? '',
+    fuellstationId: fuellung?.fuellstationId ?? auswahl.station?.id,
+    verrechnen:
+      fuellung?.verrechnen ??
+      verrechnenVorgabe({
+        feuerwehr: fuellung?.feuerwehr,
+        firecallId,
+        eigeneFeuerwehr,
+      }),
   }));
+  // Ob der Benutzer den Schalter selbst angefasst hat. Solange nicht, zieht die
+  // Vorbelegung nach: Das Feuerwehr-Feld ist beim Öffnen leer und wird meist
+  // erst danach ausgefüllt — ohne Nachziehen bliebe das Flag immer aus.
+  // Beim Bearbeiten einer gespeicherten Füllung gilt sie als angefasst: Das
+  // gespeicherte Flag ist eine getroffene Entscheidung.
+  const [verrechnenBeruehrt, setVerrechnenBeruehrt] = useState(!!fuellung);
   const [mangel, setMangel] = useState<MangelEingabe>(LEERE_MANGEL_EINGABE);
   const [saving, setSaving] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -110,6 +152,21 @@ export default function FuellungDialog({
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const setFeuerwehr = (next: string) =>
+    setForm((prev) => ({
+      ...prev,
+      feuerwehr: next,
+      ...(verrechnenBeruehrt
+        ? {}
+        : {
+            verrechnen: verrechnenVorgabe({
+              feuerwehr: next,
+              firecallId,
+              eigeneFeuerwehr,
+            }),
+          }),
+    }));
 
   // Die gewählte Flasche, sofern es zu ihr einen Stammdatensatz gibt.
   const gewaehlt = form.geraetId
@@ -128,6 +185,10 @@ export default function FuellungDialog({
   // es keins — dort bleibt nur die Bemerkung.
   const mangelGeraet = istMangel && !bereitsGemeldet ? gewaehlt : undefined;
 
+  const gewaehlteStation = auswahl.optionen.find(
+    (s) => s.id === form.fuellstationId,
+  );
+
   const input: FuellungInput = {
     geraetId: form.geraetId,
     flaschenNummer: form.flaschenNummer,
@@ -138,6 +199,11 @@ export default function FuellungDialog({
     gefuelltVon: form.gefuelltVon,
     sichtkontrolle: form.sichtkontrolle,
     bemerkung: form.bemerkung,
+    fuellstationId: gewaehlteStation?.id,
+    fuellstationName: gewaehlteStation
+      ? geraetLabel(gewaehlteStation)
+      : undefined,
+    verrechnen: form.verrechnen,
   };
   const fehler = validateFuellungInput(input);
   if (mangelGeraet && !hatMangelEingabe(mangel)) {
@@ -151,16 +217,31 @@ export default function FuellungDialog({
    * selbst.
    */
   const uebernehmeFlasche = (treffer: AtemschutzGeraet) => {
-    setForm((prev) => ({
-      ...prev,
-      // Die führende Kennung und nicht die Bezeichnung: Sonst stünde bei einer
-      // Flasche ohne eigene Nummer „Atemluftflasche CFK 6,8 l" im Feld — im
-      // Protokoll später nicht von der Nachbarflasche zu unterscheiden.
-      flaschenNummer: geraetKennung(treffer) ?? treffer.bezeichnung,
-      geraetId: treffer.id,
-      feuerwehr: treffer.feuerwehr || prev.feuerwehr,
-      enddruck: treffer.nenndruck ? String(treffer.nenndruck) : prev.enddruck,
-    }));
+    setForm((prev) => {
+      const feuerwehr = treffer.feuerwehr || prev.feuerwehr;
+      return {
+        ...prev,
+        // Die führende Kennung und nicht die Bezeichnung: Sonst stünde bei einer
+        // Flasche ohne eigene Nummer „Atemluftflasche CFK 6,8 l" im Feld — im
+        // Protokoll später nicht von der Nachbarflasche zu unterscheiden.
+        flaschenNummer: geraetKennung(treffer) ?? treffer.bezeichnung,
+        geraetId: treffer.id,
+        feuerwehr,
+        enddruck: treffer.nenndruck ? String(treffer.nenndruck) : prev.enddruck,
+        // Dieselbe Regel wie beim getippten Feuerwehr-Feld: Die Flasche einer
+        // fremden Wehr zu scannen ist der häufigste Weg zu einer zu
+        // verrechnenden Füllung.
+        ...(verrechnenBeruehrt
+          ? {}
+          : {
+              verrechnen: verrechnenVorgabe({
+                feuerwehr,
+                firecallId,
+                eigeneFeuerwehr,
+              }),
+            }),
+      };
+    });
   };
 
   const handleSave = async () => {
@@ -246,9 +327,9 @@ export default function FuellungDialog({
               fullWidth
               options={feuerwehren}
               value={form.feuerwehr}
-              onInputChange={(_, next) => set('feuerwehr', next ?? '')}
+              onInputChange={(_, next) => setFeuerwehr(next ?? '')}
               onChange={(_, next) =>
-                set('feuerwehr', typeof next === 'string' ? next : '')
+                setFeuerwehr(typeof next === 'string' ? next : '')
               }
               renderInput={(params) => (
                 <TextField {...params} label={t('fuellung.feuerwehr')} />
@@ -336,6 +417,51 @@ export default function FuellungDialog({
               <Alert severity="info">{t('fuellung.mangelBereitsGemeldet')}</Alert>
             </Grid>
           )}
+          {auswahl.modus === 'auswahl' && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                select
+                fullWidth
+                label={t('fuellung.fuellstation')}
+                value={form.fuellstationId ?? ''}
+                onChange={(e) => {
+                  set('fuellstationId', e.target.value);
+                  onFuellstationChange?.(e.target.value);
+                }}
+              >
+                {auswahl.optionen.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {geraetLabel(s)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
+          {/* Bei genau einer Station steht der Wert fest — ein Auswahlfeld mit
+              einem Eintrag wäre nur eine Klickfalle. Die Prüfung auf
+              `auswahl.station` steht hier statt eines `!`, weil das Feld
+              optional getypt ist. */}
+          {auswahl.modus === 'fest' && auswahl.station && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                {t('fuellung.fuellstation')}: {geraetLabel(auswahl.station)}
+              </Typography>
+            </Grid>
+          )}
+          <Grid size={12}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.verrechnen}
+                  onChange={(e) => {
+                    setVerrechnenBeruehrt(true);
+                    set('verrechnen', e.target.checked);
+                  }}
+                />
+              }
+              label={t('fuellung.verrechnen')}
+            />
+          </Grid>
           <Grid size={12}>
             <TextField
               fullWidth

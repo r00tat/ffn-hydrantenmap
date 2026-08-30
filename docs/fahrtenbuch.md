@@ -122,6 +122,43 @@ ein Lauf ohne jede konfigurierte Gruppe antworten dagegen mit 200: Da ist nichts
 zu wiederholen. Eine stumme Woche ist deshalb an den `results` zu erkennen, nicht
 am Status-Code.
 
+## Kategorie und Anzeigereihenfolge der Fahrzeuge
+
+In den Fahrzeugstammdaten stehen nicht nur Fahrzeuge: Anhänger und Boote
+gehören dazu, weil sie Mängel und Kostenersätze tragen und — beim Anhänger —
+die Verlastung einer Atemluft-Füllstation. Ein eigenes Fahrtenbuch führen sie
+nicht. `kategorie` (`fahrzeug`, `boot`, `anhaenger`) macht das sichtbar.
+
+**Sortiert wird nach Kategorie und darin alphabetisch** (`compareVehicles`),
+überall gleich: Auswahlfelder, Fahrzeugverwaltung, Mängel, Wochenbericht,
+PDF-Export und Gastseite. Verglichen wird mit `localeCompare('de')` — sonst
+stünde „Ölwehr" hinter „Zille", weil das Ö den höheren Codepunkt hat.
+
+Das Feld `sortOrder` ist damit **für die Anzeige ohne Wirkung**. Es bleibt am
+Dokument, weil der Kostenersatz-Import es setzt, aber eine von Hand gepflegte
+Reihenfolge wird nicht mehr angezeigt. Der Tausch war eine bewusste
+Entscheidung: Ein Name ist schneller zu finden als eine Zahl, die niemand
+sieht, und Anhänger stehen so beisammen am Ende statt zwischen den Fahrzeugen.
+
+Fehlt die Kategorie, leitet `vehicleKategorie()` sie aus dem Namen ab
+(`kategorieAusName`) — sonst stünde jedes gewachsene Fahrzeug unter „Fahrzeug",
+auch das Mehrzweckboot, und es bräuchte erst eine Datenpflege, bis die
+Gruppierung überhaupt etwas trennt. Anhänger werden **vor** Booten geprüft: Ein
+„Bootsanhänger" trägt beide Wörter und ist ein Anhänger. WLA-Aufbauten laufen
+mit den Anhängern, wie schon bei `suggestPresetForVehicleName`.
+
+Die Ableitung greift nur, solange nichts gepflegt ist. Beim Speichern in der
+Fahrzeugverwaltung wird das Feld immer geschrieben — auch wenn der Benutzer die
+vorbelegte Kategorie unverändert lässt. Danach entscheidet allein der gepflegte
+Wert; ein Wort im Namen wirft die Einordnung nicht mehr um.
+
+Die Überschriften in den Auswahlfeldern (`vehicleSelectItems`) erscheinen nur,
+wenn wirklich mehr als eine Kategorie vorkommt: Eine Wehr mit lauter Fahrzeugen
+bekäme sonst eine einzelne Überschrift „Fahrzeug" über der vollständigen Liste.
+Die Einträge kommen als **flaches** Array, weil `Select` seine Kinder selbst
+ausliest, um zum `value` die Beschriftung zu finden — steckten die `MenuItem`s
+in einem Element je Gruppe, stünde im geschlossenen Feld nichts.
+
 ## Fahrzeug-Cache im Fahrtenbuch
 
 Zählerstände, letzte Fahrt, Defekt-Hinweis und Mängelzähler stehen am

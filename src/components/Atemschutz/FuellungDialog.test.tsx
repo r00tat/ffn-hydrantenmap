@@ -48,12 +48,28 @@ function render(props: Partial<React.ComponentProps<typeof FuellungDialog>> = {}
       feuerwehren={['Neusiedl am See', 'Jois']}
       personSuggestions={['Max Muster']}
       defaultGefuelltVon="Max Muster"
+      fuellstationen={[]}
+      firecallId=""
       onClose={vi.fn()}
       onSave={onSave}
       {...props}
     />,
   );
   return { onSave };
+}
+
+function kompressor(id: string): AtemschutzGeraet {
+  return {
+    id,
+    typ: 'fuellstation',
+    bezeichnung: `Kompressor ${id}`,
+    feuerwehr: 'Neusiedl am See',
+    active: true,
+    createdAt: '',
+    createdBy: '',
+    updatedAt: '',
+    updatedBy: '',
+  };
 }
 
 /** Wählt den ersten Vorschlag der Flaschenliste aus. */
@@ -135,6 +151,8 @@ describe('FuellungDialog', () => {
         gefuelltVon: 'Anna Beispiel',
         feuerwehr: 'Jois',
         zeitpunkt: '2026-08-29T10:00:00.000Z',
+        firecallId: '',
+        verrechnen: false,
         createdAt: '',
         createdBy: '',
         updatedAt: '',
@@ -268,5 +286,99 @@ describe('FuellungDialog — Mangel aus der Sichtkontrolle', () => {
     // Die Füllung selbst bleibt speicherbar — der Zustand gehört in die
     // Bemerkung, aber die Zeile darf nicht verloren gehen.
     expect(screen.getByRole('button', { name: /speichern/i })).toBeEnabled();
+  });
+
+  it('zeigt bei genau einer Station kein Auswahlfeld, speichert sie aber mit', async () => {
+    const { onSave } = render({ fuellstationen: [kompressor('k1')] });
+
+    expect(screen.queryByLabelText('Füllstation')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Flaschennummer/), {
+      target: { value: '2.16.19' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /speichern/i }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ fuellstationId: 'k1' }),
+      ),
+    );
+  });
+
+  it('zeigt ohne Station kein Feld und speichert trotzdem', async () => {
+    const { onSave } = render({ fuellstationen: [] });
+
+    expect(screen.queryByLabelText('Füllstation')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Flaschennummer/), {
+      target: { value: '2.16.19' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /speichern/i }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ fuellstationId: undefined }),
+      ),
+    );
+  });
+
+  it('schaltet verrechnen bei fremder Feuerwehr an der Station ein', () => {
+    render({ firecallId: '', eigeneFeuerwehr: 'Neusiedl am See' });
+
+    fireEvent.change(screen.getByLabelText(/Feuerwehr/), {
+      target: { value: 'FF Weiden' },
+    });
+
+    expect(screen.getByLabelText(/verrechnen/i)).toBeChecked();
+  });
+
+  it('lässt verrechnen im Einsatz aus', () => {
+    render({ firecallId: 'abc', eigeneFeuerwehr: 'Neusiedl am See' });
+
+    fireEvent.change(screen.getByLabelText(/Feuerwehr/), {
+      target: { value: 'FF Weiden' },
+    });
+
+    expect(screen.getByLabelText(/verrechnen/i)).not.toBeChecked();
+  });
+
+  it('zieht nach einem Klick des Benutzers nicht mehr nach', () => {
+    render({ firecallId: '', eigeneFeuerwehr: 'Neusiedl am See' });
+
+    // An und gleich wieder aus: Der Schalter gilt danach als angefasst.
+    fireEvent.click(screen.getByLabelText(/verrechnen/i));
+    fireEvent.click(screen.getByLabelText(/verrechnen/i));
+    fireEvent.change(screen.getByLabelText(/Feuerwehr/), {
+      target: { value: 'FF Weiden' },
+    });
+
+    expect(screen.getByLabelText(/verrechnen/i)).not.toBeChecked();
+  });
+
+  it('zieht beim Bearbeiten einer bestehenden Füllung nie nach', () => {
+    render({
+      firecallId: '',
+      eigeneFeuerwehr: 'Neusiedl am See',
+      fuellung: {
+        id: 'f1',
+        anzahl: 1,
+        enddruck: 300,
+        gefuelltVon: 'Paul',
+        zeitpunkt: 'T',
+        firecallId: '',
+        verrechnen: false,
+        feuerwehr: 'FF Weiden',
+        createdAt: '',
+        createdBy: '',
+        updatedAt: '',
+        updatedBy: '',
+      },
+    });
+
+    fireEvent.change(screen.getByLabelText(/Feuerwehr/), {
+      target: { value: 'FF Gols' },
+    });
+
+    expect(screen.getByLabelText(/verrechnen/i)).not.toBeChecked();
   });
 });

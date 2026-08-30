@@ -73,16 +73,23 @@ export default function AusruestungTab({
   }>();
   const [mangelGeraet, setMangelGeraet] = useState<AtemschutzGeraet>();
 
+  // Eine Füllstation wird nicht ausgegeben und nicht zurückgenommen — sie steht
+  // im Bestand, gehört aber nicht auf diesen Reiter.
+  const ausgebbare = useMemo(
+    () => geraete.filter((g) => g.typ !== 'fuellstation'),
+    [geraete],
+  );
+
   const gefiltert = useMemo(() => {
     // Dieselbe Suche wie im Scanner und in der Verwaltung: über alle
     // Kennungen, die Bezeichnung und die Feuerwehr.
-    const treffer = matchGeraete(geraete, suche, geraete.length);
+    const treffer = matchGeraete(ausgebbare, suche, ausgebbare.length);
     return treffer.filter((g) => {
       if (typFilter !== 'alle' && g.typ !== typFilter) return false;
       if (!nurAusgegeben) return true;
       return ausgabeByGeraet.get(g.id as string)?.status === 'ausgegeben';
     });
-  }, [geraete, suche, typFilter, nurAusgegeben, ausgabeByGeraet]);
+  }, [ausgebbare, suche, typFilter, nurAusgegeben, ausgabeByGeraet]);
 
   /**
    * Öffnet für ein Stück den passenden Dialog: Was draußen ist, kommt zurück,
@@ -120,7 +127,7 @@ export default function AusruestungTab({
           // klicken ist der Handgriff, den der Scanner ersparen soll.
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || !canWrite) return;
-            const exakt = findByCode(geraete, suche);
+            const exakt = findByCode(ausgebbare, suche);
             const ziel = exakt.length === 1 ? exakt[0] : gefiltert[0];
             if (ziel && (exakt.length === 1 || gefiltert.length === 1)) {
               oeffneFuerGeraet(ziel);
@@ -147,11 +154,16 @@ export default function AusruestungTab({
           sx={{ minWidth: 180 }}
         >
           <MenuItem value="alle">{t('ausruestung.filterAll')}</MenuItem>
-          {ATEMSCHUTZ_GERAET_TYPEN.map((typ) => (
-            <MenuItem key={typ} value={typ}>
-              {t(`typ.${typ}`)}
-            </MenuItem>
-          ))}
+          {/* Ohne den Filter stünde „Füllstation" zur Wahl und führte
+              zuverlässig auf eine leere Liste — die Stationen sind oben schon
+              aussortiert. */}
+          {ATEMSCHUTZ_GERAET_TYPEN.filter((typ) => typ !== 'fuellstation').map(
+            (typ) => (
+              <MenuItem key={typ} value={typ}>
+                {t(`typ.${typ}`)}
+              </MenuItem>
+            ),
+          )}
         </TextField>
         <FormControlLabel
           control={
@@ -164,7 +176,7 @@ export default function AusruestungTab({
         />
       </Stack>
 
-      {geraete.length === 0 ? (
+      {ausgebbare.length === 0 ? (
         <Typography color="text.secondary">{t('ausruestung.empty')}</Typography>
       ) : gefiltert.length === 0 ? (
         <Typography color="text.secondary">{t('ausruestung.noMatch')}</Typography>
@@ -258,7 +270,7 @@ export default function AusruestungTab({
       {scannerOpen && (
         <BarcodeScannerDialog
           open
-          geraete={geraete}
+          geraete={ausgebbare}
           onClose={() => setScannerOpen(false)}
           onPicked={(code, treffer) => {
             // Wer scannt, will das Stück ausgeben oder zurücknehmen — die

@@ -6,11 +6,14 @@ import {
   FAHRTENBUCH_CONFIG_COLLECTION_ID,
   FAHRTENBUCH_PERSON_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
+  FAHRTENBUCH_VEHICLE_KATEGORIEN,
+  kategorieAusName,
   normalizePersonName,
   VEHICLE_PRESETS,
   type FahrtenbuchConfig,
   type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
+  type FahrtenbuchVehicleKategorie,
   type VehiclePresetId,
 } from '../../common/fahrtenbuch';
 import { getDefaultVehicles } from '../../common/defaultKostenersatzRates';
@@ -103,6 +106,7 @@ export async function saveFahrtenbuchVehicle(
     | 'counters'
     | 'fuelTypes'
     | 'kostenersatzVehicleId'
+    | 'kategorie'
     | 'sortOrder'
   >,
 ): Promise<StammdatenResult> {
@@ -121,6 +125,14 @@ export async function saveFahrtenbuchVehicle(
         typeof data.kostenersatzVehicleId === 'string'
           ? data.kostenersatzVehicleId.trim()
           : '',
+      // Ohne gültige Angabe die aus dem Namen abgeleitete: Das Feld ist damit
+      // nach jedem Speichern gesetzt, und die Ableitung greift nur noch bei
+      // den Fahrzeugen, die seither niemand angefasst hat.
+      kategorie: FAHRTENBUCH_VEHICLE_KATEGORIEN.includes(
+        data.kategorie as FahrtenbuchVehicleKategorie,
+      )
+        ? data.kategorie
+        : kategorieAusName(data.name ?? ''),
       sortOrder: sanitizeSortOrder(data.sortOrder),
       updatedAt: now,
       updatedBy: session.user.id,
@@ -265,6 +277,9 @@ export async function importVehiclesFromKostenersatz(
           counters: VEHICLE_PRESETS[row.preset],
           fuelTypes: [],
           kostenersatzVehicleId: row.sourceId,
+          // Der Kostenersatz-Katalog führt Anhänger und Boote mit; die
+          // Kategorie steht dort nicht, wohl aber im Namen.
+          kategorie: kategorieAusName(row.name),
           sortOrder: row.sortOrder ?? 0,
           ...stamps(session.user.id),
         });
@@ -543,6 +558,43 @@ export async function saveFahrtenbuchGroupStandort(
     return { success: true, id: groupId };
   } catch (err) {
     console.error('saveFahrtenbuchGroupStandort failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Speichert den Namen der eigenen Feuerwehr. Nur für echte Mandanten.
+ *
+ * Getrennt von `saveFahrtenbuchGroupStandort`, weil beide Felder in derselben
+ * Karte, aber unabhängig voneinander gespeichert werden — ein Tippfehler im
+ * Namen soll nicht den Standort zurücksetzen.
+ */
+export async function saveFahrtenbuchGroupFeuerwehrName(
+  groupId: string,
+  feuerwehrName: string,
+): Promise<StammdatenResult> {
+  try {
+    const session = await actionGroupAdminRequired(groupId);
+
+    const now = new Date().toISOString();
+    await firestore
+      .collection(GROUP_COLLECTION_ID)
+      .doc(groupId)
+      // Leerer Name heißt „bewusst zurückgesetzt" — dieselbe Bedeutung wie
+      // `null` beim Standort, hier als leerer String, weil das Feld ein
+      // String ist und `verrechnenVorgabe` beides gleich behandelt.
+      .set(
+        {
+          feuerwehrName: feuerwehrName.trim(),
+          updatedAt: now,
+          updatedBy: session.user.id,
+        },
+        { merge: true },
+      );
+
+    return { success: true, id: groupId };
+  } catch (err) {
+    console.error('saveFahrtenbuchGroupFeuerwehrName failed', err);
     return { success: false, error: (err as Error).message };
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -19,9 +19,12 @@ import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   ATEMSCHUTZ_GERAET_TYPEN,
@@ -43,6 +46,12 @@ import {
 import GeraetDialog from './GeraetDialog';
 import GeraetImportDialog from './GeraetImportDialog';
 import GeraetQrDialog from './GeraetQrDialog';
+import RechnungSettings from './RechnungSettings';
+import {
+  ATEMSCHUTZ_ADMIN_TABS,
+  adminTabFromParam,
+  type AtemschutzAdminTabKey,
+} from './atemschutzAdminTabs';
 
 type TypFilter = AtemschutzGeraetTyp | 'alle';
 
@@ -51,6 +60,21 @@ export default function AtemschutzAdmin() {
   const tCommon = useTranslations('common');
   const { groups: allGroups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { isAdmin, groupAdmin } = useFirebaseLogin();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Der aktive Reiter steht in der URL, nicht im State — dasselbe Muster wie
+  // am Sammelplatz: Sonst landet die Zurück-Taste auf der vorigen Seite statt
+  // auf dem vorigen Reiter, und ein Neuladen fällt auf den ersten zurück.
+  const tab = adminTabFromParam(searchParams.get('tab'));
+
+  const setTab = useCallback(
+    (next: AtemschutzAdminTabKey) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', next);
+      router.replace(`?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
   // Ein Gruppen-Admin verwaltet nur die Gruppen, in denen er eingetragen ist.
   // Keine Sicherheitsgrenze — die ist `actionGroupAdminRequired` in den
   // Actions; hier stehen bloß keine Gruppen zur Auswahl, die ohnehin abgewiesen
@@ -127,188 +151,209 @@ export default function AtemschutzAdmin() {
           <Typography color="text.secondary">{t('admin.noGroups')}</Typography>
         ) : (
           <>
-            <Stack
-              direction="row"
-              spacing={2}
-              sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}
+            <Tabs
+              value={tab}
+              onChange={(_, next: AtemschutzAdminTabKey) => setTab(next)}
+              sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
             >
-              <TextField
-                size="small"
-                label={t('admin.search')}
-                value={suche}
-                onChange={(e) => setSuche(e.target.value)}
-                sx={{ minWidth: 200 }}
-              />
-              <TextField
-                select
-                size="small"
-                label={t('admin.filterTyp')}
-                value={typFilter}
-                onChange={(e) => setTypFilter(e.target.value as TypFilter)}
-                sx={{ minWidth: 160 }}
-              >
-                <MenuItem value="alle">{t('admin.filterAll')}</MenuItem>
-                {ATEMSCHUTZ_GERAET_TYPEN.map((typ) => (
-                  <MenuItem key={typ} value={typ}>
-                    {t(`typ.${typ}`)}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={zeigeInaktive}
-                    onChange={(e) => setZeigeInaktive(e.target.checked)}
-                  />
-                }
-                label={t('admin.showInactive')}
-              />
-              <Box sx={{ flexGrow: 1 }} />
-              <Typography variant="body2" color="text.secondary">
-                {t('admin.count', { count: gefiltert.length })}
-              </Typography>
-              <Button
-                startIcon={<UploadFileIcon />}
-                onClick={() => setImportOpen(true)}
-              >
-                {t('import.button')}
-              </Button>
-            </Stack>
+              {ATEMSCHUTZ_ADMIN_TABS.map((key) => (
+                <Tab
+                  key={key}
+                  value={key}
+                  label={t(`admin.tabs.${key}` as 'admin.tabs.geraete')}
+                />
+              ))}
+            </Tabs>
 
-            {gefiltert.length === 0 ? (
-              <Typography color="text.secondary">{t('admin.empty')}</Typography>
-            ) : (
-              <List dense>
-                {gefiltert.map((g) => (
-                  <ListItem
-                    key={g.id}
-                    divider
-                    secondaryAction={
-                      <Stack direction="row" spacing={0.5}>
-                        <Tooltip title={t('qr.button')}>
-                          <span>
-                            <IconButton onClick={() => setQrGeraet(g)}>
-                              <QrCode2Icon />
+            {tab === 'rechnung' && <RechnungSettings groupId={groupId} />}
+
+            {tab === 'geraete' && (
+              <>
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}
+              >
+                <TextField
+                  size="small"
+                  label={t('admin.search')}
+                  value={suche}
+                  onChange={(e) => setSuche(e.target.value)}
+                  sx={{ minWidth: 200 }}
+                />
+                <TextField
+                  select
+                  size="small"
+                  label={t('admin.filterTyp')}
+                  value={typFilter}
+                  onChange={(e) => setTypFilter(e.target.value as TypFilter)}
+                  sx={{ minWidth: 160 }}
+                >
+                  <MenuItem value="alle">{t('admin.filterAll')}</MenuItem>
+                  {ATEMSCHUTZ_GERAET_TYPEN.map((typ) => (
+                    <MenuItem key={typ} value={typ}>
+                      {t(`typ.${typ}`)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={zeigeInaktive}
+                      onChange={(e) => setZeigeInaktive(e.target.checked)}
+                    />
+                  }
+                  label={t('admin.showInactive')}
+                />
+                <Box sx={{ flexGrow: 1 }} />
+                <Typography variant="body2" color="text.secondary">
+                  {t('admin.count', { count: gefiltert.length })}
+                </Typography>
+                <Button
+                  startIcon={<UploadFileIcon />}
+                  onClick={() => setImportOpen(true)}
+                >
+                  {t('import.button')}
+                </Button>
+              </Stack>
+
+              {gefiltert.length === 0 ? (
+                <Typography color="text.secondary">{t('admin.empty')}</Typography>
+              ) : (
+                <List dense>
+                  {gefiltert.map((g) => (
+                    <ListItem
+                      key={g.id}
+                      divider
+                      secondaryAction={
+                        <Stack direction="row" spacing={0.5}>
+                          <Tooltip title={t('qr.button')}>
+                            <span>
+                              <IconButton onClick={() => setQrGeraet(g)}>
+                                <QrCode2Icon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={t('admin.edit', { name: g.bezeichnung })}>
+                            <IconButton
+                              edge="end"
+                              onClick={() => {
+                                setEditGeraet(g);
+                                setDialogOpen(true);
+                              }}
+                            >
+                              <EditIcon />
                             </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title={t('admin.edit', { name: g.bezeichnung })}>
-                          <IconButton
-                            edge="end"
-                            onClick={() => {
-                              setEditGeraet(g);
-                              setDialogOpen(true);
-                            }}
+                          </Tooltip>
+                          <Tooltip
+                            title={t('admin.delete', { name: g.bezeichnung })}
                           >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip
-                          title={t('admin.delete', { name: g.bezeichnung })}
-                        >
-                          <IconButton edge="end" onClick={() => setLoeschKandidat(g)}>
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    }
-                  >
-                    <ListItemText
-                      primary={
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          sx={{ alignItems: 'center', flexWrap: 'wrap' }}
-                        >
-                          <span>
-                            {g.nummer ? `${g.nummer} · ` : ''}
-                            {g.bezeichnung}
-                          </span>
-                          <Chip size="small" label={t(`typ.${g.typ}`)} />
-                          {g.active === false && (
-                            <Chip
-                              size="small"
-                              color="default"
-                              variant="outlined"
-                              label={t('admin.showInactive')}
-                            />
-                          )}
+                            <IconButton edge="end" onClick={() => setLoeschKandidat(g)}>
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
                         </Stack>
                       }
-                      secondary={[g.feuerwehr, g.inventarNr, g.seriennummer]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
+                    >
+                      <ListItemText
+                        primary={
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+                          >
+                            <span>
+                              {g.nummer ? `${g.nummer} · ` : ''}
+                              {g.bezeichnung}
+                            </span>
+                            <Chip size="small" label={t(`typ.${g.typ}`)} />
+                            {g.active === false && (
+                              <Chip
+                                size="small"
+                                color="default"
+                                variant="outlined"
+                                label={t('admin.showInactive')}
+                              />
+                            )}
+                          </Stack>
+                        }
+                        secondary={[g.feuerwehr, g.inventarNr, g.seriennummer]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
 
-            <Tooltip title={t('admin.add')}>
-              <Fab
-                color="primary"
-                sx={{ position: 'fixed', bottom: 24, right: 24 }}
-                onClick={() => {
-                  setEditGeraet(undefined);
-                  setDialogOpen(true);
-                }}
-              >
-                <AddIcon />
-              </Fab>
-            </Tooltip>
+              <Tooltip title={t('admin.add')}>
+                <Fab
+                  color="primary"
+                  sx={{ position: 'fixed', bottom: 24, right: 24 }}
+                  onClick={() => {
+                    setEditGeraet(undefined);
+                    setDialogOpen(true);
+                  }}
+                >
+                  <AddIcon />
+                </Fab>
+              </Tooltip>
 
-            {qrGeraet && (
-              <GeraetQrDialog
-                key={qrGeraet.id}
-                open
-                geraet={qrGeraet}
-                onClose={() => setQrGeraet(undefined)}
-              />
-            )}
+              {qrGeraet && (
+                <GeraetQrDialog
+                  key={qrGeraet.id}
+                  open
+                  geraet={qrGeraet}
+                  onClose={() => setQrGeraet(undefined)}
+                />
+              )}
 
-            {importOpen && (
-              // `onDone` bleibt leer: `useAtemschutzGeraete` hängt an einem
-              // Firestore-Listener und zieht die neuen Dokumente von selbst
-              // nach — ein Neuladen von Hand wäre ein zweiter Weg, auf dem die
-              // Liste veralten kann.
-              <GeraetImportDialog
-                open
-                groupId={groupId}
-                onClose={() => setImportOpen(false)}
-                onDone={() => undefined}
-              />
-            )}
+              {importOpen && (
+                // `onDone` bleibt leer: `useAtemschutzGeraete` hängt an einem
+                // Firestore-Listener und zieht die neuen Dokumente von selbst
+                // nach — ein Neuladen von Hand wäre ein zweiter Weg, auf dem die
+                // Liste veralten kann.
+                <GeraetImportDialog
+                  open
+                  groupId={groupId}
+                  onClose={() => setImportOpen(false)}
+                  onDone={() => undefined}
+                />
+              )}
 
-            {dialogOpen && (
-              <GeraetDialog
-                key={editGeraet?.id ?? 'new'}
-                open={dialogOpen}
-                geraet={editGeraet}
-                feuerwehren={feuerwehren}
-                onClose={() => setDialogOpen(false)}
-                onSave={handleSave}
-              />
-            )}
+              {dialogOpen && (
+                <GeraetDialog
+                  key={editGeraet?.id ?? 'new'}
+                  open={dialogOpen}
+                  geraet={editGeraet}
+                  feuerwehren={feuerwehren}
+                  groupId={groupId}
+                  onClose={() => setDialogOpen(false)}
+                  onSave={handleSave}
+                />
+              )}
 
-            {/* `ConfirmDialog` hält sein `open` in eigenem State, der nur beim
-                ersten Rendern gesetzt wird — deshalb bedingt gemountet statt
-                dauerhaft mit `open={...}`. */}
-            {loeschKandidat && (
-              <ConfirmDialog
-                title={tCommon('confirmTitle')}
-                text={t('admin.deleteConfirm', {
-                  name: loeschKandidat.bezeichnung,
-                })}
-                yes={tCommon('yes')}
-                no={tCommon('no')}
-                onConfirm={(confirmed) => {
-                  if (confirmed) {
-                    void handleDelete();
-                  } else {
-                    setLoeschKandidat(undefined);
-                  }
-                }}
-              />
+              {/* `ConfirmDialog` hält sein `open` in eigenem State, der nur beim
+                  ersten Rendern gesetzt wird — deshalb bedingt gemountet statt
+                  dauerhaft mit `open={...}`. */}
+              {loeschKandidat && (
+                <ConfirmDialog
+                  title={tCommon('confirmTitle')}
+                  text={t('admin.deleteConfirm', {
+                    name: loeschKandidat.bezeichnung,
+                  })}
+                  yes={tCommon('yes')}
+                  no={tCommon('no')}
+                  onConfirm={(confirmed) => {
+                    if (confirmed) {
+                      void handleDelete();
+                    } else {
+                      setLoeschKandidat(undefined);
+                    }
+                  }}
+                />
+              )}
+              </>
             )}
           </>
         )}

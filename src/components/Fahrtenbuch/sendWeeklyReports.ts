@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { Group } from '../../app/groups/groupTypes';
 import {
+  compareVehicles,
   FAHRTENBUCH_COLLECTION_ID,
   FAHRTENBUCH_CONFIG_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
@@ -186,9 +187,8 @@ async function loadMangel(groupId: string): Promise<Mangel[]> {
  * Ein außer Dienst gestelltes Fahrzeug soll nicht jede Woche „keine Fahrten"
  * melden — eine erfasste Fahrt darf aber unter keinen Umständen verschwinden.
  *
- * Ein fehlender `sortOrder` sortiert nach hinten und nicht wie eine 0 nach
- * vorn: Ein Fahrzeug ohne gepflegte Reihenfolge würde sonst die eingestellte
- * Ordnung der anderen von vorne aufbrechen.
+ * Sortiert wie überall sonst nach Kategorie und darin alphabetisch: Der
+ * Bericht liest sich in derselben Reihenfolge wie die Auswahl in der App.
  */
 function reportVehicles(
   vehicles: FahrtenbuchVehicle[],
@@ -199,12 +199,7 @@ function reportVehicles(
   );
   return vehicles
     .filter((v) => v.active !== false || withEntries.has(v.id as string))
-    .sort(
-      (a, b) =>
-        (a.sortOrder ?? Number.MAX_SAFE_INTEGER) -
-          (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
-        (a.name ?? '').localeCompare(b.name ?? '', 'de'),
-    );
+    .sort(compareVehicles);
 }
 
 async function reportForGroup(

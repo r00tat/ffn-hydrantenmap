@@ -28,6 +28,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import MangelDialog from './MangelDialog';
 import MangelList from './MangelList';
 import { deleteMangel } from './mangelActions';
+import { vehicleSelectItems } from './vehicleSelectItems';
 
 /**
  * Der Statusfilter. `'openAll'` ist kein einzelner Status, sondern die
@@ -223,11 +224,9 @@ export default function MangelPage() {
           <MenuItem value="">{t('filters.all')}</MenuItem>
           {/* Auch stillgelegte Fahrzeuge: Ein offener Mangel an einem
               stillgelegten Fahrzeug darf nicht unauffindbar werden. */}
-          {vehicles.map((v) => (
-            <MenuItem key={v.id} value={v.id}>
-              {v.name}
-            </MenuItem>
-          ))}
+          {vehicleSelectItems(vehicles, (k) =>
+            tFahrtenbuch(`vehicleKategorie.${k}`),
+          )}
         </TextField>
       </Stack>
 

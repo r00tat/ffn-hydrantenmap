@@ -1,11 +1,12 @@
 import {
   type AtemschutzGeraet,
   type AtemschutzGeraetTyp,
+  type FuellstationStandort,
   normalizeCode,
 } from './atemschutz';
 
 /**
- * Import der Atemschutz-Stammdaten aus dem FDISK-Artikelexport.
+ * Import der Atemschutz-Stammdaten aus dem Sybos-Artikelexport.
  *
  * Der Export ist die einzige gepflegte Quelle für Inventar- und
  * Seriennummern — von Hand nachgetragen wäre er nach dem ersten Zugang
@@ -22,6 +23,8 @@ export const ARTIKEL_SPALTEN = {
   inventarNr: 'Inventar-Nr.',
   zusatzInventarNr: 'Zusatz-Inventar-Nr.',
   barcodes: 'Barcodes',
+  klasse1: 'Klasse 1',
+  klasse2: 'Klasse 2',
   klasse3: 'Klasse 3',
   dienststelle: 'Dienststelle',
   status: 'Status',
@@ -33,6 +36,14 @@ export const ARTIKEL_SPALTEN = {
 
 /** Ohne die Bezeichnung ist eine Zeile nicht zuzuordnen. */
 const PFLICHTSPALTEN = [ARTIKEL_SPALTEN.bezeichnung];
+
+/**
+ * Der einzige Statuswert, der eine Zeile vom Import ausschließt. Der Export
+ * kennt nur „aktiv" und „inaktiv"; alles andere — auch eine leere Zelle —
+ * wird importiert, statt an einem unbekannten Wert stillschweigend Bestand zu
+ * verlieren.
+ */
+const STATUS_INAKTIV = 'inaktiv';
 
 /** Die Felder, die der Import je Zeile setzt. Systemfelder fehlen bewusst. */
 export type ImportGeraet = Partial<
@@ -53,13 +64,70 @@ const KLASSE_TYP: Record<string, AtemschutzGeraetTyp> = {
 };
 
 /**
- * „Klasse 3" des Exports auf den Typ. Alles Unbekannte wird Zubehör: 33 der
- * 214 Zeilen haben keine Klasse 3, und eine leere Zeile stillschweigend zur
- * Flasche zu machen wäre die gefährlichere Annahme — eine Flasche taucht im
- * Füllprotokoll auf.
+ * Die groben Klassen, an denen eine Füllstation zu erkennen ist.
+ *
+ * Der Export der Füllstationen ist ein eigener Lauf mit eigenem Klassenbaum:
+ * Klasse 3 ist dort leer, der Typ steht in Klasse 1 ("Atemlufterzeugung") und
+ * Klasse 2 ("Atemluftfüllstation" / "Atemluftkompressor").
  */
-export function typAusKlasse(klasse: string): AtemschutzGeraetTyp {
-  return KLASSE_TYP[(klasse ?? '').trim().toLowerCase()] ?? 'zubehoer';
+const ERZEUGUNG_KLASSEN = new Set([
+  'atemlufterzeugung',
+  'atemluftfüllstation',
+  'atemluftfuellstation',
+  'atemluftkompressor',
+]);
+
+function klassenSchluessel(wert?: string): string {
+  return (wert ?? '').trim().toLowerCase();
+}
+
+/**
+ * Die Klassenspalten des Exports auf den Typ.
+ *
+ * Klasse 3 entscheidet zuerst und allein über die Gerätetypen: Im Geräteexport
+ * steht in Klasse 2 durchgehend "Pressluftatmer" — auch bei den 81 Masken.
+ * Zöge Klasse 2 gleichberechtigt mit, wäre jede Maske ein Pressluftatmer.
+ * Erst wenn Klasse 3 nichts hergibt, zählen die gröberen Klassen, und dort nur
+ * die Atemlufterzeugung.
+ *
+ * Alles Übrige wird Zubehör: 33 der 214 Zeilen haben keine Klasse 3, und eine
+ * leere Zeile stillschweigend zur Flasche zu machen wäre die gefährlichere
+ * Annahme — eine Flasche taucht im Füllprotokoll auf.
+ */
+export function typAusKlassen(klassen: {
+  klasse1?: string;
+  klasse2?: string;
+  klasse3?: string;
+}): AtemschutzGeraetTyp {
+  const ausKlasse3 = KLASSE_TYP[klassenSchluessel(klassen.klasse3)];
+  if (ausKlasse3) return ausKlasse3;
+  if (
+    ERZEUGUNG_KLASSEN.has(klassenSchluessel(klassen.klasse1)) ||
+    ERZEUGUNG_KLASSEN.has(klassenSchluessel(klassen.klasse2))
+  ) {
+    return 'fuellstation';
+  }
+  return 'zubehoer';
+}
+
+/**
+ * Der Standort einer Füllstation aus dem Klartext der Bezeichnung —
+ * "Atemluftfüllstation Stationär" gegen "Atemluftkompressor Mobil".
+ *
+ * Nur der Klartext, nicht die Klasse: Ob Luft von einem Kompressor oder aus
+ * einer Füllstation kommt, sagt nichts darüber, ob das Gerät fest steht oder
+ * auf dem Anhänger liegt. Fehlt das Wort, bleibt der Standort offen und wird
+ * im Dialog gesetzt, statt hier geraten zu werden.
+ */
+export function standortAusBezeichnung(
+  bezeichnung: string,
+): FuellstationStandort | undefined {
+  const text = bezeichnung ?? '';
+  if (/\bmobil/i.test(text)) return 'mobil';
+  // Die Wortgrenze schützt vor "Atemluftfüllstation": dort steht kein
+  // eigenständiges "stationär".
+  if (/\bstation(?:ä|ae)r/i.test(text)) return 'fix';
+  return undefined;
 }
 
 export interface BezeichnungsWerte {
@@ -142,8 +210,22 @@ export function rowsToGeraete(rows: string[][]): ImportGeraet[] {
     const bezeichnung = feld(row, ARTIKEL_SPALTEN.bezeichnung);
     if (!bezeichnung) continue;
 
+    // Inaktive Artikel kommen gar nicht erst in den Bestand. Sie mit
+    // `active: false` anzulegen hätte dasselbe Dokument erzeugt, das der
+    // Sammelplatz ohnehin überall ausblendet — nur eben eines, das bei jedem
+    // Import wieder mitgeschrieben wird.
+    if (
+      feld(row, ARTIKEL_SPALTEN.status).toLowerCase() === STATUS_INAKTIV
+    ) {
+      continue;
+    }
+
     const werte = werteAusBezeichnung(bezeichnung);
-    const typ = typAusKlasse(feld(row, ARTIKEL_SPALTEN.klasse3));
+    const typ = typAusKlassen({
+      klasse1: feld(row, ARTIKEL_SPALTEN.klasse1),
+      klasse2: feld(row, ARTIKEL_SPALTEN.klasse2),
+      klasse3: feld(row, ARTIKEL_SPALTEN.klasse3),
+    });
     const zusatzInventarNr = feld(row, ARTIKEL_SPALTEN.zusatzInventarNr);
     const seriennummer = feld(row, ARTIKEL_SPALTEN.seriennummer);
     const bemerkung = feld(row, ARTIKEL_SPALTEN.bemerkung);
@@ -156,7 +238,8 @@ export function rowsToGeraete(rows: string[][]): ImportGeraet[] {
       feuerwehr: werte.bezirksreserve
         ? 'Bezirksreserve'
         : feld(row, ARTIKEL_SPALTEN.dienststelle),
-      active: feld(row, ARTIKEL_SPALTEN.status).toLowerCase() !== 'inaktiv',
+      // Immer aktiv — inaktive Zeilen sind oben übersprungen worden.
+      active: true,
     };
 
     const externeId = feld(row, ARTIKEL_SPALTEN.externeId);
@@ -192,6 +275,13 @@ export function rowsToGeraete(rows: string[][]): ImportGeraet[] {
       geraet.nenndruck = nenndruckAusBemerkung(bemerkung) ?? 300;
     }
 
+    // Standort nur für Füllstationen — an einer Flasche hat das Feld keine
+    // Bedeutung, und "mobil" im Klartext hieße dort etwas anderes.
+    if (typ === 'fuellstation') {
+      const standort = standortAusBezeichnung(bezeichnung);
+      if (standort) geraet.standort = standort;
+    }
+
     geraete.push(geraet);
   }
   return geraete;
@@ -217,7 +307,7 @@ export interface ImportPlanZeile {
  * Gleicht die Importzeilen gegen den vorhandenen Bestand ab.
  *
  * Die Reihenfolge externeId → inventarNr → seriennummer ist die nach
- * Verlässlichkeit: Die FDISK-ID ist der Schlüssel des Quellsystems, die
+ * Verlässlichkeit: Die Sybos-ID ist der Schlüssel des Quellsystems, die
  * Inventar-Nr. wird von der Feuerwehr vergeben, die Seriennummer steht im
  * Export nur bei einem Teil der Zeilen und ist dort mehrfach vergeben.
  */
@@ -272,7 +362,7 @@ export function abgleich(
     // Geprüft wird nur die *führende* Kennung, also die, die den Abgleich
     // entscheidet. Über alle drei zu prüfen wäre falscher Alarm: Im echten
     // Export teilen sich 41 Zeilen irgendeine Kennung, aber nur 9 dieselbe
-    // führende. Die übrigen 32 haben eine eigene FDISK-ID und landen sauber
+    // führende. Die übrigen 32 haben eine eigene Sybos-ID und landen sauber
     // in eigenen Dokumenten — sie zum Überspringen vorzuschlagen hieße, ein
     // Sechstel des Bestands beim Import zu verlieren.
     const primaer = `${kennungen[0].feld}:${kennungen[0].value}`;

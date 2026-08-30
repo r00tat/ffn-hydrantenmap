@@ -40,6 +40,7 @@ import UserIcon from '@mui/icons-material/Person';
 import PinIcon from '@mui/icons-material/Pin';
 import PlaceIcon from '@mui/icons-material/Place';
 import PrintIcon from '@mui/icons-material/Print';
+import PropaneTankIcon from '@mui/icons-material/PropaneTank';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
@@ -319,6 +320,17 @@ export default function AppDrawer({
           text: t('maengel'),
           icon: <BuildIcon />,
           href: '/fahrtenbuch/maengel',
+        },
+        {
+          // Unter „Fahrzeuge" und nicht unter „Lage": Das Füllprotokoll ist
+          // Gerätearbeit und hängt an keinem Einsatz. Der Sammelplatz bleibt
+          // als eigener Punkt unter „Lage".
+          //
+          // Bewusst ohne `einsatzSection` — sonst leitete `resolveHref` bei
+          // aktivem Einsatz auf die Einsatzseite um.
+          text: t('fuellprotokoll'),
+          icon: <PropaneTankIcon />,
+          href: '/atemschutz/fuellprotokoll',
         },
       ],
     },

@@ -33,6 +33,17 @@ export interface FuellprotokollTabProps {
   personSuggestions: string[];
   defaultGefuelltVon: string;
   canWrite: boolean;
+  fuellstationen: AtemschutzGeraet[];
+  letzteFuellstationId?: string;
+  onFuellstationChange?: (id: string) => void;
+  /**
+   * `''` = an der Station. Steuert im Dialog die Vorbelegung von `verrechnen`;
+   * in das Dokument schreibt ihn der Aufrufer über `buildFuellungDocument`.
+   */
+  firecallId: string;
+  eigeneFeuerwehr?: string;
+  /** Herkunft je Zeile anzeigen — auf der eigenen Seite ja, am Einsatz nein. */
+  zeigeHerkunft?: boolean;
   onSave: (input: FuellungInput, id?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
@@ -46,6 +57,12 @@ export default function FuellprotokollTab({
   personSuggestions,
   defaultGefuelltVon,
   canWrite,
+  fuellstationen,
+  letzteFuellstationId,
+  onFuellstationChange,
+  firecallId,
+  eigeneFeuerwehr,
+  zeigeHerkunft,
   onSave,
   onDelete,
 }: FuellprotokollTabProps) {
@@ -97,6 +114,14 @@ export default function FuellprotokollTab({
     return g.bezeichnung;
   };
 
+  // Zweite Summe neben der Gesamtzahl. Sie entfällt, solange nichts zu
+  // verrechnen ist — eine „davon 0" wäre nur Rauschen.
+  const zuVerrechnen = useMemo(
+    () =>
+      fuellungen.filter((f) => f.verrechnen).reduce((s, f) => s + f.anzahl, 0),
+    [fuellungen],
+  );
+
   const druck = (f: AtemschutzFuellung) =>
     f.startdruck != null
       ? t('fuellung.druckRange', { start: f.startdruck, ende: f.enddruck })
@@ -111,6 +136,8 @@ export default function FuellprotokollTab({
       >
         <Typography variant="subtitle1">
           {t('fuellung.total', { count: flaschenGesamt })}
+          {zuVerrechnen > 0 &&
+            ` · ${t('verrechnen.summe', { count: zuVerrechnen })}`}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
         {/* Derselbe Weg wie über den Fab unten rechts. Der Knopf steht hier
@@ -169,6 +196,17 @@ export default function FuellprotokollTab({
                         label={t('sichtkontrolle.mangel')}
                       />
                     )}
+                    {zeigeHerkunft && f.firecallName && (
+                      <Chip size="small" label={f.firecallName} />
+                    )}
+                    {f.verrechnen && (
+                      <Chip
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                        label={t('verrechnen.chip')}
+                      />
+                    )}
                   </>
                 }
                 info={[f.feuerwehr, bezeichnung(f)]}
@@ -207,6 +245,11 @@ export default function FuellprotokollTab({
           feuerwehren={feuerwehren}
           personSuggestions={personSuggestions}
           defaultGefuelltVon={defaultGefuelltVon}
+          fuellstationen={fuellstationen}
+          letzteFuellstationId={letzteFuellstationId}
+          firecallId={firecallId}
+          eigeneFeuerwehr={eigeneFeuerwehr}
+          onFuellstationChange={onFuellstationChange}
           onClose={() => setDialogOpen(false)}
           onSave={(input) => onSave(input, edit?.id)}
         />

@@ -34,7 +34,7 @@ behauptet die Übersicht, niemand sei mehr im Einsatz.
 
 ## Warum die Barcode-Spalte des Exports nicht allein trägt
 
-Der FDISK-Artikelexport hat eine Spalte `Barcodes`. Sie wird importiert und ist
+Der Sybos-Artikelexport hat eine Spalte `Barcodes`. Sie wird importiert und ist
 der erste Nachschlagewert — heute ist sie aber in **einer von 214 Zeilen**
 gefüllt, und dieser eine Wert (`4026056001293`) ist eine EAN-13, die den
 *Artikeltyp* bezeichnet und nicht das einzelne Stück.
@@ -74,7 +74,7 @@ vorbelegt werden.
 Als Kollision zählt dabei nur die **führende** Kennung, also die, die den
 Abgleich tatsächlich entscheidet. Über alle drei geprüft meldete der echte
 Export 41 von 214 Zeilen als Dublette, tatsächlich kollidieren nur 9. Die
-übrigen 32 haben eine eigene FDISK-ID und landen sauber in eigenen Dokumenten —
+übrigen 32 haben eine eigene Sybos-ID und landen sauber in eigenen Dokumenten —
 sie zum Überspringen vorzuschlagen hieße, ein Sechstel des Bestands beim Import
 zu verlieren.
 
@@ -85,12 +85,273 @@ Behauptung — im Vorschaudialog ist jeder Wert änderbar. Ebenso die
 Bezirksreserve: Im Export steht bei diesen 25 Flaschen als Dienststelle
 trotzdem „Neusiedl am See", nur die Bezeichnung verrät sie.
 
+### Füllstationen kommen aus einem zweiten Export
+
+Sybos gibt die Atemlufterzeugung in einem eigenen Lauf aus, mit eigenem
+Klassenbaum: Klasse 3 ist dort **leer**, der Typ steht in Klasse 1
+(„Atemlufterzeugung") und Klasse 2 („Atemluftfüllstation",
+„Atemluftkompressor").
+
+`typAusKlassen()` prüft deshalb Klasse 3 zuerst und allein und zieht die
+gröberen Klassen erst heran, wenn Klasse 3 nichts hergibt — und dort nur die
+Atemlufterzeugung. Im Geräteexport steht in Klasse 2 nämlich durchgehend
+„Pressluftatmer", auch bei den 81 Masken; zöge Klasse 2 gleichberechtigt mit,
+wäre jede Maske ein Pressluftatmer.
+
+Der Standort wird ausschließlich aus dem Klartext gelesen
+(„Atemluftfüllstation Stationär" → `fix`, „Atemluftkompressor Mobil" →
+`mobil`), nicht aus der Klasse: Ob die Luft aus einem Kompressor oder einer
+Füllstation kommt, sagt nichts darüber, ob das Gerät fest steht oder auf dem
+Anhänger liegt. Fehlt das Wort, bleibt der Standort offen und wird im
+Gerätedialog gesetzt, statt beim Import geraten zu werden.
+
+### Inaktive Artikel werden übersprungen
+
+Eine Zeile mit `Status: inaktiv` wird gar nicht erst übernommen — für jeden
+Typ, nicht nur für Füllstationen. Im Geräteexport betrifft das 23 der 214
+Zeilen, im Stationsexport die fest verbaute Füllstation („Derzeit wegen
+Hausumbau inaktiv!"). Sie mit `active: false` anzulegen erzeugte ein Dokument,
+das der Sammelplatz ohnehin überall ausblendet, das aber bei jedem Import
+wieder mitgeschrieben wird.
+
+Der Preis ist bewusst in Kauf genommen: Wird ein **bereits importiertes** Gerät
+in Sybos nachträglich inaktiv gesetzt, deaktiviert ein erneuter Import es
+nicht — die Zeile fehlt ja im Lauf. Ausgeschieden wird dann von Hand im
+Gerätedialog.
+
+Unbekannte oder leere Statuswerte werden importiert. Der Export kennt nur
+„aktiv" und „inaktiv"; an einem unerwarteten Wert stillschweigend Bestand zu
+verlieren wäre der schlechtere Ausgang.
+
+## Warum das Füllprotokoll unter der Gruppe liegt
+
+Trupps und Ausrüstungsausgabe hängen am Einsatz — sie beginnen mit ihm und
+enden mit ihm. Das Füllprotokoll nicht: Gefüllt wird überwiegend im
+Feuerwehrhaus, zwischen den Einsätzen, und der Nachweis ist einer über die
+**Flasche**, nicht über den Einsatz. Es liegt deshalb unter
+`groups/{groupId}/atemschutzFuellung`, mit einem eigenen Menüpunkt
+`/atemschutz/fuellprotokoll` unter „Fahrzeuge". Der Reiter am Sammelplatz zeigt
+dieselbe Komponente, nur auf den laufenden Einsatz gefiltert.
+
+Zwei Felder stehen **immer** am Dokument, auch wenn sie leer bzw. `false` sind:
+
+- **`firecallId`** — `''` heißt „an der Station, ohne Einsatz". Firestore kann
+  nicht auf „Feld fehlt" abfragen; wäre das Feld bei Stationsfüllungen
+  weggelassen, ließe sich *Ohne Einsatz* nicht als gewöhnlicher Filter bauen.
+  Dazu gehört der zusammengesetzte Index `firecallId ASC, zeitpunkt DESC`.
+- **`verrechnen`** — aus demselben Grund: `where('verrechnen','==',true)` würde
+  sonst jede Zeile übersehen, an der das Feld fehlt. (Die Rechnungsstellung
+  selbst ist ein eigenes Vorhaben, siehe Issue #754.)
+
+`firecallName` und `fuellstationName` sind Kopien: Die Zeile soll ohne Join
+lesbar bleiben.
+
+### Die Füllstation ist ein Gerätetyp
+
+Ein Kompressor ist Ausrüstung der Feuerwehr und steht deshalb als
+`typ: 'fuellstation'` in denselben Stammdaten wie die Flaschen — statt einer
+eigenen Sammlung, die dieselben Felder noch einmal hätte. Dazu kommen
+`standort` (`fix` = Feuerwehrhaus, `mobil` = auf einem Fahrzeug) und bei
+`mobil` der Träger; der Neusiedler Kompressor ist auf dem Atemschutzanhänger
+verladen.
+
+Der Träger ist ein Feld mit **freier Eingabe** neben der Fahrzeugliste der
+Gruppe, keine reine Auswahl: Anhänger stehen nicht im Fahrtenbuch, weil sie
+keines führen — genau der Atemschutzanhänger wäre also nicht eintragbar. Wird
+ein Fahrzeug der Gruppe gewählt, bleibt der Bezug über `vehicleId` erhalten;
+bei freiem Text steht nur `vehicleName`. Deshalb sind beide Felder optional.
+
+Wird der Anhänger als Fahrzeug der Gruppe gepflegt, steht er in der Auswahl
+unter der Überschrift „Anhänger" — siehe „Kategorie und Anzeigereihenfolge der
+Fahrzeuge" in [fahrtenbuch.md](fahrtenbuch.md).
+
+Aus dem Sybos-Export kommt der Träger nicht — der Artikelexport kennt keine
+Verlastung. Er wird im Gerätedialog gesetzt.
+
+Im Ausrüstungsreiter sind Füllstationen ausgeblendet: Eine Station wird nicht
+ausgegeben und nicht zurückgenommen.
+
+Der Dialog verhält sich nach `waehleFuellstation`:
+
+| Stationen | Verhalten |
+| --- | --- |
+| keine | kein Feld — am Tag der Auslieferung hat keine Wehr einen Kompressor angelegt, daran darf nichts hängen |
+| genau eine | fest zugeordnet, nur als Text angezeigt; ein Auswahlfeld mit einem Eintrag wäre eine Klickfalle |
+| mehrere | Auswahlfeld, die letzte Wahl aus dem `localStorage` vorweggenommen |
+
+### Wann „zu verrechnen" vorbelegt ist
+
+`verrechnenVorgabe` entscheidet beim *Anlegen*:
+
+- **Im Einsatz immer aus.** Dort ist es Nachbarschaftshilfe, keine
+  Dienstleistung.
+- **An der Station an**, wenn die Feuerwehr der Flasche nicht die eigene ist.
+  Verglichen wird über `normalizeCode` — „Neusiedl am See" und
+  „neusiedl-am-see" sind dieselbe Wehr.
+
+Die eigene Wehr steht als `feuerwehrName` am Gruppendokument, gepflegt unter
+`/admin/fahrtenbuch` (`saveFahrtenbuchGroupFeuerwehrName`, Gruppen-Admin).
+Bewusst getrennt vom Gruppennamen: Der ist ein Verwaltungsbegriff („FF Neusiedl
+am See"), die `feuerwehr`-Felder der Stammdaten tragen die Schreibweise des
+Sybos-Exports. Ein Vergleich über `name` ginge still schief und markierte jede
+eigene Füllung als zu verrechnen. Ohne gepflegten Wert bleibt der Schalter aus.
+
+Die Vorbelegung zieht nach, solange der Benutzer den Schalter nicht selbst
+angefasst hat: Das Feuerwehr-Feld ist beim Öffnen leer und wird erst danach
+ausgefüllt oder durch einen Scan gesetzt. Beim Bearbeiten einer gespeicherten
+Füllung gilt der Schalter als angefasst — der gespeicherte Wert ist eine
+getroffene Entscheidung.
+
+## Verrechnung der Füllungen
+
+Was `verrechnen` markiert, wird unter `/atemschutz/verrechnung` je Feuerwehr
+gebündelt, zu einer Rechnung gemacht und per Mail mit PDF verschickt. Die
+Rechnungen, das Adressbuch und die Konfiguration liegen als
+`atemschutzRechnung`, `atemschutzEmpfaenger` und `atemschutzConfig/rechnung`
+unter der Gruppe — aus demselben Grund wie das Füllprotokoll selbst.
+
+### Der Tarif kommt nicht aus dem Volumen
+
+Vorgabe ist `5.01` („bis 6 Liter") für **jede** Position, unabhängig von der
+Flasche. In der Praxis wird auch für eine 6,8-l-CFK der 6-l-Preis verrechnet.
+Das Volumen steht in der Position nur zur Information; wer `5.02` braucht,
+stellt es je Zeile oder über „Alle auf Tarif" um.
+
+### Die Preise kommen aus dem Kostenersatz-Katalog
+
+`5.01` und `5.02` stehen als Tarife der Kategorie 5 bereits im
+Kostenersatz-Katalog (LGBl. Nr. 77/2023). Eine eigene, in der Gruppe pflegbare
+Zahl wäre eine zweite Quelle für denselben Betrag und würde driften — das
+Landesgesetzblatt gilt landesweit gleich.
+
+Der Dialog zeigt die Preise über `useKostenersatzRates()`, also aus derselben
+Firestore-Collection, die auch der Kostenersatz liest. Verbindlich ist
+trotzdem nur, was der Server auflöst: `loadFuellungTarife()` liest den Katalog
+über das Admin SDK noch einmal und friert Preis und `rateVersion` in die
+Position ein. Ein vom Client geschickter Betrag wird nie geglaubt, und eine
+gestellte Rechnung ändert sich nicht mehr, wenn der Katalog später gepflegt
+wird.
+
+### Warum Kostenersatz-Freigabe und nicht Gerätemeister
+
+`actionFuellungRechnungRequired(groupId)` verlangt **Gruppenmitglied und
+Kostenersatz-Freischaltung**. Wer den Kostenersatz der Feuerwehr macht, macht
+auch diese Rechnungen, und das ist nicht zwangsläufig der Gerätemeister — die
+Rolle wäre hier die falsche Grenze.
+
+Der Zuschnitt hat einen zweiten Grund: Die Firestore-Regel trägt wörtlich
+denselben Satz (`fahrtenbuchMember() && kostenersatzUser()`). Regel und Action
+können damit nicht auseinanderlaufen, und der Client darf den Tarifkatalog
+selbst lesen — sonst bräuchte die Vorschau eine eigene Server Action.
+
+Die Konfiguration (Betreff, Text, CC, Bankverbindung, Vorgabetarif) hängt
+dagegen an `actionGroupAdminRequired`: Sie gilt für alle Rechnungen der Gruppe
+und ist keine Tagesarbeit.
+
+### Wo die Rechnungsstammdaten stehen
+
+Absender, Anschrift, Kontakt, Kontoinhaber, IBAN, BIC, Zahlungsziel,
+Umsatzsteuerhinweis und der Leistungstext liegen in
+`atemschutzConfig/rechnung` und werden unter `/admin/atemschutz` gepflegt
+(Gruppen-Admin). Fest verdrahtet wie im Kostenersatz-PDF, das Absender und
+IBAN der FF Neusiedl am See im Code trägt, geht hier nicht: Die Füllrechnung
+stellt jede Gruppe unter ihrem eigenen Namen.
+
+Fehlen Absender, Anschrift oder IBAN, steht auf der Verrechnungsseite ein
+Hinweis mit Sprung in die Einstellungen — ohne diese Angaben weiß der
+Empfänger weder, von wem die Rechnung kommt, noch wohin er überweisen soll.
+
+Zum Umsatzsteuerhinweis gibt es **bewusst keinen Vorgabetext**: Ob und wie eine
+Feuerwehr hier unternehmerisch tätig wird, ist ihre eigene steuerliche
+Beurteilung und gehört nicht als Behauptung in den Code.
+
+Das Zahlungsziel wird in **UTC** gerechnet (`setUTCDate`). In Ortszeit
+verschöbe die Zeitumstellung das Ergebnis um eine Stunde, und da das PDF
+serverseitig auf einem UTC-Host entsteht, fiele das Fälligkeitsdatum dann
+einen Tag zu früh aus.
+
+### Der Empfänger wird in die Rechnung kopiert
+
+Die Rechnung trägt Name, Anschrift und E-Mail als eingebettete Kopie, nicht als
+Verweis ins Adressbuch. `empfaengerId` bleibt nur als Herkunftsnachweis stehen
+und wird nie nachgelesen. Sonst änderte eine gepflegte Adresse rückwirkend
+eine bereits verschickte Rechnung.
+
+### Die Feuerwehr am Empfänger ist der Zuordnungsschlüssel
+
+`empfaengerFuerFeuerwehr` vergleicht über `normalizeCode` gegen die
+`feuerwehr` an der Flasche. „FF Podersdorf" trifft „Podersdorf" damit *nicht*.
+Deshalb ist das Feld im Empfängerdialog eine Auswahl über die Schreibweisen,
+die tatsächlich in den Gerätestammdaten stehen, und warnt bei einem Wert, der
+zu keiner davon passt.
+
+Bewusst **kein** unscharfer Vergleich, der ein vorangestelltes „FF" oder
+„Freiwillige Feuerwehr" wegschneidet: Das wäre geraten und könnte zwei
+verschiedene Wehren zusammenwerfen. Die Auswahl macht das Problem stattdessen
+unmöglich.
+
+### Was sich am Entwurf noch ändern lässt
+
+`updateFuellungRechnung` greift nur bei `status === 'draft'`. Änderbar sind
+Empfänger, Rechnungsdatum, Bemerkung und der Tarif je Position; die Preise
+werden dabei **neu aufgelöst** statt aus den Positionen übernommen. Ein
+Entwurf ist nicht gestellt — ändert sich der Katalog davor, gilt der neue
+Preis. Eingefroren wird beim Verschicken, ab dann lässt
+`rechnungStatusErlaubt` diese Action nicht mehr zu.
+
+Positionen kommen weder hinzu noch weg. Das gäbe Füllungen frei bzw. bände
+neue, und beides ist der Weg über Storno und Neuanlage — ein Klick, dafür ohne
+halb gebundene Zeilen, wenn jemand mittendrin abbricht.
+
+### Warum der EPC-QR-Code fehlen darf
+
+`buildEpcPayload` gibt `undefined` zurück, sobald Empfänger, IBAN oder ein
+Betrag zwischen 0,01 und 999.999.999,99 fehlen, und das PDF lässt den Code
+dann weg. Lieber keiner als ein falscher: Ein QR-Code, der zu einer
+unvollständigen Überweisung führt, sieht aus, als könnte man ihm vertrauen.
+
+### Was das Storno mit `verrechnen` macht: nichts
+
+Storniert wird aus jedem Status außer dem Storno selbst; heraus führt kein Weg.
+Dabei verschwindet ausschließlich `rechnungId` an den Füllungen — `verrechnen`
+bleibt unangetastet. Die Aussage „das ist zu verrechnen" hat sich nicht
+geändert, nur die Rechnung ist weg, und die Zeilen stehen sofort wieder unter
+den offenen.
+
+### Warum `rechnungId` optional ist
+
+`verrechnen` und `firecallId` sind an jeder Füllung gesetzt, `rechnungId` nicht.
+Die Übersicht fragt `where('verrechnen','==',true)` serverseitig ab und filtert
+`rechnungId` clientseitig — das erspart die Migration aller Bestandszeilen und
+einen weiteren zusammengesetzten Index. Serverseitig gefiltert wird nur, was
+die Liste selbst ausmacht.
+
+### Offener Punkt
+
+`atemschutzFuellung` bleibt clientseitig schreibbar — das ist die
+Offlinefähigkeit am Sammelplatz, an der sich nichts ändern soll. Ein
+Gruppenmitglied könnte damit `rechnungId` von Hand entfernen und eine Füllung
+ein zweites Mal abrechnen. Dieselbe Vertrauensebene wie beim
+`verrechnen`-Schalter selbst; wer sie enger zieht, verliert das Nachtragen bei
+schlechter Verbindung.
+
 ## Berechtigungen
 
-- **Protokolle** (`call/{id}/atemschutz*`): Wer den Einsatz bearbeiten darf,
-  führt hier Protokoll. Dafür ist **keine eigene Firestore-Regel nötig** — die
-  bestehende `match /{subitem=**}` unter `call/{doc}` deckt jede neue
-  Untersammlung ab.
+- **Protokolle am Einsatz** (`call/{id}/atemschutzTrupp`,
+  `call/{id}/atemschutzAusgabe`): Wer den Einsatz bearbeiten darf, führt hier
+  Protokoll. Dafür ist **keine eigene Firestore-Regel nötig** — die bestehende
+  `match /{subitem=**}` unter `call/{doc}` deckt jede neue Untersammlung ab.
+- **Füllprotokoll** (`groups/{groupId}/atemschutzFuellung`): lesen *und
+  schreiben* jedes Gruppenmitglied (`fahrtenbuchMember()`). Anders als bei den
+  Stammdaten schreibt hier der **Client** und nicht eine Server Action: Am
+  Sammelplatz ist die Verbindung schlecht, und Firestore stellt
+  Client-Schreibvorgänge offline zurück und spielt sie nach — eine Server
+  Action scheitert. Und anders als beim Anlegen eines Geräts ist Schreiben hier
+  kein Verwaltungsakt: Wer füllt, protokolliert, und das ist selten ein Admin.
+  **Einsatz-Gäste** (Zugang über einen Share-Link) sind damit außen vor; sie
+  sind keine Gruppenmitglieder. Der Reiter zeigt ihnen statt der Liste einen
+  Hinweis — ein verschwundener Reiter würde als Fehler gelesen. Sie könnten die
+  Geräte-Stammdaten ohnehin nicht lesen.
 - **Stammdaten** (`groups/{groupId}/atemschutzGeraet`): lesen jedes
   Gruppenmitglied, schreiben `actionGroupAdminRequired(groupId)` — also der
   globale Admin *oder* der Gruppen-Admin dieser Feuerwehr (Rolle aus PR #752,

@@ -10,7 +10,8 @@
       "flasche": "Atemluftflasche",
       "maske": "Atemmaske",
       "pressluftatmer": "Pressluftatmer",
-      "zubehoer": "Zubehör"
+      "zubehoer": "Zubehör",
+      "fuellstation": "Füllstation"
     },
     "sichtkontrolle": {
       "offen": "offen",
@@ -26,7 +27,17 @@
       "descriptionMissing": "Bitte den Mangel beschreiben",
       "saveFailed": "Speichern fehlgeschlagen",
       "codeMissing": "Kein Code angegeben",
-      "geraetNotFound": "Gerät nicht gefunden"
+      "geraetNotFound": "Gerät nicht gefunden",
+      "rechnungNoPositions": "Keine Füllung ausgewählt.",
+      "rechnungNoRecipient": "Kein Empfänger gewählt.",
+      "rechnungNoEmail": "Der Empfänger hat keine E-Mail-Adresse.",
+      "rechnungNoText": "Betreff und Text dürfen nicht leer sein.",
+      "rechnungMailNotConfigured": "Der Mailversand ist nicht eingerichtet.",
+      "rechnungStatusInvalid": "In diesem Status nicht möglich.",
+      "rechnungFuellungGone": "Eine der Füllungen gibt es nicht mehr.",
+      "rechnungFuellungTaken": "Eine der Füllungen ist bereits abgerechnet.",
+      "rechnungEmpfaengerIncomplete": "Feuerwehr, Name und E-Mail sind Pflicht.",
+      "rechnungNurEntwurf": "Nur ein Entwurf lässt sich ändern."
     },
     "admin": {
       "title": "Atemschutz-Ausrüstung",
@@ -42,7 +53,11 @@
       "filterTyp": "Typ",
       "filterAll": "Alle",
       "search": "Suchen",
-      "showInactive": "Ausgeschiedene anzeigen"
+      "showInactive": "Ausgeschiedene anzeigen",
+      "tabs": {
+        "geraete": "Ausrüstung",
+        "rechnung": "Rechnungen"
+      }
     },
     "tabs": {
       "fuellprotokoll": "Füllprotokoll",
@@ -80,7 +95,9 @@
       "deleteConfirm": "Soll diese Füllung wirklich gelöscht werden?",
       "unbekannteFlaschen": "{count} Flaschen ohne Nummer",
       "druckRange": "{start} → {ende} bar",
-      "druckNurEnde": "auf {ende} bar"
+      "druckNurEnde": "auf {ende} bar",
+      "fuellstation": "Füllstation",
+      "verrechnen": "Zu verrechnen"
     },
     "qr": {
       "title": "QR-Etikett",
@@ -201,7 +218,7 @@
       "title": "Ausrüstung importieren",
       "button": "Importieren",
       "chooseFile": "Datei wählen (XLSX oder CSV)",
-      "hint": "Artikelexport aus FDISK oder eine CSV-Datei mit denselben Spaltennamen.",
+      "hint": "Artikelexport aus Sybos oder eine CSV-Datei mit denselben Spaltennamen.",
       "preview": "{count, plural, =0 {Keine Zeilen} one {Eine Zeile} other {# Zeilen}} gefunden",
       "statusNew": "neu",
       "statusUpdate": "aktualisieren",
@@ -236,7 +253,140 @@
       "active": "In Verwendung",
       "bemerkung": "Bemerkung",
       "dialogTitleNew": "Gerät anlegen",
-      "dialogTitleEdit": "Gerät bearbeiten"
+      "dialogTitleEdit": "Gerät bearbeiten",
+      "standort": "Standort",
+      "standortWerte": {
+        "fix": "Fix (Feuerwehrhaus)",
+        "mobil": "Mobil (Fahrzeug/Anhänger)"
+      },
+      "fahrzeug": "Fahrzeug oder Anhänger"
+    },
+    "fuellprotokoll": {
+      "title": "Füllprotokoll",
+      "group": "Gruppe",
+      "gastHinweis": "Das Füllprotokoll ist den Mitgliedern der Feuerwehr vorbehalten."
+    },
+    "filter": {
+      "einsatz": "Einsatz",
+      "alle": "Alle",
+      "ohneEinsatz": "Ohne Einsatz"
+    },
+    "verrechnen": {
+      "nurZuVerrechnende": "Nur zu verrechnende",
+      "chip": "zu verrechnen",
+      "summe": "davon {count} zu verrechnen"
+    },
+    "rechnung": {
+      "title": "Verrechnung",
+      "loginRequired": "Bitte anmelden.",
+      "noPermission": "Keine Berechtigung. Die Verrechnung der Füllungen setzt die Kostenersatz-Freischaltung voraus.",
+      "nichtGefunden": "Rechnung nicht gefunden.",
+      "offene": "Offene Füllungen",
+      "keineOffenen": "Keine offenen Füllungen zu verrechnen.",
+      "rechnungen": "Rechnungen",
+      "keineRechnungen": "Noch keine Rechnung erstellt.",
+      "ohneFeuerwehr": "Ohne Feuerwehr",
+      "create": "Rechnung",
+      "createTitle": "Rechnung an {feuerwehr}",
+      "cancel": "Abbrechen",
+      "empfaenger": "Empfänger",
+      "empfaengerNeu": "Empfänger anlegen",
+      "datum": "Rechnungsdatum",
+      "bemerkung": "Bemerkung",
+      "summe": "Summe",
+      "alleAufTarif": "Alle gewählten Positionen auf Tarif:",
+      "spalteFeuerwehr": "Feuerwehr",
+      "spalteFlaschen": "Flaschen",
+      "spalteZeitraum": "Zeitraum",
+      "spalteSumme": "Summe",
+      "spalteNummer": "Nummer",
+      "spalteEmpfaenger": "Empfänger",
+      "spalteDatum": "Datum",
+      "spalteStatus": "Status",
+      "spalteFlasche": "Flasche",
+      "spalteEinsatz": "Einsatz",
+      "spalteAnzahl": "Anzahl",
+      "spalteTarif": "Tarif",
+      "spaltePreis": "Einzelpreis",
+      "pdf": "PDF herunterladen",
+      "send": "Verschicken",
+      "bezahlt": "Als bezahlt markieren",
+      "storno": "Stornieren",
+      "stornoConfirm": "Rechnung wirklich stornieren? Die enthaltenen Füllungen stehen danach wieder als offen in der Übersicht.",
+      "mailTitle": "Rechnung verschicken",
+      "mailTo": "An",
+      "mailCc": "CC",
+      "mailCcHelp": "Mehrere Adressen mit Komma trennen.",
+      "mailSubject": "Betreff",
+      "mailBody": "Text",
+      "settingsTitle": "Rechnungseinstellungen",
+      "settingsSave": "Speichern",
+      "settingsSaved": "Gespeichert.",
+      "ccEmail": "CC-Adresse",
+      "ccEmailHelp": "Bekommt jede verschickte Rechnung in Kopie, z.B. der Kassier.",
+      "vorgabeTarif": "Vorgabetarif",
+      "vorgabeTarifHelp": "Gilt für jede neue Position. In der Praxis wird auch eine 6,8-l-Flasche nach dem 6-l-Tarif verrechnet.",
+      "subjectTemplate": "Betreffvorlage",
+      "bodyTemplate": "Textvorlage",
+      "platzhalter": "Platzhalter, jeweils in doppelte geschweifte Klammern zu setzen: rechnung.nummer, rechnung.summe, rechnung.flaschen, rechnung.zeitraum, rechnung.zeitraumSatz, rechnung.datum, empfaenger.name, feuerwehr.name. Dabei liefert zeitraum nur das Datum bzw. die Spanne, zeitraumSatz einen fertigen Satzteil („am 30.08.2026\" oder „von … bis …\").",
+      "status": {
+        "draft": "Entwurf",
+        "sent": "Verschickt",
+        "paid": "Bezahlt",
+        "cancelled": "Storniert"
+      },
+      "keinEmpfaenger": "Kein Empfänger",
+      "gruppeAbsender": "Absender auf der Rechnung",
+      "gruppeZahlung": "Zahlung",
+      "gruppeText": "Texte",
+      "absenderName": "Absender",
+      "absenderNameHelp": "Voller Name, z.B. „Freiwillige Feuerwehr Neusiedl am See\". Leer: der Name aus dem Gruppendokument.",
+      "absenderAdresse": "Anschrift",
+      "absenderKontakt": "Kontakt",
+      "absenderKontaktHelp": "Eine Zeile für den Fuß, z.B. Telefon, E-Mail und Website.",
+      "kontoinhaber": "Kontoinhaber",
+      "kontoinhaberHelp": "Leer: der Absender.",
+      "iban": "IBAN",
+      "ibanHelp": "Ohne IBAN steht auf der Rechnung kein Zahlungsblock.",
+      "bic": "BIC",
+      "zahlungszielTage": "Zahlungsziel in Tagen",
+      "zahlungszielTageHelp": "0: kein Zahlungsziel angeben.",
+      "ustHinweis": "Hinweis zur Umsatzsteuer",
+      "ustHinweisHelp": "Erscheint unter dem Zahlungsblock. Ohne Vorgabe — die steuerliche Beurteilung trifft die Feuerwehr selbst.",
+      "leistungstext": "Leistungstext",
+      "leistungstextHelp": "Steht über der Positionstabelle und sagt, wofür die Rechnung ausgestellt wird.",
+      "configUnvollstaendig": "Die Rechnungsstammdaten sind unvollständig: {felder}. Ohne sie fehlen dem Empfänger Absender und Überweisungsdaten.",
+      "zuDenEinstellungen": "Einstellungen",
+      "bearbeiten": "Bearbeiten",
+      "bearbeitenTitle": "Entwurf bearbeiten",
+      "speichern": "Speichern",
+      "zurueckZurListe": "Zurück zur Verrechnung",
+      "zumFuellprotokoll": "Zum Füllprotokoll",
+      "oeffnen": "Öffnen",
+      "tarifNeuBerechnet": "Die Summe wird beim Speichern mit den aktuellen Tarifen neu berechnet."
+    },
+    "empfaenger": {
+      "createTitle": "Empfänger anlegen",
+      "editTitle": "Empfänger ändern",
+      "feuerwehr": "Feuerwehr (Schreibweise der Stammdaten)",
+      "feuerwehrHelp": "Muss zur Feuerwehr an der Flasche passen — die Zuordnung läuft darüber.",
+      "name": "Name auf der Rechnung",
+      "ansprechpartner": "Ansprechpartner",
+      "adresse": "Adresse",
+      "email": "E-Mail",
+      "telefon": "Telefon",
+      "active": "Aktiv",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "title": "Empfänger",
+      "keine": "Noch kein Empfänger angelegt.",
+      "feuerwehrKurz": "Feuerwehr an der Flasche",
+      "feuerwehrKeinTreffer": "Diese Schreibweise steht an keiner Flasche — die Zuordnung greift dann nicht. Bitte aus der Liste wählen.",
+      "edit": "Ändern",
+      "delete": "Löschen",
+      "deleteConfirm": "Soll der Empfänger „{name}“ wirklich gelöscht werden?",
+      "ja": "Ja",
+      "nein": "Nein"
     }
   },
   "common": {
@@ -640,7 +790,8 @@
     "units": "Einsatzmittel",
     "users": "Users",
     "connectedApps": "Verbundene Anwendungen",
-    "adminMcp": "MCP-Zugänge"
+    "adminMcp": "MCP-Zugänge",
+    "fuellprotokoll": "Füllprotokoll"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -1094,7 +1245,8 @@
         "errorEmailInvalid": "Mindestens eine Adresse ist keine gültige E-Mail-Adresse.",
         "errorTooManyEmails": "Höchstens {max} Adressen.",
         "errorInvalidWeek": "Keine gültige Kalenderwoche dieses Jahres."
-      }
+      },
+      "kategorie": "Kategorie"
     },
     "shareLink": {
       "heading": "Fahrtenbuch-Link",
@@ -1228,6 +1380,17 @@
       "unlink": "Verknüpfung lösen",
       "close": "Schließen",
       "takenBy": "Ein passendes Konto ist schon zugeordnet zu: {names}"
+    },
+    "groupSettings": {
+      "feuerwehrName": "Eigene Feuerwehr",
+      "feuerwehrNameHelp": "Schreibweise wie in den Atemschutz-Stammdaten, z.B. „Neusiedl am See“. Steuert, ob eine Füllung als zu verrechnen vorbelegt wird.",
+      "feuerwehrNameSaved": "Feuerwehr gespeichert",
+      "saveFeuerwehrName": "Feuerwehr speichern"
+    },
+    "vehicleKategorie": {
+      "fahrzeug": "Fahrzeug",
+      "boot": "Boot",
+      "anhaenger": "Anhänger"
     }
   },
   "fahrtenbuchShare": {

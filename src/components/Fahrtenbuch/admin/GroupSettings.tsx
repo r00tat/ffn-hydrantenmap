@@ -3,6 +3,7 @@
 import MapIcon from '@mui/icons-material/Map';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -12,8 +13,12 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { defaultPosition } from '../../../hooks/constants';
 import useFahrtenbuchGroupStandort from '../../../hooks/useFahrtenbuchGroupStandort';
+import useGroupFeuerwehrName from '../../../hooks/useGroupFeuerwehrName';
 import LocationMapPicker from '../../Einsatzorte/LocationMapPicker';
-import { saveFahrtenbuchGroupStandort } from '../stammdatenActions';
+import {
+  saveFahrtenbuchGroupFeuerwehrName,
+  saveFahrtenbuchGroupStandort,
+} from '../stammdatenActions';
 
 /**
  * Stellen nach dem Komma, mit denen eine auf der Karte gewählte Position in die
@@ -31,6 +36,30 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
   >();
   const [saving, setSaving] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+
+  const feuerwehrName = useGroupFeuerwehrName(groupId);
+  // Wie bei den Standort-Feldern: Nur die Eingabe liegt im State, sonst wird
+  // der geladene Wert gezeigt — der Firestore-Snapshot kommt später als der
+  // erste Render, ein `useState`-Anfangswert bliebe leer.
+  const [nameEdit, setNameEdit] = useState<string>();
+  const nameValue = nameEdit ?? feuerwehrName ?? '';
+
+  const speichereName = async () => {
+    setSaving(true);
+    setFeedback(undefined);
+    const result = await saveFahrtenbuchGroupFeuerwehrName(groupId, nameValue);
+    if (result.success) {
+      // Eingabe verwerfen, damit wieder der geladene Wert angezeigt wird.
+      setNameEdit(undefined);
+      setFeedback({
+        severity: 'success',
+        text: t('groupSettings.feuerwehrNameSaved'),
+      });
+    } else {
+      setFeedback({ severity: 'error', text: result.error ?? '' });
+    }
+    setSaving(false);
+  };
 
   // Nur die Eingaben des Benutzers liegen im State; angezeigt wird sonst der
   // geladene Wert. Ein `useState`-Anfangswert griffe nur beim ersten Rendern —
@@ -97,13 +126,6 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
 
   return (
     <Paper sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        {t('admin.standort')}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {t('admin.standortHint')}
-      </Typography>
-
       {feedback && (
         <Alert
           severity={feedback.severity}
@@ -113,6 +135,38 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
           {feedback.text}
         </Alert>
       )}
+
+      <Typography variant="h6" gutterBottom>
+        {t('groupSettings.feuerwehrName')}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {t('groupSettings.feuerwehrNameHelp')}
+      </Typography>
+
+      <TextField
+        fullWidth
+        label={t('groupSettings.feuerwehrName')}
+        value={nameValue}
+        onChange={(e) => setNameEdit(e.target.value)}
+      />
+
+      <Stack direction="row" sx={{ mt: 2 }}>
+        {/* Eigene Beschriftung und nicht das allgemeine „Speichern": In
+            derselben Karte steht darunter der Speichern-Knopf des Standorts,
+            und zwei gleich benannte Knöpfe wären nicht zu unterscheiden. */}
+        <Button variant="contained" onClick={speichereName} disabled={saving}>
+          {t('groupSettings.saveFeuerwehrName')}
+        </Button>
+      </Stack>
+
+      <Divider sx={{ my: 3 }} />
+
+      <Typography variant="h6" gutterBottom>
+        {t('admin.standort')}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {t('admin.standortHint')}
+      </Typography>
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 6 }}>

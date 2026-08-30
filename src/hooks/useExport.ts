@@ -12,10 +12,8 @@ import { v4 as uuid } from 'uuid';
 import app, { firestore } from '../components/firebase/firebase';
 import {
   ATEMSCHUTZ_AUSGABE_COLLECTION_ID,
-  ATEMSCHUTZ_FUELLUNG_COLLECTION_ID,
   ATEMSCHUTZ_TRUPP_COLLECTION_ID,
   type AtemschutzAusgabe,
-  type AtemschutzFuellung,
   type AtemschutzTrupp,
 } from '../common/atemschutz';
 import {
@@ -233,9 +231,14 @@ export interface FirecallExport extends Firecall {
   auditlog: AuditLogEntry[];
   /** Besatzung je Fahrzeug — `call/{id}/crew`. */
   crew?: CrewAssignment[];
-  /** Füllprotokoll des Atemschutzsammelplatzes — `call/{id}/atemschutzFuellung`. */
-  atemschutzFuellungen?: AtemschutzFuellung[];
-  /** Bereitstellungen der Atemschutztrupps — `call/{id}/atemschutzTrupp`. */
+  /**
+   * Bereitstellungen der Atemschutztrupps — `call/{id}/atemschutzTrupp`.
+   *
+   * Das Füllprotokoll fehlt hier bewusst: Es liegt seit dem Umzug unter der
+   * Gruppe und ist kein Einsatzinhalt mehr. Würde es mitgesichert und beim
+   * Import zurückgeschrieben, stünde jede Füllung zweimal da — einmal mit dem
+   * alten Einsatzbezug, einmal mit dem neuen des importierten Einsatzes.
+   */
   atemschutzTrupps?: AtemschutzTrupp[];
   /** Ausgabe und Rücknahme der Ausrüstung — `call/{id}/atemschutzAusgabe`. */
   atemschutzAusgaben?: AtemschutzAusgabe[];
@@ -415,7 +418,6 @@ export async function exportFirecall(
     kostenersatz,
     auditlog,
     crew,
-    atemschutzFuellungen,
     atemschutzTrupps,
     atemschutzAusgaben,
   ] = await Promise.all([
@@ -429,7 +431,6 @@ export async function exportFirecall(
     readCollection<KostenersatzCalculation>(KOSTENERSATZ_SUBCOLLECTION),
     readCollection<AuditLogEntry>(FIRECALL_AUDITLOG_COLLECTION_ID),
     readCollection<CrewAssignment>(FIRECALL_CREW_COLLECTION_ID),
-    readCollection<AtemschutzFuellung>(ATEMSCHUTZ_FUELLUNG_COLLECTION_ID),
     readCollection<AtemschutzTrupp>(ATEMSCHUTZ_TRUPP_COLLECTION_ID),
     readCollection<AtemschutzAusgabe>(ATEMSCHUTZ_AUSGABE_COLLECTION_ID),
   ]);
@@ -515,7 +516,6 @@ export async function exportFirecall(
     kostenersatz,
     auditlog,
     crew,
-    atemschutzFuellungen,
     atemschutzTrupps,
     atemschutzAusgaben,
     firecallAttachments,
@@ -643,7 +643,6 @@ function countImportSteps(firecall: FirecallExport): number {
     (firecall.kostenersatz?.length ?? 0) +
     (firecall.auditlog?.length ?? 0) +
     (firecall.crew?.length ?? 0) +
-    (firecall.atemschutzFuellungen?.length ?? 0) +
     (firecall.atemschutzTrupps?.length ?? 0) +
     (firecall.atemschutzAusgaben?.length ?? 0);
 
@@ -674,7 +673,6 @@ export async function importFirecall(
     kostenersatz,
     auditlog,
     crew,
-    atemschutzFuellungen,
     atemschutzTrupps,
     atemschutzAusgaben,
     firecallAttachments,
@@ -750,10 +748,6 @@ export async function importFirecall(
     FIRECALL_AUDITLOG_COLLECTION_ID
   );
   const crewCol = collection(firecallDoc, FIRECALL_CREW_COLLECTION_ID);
-  const atemschutzFuellungCol = collection(
-    firecallDoc,
-    ATEMSCHUTZ_FUELLUNG_COLLECTION_ID,
-  );
   const atemschutzTruppCol = collection(
     firecallDoc,
     ATEMSCHUTZ_TRUPP_COLLECTION_ID,
@@ -930,18 +924,11 @@ export async function importFirecall(
     );
   }
 
-  // Atemschutzsammelplatz: Füllprotokoll, Trupps, Ausgaben.
+  // Atemschutzsammelplatz: Trupps und Ausgaben — das Füllprotokoll liegt unter
+  // der Gruppe und gehört nicht mehr dazu, siehe `FirecallExport`.
   // Die IDs bleiben erhalten — `atemschutzAusgabe.geraetId` und
   // `atemschutzTrupp.truppKey` zeigen auf Stammdaten bzw. aufeinander, und ein
   // neu vergebener Schlüssel risse beide Bezüge auf.
-  if (atemschutzFuellungen?.length) {
-    await commitOps(
-      atemschutzFuellungen.map((f) => ({
-        ref: doc(atemschutzFuellungCol, f.id || uuid()),
-        data: f as unknown as Record<string, unknown>,
-      }))
-    );
-  }
   if (atemschutzTrupps?.length) {
     await commitOps(
       atemschutzTrupps.map((t) => ({

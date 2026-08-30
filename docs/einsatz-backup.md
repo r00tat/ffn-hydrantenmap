@@ -22,7 +22,6 @@ Das Einsatz-Dokument selbst plus alle Untersammlungen unter `call/{id}`:
 | `auditlog` | `auditlog` | |
 | `chat` | `chat` | |
 | `crew` | `crew` | Besatzung je Fahrzeug |
-| `atemschutzFuellung` | `atemschutzFuellungen` | Füllprotokoll, s. [atemschutzsammelplatz.md](atemschutzsammelplatz.md) |
 | `atemschutzTrupp` | `atemschutzTrupps` | je Zeile eine Bereitstellung; `truppKey` bindet sie zusammen und bleibt erhalten |
 | `atemschutzAusgabe` | `atemschutzAusgaben` | Ausgabe der Ausrüstung; `geraetId` zeigt auf `groups/{groupId}/atemschutzGeraet` |
 
@@ -48,9 +47,17 @@ kennt.
   der Gruppe, nicht dem Einsatz — wie die Fahrtenbuch-Fahrzeuge. Die Kopie
   eines Einsatzes zeigt mit `atemschutzAusgabe.geraetId` weiterhin auf
   denselben Bestand. Wird ein Einsatz in eine *andere* Gruppe importiert,
-  laufen diese Verweise ins Leere; der Ausrüstungsreiter zeigt die Zeile dann
-  nicht mehr an, das Füllprotokoll bleibt vollständig (es trägt die
-  Flaschennummer im Klartext).
+  laufen diese Verweise ins Leere und der Ausrüstungsreiter zeigt die Zeile
+  nicht mehr an.
+- **Füllprotokoll** (`groups/{groupId}/atemschutzFuellung`): Es liegt seit dem
+  Umzug ans Gruppen-Level ebenfalls bei der Gruppe; der Einsatzbezug steht als
+  Feld `firecallId` am Dokument, siehe
+  [atemschutzsammelplatz.md](atemschutzsammelplatz.md). Mitgesichert wäre es
+  beim Zurückspielen doppelt vorhanden: einmal unter der Gruppe mit dem alten
+  Einsatzbezug, einmal neu geschrieben mit dem des importierten Einsatzes. Der
+  Nachweis über die Flasche soll aber genau einmal existieren. Der
+  Füllprotokoll-Reiter des zurückgespielten Einsatzes bleibt deshalb leer — die
+  Füllungen des ursprünglichen Einsatzes stehen unverändert unter der Gruppe.
 - **Ausrüstungsmängel** (`groups/{groupId}/mangel` mit
   `itemType: 'atemschutz'`): Sie liegen wie die Fahrzeugmängel bei der Gruppe
   und überdauern den Einsatz — genau dafür sind sie da.

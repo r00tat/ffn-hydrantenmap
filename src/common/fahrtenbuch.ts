@@ -128,6 +128,26 @@ export interface FahrtenbuchPerson {
   updatedBy: string;
 }
 
+/**
+ * Wozu eine Einheit im Fahrtenbuch zählt.
+ *
+ * Nicht jedes „Fahrzeug" fährt: Anhänger und Boote stehen in denselben
+ * Stammdaten, weil sie Mängel, Kostenersätze und — beim Anhänger — die
+ * Verlastung einer Füllstation tragen. Ein eigenes Fahrtenbuch führen sie
+ * nicht.
+ */
+export type FahrtenbuchVehicleKategorie = 'fahrzeug' | 'boot' | 'anhaenger';
+
+/**
+ * Die Kategorien in genau der Reihenfolge, in der sie überall angezeigt
+ * werden. Die Liste ist zugleich die Sortierordnung — der Index ist der Rang.
+ */
+export const FAHRTENBUCH_VEHICLE_KATEGORIEN: FahrtenbuchVehicleKategorie[] = [
+  'fahrzeug',
+  'boot',
+  'anhaenger',
+];
+
 export interface FahrtenbuchVehicle {
   id?: string;
   name: string;
@@ -136,6 +156,17 @@ export interface FahrtenbuchVehicle {
   counters: CounterDefinition[];
   fuelTypes: FuelType[];
   kostenersatzVehicleId?: string;
+  /**
+   * Fehlt bei allen gewachsenen Fahrzeugen. Wo keine gepflegt ist, leitet
+   * `vehicleKategorie()` sie aus dem Namen ab — siehe dort.
+   */
+  kategorie?: FahrtenbuchVehicleKategorie;
+  /**
+   * Manuelle Reihenfolge aus der Fahrzeugverwaltung. Für die **Anzeige** nicht
+   * mehr maßgeblich: Sortiert wird nach Kategorie und darin alphabetisch
+   * (`compareVehicles`), weil ein Name schneller zu finden ist als eine Zahl,
+   * die niemand sieht. Das Feld bleibt, weil der Kostenersatz-Import es setzt.
+   */
   sortOrder?: number;
   /**
    * Cache der jüngsten Fahrt dieses Fahrzeugs. Serverseitig nach jedem Create,
@@ -734,6 +765,61 @@ export function suggestPresetForVehicleName(name: string): VehiclePresetId {
   if (normalized === 'mzb' || normalized.includes('mehrzweckboot')) return 'boot';
   if (normalized.includes('anhänger') || normalized.startsWith('wla')) return 'none';
   return 'fahrzeug';
+}
+
+/**
+ * Die Kategorie aus dem Namen — Vorbelegung beim Anlegen und Rückfall für die
+ * Fahrzeuge, die vor dem Feld angelegt wurden.
+ *
+ * Anhänger werden **vor** Booten geprüft: Ein „Bootsanhänger" trägt beide
+ * Wörter, ist aber ein Anhänger. WLA-Aufbauten laufen mit den Anhängern, wie
+ * schon bei `suggestPresetForVehicleName` — sie fahren nicht selbst.
+ */
+export function kategorieAusName(name: string): FahrtenbuchVehicleKategorie {
+  const normalized = normalizeName(name);
+  if (normalized.includes('anhänger') || normalized.startsWith('wla')) {
+    return 'anhaenger';
+  }
+  if (normalized === 'mzb' || normalized.includes('boot')) return 'boot';
+  return 'fahrzeug';
+}
+
+/** Was zum Sortieren und Gruppieren gebraucht wird — mehr nicht. */
+export type VehicleKategorieQuelle = {
+  name: string;
+  kategorie?: FahrtenbuchVehicleKategorie;
+};
+
+/**
+ * Die gepflegte Kategorie, sonst die aus dem Namen abgeleitete.
+ *
+ * Die Ableitung greift nur, solange nichts gepflegt ist: Wer ein Fahrzeug
+ * ausdrücklich einordnet, will nicht, dass ein Wort im Namen die Einordnung
+ * wieder umwirft.
+ */
+export function vehicleKategorie(
+  vehicle: VehicleKategorieQuelle,
+): FahrtenbuchVehicleKategorie {
+  return vehicle.kategorie &&
+    FAHRTENBUCH_VEHICLE_KATEGORIEN.includes(vehicle.kategorie)
+    ? vehicle.kategorie
+    : kategorieAusName(vehicle.name);
+}
+
+/**
+ * Die Anzeigereihenfolge: erst Fahrzeuge, dann Boote, dann Anhänger, darin
+ * alphabetisch.
+ *
+ * `localeCompare` mit „de" statt eines Vergleichs über `<`: Sonst stünde
+ * „Ölwehr" hinter „Zille", weil das Ö einen höheren Codepunkt hat.
+ */
+export function compareVehicles(
+  a: VehicleKategorieQuelle,
+  b: VehicleKategorieQuelle,
+): number {
+  const rang = (v: VehicleKategorieQuelle) =>
+    FAHRTENBUCH_VEHICLE_KATEGORIEN.indexOf(vehicleKategorie(v));
+  return rang(a) - rang(b) || a.name.localeCompare(b.name, 'de');
 }
 
 /**

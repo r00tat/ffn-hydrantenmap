@@ -196,8 +196,18 @@ describe('useExport', () => {
       await exportFirecall('test-id');
 
       // items, chat, layers, mapLayers, history, locations, kostenersatz,
-      // auditlog, crew, atemschutzFuellung, atemschutzTrupp, atemschutzAusgabe
-      expect(getDocsMock).toHaveBeenCalledTimes(12);
+      // auditlog, crew, atemschutzTrupp, atemschutzAusgabe
+      expect(getDocsMock).toHaveBeenCalledTimes(11);
+    });
+
+    it('sichert das Füllprotokoll nicht mehr mit', async () => {
+      // Es liegt unter der Gruppe. Mitgesichert und zurückgespielt stünde jede
+      // Füllung zweimal da — einmal je Einsatzbezug.
+      (getDocs as Mock).mockResolvedValue({ docs: [] });
+
+      const result = await exportFirecall('test-id');
+
+      expect(result).not.toHaveProperty('atemschutzFuellungen');
     });
 
     it('should stamp the backup version', async () => {
@@ -359,8 +369,8 @@ describe('useExport', () => {
 
       await exportFirecall('test-id');
 
-      // zwölf Untersammlungen, die nicht voneinander abhängen
-      expect(peak).toBe(12);
+      // elf Untersammlungen, die nicht voneinander abhängen
+      expect(peak).toBe(11);
     });
 
     it('should warn instead of silently dropping an attachment it cannot download', async () => {
