@@ -4,7 +4,7 @@ import { unzipSync, strFromU8 } from 'fflate';
  * Ein Arbeitsblatt aus einer XLSX-Datei als Raster von Strings.
  *
  * Bewusst kein vollständiger XLSX-Parser und kein zusätzliches Paket: Gelesen
- * wird genau ein bekanntes Exportformat (der Artikelexport aus FDISK). Zahlen
+ * wird genau ein bekanntes Exportformat (der Artikelexport aus Sybos). Zahlen
  * kommen als String zurück, wie sie in der Datei stehen — die fachliche
  * Auslegung („45250 ist ein Datum", „6,8 ist ein Volumen") gehört nach
  * `atemschutzImport.ts` und nicht hierher.

@@ -74,7 +74,7 @@ export interface AtemschutzGeraet {
   inventarNr?: string;
   zusatzInventarNr?: string;
   seriennummer?: string;
-  /** ID aus dem Fremdsystem (FDISK), z.B. "96176". */
+  /** ID aus dem Fremdsystem (Sybos), z.B. "96176". */
   externeId?: string;
   /**
    * Gepflegte oder angelernte Codes. Eine Liste, weil die Exportspalte

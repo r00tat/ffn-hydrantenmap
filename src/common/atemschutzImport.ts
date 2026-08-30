@@ -6,7 +6,7 @@ import {
 } from './atemschutz';
 
 /**
- * Import der Atemschutz-Stammdaten aus dem FDISK-Artikelexport.
+ * Import der Atemschutz-Stammdaten aus dem Sybos-Artikelexport.
  *
  * Der Export ist die einzige gepflegte Quelle für Inventar- und
  * Seriennummern — von Hand nachgetragen wäre er nach dem ersten Zugang
@@ -307,7 +307,7 @@ export interface ImportPlanZeile {
  * Gleicht die Importzeilen gegen den vorhandenen Bestand ab.
  *
  * Die Reihenfolge externeId → inventarNr → seriennummer ist die nach
- * Verlässlichkeit: Die FDISK-ID ist der Schlüssel des Quellsystems, die
+ * Verlässlichkeit: Die Sybos-ID ist der Schlüssel des Quellsystems, die
  * Inventar-Nr. wird von der Feuerwehr vergeben, die Seriennummer steht im
  * Export nur bei einem Teil der Zeilen und ist dort mehrfach vergeben.
  */
@@ -362,7 +362,7 @@ export function abgleich(
     // Geprüft wird nur die *führende* Kennung, also die, die den Abgleich
     // entscheidet. Über alle drei zu prüfen wäre falscher Alarm: Im echten
     // Export teilen sich 41 Zeilen irgendeine Kennung, aber nur 9 dieselbe
-    // führende. Die übrigen 32 haben eine eigene FDISK-ID und landen sauber
+    // führende. Die übrigen 32 haben eine eigene Sybos-ID und landen sauber
     // in eigenen Dokumenten — sie zum Überspringen vorzuschlagen hieße, ein
     // Sechstel des Bestands beim Import zu verlieren.
     const primaer = `${kennungen[0].feld}:${kennungen[0].value}`;

@@ -34,7 +34,7 @@ behauptet die Übersicht, niemand sei mehr im Einsatz.
 
 ## Warum die Barcode-Spalte des Exports nicht allein trägt
 
-Der FDISK-Artikelexport hat eine Spalte `Barcodes`. Sie wird importiert und ist
+Der Sybos-Artikelexport hat eine Spalte `Barcodes`. Sie wird importiert und ist
 der erste Nachschlagewert — heute ist sie aber in **einer von 214 Zeilen**
 gefüllt, und dieser eine Wert (`4026056001293`) ist eine EAN-13, die den
 *Artikeltyp* bezeichnet und nicht das einzelne Stück.
@@ -74,7 +74,7 @@ vorbelegt werden.
 Als Kollision zählt dabei nur die **führende** Kennung, also die, die den
 Abgleich tatsächlich entscheidet. Über alle drei geprüft meldete der echte
 Export 41 von 214 Zeilen als Dublette, tatsächlich kollidieren nur 9. Die
-übrigen 32 haben eine eigene FDISK-ID und landen sauber in eigenen Dokumenten —
+übrigen 32 haben eine eigene Sybos-ID und landen sauber in eigenen Dokumenten —
 sie zum Überspringen vorzuschlagen hieße, ein Sechstel des Bestands beim Import
 zu verlieren.
 
@@ -87,7 +87,7 @@ trotzdem „Neusiedl am See", nur die Bezeichnung verrät sie.
 
 ### Füllstationen kommen aus einem zweiten Export
 
-FDISK gibt die Atemlufterzeugung in einem eigenen Lauf aus, mit eigenem
+Sybos gibt die Atemlufterzeugung in einem eigenen Lauf aus, mit eigenem
 Klassenbaum: Klasse 3 ist dort **leer**, der Typ steht in Klasse 1
 („Atemlufterzeugung") und Klasse 2 („Atemluftfüllstation",
 „Atemluftkompressor").
@@ -115,7 +115,7 @@ das der Sammelplatz ohnehin überall ausblendet, das aber bei jedem Import
 wieder mitgeschrieben wird.
 
 Der Preis ist bewusst in Kauf genommen: Wird ein **bereits importiertes** Gerät
-in FDISK nachträglich inaktiv gesetzt, deaktiviert ein erneuter Import es
+in Sybos nachträglich inaktiv gesetzt, deaktiviert ein erneuter Import es
 nicht — die Zeile fehlt ja im Lauf. Ausgeschieden wird dann von Hand im
 Gerätedialog.
 
@@ -180,7 +180,7 @@ Die eigene Wehr steht als `feuerwehrName` am Gruppendokument, gepflegt unter
 `/admin/fahrtenbuch` (`saveFahrtenbuchGroupFeuerwehrName`, Gruppen-Admin).
 Bewusst getrennt vom Gruppennamen: Der ist ein Verwaltungsbegriff („FF Neusiedl
 am See"), die `feuerwehr`-Felder der Stammdaten tragen die Schreibweise des
-FDISK-Exports. Ein Vergleich über `name` ginge still schief und markierte jede
+Sybos-Exports. Ein Vergleich über `name` ginge still schief und markierte jede
 eigene Füllung als zu verrechnen. Ohne gepflegten Wert bleibt der Schalter aus.
 
 Die Vorbelegung zieht nach, solange der Benutzer den Schalter nicht selbst

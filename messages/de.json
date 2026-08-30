@@ -204,7 +204,7 @@
       "title": "Ausrüstung importieren",
       "button": "Importieren",
       "chooseFile": "Datei wählen (XLSX oder CSV)",
-      "hint": "Artikelexport aus FDISK oder eine CSV-Datei mit denselben Spaltennamen.",
+      "hint": "Artikelexport aus Sybos oder eine CSV-Datei mit denselben Spaltennamen.",
       "preview": "{count, plural, =0 {Keine Zeilen} one {Eine Zeile} other {# Zeilen}} gefunden",
       "statusNew": "neu",
       "statusUpdate": "aktualisieren",

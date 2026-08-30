@@ -204,7 +204,7 @@
       "title": "Import equipment",
       "button": "Import",
       "chooseFile": "Choose file (XLSX or CSV)",
-      "hint": "Article export from FDISK, or a CSV file with the same column names.",
+      "hint": "Article export from Sybos, or a CSV file with the same column names.",
       "preview": "{count, plural, =0 {No rows} one {One row} other {# rows}} found",
       "statusNew": "new",
       "statusUpdate": "update",

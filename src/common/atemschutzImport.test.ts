@@ -235,7 +235,7 @@ describe('rowsToGeraete', () => {
   });
 
   it('überspringt inaktive Artikel', () => {
-    // Ein in FDISK ausgeschiedenes Gerät gehört nicht in den Bestand — es
+    // Ein in Sybos ausgeschiedenes Gerät gehört nicht in den Bestand — es
     // stünde sonst in jeder Auswahl des Sammelplatzes.
     const geraete = rowsToGeraete([
       KOPF,
@@ -441,7 +441,7 @@ describe('abgleich', () => {
   });
 
   it('meldet keine Kollision, wenn nur eine nachrangige Kennung geteilt wird', () => {
-    // Im echten Export teilen sich Zeilen mit eigener FDISK-ID häufig eine
+    // Im echten Export teilen sich Zeilen mit eigener Sybos-ID häufig eine
     // Seriennummer. Sie schreiben in verschiedene Dokumente und sind damit
     // keine Dublette — würden sie gemeldet, schlüge der Dialog vor, ein
     // Sechstel des Bestands zu überspringen.
