@@ -9,6 +9,7 @@ import * as firebaseui from 'firebaseui';
 import 'firebaseui/dist/firebaseui.css';
 import { useEffect } from 'react';
 import { auth } from './firebase';
+import { shouldUseRedirectSignIn } from './signInStrategy';
 
 export default function FirebaseUiLogin() {
   useEffect(() => {
@@ -34,7 +35,14 @@ export default function FirebaseUiLogin() {
           console.warn('signInFailure', error);
         },
       },
-      signInFlow: 'popup',
+      // Popup ist der angenehmere Weg und bleibt ueberall dort, wo er
+      // funktioniert. Auf iOS funktioniert er nicht: Der Auth-Handler gibt
+      // sein Ergebnis per `postMessage` an `window.opener` zurueck, und
+      // WebKit-Browser jenseits von Safari oeffnen `window.open` als
+      // eigenstaendigen Tab ohne diese Beziehung — der Login bleibt dann auf
+      // einer weissen Handler-Seite stehen. Warum der Redirect dafuer einen
+      // erst-party Handler braucht, steht in signInStrategy.ts.
+      signInFlow: shouldUseRedirectSignIn() ? 'redirect' : 'popup',
       // signInSuccessUrl: 'https://www.anyurl.com', // This is where should redirect if the sign in is successful.
       signInOptions: [
         {

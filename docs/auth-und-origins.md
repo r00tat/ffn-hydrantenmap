@@ -58,3 +58,81 @@ Namen unterscheidet `name_suffix` des Moduls `cloud-scheduler`. Ein
 **Bewusst kein Secret-Manager-Secret:** Der Wert ist eine Kennung, kein
 Geheimnis — wer die Adresse kennt, kann kein Token dafür ausstellen, dazu
 braucht es IAM-Rechte auf den Service Account.
+
+## Der Firebase-Auth-Handler unter der eigenen Domain
+
+`authDomain` zeigt in der Firebase-Konfiguration auf
+`ffn-utils.firebaseapp.com`. Damit läuft jeder Google-Login über eine **fremde
+Origin**, und daran scheitert er in WebKit-Browsern:
+
+- `signInWithPopup` gibt sein Ergebnis per `postMessage` an `window.opener`
+  zurück. Bluefy und andere WKWebView-Browser öffnen `window.open` als
+  eigenständigen Tab ohne diese Beziehung — der Handler bleibt als weiße Seite
+  stehen, ohne Fehler und ohne Rückweg. Aufgefallen ist es in Bluefy, das auf
+  dem iPhone als einziger Browser Web Bluetooth mitbringt und damit der einzige
+  Weg zum Radiacode ist — WebKit selbst kennt die API nicht.
+- `signInWithRedirect` bräuchte Storage auf der Handler-Domain. Die ist dort
+  Third-Party und wird von WebKit blockiert.
+
+Der von Firebase dokumentierte Ausweg: `/__/auth/*` unter der **eigenen**
+Domain ausliefern und `authDomain` dorthin zeigen lassen. Dann ist der ganze
+Ablauf same-origin — ohne Popup, ohne Third-Party-Storage. Beteiligt sind:
+
+| Stelle | Aufgabe |
+| --- | --- |
+| [next.config.js](../next.config.js) | Rewrite `/__/auth/:path*` → `https://<authDomain>/__/auth/:path*`. **Immer aktiv**, unabhängig vom Schalter — nur so lässt sich der Weg auf einem einzelnen Gerät ausprobieren. |
+| [authDomain.ts](../src/components/firebase/authDomain.ts) | Entscheidet, ob `initializeApp` die eigene Domain als `authDomain` bekommt. |
+| [signInStrategy.ts](../src/components/firebase/signInStrategy.ts) | Popup oder Redirect. Redirect nur auf iOS **und** nur bei aktivem Proxy. |
+| [firebase-ui-login.tsx](../src/components/firebase/firebase-ui-login.tsx) | wendet das auf den Web-Login an (`signInFlow`) |
+| [patterns.ts](../src/worker/patterns.ts) | `NetworkOnly` für `/__/auth/*` — der Service Worker darf den Handler nicht zwischenspeichern. |
+
+### Schalter
+
+Es gewinnt jeweils das Nähere:
+
+1. `NEXT_PUBLIC_FIREBASE_AUTH_PROXY=true` — Voreinstellung je Umgebung, als
+   Repository-Variable gesetzt und beim Image-Build ins Bundle inlined.
+2. `?authProxy=1` bzw. `?authProxy=0` in der URL — schaltet für dieses Gerät um
+   und merkt sich die Wahl.
+3. der gemerkte Wert im `localStorage` (`firebaseAuthProxy`).
+
+Zum Ausprobieren genügt daher ein Aufruf von
+`https://einsatz-dev.ffnd.at/login?authProxy=1`; für alle anderen Benutzer
+ändert sich nichts.
+
+### Welche Anmeldeoberfläche eigentlich läuft
+
+Im Browser rendert [LoginUi.tsx](../src/components/pages/LoginUi.tsx)
+**FirebaseUI**, in der Android-App stattdessen `NativeLoginPanel`. FirebaseUI
+bringt seinen eigenen Ablauf mit — der Popup-/Redirect-Weg wird ihm über
+`signInFlow` mitgegeben, nicht über `signInWithGoogle` aus dem
+`googleAuthAdapter`.
+
+`StyledLogin.tsx` sieht wie die Anmeldeseite aus, ist aber **nirgends
+importiert**. Wer dort etwas ändert, ändert nichts an der laufenden App.
+
+Daraus folgt auch, dass FirebaseUI die Kontenverknüpfung bestimmt: Zu einer
+Adresse, die schon ein Google-Konto hat, verweigert es den E-Mail-Weg mit
+„You've already used … Sign in with Google to continue". Ein Login per
+E-Mail-Link ist für solche Konten also kein Ausweichweg.
+
+### Voraussetzung in der Google Cloud Console
+
+**Jede Origin, die den Handler ausliefert, muss beim OAuth-Client als
+Redirect-URI eingetragen sein** — `https://<origin>/__/auth/handler`. Fehlt
+sie, antwortet Google mit `redirect_uri_mismatch`, und zwar erst mitten im
+Login. Betroffen ist der Client „Web client (auto created by Google Service)"
+im Projekt `ffn-utils`; einzutragen sind
+
+- `https://einsatz.ffnd.at/__/auth/handler`,
+- `https://einsatz-dev.ffnd.at/__/auth/handler`,
+- `http://localhost:3000/__/auth/handler` für die lokale Entwicklung.
+
+Der bestehende Eintrag `https://ffn-utils.firebaseapp.com/__/auth/handler`
+bleibt stehen — ohne ihn bricht der Login für alle, die den Schalter nicht
+gesetzt haben. Ein zusätzlicher Eintrag ändert für den alten Weg nichts, das
+Eintragen ist also gefahrlos und muss **vor** dem ersten Test passieren.
+
+Die Domains selbst stehen bereits unter „Authorized domains" in der
+Firebase-Konsole; das ist Voraussetzung dafür, dass die App dort überhaupt
+anmelden darf, und gilt schon für den Popup-Weg.

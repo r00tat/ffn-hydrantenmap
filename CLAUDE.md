@@ -470,6 +470,12 @@ Required environment variables (see `.env.local`):
   Umgebungsvariable. Siehe [docs/mcp-server.md](docs/mcp-server.md).
 - `MCP_WRITE_ENABLED` — schaltet die schreibenden MCP-Tools frei. In dev an,
   in prod zunächst aus.
+- `NEXT_PUBLIC_FIREBASE_AUTH_PROXY` (optional) — `true` lässt den
+  Firebase-Auth-Handler unter der eigenen Domain laufen statt auf
+  `firebaseapp.com`; nötig für den Google-Login in WebKit-Browsern. Je Gerät
+  mit `?authProxy=1` umschaltbar. **Jede Origin braucht dafür einen
+  Redirect-URI-Eintrag am OAuth-Client.** Siehe
+  [docs/auth-und-origins.md](docs/auth-und-origins.md).
 
 <!-- BEGIN:nextjs-agent-rules -->
 
