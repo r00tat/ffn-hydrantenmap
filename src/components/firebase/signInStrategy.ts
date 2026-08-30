@@ -8,63 +8,46 @@ import {
 /**
  * Popup oder Redirect?
  *
- * `signInWithPopup` ist der angenehmere Weg — die Seite bleibt stehen — und
- * bleibt deshalb ueberall dort, wo er funktioniert. Auf iOS funktioniert er
- * nicht zuverlaessig: Der Handler gibt sein Ergebnis per `postMessage` an
- * `window.opener`, und WebKit-Browser jenseits von Safari (Bluefy und andere
- * WKWebView-Browser) oeffnen `window.open` als eigenstaendigen Tab ohne diese
- * Beziehung. Der Login bleibt dann auf einer weissen Handler-Seite stehen,
- * ohne Fehler und ohne Rueckweg.
+ * **Bei aktivem erst-party Handler immer Redirect — auf jedem Geraet.**
  *
- * `signInWithRedirect` waere dort der Ausweg, taugt aber nur mit einem
- * erst-party Auth-Handler: Auf einer fremden Handler-Domain braucht er
- * Third-Party-Storage, die WebKit blockiert. Deshalb haengt der Redirect am
- * Proxy-Schalter aus authDomain.ts — ohne ihn waere er schlechter als das
- * Popup, nicht besser.
+ * Anfangs stand hier eine Geraeteerkennung: Redirect nur auf iOS, sonst das
+ * angenehmere Popup. Sie hat sich als der falsche Ansatz erwiesen. iPadOS
+ * meldet sich seit Version 13 als „Macintosh" und ist nur an den
+ * Beruehrpunkten vom echten Mac zu unterscheiden; WKWebView-Browser wie
+ * Bluefy bringen eigene Kennungen mit, und mit jedem iOS-Update kann sich das
+ * wieder aendern. Greift die Erkennung nicht, faellt der Login lautlos auf
+ * genau den Popup-Weg zurueck, der in WebKit kaputt ist — ohne Fehler, ohne
+ * Hinweis. Eine Weiche, deren Fehlerfall der Fehler selbst ist, ist keine
+ * gute Weiche.
+ *
+ * Mit erst-party Handler ist der Redirect ueberall unterstuetzt, und auf der
+ * Anmeldeseite kostet der Seitenneuaufbau nichts — es gibt kein Formular, das
+ * dabei verloren geht. Ein Weg statt zwei, und der ohne stillen Fehlerfall.
+ *
+ * Zur Erinnerung, warum das Popup in WebKit scheitert: Der Handler gibt sein
+ * Ergebnis per `postMessage` an `window.opener` zurueck, und WKWebView-Browser
+ * oeffnen `window.open` als eigenstaendigen Tab ohne diese Beziehung. Der
+ * Login bleibt dann auf einer weissen Handler-Seite stehen.
  */
 
 export const SIGN_IN_FLOW_STORAGE_KEY = 'firebaseSignInFlow';
 export const SIGN_IN_FLOW_QUERY_PARAM = 'signInFlow';
 
-/** Nur die Teile von `navigator`, die hier gebraucht werden. */
-export interface SignInNavigator {
-  userAgent: string;
-  maxTouchPoints: number;
-}
-
-function currentNavigator(): SignInNavigator | undefined {
-  return typeof navigator === 'undefined' ? undefined : navigator;
-}
-
-export function isIosWebKit(
-  nav: SignInNavigator | undefined = currentNavigator(),
-): boolean {
-  if (!nav) return false;
-  if (/iPad|iPhone|iPod/.test(nav.userAgent)) return true;
-  // Ein iPad meldet sich seit iPadOS 13 als "Macintosh". Vom echten Mac
-  // unterscheidet es nur, dass es mehrere Beruehrpunkte kennt.
-  return /Macintosh/.test(nav.userAgent) && nav.maxTouchPoints > 1;
-}
-
 export function shouldUseRedirectSignIn(
-  nav: SignInNavigator | undefined = currentNavigator(),
   win: AuthProxyWindow | undefined = currentWindow(),
 ): boolean {
-  if (!nav) return false;
+  if (!win) return false;
 
   // Der Redirect steht und faellt mit dem erst-party Handler — auch ein von
-  // Hand erzwungener. Ohne ihn braeuchte er Third-Party-Storage und waere
-  // schlechter als das Popup, nicht besser.
+  // Hand erzwungener. Ohne ihn braeuchte er Third-Party-Storage, die WebKit
+  // blockiert, und waere schlechter als das Popup, nicht besser.
   if (!isAuthProxyEnabled(win)) return false;
 
-  // `?signInFlow=redirect` bzw. `=popup` uebergeht die Geraeteerkennung.
-  // Ohne diesen Schalter liesse sich der Redirect-Weg nur auf einem iPhone
-  // ausprobieren — also genau dort nicht, wo man beim Entwickeln sitzt.
-  const chosen = win
-    ? readDeviceSwitch(win, SIGN_IN_FLOW_QUERY_PARAM, SIGN_IN_FLOW_STORAGE_KEY)
-    : undefined;
-  if (chosen === 'redirect') return true;
-  if (chosen === 'popup') return false;
-
-  return isIosWebKit(nav);
+  // Notausstieg: `?signInFlow=popup` dreht auf den alten Weg zurueck, falls
+  // sich der Redirect irgendwo doch als untauglich erweist.
+  // `?signInFlow=redirect` nimmt das wieder zurueck.
+  return (
+    readDeviceSwitch(win, SIGN_IN_FLOW_QUERY_PARAM, SIGN_IN_FLOW_STORAGE_KEY) !==
+    'popup'
+  );
 }

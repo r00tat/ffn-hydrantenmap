@@ -33,18 +33,6 @@ vi.mock('firebase/auth', () => ({
   sendEmailVerification: vi.fn(),
 }));
 
-const IPHONE =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
-const DESKTOP =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
-
-function setUserAgent(userAgent: string) {
-  Object.defineProperty(navigator, 'userAgent', {
-    value: userAgent,
-    configurable: true,
-  });
-}
-
 interface UiConfig {
   signInFlow: string;
   callbacks: { signInFailure: (error: unknown) => unknown };
@@ -72,22 +60,15 @@ afterEach(() => {
 });
 
 describe('FirebaseUiLogin', () => {
-  it('bleibt auf dem Desktop beim Popup', async () => {
+  it('nimmt bei erst-party Handler den Redirect', async () => {
+    // Ohne Geraeteerkennung: Der Browser spielt keine Rolle mehr.
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
-    setUserAgent(DESKTOP);
-    expect((await renderLogin()).signInFlow).toBe('popup');
-  });
-
-  it('bleibt auf iOS beim Popup, solange der Handler nicht erst-party ist', async () => {
-    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', '');
-    setUserAgent(IPHONE);
-    expect((await renderLogin()).signInFlow).toBe('popup');
-  });
-
-  it('nimmt auf iOS den Redirect, sobald der Handler erst-party ist', async () => {
-    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
-    setUserAgent(IPHONE);
     expect((await renderLogin()).signInFlow).toBe('redirect');
+  });
+
+  it('bleibt ohne erst-party Handler beim Popup', async () => {
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', '');
+    expect((await renderLogin()).signInFlow).toBe('popup');
   });
 });
 
@@ -96,7 +77,6 @@ describe('FirebaseUiLogin: gescheiterte Anmeldung', () => {
     // Beim Redirect-Weg kommt die Seite neu hoch; ohne sichtbare Meldung
     // saehe man nur wieder das Anmeldeformular.
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
-    setUserAgent(IPHONE);
     const config = await renderLogin();
 
     config.callbacks.signInFailure({
