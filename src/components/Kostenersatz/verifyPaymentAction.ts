@@ -2,8 +2,13 @@
 import 'server-only';
 
 import crypto from 'node:crypto';
+import { absenderNameOf } from '../../common/groupStammdaten';
 import { firestore } from '../../server/firebase/admin';
-import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
+import {
+  loadGroupFeuerwehrName,
+  loadGroupStammdaten,
+} from '../../server/groups/stammdatenStore';
+import { FIRECALL_COLLECTION_ID, type Firecall } from '../firebase/firestore';
 import {
   KostenersatzCalculation,
   KOSTENERSATZ_SUBCOLLECTION,
@@ -28,9 +33,38 @@ export interface PaymentVerificationResult {
   amount?: number;
   reference?: string;
   recipientName?: string;
+  /**
+   * Absender laut den Stammdaten der Gruppe — für die Fußzeile der Seite.
+   *
+   * Kommt vom Server und nicht aus einem Client-Hook: Die Seite ruft der
+   * Zahlungspflichtige auf, und der ist nicht angemeldet. Ein Firestore-Lesen
+   * im Browser scheiterte an den Regeln.
+   */
+  absenderName?: string;
   firecallId?: string;
   calculationId?: string;
   alreadyCompleted?: boolean;
+}
+
+/**
+ * Der Absender laut den Stammdaten der Gruppe des Einsatzes, oder ein leerer
+ * String. Wirft nicht: Eine Zahlungsbestätigung ohne Fußzeile ist brauchbar,
+ * eine mit Fehlerseite nicht.
+ */
+async function loadAbsenderName(firecallId: string): Promise<string> {
+  try {
+    const doc = await firestore.collection(FIRECALL_COLLECTION_ID).doc(firecallId).get();
+    const groupId = (doc.data() as Firecall | undefined)?.group?.trim();
+    if (!groupId) return '';
+    const [stammdaten, feuerwehrName] = await Promise.all([
+      loadGroupStammdaten(groupId),
+      loadGroupFeuerwehrName(groupId),
+    ]);
+    return absenderNameOf(stammdaten, feuerwehrName);
+  } catch (error) {
+    console.error('loadAbsenderName failed', error);
+    return '';
+  }
 }
 
 /**
@@ -161,6 +195,7 @@ export async function verifyPaymentAndComplete(
       amount: calculation.totalSum,
       reference: calculation.sumupCheckoutRef || calculationId,
       recipientName: calculation.recipient.name,
+      absenderName: await loadAbsenderName(firecallId),
       firecallId,
       calculationId,
       alreadyCompleted,

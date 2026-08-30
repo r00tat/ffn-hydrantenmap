@@ -2,6 +2,7 @@
  * Kostenersatz Email Configuration and Template Rendering
  */
 
+import { absenderNameOf, type GroupStammdaten } from './groupStammdaten';
 import { formatCurrency, KostenersatzCalculation } from './kostenersatz';
 import { Firecall } from '../components/firebase/firestore';
 
@@ -35,6 +36,15 @@ export interface EmailTemplateContext {
     defaultStunden: number;
     comment: string;
   };
+  /** Absender und Bankverbindung der Gruppe — als Platzhalter im Vorlagentext. */
+  absender: {
+    name: string;
+    adresse: string;
+    kontakt: string;
+    kontoinhaber: string;
+    iban: string;
+    bic: string;
+  };
 }
 
 export interface SendEmailRequest {
@@ -57,18 +67,24 @@ export interface SendEmailResponse {
 // Constants
 // ============================================================================
 
+/**
+ * Untersammlung unter `groups/{groupId}` — vorher ein einzelnes Dokument auf
+ * Wurzelebene. Mit der Bankverbindung je Gruppe muss auch der Mailtext je
+ * Gruppe gelten, sonst stünde in ihm die IBAN einer anderen Feuerwehr.
+ */
 export const KOSTENERSATZ_CONFIG_COLLECTION = 'kostenersatzConfig';
-export const KOSTENERSATZ_EMAIL_CONFIG_DOC = 'emailSettings';
+export const KOSTENERSATZ_EMAIL_CONFIG_DOC = 'email';
 
 // ============================================================================
 // Default Templates
 // ============================================================================
 
 export const DEFAULT_EMAIL_CONFIG: KostenersatzEmailConfig = {
-  fromEmail: 'no-reply@ff-neusiedlamsee.at',
-  ccEmail: 'no-reply@ff-neusiedlamsee.at',
-  subjectTemplate:
-    'Kostenersatz - Feuerwehr Neusiedl am See - {{ firecall.date }}',
+  // Leer und nicht auf eine Adresse gesetzt: Eine hier eingetragene
+  // Absenderadresse ginge im Namen einer fremden Feuerwehr hinaus.
+  fromEmail: '',
+  ccEmail: '',
+  subjectTemplate: 'Kostenersatz - {{ absender.name }} - {{ firecall.date }}',
   bodyTemplate: `Sehr geehrte(r) {{ recipient.name }},
 
 Anbei finden Sie die Abrechnung für den Kostenersatz zum Einsatz {{ firecall.name }} am {{ firecall.date }}.
@@ -76,22 +92,22 @@ Laut Landesgesetztblatt Nr. 77/2023 des Burgenlandes hat die Feuerwehr das Recht
 
 Sollte der Kostenersatz nicht vor Ort beglichen sein, bitte den Betrag auf folgendes Konto überweisen:
 
-Freiwillige Feuerwehr Neusiedl am See
-AT40 3300 0000 0202 0402
-RLBBAT2E
+{{ absender.kontoinhaber }}
+{{ absender.iban }}
+{{ absender.bic }}
 
 
 
 Dear {{ recipient.name }},
 
 Attached you will find the reimbursement for the emergency call {{ firecall.name }} on {{ firecall.date }}.
-As by Austrian law (LgBl Nr. 77/2023 Burgenland) die fire departement has the right to request reimbursement.
+As by Austrian law (LgBl Nr. 77/2023 Burgenland) the fire department has the right to request reimbursement.
 
 If the payment didn't take place on the scene, please transfer the pending amount to the following bank account:
 
-Freiwillige Feuerwehr Neusiedl am See
-AT40 3300 0000 0202 0402
-RLBBAT2E`,
+{{ absender.kontoinhaber }}
+{{ absender.iban }}
+{{ absender.bic }}`,
 };
 
 // ============================================================================
@@ -104,6 +120,8 @@ RLBBAT2E`,
 export function buildTemplateContext(
   calculation: KostenersatzCalculation,
   firecall: Firecall,
+  stammdaten: GroupStammdaten,
+  feuerwehrName?: string,
 ): EmailTemplateContext {
   // Format date as DD.MM.YYYY
   const dateStr = calculation.callDateOverride || firecall.date || '';
@@ -127,6 +145,8 @@ export function buildTemplateContext(
   const firecallName =
     calculation.nameOverride || firecall.name || '';
 
+  const absender = absenderNameOf(stammdaten, feuerwehrName);
+
   return {
     recipient: {
       name: calculation.recipient.name,
@@ -143,6 +163,14 @@ export function buildTemplateContext(
       totalSum: formatCurrency(calculation.totalSum),
       defaultStunden: calculation.defaultStunden,
       comment: calculation.comment,
+    },
+    absender: {
+      name: absender,
+      adresse: stammdaten.absenderAdresse,
+      kontakt: stammdaten.absenderKontakt,
+      kontoinhaber: stammdaten.kontoinhaber.trim() || absender,
+      iban: stammdaten.iban,
+      bic: stammdaten.bic,
     },
   };
 }

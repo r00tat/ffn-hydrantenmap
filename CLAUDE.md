@@ -36,6 +36,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/lagekarte-austausch.md](docs/lagekarte-austausch.md) | Import und Export für lagekarte.info: beobachtetes Format, Kupplungsmarker, `ffnd`-Block, Symbolkatalog und seine Lücken |
 | [docs/eigene-kartenebenen.md](docs/eigene-kartenebenen.md) | Eigene WMS-/WMTS-Kartenebenen je Einsatz: Abgrenzung „Kartenebene" gegen „Ebene", Berechtigungen und warum die Firestore-Regeln nichts prüfen, GetCapabilities über den Server, Darstellung im Layer-Control |
 | [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md) | Atemschutzsammelplatz: warum jede Bereitstellung eines Trupps eine eigene Zeile ist, die sechs Kennungen der Flaschensuche und warum die Barcode-Spalte des Sybos-Exports nicht allein trägt, Dublettenbehandlung im Import, Berechtigungen, Kamera in der Android-App, Mangel-Verallgemeinerung, warum das Füllprotokoll unter der Gruppe liegt, Füllstation als Gerätetyp, Vorbelegung von `verrechnen`, Verrechnung der Füllungen: Tarifwahl, Berechtigung, Storno |
+| [docs/gruppen-stammdaten.md](docs/gruppen-stammdaten.md) | Absender, Bankverbindung und Logo je Gruppe: warum sie gemeinsam liegen, warum ohne sie kein Beleg entsteht, warum das Logo kein SVG sein darf, Storage-Pfad und Signierung |
 | [docs/rettungskarten.md](docs/rettungskarten.md) | Rettungskarten aus dem Euro-Rescue-Katalog: warum kein Deep Link in die App geht, die offene API von Euro NCAP, Cache, Zuordnung Zulassung → Variante |
 
 ## Commands
@@ -422,7 +423,9 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 - `appConfig` - App-weite Konfiguration (u.a. Dokument `bugReport` mit Empfänger-E-Mails)
 - `atemschutzGeraet` - Atemschutz-Ausrüstung je Gruppe (`groups/{groupId}/atemschutzGeraet`, siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
 - `atemschutzFuellung` - Füllprotokoll je Gruppe (`groups/{groupId}/atemschutzFuellung`), mit `firecallId` als Einsatzbezug
-- `atemschutzRechnung`, `atemschutzEmpfaenger`, `atemschutzConfig` - Verrechnung der Flaschenfüllungen je Gruppe (siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
+- `atemschutzRechnung`, `atemschutzEmpfaenger`, `atemschutzConfig` - Verrechnung der Flaschenfüllungen je Gruppe; **ohne** Absender und Bankverbindung, die liegen in `groupConfig` (siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
+- `groupConfig` - Stammdaten einer Gruppe: Absender, Bankverbindung und Logo (`groups/{groupId}/groupConfig/stammdaten`). Von Kostenersatz **und** Atemschutz-Verrechnung gelesen (siehe [docs/gruppen-stammdaten.md](docs/gruppen-stammdaten.md))
+- `kostenersatzConfig` - Mailvorlagen des Kostenersatzes je Gruppe (`groups/{groupId}/kostenersatzConfig/email`)
 - `atemschutzTrupp`, `atemschutzAusgabe` - Protokolle des Atemschutzsammelplatzes je Einsatz
 - `oauthClients`, `oauthAuthCodes`, `oauthRefreshTokens`, `oauthConsents` - OAuth-Authorization-Server des MCP-Zugangs, rein serverseitig (siehe [docs/mcp-server.md](docs/mcp-server.md))
 

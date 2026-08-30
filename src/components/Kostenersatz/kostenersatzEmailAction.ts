@@ -1,23 +1,29 @@
 'use server';
 import 'server-only';
 
-import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { gmail } from '@googleapis/gmail';
 import { actionUserAuthorizedForFirecall } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
+import {
+  requireStammdatenForFirecall,
+  StammdatenUnvollstaendigError,
+} from '../../server/groups/requireStammdaten';
+import { loadStammdatenLogo } from '../../server/groups/stammdatenStore';
 import { createWorkspaceAuth } from '../../server/auth/workspace';
 import { buildMailMessage } from '../../server/mail/buildMailMessage';
 import KostenersatzPdf from './KostenersatzPdf';
-
-const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
 import {
   KostenersatzCalculation,
   KostenersatzRate,
   KOSTENERSATZ_RATES_COLLECTION,
   KOSTENERSATZ_SUBCOLLECTION,
 } from '../../common/kostenersatz';
-import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  GROUP_COLLECTION_ID,
+  Firecall,
+} from '../firebase/firestore';
 import { getDefaultRatesWithVersion } from '../../common/defaultKostenersatzRates';
 import {
   SendEmailRequest,
@@ -66,15 +72,23 @@ export async function sendKostenersatzEmailAction(
   }
 
   try {
-    // Load email config for the from address
+    // Ohne Absender und Bankverbindung entsteht kein Beleg, sondern ein
+    // Zettel — und der hinge dann als PDF an einer Mail.
+    const { stammdaten, feuerwehrName } = await requireStammdatenForFirecall(firecall);
+    const logo = await loadStammdatenLogo(stammdaten);
+
+    // Mailvorlage der Gruppe. `firecall.group` ist hier gesetzt, weil
+    // `requireStammdatenForFirecall` sonst geworfen hätte.
     let emailConfig: KostenersatzEmailConfig = DEFAULT_EMAIL_CONFIG;
     const configDoc = await firestore
+      .collection(GROUP_COLLECTION_ID)
+      .doc(firecall.group!)
       .collection(KOSTENERSATZ_CONFIG_COLLECTION)
       .doc(KOSTENERSATZ_EMAIL_CONFIG_DOC)
       .get();
 
     if (configDoc.exists) {
-      emailConfig = configDoc.data() as KostenersatzEmailConfig;
+      emailConfig = { ...DEFAULT_EMAIL_CONFIG, ...configDoc.data() };
     }
 
     // Load calculation
@@ -122,7 +136,9 @@ export async function sendKostenersatzEmailAction(
         calculation,
         rates,
         firecall,
-        logoPath,
+        stammdaten,
+        feuerwehrName,
+        logo,
       })
     );
 
@@ -180,6 +196,9 @@ export async function sendKostenersatzEmailAction(
       emailSentAt,
     };
   } catch (error: any) {
+    if (error instanceof StammdatenUnvollstaendigError) {
+      return { success: false, error: 'stammdatenUnvollstaendig' };
+    }
     console.error('Error sending email:', error);
 
     // Handle Gmail API errors

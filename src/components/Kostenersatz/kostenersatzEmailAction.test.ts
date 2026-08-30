@@ -14,11 +14,15 @@ const firecallDocRef = { collection: vi.fn(() => subColl) };
 const firecallColl = { doc: vi.fn(() => firecallDocRef) };
 const configColl = { doc: vi.fn(() => ({ get: configGet })) };
 const ratesColl = { where: vi.fn(() => ({ get: ratesGet })) };
+const groupDocRef = { collection: vi.fn(() => configColl) };
+const groupColl = { doc: vi.fn(() => groupDocRef) };
 
 const mockCollection = vi.fn((name: string) => {
   switch (name) {
     case 'kostenersatzConfig':
       return configColl;
+    case 'groups':
+      return groupColl;
     case 'call':
       return firecallColl;
     case 'kostenersatzRates':
@@ -34,7 +38,35 @@ vi.mock('../../server/firebase/admin', () => ({
 
 vi.mock('../firebase/firestore', () => ({
   FIRECALL_COLLECTION_ID: 'call',
+  GROUP_COLLECTION_ID: 'groups',
 }));
+// Absender und Bankverbindung stehen seit den Gruppen-Stammdaten unter der
+// Gruppe; der Guard davor ist in `requireStammdaten.test.ts` eigen getestet.
+vi.mock('../../server/groups/requireStammdaten', async () => {
+  const actual = await vi.importActual<
+    typeof import('../../server/groups/requireStammdaten')
+  >('../../server/groups/requireStammdaten');
+  return {
+    ...actual,
+    requireStammdatenForFirecall: async () => ({
+      groupId: 'ffnd',
+      feuerwehrName: 'Musterdorf',
+      stammdaten: {
+        absenderName: 'Freiwillige Feuerwehr Musterdorf',
+        absenderAdresse: 'Hauptstraße 1',
+        absenderKontakt: '',
+        kontoinhaber: '',
+        iban: 'AT40 3300 0000 0202 0402',
+        bic: '',
+      },
+    }),
+  };
+});
+
+vi.mock('../../server/groups/stammdatenStore', () => ({
+  loadStammdatenLogo: async () => undefined,
+}));
+
 
 const actionAuthMock = vi.fn();
 vi.mock('../../app/auth', () => ({

@@ -1,7 +1,6 @@
 'use server';
 import 'server-only';
 
-import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { FieldValue } from 'firebase-admin/firestore';
 import { actionGroupAdminRequired } from '../../app/auth';
@@ -25,10 +24,11 @@ import {
 } from '../../common/atemschutzRechnung';
 import { renderTemplate } from '../../common/kostenersatzEmail';
 import { firestore } from '../../server/firebase/admin';
+import { requireGroupStammdaten } from '../../server/groups/requireStammdaten';
+import { loadStammdatenLogo } from '../../server/groups/stammdatenStore';
 import { buildMailMessage } from '../../server/mail/buildMailMessage';
 import { mailSender, sendRawMail } from '../../server/mail/sendRawMail';
 import { actionErrorKey } from '../Fahrtenbuch/actionErrorKey';
-import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import FuellungRechnungPdf from './FuellungRechnungPdf';
 import { actionFuellungRechnungRequired } from './rechnungGuards';
 import {
@@ -75,18 +75,10 @@ export interface CreateRechnungRequest {
   bemerkung?: string;
 }
 
-const LOGO_PATH = path.join(process.cwd(), 'public', 'FFND_logo.png');
-
 function trimmed(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const t = value.trim();
   return t.length > 0 ? t : undefined;
-}
-
-async function loadGroupFeuerwehrName(groupId: string): Promise<string> {
-  const doc = await firestore.collection(GROUP_COLLECTION_ID).doc(groupId).get();
-  const data = doc.data();
-  return trimmed(data?.feuerwehrName) ?? trimmed(data?.name) ?? '';
 }
 
 /**
@@ -111,6 +103,10 @@ export async function createFuellungRechnung(
     if (!trimmed(empfaengerId)) {
       return { success: false, error: 'rechnungNoRecipient' };
     }
+
+    // Ohne Absender und Bankverbindung entsteht kein Beleg, sondern ein
+    // Zettel. Der Fehler fiele sonst erst beim Empfänger auf.
+    await requireGroupStammdaten(groupId);
 
     const empfaengerDoc = await empfaengerRef(groupId).doc(empfaengerId).get();
     if (!empfaengerDoc.exists) {
@@ -340,14 +336,10 @@ async function baueRechnungPdf(
   rechnung: AtemschutzRechnung,
   config: AtemschutzRechnungConfig,
 ): Promise<Buffer> {
-  const feuerwehrName = await loadGroupFeuerwehrName(groupId);
+  const { stammdaten, feuerwehrName } = await requireGroupStammdaten(groupId);
+  const logo = await loadStammdatenLogo(stammdaten);
   return renderToBuffer(
-    FuellungRechnungPdf({
-      rechnung,
-      feuerwehrName,
-      config,
-      logoPath: LOGO_PATH,
-    }),
+    FuellungRechnungPdf({ rechnung, feuerwehrName, config, stammdaten, logo }),
   );
 }
 
@@ -394,7 +386,10 @@ export async function buildFuellungRechnungMail(request: {
     await actionFuellungRechnungRequired(groupId);
     const rechnung = await loadRechnung(groupId, rechnungId);
     const config = await loadRechnungConfig(groupId);
-    const kontext = baueKontext(rechnung, await loadGroupFeuerwehrName(groupId));
+    // Auch für die Mail: Der Anhang ist die Rechnung, und die entsteht nicht
+    // ohne Absender und Konto.
+    const { feuerwehrName } = await requireGroupStammdaten(groupId);
+    const kontext = baueKontext(rechnung, feuerwehrName);
     return {
       success: true,
       to: rechnung.empfaenger.email,
@@ -647,15 +642,7 @@ export async function saveAtemschutzRechnungConfig(request: {
         ccEmail: trimmed(config.ccEmail) ?? '',
         subjectTemplate: trimmed(config.subjectTemplate) ?? DEFAULT_RECHNUNG_CONFIG.subjectTemplate,
         bodyTemplate: trimmed(config.bodyTemplate) ?? DEFAULT_RECHNUNG_CONFIG.bodyTemplate,
-        absenderName: trimmed(config.absenderName) ?? '',
-        absenderAdresse: trimmed(config.absenderAdresse) ?? '',
-        absenderKontakt: trimmed(config.absenderKontakt) ?? '',
         leistungstext: trimmed(config.leistungstext) ?? DEFAULT_RECHNUNG_CONFIG.leistungstext,
-        kontoinhaber: trimmed(config.kontoinhaber) ?? '',
-        // Leerzeichen in der IBAN sind üblich und beim Abtippen hilfreich —
-        // gespeichert wird die Eingabe, nur ohne Rand.
-        iban: trimmed(config.iban) ?? '',
-        bic: trimmed(config.bic) ?? '',
         zahlungszielTage:
           Number.isFinite(config.zahlungszielTage) && config.zahlungszielTage >= 0
             ? Math.floor(config.zahlungszielTage)

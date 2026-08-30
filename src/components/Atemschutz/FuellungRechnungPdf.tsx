@@ -8,6 +8,11 @@ import {
   type AtemschutzRechnungConfig,
 } from '../../common/atemschutzRechnung';
 import { epcQrCode } from '../../common/epcQr';
+import {
+  absenderNameOf,
+  type GroupStammdaten,
+  type PdfLogo,
+} from '../../common/groupStammdaten';
 import { formatCurrency } from '../../common/kostenersatz';
 
 function formatDate(iso?: string): string {
@@ -100,26 +105,32 @@ export interface FuellungRechnungPdfProps {
   rechnung: AtemschutzRechnung;
   /** Name aus dem Gruppendokument — Rückfall, wenn kein Absender gepflegt ist. */
   feuerwehrName: string;
-  /** Absender, Zahlungsdaten und Leistungstext der Gruppe. */
+  /** Textvorlagen, Zahlungsziel und Leistungstext der Gruppe. */
   config: AtemschutzRechnungConfig;
-  /** Absoluter Pfad zum Logo; `undefined` lässt den Kopf ohne Bild. */
-  logoPath?: string;
+  /** Absender und Bankverbindung der Gruppe. */
+  stammdaten: GroupStammdaten;
+  /** Logo der Gruppe; `undefined` lässt den Kopf ohne Bild. */
+  logo?: PdfLogo;
 }
 
 export default function FuellungRechnungPdf({
   rechnung,
   feuerwehrName,
   config,
-  logoPath,
+  stammdaten,
+  logo,
 }: FuellungRechnungPdfProps) {
-  const absender = config.absenderName.trim() || feuerwehrName;
-  const kontoinhaber = config.kontoinhaber.trim() || absender;
+  const absender = absenderNameOf(stammdaten, feuerwehrName);
+  const kontoinhaber = stammdaten.kontoinhaber.trim() || absender;
   const faellig = zahlungszielDatum(rechnung.datum, config.zahlungszielTage);
-  const hatBankdaten = !!config.iban.trim();
+  // Bleibt stehen, obwohl das Erstellen ohne Bankdaten blockiert: Eine
+  // bereits gestellte Rechnung muss auch dann noch druckbar sein, wenn
+  // jemand die Stammdaten später leert.
+  const hatBankdaten = !!stammdaten.iban.trim();
   const qr = epcQrCode({
     kontoinhaber,
-    iban: config.iban,
-    bic: config.bic,
+    iban: stammdaten.iban,
+    bic: stammdaten.bic,
     betrag: rechnung.summe,
     verwendungszweck: rechnung.nummer,
   });
@@ -129,15 +140,15 @@ export default function FuellungRechnungPdf({
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image doesn't support alt */}
-          {logoPath && <Image style={styles.logo} src={logoPath} />}
+          {logo && <Image style={styles.logo} src={logo} />}
           <View>
             <Text style={styles.title}>Rechnung {rechnung.nummer}</Text>
             <Text style={styles.absender}>{absender}</Text>
-            {!!config.absenderAdresse && (
-              <Text style={styles.absender}>{config.absenderAdresse}</Text>
+            {!!stammdaten.absenderAdresse && (
+              <Text style={styles.absender}>{stammdaten.absenderAdresse}</Text>
             )}
-            {!!config.absenderKontakt && (
-              <Text style={styles.absender}>{config.absenderKontakt}</Text>
+            {!!stammdaten.absenderKontakt && (
+              <Text style={styles.absender}>{stammdaten.absenderKontakt}</Text>
             )}
           </View>
         </View>
@@ -215,12 +226,12 @@ export default function FuellungRechnungPdf({
               </View>
               <View style={styles.zahlungZeile}>
                 <Text style={styles.zahlungLabel}>IBAN</Text>
-                <Text>{config.iban}</Text>
+                <Text>{stammdaten.iban}</Text>
               </View>
-              {!!config.bic.trim() && (
+              {!!stammdaten.bic.trim() && (
                 <View style={styles.zahlungZeile}>
                   <Text style={styles.zahlungLabel}>BIC</Text>
-                  <Text>{config.bic}</Text>
+                  <Text>{stammdaten.bic}</Text>
                 </View>
               )}
               <View style={styles.zahlungZeile}>
@@ -258,11 +269,11 @@ export default function FuellungRechnungPdf({
             kaum zu lesen. */}
         <View style={styles.fussblock}>
           <Text style={styles.fusszeile}>{absender}</Text>
-          {!!config.absenderAdresse && (
-            <Text style={styles.fusszeile}>{config.absenderAdresse}</Text>
+          {!!stammdaten.absenderAdresse && (
+            <Text style={styles.fusszeile}>{stammdaten.absenderAdresse}</Text>
           )}
-          {!!config.absenderKontakt && (
-            <Text style={styles.fusszeile}>{config.absenderKontakt}</Text>
+          {!!stammdaten.absenderKontakt && (
+            <Text style={styles.fusszeile}>{stammdaten.absenderKontakt}</Text>
           )}
         </View>
       </Page>

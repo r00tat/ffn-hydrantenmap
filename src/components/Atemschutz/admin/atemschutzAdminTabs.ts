@@ -1,4 +1,4 @@
-export const ATEMSCHUTZ_ADMIN_TABS = ['geraete', 'rechnung'] as const;
+export const ATEMSCHUTZ_ADMIN_TABS = ['geraete', 'rechnung', 'stammdaten'] as const;
 
 export type AtemschutzAdminTabKey = (typeof ATEMSCHUTZ_ADMIN_TABS)[number];
 

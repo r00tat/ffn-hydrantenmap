@@ -107,20 +107,14 @@ export interface AtemschutzRechnungConfig {
   subjectTemplate: string;
   bodyTemplate: string;
   /**
-   * Absender auf der Rechnung. Leer heißt: der `feuerwehrName` aus dem
-   * Gruppendokument. Eigenes Feld, weil auf einer Rechnung der volle Name
-   * stehen soll („Freiwillige Feuerwehr …"), während `feuerwehrName` die
-   * Schreibweise der Stammdaten trägt.
+   * Wofür die Rechnung ausgestellt wird, als Satz über der Tabelle.
+   *
+   * Absender und Bankverbindung stehen **nicht** hier, sondern in den
+   * Gruppen-Stammdaten (`common/groupStammdaten.ts`): Dieselbe IBAN an zwei
+   * Orten liefe auseinander, sobald sich das Konto ändert, und der
+   * Kostenersatz braucht sie ebenso.
    */
-  absenderName: string;
-  absenderAdresse: string;
-  /** Telefon, Web, E-Mail — eine Zeile im Fuß. */
-  absenderKontakt: string;
-  /** Wofür die Rechnung ausgestellt wird, als Satz über der Tabelle. */
   leistungstext: string;
-  kontoinhaber: string;
-  iban: string;
-  bic: string;
   /** Tage ab Rechnungsdatum. 0 heißt: kein Zahlungsziel angeben. */
   zahlungszielTage: number;
   /**
@@ -149,14 +143,8 @@ export const DEFAULT_RECHNUNG_CONFIG: AtemschutzRechnungConfig = {
 anbei die Rechnung {{ rechnung.nummer }} über {{ rechnung.flaschen }} Flaschenfüllungen {{ rechnung.zeitraumSatz }}.
 
 Mit kameradschaftlichen Grüßen`,
-  absenderName: '',
-  absenderAdresse: '',
-  absenderKontakt: '',
   leistungstext:
     'Für das Füllen von Pressluftflaschen Ihrer Feuerwehr verrechnen wir die folgenden Positionen.',
-  kontoinhaber: '',
-  iban: '',
-  bic: '',
   zahlungszielTage: 14,
   ustHinweis: '',
   vorgabeTarif: TARIF_BIS_6L,
@@ -177,28 +165,6 @@ export function zahlungszielDatum(rechnungsdatum: string, tage: number): string 
   // früh aus.
   datum.setUTCDate(datum.getUTCDate() + tage);
   return datum.toISOString();
-}
-
-/**
- * Fehlt etwas, ohne das die Rechnung unbrauchbar ist? Absender und
- * Bankverbindung sind der Unterschied zwischen einem Beleg und einem Zettel.
- */
-export function rechnungConfigLuecken(
-  config: AtemschutzRechnungConfig,
-  feuerwehrName?: string,
-): string[] {
-  // Nachsichtig gegenüber fehlenden Feldern: Ein Dokument aus der Zeit vor
-  // diesen Feldern trägt sie nicht, und ein Absturz beim Prüfen auf
-  // Vollständigkeit wäre das Gegenteil des Zwecks.
-  const gefuellt = (wert?: string) => !!wert?.trim();
-
-  const luecken: string[] = [];
-  if (!gefuellt(config.absenderName) && !gefuellt(feuerwehrName)) {
-    luecken.push('absenderName');
-  }
-  if (!gefuellt(config.absenderAdresse)) luecken.push('absenderAdresse');
-  if (!gefuellt(config.iban)) luecken.push('iban');
-  return luecken;
 }
 
 /** Zu verrechnen und noch keiner Rechnung zugeordnet. */

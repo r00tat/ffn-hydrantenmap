@@ -19,7 +19,11 @@ export interface RechnungSettingsProps {
 }
 
 /**
- * Betreff, Text, CC, Bankverbindung und Vorgabetarif der Füllungsrechnungen.
+ * Betreff, Text, CC, Zahlungsziel und Vorgabetarif der Füllungsrechnungen.
+ *
+ * Absender und Bankverbindung stehen nicht hier, sondern in den
+ * Gruppen-Stammdaten: Sie gelten auch für den Kostenersatz, und dieselbe IBAN
+ * an zwei Orten liefe auseinander.
  *
  * Liegt in der Verwaltung und nicht auf der Verrechnungsseite: Die Werte
  * gelten für alle Rechnungen der Gruppe, sind keine Tagesarbeit und stehen
@@ -32,13 +36,7 @@ export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
   const [ccEmail, setCcEmail] = useState(config.ccEmail);
   const [subjectTemplate, setSubjectTemplate] = useState(config.subjectTemplate);
   const [bodyTemplate, setBodyTemplate] = useState(config.bodyTemplate);
-  const [absenderName, setAbsenderName] = useState(config.absenderName);
-  const [absenderAdresse, setAbsenderAdresse] = useState(config.absenderAdresse);
-  const [absenderKontakt, setAbsenderKontakt] = useState(config.absenderKontakt);
   const [leistungstext, setLeistungstext] = useState(config.leistungstext);
-  const [kontoinhaber, setKontoinhaber] = useState(config.kontoinhaber);
-  const [iban, setIban] = useState(config.iban);
-  const [bic, setBic] = useState(config.bic);
   const [zahlungszielTage, setZahlungszielTage] = useState(String(config.zahlungszielTage));
   const [ustHinweis, setUstHinweis] = useState(config.ustHinweis);
   const [vorgabeTarif, setVorgabeTarif] = useState(config.vorgabeTarif);
@@ -52,13 +50,7 @@ export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
     setCcEmail(config.ccEmail);
     setSubjectTemplate(config.subjectTemplate);
     setBodyTemplate(config.bodyTemplate);
-    setAbsenderName(config.absenderName);
-    setAbsenderAdresse(config.absenderAdresse);
-    setAbsenderKontakt(config.absenderKontakt);
     setLeistungstext(config.leistungstext);
-    setKontoinhaber(config.kontoinhaber);
-    setIban(config.iban);
-    setBic(config.bic);
     setZahlungszielTage(String(config.zahlungszielTage));
     setUstHinweis(config.ustHinweis);
     setVorgabeTarif(config.vorgabeTarif);
@@ -74,13 +66,7 @@ export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
         ccEmail,
         subjectTemplate,
         bodyTemplate,
-        absenderName,
-        absenderAdresse,
-        absenderKontakt,
         leistungstext,
-        kontoinhaber,
-        iban,
-        bic,
         zahlungszielTage: Number(zahlungszielTage) || 0,
         ustHinweis,
         vorgabeTarif,
@@ -100,53 +86,11 @@ export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
       <Stack spacing={2} sx={{ maxWidth: 700 }}>
         {fehler && <Alert severity="error">{fehlerText(t, fehler)}</Alert>}
         {gespeichert && <Alert severity="success">{t('rechnung.settingsSaved')}</Alert>}
-        <Typography variant="subtitle2">{t('rechnung.gruppeAbsender')}</Typography>
-        <TextField
-          label={t('rechnung.absenderName')}
-          value={absenderName}
-          onChange={(e) => setAbsenderName(e.target.value)}
-          fullWidth
-          helperText={t('rechnung.absenderNameHelp')}
-        />
-        <TextField
-          label={t('rechnung.absenderAdresse')}
-          value={absenderAdresse}
-          onChange={(e) => setAbsenderAdresse(e.target.value)}
-          fullWidth
-          multiline
-          minRows={2}
-        />
-        <TextField
-          label={t('rechnung.absenderKontakt')}
-          value={absenderKontakt}
-          onChange={(e) => setAbsenderKontakt(e.target.value)}
-          fullWidth
-          helperText={t('rechnung.absenderKontaktHelp')}
-        />
+        <Alert severity="info">{t('rechnung.absenderInStammdaten')}</Alert>
 
         <Typography variant="subtitle2" sx={{ mt: 2 }}>
           {t('rechnung.gruppeZahlung')}
         </Typography>
-        <TextField
-          label={t('rechnung.kontoinhaber')}
-          value={kontoinhaber}
-          onChange={(e) => setKontoinhaber(e.target.value)}
-          fullWidth
-          helperText={t('rechnung.kontoinhaberHelp')}
-        />
-        <TextField
-          label={t('rechnung.iban')}
-          value={iban}
-          onChange={(e) => setIban(e.target.value)}
-          fullWidth
-          helperText={t('rechnung.ibanHelp')}
-        />
-        <TextField
-          label={t('rechnung.bic')}
-          value={bic}
-          onChange={(e) => setBic(e.target.value)}
-          sx={{ maxWidth: 260 }}
-        />
         <TextField
           label={t('rechnung.zahlungszielTage')}
           value={zahlungszielTage}

@@ -244,22 +244,33 @@ denselben Satz (`fahrtenbuchMember() && kostenersatzUser()`). Regel und Action
 können damit nicht auseinanderlaufen, und der Client darf den Tarifkatalog
 selbst lesen — sonst bräuchte die Vorschau eine eigene Server Action.
 
-Die Konfiguration (Betreff, Text, CC, Bankverbindung, Vorgabetarif) hängt
+Die Konfiguration (Betreff, Text, CC, Zahlungsziel, Vorgabetarif) hängt
 dagegen an `actionGroupAdminRequired`: Sie gilt für alle Rechnungen der Gruppe
 und ist keine Tagesarbeit.
 
 ### Wo die Rechnungsstammdaten stehen
 
-Absender, Anschrift, Kontakt, Kontoinhaber, IBAN, BIC, Zahlungsziel,
-Umsatzsteuerhinweis und der Leistungstext liegen in
+Zahlungsziel, Umsatzsteuerhinweis und der Leistungstext liegen in
 `atemschutzConfig/rechnung` und werden unter `/admin/atemschutz` gepflegt
-(Gruppen-Admin). Fest verdrahtet wie im Kostenersatz-PDF, das Absender und
-IBAN der FF Neusiedl am See im Code trägt, geht hier nicht: Die Füllrechnung
-stellt jede Gruppe unter ihrem eigenen Namen.
+(Gruppen-Admin).
 
-Fehlen Absender, Anschrift oder IBAN, steht auf der Verrechnungsseite ein
-Hinweis mit Sprung in die Einstellungen — ohne diese Angaben weiß der
-Empfänger weder, von wem die Rechnung kommt, noch wohin er überweisen soll.
+**Absender, Anschrift, Kontakt, Kontoinhaber, IBAN, BIC und das Logo stehen
+nicht mehr hier**, sondern in den Gruppen-Stammdaten
+(`groups/{groupId}/groupConfig/stammdaten`, Reiter „Stammdaten"). Sie gelten
+auch für den Kostenersatz: Dieselbe IBAN an zwei Orten liefe auseinander,
+sobald sich das Konto ändert. Begründung und Aufbau:
+[docs/gruppen-stammdaten.md](gruppen-stammdaten.md).
+
+Fehlen Absender, Anschrift oder IBAN, ist das Erstellen einer Rechnung
+**gesperrt** — nicht nur mit einem Hinweis versehen. Die Verrechnungsseite
+zeigt den Grund mit Sprung in die Stammdaten, und `createFuellungRechnung`
+weist den Aufruf auch dann ab, wenn er anders hereinkommt. Ohne diese Angaben
+weiß der Empfänger weder, von wem die Rechnung kommt, noch wohin er
+überweisen soll; ein Blatt ohne beides sieht aus wie ein Beleg und ist keiner.
+
+Das PDF prüft die Bankdaten trotzdem noch einmal selbst (`hatBankdaten`) und
+lässt den Zahlungsblock weg, wenn sie fehlen: Eine bereits gestellte Rechnung
+muss auch dann noch druckbar sein, wenn jemand die Stammdaten später leert.
 
 Zum Umsatzsteuerhinweis gibt es **bewusst keinen Vorgabetext**: Ob und wie eine
 Feuerwehr hier unternehmerisch tätig wird, ist ihre eigene steuerliche

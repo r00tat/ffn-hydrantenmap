@@ -27,6 +27,8 @@ import {
   SendEmailRequest,
 } from '../../common/kostenersatzEmail';
 import { sendKostenersatzEmailAction } from './kostenersatzEmailAction';
+import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
+import useGroupStammdaten from '../../hooks/useGroupStammdaten';
 import { useKostenersatzEmailConfig } from '../../hooks/useKostenersatzEmailConfig';
 import { Firecall } from '../firebase/firestore';
 
@@ -49,7 +51,12 @@ export default function KostenersatzEmailDialog({
 }: KostenersatzEmailDialogProps) {
   const t = useTranslations('kostenersatz.emailDialog');
   const tCommon = useTranslations('common');
-  const { config, loading: configLoading } = useKostenersatzEmailConfig();
+  // Die Gruppe des Einsatzes bestimmt Vorlage und Bankverbindung — dieselbe
+  // Auflösung wie serverseitig in `requireStammdatenForFirecall`.
+  const groupId = firecall.group;
+  const { config, loading: configLoading } = useKostenersatzEmailConfig(groupId);
+  const stammdaten = useGroupStammdaten(groupId);
+  const feuerwehrName = useGroupFeuerwehrName(groupId);
 
   // Form state
   const [to, setTo] = useState('');
@@ -66,7 +73,12 @@ export default function KostenersatzEmailDialog({
   useEffect(() => {
     if (open && config && !configLoading) {
       // Build template context
-      const context = buildTemplateContext(calculation, firecall);
+      const context = buildTemplateContext(
+        calculation,
+        firecall,
+        stammdaten,
+        feuerwehrName,
+      );
 
       // Render templates
       const { subject: renderedSubject, body: renderedBody } = renderEmailTemplates(config, context);
@@ -79,7 +91,7 @@ export default function KostenersatzEmailDialog({
       setBody(renderedBody);
       setError(null);
     }
-  }, [open, config, configLoading, calculation, firecall]);
+  }, [open, config, configLoading, calculation, firecall, stammdaten, feuerwehrName]);
 
   // Add CC address
   const handleAddCc = useCallback(() => {

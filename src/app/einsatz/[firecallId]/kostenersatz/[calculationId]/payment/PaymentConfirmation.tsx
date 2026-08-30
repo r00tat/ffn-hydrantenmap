@@ -109,9 +109,15 @@ export default function PaymentConfirmation({
           Rechnung herunterladen (PDF)
         </Button>
 
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 3, display: 'block' }}>
-          Freiwillige Feuerwehr Neusiedl am See
-        </Typography>
+        {!!result.absenderName && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 3, display: 'block' }}
+          >
+            {result.absenderName}
+          </Typography>
+        )}
       </Paper>
     </Container>
   );

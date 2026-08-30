@@ -1,10 +1,13 @@
 import 'server-only';
 
-import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { gmail } from '@googleapis/gmail';
 import { firestore } from '../../server/firebase/admin';
-import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  GROUP_COLLECTION_ID,
+  Firecall,
+} from '../firebase/firestore';
 import {
   KostenersatzCalculation,
   KostenersatzRate,
@@ -21,9 +24,13 @@ import {
   renderEmailTemplates,
 } from '../../common/kostenersatzEmail';
 import { createWorkspaceAuth } from '../../server/auth/workspace';
+import {
+  requireStammdatenForFirecall,
+  type StammdatenKontext,
+} from '../../server/groups/requireStammdaten';
+import { loadStammdatenLogo } from '../../server/groups/stammdatenStore';
 import KostenersatzPdf from './KostenersatzPdf';
 
-const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
 
 // ============================================================================
@@ -60,17 +67,23 @@ export async function loadRatesForVersion(
 // ============================================================================
 
 /**
- * Load Kostenersatz email configuration from Firestore.
- * Falls back to DEFAULT_EMAIL_CONFIG if not found.
+ * Mailvorlage der Gruppe, mit den Vorgaben als Rückfall.
+ *
+ * Je Gruppe, seit der Vorlagentext über `{{ absender.* }}` die Bankverbindung
+ * nennt: Eine app-weite Vorlage trüge die IBAN einer fremden Feuerwehr.
  */
-export async function loadEmailConfig(): Promise<KostenersatzEmailConfig> {
+export async function loadEmailConfig(
+  groupId: string
+): Promise<KostenersatzEmailConfig> {
   const configDoc = await firestore
+    .collection(GROUP_COLLECTION_ID)
+    .doc(groupId)
     .collection(KOSTENERSATZ_CONFIG_COLLECTION)
     .doc(KOSTENERSATZ_EMAIL_CONFIG_DOC)
     .get();
 
   if (configDoc.exists) {
-    return configDoc.data() as KostenersatzEmailConfig;
+    return { ...DEFAULT_EMAIL_CONFIG, ...configDoc.data() };
   }
 
   return DEFAULT_EMAIL_CONFIG;
@@ -82,18 +95,25 @@ export async function loadEmailConfig(): Promise<KostenersatzEmailConfig> {
 
 /**
  * Generate a PDF buffer for a Kostenersatz calculation.
+ *
+ * Wirft `StammdatenUnvollstaendigError`, wenn Absender oder Bankverbindung der
+ * Gruppe fehlen: Ein Blatt ohne beides sieht aus wie ein Beleg und ist keiner.
  */
 export async function generatePdfBuffer(
   calculation: KostenersatzCalculation,
   rates: KostenersatzRate[],
   firecall: Firecall
 ): Promise<Buffer> {
+  const { stammdaten, feuerwehrName } = await requireStammdatenForFirecall(firecall);
+  const logo = await loadStammdatenLogo(stammdaten);
   const pdfBuffer = await renderToBuffer(
     KostenersatzPdf({
       calculation,
       rates,
       firecall,
-      logoPath,
+      stammdaten,
+      feuerwehrName,
+      logo,
     })
   );
   return pdfBuffer;
@@ -216,8 +236,22 @@ export async function completePaymentAndNotify(
     ...firecallDoc.data(),
   } as Firecall;
 
+  // Ohne Absender und Bankverbindung entsteht kein Beleg. Der Zahlungseingang
+  // ist davon unberührt — die Berechnung bleibt Entwurf und lässt sich
+  // nachschicken, sobald die Stammdaten gepflegt sind.
+  let kontext: StammdatenKontext;
+  try {
+    kontext = await requireStammdatenForFirecall(firecall);
+  } catch (error) {
+    console.warn(
+      `[completePaymentAndNotify] Stammdaten der Gruppe fehlen für ${calculationId}; Berechnung bleibt Entwurf:`,
+      error
+    );
+    return false; // No invoice possible -> do not close.
+  }
+
   const [emailConfig, rates] = await Promise.all([
-    loadEmailConfig(),
+    loadEmailConfig(kontext.groupId),
     loadRatesForVersion(calculation.rateVersion),
   ]);
 
@@ -253,7 +287,12 @@ export async function completePaymentAndNotify(
 
   try {
     // 6. Render email subject and body using templates
-    const templateContext = buildTemplateContext(calculation, firecall);
+    const templateContext = buildTemplateContext(
+      calculation,
+      firecall,
+      kontext.stammdaten,
+      kontext.feuerwehrName
+    );
     const { subject, body } = renderEmailTemplates(emailConfig, templateContext);
 
     // 7. Generate PDF

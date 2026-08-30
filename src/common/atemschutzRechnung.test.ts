@@ -11,7 +11,6 @@ import {
   offeneFuellungen,
   rechnungPositionen,
   rechnungStatusErlaubt,
-  rechnungConfigLuecken,
   rechnungStatusFarbe,
   rechnungSumme,
   zahlungszielDatum,
@@ -289,38 +288,6 @@ describe('zahlungszielDatum', () => {
   it('erfindet kein Datum aus einer unlesbaren Eingabe', () => {
     expect(zahlungszielDatum('kein Datum', 14)).toBeUndefined();
     expect(zahlungszielDatum('', 14)).toBeUndefined();
-  });
-});
-
-describe('rechnungConfigLuecken', () => {
-  const vollstaendig = {
-    ...DEFAULT_RECHNUNG_CONFIG,
-    absenderName: 'FF Neusiedl am See',
-    absenderAdresse: 'Satzgasse 9',
-    iban: 'AT40 3300 0000 0202 0402',
-  };
-
-  it('meldet nichts, wenn Absender und Konto stehen', () => {
-    expect(rechnungConfigLuecken(vollstaendig)).toEqual([]);
-  });
-
-  it('nimmt den Gruppennamen als Absender an', () => {
-    expect(rechnungConfigLuecken({ ...vollstaendig, absenderName: '' }, 'Neusiedl am See')).toEqual(
-      [],
-    );
-  });
-
-  it('benennt die fehlenden Felder', () => {
-    expect(rechnungConfigLuecken(DEFAULT_RECHNUNG_CONFIG)).toEqual([
-      'absenderName',
-      'absenderAdresse',
-      'iban',
-    ]);
-  });
-
-  it('stürzt an einem Dokument ohne die neuen Felder nicht ab', () => {
-    const alt = { vorgabeTarif: TARIF_BIS_6L } as never;
-    expect(rechnungConfigLuecken(alt)).toEqual(['absenderName', 'absenderAdresse', 'iban']);
   });
 });
 
