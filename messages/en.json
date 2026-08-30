@@ -36,7 +36,8 @@
       "rechnungStatusInvalid": "Not possible in this status.",
       "rechnungFuellungGone": "One of the fillings no longer exists.",
       "rechnungFuellungTaken": "One of the fillings has already been invoiced.",
-      "rechnungEmpfaengerIncomplete": "Fire brigade, name and email are required."
+      "rechnungEmpfaengerIncomplete": "Fire brigade, name and email are required.",
+      "rechnungNurEntwurf": "Only a draft can be changed."
     },
     "admin": {
       "title": "Breathing apparatus equipment",
@@ -327,7 +328,7 @@
       "vorgabeTarifHelp": "Applies to every new item. In practice a 6.8 l cylinder is billed at the 6 l rate as well.",
       "subjectTemplate": "Subject template",
       "bodyTemplate": "Message template",
-      "platzhalter": "Placeholders, each to be wrapped in double curly braces: rechnung.nummer, rechnung.summe, rechnung.flaschen, rechnung.zeitraum, rechnung.datum, empfaenger.name, feuerwehr.name",
+      "platzhalter": "Placeholders, each to be wrapped in double curly braces: rechnung.nummer, rechnung.summe, rechnung.flaschen, rechnung.zeitraum, rechnung.zeitraumSatz, rechnung.datum, empfaenger.name, feuerwehr.name. Here zeitraum yields just the date or range, zeitraumSatz a ready-made phrase (\"am 30.08.2026\" or \"von … bis …\").",
       "status": {
         "draft": "Draft",
         "sent": "Sent",
@@ -355,7 +356,14 @@
       "leistungstext": "Service description",
       "leistungstextHelp": "Appears above the line items and states what the invoice is for.",
       "configUnvollstaendig": "The invoice master data is incomplete: {felder}. Without it the recipient has no sender and no payment details.",
-      "zuDenEinstellungen": "Settings"
+      "zuDenEinstellungen": "Settings",
+      "bearbeiten": "Edit",
+      "bearbeitenTitle": "Edit draft",
+      "speichern": "Save",
+      "zurueckZurListe": "Back to invoicing",
+      "zumFuellprotokoll": "To the filling log",
+      "oeffnen": "Open",
+      "tarifNeuBerechnet": "The total is recalculated with the current rates on save."
     },
     "empfaenger": {
       "createTitle": "Add recipient",

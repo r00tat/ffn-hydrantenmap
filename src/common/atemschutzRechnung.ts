@@ -146,7 +146,7 @@ export const DEFAULT_RECHNUNG_CONFIG: AtemschutzRechnungConfig = {
   subjectTemplate: 'Rechnung {{ rechnung.nummer }} — Füllen von Pressluftflaschen',
   bodyTemplate: `Sehr geehrte Kameraden,
 
-anbei die Rechnung {{ rechnung.nummer }} über {{ rechnung.flaschen }} Flaschenfüllungen im Zeitraum {{ rechnung.zeitraum }}.
+anbei die Rechnung {{ rechnung.nummer }} über {{ rechnung.flaschen }} Flaschenfüllungen {{ rechnung.zeitraumSatz }}.
 
 Mit kameradschaftlichen Grüßen`,
   absenderName: '',
@@ -308,6 +308,57 @@ export function zeitraumDerPositionen(positionen: AtemschutzRechnungPosition[]):
 } {
   const zeiten = positionen.map((p) => p.zeitpunkt).sort();
   return { von: zeiten[0] ?? '', bis: zeiten[zeiten.length - 1] ?? '' };
+}
+
+/**
+ * Zeitraum als Text: bei gleichem Tag nur das Datum, sonst die Spanne.
+ *
+ * Eine Rechnung über eine einzelne Füllung trug bisher „12.03.2026 –
+ * 12.03.2026". Das Formatieren kommt von außen, damit PDF und Mailvorlage
+ * dieselbe Regel, aber ihre eigene Darstellung benutzen.
+ */
+export function zeitraumText(
+  von: string,
+  bis: string,
+  formatiere: (iso: string) => string,
+): string {
+  const vonText = von ? formatiere(von) : '';
+  const bisText = bis ? formatiere(bis) : '';
+  if (!vonText) return bisText;
+  if (!bisText || vonText === bisText) return vonText;
+  return `${vonText} – ${bisText}`;
+}
+
+/**
+ * Ist die Leistung an einem einzigen Tag erbracht worden?
+ *
+ * Entscheidet über die Beschriftung: Bei einem Tag heißt es auf einer
+ * Rechnung *Leistungsdatum*, bei mehreren *Leistungszeitraum*.
+ */
+export function istEinTag(von: string, bis: string, formatiere: (iso: string) => string): boolean {
+  if (!von || !bis) return true;
+  return formatiere(von) === formatiere(bis);
+}
+
+/**
+ * Der Zeitraum als Satzteil: „am 30.08.2026" oder „von … bis …".
+ *
+ * Eigener Platzhalter neben `zeitraum`: Eine Vorlage schreibt „im Zeitraum
+ * {{ rechnung.zeitraum }}", und das liest sich bei einem einzigen Tag falsch.
+ * Der bloße `zeitraum` bleibt unverändert, damit gespeicherte Vorlagen
+ * weiterhin das tun, was dort steht.
+ */
+export function zeitraumSatz(
+  von: string,
+  bis: string,
+  formatiere: (iso: string) => string,
+): string {
+  const vonText = von ? formatiere(von) : '';
+  const bisText = bis ? formatiere(bis) : '';
+  if (!vonText && !bisText) return '';
+  if (!vonText) return `am ${bisText}`;
+  if (!bisText || vonText === bisText) return `am ${vonText}`;
+  return `von ${vonText} bis ${bisText}`;
 }
 
 export function empfaengerFuerFeuerwehr(

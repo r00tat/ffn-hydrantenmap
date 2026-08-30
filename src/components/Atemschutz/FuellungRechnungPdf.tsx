@@ -1,10 +1,13 @@
-import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
+import { Document, Image, Page, Path, StyleSheet, Svg, Text, View } from '@react-pdf/renderer';
 import moment from 'moment';
 import {
   zahlungszielDatum,
+  istEinTag,
+  zeitraumText,
   type AtemschutzRechnung,
   type AtemschutzRechnungConfig,
 } from '../../common/atemschutzRechnung';
+import { epcQrCode } from '../../common/epcQr';
 import { formatCurrency } from '../../common/kostenersatz';
 
 function formatDate(iso?: string): string {
@@ -74,20 +77,23 @@ const styles = StyleSheet.create({
     marginTop: 20,
     padding: 10,
     backgroundColor: '#f4f4f4',
+    flexDirection: 'row',
   },
+  zahlungDaten: { flexGrow: 1 },
+  qr: { alignItems: 'center', width: 96 },
+  qrText: { fontSize: 7, color: '#666', marginBottom: 3 },
   zahlungTitel: { fontFamily: 'Helvetica-Bold', marginBottom: 4 },
   zahlungZeile: { flexDirection: 'row', marginBottom: 2 },
   zahlungLabel: { width: 110, color: '#444' },
   fuss: { marginTop: 20, fontSize: 9, color: '#444' },
   rechtsgrundlage: { marginTop: 10, fontSize: 8, color: '#666' },
-  fusszeile: {
+  fussblock: {
     marginTop: 16,
     paddingTop: 6,
     borderTop: 0.5,
     borderTopColor: '#ccc',
-    fontSize: 8,
-    color: '#666',
   },
+  fusszeile: { fontSize: 8, color: '#666' },
 });
 
 export interface FuellungRechnungPdfProps {
@@ -110,6 +116,13 @@ export default function FuellungRechnungPdf({
   const kontoinhaber = config.kontoinhaber.trim() || absender;
   const faellig = zahlungszielDatum(rechnung.datum, config.zahlungszielTage);
   const hatBankdaten = !!config.iban.trim();
+  const qr = epcQrCode({
+    kontoinhaber,
+    iban: config.iban,
+    bic: config.bic,
+    betrag: rechnung.summe,
+    verwendungszweck: rechnung.nummer,
+  });
 
   return (
     <Document>
@@ -135,12 +148,20 @@ export default function FuellungRechnungPdf({
             <Text>{rechnung.empfaenger.ansprechpartner}</Text>
           )}
           <Text>{rechnung.empfaenger.adresse}</Text>
+          {/* E-Mail und Telefon stehen mit auf der Rechnung: Bei einer
+              späteren Kontrolle steht damit alles auf dem Beleg, ohne dass
+              jemand das Adressbuch danebenlegen muss. */}
+          {!!rechnung.empfaenger.email && <Text>{rechnung.empfaenger.email}</Text>}
+          {!!rechnung.empfaenger.telefon && <Text>{rechnung.empfaenger.telefon}</Text>}
         </View>
 
         <View style={[styles.block, styles.meta]}>
           <Text>Rechnungsdatum: {formatDate(rechnung.datum)}</Text>
           <Text>
-            Zeitraum: {formatDate(rechnung.zeitraumVon)} – {formatDate(rechnung.zeitraumBis)}
+            {istEinTag(rechnung.zeitraumVon, rechnung.zeitraumBis, formatDate)
+              ? 'Leistungsdatum'
+              : 'Leistungszeitraum'}
+            : {zeitraumText(rechnung.zeitraumVon, rechnung.zeitraumBis, formatDate)}
           </Text>
         </View>
 
@@ -186,25 +207,38 @@ export default function FuellungRechnungPdf({
 
         {hatBankdaten && (
           <View style={styles.zahlung}>
-            <Text style={styles.zahlungTitel}>{faelligText(faellig)}</Text>
-            <View style={styles.zahlungZeile}>
-              <Text style={styles.zahlungLabel}>Empfänger</Text>
-              <Text>{kontoinhaber}</Text>
-            </View>
-            <View style={styles.zahlungZeile}>
-              <Text style={styles.zahlungLabel}>IBAN</Text>
-              <Text>{config.iban}</Text>
-            </View>
-            {!!config.bic.trim() && (
+            <View style={styles.zahlungDaten}>
+              <Text style={styles.zahlungTitel}>{faelligText(faellig)}</Text>
               <View style={styles.zahlungZeile}>
-                <Text style={styles.zahlungLabel}>BIC</Text>
-                <Text>{config.bic}</Text>
+                <Text style={styles.zahlungLabel}>Empfänger</Text>
+                <Text>{kontoinhaber}</Text>
+              </View>
+              <View style={styles.zahlungZeile}>
+                <Text style={styles.zahlungLabel}>IBAN</Text>
+                <Text>{config.iban}</Text>
+              </View>
+              {!!config.bic.trim() && (
+                <View style={styles.zahlungZeile}>
+                  <Text style={styles.zahlungLabel}>BIC</Text>
+                  <Text>{config.bic}</Text>
+                </View>
+              )}
+              <View style={styles.zahlungZeile}>
+                <Text style={styles.zahlungLabel}>Verwendungszweck</Text>
+                <Text>{rechnung.nummer}</Text>
+              </View>
+            </View>
+            {/* Der Code steht nur da, wenn der Datensatz trägt — ein
+                QR-Code, der zu einer unvollständigen Überweisung führt, sähe
+                aus, als könnte man ihm vertrauen. */}
+            {qr && (
+              <View style={styles.qr}>
+                <Text style={styles.qrText}>Bezahlen mit Code</Text>
+                <Svg viewBox={`0 0 ${qr.size} ${qr.size}`} style={{ width: 80, height: 80 }}>
+                  <Path d={qr.path} fill="#000000" />
+                </Svg>
               </View>
             )}
-            <View style={styles.zahlungZeile}>
-              <Text style={styles.zahlungLabel}>Verwendungszweck</Text>
-              <Text>{rechnung.nummer}</Text>
-            </View>
           </View>
         )}
 
@@ -219,13 +253,18 @@ export default function FuellungRechnungPdf({
           Burgenland ({rechnung.rateVersion}).
         </Text>
 
-        {!!config.absenderKontakt && (
-          <Text style={styles.fusszeile}>
-            {absender}
-            {config.absenderAdresse ? ` · ${config.absenderAdresse}` : ''}
-            {` · ${config.absenderKontakt}`}
-          </Text>
-        )}
+        {/* Ein Feld pro Zeile statt einer mit Trennpunkten verketteten:
+            Anschrift und Kontakt sind eigene Angaben und in einer Zeile
+            kaum zu lesen. */}
+        <View style={styles.fussblock}>
+          <Text style={styles.fusszeile}>{absender}</Text>
+          {!!config.absenderAdresse && (
+            <Text style={styles.fusszeile}>{config.absenderAdresse}</Text>
+          )}
+          {!!config.absenderKontakt && (
+            <Text style={styles.fusszeile}>{config.absenderKontakt}</Text>
+          )}
+        </View>
       </Page>
     </Document>
   );

@@ -15,6 +15,8 @@ import {
   rechnungStatusErlaubt,
   rechnungSumme,
   zeitraumDerPositionen,
+  zeitraumSatz,
+  zeitraumText,
   type AtemschutzEmpfaenger,
   type AtemschutzRechnung,
   type AtemschutzRechnungConfig,
@@ -202,12 +204,107 @@ export async function createFuellungRechnung(
   }
 }
 
+export interface UpdateRechnungRequest {
+  groupId: string;
+  rechnungId: string;
+  empfaengerId: string;
+  datum?: string;
+  bemerkung?: string;
+  /** `fuellungId` → Tarif. Fehlt ein Eintrag, bleibt der bisherige Tarif. */
+  tarife?: Record<string, string>;
+}
+
+/**
+ * Ändert Empfänger, Datum, Bemerkung und Tarife eines Entwurfs.
+ *
+ * Nur im Entwurf: Eine verschickte Rechnung liegt beim Empfänger, und was
+ * dort liegt, darf sich hier nicht mehr ändern — dafür gibt es das Storno.
+ *
+ * Die Preise werden dabei neu aufgelöst und nicht aus den Positionen
+ * übernommen. Ein Entwurf ist nicht gestellt; ändert sich der Katalog davor,
+ * gilt der neue Preis. Eingefroren wird erst beim Verschicken — ab dann
+ * greift `rechnungStatusErlaubt` und diese Action nicht mehr.
+ *
+ * Positionen kommen weder hinzu noch weg: Das gäbe Füllungen frei bzw. bände
+ * neue, und beides ist der Weg über Storno und Neuanlage — ein Klick, dafür
+ * ohne halb gebundene Zeilen bei einem Abbruch.
+ */
+export async function updateFuellungRechnung(
+  request: UpdateRechnungRequest,
+): Promise<RechnungActionResult> {
+  try {
+    const { groupId, rechnungId, empfaengerId, datum, bemerkung, tarife } = request;
+    const session = await actionFuellungRechnungRequired(groupId);
+
+    const rechnung = await loadRechnung(groupId, rechnungId);
+    if (rechnung.status !== 'draft') {
+      return { success: false, error: 'rechnungNurEntwurf' };
+    }
+
+    if (!trimmed(empfaengerId)) {
+      return { success: false, error: 'rechnungNoRecipient' };
+    }
+    const empfaengerDoc = await empfaengerRef(groupId).doc(empfaengerId).get();
+    if (!empfaengerDoc.exists) {
+      return { success: false, error: 'rechnungNoRecipient' };
+    }
+    const empfaenger = {
+      id: empfaengerDoc.id,
+      ...empfaengerDoc.data(),
+    } as AtemschutzEmpfaenger;
+
+    const { preise, rateVersion } = await loadFuellungTarife();
+
+    const positionen = rechnung.positionen.map((position) => {
+      const gewaehlt = tarife?.[position.fuellungId];
+      const rateId = FUELLUNG_TARIF_IDS.includes(gewaehlt ?? '')
+        ? (gewaehlt as string)
+        : position.rateId;
+      const einzelpreis = preise[rateId];
+      if (typeof einzelpreis !== 'number') {
+        throw new Error(`Kein Preis für Tarif ${rateId}`);
+      }
+      return {
+        ...position,
+        rateId,
+        einzelpreis,
+        summe: Math.round(position.anzahl * einzelpreis * 100) / 100,
+      };
+    });
+
+    const now = new Date().toISOString();
+    const userId = session.user.email ?? session.user.name ?? 'unbekannt';
+
+    await rechnungRef(groupId)
+      .doc(rechnungId)
+      .update({
+        empfaenger: empfaengerKopie(empfaenger),
+        empfaengerId: empfaenger.id,
+        positionen,
+        rateVersion,
+        summe: rechnungSumme(positionen),
+        datum: trimmed(datum) ?? rechnung.datum,
+        // `FieldValue.delete()` und nicht `''`: Eine geleerte Bemerkung soll
+        // im PDF gar nicht erscheinen, nicht als leere Zeile.
+        bemerkung: trimmed(bemerkung) ?? FieldValue.delete(),
+        updatedAt: now,
+        updatedBy: userId,
+      });
+
+    return { success: true, id: rechnungId };
+  } catch (err) {
+    console.error('updateFuellungRechnung failed', err);
+    return { success: false, error: actionErrorKey(err) };
+  }
+}
+
 interface RechnungKontext {
   rechnung: {
     nummer: string;
     summe: string;
     flaschen: number;
     zeitraum: string;
+    zeitraumSatz: string;
     datum: string;
   };
   empfaenger: EmpfaengerKopie;
@@ -224,7 +321,8 @@ function baueKontext(rechnung: AtemschutzRechnung, feuerwehrName: string): Rechn
         currency: 'EUR',
       }).format(rechnung.summe),
       flaschen: rechnung.positionen.reduce((s, p) => s + p.anzahl, 0),
-      zeitraum: `${tag(rechnung.zeitraumVon)} – ${tag(rechnung.zeitraumBis)}`,
+      zeitraum: zeitraumText(rechnung.zeitraumVon, rechnung.zeitraumBis, tag),
+      zeitraumSatz: zeitraumSatz(rechnung.zeitraumVon, rechnung.zeitraumBis, tag),
       datum: tag(rechnung.datum),
     },
     empfaenger: rechnung.empfaenger,

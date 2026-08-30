@@ -290,6 +290,26 @@ Bewusst **kein** unscharfer Vergleich, der ein vorangestelltes „FF" oder
 verschiedene Wehren zusammenwerfen. Die Auswahl macht das Problem stattdessen
 unmöglich.
 
+### Was sich am Entwurf noch ändern lässt
+
+`updateFuellungRechnung` greift nur bei `status === 'draft'`. Änderbar sind
+Empfänger, Rechnungsdatum, Bemerkung und der Tarif je Position; die Preise
+werden dabei **neu aufgelöst** statt aus den Positionen übernommen. Ein
+Entwurf ist nicht gestellt — ändert sich der Katalog davor, gilt der neue
+Preis. Eingefroren wird beim Verschicken, ab dann lässt
+`rechnungStatusErlaubt` diese Action nicht mehr zu.
+
+Positionen kommen weder hinzu noch weg. Das gäbe Füllungen frei bzw. bände
+neue, und beides ist der Weg über Storno und Neuanlage — ein Klick, dafür ohne
+halb gebundene Zeilen, wenn jemand mittendrin abbricht.
+
+### Warum der EPC-QR-Code fehlen darf
+
+`buildEpcPayload` gibt `undefined` zurück, sobald Empfänger, IBAN oder ein
+Betrag zwischen 0,01 und 999.999.999,99 fehlen, und das PDF lässt den Code
+dann weg. Lieber keiner als ein falscher: Ein QR-Code, der zu einer
+unvollständigen Überweisung führt, sieht aus, als könnte man ihm vertrauen.
+
 ### Was das Storno mit `verrechnen` macht: nichts
 
 Storniert wird aus jedem Status außer dem Storno selbst; heraus führt kein Weg.

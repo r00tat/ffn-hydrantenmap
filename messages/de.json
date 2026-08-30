@@ -36,7 +36,8 @@
       "rechnungStatusInvalid": "In diesem Status nicht möglich.",
       "rechnungFuellungGone": "Eine der Füllungen gibt es nicht mehr.",
       "rechnungFuellungTaken": "Eine der Füllungen ist bereits abgerechnet.",
-      "rechnungEmpfaengerIncomplete": "Feuerwehr, Name und E-Mail sind Pflicht."
+      "rechnungEmpfaengerIncomplete": "Feuerwehr, Name und E-Mail sind Pflicht.",
+      "rechnungNurEntwurf": "Nur ein Entwurf lässt sich ändern."
     },
     "admin": {
       "title": "Atemschutz-Ausrüstung",
@@ -327,7 +328,7 @@
       "vorgabeTarifHelp": "Gilt für jede neue Position. In der Praxis wird auch eine 6,8-l-Flasche nach dem 6-l-Tarif verrechnet.",
       "subjectTemplate": "Betreffvorlage",
       "bodyTemplate": "Textvorlage",
-      "platzhalter": "Platzhalter, jeweils in doppelte geschweifte Klammern zu setzen: rechnung.nummer, rechnung.summe, rechnung.flaschen, rechnung.zeitraum, rechnung.datum, empfaenger.name, feuerwehr.name",
+      "platzhalter": "Platzhalter, jeweils in doppelte geschweifte Klammern zu setzen: rechnung.nummer, rechnung.summe, rechnung.flaschen, rechnung.zeitraum, rechnung.zeitraumSatz, rechnung.datum, empfaenger.name, feuerwehr.name. Dabei liefert zeitraum nur das Datum bzw. die Spanne, zeitraumSatz einen fertigen Satzteil („am 30.08.2026\" oder „von … bis …\").",
       "status": {
         "draft": "Entwurf",
         "sent": "Verschickt",
@@ -355,7 +356,14 @@
       "leistungstext": "Leistungstext",
       "leistungstextHelp": "Steht über der Positionstabelle und sagt, wofür die Rechnung ausgestellt wird.",
       "configUnvollstaendig": "Die Rechnungsstammdaten sind unvollständig: {felder}. Ohne sie fehlen dem Empfänger Absender und Überweisungsdaten.",
-      "zuDenEinstellungen": "Einstellungen"
+      "zuDenEinstellungen": "Einstellungen",
+      "bearbeiten": "Bearbeiten",
+      "bearbeitenTitle": "Entwurf bearbeiten",
+      "speichern": "Speichern",
+      "zurueckZurListe": "Zurück zur Verrechnung",
+      "zumFuellprotokoll": "Zum Füllprotokoll",
+      "oeffnen": "Öffnen",
+      "tarifNeuBerechnet": "Die Summe wird beim Speichern mit den aktuellen Tarifen neu berechnet."
     },
     "empfaenger": {
       "createTitle": "Empfänger anlegen",

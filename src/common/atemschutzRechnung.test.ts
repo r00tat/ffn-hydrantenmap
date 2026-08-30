@@ -16,6 +16,7 @@ import {
   rechnungSumme,
   zahlungszielDatum,
   zeitraumDerPositionen,
+  zeitraumText,
   type AtemschutzEmpfaenger,
 } from './atemschutzRechnung';
 
@@ -320,5 +321,27 @@ describe('rechnungConfigLuecken', () => {
   it('stürzt an einem Dokument ohne die neuen Felder nicht ab', () => {
     const alt = { vorgabeTarif: TARIF_BIS_6L } as never;
     expect(rechnungConfigLuecken(alt)).toEqual(['absenderName', 'absenderAdresse', 'iban']);
+  });
+});
+
+describe('zeitraumText', () => {
+  const tag = (iso: string) => iso.slice(0, 10).split('-').reverse().join('.');
+
+  it('zeigt bei gleichem Tag nur ein Datum', () => {
+    expect(zeitraumText('2026-03-12T08:00:00.000Z', '2026-03-12T16:00:00.000Z', tag)).toBe(
+      '12.03.2026',
+    );
+  });
+
+  it('zeigt sonst die Spanne', () => {
+    expect(zeitraumText('2026-03-01T08:00:00.000Z', '2026-03-12T16:00:00.000Z', tag)).toBe(
+      '01.03.2026 – 12.03.2026',
+    );
+  });
+
+  it('kommt mit einem fehlenden Ende zurecht', () => {
+    expect(zeitraumText('2026-03-12T08:00:00.000Z', '', tag)).toBe('12.03.2026');
+    expect(zeitraumText('', '2026-03-12T08:00:00.000Z', tag)).toBe('12.03.2026');
+    expect(zeitraumText('', '', tag)).toBe('');
   });
 });
