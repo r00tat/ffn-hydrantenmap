@@ -115,7 +115,16 @@ https://localhost:3000/login?authProxy=1&signInFlow=redirect
 ```
 
 Auch er wird im `localStorage` gemerkt (`firebaseSignInFlow`);
-`?signInFlow=popup` nimmt ihn zurück. Er wirkt nur bei aktivem Proxy — ein
+`?signInFlow=popup` nimmt ihn zurück.
+
+**Beide Schalter gelten pro Origin — inklusive Port.** Ein `?authProxy=1` auf
+`https://localhost:3000` wirkt auf `https://localhost:3001` nicht, und weil
+die Voreinstellung „aus" ist, läuft dort der erste Aufruf wieder über
+`firebaseapp.com`. Wer beim Testen den Port wechselt, muss den Parameter
+erneut mitgeben. Sichtbar wird das an der Diagnosezeile: `authDomain=` nennt
+die Domain, mit der die Firebase-App tatsächlich angelegt wurde, und die
+steht **für die Lebensdauer der Seite fest** — sie wird beim Laden des
+Moduls entschieden, nicht bei jedem Anmeldeversuch neu. Er wirkt nur bei aktivem Proxy — ein
 erzwungener Redirect auf die fremde Handler-Domain wäre schlechter als das
 Popup, nicht besser.
 
