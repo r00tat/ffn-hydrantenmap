@@ -7,6 +7,7 @@ import { gmail } from '@googleapis/gmail';
 import { actionUserAuthorizedForFirecall } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
 import { createWorkspaceAuth } from '../../server/auth/workspace';
+import { buildMailMessage } from '../../server/mail/buildMailMessage';
 import KostenersatzPdf from './KostenersatzPdf';
 
 const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
@@ -28,52 +29,6 @@ import {
 } from '../../common/kostenersatzEmail';
 
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
-
-/**
- * Build an RFC 2822 formatted email message with attachment
- */
-function buildEmailMessage(
-  to: string,
-  from: string,
-  replyTo: string,
-  cc: string[] | undefined,
-  subject: string,
-  body: string,
-  attachment: { content: Buffer; filename: string; mimeType: string }
-): string {
-  const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-
-  const headers = [
-    `From: ${from}`,
-    `Reply-To: ${replyTo}`,
-    `To: ${to}`,
-    ...(cc && cc.length > 0 ? [`Cc: ${cc.join(', ')}`] : []),
-    `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-  ].join('\r\n');
-
-  const textPart = [
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    'Content-Transfer-Encoding: base64',
-    '',
-    Buffer.from(body).toString('base64'),
-  ].join('\r\n');
-
-  const attachmentPart = [
-    `--${boundary}`,
-    `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
-    'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="${attachment.filename}"`,
-    '',
-    attachment.content.toString('base64'),
-  ].join('\r\n');
-
-  const message = [headers, '', textPart, attachmentPart, `--${boundary}--`].join('\r\n');
-
-  return message;
-}
 
 /**
  * Server action to send Kostenersatz email with PDF attachment
@@ -177,19 +132,21 @@ export async function sendKostenersatzEmailAction(
     // Build RFC 2822 email message
     // From is the impersonation account (actual sender), Reply-To is the configured fromEmail
     const impersonationAccount = process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT!;
-    const rawMessage = buildEmailMessage(
+    const rawMessage = buildMailMessage({
       to,
-      impersonationAccount,
-      emailConfig.fromEmail,
-      cc && cc.length > 0 ? cc : undefined,
+      from: impersonationAccount,
+      replyTo: emailConfig.fromEmail,
+      cc: cc && cc.length > 0 ? cc : undefined,
       subject,
-      emailBody,
-      {
-        content: pdfBuffer,
-        filename,
-        mimeType: 'application/pdf',
-      }
-    );
+      body: emailBody,
+      attachments: [
+        {
+          content: pdfBuffer,
+          filename,
+          mimeType: 'application/pdf',
+        },
+      ],
+    });
 
     // Encode message as base64url (Gmail API requirement)
     const encodedMessage = Buffer.from(rawMessage)

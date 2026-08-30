@@ -153,7 +153,10 @@ export function buildTemplateContext(
  */
 export function renderTemplate(
   template: string,
-  context: EmailTemplateContext,
+  // `object` statt nur `EmailTemplateContext`: Die Füllungsrechnung hat einen
+  // eigenen Kontext, die Ersetzung ist dieselbe. Der Rumpf arbeitet ohnehin
+  // über `unknown`.
+  context: EmailTemplateContext | object,
 ): string {
   try {
     return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, path: string) => {
