@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { FUELLUNG_TARIF_IDS } from '../../../common/atemschutzRechnung';
 import useAtemschutzRechnungConfig from '../../../hooks/useAtemschutzRechnungConfig';
+import { fehlerText } from '../rechnungFehler';
 import { saveAtemschutzRechnungConfig } from '../rechnungActions';
 
 export interface RechnungSettingsProps {
@@ -97,7 +98,7 @@ export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
         {t('rechnung.settingsTitle')}
       </Typography>
       <Stack spacing={2} sx={{ maxWidth: 700 }}>
-        {fehler && <Alert severity="error">{t(`errors.${fehler}` as 'errors.saveFailed')}</Alert>}
+        {fehler && <Alert severity="error">{fehlerText(t, fehler)}</Alert>}
         {gespeichert && <Alert severity="success">{t('rechnung.settingsSaved')}</Alert>}
         <Typography variant="subtitle2">{t('rechnung.gruppeAbsender')}</Typography>
         <TextField

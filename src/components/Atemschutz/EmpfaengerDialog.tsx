@@ -12,6 +12,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
+import { fehlerText } from './rechnungFehler';
 import { useState } from 'react';
 import { normalizeCode } from '../../common/atemschutz';
 import type { AtemschutzEmpfaenger } from '../../common/atemschutzRechnung';
@@ -97,7 +98,7 @@ export default function EmpfaengerDialog({
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          {fehler && <Alert severity="error">{t(`errors.${fehler}` as 'errors.saveFailed')}</Alert>}
+          {fehler && <Alert severity="error">{fehlerText(t, fehler)}</Alert>}
           <Autocomplete
             freeSolo
             options={feuerwehren}

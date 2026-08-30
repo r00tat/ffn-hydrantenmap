@@ -10,6 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
+import { fehlerText } from './rechnungFehler';
 import { useEffect, useState } from 'react';
 import { buildFuellungRechnungMail, sendFuellungRechnung } from './rechnungActions';
 
@@ -91,7 +92,7 @@ export default function RechnungMailDialog({
         ) : (
           <Stack spacing={2} sx={{ mt: 1 }}>
             {fehler && (
-              <Alert severity="error">{t(`errors.${fehler}` as 'errors.saveFailed')}</Alert>
+              <Alert severity="error">{fehlerText(t, fehler)}</Alert>
             )}
             <TextField
               label={t('rechnung.mailTo')}

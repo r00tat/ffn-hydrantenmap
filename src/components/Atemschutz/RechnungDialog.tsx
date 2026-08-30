@@ -29,6 +29,7 @@ import {
   type FeuerwehrBuendel,
 } from '../../common/atemschutzRechnung';
 import { formatCurrency } from '../../common/kostenersatz';
+import { fehlerText } from './rechnungFehler';
 import EmpfaengerDialog from './EmpfaengerDialog';
 import { createFuellungRechnung, type RechnungPositionWahl } from './rechnungActions';
 
@@ -141,7 +142,7 @@ export default function RechnungDialog({
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          {fehler && <Alert severity="error">{t(`errors.${fehler}` as 'errors.saveFailed')}</Alert>}
+          {fehler && <Alert severity="error">{fehlerText(t, fehler)}</Alert>}
 
           <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
             <TextField
