@@ -52,7 +52,11 @@
       "filterTyp": "Type",
       "filterAll": "All",
       "search": "Search",
-      "showInactive": "Show retired items"
+      "showInactive": "Show retired items",
+      "tabs": {
+        "geraete": "Equipment",
+        "rechnung": "Invoicing"
+      }
     },
     "tabs": {
       "fuellprotokoll": "Filling log",

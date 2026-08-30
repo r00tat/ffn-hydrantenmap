@@ -52,7 +52,11 @@
       "filterTyp": "Typ",
       "filterAll": "Alle",
       "search": "Suchen",
-      "showInactive": "Ausgeschiedene anzeigen"
+      "showInactive": "Ausgeschiedene anzeigen",
+      "tabs": {
+        "geraete": "Ausrüstung",
+        "rechnung": "Rechnungen"
+      }
     },
     "tabs": {
       "fuellprotokoll": "Füllprotokoll",
