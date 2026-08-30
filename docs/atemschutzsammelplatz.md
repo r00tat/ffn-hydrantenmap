@@ -85,6 +85,44 @@ Behauptung — im Vorschaudialog ist jeder Wert änderbar. Ebenso die
 Bezirksreserve: Im Export steht bei diesen 25 Flaschen als Dienststelle
 trotzdem „Neusiedl am See", nur die Bezeichnung verrät sie.
 
+### Füllstationen kommen aus einem zweiten Export
+
+FDISK gibt die Atemlufterzeugung in einem eigenen Lauf aus, mit eigenem
+Klassenbaum: Klasse 3 ist dort **leer**, der Typ steht in Klasse 1
+(„Atemlufterzeugung") und Klasse 2 („Atemluftfüllstation",
+„Atemluftkompressor").
+
+`typAusKlassen()` prüft deshalb Klasse 3 zuerst und allein und zieht die
+gröberen Klassen erst heran, wenn Klasse 3 nichts hergibt — und dort nur die
+Atemlufterzeugung. Im Geräteexport steht in Klasse 2 nämlich durchgehend
+„Pressluftatmer", auch bei den 81 Masken; zöge Klasse 2 gleichberechtigt mit,
+wäre jede Maske ein Pressluftatmer.
+
+Der Standort wird ausschließlich aus dem Klartext gelesen
+(„Atemluftfüllstation Stationär" → `fix`, „Atemluftkompressor Mobil" →
+`mobil`), nicht aus der Klasse: Ob die Luft aus einem Kompressor oder einer
+Füllstation kommt, sagt nichts darüber, ob das Gerät fest steht oder auf dem
+Anhänger liegt. Fehlt das Wort, bleibt der Standort offen und wird im
+Gerätedialog gesetzt, statt beim Import geraten zu werden.
+
+### Inaktive Artikel werden übersprungen
+
+Eine Zeile mit `Status: inaktiv` wird gar nicht erst übernommen — für jeden
+Typ, nicht nur für Füllstationen. Im Geräteexport betrifft das 23 der 214
+Zeilen, im Stationsexport die fest verbaute Füllstation („Derzeit wegen
+Hausumbau inaktiv!"). Sie mit `active: false` anzulegen erzeugte ein Dokument,
+das der Sammelplatz ohnehin überall ausblendet, das aber bei jedem Import
+wieder mitgeschrieben wird.
+
+Der Preis ist bewusst in Kauf genommen: Wird ein **bereits importiertes** Gerät
+in FDISK nachträglich inaktiv gesetzt, deaktiviert ein erneuter Import es
+nicht — die Zeile fehlt ja im Lauf. Ausgeschieden wird dann von Hand im
+Gerätedialog.
+
+Unbekannte oder leere Statuswerte werden importiert. Der Export kennt nur
+„aktiv" und „inaktiv"; an einem unerwarteten Wert stillschweigend Bestand zu
+verlieren wäre der schlechtere Ausgang.
+
 ## Warum das Füllprotokoll unter der Gruppe liegt
 
 Trupps und Ausrüstungsausgabe hängen am Einsatz — sie beginnen mit ihm und

@@ -5,7 +5,8 @@ import {
   abgleich,
   parseBarcodes,
   rowsToGeraete,
-  typAusKlasse,
+  standortAusBezeichnung,
+  typAusKlassen,
   werteAusBezeichnung,
 } from './atemschutzImport';
 
@@ -32,22 +33,70 @@ function row(values: Record<string, string>): string[] {
   return KOPF.map((spalte) => values[spalte] ?? '');
 }
 
-describe('typAusKlasse', () => {
-  it('bildet die vier vorkommenden Klassen ab', () => {
-    expect(typAusKlasse('Atemluftflasche')).toBe('flasche');
-    expect(typAusKlasse('Atemmaske')).toBe('maske');
-    expect(typAusKlasse('Atemschutzgerät')).toBe('pressluftatmer');
-    expect(typAusKlasse('Zubehör')).toBe('zubehoer');
+describe('typAusKlassen', () => {
+  it('bildet die vier vorkommenden Klasse-3-Werte ab', () => {
+    expect(typAusKlassen({ klasse3: 'Atemluftflasche' })).toBe('flasche');
+    expect(typAusKlassen({ klasse3: 'Atemmaske' })).toBe('maske');
+    expect(typAusKlassen({ klasse3: 'Atemschutzgerät' })).toBe('pressluftatmer');
+    expect(typAusKlassen({ klasse3: 'Zubehör' })).toBe('zubehoer');
+  });
+
+  it('erkennt die Füllstation an der Atemlufterzeugung', () => {
+    // Der Füllstationsexport hat keine Klasse 3 — dort steht der Typ in
+    // Klasse 1 ("Atemlufterzeugung") und Klasse 2.
+    expect(
+      typAusKlassen({
+        klasse1: 'Atemlufterzeugung',
+        klasse2: 'Atemluftfüllstation',
+      }),
+    ).toBe('fuellstation');
+    expect(
+      typAusKlassen({
+        klasse1: 'Atemlufterzeugung',
+        klasse2: 'Atemluftkompressor',
+      }),
+    ).toBe('fuellstation');
+  });
+
+  it('lässt Klasse 3 vor den gröberen Klassen gehen', () => {
+    // Im Geräteexport steht in Klasse 2 durchgehend "Pressluftatmer", auch bei
+    // Masken. Würde Klasse 2 mitentscheiden, wäre jede Maske ein Pressluftatmer.
+    expect(
+      typAusKlassen({
+        klasse1: 'Atemschutzgeräte',
+        klasse2: 'Pressluftatmer',
+        klasse3: 'Atemmaske',
+      }),
+    ).toBe('maske');
   });
 
   it('behandelt eine leere Klasse als Zubehör', () => {
     // 33 der 214 Zeilen haben keine Klasse 3.
-    expect(typAusKlasse('')).toBe('zubehoer');
-    expect(typAusKlasse('Unbekanntes')).toBe('zubehoer');
+    expect(typAusKlassen({})).toBe('zubehoer');
+    expect(typAusKlassen({ klasse3: 'Unbekanntes' })).toBe('zubehoer');
+    // Klasse 2 allein macht noch keine Füllstation.
+    expect(typAusKlassen({ klasse2: 'Pressluftatmer' })).toBe('zubehoer');
   });
 
   it('ignoriert Groß-/Kleinschreibung und Randleerzeichen', () => {
-    expect(typAusKlasse('  atemluftflasche ')).toBe('flasche');
+    expect(typAusKlassen({ klasse3: '  atemluftflasche ' })).toBe('flasche');
+    expect(typAusKlassen({ klasse1: ' ATEMLUFTERZEUGUNG ' })).toBe(
+      'fuellstation',
+    );
+  });
+});
+
+describe('standortAusBezeichnung', () => {
+  it('liest den Standort aus dem Klartext', () => {
+    expect(standortAusBezeichnung('Atemluftfüllstation Stationär')).toBe('fix');
+    expect(standortAusBezeichnung('Atemluftkompressor Mobil')).toBe('mobil');
+  });
+
+  it('bleibt ohne Hinweis unbestimmt', () => {
+    // "Füllstation" endet zwar auf "station", sagt aber nichts über den
+    // Standort — geraten wird hier nichts.
+    expect(standortAusBezeichnung('Atemluftfüllstation')).toBeUndefined();
+    expect(standortAusBezeichnung('')).toBeUndefined();
   });
 });
 
@@ -185,8 +234,10 @@ describe('rowsToGeraete', () => {
     expect(geraet.feuerwehr).toBe('Bezirksreserve');
   });
 
-  it('setzt active auf false bei Status inaktiv', () => {
-    const [geraet] = rowsToGeraete([
+  it('überspringt inaktive Artikel', () => {
+    // Ein in FDISK ausgeschiedenes Gerät gehört nicht in den Bestand — es
+    // stünde sonst in jeder Auswahl des Sammelplatzes.
+    const geraete = rowsToGeraete([
       KOPF,
       row({
         Bezeichnung: 'Vollatemmaske',
@@ -194,8 +245,67 @@ describe('rowsToGeraete', () => {
         Dienststelle: 'Neusiedl am See',
         Status: 'inaktiv',
       }),
+      row({
+        Bezeichnung: 'Atemluftfüllstation Stationär',
+        'Klasse 1': 'Atemlufterzeugung',
+        'Klasse 2': 'Atemluftfüllstation',
+        Dienststelle: 'Neusiedl am See',
+        Status: 'inaktiv',
+      }),
+      row({
+        Bezeichnung: 'Atemluftflasche CFK 6,8 l',
+        'Klasse 3': 'Atemluftflasche',
+        Dienststelle: 'Neusiedl am See',
+        Status: 'aktiv',
+      }),
     ]);
-    expect(geraet.active).toBe(false);
+    expect(geraete).toHaveLength(1);
+    expect(geraete[0]).toMatchObject({ typ: 'flasche', active: true });
+  });
+
+  it('importiert eine Füllstation samt Standort', () => {
+    const [geraet] = rowsToGeraete([
+      KOPF,
+      row({
+        ID: '29218',
+        Bezeichnung: 'Atemluftkompressor Mobil',
+        'Klasse 1': 'Atemlufterzeugung',
+        'Klasse 2': 'Atemluftkompressor',
+        Dienststelle: 'Neusiedl am See',
+        Status: 'aktiv',
+        'Hersteller/Marke': 'Drucklufttechnik Otto Nemec',
+        'Herstellungs-Jahr (Baujahr)': '2016',
+        Seriennummer: '2016/031',
+      }),
+    ]);
+    expect(geraet).toMatchObject({
+      externeId: '29218',
+      typ: 'fuellstation',
+      standort: 'mobil',
+      bezeichnung: 'Atemluftkompressor Mobil',
+      feuerwehr: 'Neusiedl am See',
+      hersteller: 'Drucklufttechnik Otto Nemec',
+      baujahr: 2016,
+      seriennummer: '2016/031',
+      active: true,
+    });
+    // Kein Nenndruck: Der gilt nur für Flaschen.
+    expect(geraet.nenndruck).toBeUndefined();
+  });
+
+  it('setzt keinen Standort für Flaschen und Masken', () => {
+    // "Atemluftflasche Stahl 6 l mobil" gibt es nicht, aber die Regel soll
+    // nicht am Klartext hängen: Standort ist ein Feld der Füllstation.
+    const [geraet] = rowsToGeraete([
+      KOPF,
+      row({
+        Bezeichnung: 'Vollatemmaske mobil',
+        'Klasse 3': 'Atemmaske',
+        Dienststelle: 'Neusiedl am See',
+        Status: 'aktiv',
+      }),
+    ]);
+    expect(geraet.standort).toBeUndefined();
   });
 
   it('liest 200 bar aus der Bemerkung', () => {
