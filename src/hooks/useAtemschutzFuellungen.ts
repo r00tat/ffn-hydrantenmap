@@ -23,6 +23,17 @@ export interface UseAtemschutzFuellungenOptions {
    * Eine ID = nur die Füllungen dieses Einsatzes.
    */
   firecallId?: string;
+  /**
+   * Nur zu verrechnende Füllungen — die Abfrage der Verrechnungsübersicht.
+   *
+   * Serverseitig und nicht wie im Füllprotokoll clientseitig: Dort ist es ein
+   * Filter auf einer ohnehin geladenen Liste, hier die Liste selbst. Braucht
+   * den Index `verrechnen ASC, zeitpunkt DESC`.
+   *
+   * Nicht mit `firecallId` zusammen benutzen — die Kombination bräuchte einen
+   * weiteren Index, und keine Seite fragt beides.
+   */
+  nurVerrechnen?: boolean;
 }
 
 export interface UseAtemschutzFuellungenResult {
@@ -38,7 +49,7 @@ export default function useAtemschutzFuellungen(
   groupId?: string,
   options: UseAtemschutzFuellungenOptions = {},
 ): UseAtemschutzFuellungenResult {
-  const { firecallId } = options;
+  const { firecallId, nurVerrechnen } = options;
 
   const queryConstraints = useMemo<QueryConstraint[]>(() => {
     const constraints: QueryConstraint[] = [];
@@ -47,9 +58,12 @@ export default function useAtemschutzFuellungen(
     if (firecallId !== undefined) {
       constraints.push(where('firecallId', '==', firecallId));
     }
+    if (nurVerrechnen) {
+      constraints.push(where('verrechnen', '==', true));
+    }
     constraints.push(orderBy('zeitpunkt', 'desc'), limit(FUELLUNG_LIMIT));
     return constraints;
-  }, [firecallId]);
+  }, [firecallId, nurVerrechnen]);
 
   const fuellungen = useFirebaseCollection<AtemschutzFuellung>({
     // Leerer Name heißt: keine Subscription. Ein leeres `pathSegments`

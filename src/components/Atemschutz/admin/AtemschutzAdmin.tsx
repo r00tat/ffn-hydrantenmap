@@ -43,6 +43,7 @@ import {
 import GeraetDialog from './GeraetDialog';
 import GeraetImportDialog from './GeraetImportDialog';
 import GeraetQrDialog from './GeraetQrDialog';
+import RechnungSettings from './RechnungSettings';
 
 type TypFilter = AtemschutzGeraetTyp | 'alle';
 
@@ -243,6 +244,8 @@ export default function AtemschutzAdmin() {
                 ))}
               </List>
             )}
+
+            <RechnungSettings groupId={groupId} />
 
             <Tooltip title={t('admin.add')}>
               <Fab
