@@ -48,6 +48,10 @@ function setUserAgent(userAgent: string) {
 interface UiConfig {
   signInFlow: string;
   callbacks: { signInFailure: (error: unknown) => unknown };
+  signInOptions: {
+    provider: string;
+    customParameters?: Record<string, string>;
+  }[];
 }
 
 async function renderLogin() {
@@ -105,5 +109,17 @@ describe('FirebaseUiLogin: gescheiterte Anmeldung', () => {
         screen.getByText(/auth\/credential-already-in-use: Bereits vergeben/),
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe('FirebaseUiLogin: Kontenauswahl', () => {
+  it('laesst Google immer nach dem Konto fragen', async () => {
+    // Ohne `prompt` waehlt Google bei einer aktiven Sitzung stillschweigend
+    // ein Konto aus. Wer zwei hat, kommt so nie an das zweite.
+    const config = await renderLogin();
+    const google = config.signInOptions.find(
+      (o) => o.provider === 'google.com',
+    );
+    expect(google?.customParameters).toEqual({ prompt: 'select_account' });
   });
 });

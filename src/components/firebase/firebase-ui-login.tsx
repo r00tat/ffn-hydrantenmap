@@ -151,6 +151,12 @@ export default function FirebaseUiLogin() {
           provider: GoogleAuthProvider.PROVIDER_ID,
           // scopes: ['https://www.googleapis.com/auth/contacts.readonly'],
           clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID,
+          // Ohne `prompt` entscheidet Google selbst und nimmt bei einer
+          // aktiven Sitzung stillschweigend ein Konto — in der Antwort steht
+          // dann `prompt=none`. Wer dienstlich und privat getrennte Konten
+          // hat, kommt so nie an das zweite und muesste sich erst im Browser
+          // abmelden. `select_account` erzwingt die Auswahl.
+          customParameters: { prompt: 'select_account' },
         },
         {
           provider: EmailAuthProvider.PROVIDER_ID,
