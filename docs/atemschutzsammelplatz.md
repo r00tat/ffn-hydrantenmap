@@ -152,8 +152,17 @@ Ein Kompressor ist Ausrüstung der Feuerwehr und steht deshalb als
 `typ: 'fuellstation'` in denselben Stammdaten wie die Flaschen — statt einer
 eigenen Sammlung, die dieselben Felder noch einmal hätte. Dazu kommen
 `standort` (`fix` = Feuerwehrhaus, `mobil` = auf einem Fahrzeug) und bei
-`mobil` der Fahrzeugbezug; der Neusiedler Kompressor ist auf dem
-Atemschutzanhänger verladen.
+`mobil` der Träger; der Neusiedler Kompressor ist auf dem Atemschutzanhänger
+verladen.
+
+Der Träger ist ein Feld mit **freier Eingabe** neben der Fahrzeugliste der
+Gruppe, keine reine Auswahl: Anhänger stehen nicht im Fahrtenbuch, weil sie
+keines führen — genau der Atemschutzanhänger wäre also nicht eintragbar. Wird
+ein Fahrzeug der Gruppe gewählt, bleibt der Bezug über `vehicleId` erhalten;
+bei freiem Text steht nur `vehicleName`. Deshalb sind beide Felder optional.
+
+Aus dem Sybos-Export kommt der Träger nicht — der Artikelexport kennt keine
+Verlastung. Er wird im Gerätedialog gesetzt.
 
 Im Ausrüstungsreiter sind Füllstationen ausgeblendet: Eine Station wird nicht
 ausgegeben und nicht zurückgenommen.

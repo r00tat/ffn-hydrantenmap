@@ -243,9 +243,9 @@
       "standort": "Location",
       "standortWerte": {
         "fix": "Fixed (fire station)",
-        "mobil": "Mobile (vehicle)"
+        "mobil": "Mobile (vehicle/trailer)"
       },
-      "fahrzeug": "Vehicle"
+      "fahrzeug": "Vehicle or trailer"
     },
     "fuellprotokoll": {
       "title": "Filling log",

@@ -224,28 +224,36 @@ export default function GeraetDialog({
               </Grid>
               {form.standort === 'mobil' && (
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    select
-                    fullWidth
-                    label={t('geraet.fahrzeug')}
-                    value={form.vehicleId ?? ''}
-                    onChange={(e) => {
-                      const fzg = activeVehicles.find(
-                        (v) => v.id === e.target.value,
-                      );
+                  {/* Freie Eingabe neben der Fahrzeugliste: Anhänger stehen
+                      nicht im Fahrtenbuch — sie führen keines. Der
+                      Atemschutzanhänger, auf dem der Kompressor verlastet ist,
+                      wäre in einer reinen Auswahlliste nicht eintragbar. Wird
+                      ein Fahrzeug der Gruppe gewählt, bleibt der Bezug über
+                      `vehicleId` erhalten; bei freiem Text steht nur der
+                      Name. */}
+                  <Autocomplete
+                    freeSolo
+                    options={activeVehicles}
+                    getOptionLabel={(option) =>
+                      typeof option === 'string' ? option : option.name
+                    }
+                    inputValue={form.vehicleName ?? ''}
+                    onInputChange={(_, value) => {
+                      const fzg = activeVehicles.find((v) => v.name === value);
                       setForm((prev) => ({
                         ...prev,
                         vehicleId: fzg?.id,
-                        vehicleName: fzg?.name,
+                        vehicleName: value || undefined,
                       }));
                     }}
-                  >
-                    {activeVehicles.map((v) => (
-                      <MenuItem key={v.id} value={v.id}>
-                        {v.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        fullWidth
+                        label={t('geraet.fahrzeug')}
+                      />
+                    )}
+                  />
                 </Grid>
               )}
             </>

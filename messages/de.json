@@ -243,9 +243,9 @@
       "standort": "Standort",
       "standortWerte": {
         "fix": "Fix (Feuerwehrhaus)",
-        "mobil": "Mobil (Fahrzeug)"
+        "mobil": "Mobil (Fahrzeug/Anhänger)"
       },
-      "fahrzeug": "Fahrzeug"
+      "fahrzeug": "Fahrzeug oder Anhänger"
     },
     "fuellprotokoll": {
       "title": "Füllprotokoll",
