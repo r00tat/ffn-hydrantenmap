@@ -75,8 +75,19 @@ service firebase.storage {
     // falsche Antwort. Die Server Action `signStammdatenLogo` prüft die
     // Mitgliedschaft und signiert erst danach.
     //
+    // Hochladen darf nur, wer in der Gruppe ist: `authorizedUser()` allein
+    // ließe jeden Angemeldeten Dateien in den Ordner jeder Gruppe legen. Die
+    // Mitgliedschaft steht als Claim im Token (`groups`, gesetzt in
+    // `updateUser.ts`) und ist damit ohne Firestore-Zugriff prüfbar — anders
+    // als die Gruppen-Admin-Rolle, die es bewusst nicht als Claim gibt
+    // (docs/berechtigungen.md). Die eigentliche Schranke bleibt deshalb
+    // `actionGroupAdminRequired` in `saveGroupStammdaten`: Eine hochgeladene
+    // Datei ist wirkungslos, bis ein Gruppen-Admin das Dokument der Gruppe
+    // darauf zeigen lässt.
+    //
     // Nur `create`: Jeder Dateiname trägt eine UUID, es gibt nichts zu
-    // überschreiben. Gelöscht wird ausschließlich serverseitig, wenn ein
+    // überschreiben. `update: false` sperrt zusätzlich das Ersetzen einer
+    // vorhandenen Datei. Gelöscht wird ausschließlich serverseitig, wenn ein
     // neues Logo das alte ablöst.
     //
     // Kein SVG — `@react-pdf/renderer` rendert es als `<Image>` nicht. Wer
@@ -85,6 +96,7 @@ service firebase.storage {
     // und vergleicht beide.
     match /groups/{groupId}/stammdaten/{fileName} {
       allow create: if authorizedUser()
+        && groupId in request.auth.token.groups
         && request.resource.size < 2 * 1024 * 1024
         && request.resource.contentType.matches('image/(png|jpeg)');
       allow read, update, delete: if false;

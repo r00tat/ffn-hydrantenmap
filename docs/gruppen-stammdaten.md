@@ -66,10 +66,28 @@ vergleicht die Werte. Die Regel ist die Schranke, die Prüfung im Browser die
 Auskunft: Ohne sie antwortet der Storage nur mit `storage/unauthorized`, und
 niemand erfährt, dass die Datei zu groß war.
 
-Die Storage-Regel erlaubt nur `create` und verbietet `read` für alle. Lesen
-kann sie nicht freigeben, weil die Entscheidung an der Gruppenmitgliedschaft
-hängt und die in Firestore steht — ein `firestore.get` aus einer
-Storage-Regel trifft immer die Default-Datenbank und gäbe in der
+Die Storage-Regel erlaubt nur `create`, bindet den Upload an
+`groupId in request.auth.token.groups` und verbietet `read`, `update` und
+`delete` für alle.
+
+Die Gruppenbindung ist nötig, weil `authorizedUser()` allein jeden
+Angemeldeten Dateien in den Ordner **jeder** Gruppe legen ließe. Die
+Mitgliedschaft steht als Claim im Token (`groups`, gesetzt in
+`updateUser.ts`) und ist damit ohne Firestore-Zugriff prüfbar — die
+Gruppen-Admin-Rolle dagegen gibt es bewusst nicht als Claim
+([berechtigungen.md](berechtigungen.md)). Die Regel prüft also die
+Mitgliedschaft, die eigentliche Schranke bleibt `actionGroupAdminRequired` in
+`saveGroupStammdaten`: Eine hochgeladene Datei ist wirkungslos, solange kein
+Gruppen-Admin das Dokument der Gruppe darauf zeigen lässt.
+
+`update: false` sperrt das Ersetzen einer vorhandenen Datei — ein Schreibzugriff
+auf einen belegten Pfad ist in den Storage-Regeln ein `update`, kein `create`.
+Ein fremdes Logo lässt sich damit auch ohne die Gruppenprüfung nicht
+austauschen; die Prüfung verhindert das Ablegen zusätzlicher Dateien.
+
+Lesen kann die Regel nicht freigeben, weil die Entscheidung an der
+Gruppenmitgliedschaft hängt und die in Firestore steht — ein `firestore.get`
+aus einer Storage-Regel trifft immer die Default-Datenbank und gäbe in der
 Dev-Datenbank `ffndev` die falsche Antwort. Deshalb geht die Vorschau über die
 Server Action `signStammdatenLogo`, die die Mitgliedschaft prüft und erst
 danach signiert. Serverseitig lädt `loadStammdatenLogo` die Bytes für das PDF;

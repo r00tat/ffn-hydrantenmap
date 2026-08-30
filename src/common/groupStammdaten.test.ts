@@ -151,4 +151,16 @@ describe('Logo-Schranken spiegeln die storage.rules', () => {
   it('prüft denselben Contenttype wie die Regel', () => {
     expect(logoRule).toContain("request.resource.contentType.matches('image/(png|jpeg)')");
   });
+
+  it('bindet den Upload an die Gruppe des Hochladenden', () => {
+    // Ohne diese Bedingung dürfte jeder angemeldete Benutzer Dateien in den
+    // Ordner jeder Gruppe legen. `authorizedUser()` allein genügt hier nicht.
+    expect(logoRule).toContain('groupId in request.auth.token.groups');
+  });
+
+  it('lässt eine vorhandene Datei nicht ersetzen', () => {
+    // `create` gilt nur für ein Objekt, das es noch nicht gibt; das Ersetzen
+    // wäre ein `update` und ist gesperrt.
+    expect(logoRule).toContain('allow read, update, delete: if false;');
+  });
 });
