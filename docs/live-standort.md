@@ -100,3 +100,16 @@ Nachbarwehr) da. Geschrieben und gelöscht wird nur das eigene Dokument.
 Der Lesepfad hängt **nicht** an der eigenen Freigabe: die Einsatzleitung teilt
 selbst nichts und muss die Kräfte trotzdem sehen. `useLiveLocations` bekommt den
 Sharing-Status nirgends herein, und der Layer ist in `Map.tsx` fest eingehängt.
+
+## `name`, `email` und `deviceLabel` sind ungeprüfte Fremdeingabe
+
+Die Regeln binden am Dokument nur `uid` (und über die Dokument-ID das Gerät).
+Alles andere — `name`, `email`, `deviceLabel` — schreibt der Client frei, und
+schreiben darf jeder im Einsatz Berechtigte, auch ein Gast über einen
+Freigabe-Link. Diese Felder landen auf **allen** anderen Karten.
+
+Der Marker geht über `L.divIcon({ html })` per `innerHTML` in die Karte, also an
+React und dessen Maskierung vorbei. `buildIconHtml` maskiert deshalb jeden
+eingesetzten Wert (`escapeHtml` aus [src/common/html.ts](../src/common/html.ts));
+ohne das wäre es ein gespeicherter XSS in der Sitzung jedes Mitlesenden. Wer den
+Marker erweitert, maskiert mit — im Popup übernimmt React das von selbst.

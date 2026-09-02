@@ -7,6 +7,7 @@ import { MarkerClusterGroup } from 'leaflet.markercluster';
 import { LayerGroupProps } from 'react-leaflet';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import { escapeHtml } from '../../../common/html';
 
 export type SummaryPosition = 'off' | 'hover' | 'top' | 'bottom' | 'left' | 'right';
 
@@ -80,10 +81,6 @@ function getLabelForTypeKey(typeKey: string): string {
     .replace(/\.\w+$/, '')
     .replace(/\bicon\b/gi, '')
     .trim() || 'Marker';
-}
-
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function buildTooltipContent(cluster: any): string {

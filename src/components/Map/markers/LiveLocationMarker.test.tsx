@@ -31,6 +31,50 @@ describe('formatRelative', () => {
   });
 });
 
+// Der Marker landet über `L.divIcon({ html })` per innerHTML in der Karte.
+// `name`, `email` und `deviceLabel` kommen aus dem Firestore-Dokument und sind
+// vom schreibenden Client frei wählbar — die Regeln binden nur `uid`. Ohne
+// Maskierung führt jeder im Einsatz Berechtigte (auch ein Gast über einen
+// Freigabe-Link) beliebiges HTML in der Sitzung aller anderen aus.
+describe('buildIconHtml escaping', () => {
+  it('does not emit the display name as markup', () => {
+    const html = buildIconHtml({
+      initials: 'AB',
+      color: '#1976d2',
+      displayName: '<img src=x onerror=alert(1)>',
+      opacity: 1,
+    });
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('onerror=alert(1)>');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+  });
+
+  it('does not emit the initials as markup', () => {
+    const html = buildIconHtml({
+      initials: '<s',
+      color: '#1976d2',
+      displayName: 'Anna Bauer',
+      opacity: 1,
+    });
+    expect(html).not.toContain('<s');
+    expect(html).toContain('&lt;s');
+  });
+
+  // Die Farbe steht in einem style-Attribut. Sie kommt heute aus einer festen
+  // Palette, die Maskierung hält die Stelle aber auch dann dicht, wenn dort
+  // einmal etwas anderes ankommt.
+  it('does not let the color break out of the style attribute', () => {
+    const html = buildIconHtml({
+      initials: 'AB',
+      color: '#fff" onmouseover="alert(1)',
+      displayName: 'Anna Bauer',
+      opacity: 1,
+    });
+    expect(html).not.toContain('onmouseover="alert(1)"');
+    expect(html).toContain('&quot;');
+  });
+});
+
 describe('buildIconHtml', () => {
   it('contains initials, color, and display name', () => {
     const html = buildIconHtml({
