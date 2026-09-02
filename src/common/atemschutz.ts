@@ -358,6 +358,18 @@ export interface AtemschutzTrupp {
    * Überwachung, nicht mehr der Sammelplatz (FH-06 5.3.4).
    */
   ueberwachungSeit?: string;
+  /**
+   * Wann der zurückgekehrte Trupp an den Sammelplatz übergeben wurde.
+   *
+   * Das Gegenstück zu `ueberwachungSeit`: Beide zusammen sind der Zeitraum, in
+   * dem der Gruppenkommandant die Zeitkontrolle hatte. Danach ist der Trupp
+   * Sache des Sammelplatzes — Regeneration, Flaschen füllen, neu ausrüsten —,
+   * und wer die Überwachung führte, ist damit fertig.
+   *
+   * `ueberwachungSeit` bleibt dabei stehen: Es belegt, wann die Verantwortung
+   * begann, und ein gelöschter Anfang machte das Ende unlesbar.
+   */
+  ueberwachungBis?: string;
   /** Vorlage des Gerätesatzes; `custom` heißt: Werte von Hand oder aus der Flasche. */
   paTyp?: PaTypKey;
   /** Zahl der Flaschen je Geräteträger. */
@@ -1121,6 +1133,25 @@ export function uebernahmePatch(input: UebernahmeInput): UeberwachungPatch {
     }
   }
   return patch;
+}
+
+/**
+ * Der Patch, mit dem ein zurückgekehrter Trupp an den Sammelplatz zurückgeht.
+ *
+ * Nur ein Zeitstempel und keine Zustandsänderung: `zurueck` bleibt `zurueck`.
+ * Der Trupp ist ja nicht weg, er wird regeneriert — und wer das tut, steht am
+ * Sammelplatz und nicht bei der Zeitkontrolle. Die neue Bereitstellung entsteht
+ * dort über „wieder bereitstellen" (`nextBereitstellung`).
+ *
+ * Warum überhaupt festgehalten: Die Übergabe der Verantwortung ist
+ * protokollpflichtig — in beide Richtungen. Ohne Vermerk stünde am Ende des
+ * Einsatzes an jedem Trupp ein Gruppenkommandant, der ihn „überwacht", auch
+ * Stunden nachdem er wieder Umgebungsluft atmet.
+ */
+export function sammelplatzUebergabePatch(input: {
+  jetzt: string;
+}): UeberwachungPatch {
+  return { ueberwachungBis: input.jetzt };
 }
 
 /** Die Eingabe des Druckabfrage-Dialogs. */

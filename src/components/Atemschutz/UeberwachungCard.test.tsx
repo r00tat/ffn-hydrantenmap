@@ -50,6 +50,7 @@ interface RenderOptionen {
   canWrite?: boolean;
   istAktuell?: boolean;
   onErneutEinsatz?: () => void;
+  onAnSammelplatz?: () => void;
 }
 
 function render(
@@ -59,6 +60,7 @@ function render(
     canWrite = true,
     istAktuell = true,
     onErneutEinsatz = vi.fn(),
+    onAnSammelplatz = vi.fn(),
   }: RenderOptionen = {},
 ) {
   renderWithIntl(
@@ -75,6 +77,7 @@ function render(
       onAbmarsch={vi.fn()}
       onRueckkehr={vi.fn()}
       onErneutEinsatz={onErneutEinsatz}
+      onAnSammelplatz={onAnSammelplatz}
     />,
   );
 }
@@ -159,13 +162,27 @@ describe('UeberwachungCard', () => {
     expect(screen.queryByRole('button', { name: 'Druckabfrage' })).toBeNull();
   });
 
-  it('zeigt den Druckverlauf mit Abmarsch und Abfragen', () => {
-    render(trupp({ abfragen: [abfrage(5, 200, true)] }), { jetzt: nachAbmarsch(6) });
+  it('zeigt den Druckverlauf als eigene Zeile je Wert', () => {
+    render(
+      trupp({
+        abfragen: [abfrage(5, 200, true), abfrage(12, 150)],
+        status: 'zurueck',
+        rueckkehrZeit: nachAbmarsch(20).toISOString(),
+        druckRueckkehr: 70,
+      }),
+      { jetzt: nachAbmarsch(25) },
+    );
     expect(screen.getByText('Druckverlauf')).toBeInTheDocument();
-    // Auf den Verlaufseintrag geprüft und nicht auf „300 bar": Denselben Wert
-    // trägt auch der Chip mit dem Gerätesatz.
-    expect(screen.getByText(/300 bar \(Entsenden\)/)).toBeInTheDocument();
-    expect(screen.getByText(/200 bar \(Ankunft\)/)).toBeInTheDocument();
+    // Jeder Wert steht für sich — nicht als Kette mit Pfeilen in einer Zeile.
+    expect(screen.getByText('300 bar')).toBeInTheDocument();
+    expect(screen.getByText('200 bar')).toBeInTheDocument();
+    expect(screen.getByText('150 bar')).toBeInTheDocument();
+    expect(screen.getByText('70 bar')).toBeInTheDocument();
+    expect(screen.getByText('Ankunft')).toBeInTheDocument();
+    // Die Uhrzeiten stehen in einer eigenen Spalte, also auch als eigener Text.
+    expect(screen.getAllByText(/^\d{2}:\d{2}$/).length).toBeGreaterThanOrEqual(
+      4,
+    );
   });
 
   it('bietet einem zurückgekehrten Trupp den erneuten Einsatz an', () => {
@@ -185,11 +202,49 @@ describe('UeberwachungCard', () => {
     expect(onErneutEinsatz).toHaveBeenCalled();
   });
 
+  it('übergibt einen zurückgekehrten Trupp an den Sammelplatz', () => {
+    const onAnSammelplatz = vi.fn();
+    render(
+      trupp({
+        status: 'zurueck',
+        rueckkehrZeit: nachAbmarsch(30).toISOString(),
+        druckRueckkehr: 70,
+      }),
+      { jetzt: nachAbmarsch(40), onAnSammelplatz },
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'An den Sammelplatz übergeben' }),
+    );
+    expect(onAnSammelplatz).toHaveBeenCalled();
+  });
+
+  it('bietet nach der Übergabe keine Entsendung mehr an', () => {
+    render(
+      trupp({
+        status: 'zurueck',
+        rueckkehrZeit: nachAbmarsch(30).toISOString(),
+        druckRueckkehr: 70,
+        ueberwachungBis: nachAbmarsch(35).toISOString(),
+      }),
+      { jetzt: nachAbmarsch(40) },
+    );
+    expect(
+      screen.queryByRole('button', {
+        name: 'Erneut in den Einsatz schicken',
+      }),
+    ).toBeNull();
+    expect(
+      screen.getByText(/An den Sammelplatz übergeben \(\d{2}:\d{2}\)/),
+    ).toBeInTheDocument();
+  });
+
   it('nennt den Abmarsch als Grundlage der Schätzung', () => {
     render(trupp({ abfragen: [abfrage(5, 200, true)] }), {
       jetzt: nachAbmarsch(10),
     });
-    expect(screen.getByText('Abmarsch')).toBeInTheDocument();
+    // Zweimal „Abmarsch": als Überschrift der Kennzahl und als Zeile im
+    // Druckverlauf.
+    expect(screen.getAllByText('Abmarsch')).toHaveLength(2);
     expect(screen.getByText('seit 10 min')).toBeInTheDocument();
     // Fortgeschrieben wird ab dem jüngsten Messwert, nicht ab dem Abmarsch.
     expect(

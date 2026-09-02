@@ -18,6 +18,7 @@ import {
   canTransition,
   erneuterEinsatz,
   newTruppKey,
+  sammelplatzUebergabePatch,
   sanitizeMitglieder,
   sanitizeTruppGeraete,
   uebernahmePatch,
@@ -363,6 +364,23 @@ export default function UeberwachungPage() {
     [actorNow, firecallId],
   );
 
+  const handleAnSammelplatz = useCallback(
+    async (trupp: AtemschutzTrupp) => {
+      if (!trupp.id) return;
+      const stamp = actorNow();
+      // Kein Zustandswechsel: `zurueck` bleibt `zurueck`. Die neue
+      // Bereitstellung entsteht am Sammelplatz über „wieder bereitstellen" —
+      // dort wird regeneriert, und dort steht, wer das tut.
+      await updateUeberwachung(
+        firecallId,
+        trupp.id,
+        sammelplatzUebergabePatch({ jetzt: stamp.now }),
+        stamp,
+      );
+    },
+    [actorNow, firecallId],
+  );
+
   const handlePatch = useCallback(
     async (trupp: AtemschutzTrupp, patch: TruppPatch) => {
       // Dieselbe Schranke wie am Sammelplatz: Zwei Geräte sehen dieselbe Karte,
@@ -390,6 +408,7 @@ export default function UeberwachungPage() {
       onErneutEinsatz={() =>
         setDialog({ art: 'zeit', trupp, modus: 'entsenden', neueZeile: true })
       }
+      onAnSammelplatz={() => void handleAnSammelplatz(trupp)}
     />
   );
 

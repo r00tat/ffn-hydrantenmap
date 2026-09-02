@@ -27,6 +27,7 @@ import {
   sanitizeMitglieder,
   sanitizePersonen,
   sanitizeTruppGeraete,
+  sammelplatzUebergabePatch,
   sanitizeUeberwachungUids,
   truppGeraetLabel,
   truppGeraetVonGeraet,
@@ -423,6 +424,14 @@ describe('nextBereitstellung', () => {
   });
 });
 
+describe('sammelplatzUebergabePatch', () => {
+  it('vermerkt nur den Zeitpunkt und fasst den Zustand nicht an', () => {
+    expect(
+      sammelplatzUebergabePatch({ jetzt: '2026-08-29T11:20:00.000Z' }),
+    ).toEqual({ ueberwachungBis: '2026-08-29T11:20:00.000Z' });
+  });
+});
+
 describe('erneuterEinsatz', () => {
   const zurueck = trupp({
     id: 't1',
@@ -505,6 +514,21 @@ describe('erneuterEinsatz', () => {
     // führt den Trupp oft woandershin, und ein stehengebliebenes „Stiegenhaus
     // 3. OG" wäre eine Behauptung.
     expect(neu).not.toHaveProperty('einsatzziel');
+  });
+
+  it('trägt eine frühere Übergabe an den Sammelplatz nicht mit', () => {
+    // Sonst wäre die neue Bereitstellung im selben Moment schon wieder
+    // abgegeben, in dem sie in den Einsatz geht.
+    const uebergeben = trupp({
+      ...zurueck,
+      ueberwachungBis: '2026-08-29T11:20:00.000Z',
+    });
+    const neu = erneuterEinsatz({
+      vorherige: uebergeben,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu).not.toHaveProperty('ueberwachungBis');
   });
 
   it('lässt die alte Zeile unverändert', () => {

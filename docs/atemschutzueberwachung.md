@@ -173,6 +173,19 @@ daran, dass die Ankunft für diesen Trupp noch fehlt — und dass bis dahin die
 Ein gestiegener oder gleicher Druck verwirft die Messung (Tippfehler, oder es
 war ein anderer Geräteträger) und der Anhaltswert gilt weiter.
 
+### Der Druckverlauf steht zeilenweise
+
+Die Werte standen zuerst als Kette in einer Zeile („10:00 300 bar → 10:05
+200 bar (Ankunft) → …"). Am Einsatzort wird das im Vorbeigehen gelesen, oft auf
+einem Telefon, und dort bricht die Kette um — drei Zeitangaben in einer
+umgebrochenen Zeile sind genau dann nicht zu erfassen. Jetzt trägt jeder Wert
+eine eigene Zeile in einem Raster aus drei Spalten (Uhrzeit, Druck,
+Bezeichnung), damit Uhrzeiten und Drücke untereinander stehen und mit
+`tabular-nums` auch gleich breit sind.
+
+Beschriftet sind nur Abmarsch, Ankunft und Rückkehr. Stünde an jeder Zeile
+„Druckabfrage", fielen genau die drei Zeilen nicht mehr auf, auf die es ankommt.
+
 ### Die Anzeige nennt die Grundlage der Schätzung
 
 Links vom vermuteten Druck steht der **Abmarsch** mit „seit *n* min", und unter
@@ -398,6 +411,31 @@ dieser Entsendung, und der zweite Einsatz führt den Trupp oft woandershin; ein
 stehengebliebenes „Stiegenhaus 3. OG" wäre eine Behauptung. `ueberwachungSeit`
 steht auf jetzt: Die Verantwortung läuft weiter, aber auf dieser Zeile beginnt
 sie hier.
+
+### …oder zurück an den Sammelplatz
+
+Die zweite Möglichkeit an einem zurückgekehrten Trupp: **„An den Sammelplatz
+übergeben"** (`sammelplatzUebergabePatch`). Das schreibt nur `ueberwachungBis`
+und lässt den Zustand `zurueck` unberührt — der Trupp ist nicht weg, er wird
+regeneriert, und wer das tut, steht am Sammelplatz. Die neue Bereitstellung
+entsteht dort über „Wieder bereitstellen".
+
+`ueberwachungSeit` bleibt dabei stehen. Beide Zeitstempel zusammen sind der
+Zeitraum, in dem der Gruppenkommandant die Zeitkontrolle hatte; ein gelöschter
+Anfang machte das Ende unlesbar. Die Übergabe der Verantwortung ist
+protokollpflichtig, und zwar in **beide** Richtungen: Ohne diesen Vermerk stünde
+am Ende des Einsatzes an jedem Trupp ein Gruppenkommandant, der ihn „überwacht",
+Stunden nachdem er wieder Umgebungsluft atmet.
+
+Sichtbar ist die Übergabe auf **beiden** Seiten — als Chip auf der
+Überwachungskarte und auf der Truppkarte des Sammelplatzes („Von der
+Atemschutzüberwachung übergeben"). Eine Übergabe, die nur der Übergebende sieht,
+ist keine.
+
+Danach bietet die Überwachungskarte an dieser Zeile keine Entsendung mehr an: Ab
+hier entscheidet der Sammelplatz, wann der Trupp wieder bereitsteht. Ein
+Fehlgriff ist damit nicht ausweglos — der Sammelplatz stellt den Trupp wieder
+bereit, und die neue Zeile ist an der Zeitkontrolle wieder in vollem Umfang da.
 
 ## Wer was sieht
 

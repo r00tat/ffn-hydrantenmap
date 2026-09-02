@@ -53,6 +53,22 @@ describe('TruppCard', () => {
     expect(screen.queryByRole('button', { name: 'Abmelden' })).toBeNull();
   });
 
+  it('weist einen von der Überwachung übergebenen Trupp aus', () => {
+    // Der Gruppenkommandant hat die Zeitkontrolle beendet; ab hier ist der
+    // Trupp Sache des Sammelplatzes.
+    render(
+      trupp({
+        status: 'zurueck',
+        rueckkehrZeit: '2026-08-29T11:00:00.000Z',
+        ueberwachungSeit: '2026-08-29T10:20:00.000Z',
+        ueberwachungBis: '2026-08-29T11:20:00.000Z',
+      }),
+    );
+    expect(
+      screen.getByText(/Von der Atemschutzüberwachung übergeben/),
+    ).toBeInTheDocument();
+  });
+
   it('zeigt nach der Rückkehr „Wieder bereitstellen“', () => {
     render(trupp({ status: 'zurueck' }));
     expect(

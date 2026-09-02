@@ -147,6 +147,7 @@
       "mitgliederVoll": "At most {max} names per team.",
       "bemerkung": "Note",
       "laufendeNummer": "Deployment {n}",
+      "vonUeberwachung": "Handed over by the monitoring ({zeit})",
       "status": {
         "bereit": "Standing by",
         "imEinsatz": "Deployed",
@@ -490,6 +491,7 @@
       "druckverlauf": "Pressure history",
       "startdruckGeschaetzt": "Departure pressure not read",
       "zielMeldungFehlt": "No arrival report",
+      "uebergeben": "Handed back to the staging area ({zeit})",
       "geraetesatz": "{anzahl}×{volumen} l / {druck} bar · {dauer} min calculated",
       "grund": {
         "vormarsch": "Turn-around pressure {druck} bar (twice the inbound drop)",
@@ -531,6 +533,7 @@
         "uebernehmen": "Take over time control",
         "inDenEinsatz": "Send into action",
         "erneutInDenEinsatz": "Send into action again",
+        "anSammelplatz": "Hand back to the staging area",
         "druckabfrage": "Pressure check",
         "truppErfassen": "Add team",
         "pushErlauben": "Enable notifications"

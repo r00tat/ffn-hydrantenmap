@@ -86,6 +86,20 @@ export default function TruppCard({
               label={t('trupp.laufendeNummer', { n: trupp.laufendeNummer })}
             />
           )}
+          {trupp.ueberwachungBis && (
+            // Die Gegenseite der Übergabe: Der Gruppenkommandant hat die
+            // Zeitkontrolle beendet, der Trupp ist wieder Sache des
+            // Sammelplatzes — Regeneration, Flaschen, neu ausrüsten. Eine
+            // Übergabe, die nur der Übergebende sieht, ist keine.
+            <Chip
+              size="small"
+              variant="outlined"
+              color="info"
+              label={t('trupp.vonUeberwachung', {
+                zeit: uhrzeit(trupp.ueberwachungBis),
+              })}
+            />
+          )}
           <Box sx={{ flexGrow: 1 }} />
           {canWrite && (
             <>

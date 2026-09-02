@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment } from 'react';
 import AirIcon from '@mui/icons-material/Air';
 import BuildIcon from '@mui/icons-material/Build';
 import EditIcon from '@mui/icons-material/Edit';
@@ -50,6 +51,16 @@ export interface UeberwachungCardProps {
   onRueckkehr: () => void;
   /** Zurückgekehrter Trupp geht erneut hinein — als neue Bereitstellung. */
   onErneutEinsatz: () => void;
+  /** Zurückgekehrter Trupp geht zurück an den Sammelplatz. */
+  onAnSammelplatz: () => void;
+}
+
+/** Eine Zeile des Druckverlaufs: Uhrzeit, Druck, wofür der Wert steht. */
+interface VerlaufZeile {
+  key: string;
+  zeitpunkt: string;
+  druck?: number;
+  label: string;
 }
 
 const FARBE: Record<Dringlichkeit, 'success' | 'warning' | 'error'> = {
@@ -72,6 +83,7 @@ export default function UeberwachungCard({
   onAbmarsch,
   onRueckkehr,
   onErneutEinsatz,
+  onAnSammelplatz,
 }: UeberwachungCardProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
@@ -92,6 +104,45 @@ export default function UeberwachungCard({
     : [];
   const abfragen = sortierteAbfragen(trupp);
   const uebernommen = !!trupp.ueberwachungSeit;
+  const uebergeben = !!trupp.ueberwachungBis;
+
+  /**
+   * Der Druckverlauf als Zeilen.
+   *
+   * Der Abmarsch steht nicht in `abfragen` (er ist `abmarschZeit` +
+   * `druckAbmarsch`), die Rückkehr auch nicht — für die Anzeige gehören alle
+   * drei in dieselbe Spalte.
+   */
+  const verlauf: VerlaufZeile[] = [
+    ...(trupp.abmarschZeit
+      ? [
+          {
+            key: 'abmarsch',
+            zeitpunkt: trupp.abmarschZeit,
+            druck: trupp.druckAbmarsch,
+            label: t('ueberwachung.abmarschUm'),
+          },
+        ]
+      : []),
+    ...abfragen.map((a, i) => ({
+      key: `abfrage-${i}-${a.zeitpunkt}`,
+      zeitpunkt: a.zeitpunkt,
+      druck: a.druck,
+      // Eine gewöhnliche Zwischenabfrage bleibt unbeschriftet: Stünde an jeder
+      // Zeile „Druckabfrage", fielen Ankunft und Rückkehr nicht mehr auf.
+      label: a.amZiel ? t('ueberwachung.amZielKurz') : '',
+    })),
+    ...(trupp.rueckkehrZeit
+      ? [
+          {
+            key: 'rueckkehr',
+            zeitpunkt: trupp.rueckkehrZeit,
+            druck: trupp.druckRueckkehr,
+            label: t('trupp.actions.rueckkehr'),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Card
@@ -123,6 +174,20 @@ export default function UeberwachungCard({
               size="small"
               variant="outlined"
               label={t('trupp.laufendeNummer', { n: trupp.laufendeNummer })}
+            />
+          )}
+          {uebergeben && (
+            // Der Trupp ist regeneriert oder wird es gerade — er steht nicht
+            // mehr unter dieser Zeitkontrolle. Ohne diesen Vermerk stünde am
+            // Ende des Einsatzes an jedem Trupp ein Gruppenkommandant, der ihn
+            // „überwacht".
+            <Chip
+              size="small"
+              variant="outlined"
+              color="info"
+              label={t('ueberwachung.uebergeben', {
+                zeit: uhrzeit(trupp.ueberwachungBis),
+              })}
             />
           )}
           {!uebernommen && (
@@ -352,30 +417,40 @@ export default function UeberwachungCard({
             <Typography variant="caption" color="text.secondary">
               {t('ueberwachung.druckverlauf')}
             </Typography>
-            <Typography variant="body2" component="div">
-              {[
-                trupp.abmarschZeit &&
-                  `${uhrzeit(trupp.abmarschZeit)} ${
-                    trupp.druckAbmarsch != null
-                      ? t('ueberwachung.bar', { druck: trupp.druckAbmarsch })
-                      : '–'
-                  } (${t('trupp.actions.entsenden')})`,
-                ...abfragen.map(
-                  (a) =>
-                    `${uhrzeit(a.zeitpunkt)} ${t('ueberwachung.bar', {
-                      druck: a.druck,
-                    })}${a.amZiel ? ` (${t('ueberwachung.amZielKurz')})` : ''}`,
-                ),
-                trupp.rueckkehrZeit &&
-                  `${uhrzeit(trupp.rueckkehrZeit)} ${
-                    trupp.druckRueckkehr != null
-                      ? t('ueberwachung.bar', { druck: trupp.druckRueckkehr })
-                      : '–'
-                  } (${t('trupp.actions.rueckkehr')})`,
-              ]
-                .filter(Boolean)
-                .join('  →  ')}
-            </Typography>
+            {/* Eine Zeile je Wert und keine Kette mit Pfeilen: Am
+                Einsatzort wird das im Vorbeigehen gelesen, und drei
+                Zeitangaben in einer umgebrochenen Zeile sind genau dann nicht
+                zu erfassen. Drei Spalten, damit Uhrzeiten und Drücke
+                untereinander stehen. */}
+            <Box
+              sx={{
+                mt: 0.5,
+                display: 'grid',
+                gridTemplateColumns: 'auto auto 1fr',
+                columnGap: 1.5,
+                rowGap: 0.25,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {verlauf.map((zeile) => (
+                <Fragment key={zeile.key}>
+                  <Typography variant="body2" color="text.secondary">
+                    {uhrzeit(zeile.zeitpunkt)}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 600, textAlign: 'right' }}
+                  >
+                    {zeile.druck != null
+                      ? t('ueberwachung.bar', { druck: zeile.druck })
+                      : '–'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {zeile.label}
+                  </Typography>
+                </Fragment>
+              ))}
+            </Box>
           </>
         )}
 
@@ -433,13 +508,24 @@ export default function UeberwachungCard({
               </Button>
             </>
           )}
-          {trupp.status === 'zurueck' && (
-            // Der Trupp hat gefüllt und geht wieder hinein. Am Sammelplatz
-            // führt der Weg über „wieder bereitstellen" — hier steht der
-            // Gruppenkommandant selbst davor und schickt ihn direkt.
-            <Button size="small" variant="contained" onClick={onErneutEinsatz}>
-              {t('ueberwachung.actions.erneutInDenEinsatz')}
-            </Button>
+          {trupp.status === 'zurueck' && !uebergeben && (
+            <>
+              {/* Der Trupp hat gefüllt und geht wieder hinein. Am Sammelplatz
+                  führt der Weg über „wieder bereitstellen" — hier steht der
+                  Gruppenkommandant selbst davor und schickt ihn direkt. */}
+              <Button
+                size="small"
+                variant="contained"
+                onClick={onErneutEinsatz}
+              >
+                {t('ueberwachung.actions.erneutInDenEinsatz')}
+              </Button>
+              {/* Oder eben nicht — dann ist der Trupp Sache des
+                  Sammelplatzes, und die Zeitkontrolle ist hier zu Ende. */}
+              <Button size="small" onClick={onAnSammelplatz}>
+                {t('ueberwachung.actions.anSammelplatz')}
+              </Button>
+            </>
           )}
         </CardActions>
       )}

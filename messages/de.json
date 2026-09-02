@@ -147,6 +147,7 @@
       "mitgliederVoll": "Höchstens {max} Namen je Trupp.",
       "bemerkung": "Bemerkung",
       "laufendeNummer": "{n}. Einsatz",
+      "vonUeberwachung": "Von der Atemschutzüberwachung übergeben ({zeit})",
       "status": {
         "bereit": "In Bereitschaft",
         "imEinsatz": "Im Einsatz",
@@ -490,6 +491,7 @@
       "druckverlauf": "Druckverlauf",
       "startdruckGeschaetzt": "Abmarschdruck nicht abgelesen",
       "zielMeldungFehlt": "Keine Ankunftsmeldung",
+      "uebergeben": "An den Sammelplatz übergeben ({zeit})",
       "geraetesatz": "{anzahl}×{volumen} l / {druck} bar · {dauer} min rechnerisch",
       "grund": {
         "vormarsch": "Rückmarschdruck {druck} bar (doppelter Vormarschdruckabfall)",
@@ -531,6 +533,7 @@
         "uebernehmen": "Zeitkontrolle übernehmen",
         "inDenEinsatz": "In den Einsatz schicken",
         "erneutInDenEinsatz": "Erneut in den Einsatz schicken",
+        "anSammelplatz": "An den Sammelplatz übergeben",
         "druckabfrage": "Druckabfrage",
         "truppErfassen": "Trupp erfassen",
         "pushErlauben": "Benachrichtigungen einschalten"
