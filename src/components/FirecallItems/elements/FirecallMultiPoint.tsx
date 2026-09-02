@@ -32,6 +32,14 @@ export class FirecallMultiPoint extends FirecallItemBase {
   color?: string;
   alwaysShowMarker?: string;
   /**
+   * Länge und Schlaucheinteilung an der Linie anzeigen.
+   *
+   * Steht hier neben `alwaysShowMarker` und nicht an der Leitung: Eine
+   * Dammlinie hat eine Länge, nur keine Schläuche — die Querstriche entfallen
+   * dort, das Etikett nicht.
+   */
+  showLength?: string;
+  /**
    * Straßen-Routing. Die Felder stehen hier und nicht erst an Leitung und Linie,
    * weil `data()` die Grundlage jedes Schreibvorgangs ist — was dort fehlt,
    * löscht ein Speichern aus dem Dialog. Angeboten wird die Option nur, wo sie
@@ -54,6 +62,7 @@ export class FirecallMultiPoint extends FirecallItemBase {
         distance: this.distance,
         color: this.color,
         alwaysShowMarker: this.alwaysShowMarker = 'false',
+        showLength: this.showLength = 'false',
         streetRouting: this.streetRouting,
         routingProfile: this.routingProfile,
         routedPositions: this.routedPositions,
@@ -76,6 +85,7 @@ export class FirecallMultiPoint extends FirecallItemBase {
       ...super.fields(),
       color: 'Farbe (HTML bzw. Englisch)',
       alwaysShowMarker: 'Punkte immer anzeigen',
+      showLength: 'Länge und Schläuche anzeigen',
     };
   }
 
@@ -83,6 +93,7 @@ export class FirecallMultiPoint extends FirecallItemBase {
     return {
       ...super.fieldTypes(),
       alwaysShowMarker: 'boolean',
+      showLength: 'boolean',
       color: 'color',
     };
   }
@@ -96,6 +107,7 @@ export class FirecallMultiPoint extends FirecallItemBase {
       distance: this.distance,
       color: this.color,
       alwaysShowMarker: this.alwaysShowMarker,
+      showLength: this.showLength,
       streetRouting: this.streetRouting,
       routingProfile: this.routingProfile,
       routedPositions: this.routedPositions,

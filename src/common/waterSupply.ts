@@ -370,12 +370,34 @@ export function hoseLineDraftLabel(draft: HoseLineDraft): string {
 }
 
 /**
- * Punkt für das Etikett: die Mitte des längsten Teilstücks. Bei einer geraden
- * Leitung ist das die Streckenmitte; bei einer geknickten sitzt es dort, wo
- * am meisten Platz ist, statt auf einem Knick.
+ * Dasselbe Etikett aus Rohwerten — für die Linie beim Zeichnen, beim
+ * Verschieben und an der fertigen Leitung.
+ *
+ * Ohne `dimension` bleibt es bei der Länge: Dieselbe Zeichenmaschine bedient
+ * Leitungen, Linien und Flächen, und „62 Schläuche" an einer Dammlinie wäre
+ * Unsinn.
  */
-export function hoseLineDraftMidpoint(draft: HoseLineDraft): LatLngPosition {
-  const { positions } = draft;
+export function hoseLabel(
+  distanceM: number,
+  dimension?: string,
+  hoseLengthM = 20
+): string {
+  const metres = `${Math.round(distanceM)} m`;
+  if (!dimension || hoseLengthM <= 0) return metres;
+  // Aufgerundet: Ein angebrochener Schlauch muss trotzdem mit.
+  const count = Math.ceil(distanceM / hoseLengthM);
+  return `${metres} · ${count} × ${dimension}`;
+}
+
+/**
+ * Die Mitte des längsten Teilstücks — der Platz für ein Etikett.
+ *
+ * Bei einer geraden Leitung ist das die Streckenmitte; bei einer geknickten
+ * sitzt es dort, wo am meisten Platz ist, statt auf einem Knick.
+ */
+export function longestSegmentMidpoint(
+  positions: LatLngPosition[]
+): LatLngPosition {
   if (positions.length < 2) return positions[0];
 
   let bestIndex = 1;
@@ -394,4 +416,91 @@ export function hoseLineDraftMidpoint(draft: HoseLineDraft): LatLngPosition {
   const a = positions[bestIndex - 1];
   const b = positions[bestIndex];
   return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+}
+
+/**
+ * Ein kurzer Querstrich je Schlauchgrenze, senkrecht auf dem Verlauf.
+ *
+ * Damit ist auf der Karte zu sehen, wo ein Schlauch endet und der nächste
+ * beginnt — und ob die Länge bis zur nächsten Ecke noch reicht.
+ *
+ * `fromEnd` zählt vom letzten Punkt her. Schläuche werden von der
+ * Entnahmestelle weg verlegt; liegt sie bei umgekehrter Förderrichtung am
+ * letzten Punkt, hinge der kurze Restschlauch sonst am falschen Ende.
+ *
+ * `halfLengthM` kommt vom Aufrufer und nicht aus einer Konstante: Die
+ * Strichlänge wird aus dem Kartenmaßstab so gewählt, dass sie in Pixeln gleich
+ * bleibt — in Metern fest wäre sie bei kleinem Zoom unsichtbar und bei großem
+ * eine Querstraße.
+ */
+export function hoseBoundaryTicks(
+  positions: LatLngPosition[],
+  hoseLengthM: number,
+  halfLengthM: number,
+  fromEnd = false
+): [LatLngPosition, LatLngPosition][] {
+  if (positions.length < 2 || hoseLengthM <= 0 || halfLengthM <= 0) return [];
+
+  const path = fromEnd ? [...positions].reverse() : positions;
+
+  const segments = path.slice(1).map((to, index) => {
+    const from = path[index];
+    return {
+      from,
+      to,
+      length: haversine(
+        { lat: from[0], lng: from[1] },
+        { lat: to[0], lng: to[1] }
+      ),
+    };
+  });
+  const total = segments.reduce((sum, segment) => sum + segment.length, 0);
+
+  const ticks: [LatLngPosition, LatLngPosition][] = [];
+  let segmentIndex = 0;
+  let consumed = 0;
+
+  // Die Grenze am Leitungsende ist keine: Dort hört der letzte Schlauch auf.
+  for (let at = hoseLengthM; at < total; at += hoseLengthM) {
+    while (
+      segmentIndex < segments.length - 1 &&
+      consumed + segments[segmentIndex].length < at
+    ) {
+      consumed += segments[segmentIndex].length;
+      segmentIndex += 1;
+    }
+
+    const segment = segments[segmentIndex];
+    const ratio = segment.length > 0 ? (at - consumed) / segment.length : 0;
+    const lat = segment.from[0] + (segment.to[0] - segment.from[0]) * ratio;
+    const lng = segment.from[1] + (segment.to[1] - segment.from[1]) * ratio;
+
+    // Senkrechte in Metern, über die Breitengrad-Verkürzung in Grad
+    // zurückgerechnet — auf der Länge eines Strichs ist die Erde eben.
+    const latScale = 111_320;
+    const lngScale = latScale * Math.cos((lat * Math.PI) / 180) || 1;
+    const dLat = (segment.to[0] - segment.from[0]) * latScale;
+    const dLng = (segment.to[1] - segment.from[1]) * lngScale;
+    const norm = Math.hypot(dLat, dLng);
+    if (norm === 0) continue;
+    // Senkrecht heißt: Richtungsvektor um 90° drehen.
+    const offLat = (-dLng / norm) * halfLengthM;
+    const offLng = (dLat / norm) * halfLengthM;
+
+    ticks.push([
+      [lat - offLat / latScale, lng - offLng / lngScale],
+      [lat + offLat / latScale, lng + offLng / lngScale],
+    ]);
+  }
+
+  return ticks;
+}
+
+/**
+ * Punkt für das Etikett: die Mitte des längsten Teilstücks. Bei einer geraden
+ * Leitung ist das die Streckenmitte; bei einer geknickten sitzt es dort, wo
+ * am meisten Platz ist, statt auf einem Knick.
+ */
+export function hoseLineDraftMidpoint(draft: HoseLineDraft): LatLngPosition {
+  return longestSegmentMidpoint(draft.positions);
 }

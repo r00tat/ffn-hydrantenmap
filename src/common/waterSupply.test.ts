@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { LatLngPosition } from './geo';
 import { GeohashCluster } from './gis-objects';
 import {
   buildHoseLineDraft,
@@ -6,9 +7,12 @@ import {
   compassDirection,
   describeHoseLineDraft,
   describeWaterSupplyCandidate,
+  hoseBoundaryTicks,
+  hoseLabel,
   hoseLineDraftLabel,
   hoseLineDraftMidpoint,
   hoseSectionCount,
+  longestSegmentMidpoint,
   WATER_SUPPLY_KINDS,
 } from './waterSupply';
 
@@ -406,5 +410,80 @@ describe('describeWaterSupplyCandidate', () => {
     expect(describeWaterSupplyCandidate(candidate, from)).toBe(
       'Saugstelle Seeufer, 149 m westlich, 1600 l/min'
     );
+  });
+});
+
+describe('hoseLabel', () => {
+  it('nennt Länge, Schlauchzahl und Dimension', () => {
+    expect(hoseLabel(1240, 'B', 20)).toBe('1240 m · 62 × B');
+  });
+
+  it('rundet die Schlauchzahl auf — ein angebrochener Schlauch zählt', () => {
+    expect(hoseLabel(101, 'B', 20)).toBe('101 m · 6 × B');
+  });
+
+  it('nennt nur die Länge, wo es keine Schläuche gibt', () => {
+    // Dieselbe Zeichenmaschine bedient Linien und Flächen; „62 Schläuche" an
+    // einer Dammlinie wäre Unsinn.
+    expect(hoseLabel(1240)).toBe('1240 m');
+  });
+});
+
+describe('longestSegmentMidpoint', () => {
+  it('sitzt in der Mitte des längsten Teilstücks, nicht auf einem Knick', () => {
+    const positions: LatLngPosition[] = [
+      [47.9, 16.8],
+      [47.9, 16.801],
+      [47.9, 16.81],
+    ];
+    const [lat, lng] = longestSegmentMidpoint(positions);
+    expect(lat).toBeCloseTo(47.9, 6);
+    expect(lng).toBeCloseTo((16.801 + 16.81) / 2, 6);
+  });
+
+  it('kommt mit einem einzelnen Punkt zurecht', () => {
+    expect(longestSegmentMidpoint([[47.9, 16.8]])).toEqual([47.9, 16.8]);
+  });
+});
+
+describe('hoseBoundaryTicks', () => {
+  /** Rund 400 m nach Norden — 20 Schlauchlängen zu 20 m. */
+  const gerade: LatLngPosition[] = [
+    [47.9, 16.8],
+    [47.9 + 400 / 111_320, 16.8],
+  ];
+
+  it('setzt je Schlauchgrenze einen Strich, aber keinen am Ende', () => {
+    // 400 m in 20-m-Schläuchen sind 20 Schläuche mit 19 Grenzen dazwischen.
+    // Die Grenze am Leitungsende ist keine, dort hört der Schlauch auf.
+    expect(hoseBoundaryTicks(gerade, 20, 5)).toHaveLength(19);
+  });
+
+  it('steht senkrecht auf dem Verlauf', () => {
+    const [[a, b]] = hoseBoundaryTicks(gerade, 100, 5);
+    // Die Leitung läuft nach Norden, der Strich muss also nach Osten/Westen
+    // zeigen: gleiche Breite, verschiedene Länge.
+    expect(a[0]).toBeCloseTo(b[0], 6);
+    expect(a[1]).not.toBeCloseTo(b[1], 6);
+  });
+
+  it('legt den Reststrich ans andere Ende, wenn von hinten gezählt wird', () => {
+    // Schläuche werden von der Entnahmestelle weg verlegt. Liegt sie am letzten
+    // Punkt, darf der kurze Restschlauch nicht am ersten hängen.
+    const vorne = hoseBoundaryTicks(gerade, 150, 5);
+    const hinten = hoseBoundaryTicks(gerade, 150, 5, true);
+    expect(vorne).toHaveLength(2);
+    expect(hinten).toHaveLength(2);
+    expect(vorne[0][0][0]).not.toBeCloseTo(hinten[0][0][0], 5);
+  });
+
+  it('gibt nichts zurück, wo nichts zu teilen ist', () => {
+    expect(hoseBoundaryTicks([[47.9, 16.8]], 20, 5)).toEqual([]);
+    expect(hoseBoundaryTicks(gerade, 0, 5)).toEqual([]);
+    expect(hoseBoundaryTicks(gerade, 20, 0)).toEqual([]);
+  });
+
+  it('setzt keinen Strich, wenn die Leitung kürzer als ein Schlauch ist', () => {
+    expect(hoseBoundaryTicks(gerade, 500, 5)).toEqual([]);
   });
 });
