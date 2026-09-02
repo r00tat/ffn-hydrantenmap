@@ -16,6 +16,7 @@ import {
   nextBereitstellung,
   sanitizeMitglieder,
   truppLabel,
+  type AtemschutzFuellung,
   type AtemschutzGeraet,
   type AtemschutzTrupp,
   type FuellungInput,
@@ -64,7 +65,12 @@ export default function AtemschutzPage() {
   const firecallId = useFirecallId();
   const firecall = useFirecall();
   const canWrite = useFirecallWriteAccess();
-  const { email, displayName, uid, firecall: gastFirecall } = useFirebaseLogin();
+  const {
+    email,
+    displayName,
+    uid,
+    firecall: gastFirecall,
+  } = useFirebaseLogin();
   // Ein Einsatz-Gast ist kein Gruppenmitglied und darf das Füllprotokoll unter
   // der Gruppe weder lesen noch schreiben — auch dann nicht, wenn sein Token
   // Schreibrecht am Einsatz trägt. Deshalb `isFirecallGuest` und nicht
@@ -164,7 +170,7 @@ export default function AtemschutzPage() {
   );
 
   const handleSaveFuellung = useCallback(
-    async (input: FuellungInput, id?: string) => {
+    async (input: FuellungInput, bestehende?: AtemschutzFuellung) => {
       if (!groupId) return;
       const now = new Date().toISOString();
       const data = buildFuellungDocument(input, {
@@ -173,8 +179,8 @@ export default function AtemschutzPage() {
         now,
       });
       const stamp: AtemschutzActor = { userId: actor.userId, now };
-      if (id) {
-        await updateFuellung(groupId, id, data, stamp);
+      if (bestehende?.id) {
+        await updateFuellung(groupId, bestehende.id, data, stamp);
       } else {
         await addFuellung(groupId, data, stamp);
       }
@@ -183,7 +189,8 @@ export default function AtemschutzPage() {
   );
 
   const handleDeleteFuellung = useCallback(
-    (id: string) => deleteFuellung(groupId ?? '', id),
+    (fuellung: AtemschutzFuellung) =>
+      deleteFuellung(groupId ?? '', fuellung.id ?? ''),
     [groupId],
   );
 
@@ -346,11 +353,22 @@ export default function AtemschutzPage() {
             flaschen={flaschen}
             fuellstationen={fuellstationen}
             firecallId={firecallId}
+            // Ohne `firecalls`, also ohne Auswahl: Am Sammelplatz gehört jede
+            // Füllung zu *diesem* Einsatz. Der Name steht trotzdem im Dialog —
+            // wer erfasst, soll sehen, wohin die Zeile geht.
+            firecallName={firecall?.name}
             eigeneFeuerwehr={eigeneFeuerwehr}
             feuerwehren={feuerwehren}
             personSuggestions={suggestions}
             defaultGefuelltVon={benutzerName}
             canWrite={canWrite}
+            uid={uid}
+            // Bewusst **ohne** `istGruppenAdmin`, obwohl die Rolle hier
+            // bekannt wäre: Eine fremde Zeile zu ändern geht nur über eine
+            // Server Action (die Firestore-Regel sieht die Rolle nicht), und
+            // eine Server Action scheitert an der schlechten Verbindung am
+            // Sammelplatz — genau dem Grund, aus dem hier der Client schreibt.
+            // Korrigiert wird am Schreibtisch, auf /atemschutz/fuellprotokoll.
             onSave={handleSaveFuellung}
             onDelete={handleDeleteFuellung}
           />

@@ -5,9 +5,12 @@ import {
   type AtemschutzTrupp,
   type FuellungInput,
   type TruppInput,
+  braucheDatum,
   canTransition,
+  darfFuellungAendern,
   entsendePatch,
   findByCode,
+  fuellungSperre,
   geraetDetails,
   geraetKennung,
   gruppiereTrupps,
@@ -22,6 +25,8 @@ import {
   validateTruppInput,
   verrechnenVorgabe,
   waehleFuellstation,
+  zweckOf,
+  zweckVorgabe,
 } from './atemschutz';
 
 function geraet(over: Partial<AtemschutzGeraet> = {}): AtemschutzGeraet {
@@ -205,6 +210,7 @@ describe('validateFuellungInput', () => {
     enddruck: 300,
     gefuelltVon: 'Max Muster',
     verrechnen: false,
+    zweck: 'sonstiges',
   };
 
   it('akzeptiert eine vollständige Eingabe', () => {
@@ -702,5 +708,94 @@ describe('verrechnenVorgabe', () => {
         eigeneFeuerwehr: eigene,
       }),
     ).toBe(false);
+  });
+});
+
+describe('zweckVorgabe', () => {
+  it('ist mit Einsatz „Einsatz"', () => {
+    expect(zweckVorgabe('e1')).toBe('einsatz');
+  });
+
+  it('ist ohne Einsatz „Sonstiges" und nicht „Übung"', () => {
+    expect(zweckVorgabe('')).toBe('sonstiges');
+  });
+});
+
+describe('zweckOf', () => {
+  it('nimmt den gespeicherten Zweck, auch gegen den Einsatzbezug', () => {
+    // Eine Übung *mit* Einsatznummer kommt vor — die Übung wird als Einsatz
+    // geführt. Der gesetzte Zweck ist die Aussage des Benutzers.
+    expect(zweckOf({ zweck: 'uebung', firecallId: 'e1' })).toBe('uebung');
+  });
+
+  it('leitet ihn für Altzeilen aus dem Einsatzbezug ab', () => {
+    expect(zweckOf({ firecallId: 'e1' })).toBe('einsatz');
+    expect(zweckOf({ firecallId: '' })).toBe('sonstiges');
+  });
+});
+
+describe('fuellungSperre', () => {
+  const eigene = { createdBy: 'u1' };
+
+  it('lässt den Erfasser ändern', () => {
+    expect(fuellungSperre({ fuellung: eigene, uid: 'u1' })).toBeUndefined();
+    expect(darfFuellungAendern({ fuellung: eigene, uid: 'u1' })).toBe(true);
+  });
+
+  it('sperrt eine fremde Zeile', () => {
+    expect(fuellungSperre({ fuellung: eigene, uid: 'u2' })).toBe('fremd');
+  });
+
+  it('lässt den Gruppen-Admin auch fremde Zeilen ändern', () => {
+    expect(
+      fuellungSperre({ fuellung: eigene, uid: 'u2', istGruppenAdmin: true }),
+    ).toBeUndefined();
+  });
+
+  it('sperrt eine verrechnete Zeile auch für den Erfasser', () => {
+    expect(
+      fuellungSperre({
+        fuellung: { createdBy: 'u1', rechnungId: 'r1' },
+        uid: 'u1',
+      }),
+    ).toBe('verrechnet');
+  });
+
+  it('sperrt eine verrechnete Zeile auch für den Gruppen-Admin', () => {
+    expect(
+      fuellungSperre({
+        fuellung: { createdBy: 'u1', rechnungId: 'r1' },
+        uid: 'u1',
+        istGruppenAdmin: true,
+      }),
+    ).toBe('verrechnet');
+  });
+
+  it('gibt eine Zeile ohne Erfasser nicht an jeden frei', () => {
+    // Weder der abgemeldete Zustand (`uid` fehlt) noch ein beliebiges
+    // Mitglied darf über `createdBy: ''` an die Zeile.
+    expect(fuellungSperre({ fuellung: { createdBy: '' } })).toBe('fremd');
+    expect(fuellungSperre({ fuellung: { createdBy: '' }, uid: 'u1' })).toBe(
+      'fremd',
+    );
+    expect(
+      fuellungSperre({ fuellung: { createdBy: '' }, istGruppenAdmin: true }),
+    ).toBeUndefined();
+  });
+});
+
+describe('braucheDatum', () => {
+  const jetzt = new Date('2026-09-02T10:00:00');
+
+  it('zeigt für heute kein Datum', () => {
+    expect(braucheDatum('2026-09-02T06:15:00', jetzt)).toBe(false);
+  });
+
+  it('zeigt für einen anderen Tag ein Datum', () => {
+    expect(braucheDatum('2026-09-01T23:59:00', jetzt)).toBe(true);
+  });
+
+  it('bleibt bei einem unlesbaren Zeitpunkt still', () => {
+    expect(braucheDatum('kaputt', jetzt)).toBe(false);
   });
 });
