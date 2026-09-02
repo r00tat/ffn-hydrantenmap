@@ -236,6 +236,8 @@ public class RadiacodeNotificationPlugin extends Plugin {
     public void startLiveShare(PluginCall call) {
         String firecallId   = call.getString("firecallId");
         String uid          = call.getString("uid");
+        String deviceId     = call.getString("deviceId", "");
+        String deviceLabel  = call.getString("deviceLabel", "");
         String name         = call.getString("name", "");
         String email        = call.getString("email", "");
         Integer intervalMs  = call.getInt("intervalMs");
@@ -251,11 +253,14 @@ public class RadiacodeNotificationPlugin extends Plugin {
             return;
         }
         Log.i(TAG, "plugin.startLiveShare firecallId=" + firecallId + " uid=" + uid
+            + " deviceId=" + deviceId
             + " intervalMs=" + intervalMs + " distanceM=" + distanceM);
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_START_LIVE_SHARE);
         intent.putExtra(RadiacodeForegroundService.EXTRA_FIRECALL_ID, firecallId);
         intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_UID, uid);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_DEVICE_ID, deviceId == null ? "" : deviceId);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_DEVICE_LABEL, deviceLabel == null ? "" : deviceLabel);
         intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_NAME, name);
         intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_EMAIL, email);
         intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_INTERVAL_MS, intervalMs.longValue());

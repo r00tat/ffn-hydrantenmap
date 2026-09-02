@@ -4,6 +4,8 @@ import {
   pickAvatarColor,
   isFresh,
   computeOpacity,
+  deviceLabelFromUserAgent,
+  liveLocationDocId,
   LIVE_LOCATION_COLLECTION_ID,
   STALE_HARD_CUTOFF_MS,
   STALE_FADE_START_MS,
@@ -65,6 +67,58 @@ describe('liveLocation helpers', () => {
       const v = computeOpacity(mid, now);
       expect(v).toBeGreaterThan(0.3);
       expect(v).toBeLessThan(1);
+    });
+  });
+
+  // Ein Dokument je Gerät, nicht je Benutzer: derselbe Account auf Tablet und
+  // Desktop schrieb sonst dasselbe Dokument und die Geräte überschrieben sich.
+  describe('liveLocationDocId', () => {
+    it('combines uid and device id', () => {
+      expect(liveLocationDocId('uid-1', 'abc123def456')).toBe(
+        'uid-1_abc123def456',
+      );
+    });
+    it('falls back to the bare uid without a device id', () => {
+      expect(liveLocationDocId('uid-1', '')).toBe('uid-1');
+    });
+    it('stays within the character class the Firestore rules allow', () => {
+      expect(liveLocationDocId('AbC123', 'ff00aa1234bc')).toMatch(
+        /^AbC123_[A-Za-z0-9]+$/,
+      );
+    });
+  });
+
+  describe('deviceLabelFromUserAgent', () => {
+    it('recognises Android before Linux (the Android UA carries both)', () => {
+      expect(
+        deviceLabelFromUserAgent(
+          'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36',
+        ),
+      ).toBe('Android');
+    });
+    it('recognises iPhone and iPad', () => {
+      expect(
+        deviceLabelFromUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)'),
+      ).toBe('iPhone');
+      expect(
+        deviceLabelFromUserAgent('Mozilla/5.0 (iPad; CPU OS 17_0)'),
+      ).toBe('iPad');
+    });
+    it('recognises Windows', () => {
+      expect(
+        deviceLabelFromUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'),
+      ).toBe('Windows');
+    });
+    it('recognises Mac', () => {
+      expect(
+        deviceLabelFromUserAgent(
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        ),
+      ).toBe('Mac');
+    });
+    it('returns an empty label for anything unknown', () => {
+      expect(deviceLabelFromUserAgent('')).toBe('');
+      expect(deviceLabelFromUserAgent('curl/8.4.0')).toBe('');
     });
   });
 

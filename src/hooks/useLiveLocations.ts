@@ -6,8 +6,10 @@ import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
 import {
   LIVE_LOCATION_COLLECTION_ID,
   isFresh,
+  liveLocationDocId,
   LiveLocation,
 } from '../common/liveLocation';
+import { liveLocationDeviceId } from '../common/liveLocationDevice';
 import { useFirecallId } from './useFirecall';
 import useFirebaseLogin from './useFirebaseLogin';
 
@@ -15,6 +17,12 @@ export interface DisplayableLiveLocation extends LiveLocation {
   id: string;
   /** epoch ms of updatedAt for opacity calc */
   updatedAtMs: number;
+  /**
+   * Ob das Gerät am Namen stehen soll. Nur wahr, wenn dieselbe Person mehrfach
+   * auf der Karte steht — sonst hinge an jedem Marker ein „(Android)", das
+   * nichts unterscheidet.
+   */
+  showDeviceLabel: boolean;
 }
 
 /** Narrow the unknown updatedAt field to a Firestore Timestamp duck-type. */
@@ -41,15 +49,37 @@ export function useLiveLocations(): DisplayableLiveLocation[] {
     pathSegments,
   });
 
+  const myDeviceId = liveLocationDeviceId();
+
   return useMemo(() => {
     if (!records) return [];
-    return records
-      .filter((r) => r.uid !== myUid)
+
+    // Ausgefiltert wird **dieses Gerät**, nicht das ganze Konto: dieselbe
+    // Anmeldung auf Tablet und Desktop soll sich gegenseitig sehen (die eigene
+    // Position kommt schon vom PositionMarker). Das Altdokument unter der
+    // bloßen uid gehört ebenfalls weg — es stammt von diesem Gerät aus der
+    // Zeit vor der Umstellung und liegt bis zum TTL-Ablauf noch da.
+    const ownDocIds = new Set(
+      myUid ? [liveLocationDocId(myUid, myDeviceId), myUid] : []
+    );
+
+    const fresh = records
+      .filter((r) => !ownDocIds.has(r.id))
       .map((r) => {
         const ts: unknown = r.updatedAt;
         const ms = hasToMillis(ts) ? ts.toMillis() : 0;
         return { ...r, id: r.id, updatedAtMs: ms };
       })
       .filter((r) => isFresh(r.updatedAtMs));
-  }, [records, myUid]);
+
+    const perUid = new Map<string, number>();
+    for (const r of fresh) {
+      perUid.set(r.uid, (perUid.get(r.uid) ?? 0) + 1);
+    }
+
+    return fresh.map((r) => ({
+      ...r,
+      showDeviceLabel: (perUid.get(r.uid) ?? 0) > 1,
+    }));
+  }, [records, myUid, myDeviceId]);
 }

@@ -14,6 +14,10 @@ import {
   nativeStartLiveShare,
   nativeStopLiveShare,
 } from '../../hooks/recording/nativeGpsTrackBridge';
+import {
+  liveLocationDeviceId,
+  liveLocationDeviceLabel,
+} from '../../common/liveLocationDevice';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecall, useFirecallId } from '../../hooks/useFirecall';
 import { useLiveLocationShare } from '../../hooks/useLiveLocationShare';
@@ -83,6 +87,11 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
   const { settings, setSettings } = useLiveLocationSettings();
   const [isSharing, setIsSharing] = useState(false);
 
+  // Ein Dokument je Gerät statt je Benutzer: dasselbe Konto auf mehreren
+  // Tablets schrieb sonst dasselbe Dokument. Siehe `liveLocationDocId`.
+  const deviceId = liveLocationDeviceId();
+  const deviceLabel = liveLocationDeviceLabel();
+
   const identity = useMemo(() => {
     if (!isSharing || !uid || !firecallId || firecallId === 'unknown') {
       return null;
@@ -90,10 +99,12 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
     return {
       firecallId,
       uid,
+      deviceId,
+      deviceLabel,
       name: displayName || email || '',
       email: email ?? '',
     };
-  }, [isSharing, uid, firecallId, displayName, email]);
+  }, [isSharing, uid, firecallId, displayName, email, deviceId, deviceLabel]);
 
   const { maybeSend, deleteOwn } = useLiveLocationShare(identity, settings);
 
@@ -162,6 +173,8 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
       await nativeStartLiveShare({
         firecallId,
         uid,
+        deviceId,
+        deviceLabel,
         name: displayName || email || '',
         email: email ?? '',
         intervalMs: settings.heartbeatMs,
@@ -171,7 +184,16 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
         console.warn('[liveLocation] native start failed', err),
       );
     }
-  }, [uid, firecallId, displayName, email, settings, firecall.name]);
+  }, [
+    uid,
+    firecallId,
+    displayName,
+    email,
+    settings,
+    firecall.name,
+    deviceId,
+    deviceLabel,
+  ]);
 
   const stop = useCallback(async () => {
     setIsSharing(false);

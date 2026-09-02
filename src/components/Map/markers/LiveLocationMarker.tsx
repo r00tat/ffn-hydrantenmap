@@ -24,6 +24,24 @@ export interface IconHtmlOptions {
   opacity: number;
 }
 
+/**
+ * Anzeigename am Marker. Das Gerät gehört nur dann an den Namen, wenn dieselbe
+ * Person mehrfach auf der Karte steht (`showDeviceLabel`, gesetzt in
+ * `useLiveLocations`) — bei einem Gerät je Person unterscheidet es nichts und
+ * hinge nur als Rauschen an jedem Marker.
+ */
+export function markerDisplayName(loc: {
+  name: string;
+  email: string;
+  deviceLabel?: string;
+  showDeviceLabel?: boolean;
+}): string {
+  const personName = loc.name || loc.email;
+  return loc.showDeviceLabel && loc.deviceLabel
+    ? `${personName} (${loc.deviceLabel})`
+    : personName;
+}
+
 /** Pure helper: builds the divIcon HTML so it can be unit-tested. */
 export function buildIconHtml({
   initials,
@@ -63,7 +81,8 @@ export default function LiveLocationMarker({
   const opacity = computeOpacity(loc.updatedAtMs);
   const initials = computeInitials(loc.name, loc.email);
   const color = pickAvatarColor(loc.uid);
-  const displayName = loc.name || loc.email;
+  const personName = loc.name || loc.email;
+  const displayName = markerDisplayName(loc);
 
   const icon = useMemo(
     () =>
@@ -82,7 +101,13 @@ export default function LiveLocationMarker({
   return (
     <Marker position={{ lat: loc.lat, lng: loc.lng }} icon={icon}>
       <Popup>
-        <strong>{displayName}</strong>
+        <strong>{personName}</strong>
+        {loc.deviceLabel && (
+          <>
+            <br />
+            Gerät: {loc.deviceLabel}
+          </>
+        )}
         <br />
         zuletzt aktualisiert {formatRelative(loc.updatedAtMs)}
       </Popup>

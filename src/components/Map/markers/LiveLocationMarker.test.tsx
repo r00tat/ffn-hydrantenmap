@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildIconHtml, formatRelative } from './LiveLocationMarker';
+import {
+  buildIconHtml,
+  formatRelative,
+  markerDisplayName,
+} from './LiveLocationMarker';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -52,6 +56,48 @@ describe('buildIconHtml', () => {
   });
 });
 
+// Nachtrag zu #760: dasselbe Konto auf mehreren Geräten steht jetzt mehrfach
+// auf der Karte, und die Marker müssen unterscheidbar sein.
+describe('markerDisplayName', () => {
+  it('is the plain name for a single device', () => {
+    expect(
+      markerDisplayName({
+        name: 'Paul Wölfel',
+        email: 'paul@x.at',
+        deviceLabel: 'Android',
+        showDeviceLabel: false,
+      }),
+    ).toBe('Paul Wölfel');
+  });
+
+  it('appends the device when the person appears more than once', () => {
+    expect(
+      markerDisplayName({
+        name: 'Paul Wölfel',
+        email: 'paul@x.at',
+        deviceLabel: 'Android',
+        showDeviceLabel: true,
+      }),
+    ).toBe('Paul Wölfel (Android)');
+  });
+
+  it('stays with the plain name when the device is unknown', () => {
+    expect(
+      markerDisplayName({
+        name: 'Paul Wölfel',
+        email: 'paul@x.at',
+        showDeviceLabel: true,
+      }),
+    ).toBe('Paul Wölfel');
+  });
+
+  it('falls back to the email as the person name', () => {
+    expect(
+      markerDisplayName({ name: '', email: 'paul@x.at', showDeviceLabel: true }),
+    ).toBe('paul@x.at');
+  });
+});
+
 describe('LiveLocationMarker rendering decisions', () => {
   it('returns null when opacity is zero (stale)', async () => {
     const { default: LiveLocationMarker } = await import('./LiveLocationMarker');
@@ -71,6 +117,7 @@ describe('LiveLocationMarker rendering decisions', () => {
       updatedAt: Timestamp.fromMillis(stale),
       expiresAt: Timestamp.fromMillis(stale + 1_000_000),
       updatedAtMs: stale,
+      showDeviceLabel: false,
     };
 
     // Render without a MapContainer; component should bail out and return null

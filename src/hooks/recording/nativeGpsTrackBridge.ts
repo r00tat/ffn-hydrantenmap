@@ -47,6 +47,9 @@ export async function nativeStopGpsTrack(): Promise<void> {
 export interface NativeLiveShareOpts {
   firecallId: string;
   uid: string;
+  /** Ein Dokument je Gerät, siehe `liveLocationDocId`. */
+  deviceId: string;
+  deviceLabel: string;
   name: string;
   email: string;
   intervalMs: number;
@@ -60,6 +63,8 @@ export async function nativeStartLiveShare(
   const payload: Record<string, unknown> = {
     firecallId: opts.firecallId,
     uid: opts.uid,
+    deviceId: opts.deviceId,
+    deviceLabel: opts.deviceLabel,
     name: opts.name,
     email: opts.email,
     intervalMs: opts.intervalMs,

@@ -107,16 +107,27 @@ service cloud.firestore {
       // Information an die Einsatzleitung — genau dafür sind Nur-Lese-Gäste
       // (externe Kräfte, Nachbarwehr) da. Dasselbe gilt für das Audit-Log
       // oben: append-only und nur zur Nachvollziehbarkeit.
-      match /livelocation/{userId} {
+      // Ein Dokument je **Gerät**, nicht je Benutzer: `<uid>_<deviceId>`.
+      // Vorher war die Dokument-ID die bloße uid, und dasselbe Konto auf
+      // Tablet und Desktop überschrieb sich gegenseitig. Die bloße uid bleibt
+      // erlaubt, damit Clients der Vorgängerversion weiterschreiben und ihr
+      // Altdokument löschen können; solche Dokumente laufen über die TTL aus.
+      // `matches()` prüft die ganze Zeichenkette, und eine Firebase-uid ist
+      // alphanumerisch — sie kann das Muster nicht verlassen.
+      match /livelocation/{docId} {
+        function ownLiveLocationDoc() {
+          return docId == request.auth.uid
+            || docId.matches(request.auth.uid + '_[A-Za-z0-9]+');
+        }
         allow read: if callAuthorized();
         allow create: if callAuthorized()
-          && userId == request.auth.uid
+          && ownLiveLocationDoc()
           && request.resource.data.uid == request.auth.uid;
         allow update: if callAuthorized()
-          && userId == request.auth.uid
+          && ownLiveLocationDoc()
           && request.resource.data.uid == request.auth.uid;
         allow delete: if callAuthorized()
-          && userId == request.auth.uid;
+          && ownLiveLocationDoc();
       }
 
       match /{subitem=**} {
