@@ -10,6 +10,12 @@ const { sendMock, state } = vi.hoisted(() => ({
     firecalls: {} as Record<string, Record<string, unknown> | undefined>,
     users: {} as Record<string, Record<string, unknown> | undefined>,
     updates: [] as { id: string; patch: Record<string, unknown> }[],
+    /** Die Pfade, die `getAll` bekommen hat — für die Pfadprüfung der uids. */
+    gelesenePfade: [] as string[],
+    /** Lässt `ref.update` scheitern. */
+    updateFehler: undefined as Error | undefined,
+    /** Lässt das Lesen der Empfänger scheitern. */
+    getAllFehler: undefined as Error | undefined,
   },
 }));
 
@@ -26,6 +32,7 @@ vi.mock('../../server/firebase/admin', () => {
       ref: {
         parent: { parent: { id: t.firecallId } },
         update: async (patch: Record<string, unknown>) => {
+          if (state.updateFehler) throw state.updateFehler;
           state.updates.push({ id: t.id, patch });
         },
       },
@@ -47,11 +54,14 @@ vi.mock('../../server/firebase/admin', () => {
           },
         }),
       }),
-      getAll: async (...refs: { path: string }[]) =>
-        refs.map((ref) => {
+      getAll: async (...refs: { path: string }[]) => {
+        if (state.getAllFehler) throw state.getAllFehler;
+        state.gelesenePfade.push(...refs.map((ref) => ref.path));
+        return refs.map((ref) => {
           const uid = ref.path.split('/')[1];
           return { data: () => state.users[uid] };
-        }),
+        });
+      },
     },
   };
 });
@@ -94,6 +104,9 @@ beforeEach(() => {
   state.firecalls = { f1: { name: 'Zimmerbrand' } };
   state.users = { u1: { messaging: ['tok-1', 'tok-2'] } };
   state.updates = [];
+  state.gelesenePfade = [];
+  state.updateFehler = undefined;
+  state.getAllFehler = undefined;
   sendMock.mockReset();
   sendMock.mockResolvedValue({ successCount: 2, failureCount: 0 });
 });
@@ -185,5 +198,81 @@ describe('sendUeberwachungWarnungen', () => {
 
     expect(result.results.map((r) => r.status)).toEqual(['failed', 'sent']);
     expect(result.results[0].error).toBe('FCM weg');
+  });
+
+  it('vermerkt nichts, wenn kein Gerät erreicht wurde', async () => {
+    // `sendEachForMulticast` wirft nicht, wenn alle Token abgelehnt werden —
+    // es meldet das in `successCount`. Ohne die Prüfung wäre die Warnung
+    // vermerkt und käme nie wieder.
+    state.trupps = [{ id: 't1', firecallId: 'f1', data: trupp() }];
+    sendMock.mockResolvedValue({
+      successCount: 0,
+      failureCount: 2,
+      responses: [{ success: false, error: new Error('token abgelaufen') }],
+    });
+
+    const result = await sendUeberwachungWarnungen(optionen);
+
+    expect(result.results[0].status).toBe('failed');
+    expect(result.results[0].error).toBe('keinGeraetErreicht');
+    expect(state.updates).toEqual([]);
+  });
+
+  it('meldet einen fehlgeschlagenen Vermerk getrennt vom Versand', async () => {
+    // Sonst sähe „verschickt, aber nicht vermerkt" wie „nicht verschickt" aus,
+    // und die Wiederholung in der nächsten Minute wäre nicht erklärbar.
+    state.trupps = [{ id: 't1', firecallId: 'f1', data: trupp() }];
+    state.updateFehler = new Error('Firestore weg');
+
+    const result = await sendUeberwachungWarnungen(optionen);
+
+    expect(result.results[0].status).toBe('sentUnrecorded');
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('setzt eine krumme uid nicht zu einem Pfad zusammen', async () => {
+    // `ueberwachungUids` darf jeder schreiben, der am Einsatz schreiben darf.
+    // `foo/geheim/bar` würde sonst `user/foo/geheim/bar` lesen.
+    state.trupps = [
+      {
+        id: 't1',
+        firecallId: 'f1',
+        data: trupp({ ueberwachungUids: ['foo/geheim/bar', '..', 'u1'] }),
+      },
+    ];
+
+    const result = await sendUeberwachungWarnungen(optionen);
+
+    expect(state.gelesenePfade).toEqual(['user/u1']);
+    expect(result.results[0].status).toBe('sent');
+  });
+
+  it('hält beim Lesen der Empfänger nur diesen Trupp auf', async () => {
+    // Vorher lag der Aufruf außerhalb der Fehlerbehandlung je Trupp: Ein
+    // krummer Eintrag hätte die Warnungen aller anderen Trupps mitgenommen.
+    state.trupps = [
+      { id: 't1', firecallId: 'f1', data: trupp() },
+      { id: 't2', firecallId: 'f1', data: trupp({ truppName: 'Trupp 2' }) },
+    ];
+    state.getAllFehler = new Error('Pfad unbrauchbar');
+
+    const result = await sendUeberwachungWarnungen(optionen);
+
+    expect(result.results.map((r) => r.status)).toEqual(['failed', 'failed']);
+    expect(result.geprueft).toBe(2);
+  });
+
+  it('kappt die Token bei der Grenze von sendEachForMulticast', async () => {
+    // Mehr als 500 Token weist FCM komplett ab — eine Warnung, die an gar
+    // niemanden geht, wäre die schlechteste aller Antworten.
+    state.users = {
+      u1: { messaging: Array.from({ length: 620 }, (_, i) => `tok-${i}`) },
+    };
+    state.trupps = [{ id: 't1', firecallId: 'f1', data: trupp() }];
+
+    const result = await sendUeberwachungWarnungen(optionen);
+
+    expect(sendMock.mock.calls[0][0].tokens).toHaveLength(500);
+    expect(result.results[0].tokenCount).toBe(500);
   });
 });

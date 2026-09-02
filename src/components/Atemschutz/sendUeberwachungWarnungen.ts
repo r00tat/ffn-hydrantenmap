@@ -3,6 +3,7 @@ import 'server-only';
 import { getMessaging } from 'firebase-admin/messaging';
 import {
   ATEMSCHUTZ_TRUPP_COLLECTION_ID,
+  sanitizeUeberwachungUids,
   warnungVermerk,
   type AtemschutzTrupp,
   type WarnungKey,
@@ -38,7 +39,19 @@ import {
  * prüfbar sind — dieselbe Aufteilung wie bei `sendWeeklyReports`.
  */
 
-export type WarnungStatus = 'sent' | 'noRecipient' | 'failed' | 'dryRun';
+export type WarnungStatus =
+  | 'sent'
+  /**
+   * Verschickt, aber der Vermerk am Dokument ist nicht durchgekommen.
+   *
+   * Ein eigener Zustand und nicht `failed`: Der Unterschied entscheidet, ob die
+   * Warnung beim nächsten Lauf erneut hinausgeht. Er gehört ins Ergebnis, damit
+   * der Betrieb den Unterschied auch sieht.
+   */
+  | 'sentUnrecorded'
+  | 'noRecipient'
+  | 'failed'
+  | 'dryRun';
 
 export interface WarnungResult {
   firecallId: string;
@@ -69,6 +82,16 @@ export interface SendUeberwachungWarnungenResult {
 }
 
 /**
+ * Obergrenze der Token je Sendung.
+ *
+ * `sendEachForMulticast` nimmt höchstens 500 Token und weist mehr komplett ab —
+ * eine Warnung, die an gar niemanden geht, wäre die schlechteste aller
+ * Antworten. Mit `MAX_UEBERWACHUNG_UIDS` Geräten und mehreren Browsern je
+ * Benutzer ist die Grenze praktisch unerreichbar; sie steht als Riegel da.
+ */
+const MAX_TOKENS_PRO_SENDUNG = 500;
+
+/**
  * Die Push-Token der Geräte, die an dieser Überwachung arbeiten.
  *
  * Empfänger sind die `uid`s aus `ueberwachungUids` — wer übernommen oder eine
@@ -76,8 +99,14 @@ export interface SendUeberwachungWarnungenResult {
  * Warnung, die jede Feuerwehrfrau und jeden Feuerwehrmann erreicht, ist nach
  * dem zweiten Einsatz eine, die niemand mehr ansieht.
  */
-async function tokensFor(uids: string[]): Promise<string[]> {
-  const eindeutig = [...new Set(uids.filter((uid) => !!uid?.trim()))];
+async function tokensFor(uids: string[] | undefined): Promise<string[]> {
+  // `sanitizeUeberwachungUids` ist hier die Sicherheitsgrenze, nicht eine
+  // Höflichkeit: Die Liste steht am Trupp-Dokument und darf von jedem
+  // geschrieben werden, der am Einsatz schreiben darf. Ein Wert mit
+  // Schrägstrich würde `user/{uid}` zu einem anderen Pfad zusammensetzen, ein
+  // `.` oder `..` ließe das SDK werfen — und die Zahl der Einträge bestimmte
+  // sonst der Schreiber.
+  const eindeutig = sanitizeUeberwachungUids(uids);
   if (eindeutig.length === 0) return [];
   const docs = await firestore.getAll(
     ...eindeutig.map((uid) =>
@@ -90,6 +119,7 @@ async function tokensFor(uids: string[]): Promise<string[]> {
     if (!Array.isArray(messaging)) continue;
     for (const token of messaging) {
       if (typeof token === 'string' && token.trim()) tokens.add(token);
+      if (tokens.size >= MAX_TOKENS_PRO_SENDUNG) return [...tokens];
     }
   }
   return [...tokens];
@@ -144,7 +174,28 @@ export async function sendUeberwachungWarnungen({
     const stand = berechneStand(trupp, jetzt);
     if (!warnung || !stand) continue;
 
-    const tokens = await tokensFor(trupp.ueberwachungUids ?? []);
+    // Innerhalb der Fehlerbehandlung je Trupp: Das Lesen der Token greift auf
+    // fremd geschriebene Daten zu, und ein Fehler daran darf nicht die
+    // Warnungen aller anderen Trupps mitnehmen.
+    let tokens: string[];
+    try {
+      tokens = await tokensFor(trupp.ueberwachungUids);
+    } catch (err) {
+      console.error(
+        `Atemschutzwarnung: Empfänger nicht lesbar (${firecallId}/${doc.id})`,
+        err,
+      );
+      results.push({
+        firecallId,
+        truppId: doc.id,
+        warnung: warnung.key,
+        status: 'failed',
+        tokenCount: 0,
+        error: (err as Error).message,
+      });
+      continue;
+    }
+
     const push = buildUeberwachungPush({
       firecallId,
       firecallName: firecall.name,
@@ -181,10 +232,29 @@ export async function sendUeberwachungWarnungen({
     }
 
     try {
-      await getMessaging().sendEachForMulticast({
+      const antwort = await getMessaging().sendEachForMulticast({
         tokens,
         data: push.data as unknown as Record<string, string>,
       });
+      // `sendEachForMulticast` wirft **nicht**, wenn einzelne oder alle Token
+      // abgelehnt werden — es meldet das in `successCount`. Ohne diese Prüfung
+      // würde eine Warnung als verschickt vermerkt, die kein Gerät erreicht
+      // hat, und danach nie wieder hinausgehen: bei einer Sicherheitsfunktion
+      // die falsche Richtung. Kam nichts durch, bleibt die Warnung offen und
+      // der nächste Lauf versucht es erneut.
+      if ((antwort?.successCount ?? 0) === 0) {
+        console.error(
+          `Atemschutzwarnung: kein Gerät erreicht (${firecallId}/${doc.id})`,
+          antwort?.responses?.[0]?.error,
+        );
+        results.push({
+          ...basis,
+          status: 'failed',
+          error: 'keinGeraetErreicht',
+        });
+        continue;
+      }
+
       // Alle offenen Warnungen vermerken, nicht nur die verschickte: Die
       // überholten Erinnerungen sind mit der dringlicheren Meldung erledigt,
       // und nachträglich zugestellt wären sie irreführend.
@@ -192,8 +262,24 @@ export async function sendUeberwachungWarnungen({
         (acc, w) => ({ ...acc, ...warnungVermerk(w.key, jetzt.toISOString()) }),
         {},
       );
-      await doc.ref.update(vermerke);
-      results.push({ ...basis, status: 'sent' });
+      try {
+        await doc.ref.update(vermerke);
+        results.push({ ...basis, status: 'sent' });
+      } catch (err) {
+        // Verschickt, aber nicht vermerkt. Getrennt gemeldet, weil sonst genau
+        // dieser Fall wie „nicht verschickt" aussähe: Die Warnung geht in einer
+        // Minute erneut hinaus, und das soll im Protokoll erkennbar sein statt
+        // als rätselhafte Wiederholung.
+        console.error(
+          `Atemschutzwarnung verschickt, Vermerk fehlgeschlagen (${firecallId}/${doc.id})`,
+          err,
+        );
+        results.push({
+          ...basis,
+          status: 'sentUnrecorded',
+          error: (err as Error).message,
+        });
+      }
     } catch (err) {
       // Ein Fehler an einem Trupp darf den Lauf nicht beenden — die anderen
       // Warnungen sind davon unabhängig.

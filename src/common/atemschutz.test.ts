@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_TRUPP_MITGLIEDER,
+  MAX_UEBERWACHUNG_UIDS,
   type AtemschutzGeraet,
   type AtemschutzTrupp,
   type FuellungInput,
@@ -15,6 +16,7 @@ import {
   geraetDetails,
   geraetKennung,
   gruppiereTrupps,
+  istGueltigeUid,
   lookupKeys,
   matchGeraete,
   mitUeberwachungsUid,
@@ -24,6 +26,7 @@ import {
   sanitizeMitglieder,
   sanitizePersonen,
   sanitizeTruppGeraete,
+  sanitizeUeberwachungUids,
   truppGeraetLabel,
   truppGeraetVonGeraet,
   uebernahmePatch,
@@ -990,5 +993,80 @@ describe('sanitizeTruppGeraete', () => {
     ).toEqual([
       { typ: 'flasche', bezeichnung: '2.16.19', kennung: '2.16.19' },
     ]);
+  });
+});
+
+describe('istGueltigeUid', () => {
+  it('nimmt eine gewöhnliche Auth-uid', () => {
+    expect(istGueltigeUid('AbC123xyz_-')).toBe(true);
+  });
+
+  it('lehnt einen Pfad ab — er würde auf ein anderes Dokument zeigen', () => {
+    // `user/foo/geheim/bar` statt `user/foo`.
+    expect(istGueltigeUid('foo/geheim/bar')).toBe(false);
+    expect(istGueltigeUid('/foo')).toBe(false);
+  });
+
+  it('lehnt die Punkt-Segmente ab — das SDK würde werfen', () => {
+    expect(istGueltigeUid('.')).toBe(false);
+    expect(istGueltigeUid('..')).toBe(false);
+  });
+
+  it('lehnt die von Firestore reservierte Form ab', () => {
+    expect(istGueltigeUid('__name__')).toBe(false);
+  });
+
+  it('lehnt Leeres ab', () => {
+    expect(istGueltigeUid('')).toBe(false);
+    expect(istGueltigeUid('   ')).toBe(false);
+  });
+
+  it('lehnt mehr als 1500 Byte ab', () => {
+    expect(istGueltigeUid('a'.repeat(1500))).toBe(true);
+    expect(istGueltigeUid('a'.repeat(1501))).toBe(false);
+    // Mehrbyte-Zeichen zählen als Bytes, nicht als Zeichen.
+    expect(istGueltigeUid('ä'.repeat(751))).toBe(false);
+  });
+});
+
+describe('sanitizeUeberwachungUids', () => {
+  it('wirft ungültige Einträge weg und hält die Reihenfolge', () => {
+    expect(
+      sanitizeUeberwachungUids(['u1', 'foo/bar', ' u2 ', '..', '', 'u1']),
+    ).toEqual(['u1', 'u2']);
+  });
+
+  it('übergeht Einträge, die keine Zeichenketten sind', () => {
+    expect(
+      sanitizeUeberwachungUids([
+        'u1',
+        42 as unknown as string,
+        null as unknown as string,
+      ]),
+    ).toEqual(['u1']);
+  });
+
+  it('kürzt auf die Höchstzahl', () => {
+    const viele = Array.from({ length: MAX_UEBERWACHUNG_UIDS + 5 }, (_, i) => `u${i}`);
+    expect(sanitizeUeberwachungUids(viele)).toHaveLength(MAX_UEBERWACHUNG_UIDS);
+  });
+
+  it('ist ohne Liste leer', () => {
+    expect(sanitizeUeberwachungUids(undefined)).toEqual([]);
+  });
+});
+
+describe('mitUeberwachungsUid: Schranken', () => {
+  it('nimmt eine krumme uid nicht auf', () => {
+    expect(mitUeberwachungsUid(['u1'], 'foo/bar')).toEqual(['u1']);
+  });
+
+  it('räumt eine bereits verunreinigte Liste mit auf', () => {
+    expect(mitUeberwachungsUid(['u1', 'foo/bar'], 'u2')).toEqual(['u1', 'u2']);
+  });
+
+  it('hängt über der Höchstzahl nichts mehr an', () => {
+    const voll = Array.from({ length: MAX_UEBERWACHUNG_UIDS }, (_, i) => `u${i}`);
+    expect(mitUeberwachungsUid(voll, 'neu')).toEqual(voll);
   });
 });

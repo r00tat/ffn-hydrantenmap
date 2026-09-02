@@ -988,10 +988,19 @@ export function mitUeberwachungsUid(
   vorhanden: string[] | undefined,
   uid: string,
 ): string[] {
-  const liste = [...(vorhanden ?? [])];
+  // Bereinigt und nicht bloß kopiert: Was hier zurückgeht, wird geschrieben,
+  // und die Liste soll schon beim Schreiben die Schranken einhalten, die der
+  // Zeitplan beim Lesen ohnehin durchsetzt (`sanitizeUeberwachungUids`).
+  const liste = sanitizeUeberwachungUids(vorhanden);
   const wert = uid?.trim();
-  if (!wert || liste.includes(wert)) return liste;
-  liste.push(wert);
+  if (
+    !istGueltigeUid(wert ?? '') ||
+    liste.includes(wert as string) ||
+    liste.length >= MAX_UEBERWACHUNG_UIDS
+  ) {
+    return liste;
+  }
+  liste.push(wert as string);
   return liste;
 }
 
@@ -1150,6 +1159,68 @@ export function sanitizeTruppGeraete(liste: TruppGeraet[]): TruppGeraet[] {
     const person = roh.person?.trim();
     if (person) sauber.person = person;
     result.push(sauber);
+  }
+  return result;
+}
+
+/**
+ * Höchstzahl der Geräte, die eine Warnung der Überwachung bekommen.
+ *
+ * Eine Schranke gegen eine Liste, die niemand mehr liest — und gegen eine, die
+ * jemand aufbläht: `ueberwachungUids` steht am Trupp-Dokument, und das darf
+ * jeder schreiben, der am Einsatz schreiben darf (`call/{id}/{subitem=**}` in
+ * den Firestore-Regeln), einschließlich eines Einsatz-Gastes mit Schreibrecht.
+ * Zwanzig ist weit über dem, was ein Trupp je braucht — der Regelfall sind ein
+ * bis zwei Geräte.
+ */
+export const MAX_UEBERWACHUNG_UIDS = 20;
+
+/**
+ * Ob eine Zeichenkette als Firestore-Dokument-ID taugen kann.
+ *
+ * **Sicherheitsrelevant, nicht Kosmetik.** Die `uid`s aus `ueberwachungUids`
+ * werden serverseitig zu `user/{uid}` zusammengesetzt. Ein Wert mit
+ * Schrägstrich ergäbe einen *anderen* Pfad — `foo/geheim/bar` liest ein Dokument
+ * in einer Untersammlung von `user/foo` —, und `.` oder `..` lässt das SDK
+ * werfen. Ein Wurf wäre hier besonders teuer: Er käme aus dem Lesen der Token
+ * und damit von *außerhalb* der Fehlerbehandlung je Trupp, ein einziger
+ * krummer Eintrag hielte also die Warnungen aller anderen Trupps auf.
+ *
+ * Geprüft wird gegen die Regeln für Dokument-IDs und nicht gegen das Format von
+ * Firebase-Auth-`uid`s: Letzteres ist nirgends garantiert, die Pfadregeln sind
+ * das, worauf es hier ankommt.
+ */
+export function istGueltigeUid(uid: string): boolean {
+  const wert = (uid ?? '').trim();
+  if (!wert) return false;
+  if (wert.includes('/')) return false;
+  if (wert === '.' || wert === '..') return false;
+  // Von Firestore reservierte Form.
+  if (/^__.*__$/.test(wert)) return false;
+  // Firestore lässt höchstens 1500 Byte zu; UTF-8-Länge, nicht Zeichenzahl.
+  return new TextEncoder().encode(wert).length <= 1500;
+}
+
+/**
+ * Die brauchbaren Empfänger einer Warnung: gültig, ohne Dubletten, gekürzt.
+ *
+ * Angewendet beim **Lesen** und nicht nur beim Schreiben: Geschrieben hat die
+ * Liste möglicherweise ein anderer Client, und der Zeitplan darf sich nicht
+ * darauf verlassen, dass es dieser war.
+ */
+export function sanitizeUeberwachungUids(
+  uids: string[] | undefined,
+  max = MAX_UEBERWACHUNG_UIDS,
+): string[] {
+  const result: string[] = [];
+  const gesehen = new Set<string>();
+  for (const roh of uids ?? []) {
+    if (typeof roh !== 'string') continue;
+    const uid = roh.trim();
+    if (!istGueltigeUid(uid) || gesehen.has(uid)) continue;
+    gesehen.add(uid);
+    result.push(uid);
+    if (result.length >= max) break;
   }
   return result;
 }

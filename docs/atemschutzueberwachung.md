@@ -239,6 +239,27 @@ Details, die nicht offensichtlich sind:
 - **Die Buchführung steht am Dokument** (`warnungen.<key>`, per Punktpfad
   geschrieben, damit die anderen Einträge unberührt bleiben). Ohne sie käme jede
   Warnung sechzigmal je Stunde erneut.
+- **Die Empfängerliste ist eine Sicherheitsgrenze.** `ueberwachungUids` steht am
+  Trupp-Dokument, und schreiben darf sie jeder, der am Einsatz schreiben darf
+  (`call/{id}/{subitem=**}` in den Firestore-Regeln) — einschließlich eines
+  Einsatz-Gastes mit Schreibrecht. Der Lauf setzt daraus `user/{uid}` zusammen,
+  und deshalb wird beim **Lesen** bereinigt (`sanitizeUeberwachungUids`), nicht
+  nur beim Schreiben: Ein Eintrag mit Schrägstrich zeigte auf ein anderes
+  Dokument (`user/foo/geheim/bar` statt `user/foo`), `.` und `..` ließen das SDK
+  werfen — und dieser Wurf käme von außerhalb der Fehlerbehandlung je Trupp und
+  hielte die Warnungen aller anderen Trupps auf. Deshalb liegt auch das Lesen
+  der Token inzwischen *innerhalb* dieser Fehlerbehandlung. Zahl der Einträge
+  und Zahl der Token sind ebenfalls gekappt (`MAX_UEBERWACHUNG_UIDS`,
+  500 Token — mehr weist `sendEachForMulticast` komplett ab).
+- **`sendEachForMulticast` wirft nicht, wenn alle Token abgelehnt werden.** Es
+  meldet das in `successCount`. Ohne diese Prüfung wäre die Warnung als
+  verschickt vermerkt, obwohl sie kein Gerät erreicht hat, und ginge nie wieder
+  hinaus — bei einer Sicherheitsfunktion die falsche Richtung. Kam nichts durch,
+  bleibt die Warnung offen.
+- **Verschickt und nicht vermerkt ist ein eigener Zustand** (`sentUnrecorded`).
+  Scheitert der Vermerk *nach* erfolgreichem Versand, geht die Warnung in einer
+  Minute erneut hinaus; als `failed` gemeldet sähe genau das wie „nie
+  verschickt" aus und die Wiederholung wäre nicht erklärbar.
 - **Der Lauf rechnet ohne die Bestandsvorgabe.** `berechneStand` fällt dort auf
   den Standard-Pressluftatmer zurück, während die Seite den häufigsten Satz aus
   dem Flaschenbestand nimmt. Das fällt nicht auf, weil eine Warnung nur an
