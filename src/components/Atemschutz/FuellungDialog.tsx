@@ -82,6 +82,13 @@ export interface FuellungDialogProps {
    * gehört und eine Auswahl nur eine Gelegenheit zum Verklicken wäre.
    */
   firecalls?: FuellungEinsatz[];
+  /**
+   * Name des feststehenden Einsatzes — nur zur Anzeige, wenn der Dialog keine
+   * Auswahl anbietet. Ohne ihn stünde am Sammelplatz beim Anlegen gar kein
+   * Einsatz im Formular: Der Name steht dort erst am gespeicherten Dokument,
+   * und wer eine Füllung erfasst, soll sehen, welchem Einsatz sie zugeht.
+   */
+  firecallName?: string;
   /** Name der eigenen Feuerwehr, für dieselbe Vorbelegung. */
   eigeneFeuerwehr?: string;
   /** Meldet die gewählte Station zurück, damit sie gemerkt werden kann. */
@@ -153,6 +160,7 @@ export default function FuellungDialog({
   letzteFuellstationId,
   firecallId,
   firecalls,
+  firecallName,
   eigeneFeuerwehr,
   onFuellstationChange,
   onClose,
@@ -280,6 +288,16 @@ export default function FuellungDialog({
     (form.firecallId && form.firecallId === fuellung?.firecallId
       ? fuellung.firecallName
       : undefined);
+
+  /**
+   * Der Einsatz, wenn der Dialog ihn nur anzeigt.
+   *
+   * Beim Bearbeiten der Einsatz *der Zeile*, beim Anlegen der des Kontexts:
+   * Am Sammelplatz gehört jede neue Füllung zum laufenden Einsatz, und dessen
+   * Name steht erst am gespeicherten Dokument. Ohne den Rückfall stünde beim
+   * Erfassen kein Einsatz im Formular.
+   */
+  const angezeigterEinsatz = fuellung ? fuellung.firecallName : firecallName;
 
   const input: FuellungInput = {
     geraetId: form.geraetId,
@@ -639,14 +657,14 @@ export default function FuellungDialog({
                   </TextField>
                 </Grid>
               ) : (
-                !!fuellung?.firecallName && (
+                !!angezeigterEinsatz && (
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography
                       variant="body2"
                       color="text.secondary"
                       sx={{ mt: 2 }}
                     >
-                      {t('filter.einsatz')}: {fuellung.firecallName}
+                      {t('filter.einsatz')}: {angezeigterEinsatz}
                     </Typography>
                   </Grid>
                 )

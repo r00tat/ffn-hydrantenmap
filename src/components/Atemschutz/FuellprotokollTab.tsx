@@ -47,6 +47,8 @@ export interface FuellprotokollTabProps {
   firecallId: string;
   /** Einsätze zur Auswahl im Dialog; leer heißt: Der Einsatz steht fest. */
   firecalls?: FuellungEinsatz[];
+  /** Name des feststehenden Einsatzes — der Dialog zeigt ihn dann nur an. */
+  firecallName?: string;
   eigeneFeuerwehr?: string;
   /** Herkunft je Zeile anzeigen — auf der eigenen Seite ja, am Einsatz nein. */
   zeigeHerkunft?: boolean;
@@ -80,6 +82,7 @@ export default function FuellprotokollTab({
   onFuellstationChange,
   firecallId,
   firecalls,
+  firecallName,
   eigeneFeuerwehr,
   zeigeHerkunft,
   uid,
@@ -297,6 +300,7 @@ export default function FuellprotokollTab({
           letzteFuellstationId={letzteFuellstationId}
           firecallId={firecallId}
           firecalls={firecalls}
+          firecallName={firecallName}
           eigeneFeuerwehr={eigeneFeuerwehr}
           onFuellstationChange={onFuellstationChange}
           onClose={() => setDialogOpen(false)}

@@ -470,6 +470,9 @@ export default function FuellprotokollPage() {
         onFuellstationChange={merkeStation}
         firecallId={neuerEinsatz}
         firecalls={firecalls}
+        // Nur wirksam, solange die Gruppe noch keinen Einsatz hat und der
+        // Dialog deshalb keine Auswahl anbietet.
+        firecallName={neuerEinsatzName}
         eigeneFeuerwehr={eigeneFeuerwehr}
         zeigeHerkunft
         feuerwehren={feuerwehren}

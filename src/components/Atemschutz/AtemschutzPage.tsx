@@ -353,6 +353,10 @@ export default function AtemschutzPage() {
             flaschen={flaschen}
             fuellstationen={fuellstationen}
             firecallId={firecallId}
+            // Ohne `firecalls`, also ohne Auswahl: Am Sammelplatz gehört jede
+            // Füllung zu *diesem* Einsatz. Der Name steht trotzdem im Dialog —
+            // wer erfasst, soll sehen, wohin die Zeile geht.
+            firecallName={firecall?.name}
             eigeneFeuerwehr={eigeneFeuerwehr}
             feuerwehren={feuerwehren}
             personSuggestions={suggestions}

@@ -238,6 +238,12 @@ Ein Einsatz, der nicht mehr in der Auswahl steht — die Liste führt die letzte
 50 —, bekommt einen eigenen Eintrag aus der Namenskopie am Dokument. Ohne den
 stünde das Feld leer und ein Speichern nähme der Zeile den Einsatz.
 
+Angezeigt wird er am Sammelplatz **auch beim Anlegen**, dafür gibt es die Prop
+`firecallName`. Der Name steht sonst erst am gespeicherten Dokument, und wer
+eine Füllung erfasst, soll sehen, welchem Einsatz sie zugeht. Beim Bearbeiten
+gilt der Einsatz *der Zeile* und nicht der des Kontexts — sonst behauptete das
+Formular für eine ältere Zeile den laufenden Einsatz.
+
 Aus demselben Grund steht beim Bearbeiten der **Zeitpunkt** im Formular: Der
 Dialog schickte ihn vorher nicht mit, und `buildFuellungDocument` setzte
 mangels Angabe die aktuelle Zeit — jede Korrektur verschob die Füllung

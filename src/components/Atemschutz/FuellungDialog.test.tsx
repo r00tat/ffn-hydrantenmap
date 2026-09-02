@@ -410,6 +410,27 @@ describe('FuellungDialog — Einsatz, Zweck und Zeitpunkt', () => {
     expect(screen.queryByLabelText('Einsatz')).not.toBeInTheDocument();
   });
 
+  it('nennt den Einsatz am Sammelplatz auch beim Anlegen', () => {
+    // Der Name steht dort erst am gespeicherten Dokument; ohne den Rückfall
+    // auf den Kontext stünde beim Erfassen kein Einsatz im Formular.
+    render({ firecallId: 'e1', firecallName: 'Brand K1' });
+    expect(screen.getByText('Einsatz: Brand K1')).toBeInTheDocument();
+  });
+
+  it('nennt beim Bearbeiten den Einsatz der Zeile, nicht den des Kontexts', () => {
+    render({
+      firecallId: 'e1',
+      firecallName: 'Brand K1',
+      fuellung: { ...bestehend, firecallName: 'Übung Ost' },
+    });
+    expect(screen.getByText('Einsatz: Übung Ost')).toBeInTheDocument();
+  });
+
+  it('bleibt still, wenn es gar keinen Einsatz gibt', () => {
+    render({ firecallId: '' });
+    expect(screen.queryByText(/^Einsatz:/)).not.toBeInTheDocument();
+  });
+
   it('belegt den Zweck aus dem Einsatzbezug vor', () => {
     render({ firecallId: 'e1' });
     expect(screen.getByLabelText('Zweck')).toHaveTextContent('Einsatz');
