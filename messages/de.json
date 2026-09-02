@@ -447,9 +447,14 @@
       "title": "Atemschutzüberwachung",
       "verantwortungHinweis": "Die Atemschutzüberwachung unterstützt den Trupp bei der Überwachung seines Luftvorrats; die Verantwortung für den Trupp bleibt beim Truppkommandanten und beim Kommandanten der taktischen Einheit.",
       "keinEinsatz": "Kein Einsatz gewählt — die Atemschutzüberwachung gehört zu einem Einsatz. Zuerst einen Einsatz wählen.",
-      "einheit": "Einheit",
-      "einheitHint": "Wird je Gerät gemerkt. Ohne Auswahl sind alle Trupps des Einsatzes sichtbar.",
+      "einheit": "Meine Einheit",
+      "einheitHint": "Wird je Gerät gemerkt, steht als erster Reiter und wird neuen Trupps zugeordnet.",
       "einheitAlle": "Alle Trupps",
+      "einheitKeine": "Nicht festgelegt",
+      "zuordnung": {
+        "assp": "ASSP",
+        "keine": "Nicht zugeordnet"
+      },
       "truppEinheit": "Taktische Einheit",
       "truppEinheitHint": "Fahrzeug oder Einheit, die den Trupp bekommt — z.B. RLFA-ND",
       "nichtUebernommen": "Zeitkontrolle nicht übernommen",
@@ -470,7 +475,7 @@
       "flaschenVolumen": "Volumen je Flasche (l)",
       "fuellDruck": "Nenndruck (bar)",
       "rechnerischeDauer": "Rechnerische Einsatzdauer: {minuten} min (Anhaltswert bei 50 l/min und 55 bar Reservedruck)",
-      "uebernehmenTitle": "Zeitkontrolle übernehmen",
+      "uebernehmenTitle": "Trupp übernehmen",
       "bearbeitenTitle": "Überwachung bearbeiten",
       "einsatzTitle": "Trupp in den Einsatz schicken",
       "abmarschZeit": "Abmarsch (Anschließen der Luftversorgung)",
@@ -534,7 +539,7 @@
         "aus": "Der Browser lässt keine Benachrichtigungen zu. Warnungen erscheinen dann nur, solange diese Seite offen ist; erlauben lässt sich das in den Website-Einstellungen des Browsers."
       },
       "actions": {
-        "uebernehmen": "Zeitkontrolle übernehmen",
+        "uebernehmen": "Trupp übernehmen",
         "inDenEinsatz": "In den Einsatz schicken",
         "erneutInDenEinsatz": "Erneut in den Einsatz schicken",
         "anSammelplatz": "An den Sammelplatz übergeben",

@@ -10,6 +10,8 @@ import Divider from '@mui/material/Divider';
 import Fab from '@mui/material/Fab';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
@@ -59,21 +61,29 @@ import UeberwachungDialog, {
 } from './UeberwachungDialog';
 import {
   ALLE_EINHEITEN as ALLE,
+  ASSP_EINHEIT,
   einheitOptionen,
+  einheitTabs,
+  istEinheitName,
   truppPasstZuEinheit,
+  type EinheitTab,
 } from './einheiten';
 import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
 import useUeberwachungHinweise from './useUeberwachungHinweise';
 
 /**
- * Die gewählte Einheit steht je **Gerät** im `localStorage`, nicht am Benutzer
- * und nicht am Einsatz.
+ * Die **eigene** Einheit des Geräts steht im `localStorage` — nicht am
+ * Benutzer und nicht am Einsatz.
  *
  * Nicht am Benutzer, weil auf einem Fahrzeug mehrere Leute ein Konto teilen —
  * das ist hier der Regelfall. Nicht je Einsatz, weil dasselbe Fahrzeug im
- * nächsten Einsatz dieselbe Einheit ist; und eine Einheit, an die in *diesem*
- * Einsatz kein Trupp entsendet wurde, fällt in der Anzeige ohnehin auf „alle"
- * zurück.
+ * nächsten Einsatz dieselbe Einheit ist und die Wahl sonst in jedem Einsatz neu
+ * zu treffen wäre, im ungünstigsten Moment.
+ *
+ * Sie ist eine Angabe über das Gerät und **kein Filter**: Sie stellt den
+ * eigenen Reiter voran, wählt ihn beim Laden aus, ordnet neue Trupps zu und
+ * entscheidet, für welche Trupps die offene Seite selbst warnt. Was angezeigt
+ * wird, entscheidet dagegen der Reiter.
  */
 const EINHEIT_STORAGE_KEY = 'asue-einheit';
 
@@ -144,10 +154,17 @@ export default function UeberwachungPage() {
   // abgelesen aus dem eigenen Flaschenbestand.
   const vorgabe = useMemo(() => vorgabeGeraetesatz(flaschen), [flaschen]);
 
-  const [einheit, setEinheit] = useState<string>(leseEinheit);
+  const [meineEinheit, setMeineEinheit] = useState<string>(leseEinheit);
+  // Der Reiter startet auf der eigenen Einheit: Der Fokus gehört auf die
+  // eigenen Trupps, nicht auf die Gesamtlage.
+  const [tab, setTab] = useState<string>(leseEinheit);
 
-  const waehleEinheit = useCallback((wert: string) => {
-    setEinheit(wert);
+  const waehleMeineEinheit = useCallback((wert: string) => {
+    setMeineEinheit(wert);
+    // Beides in einem Aufruf und nicht in einem Effekt: Wer seine Einheit
+    // wechselt, will deren Trupps sehen — und `set-state-in-effect` verbietet
+    // die nachgelagerte Variante ohnehin.
+    setTab(wert);
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(EINHEIT_STORAGE_KEY, wert);
@@ -172,7 +189,7 @@ export default function UeberwachungPage() {
   }, [vehicles, tacticalUnits]);
 
   /**
-   * Die Einheiten für Filter und Zuordnung: die am Trupp vergebenen *und* die
+   * Die Einheiten zur Wahl und als Vorschlag: die am Trupp vergebenen *und* die
    * Fahrzeuge des Einsatzes. Nur die vergebenen wären beim ersten Trupp eine
    * leere Liste — genau dann, wenn die Einheit zu wählen ist.
    */
@@ -181,15 +198,44 @@ export default function UeberwachungPage() {
       einheitOptionen({
         trupps: trupps.protokoll,
         bekannt: bekannteEinheiten,
-        gewaehlt: einheit,
+        gewaehlt: meineEinheit,
       }),
-    [bekannteEinheiten, einheit, trupps.protokoll],
+    [bekannteEinheiten, meineEinheit, trupps.protokoll],
   );
 
-  const passt = useCallback(
-    (trupp: AtemschutzTrupp) => truppPasstZuEinheit(trupp, einheit),
-    [einheit],
+  /** Die Reiter: eigene Einheit zuerst, dann die anderen, dann die Gesamtlage. */
+  const tabs = useMemo(
+    () =>
+      einheitTabs({
+        trupps: trupps.protokoll,
+        aktuell: trupps.aktuell,
+        gewaehlt: meineEinheit,
+      }),
+    [meineEinheit, trupps.aktuell, trupps.protokoll],
   );
+
+  // Ein Reiter kann verschwinden — der letzte Trupp einer Einheit wird
+  // abgemeldet, ein Einsatz gewechselt. Dann gilt die Gesamtlage, statt eine
+  // leere Seite unter einem Reiter zu zeigen, den es nicht mehr gibt.
+  const aktiverTab = tabs.some((x) => x.key === tab) ? tab : ALLE;
+
+  const passt = useCallback(
+    (trupp: AtemschutzTrupp) => truppPasstZuEinheit(trupp, aktiverTab),
+    [aktiverTab],
+  );
+
+  /**
+   * Die Einheit, der ein hier erfasster oder entsendeter Trupp zufällt.
+   *
+   * Der Reiter zuerst: Wer unter „RLFA-ND" einen Trupp anlegt, erwartet ihn
+   * dort und nicht unter einem Reiter, den er gerade nicht ansieht. Steht dort
+   * eine Sammelkategorie („ASSP", „alle"), gilt die eigene Einheit.
+   */
+  const zielEinheit = istEinheitName(aktiverTab)
+    ? aktiverTab
+    : istEinheitName(meineEinheit)
+      ? meineEinheit
+      : undefined;
 
   // Gemerkt und nicht bei jedem Render neu: Die Liste hängt am Effekt der
   // Warnhinweise, und ein neues Array je Render ließe ihn jedes Mal laufen.
@@ -205,17 +251,42 @@ export default function UeberwachungPage() {
     () => trupps.zurueck.filter(passt),
     [passt, trupps.zurueck],
   );
+  const protokoll = useMemo(
+    () => trupps.protokoll.filter(passt),
+    [passt, trupps.protokoll],
+  );
   const aktuellIds = useMemo(
     () => new Set(trupps.aktuell.map((x) => x.id)),
     [trupps.aktuell],
   );
+
+  /**
+   * Für welche Trupps die **offene Seite** selbst warnt.
+   *
+   * Bewusst nicht die angezeigte Liste: Ein Blick auf den Reiter des
+   * Sammelplatzes darf die Warnungen der eigenen Trupps nicht abschalten. Die
+   * Zuständigkeit entscheidet, nicht die Ansicht — also die Trupps der eigenen
+   * Einheit und die, an denen dieses Konto schon gearbeitet hat
+   * (`ueberwachungUids`, dieselbe Liste, die der Push-Versand verwendet).
+   *
+   * Ohne eigene Einheit bleibt es bei allen Trupps im Einsatz: Wer die
+   * Gesamtlage offen hat, soll nicht weniger sehen als vorher.
+   */
+  const zuUeberwachen = useMemo(() => {
+    if (!istEinheitName(meineEinheit)) return trupps.imEinsatz;
+    return trupps.imEinsatz.filter(
+      (t) =>
+        truppPasstZuEinheit(t, meineEinheit) ||
+        (!!uid && !!t.ueberwachungUids?.includes(uid)),
+    );
+  }, [meineEinheit, trupps.imEinsatz, uid]);
 
   // Warnungen aus der offenen Seite heraus — der Serverlauf erreicht nur
   // Geräte mit Push-Token, und in der Entwicklung gibt es keinen Zeitplan.
   useUeberwachungHinweise({
     firecallId,
     firecallName: firecall?.name,
-    trupps: imEinsatz,
+    trupps: zuUeberwachen,
     jetzt,
     vorgabe,
   });
@@ -280,12 +351,12 @@ export default function UeberwachungPage() {
         ...(input.bemerkung?.trim()
           ? { bemerkung: input.bemerkung.trim() }
           : {}),
-        // Aus dem Dialog, sonst aus dem Einheitenfilter: Wer auf sein Fahrzeug
-        // gefiltert hat, erfasst Trupps für dieses Fahrzeug.
+        // Aus dem Dialog, sonst aus dem Reiter bzw. der eigenen Einheit: Wer
+        // bei seinem Fahrzeug einen Trupp erfasst, erfasst ihn für dieses.
         ...(input.entsendetAn?.trim()
           ? { entsendetAn: input.entsendetAn.trim() }
-          : einheit !== ALLE
-            ? { entsendetAn: einheit }
+          : zielEinheit
+            ? { entsendetAn: zielEinheit }
             : {}),
       };
       if (trupp?.id) {
@@ -314,7 +385,7 @@ export default function UeberwachungPage() {
         console.warn('Push-Registrierung fehlgeschlagen', err);
       });
     },
-    [actorNow, einheit, firecallId, registerMessaging],
+    [actorNow, firecallId, registerMessaging, zielEinheit],
   );
 
   const handleUebernahme = useCallback(
@@ -454,6 +525,17 @@ export default function UeberwachungPage() {
     />
   );
 
+  /** Benannte Einheiten stehen für sich; die Kategorien werden übersetzt. */
+  const tabLabel = (eintrag: EinheitTab) =>
+    eintrag.name ??
+    (eintrag.key === ALLE
+      ? t('ueberwachung.einheitAlle')
+      : t(
+          `ueberwachung.zuordnung.${
+            eintrag.key === ASSP_EINHEIT ? 'assp' : 'keine'
+          }` as 'ueberwachung.zuordnung.assp',
+        ));
+
   const abschnitt = (
     key: 'imEinsatz' | 'bereit' | 'zurueck',
     liste: AtemschutzTrupp[],
@@ -536,16 +618,20 @@ export default function UeberwachungPage() {
         spacing={2}
         sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
       >
+        {/* Die eigene Einheit ist eine Angabe über *dieses Gerät* und kein
+            Filter: Sie stellt den eigenen Reiter voran und ordnet neue Trupps
+            zu. Zur Wahl stehen deshalb alle Fahrzeuge des Einsatzes, nicht nur
+            die, an denen schon ein Trupp hängt. */}
         <TextField
           select
           size="small"
           label={t('ueberwachung.einheit')}
           helperText={t('ueberwachung.einheitHint')}
-          value={einheiten.includes(einheit) ? einheit : ALLE}
-          onChange={(e) => waehleEinheit(e.target.value)}
+          value={einheiten.includes(meineEinheit) ? meineEinheit : ALLE}
+          onChange={(e) => waehleMeineEinheit(e.target.value)}
           sx={{ minWidth: 220 }}
         >
-          <MenuItem value={ALLE}>{t('ueberwachung.einheitAlle')}</MenuItem>
+          <MenuItem value={ALLE}>{t('ueberwachung.einheitKeine')}</MenuItem>
           {einheiten.map((name) => (
             <MenuItem key={name} value={name}>
               {name}
@@ -564,6 +650,29 @@ export default function UeberwachungPage() {
         )}
       </Stack>
 
+      {/* Ein Reiter je Einheit statt eines Filters über einer Liste: Die Wahl
+          wirkt damit auf *alle* Abschnitte — vorher blieben „Zurück" und
+          „Protokoll" unverändert stehen, und niemand konnte mehr sagen, welche
+          Trupps die eigenen sind und welche am Sammelplatz stehen. Scrollbar,
+          weil an einem größeren Einsatz mehr Einheiten zusammenkommen, als in
+          eine Handy-Zeile passen. */}
+      <Tabs
+        value={aktiverTab}
+        onChange={(_, wert: string) => setTab(wert)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+      >
+        {tabs.map((eintrag) => (
+          <Tab
+            key={eintrag.key}
+            value={eintrag.key}
+            label={`${tabLabel(eintrag)}${eintrag.anzahl > 0 ? ` (${eintrag.anzahl})` : ''}`}
+          />
+        ))}
+      </Tabs>
+
       {abschnitt('imEinsatz', imEinsatz)}
       {abschnitt('bereit', bereit)}
       {abschnitt('zurueck', zurueck)}
@@ -572,12 +681,14 @@ export default function UeberwachungPage() {
       <Typography variant="h6" gutterBottom>
         {t('trupp.sections.protokoll')}
       </Typography>
-      {trupps.protokoll.length === 0 ? (
+      {/* Auf die *gefilterte* Liste geprüft: Sonst blieb unter einem Reiter
+          ohne eigene Zeilen eine leere Fläche ohne Erklärung stehen. */}
+      {protokoll.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
           {t('trupp.empty.protokoll')}
         </Typography>
       ) : (
-        <Stack spacing={1}>{trupps.protokoll.filter(passt).map(karte)}</Stack>
+        <Stack spacing={1}>{protokoll.map(karte)}</Stack>
       )}
 
       {canWrite && (
@@ -658,7 +769,7 @@ export default function UeberwachungPage() {
           // „Entsendet an" — dieselbe Angabe, aber keine Übergabe.
           kontext="ueberwachung"
           entsendetAnVorschlag={
-            dialog.trupp.entsendetAn ?? (einheit !== ALLE ? einheit : undefined)
+            dialog.trupp.entsendetAn ?? zielEinheit
           }
           entsendetAnVorschlaege={einheiten}
           onClose={() => setDialog(undefined)}

@@ -447,9 +447,14 @@
       "title": "Breathing apparatus monitoring",
       "verantwortungHinweis": "Monitoring supports the team in tracking its air supply; responsibility for the team stays with the team leader and the commander of the tactical unit.",
       "keinEinsatz": "No operation selected — monitoring belongs to an operation. Select one first.",
-      "einheit": "Unit",
-      "einheitHint": "Remembered per device. Without a selection all teams of the operation are shown.",
+      "einheit": "My unit",
+      "einheitHint": "Remembered per device, shown as the first tab and assigned to new teams.",
       "einheitAlle": "All teams",
+      "einheitKeine": "Not set",
+      "zuordnung": {
+        "assp": "Staging area",
+        "keine": "Unassigned"
+      },
       "truppEinheit": "Tactical unit",
       "truppEinheitHint": "Vehicle or unit the team is assigned to — e.g. RLFA-ND",
       "nichtUebernommen": "Time control not taken over",
@@ -470,7 +475,7 @@
       "flaschenVolumen": "Volume per cylinder (l)",
       "fuellDruck": "Nominal pressure (bar)",
       "rechnerischeDauer": "Calculated duration: {minuten} min (guide value at 50 l/min and 55 bar reserve)",
-      "uebernehmenTitle": "Take over time control",
+      "uebernehmenTitle": "Take over team",
       "bearbeitenTitle": "Edit monitoring",
       "einsatzTitle": "Send team into action",
       "abmarschZeit": "Departure (connecting the air supply)",
@@ -534,7 +539,7 @@
         "aus": "The browser does not allow notifications. Warnings then only appear while this page is open; you can allow them in the browser's site settings."
       },
       "actions": {
-        "uebernehmen": "Take over time control",
+        "uebernehmen": "Take over team",
         "inDenEinsatz": "Send into action",
         "erneutInDenEinsatz": "Send into action again",
         "anSammelplatz": "Hand back to the staging area",

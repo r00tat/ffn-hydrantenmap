@@ -34,6 +34,12 @@ import {
   sortierteAbfragen,
   type Dringlichkeit,
 } from '../../common/atemschutzUeberwachung';
+import {
+  ASSP_EINHEIT,
+  OHNE_EINHEIT,
+  istEinheitName,
+  zuordnungKey,
+} from './einheiten';
 
 export interface UeberwachungCardProps {
   trupp: AtemschutzTrupp;
@@ -62,6 +68,16 @@ interface VerlaufZeile {
   druck?: number;
   label: string;
 }
+
+/**
+ * Der Chip der Zuordnung. „Nicht zugeordnet" ist gelb, weil es eine Lücke im
+ * Protokoll ist; der Sammelplatz ist blau, weil er eine gewöhnliche Station im
+ * Ablauf ist. Eine benannte Einheit braucht keine Farbe.
+ */
+const ZUORDNUNG_FARBE: Record<string, 'info' | 'warning'> = {
+  [ASSP_EINHEIT]: 'info',
+  [OHNE_EINHEIT]: 'warning',
+};
 
 const FARBE: Record<Dringlichkeit, 'success' | 'warning' | 'error'> = {
   ok: 'success',
@@ -105,6 +121,15 @@ export default function UeberwachungCard({
   const abfragen = sortierteAbfragen(trupp);
   const uebernommen = !!trupp.ueberwachungSeit;
   const uebergeben = !!trupp.ueberwachungBis;
+
+  const zuordnung = zuordnungKey(trupp);
+  const zuordnungLabel = istEinheitName(zuordnung)
+    ? zuordnung
+    : t(
+        `ueberwachung.zuordnung.${
+          zuordnung === ASSP_EINHEIT ? 'assp' : 'keine'
+        }` as 'ueberwachung.zuordnung.assp',
+      );
 
   /**
    * Der Druckverlauf als Zeilen.
@@ -169,14 +194,18 @@ export default function UeberwachungCard({
             }
             label={t(`trupp.status.${trupp.status}`)}
           />
-          {trupp.entsendetAn && (
-            // Die Zuordnung gehört in den Kopf und nicht in die Detailzeile:
-            // Wer auf die Karte schaut, will zuerst wissen, ob der Trupp zu
-            // *seiner* Einheit gehört.
-            <Tooltip title={t('ueberwachung.truppEinheit')} describeChild>
-              <Chip size="small" variant="outlined" label={trupp.entsendetAn} />
-            </Tooltip>
-          )}
+          {/* Die Zuordnung gehört in den Kopf und nicht in die Detailzeile: Wer
+              auf die Karte schaut, will zuerst wissen, ob der Trupp zu *seiner*
+              Einheit gehört. Immer da, auch ohne Einheit — eine leere Stelle
+              wäre nicht von „steht am Sammelplatz" zu unterscheiden. */}
+          <Tooltip title={t('ueberwachung.truppEinheit')} describeChild>
+            <Chip
+              size="small"
+              variant="outlined"
+              color={ZUORDNUNG_FARBE[zuordnung] ?? 'default'}
+              label={zuordnungLabel}
+            />
+          </Tooltip>
           {trupp.laufendeNummer > 1 && (
             <Chip
               size="small"

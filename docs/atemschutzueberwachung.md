@@ -49,7 +49,7 @@ erscheint hier von selbst („nicht erst, wenn ich ihn suche"), und die
 Einsatzsicherung ([useExport.ts](../src/hooks/useExport.ts)) trägt die neuen
 Felder mit, ohne dass dort etwas nachgezogen werden muss.
 
-## Was „Zeitkontrolle übernehmen" tut
+## Was „Trupp übernehmen" tut
 
 Der Knopf sieht nach einem Formular aus und ist in Wahrheit eine Anmeldung. Drei
 Dinge passieren gleichzeitig (`uebernahmePatch`), und keines davon ist aus dem
@@ -510,11 +510,70 @@ entsendet hatte. Verglichen wird ohne Rücksicht auf Groß- und Kleinschreibung:
 `entsendetAn` ist Freitext, und dasselbe Fahrzeug zweimal im Filter wären zwei
 Ansichten desselben Einsatzes.
 
-Ein Trupp **ohne** Zuordnung passt zu jeder Einheit (`truppPasstZuEinheit`). Am
-Sammelplatz bereitgestellte Trupps tragen noch keine — wären sie unter einem
-Einheitenfilter unsichtbar, sähe der Gruppenkommandant eine leere Seite und
-müsste den Filter wegnehmen, um einen Trupp übernehmen zu können. Dabei entsteht
-die Zuordnung ja gerade.
+### Zwei Kategorien neben den benannten Einheiten
+
+Ein Trupp ohne eingetragene Einheit ist nicht einfach „ohne Angabe" — es sind
+zwei verschiedene Lagen, und `zuordnungKey` unterscheidet sie:
+
+- **ASSP**: Den Trupp hat niemand übernommen (`!ueberwachungSeit`) oder er ist
+  an den Sammelplatz zurückgegeben (`ueberwachungBis`). Dann ist er dort in
+  Bereitschaft, wird regeneriert und ausgerüstet — eine gewöhnliche Station im
+  Ablauf (FH-06 5.3.4), auf der Karte blau.
+- **Nicht zugeordnet**: Jemand führt die Zeitkontrolle, hat aber nicht gesagt,
+  für welche Einheit. Das ist eine Lücke im Protokoll und deshalb gelb.
+
+Eine eingetragene Einheit gewinnt immer, auch nach der Rückgabe an den
+Sammelplatz: Die Zeile ist der Nachweis über den Einsatz *dieser* Einheit und
+soll in ihrem Protokoll stehen bleiben. Dass der Trupp danach zum Sammelplatz
+ging, sagt der Chip „übergeben um …".
+
+Der Zuordnungs-Chip steht deshalb **immer** im Kopf der Karte, auch ohne
+Einheit: Eine leere Stelle wäre von „steht am Sammelplatz" nicht zu
+unterscheiden.
+
+### Ein Reiter je Einheit, nicht ein Filter über allem
+
+Zuerst gab es einen Filter über der Liste, und Trupps ohne Zuordnung rutschten
+durch jeden Wert davon durch — damit ein Trupp am Sammelplatz nicht unsichtbar
+wird, wenn eine Einheit gewählt ist. Die Folge war schlimmer als das Problem:
+„Zurück" und „Protokoll" änderten sich beim Wechsel der Einheit gar nicht, und
+niemand konnte mehr sagen, welche Trupps die eigenen sind und welche irgendwo
+sonst in Bereitschaft stehen.
+
+Jetzt trennt `truppPasstZuEinheit` scharf, und die Einheiten sind **Reiter**
+(`einheitTabs`): die eigene zuerst, dann die übrigen alphabetisch, dann ASSP und
+Nicht-zugeordnet, zuletzt „Alle Trupps". Jeder Reiter trägt die Zahl der
+aktuellen Bereitstellungen — über das Protokoll gezählt vervielfachte jeder
+erneute Einsatz denselben Trupp. Der Reiter wirkt auf **alle** Abschnitte
+einschließlich des Protokolls, und die Trupps des Sammelplatzes sind unter ihrem
+eigenen Reiter zu finden, mit Anzahl.
+
+In der Reiterzeile stehen nur Einheiten, an denen wirklich Zeilen hängen (plus
+die eigene). Die Fahrzeuge des Einsatzes gehören in die **Wahl** der eigenen
+Einheit, nicht in die Reiter: Das wären zwanzig Reiter, von denen neunzehn leer
+sind.
+
+### „Meine Einheit" ist kein Filter
+
+Die Auswahl über der Reiterzeile ist eine Angabe über *dieses Gerät*: Sie stellt
+den eigenen Reiter voran, wählt ihn beim Laden aus, ordnet hier erfasste Trupps
+zu und entscheidet, für welche Trupps die offene Seite selbst warnt. Angezeigt
+wird, was der Reiter sagt.
+
+Deshalb stehen dort **alle** Fahrzeuge und taktischen Einheiten des Einsatzes
+zur Wahl (`einheitOptionen`) und nicht nur die mit Trupps: Die Einheit ist
+festzulegen, *bevor* der erste Trupp erfasst ist. Ein hier erfasster Trupp
+bekommt die Einheit des aktiven Reiters, sonst die eigene — wer unter „RLFA-ND"
+einen Trupp anlegt, erwartet ihn dort und nicht unter einem Reiter, den er
+gerade nicht ansieht.
+
+Die **lokalen Warnungen** hängen bewusst nicht an der Ansicht: Ein Blick auf den
+Reiter des Sammelplatzes darf die Warnungen der eigenen Trupps nicht
+abschalten. Gewarnt wird für die Trupps der eigenen Einheit und für die, an
+denen dieses Konto schon gearbeitet hat (`ueberwachungUids` — dieselbe Liste,
+die auch der Push-Versand verwendet). Ohne festgelegte eigene Einheit bleibt es
+bei allen Trupps im Einsatz: Wer die Gesamtlage offen hat, soll nicht weniger
+sehen als vorher.
 
 ### Ein zurückgekehrter Trupp geht in einem Schritt wieder hinein
 
@@ -573,15 +632,15 @@ bereit, und die neue Zeile ist an der Zeitkontrolle wieder in vollem Umfang da.
 Alle für den Einsatz berechtigten Benutzer sehen **alle** Trupps — die
 Firestore-Regeln für `call/{id}/{subitem=**}` gelten je Einsatz, nicht je
 Einheit, und die Gesamtlage muss jemand sehen können. Für „meine Trupps" gibt es
-einen Filter auf die taktische Einheit (`entsendetAn`), der **je Gerät** im
-`localStorage` gemerkt wird: Welche Trupps die eigenen sind, hängt am Gerät in
-der Hand, nicht am Konto — auf einem Fahrzeug teilen sich mehrere Leute eines
-(siehe die Bedienung am Sammelplatz in
+einen Reiter je taktischer Einheit (`entsendetAn`) und die Angabe „meine
+Einheit", die **je Gerät** im `localStorage` gemerkt wird: Welche Trupps die
+eigenen sind, hängt am Gerät in der Hand, nicht am Konto — auf einem Fahrzeug
+teilen sich mehrere Leute eines (siehe die Bedienung am Sammelplatz in
 [atemschutzsammelplatz.md](atemschutzsammelplatz.md)). Bewusst **nicht** je
 Einsatz: Dasselbe Fahrzeug ist im nächsten Einsatz dieselbe Einheit, und die
 Wahl wäre sonst in jedem Einsatz neu zu treffen — im ungünstigsten Moment.
-Trupps ohne Zuordnung bleiben unter jedem Filter sichtbar (siehe „Die taktische
-Einheit steht am Trupp").
+Reiter, Kategorien und die Abgrenzung zum Filter stehen unter „Die taktische
+Einheit steht am Trupp".
 
 Die Gesamtlage ist die ungefilterte Liste. Schreiben darf, wer am Einsatz
 schreiben darf; ein Nur-Lese-Gast sieht die Überwachung, ändert sie aber nicht.

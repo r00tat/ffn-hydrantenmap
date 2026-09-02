@@ -140,7 +140,7 @@ describe('UeberwachungCard', () => {
     render(trupp({ ueberwachungSeit: undefined }));
     expect(screen.getByText('Zeitkontrolle nicht übernommen')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Zeitkontrolle übernehmen' }),
+      screen.getByRole('button', { name: 'Trupp übernehmen' }),
     ).toBeInTheDocument();
   });
 
@@ -257,6 +257,18 @@ describe('UeberwachungCard', () => {
     // die Frage, mit der jemand auf die Karte schaut.
     render(trupp({ entsendetAn: 'RLFA-ND' }));
     expect(screen.getByText('RLFA-ND')).toBeInTheDocument();
+  });
+
+  it('nennt den Sammelplatz, solange den Trupp niemand übernommen hat', () => {
+    render(trupp({ status: 'bereit', ueberwachungSeit: undefined }));
+    expect(screen.getByText('ASSP')).toBeInTheDocument();
+  });
+
+  it('nennt eine fehlende Zuordnung ausdrücklich', () => {
+    // Ein überwachter Trupp ohne Einheit ist eine Lücke im Protokoll — sie
+    // soll auffallen und nicht als leere Stelle durchgehen.
+    render(trupp());
+    expect(screen.getByText('Nicht zugeordnet')).toBeInTheDocument();
   });
 
   it('zeigt die Geräte am Trupp samt Träger', () => {
