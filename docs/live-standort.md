@@ -44,6 +44,15 @@ können.
 Aus demselben Grund räumen Web und Android beim **ersten** Schreiben einer
 Sitzung das Altdokument unter der bloßen uid weg.
 
+Der Lesepfad filtert dieses Altdokument dagegen **nicht** heraus, auch wenn es
+die eigene uid trägt. Es ist nicht zwingend das eigene: genauso gut schreibt es
+ein zweites Gerät desselben Kontos, das noch auf der Vorgängerversion läuft —
+und das ist der Fall, um den es überhaupt geht. Wegzufiltern wäre also genau
+falsch. Das eigene Altdokument verschwindet ohne Filter: niemand schreibt es
+fort, damit greift die Frische-Grenze nach 5 Minuten, und beim ersten Teilen ist
+es sofort gelöscht. Ausgefiltert wird ausschließlich das Dokument **dieses**
+Geräts.
+
 ## Der Heartbeat kommt nicht von der Geolocation
 
 `navigator.geolocation.watchPosition` ist kein Taktgeber. Auf dem Desktop

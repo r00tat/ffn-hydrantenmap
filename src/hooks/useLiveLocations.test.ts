@@ -115,10 +115,14 @@ describe('useLiveLocations', () => {
     expect(result.current[0].deviceLabel).toBe('Android');
   });
 
-  // Dokumente aus der Zeit vor der Geräte-ID heißen wie die uid. Das eigene
-  // Altdokument gehört weg (sonst steht der eigene Pin doppelt herum), ein
-  // fremdes bleibt.
-  it('drops the own legacy document but keeps a foreign one', () => {
+  // Dokumente aus der Zeit vor der Geräte-ID heißen wie die uid. Ein solches
+  // Dokument mit der eigenen uid ist **nicht** zwingend das eigene: es kann
+  // genauso von einem zweiten Gerät desselben Kontos kommen, das noch auf der
+  // Vorgängerversion läuft. Es wegzufiltern versteckte genau das Gerät, um das
+  // es in #760 geht. Das eigene Altdokument fällt stattdessen von selbst weg —
+  // niemand schreibt es fort, also greift die Frische-Grenze, und beim ersten
+  // Teilen löscht `useLiveLocationShare` es.
+  it('keeps a legacy document of the same account (another device, old version)', () => {
     const now = Date.now();
     useFirebaseCollectionMock.mockReturnValue([
       {
@@ -144,8 +148,28 @@ describe('useLiveLocations', () => {
     ]);
 
     const { result } = renderHook(() => useLiveLocations());
-    expect(result.current).toHaveLength(1);
-    expect(result.current[0].uid).toBe('other');
+    expect(result.current.map((r) => r.id).sort()).toEqual(['me', 'other']);
+  });
+
+  // Ein Altdokument, das keiner mehr fortschreibt, verschwindet über die
+  // Frische-Grenze — dafür braucht es keinen Filter auf die eigene uid.
+  it('lets a stale legacy document fall out through the freshness check', () => {
+    const now = Date.now();
+    useFirebaseCollectionMock.mockReturnValue([
+      {
+        id: 'me',
+        uid: 'me',
+        name: 'Me',
+        email: 'me@example.com',
+        lat: 0,
+        lng: 0,
+        updatedAt: makeTimestamp(now - STALE_HARD_CUTOFF_MS - 1_000),
+        expiresAt: makeTimestamp(now + 1_000_000),
+      },
+    ]);
+
+    const { result } = renderHook(() => useLiveLocations());
+    expect(result.current).toEqual([]);
   });
 
   // Das Gerät im Namen ist nur dann Information, wenn eine Person mehrfach auf

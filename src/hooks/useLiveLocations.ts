@@ -54,17 +54,21 @@ export function useLiveLocations(): DisplayableLiveLocation[] {
   return useMemo(() => {
     if (!records) return [];
 
-    // Ausgefiltert wird **dieses Gerät**, nicht das ganze Konto: dieselbe
-    // Anmeldung auf Tablet und Desktop soll sich gegenseitig sehen (die eigene
-    // Position kommt schon vom PositionMarker). Das Altdokument unter der
-    // bloßen uid gehört ebenfalls weg — es stammt von diesem Gerät aus der
-    // Zeit vor der Umstellung und liegt bis zum TTL-Ablauf noch da.
-    const ownDocIds = new Set(
-      myUid ? [liveLocationDocId(myUid, myDeviceId), myUid] : []
-    );
+    // Ausgefiltert wird **genau dieses Gerät**, nicht das ganze Konto:
+    // dieselbe Anmeldung auf Tablet und Desktop soll sich gegenseitig sehen
+    // (die eigene Position kommt schon vom PositionMarker).
+    //
+    // Das Altdokument unter der bloßen uid gehört ausdrücklich *nicht* dazu.
+    // Es ist nicht zwingend das eigene: genauso gut schreibt es ein zweites
+    // Gerät desselben Kontos, das noch auf der Vorgängerversion läuft — und
+    // das ist der Fall, um den es in #760 geht. Das eigene Altdokument fällt
+    // von selbst weg: niemand schreibt es fort, also greift die
+    // Frische-Grenze nach 5 Minuten, und beim ersten Teilen löscht
+    // `useLiveLocationShare` es sofort.
+    const ownDocId = myUid ? liveLocationDocId(myUid, myDeviceId) : undefined;
 
     const fresh = records
-      .filter((r) => !ownDocIds.has(r.id))
+      .filter((r) => r.id !== ownDocId)
       .map((r) => {
         const ts: unknown = r.updatedAt;
         const ms = hasToMillis(ts) ? ts.toMillis() : 0;
