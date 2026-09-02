@@ -38,7 +38,14 @@
       "rechnungFuellungTaken": "Eine der Füllungen ist bereits abgerechnet.",
       "rechnungEmpfaengerIncomplete": "Feuerwehr, Name und E-Mail sind Pflicht.",
       "rechnungNurEntwurf": "Nur ein Entwurf lässt sich ändern.",
-      "stammdatenUnvollstaendig": "Absender und Bankverbindung der Gruppe fehlen. Bitte zuerst die Stammdaten pflegen."
+      "stammdatenUnvollstaendig": "Absender und Bankverbindung der Gruppe fehlen. Bitte zuerst die Stammdaten pflegen.",
+      "exportRangeInvalid": "Der Zeitraum ist ungültig — „Bis“ liegt vor „Von“.",
+      "exportTooLarge": "Der Zeitraum enthält zu viele Füllungen. Bitte in kleineren Zeiträumen ausdrucken.",
+      "fuellungGone": "Diese Füllung gibt es nicht mehr.",
+      "fuellungVerrechnet": "Diese Füllung steht auf einer Rechnung und lässt sich nicht mehr ändern.",
+      "notInGroup": "Kein Zugriff auf diese Feuerwehr.",
+      "notGroupAdmin": "Dafür braucht es die Rechte eines Gruppen-Admins.",
+      "notLoggedIn": "Nicht angemeldet oder nicht freigeschaltet."
     },
     "admin": {
       "title": "Atemschutz-Ausrüstung",
@@ -99,7 +106,12 @@
       "druckRange": "{start} → {ende} bar",
       "druckNurEnde": "auf {ende} bar",
       "fuellstation": "Füllstation",
-      "verrechnen": "Zu verrechnen"
+      "verrechnen": "Zu verrechnen",
+      "zweck": "Zweck",
+      "gesperrt": {
+        "fremd": "Nur wer die Füllung erfasst hat oder ein Gruppen-Admin darf sie ändern.",
+        "verrechnet": "Diese Füllung steht auf einer Rechnung und lässt sich nicht mehr ändern."
+      }
     },
     "qr": {
       "title": "QR-Etikett",
@@ -271,7 +283,9 @@
     "filter": {
       "einsatz": "Einsatz",
       "alle": "Alle",
-      "ohneEinsatz": "Ohne Einsatz"
+      "ohneEinsatz": "Ohne Einsatz",
+      "von": "Von",
+      "bis": "Bis"
     },
     "verrechnen": {
       "nurZuVerrechnende": "Nur zu verrechnende",
@@ -391,6 +405,42 @@
       "deleteConfirm": "Soll der Empfänger „{name}“ wirklich gelöscht werden?",
       "ja": "Ja",
       "nein": "Nein"
+    },
+    "zweck": {
+      "einsatz": "Einsatz",
+      "uebung": "Übung",
+      "sonstiges": "Sonstiges"
+    },
+    "export": {
+      "pdf": "Ausdruck (PDF)",
+      "csv": "Export (CSV)",
+      "druck": "Druck",
+      "anlass": "Einsatz / Zweck",
+      "page": "Seite {page}/{total}",
+      "generated": "Erstellt am {date}",
+      "generatedBy": "Erstellt am {date} von {user}"
+    },
+    "fuellprotokollImport": {
+      "title": "Füllungen nachtragen",
+      "button": "Importieren",
+      "chooseFile": "CSV-Datei wählen",
+      "hint": "Trägt Füllungen aus einer CSV-Datei nach. Die Datei muss dieselben Spalten haben wie der CSV-Export dieser Seite — am einfachsten einmal exportieren, die Zeilen ergänzen und wieder einspielen. Datum und Uhrzeit gelten in der Zeitzone dieses Geräts. Bereits vorhandene Füllungen werden übersprungen.",
+      "preview": "{neue, plural, =0 {Keine neue Zeile} one {Eine neue Zeile} other {# neue Zeilen}}, {dubletten, plural, =0 {keine Dublette} one {eine Dublette} other {# Dubletten}} werden übersprungen.",
+      "done": "{created, plural, =0 {Keine Füllung} one {Eine Füllung} other {# Füllungen}} nachgetragen, {skipped} übersprungen.",
+      "row": "Zeile {row}",
+      "rowErrors": "{count, plural, one {Eine Zeile lässt sich nicht lesen} other {# Zeilen lassen sich nicht lesen}} und wird übersprungen:",
+      "errors": {
+        "fileEmpty": "Die Datei enthält keine lesbare Zeile.",
+        "columnsMissing": "Der Datei fehlen Pflichtspalten (Datum, Enddruck, Gefüllt von).",
+        "tooManyRows": "Zu viele Zeilen (max. 3000).",
+        "fileTooLarge": "Datei ist zu groß (max. 5 MB).",
+        "dateInvalid": "Datum oder Uhrzeit sind nicht lesbar.",
+        "enddruckInvalid": "Enddruck fehlt oder ist keine Zahl über 0.",
+        "gefuelltVonMissing": "Es fehlt, wer gefüllt hat.",
+        "identifierMissing": "Weder Flaschennummer noch Feuerwehr angegeben.",
+        "anzahlInvalid": "Anzahl muss zwischen 1 und 99 liegen.",
+        "startdruckAboveEnddruck": "Startdruck liegt über dem Enddruck."
+      }
     }
   },
   "common": {

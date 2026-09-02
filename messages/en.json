@@ -38,7 +38,14 @@
       "rechnungFuellungTaken": "One of the fillings has already been invoiced.",
       "rechnungEmpfaengerIncomplete": "Fire brigade, name and email are required.",
       "rechnungNurEntwurf": "Only a draft can be changed.",
-      "stammdatenUnvollstaendig": "The group has no sender or bank details. Please fill in the master data first."
+      "stammdatenUnvollstaendig": "The group has no sender or bank details. Please fill in the master data first.",
+      "exportRangeInvalid": "The period is invalid — “To” is before “From”.",
+      "exportTooLarge": "The period contains too many fillings. Please print smaller periods.",
+      "fuellungGone": "This filling no longer exists.",
+      "fuellungVerrechnet": "This filling is on an invoice and can no longer be changed.",
+      "notInGroup": "No access to this fire brigade.",
+      "notGroupAdmin": "This requires group admin rights.",
+      "notLoggedIn": "Not signed in or not authorized."
     },
     "admin": {
       "title": "Breathing apparatus equipment",
@@ -99,7 +106,12 @@
       "druckRange": "{start} → {ende} bar",
       "druckNurEnde": "to {ende} bar",
       "fuellstation": "Filling station",
-      "verrechnen": "To be billed"
+      "verrechnen": "To be billed",
+      "zweck": "Purpose",
+      "gesperrt": {
+        "fremd": "Only the person who recorded this filling or a group admin may change it.",
+        "verrechnet": "This filling is on an invoice and can no longer be changed."
+      }
     },
     "qr": {
       "title": "QR label",
@@ -271,7 +283,9 @@
     "filter": {
       "einsatz": "Operation",
       "alle": "All",
-      "ohneEinsatz": "Without operation"
+      "ohneEinsatz": "Without operation",
+      "von": "From",
+      "bis": "To"
     },
     "verrechnen": {
       "nurZuVerrechnende": "Billable only",
@@ -391,6 +405,42 @@
       "deleteConfirm": "Really delete the recipient \"{name}\"?",
       "ja": "Yes",
       "nein": "No"
+    },
+    "zweck": {
+      "einsatz": "Operation",
+      "uebung": "Drill",
+      "sonstiges": "Other"
+    },
+    "export": {
+      "pdf": "Print (PDF)",
+      "csv": "Export (CSV)",
+      "druck": "Pressure",
+      "anlass": "Operation / purpose",
+      "page": "Page {page}/{total}",
+      "generated": "Created on {date}",
+      "generatedBy": "Created on {date} by {user}"
+    },
+    "fuellprotokollImport": {
+      "title": "Import fillings",
+      "button": "Import",
+      "chooseFile": "Choose CSV file",
+      "hint": "Imports fillings from a CSV file. The file must use the same columns as this page's CSV export — easiest is to export once, add the rows and import it again. Date and time are read in this device's time zone. Fillings that already exist are skipped.",
+      "preview": "{neue, plural, =0 {No new row} one {One new row} other {# new rows}}, {dubletten, plural, =0 {no duplicate} one {one duplicate} other {# duplicates}} will be skipped.",
+      "done": "{created, plural, =0 {No filling} one {One filling} other {# fillings}} imported, {skipped} skipped.",
+      "row": "Row {row}",
+      "rowErrors": "{count, plural, one {One row cannot be read} other {# rows cannot be read}} and will be skipped:",
+      "errors": {
+        "fileEmpty": "The file contains no readable row.",
+        "columnsMissing": "The file is missing required columns (Datum, Enddruck, Gefüllt von).",
+        "tooManyRows": "Too many rows (max. 3000).",
+        "fileTooLarge": "File is too large (max. 5 MB).",
+        "dateInvalid": "Date or time cannot be read.",
+        "enddruckInvalid": "Final pressure is missing or not a number above 0.",
+        "gefuelltVonMissing": "Missing who did the filling.",
+        "identifierMissing": "Neither cylinder number nor fire brigade given.",
+        "anzahlInvalid": "Quantity must be between 1 and 99.",
+        "startdruckAboveEnddruck": "Initial pressure is above the final pressure."
+      }
     }
   },
   "common": {

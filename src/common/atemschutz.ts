@@ -47,6 +47,23 @@ export type FuellstationStandort = 'fix' | 'mobil';
 
 export const FUELLSTATION_STANDORTE: FuellstationStandort[] = ['fix', 'mobil'];
 
+/**
+ * Anlass einer Füllung.
+ *
+ * `firecallId` allein reicht dafür nicht: Ohne Einsatz sind Übung und
+ * Stationsfüllung beide „ohne Einsatz", und für die Jahresauswertung ist genau
+ * das der Unterschied, der zählt. Drei Werte und nicht mehr — jeder weitere
+ * müsste am Sammelplatz in derselben Sekunde entschieden werden, in der die
+ * Flasche am Kompressor hängt.
+ */
+export type FuellungZweck = 'einsatz' | 'uebung' | 'sonstiges';
+
+export const FUELLUNG_ZWECKE: FuellungZweck[] = [
+  'einsatz',
+  'uebung',
+  'sonstiges',
+];
+
 export type Sichtkontrolle = 'offen' | 'ok' | 'mangel';
 
 export const SICHTKONTROLLE_WERTE: Sichtkontrolle[] = ['offen', 'ok', 'mangel'];
@@ -135,6 +152,13 @@ export interface AtemschutzFuellung {
    * `where('verrechnen','==',true)` nichts übersieht.
    */
   verrechnen: boolean;
+  /**
+   * Anlass der Füllung. **Optional**, anders als `verrechnen`: Die Zeilen aus
+   * der Zeit vor diesem Feld haben keinen, und der Filter läuft ohnehin
+   * clientseitig auf der geladenen Liste. Wer den Wert braucht, nimmt
+   * `zweckOf` — das leitet ihn für Altzeilen aus `firecallId` ab.
+   */
+  zweck?: FuellungZweck;
   /**
    * Verweis in `groups/{groupId}/atemschutzRechnung` — gesetzt heißt
    * abgerechnet.
@@ -352,6 +376,18 @@ export interface FuellungInput {
   /** Pflichtfeld ohne Vorgabe im Typ: Der Dialog leitet den Wert aus
    *  `verrechnenVorgabe` ab und schickt ihn immer mit. */
   verrechnen: boolean;
+  /** Wie `verrechnen`: aus `zweckVorgabe` abgeleitet und immer mitgeschickt. */
+  zweck: FuellungZweck;
+  /**
+   * Der Einsatzbezug, wenn der Dialog ihn zur Wahl stellt.
+   *
+   * Optional, weil der Sammelplatz ihn nicht zur Wahl stellt — dort steht der
+   * Einsatz fest und kommt aus dem Kontext. Auf der zentralen Seite ist er
+   * dagegen ein Feld des Dialogs: Ohne das übernähme eine bearbeitete Zeile
+   * den *Filter* als Einsatz und verlöre ihren eigenen.
+   */
+  firecallId?: string;
+  firecallName?: string;
 }
 
 /**
@@ -446,6 +482,94 @@ export function verrechnenVorgabe(args: {
   const eigen = args.eigeneFeuerwehr?.trim();
   if (!fremd || !eigen) return false;
   return normalizeCode(fremd) !== normalizeCode(eigen);
+}
+
+/**
+ * Vorbelegung des Zwecks beim *Anlegen* einer Füllung.
+ *
+ * Mit Einsatz ist der Anlass eindeutig; ohne Einsatz bleibt „Sonstiges" und
+ * nicht „Übung": Der Regelfall an der Station ist das Nachfüllen nach dem
+ * Einsatz oder für den Bestand, nicht die Übung. Wer geübt hat, stellt um —
+ * eine falsche Vorbelegung auf „Übung" bekäme dagegen niemand zu sehen.
+ */
+export function zweckVorgabe(firecallId: string): FuellungZweck {
+  return firecallId ? 'einsatz' : 'sonstiges';
+}
+
+/**
+ * Der Zweck einer Zeile, auch wenn sie noch keinen trägt.
+ *
+ * Für Zeilen aus der Zeit vor dem Feld wird er aus `firecallId` abgeleitet,
+ * statt sie als „ohne Zweck" aus jedem Filter fallen zu lassen. Eine Migration
+ * aller Bestandszeilen spart das ebenfalls — dieselbe Abwägung wie bei
+ * `rechnungId`.
+ */
+export function zweckOf(
+  f: Pick<AtemschutzFuellung, 'zweck' | 'firecallId'>,
+): FuellungZweck {
+  return f.zweck ?? zweckVorgabe(f.firecallId ?? '');
+}
+
+/**
+ * Warum eine Füllung nicht mehr geändert werden darf — `undefined` heißt:
+ * sie darf.
+ */
+export type FuellungSperre = 'verrechnet' | 'fremd';
+
+/**
+ * Wer eine bereits erfasste Füllung ändern oder löschen darf.
+ *
+ * Zwei Schranken, in dieser Reihenfolge:
+ *
+ * - **Abgerechnet ist abgerechnet.** Trägt die Zeile eine `rechnungId`, steht
+ *   ihr Inhalt auf einem Beleg, der das Haus verlassen hat. Sie still zu
+ *   ändern hieße, die Rechnung nachträglich zu einer Behauptung zu machen. Die
+ *   Sperre gilt auch für den Gruppen-Admin: Der Weg zurück führt über das
+ *   Storno der Rechnung, nicht über die Zeile.
+ * - **Sonst nur der Erfasser oder ein Gruppen-Admin.** Das Füllprotokoll ist
+ *   ein Nachweis; wer gefüllt hat, korrigiert seinen eigenen Tippfehler, und
+ *   für alles andere gibt es den Gruppen-Admin. Vorher durfte jedes
+ *   Gruppenmitglied jede fremde Zeile ändern und löschen.
+ *
+ * Zeilen ohne `createdBy` — es gibt sie nicht aus der App, wohl aber aus einem
+ * Import von Hand — bleiben damit dem Gruppen-Admin vorbehalten. Das ist die
+ * sichere Richtung: `createdBy: ''` gegen ein leeres `uid` zu vergleichen
+ * gäbe sonst jedem abgemeldeten Zustand das Recht.
+ */
+export function fuellungSperre(args: {
+  fuellung: Pick<AtemschutzFuellung, 'createdBy' | 'rechnungId'>;
+  uid?: string;
+  istGruppenAdmin?: boolean;
+}): FuellungSperre | undefined {
+  if (args.fuellung.rechnungId) return 'verrechnet';
+  if (args.istGruppenAdmin) return undefined;
+  const uid = args.uid?.trim();
+  if (uid && args.fuellung.createdBy === uid) return undefined;
+  return 'fremd';
+}
+
+/** Kurzform für die Stellen, die nur ja oder nein brauchen. */
+export function darfFuellungAendern(args: {
+  fuellung: Pick<AtemschutzFuellung, 'createdBy' | 'rechnungId'>;
+  uid?: string;
+  istGruppenAdmin?: boolean;
+}): boolean {
+  return fuellungSperre(args) === undefined;
+}
+
+/**
+ * Ob die Liste zu einer Füllung das Datum zeigen muss.
+ *
+ * Am Sammelplatz sind alle Zeilen von heute und die Uhrzeit genügt; auf der
+ * zentralen Seite stehen Füllungen aus Monaten untereinander und wären ohne
+ * Datum nicht auseinanderzuhalten. Statt eines Schalters je Aufrufer
+ * entscheidet der Zeitpunkt selbst — dann steht das Datum auch am Sammelplatz,
+ * wenn ein Einsatz über Mitternacht geht, und genau dort gehört es hin.
+ */
+export function braucheDatum(zeitpunkt: string, jetzt: Date): boolean {
+  const d = new Date(zeitpunkt);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.toDateString() !== jetzt.toDateString();
 }
 
 /**

@@ -12,17 +12,21 @@ import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import {
+  braucheDatum,
+  fuellungSperre,
   geraetKennung,
+  zweckOf,
   type AtemschutzFuellung,
   type AtemschutzGeraet,
   type FuellungInput,
 } from '../../common/atemschutz';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import AtemschutzZeile from './AtemschutzZeile';
-import FuellungDialog from './FuellungDialog';
+import FuellungDialog, { type FuellungEinsatz } from './FuellungDialog';
 
 export interface FuellprotokollTabProps {
   groupId: string;
@@ -41,11 +45,27 @@ export interface FuellprotokollTabProps {
    * in das Dokument schreibt ihn der Aufrufer über `buildFuellungDocument`.
    */
   firecallId: string;
+  /** Einsätze zur Auswahl im Dialog; leer heißt: Der Einsatz steht fest. */
+  firecalls?: FuellungEinsatz[];
+  /** Name des feststehenden Einsatzes — der Dialog zeigt ihn dann nur an. */
+  firecallName?: string;
   eigeneFeuerwehr?: string;
   /** Herkunft je Zeile anzeigen — auf der eigenen Seite ja, am Einsatz nein. */
   zeigeHerkunft?: boolean;
-  onSave: (input: FuellungInput, id?: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  /**
+   * Der angemeldete Benutzer und seine Rolle in dieser Gruppe. Beides
+   * entscheidet je Zeile, ob Bearbeiten und Löschen angeboten werden —
+   * siehe `fuellungSperre`.
+   */
+  uid?: string;
+  istGruppenAdmin?: boolean;
+  /**
+   * Speichert. Beim Bearbeiten kommt die **ganze** bestehende Zeile mit und
+   * nicht nur ihre ID: Der Aufrufer muss an `createdBy` erkennen, ob er
+   * clientseitig schreiben darf oder über die Gruppen-Admin-Action gehen muss.
+   */
+  onSave: (input: FuellungInput, bestehende?: AtemschutzFuellung) => Promise<void>;
+  onDelete: (fuellung: AtemschutzFuellung) => Promise<void>;
 }
 
 export default function FuellprotokollTab({
@@ -61,8 +81,12 @@ export default function FuellprotokollTab({
   letzteFuellstationId,
   onFuellstationChange,
   firecallId,
+  firecalls,
+  firecallName,
   eigeneFeuerwehr,
   zeigeHerkunft,
+  uid,
+  istGruppenAdmin,
   onSave,
   onDelete,
 }: FuellprotokollTabProps) {
@@ -82,10 +106,7 @@ export default function FuellprotokollTab({
   // Die Bezeichnung steht nicht am Protokolleintrag, sondern nur die Nummer.
   // Für die zweite Zeile wird sie aus den Stammdaten nachgeschlagen — ein
   // zweites Feld im Dokument liefe mit einer umbenannten Flasche auseinander.
-  const flaschenById = useMemo(
-    () => new Map(flaschen.map((f) => [f.id as string, f])),
-    [flaschen],
-  );
+  const flaschenById = useMemo(() => new Map(flaschen.map((f) => [f.id as string, f])), [flaschen]);
 
   /**
    * Die Kennung der Flasche.
@@ -117,8 +138,7 @@ export default function FuellprotokollTab({
   // Zweite Summe neben der Gesamtzahl. Sie entfällt, solange nichts zu
   // verrechnen ist — eine „davon 0" wäre nur Rauschen.
   const zuVerrechnen = useMemo(
-    () =>
-      fuellungen.filter((f) => f.verrechnen).reduce((s, f) => s + f.anzahl, 0),
+    () => fuellungen.filter((f) => f.verrechnen).reduce((s, f) => s + f.anzahl, 0),
     [fuellungen],
   );
 
@@ -127,17 +147,35 @@ export default function FuellprotokollTab({
       ? t('fuellung.druckRange', { start: f.startdruck, ende: f.enddruck })
       : t('fuellung.druckNurEnde', { ende: f.enddruck });
 
+  // Einmal je Render und nicht je Zeile: Sonst hinge die Entscheidung „ist das
+  // heute?" innerhalb einer Liste an unterschiedlichen Millisekunden.
+  const jetzt = new Date();
+
+  /**
+   * Zeitpunkt einer Zeile: die Uhrzeit allein, solange sie von heute ist, und
+   * sonst mit Datum davor. Am Sammelplatz bleibt die Liste damit so knapp wie
+   * bisher, auf der zentralen Seite sind Tage auseinanderzuhalten.
+   */
+  const zeit = (f: AtemschutzFuellung) =>
+    format.dateTime(
+      new Date(f.zeitpunkt),
+      braucheDatum(f.zeitpunkt, jetzt)
+        ? {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }
+        : { hour: '2-digit', minute: '2-digit' },
+    );
+
   return (
     <Box sx={{ pb: 10 }}>
-      <Stack
-        direction="row"
-        spacing={2}
-        sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}
-      >
+      <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
         <Typography variant="subtitle1">
           {t('fuellung.total', { count: flaschenGesamt })}
-          {zuVerrechnen > 0 &&
-            ` · ${t('verrechnen.summe', { count: zuVerrechnen })}`}
+          {zuVerrechnen > 0 && ` · ${t('verrechnen.summe', { count: zuVerrechnen })}`}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
         {/* Derselbe Weg wie über den Fab unten rechts. Der Knopf steht hier
@@ -154,73 +192,86 @@ export default function FuellprotokollTab({
         <Typography color="text.secondary">{t('fuellung.empty')}</Typography>
       ) : (
         <List dense>
-          {fuellungen.map((f) => (
-            <ListItem
-              key={f.id}
-              divider
-              secondaryAction={
-                canWrite ? (
-                  <>
-                    <IconButton
-                      aria-label={tCommon('edit')}
-                      onClick={() => {
-                        setEdit(f);
-                        setDialogOpen(true);
-                      }}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      aria-label={t('fuellung.delete')}
-                      color="warning"
-                      onClick={() => setLoeschKandidat(f)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </>
-                ) : undefined
-              }
-            >
-              <AtemschutzZeile
-                titel={titel(f)}
-                chips={
-                  <>
-                    <Chip size="small" label={druck(f)} />
-                    {f.anzahl > 1 && f.flaschenNummer && (
-                      <Chip size="small" label={`×${f.anzahl}`} />
-                    )}
-                    {f.sichtkontrolle === 'mangel' && (
-                      <Chip
-                        size="small"
-                        color="warning"
-                        label={t('sichtkontrolle.mangel')}
-                      />
-                    )}
-                    {zeigeHerkunft && f.firecallName && (
-                      <Chip size="small" label={f.firecallName} />
-                    )}
-                    {f.verrechnen && (
-                      <Chip
-                        size="small"
-                        color="warning"
-                        variant="outlined"
-                        label={t('verrechnen.chip')}
-                      />
-                    )}
-                  </>
+          {fuellungen.map((f) => {
+            const sperre = fuellungSperre({
+              fuellung: f,
+              uid,
+              istGruppenAdmin,
+            });
+            // Gesperrte Knöpfe stehen sichtbar da statt zu verschwinden: Wer
+            // seinen Bearbeiten-Knopf sucht, soll den Grund lesen können,
+            // nicht raten, ob die App etwas verloren hat. `span` als Wrapper,
+            // weil ein disabled Button keine Tooltip-Events feuert.
+            const hinweis = sperre
+              ? t(`fuellung.gesperrt.${sperre}` as 'fuellung.gesperrt.fremd')
+              : '';
+            return (
+              <ListItem
+                key={f.id}
+                divider
+                secondaryAction={
+                  canWrite ? (
+                    <Tooltip title={hinweis}>
+                      <span>
+                        <IconButton
+                          aria-label={tCommon('edit')}
+                          disabled={!!sperre}
+                          onClick={() => {
+                            setEdit(f);
+                            setDialogOpen(true);
+                          }}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton
+                          aria-label={t('fuellung.delete')}
+                          color="warning"
+                          disabled={!!sperre}
+                          onClick={() => setLoeschKandidat(f)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  ) : undefined
                 }
-                info={[f.feuerwehr, bezeichnung(f)]}
-                details={[
-                  f.gefuelltVon,
-                  format.dateTime(new Date(f.zeitpunkt), {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }),
-                  f.bemerkung,
-                ]}
-              />
-            </ListItem>
-          ))}
+              >
+                <AtemschutzZeile
+                  titel={titel(f)}
+                  chips={
+                    <>
+                      <Chip size="small" label={druck(f)} />
+                      {f.anzahl > 1 && f.flaschenNummer && (
+                        <Chip size="small" label={`×${f.anzahl}`} />
+                      )}
+                      {f.sichtkontrolle === 'mangel' && (
+                        <Chip size="small" color="warning" label={t('sichtkontrolle.mangel')} />
+                      )}
+                      {zeigeHerkunft && f.firecallName && (
+                        <Chip size="small" label={f.firecallName} />
+                      )}
+                      {/* Der Zweck nur, wenn er etwas sagt: „Einsatz" neben dem
+                        Einsatznamen wäre doppelt, und am Sammelplatz stünde er
+                        an jeder Zeile. */}
+                      {zweckOf(f) !== 'einsatz' && (
+                        <Chip size="small" variant="outlined" label={t(`zweck.${zweckOf(f)}`)} />
+                      )}
+                      {f.verrechnen && (
+                        <Chip
+                          size="small"
+                          color="warning"
+                          variant="outlined"
+                          label={t('verrechnen.chip')}
+                        />
+                      )}
+                    </>
+                  }
+                  info={[f.feuerwehr, bezeichnung(f)]}
+                  details={[f.gefuelltVon, zeit(f), f.bemerkung]}
+                />
+              </ListItem>
+            );
+          })}
         </List>
       )}
 
@@ -248,10 +299,12 @@ export default function FuellprotokollTab({
           fuellstationen={fuellstationen}
           letzteFuellstationId={letzteFuellstationId}
           firecallId={firecallId}
+          firecalls={firecalls}
+          firecallName={firecallName}
           eigeneFeuerwehr={eigeneFeuerwehr}
           onFuellstationChange={onFuellstationChange}
           onClose={() => setDialogOpen(false)}
-          onSave={(input) => onSave(input, edit?.id)}
+          onSave={(input) => onSave(input, edit)}
         />
       )}
 
@@ -265,8 +318,8 @@ export default function FuellprotokollTab({
           yes={tCommon('yes')}
           no={tCommon('no')}
           onConfirm={async (confirmed) => {
-            if (confirmed && loeschKandidat.id) {
-              await onDelete(loeschKandidat.id);
+            if (confirmed) {
+              await onDelete(loeschKandidat);
             }
             setLoeschKandidat(undefined);
           }}
