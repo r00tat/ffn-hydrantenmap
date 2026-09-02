@@ -252,23 +252,21 @@ describe('UeberwachungCard', () => {
     ).toBeInTheDocument();
   });
 
-  it('zeigt die taktische Einheit im Kopf der Karte', () => {
-    // Oben und nicht in der Detailzeile: „Welche Einheit hat den Trupp?" ist
-    // die Frage, mit der jemand auf die Karte schaut.
+  it('nennt die taktische Einheit in der Detailzeile', () => {
     render(trupp({ entsendetAn: 'RLFA-ND' }));
-    expect(screen.getByText('RLFA-ND')).toBeInTheDocument();
+    expect(screen.getByText(/Einheit: RLFA-ND/)).toBeInTheDocument();
   });
 
   it('nennt den Sammelplatz, solange den Trupp niemand übernommen hat', () => {
     render(trupp({ status: 'bereit', ueberwachungSeit: undefined }));
-    expect(screen.getByText('ASSP')).toBeInTheDocument();
+    expect(screen.getByText(/Einheit: ASSP/)).toBeInTheDocument();
   });
 
   it('nennt eine fehlende Zuordnung ausdrücklich', () => {
     // Ein überwachter Trupp ohne Einheit ist eine Lücke im Protokoll — sie
     // soll auffallen und nicht als leere Stelle durchgehen.
     render(trupp());
-    expect(screen.getByText('Nicht zugeordnet')).toBeInTheDocument();
+    expect(screen.getByText(/Einheit: Nicht zugeordnet/)).toBeInTheDocument();
   });
 
   it('zeigt die Geräte am Trupp samt Träger', () => {

@@ -58,11 +58,23 @@ export default function DruckabfrageDialog({
 
   const [druck, setDruck] = useState('');
   const [amZiel, setAmZiel] = useState(false);
+  const [rueckzug, setRueckzug] = useState(false);
   const [bemerkung, setBemerkung] = useState('');
   // Vorbelegt mit jetzt, aber änderbar: Die Meldung kommt über Funk und wird
   // eine Minute später eingetippt — mit dem Erfassungszeitpunkt gerechnet,
   // sähe der Verbrauch zu niedrig aus.
   const [zeit, setZeit] = useState(() => toLocalInput(new Date()));
+  /**
+   * Ob die Zeit von Hand geändert wurde.
+   *
+   * Wichtig für die **Sekunden**: `datetime-local` kennt nur Minuten, und der
+   * unveränderte Wert würde die Erfassungszeit auf `:00` abschneiden. Bei einem
+   * Standardgerät sind das rund 8 bar Verbrauch — genug, um den gemessenen
+   * Verbrauch und damit die Rückzugsprognose zu verschieben, besonders wenn
+   * zwei Abfragen kurz aufeinander folgen. Unverändert gilt deshalb der
+   * genaue Zeitpunkt des Speicherns (`buildDruckabfrage` nimmt dann `jetzt`).
+   */
+  const [zeitGeaendert, setZeitGeaendert] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const druckWert = druck.trim()
@@ -71,8 +83,11 @@ export default function DruckabfrageDialog({
   const input: DruckabfrageInput = {
     druck: druckWert,
     amZiel,
+    rueckzug,
     bemerkung,
-    zeitpunkt: fromLocalInput(zeit),
+    // Ohne Änderung kein Zeitpunkt im Input — dann gilt der Moment des
+    // Speicherns, samt Sekunden.
+    ...(zeitGeaendert ? { zeitpunkt: fromLocalInput(zeit) } : {}),
   };
   const fehler = validateDruckabfrage(input);
 
@@ -110,7 +125,10 @@ export default function DruckabfrageDialog({
             type="datetime-local"
             label={t('ueberwachung.zeitpunkt')}
             value={zeit}
-            onChange={(e) => setZeit(e.target.value)}
+            onChange={(e) => {
+              setZeit(e.target.value);
+              setZeitGeaendert(true);
+            }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
           <FormControlLabel
@@ -128,6 +146,21 @@ export default function DruckabfrageDialog({
           {zielMeldungFehlt && !amZiel && (
             <Alert severity="info">{t('ueberwachung.amZielFehltHinweis')}</Alert>
           )}
+          {/* Die Gegenmeldung zur Ankunft. Ebenfalls nicht vorbelegt: Sie
+              beendet die Warnungen, und das darf nicht aus Versehen
+              passieren. */}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={rueckzug}
+                onChange={(e) => setRueckzug(e.target.checked)}
+              />
+            }
+            label={t('ueberwachung.rueckzug')}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {t('ueberwachung.rueckzugHint')}
+          </Typography>
           <TextField
             fullWidth
             multiline

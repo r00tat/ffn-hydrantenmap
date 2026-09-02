@@ -451,6 +451,7 @@
       "einheitHint": "Wird je Gerät gemerkt, steht als erster Reiter und wird neuen Trupps zugeordnet.",
       "einheitAlle": "Alle Trupps",
       "einheitKeine": "Nicht festgelegt",
+      "einheitKurz": "Einheit",
       "zuordnung": {
         "assp": "ASSP",
         "keine": "Nicht zugeordnet"
@@ -487,6 +488,19 @@
       "amZielHint": "Nur mit dem Druck bei der Ankunft lässt sich der Rückmarschdruck aus dem doppelten Vormarschdruckabfall berechnen. Nicht ankreuzen für eine gewöhnliche Zwischenabfrage.",
       "amZielFehltHinweis": "Für diesen Trupp ist noch keine Ankunft am Einsatzziel erfasst. Bis dahin gilt als Rückzugszeitpunkt die Restdruckwarnung bei 55 bar.",
       "amZielKurz": "Ankunft",
+      "rueckzug": "Trupp hat den Rückzug angetreten",
+      "rueckzugHint": "Die Meldung „wir kommen zurück“. Danach keine Drittel- und Rückzugswarnungen mehr — beobachtet wird noch der Reservedruck.",
+      "rueckzugKurz": "Rückzug",
+      "rueckzugSeit": "Rückzug angetreten",
+      "druckverlaufChart": "Druckverlauf über die Zeit",
+      "chart": {
+        "drittel": "1/3",
+        "zweiDrittel": "2/3",
+        "ende": "rechn. Ende",
+        "jetzt": "jetzt",
+        "rueckzug": "Rückzug {druck} bar",
+        "reserve": "Reserve {druck} bar"
+      },
       "bemerkung": "Bemerkung",
       "abmarschUm": "Abmarsch",
       "seitMinuten": "seit {minuten} min",
@@ -536,7 +550,8 @@
       "pushHinweis": {
         "offen": "Warnungen erscheinen auf dieser Seite. Damit sie auch bei gesperrtem Bildschirm ankommen, müssen Benachrichtigungen erlaubt sein.",
         "ein": "Benachrichtigungen sind eingeschaltet — Warnungen kommen auch an, wenn die Seite im Hintergrund ist.",
-        "aus": "Der Browser lässt keine Benachrichtigungen zu. Warnungen erscheinen dann nur, solange diese Seite offen ist; erlauben lässt sich das in den Website-Einstellungen des Browsers."
+        "aus": "Der Browser lässt keine Benachrichtigungen zu. Warnungen erscheinen dann nur, solange diese Seite offen ist; erlauben lässt sich das in den Website-Einstellungen des Browsers.",
+        "nichtMoeglich": "Dieses Gerät kann keine Benachrichtigungen anzeigen. Warnungen erscheinen nur, solange diese Seite offen ist."
       },
       "actions": {
         "uebernehmen": "Trupp übernehmen",

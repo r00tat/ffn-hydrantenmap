@@ -220,6 +220,68 @@ Bezeichnung), damit Uhrzeiten und Drücke untereinander stehen und mit
 Beschriftet sind nur Abmarsch, Ankunft und Rückkehr. Stünde an jeder Zeile
 „Druckabfrage", fielen genau die drei Zeilen nicht mehr auf, auf die es ankommt.
 
+### Die Kurve unter den Zeilen
+
+Zusätzlich zur Zeilenliste steht der Verlauf als Grafik da
+([DruckVerlaufChart.tsx](../src/components/Atemschutz/DruckVerlaufChart.tsx),
+Modell in
+[druckVerlaufModell.ts](../src/components/Atemschutz/druckVerlaufModell.ts)).
+Nicht als Verschönerung: Aus Zahlen ist die **Steigung** nicht abzulesen, und
+die ist die Frage am Einsatzort — wie schnell geht die Luft weg, und reicht sie
+bis zur Marke? Beides steht deshalb im selben Bild: die durchgezogene Linie der
+gemessenen Werte, gestrichelt die Fortschreibung bis zur maßgeblichen Schwelle,
+senkrecht die Drittelmarken, das **rechnerische** Einsatzende (Anhaltswert der
+Unterlage) und „jetzt", waagrecht Rückzugsdruck und Restdruckwarnung. Wer
+schneller verbraucht als 50 l/min, sieht seine Linie vor der Marke „rechn. Ende"
+unten ankommen — das ist die Aussage, für die es die Grafik gibt.
+
+Das Modell liegt getrennt von der Zeichnung, weil dort die Aussagen stehen:
+welcher Wert gemessen und welcher fortgeschrieben ist, wie weit die Achse
+reicht. Eine gestauchte Druckachse macht aus einem harmlosen Verbrauch einen
+Sturz, deshalb beginnt sie immer bei 0. Gezeichnet wird erst ab dem zweiten
+Punkt — eine Grafik mit einem Punkt darin nimmt nur Platz weg. Handgeschriebenes
+Inline-SVG wie beim Höhenprofil der Leitung: Für eine Linie mit ein paar Marken
+ist eine Chart-Bibliothek im Bündel teurer als die Datei.
+
+### Sekunden werden nicht abgeschnitten
+
+`datetime-local` kennt nur Minuten. Die Dialoge für Abmarsch, Rückkehr und
+Druckabfrage sind mit der aktuellen Zeit vorbelegt und schrieben diesen
+gerundeten Wert auch dann, wenn niemand das Feld angefasst hatte — bis zu 59
+Sekunden Fehler an jedem Ankerpunkt. Beim Abmarsch hängt daran jede weitere
+Rechnung, und bei zwei kurz aufeinanderfolgenden Druckabfragen verschiebt eine
+Minute den gemessenen Verbrauch erheblich (bei einem Standardgerät sind 8 bar
+eine Minute).
+
+Deshalb merken die Dialoge, ob die Zeit **von Hand** geändert wurde: Unverändert
+gilt der genaue Zeitpunkt des Speicherns samt Sekunden, geändert der eingetippte
+Wert. Die Druckabfrage schickt dann gar kein `zeitpunkt`-Feld, und
+`buildDruckabfrage` nimmt `jetzt`.
+
+### Der angetretene Rückzug beendet die Warnungen
+
+Neben der Ankunft am Einsatzziel gibt es die Gegenmeldung: **„Trupp hat den
+Rückzug angetreten"** — ein Feld an der Druckabfrage (`rueckzug`), weil die
+Meldung „wir kommen zurück" über Funk zusammen mit einem Flaschendruck kommt und
+genau dieses Paar eine Druckabfrage ist. Ein eigener Zeitstempel am Trupp wäre
+eine zweite Wahrheit über denselben Funkspruch.
+
+Ab dieser Meldung schweigen **alle** Warnungen (`faelligeWarnungen` liefert eine
+leere Liste, `naechsteWarnung` plant keinen Termin mehr). Der Grund: Alle drei
+Warnungen zielen darauf, den Trupp zum Umkehren zu bringen. Er kehrt um — eine
+Meldung „Rückzug überfällig" wäre jetzt ein Fehlalarm, und ein Fehlalarm
+entwertet jede weitere Warnung.
+
+Beobachtet wird weiter, nur anderes: Die Karte zeigt statt der Frist „Rückzug
+angetreten HH:MM" mit den Minuten seither, die Fortschreibung läuft auf die
+Restdruckwarnung zu, und `dringlichkeit` richtet sich nach der Reserve —
+`achtung`, solange der Trupp über 55 bar hat, `kritisch` darunter. Ausdrücklich
+nicht `ok`: Der Trupp atmet weiter aus der Flasche, und eine grüne Karte hieße
+„hier ist nichts zu tun".
+
+Wie die Ankunft ist der Haken **nicht** vorbelegt: Er beendet die Warnungen, und
+das darf nicht aus Versehen passieren.
+
 ### Die Anzeige nennt die Grundlage der Schätzung
 
 Links vom vermuteten Druck steht der **Abmarsch** mit „seit *n* min", und unter
@@ -275,6 +337,34 @@ schweigt die Überwachung, sobald eine vorliegt.
 **Warum serverseitig:** Die Fristen sind Vorschrift, und ein Gruppenkommandant
 hat das Telefon in der Tasche, nicht die Seite offen. Eine Warnung, die nur
 kommt, solange jemand hinsieht, ist für eine Sicherheitsfunktion keine.
+
+### Der Push-Hinweis fragt nicht zweimal
+
+Ob Benachrichtigungen erlaubt sind, steht am **Gerät** und nicht in der Sitzung
+(`useNotificationPermission`). Vorher merkte die Seite nur, ob in *dieser*
+Sitzung jemand auf „Benachrichtigungen einschalten" gedrückt hatte — nach jedem
+Neuladen stand die Aufforderung wieder da, obwohl die Erlaubnis längst erteilt
+war.
+
+Gelesen wird über `useSyncExternalStore` und nicht in einem Effekt mit
+`setState`: Der Wert kommt von außerhalb von React, darf beim Server-Rendern
+nicht gelesen werden, und `react-hooks/set-state-in-effect` verbietet die naive
+Variante ohnehin. Der Schnappschuss liegt in einer Modulvariablen — eine
+Erlaubnis gilt für das ganze Gerät, nicht je Komponente. In der **App** fragt
+der Hook das Betriebssystem (`AppPermissions.checkPermission`) und nicht die
+WebView: Dort steht `Notification.permission` oft auf `default`, obwohl die App
+die Erlaubnis hat.
+
+Der Hinweis erscheint nur, wenn etwas zu tun oder zu wissen ist: bei erteilter
+Erlaubnis **nichts** (die Bestätigung kommt einmal kurz als Einblendung), bei
+`denied` ohne Knopf — der Browser fragt nach einer Ablehnung nicht wieder, das
+geht nur über seine Website-Einstellungen. Solange die Erlaubnis noch nicht
+gelesen ist, steht ebenfalls nichts da, sonst blitzte die Aufforderung beim
+Laden auf.
+
+Ist die Erlaubnis schon erteilt, holt die Seite den Push-Token ohne Zutun nach.
+Ohne das hätte ein Gerät die Erlaubnis, aber keinen registrierten Token — die
+Warnung käme dann nur, solange die Seite offen ist.
 
 ### Drei Wege, und warum es alle drei gibt
 
@@ -553,6 +643,11 @@ die eigene). Die Fahrzeuge des Einsatzes gehören in die **Wahl** der eigenen
 Einheit, nicht in die Reiter: Das wären zwanzig Reiter, von denen neunzehn leer
 sind.
 
+Das **Protokoll** unter den drei Abschnitten ist eingeklappt (Accordion mit
+`unmountOnExit`): Es wächst mit jeder Bereitstellung und schob die laufende Lage
+nach oben aus dem Blick. Eingeklappt werden seine Karten samt ihrer Kurven auch
+gar nicht gezeichnet.
+
 ### „Meine Einheit" ist kein Filter
 
 Die Auswahl über der Reiterzeile ist eine Angabe über *dieses Gerät*: Sie stellt
@@ -650,7 +745,10 @@ schreiben darf; ein Nur-Lese-Gast sieht die Überwachung, ändert sie aber nicht
 > „Die mit der Atemschutzüberwachung beauftragte Person übernimmt dabei NICHT
 > die Verantwortung für den Atemschutztrupp, sondern unterstützt diesen nur."
 
-Der Hinweis steht deshalb oben auf der Seite. Praktisch heißt das auch: Die
+Der Hinweis steht im Dialog **„Trupp übernehmen"** und nicht mehr dauerhaft oben
+auf der Seite: Als Banner nahm er in jedem Einsatz die Zeile weg, in der der
+erste Trupp stehen soll, und gelesen werden muss er in dem Moment, in dem jemand
+die Zeitkontrolle übernimmt. Praktisch heißt das auch: Die
 Papier-Rückfallebene bleibt. Fällt das Gerät oder die Verbindung aus, läuft die
 Zeitkontrolle auf dem Formblatt weiter — die App ist die Unterstützung, nicht
 die Vorschrift. Firestore puffert Schreibvorgänge offline und stellt sie später

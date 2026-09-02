@@ -136,7 +136,18 @@ export default function UeberwachungDialog({
             // Nur bei der Übernahme: Wer den Dialog später zum Bearbeiten
             // öffnet, hat die Kontrolle längst und braucht die Erklärung nicht
             // mehr.
-            <Alert severity="info">{t('ueberwachung.uebernehmenHinweis')}</Alert>
+            <>
+              <Alert severity="info">
+                {t('ueberwachung.uebernehmenHinweis')}
+              </Alert>
+              {/* Die Abgrenzung der Unterlage steht hier und nicht mehr
+                  dauerhaft oben auf der Seite: Dort nahm sie in jedem Einsatz
+                  Platz weg, gelesen werden muss sie in dem Moment, in dem
+                  jemand „übernehmen" drückt. */}
+              <Typography variant="caption" color="text.secondary">
+                {t('ueberwachung.verantwortungHinweis')}
+              </Typography>
+            </>
           )}
           {/* Die Einheit steht oben: Sie ist die Frage, die vor allen anderen
               beantwortet ist — „welches Fahrzeug hat den Trupp?" —, und sie

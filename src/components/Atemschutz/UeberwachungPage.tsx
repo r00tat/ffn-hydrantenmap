@@ -1,7 +1,11 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import Accordion from '@mui/material/Accordion';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -9,6 +13,7 @@ import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Fab from '@mui/material/Fab';
 import MenuItem from '@mui/material/MenuItem';
+import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
@@ -40,6 +45,10 @@ import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSugge
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
+import useNotificationPermission, {
+  pruefeNotificationErlaubnis,
+  type NotificationErlaubnis,
+} from '../../hooks/useNotificationPermission';
 import useRegisterMessaging from '../../hooks/useRegisterMessaging';
 import { requestPermission } from '../firebase/messaging';
 import useTicker from '../../hooks/useTicker';
@@ -97,6 +106,18 @@ function leseEinheit(): string {
     return ALLE;
   }
 }
+
+/** Welcher Hinweistext zu welchem Erlaubniszustand gehört. */
+const PUSH_HINWEIS: Record<
+  NotificationErlaubnis,
+  'offen' | 'ein' | 'aus' | 'nichtMoeglich'
+> = {
+  unbekannt: 'offen',
+  default: 'offen',
+  granted: 'ein',
+  denied: 'aus',
+  nichtMoeglich: 'nichtMoeglich',
+};
 
 type Dialog =
   | { art: 'trupp'; trupp?: AtemschutzTrupp }
@@ -292,18 +313,35 @@ export default function UeberwachungPage() {
   });
 
   const [dialog, setDialog] = useState<Dialog>();
-  const [pushStatus, setPushStatus] = useState<'offen' | 'ein' | 'aus'>(
-    'offen',
-  );
+  // Nur die einmalige Bestätigung nach dem Einschalten — kein Dauerzustand.
+  const [pushBestaetigung, setPushBestaetigung] = useState(false);
 
   /**
-   * Benachrichtigungen einschalten — als Handlung und nicht beim Laden.
+   * Der Zustand kommt vom **Gerät** und nicht aus dieser Sitzung.
    *
-   * Der Zustand steht in `useState` und wird **nicht** aus
-   * `Notification.permission` gelesen: Die Seite wird auch auf dem Server
-   * gerendert, wo es das Objekt nicht gibt, und ein daraus abgeleiteter
-   * Startwert wäre ein Unterschied zwischen Server- und Client-Render.
+   * Vorher stand er in einem `useState`, das mit „offen" begann: Nach jedem
+   * Neuladen forderte die Seite erneut auf, Benachrichtigungen einzuschalten,
+   * obwohl die Erlaubnis längst erteilt war. Siehe `useNotificationPermission`.
    */
+  const pushErlaubnis = useNotificationPermission();
+
+  /**
+   * Ist die Erlaubnis schon erteilt, wird der Push-Token ohne Zutun
+   * nachgetragen.
+   *
+   * Ohne das hätte ein Gerät die Erlaubnis, aber keinen registrierten Token —
+   * die Warnung käme dann nur, solange die Seite offen ist. Ein Dialog erscheint
+   * dabei nicht (die Erlaubnis liegt vor), und `registerMessaging` tut nichts,
+   * wenn der Token schon eingetragen ist.
+   */
+  useEffect(() => {
+    if (pushErlaubnis !== 'granted') return;
+    registerMessaging().catch((err) => {
+      console.warn('Push-Registrierung fehlgeschlagen', err);
+    });
+  }, [pushErlaubnis, registerMessaging]);
+
+  /** Benachrichtigungen einschalten — als Handlung und nicht beim Laden. */
   const handlePushErlauben = useCallback(async () => {
     const erlaubt = await requestPermission().catch(() => false);
     if (erlaubt) {
@@ -311,8 +349,20 @@ export default function UeberwachungPage() {
         console.warn('Push-Registrierung fehlgeschlagen', err);
       });
     }
-    setPushStatus(erlaubt ? 'ein' : 'aus');
+    // Nachlesen statt merken: In Safari und in der App gibt es kein
+    // `change`-Ereignis, auf das der Hook warten könnte.
+    await pruefeNotificationErlaubnis();
+    setPushBestaetigung(erlaubt);
   }, [registerMessaging]);
+
+  /**
+   * Ob überhaupt ein Hinweis nötig ist.
+   *
+   * Bei erteilter Erlaubnis nicht: Dann kommen die Warnungen an, und das ist
+   * der Normalfall — dafür braucht es keine dauerhafte Zeile.
+   */
+  const braucheHinweis =
+    pushErlaubnis !== 'granted' && pushErlaubnis !== 'unbekannt';
 
   const actorNow = useCallback(
     (): AtemschutzActor => ({
@@ -576,27 +626,23 @@ export default function UeberwachungPage() {
         </Alert>
       )}
 
-      <Alert severity="info" sx={{ mb: 2 }}>
-        {t('ueberwachung.verantwortungHinweis')}
-      </Alert>
-
-      {canWrite && (
-        // Der Hinweis steht immer da und nicht nur bei fehlender Erlaubnis:
-        // Ob der Browser sie erteilt hat, lässt sich beim Rendern nicht
-        // ablesen, ohne dass Server- und Client-Render auseinanderlaufen —
-        // und die Frage „kommt eine Warnung an, wenn das Handy im Sack ist?"
-        // muss vor dem ersten Trupp beantwortbar sein.
+      {canWrite && braucheHinweis && (
+        // Nur, wenn etwas zu tun oder zu wissen ist. Bei erteilter Erlaubnis
+        // steht hier **nichts**: Ein dauerhaftes „ist eingeschaltet" nimmt auf
+        // einem Handy die Zeile weg, in der der erste Trupp stehen soll — die
+        // Bestätigung kommt einmal kurz als Einblendung. Solange die Erlaubnis
+        // noch nicht gelesen ist (Server-Render, erster Moment nach dem Laden),
+        // ebenfalls nichts, sonst blitzte die Aufforderung auf, obwohl längst
+        // alles eingeschaltet ist.
         <Alert
-          severity={
-            pushStatus === 'ein'
-              ? 'success'
-              : pushStatus === 'aus'
-                ? 'warning'
-                : 'info'
-          }
+          severity={pushErlaubnis === 'default' ? 'info' : 'warning'}
           sx={{ mb: 2 }}
           action={
-            pushStatus === 'ein' ? undefined : (
+            // Bei „denied" hilft der Knopf nicht mehr: Der Browser fragt nach
+            // einer Ablehnung nicht wieder, das geht nur über seine
+            // Website-Einstellungen. Genauso bei einem Gerät ohne
+            // Benachrichtigungen.
+            pushErlaubnis === 'default' ? (
               <Button
                 color="inherit"
                 size="small"
@@ -604,14 +650,21 @@ export default function UeberwachungPage() {
               >
                 {t('ueberwachung.actions.pushErlauben')}
               </Button>
-            )
+            ) : undefined
           }
         >
           {t(
-            `ueberwachung.pushHinweis.${pushStatus}` as 'ueberwachung.pushHinweis.offen',
+            `ueberwachung.pushHinweis.${PUSH_HINWEIS[pushErlaubnis]}` as 'ueberwachung.pushHinweis.offen',
           )}
         </Alert>
       )}
+
+      <Snackbar
+        open={pushBestaetigung}
+        autoHideDuration={4000}
+        onClose={() => setPushBestaetigung(false)}
+        message={t('ueberwachung.pushHinweis.ein')}
+      />
 
       <Stack
         direction="row"
@@ -678,18 +731,33 @@ export default function UeberwachungPage() {
       {abschnitt('zurueck', zurueck)}
 
       <Divider sx={{ my: 3 }} />
-      <Typography variant="h6" gutterBottom>
-        {t('trupp.sections.protokoll')}
-      </Typography>
-      {/* Auf die *gefilterte* Liste geprüft: Sonst blieb unter einem Reiter
-          ohne eigene Zeilen eine leere Fläche ohne Erklärung stehen. */}
-      {protokoll.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          {t('trupp.empty.protokoll')}
-        </Typography>
-      ) : (
-        <Stack spacing={1}>{protokoll.map(karte)}</Stack>
-      )}
+      {/* Eingeklappt, und zwar standardmäßig: Das Protokoll wächst mit jeder
+          Bereitstellung und schob die laufende Lage nach oben aus dem Blick.
+          `unmountOnExit`, damit die eingeklappten Karten samt ihrer Kurven gar
+          nicht gezeichnet werden. */}
+      <Accordion
+        disableGutters
+        variant="outlined"
+        slotProps={{ transition: { unmountOnExit: true } }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="h6">
+            {t('trupp.sections.protokoll')}
+            {protokoll.length > 0 && ` (${protokoll.length})`}
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          {/* Auf die *gefilterte* Liste geprüft: Sonst blieb unter einem Reiter
+              ohne eigene Zeilen eine leere Fläche ohne Erklärung stehen. */}
+          {protokoll.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              {t('trupp.empty.protokoll')}
+            </Typography>
+          ) : (
+            <Stack spacing={1}>{protokoll.map(karte)}</Stack>
+          )}
+        </AccordionDetails>
+      </Accordion>
 
       {canWrite && (
         <Fab
@@ -712,6 +780,7 @@ export default function UeberwachungPage() {
           // Anders als am Sammelplatz: Wer den Trupp bei seiner eigenen Einheit
           // erfasst, weiß in derselben Sekunde, zu welcher er gehört.
           einheitVorschlaege={einheiten}
+          einheitVorgabe={zielEinheit}
           onClose={() => setDialog(undefined)}
           onSave={(input) => handleSaveTrupp(input, dialog.trupp)}
         />

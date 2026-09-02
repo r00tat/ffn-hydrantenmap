@@ -82,6 +82,16 @@ export default function TruppZeitDialog({
   const tCommon = useTranslations('common');
 
   const [zeit, setZeit] = useState(() => toLocalInput(new Date()));
+  /**
+   * Ob die Zeit von Hand geändert wurde — entscheidet über die **Sekunden**.
+   *
+   * `datetime-local` kennt nur Minuten. Unverändert übernommen schnitte der
+   * Abmarsch auf `:00` ab, und daran hängt jede weitere Rechnung: Drittelmarken,
+   * gemessener Verbrauch, Rückzugszeitpunkt. Bis zu einer Minute Fehler beim
+   * Ankerpunkt ist mehr, als die Anzeige später auflöst — deshalb gilt ohne
+   * Änderung der genaue Zeitpunkt des Speicherns.
+   */
+  const [zeitGeaendert, setZeitGeaendert] = useState(false);
   const [druck, setDruck] = useState('');
   const [entsendetAn, setEntsendetAn] = useState(entsendetAnVorschlag ?? '');
   const [saving, setSaving] = useState(false);
@@ -93,6 +103,10 @@ export default function TruppZeitDialog({
   const fragtZiel = istEntsenden;
   const druckWert = druck.trim() ? Number(druck.trim().replace(',', '.')) : undefined;
 
+  // Unverändert: der genaue Moment mit Sekunden, s. `zeitGeaendert`.
+  const zeitpunkt = () =>
+    zeitGeaendert ? fromLocalInput(zeit) : new Date().toISOString();
+
   const handleConfirm = async () => {
     setSaving(true);
     try {
@@ -101,11 +115,11 @@ export default function TruppZeitDialog({
             // Leer heißt „nicht angefasst": `entsendePatch` lässt das Feld dann
             // aus dem Patch weg, ein schon gesetztes Ziel bleibt also stehen.
             entsendetAn: fragtZiel ? entsendetAn : undefined,
-            abmarschZeit: fromLocalInput(zeit),
+            abmarschZeit: zeitpunkt(),
             druckAbmarsch: Number.isFinite(druckWert) ? druckWert : undefined,
           })
         : rueckkehrPatch({
-            rueckkehrZeit: fromLocalInput(zeit),
+            rueckkehrZeit: zeitpunkt(),
             druckRueckkehr: Number.isFinite(druckWert) ? druckWert : undefined,
           });
       await onConfirm(patch);
@@ -169,7 +183,10 @@ export default function TruppZeitDialog({
                   : t('trupp.abmarschZeit')
             }
             value={zeit}
-            onChange={(e) => setZeit(e.target.value)}
+            onChange={(e) => {
+              setZeit(e.target.value);
+              setZeitGeaendert(true);
+            }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
           <TextField

@@ -331,6 +331,14 @@ export interface UeberwachungStand {
   vermuteterDruck: number;
   /** Druck bei Erreichen des Einsatzziels, wenn gemeldet. */
   druckAmZiel?: number;
+  /**
+   * Wann der Trupp den Rückzug angetreten hat, wenn gemeldet (ISO).
+   *
+   * Ab hier sind die Fristen erledigt: Sie sollten den Trupp zum Umkehren
+   * bringen, und er kehrt um. Die Rechnung läuft weiter — der Trupp atmet noch
+   * aus der Flasche —, aber gewarnt wird nicht mehr.
+   */
+  rueckzugSeit?: string;
   /** Doppelter Vormarschdruckabfall, wenn berechenbar. */
   rueckmarschDruck?: number;
   /** Der maßgebliche Druck: der höhere von Rückmarschdruck und Restdruck. */
@@ -416,6 +424,9 @@ export function berechneStand(
   // Einsatzzieles". Eine spätere Abfrage mit gesetztem Haken wäre eine
   // Korrektur des Ortes, nicht ein zweites Erreichen.
   const zielAbfrage = abfragen.find((a) => a.amZiel === true);
+  // Die *erste* Rückzugsmeldung zählt, aus demselben Grund wie bei der
+  // Ankunft: Eine zweite wäre eine Wiederholung, nicht ein zweiter Rückzug.
+  const rueckzugAbfrage = abfragen.find((a) => a.rueckzug === true);
   const rueckmarsch = rueckmarschDruck({
     startdruck,
     druckAmZiel: zielAbfrage?.druck,
@@ -454,6 +465,7 @@ export function berechneStand(
     letzterPunkt,
     vermuteterDruck,
     ...(zielAbfrage ? { druckAmZiel: zielAbfrage.druck } : {}),
+    ...(rueckzugAbfrage ? { rueckzugSeit: rueckzugAbfrage.zeitpunkt } : {}),
     ...(rueckmarsch != null ? { rueckmarschDruck: rueckmarsch } : {}),
     rueckzugsDruck,
     rueckzugsGrund: vormarschGreiftZuerst ? 'vormarsch' : 'restdruck',
@@ -503,6 +515,11 @@ export function faelligeWarnungen(
   if (trupp.status !== 'imEinsatz') return [];
   const stand = berechneStand(trupp, jetzt, opts);
   if (!stand) return [];
+  // Der Trupp ist auf dem Rückweg. Alle drei Warnungen zielen darauf, ihn dazu
+  // zu bringen — jetzt noch zu mahnen wäre ein Fehlalarm, und ein Fehlalarm
+  // entwertet jede weitere Warnung. Beobachtet wird ab hier der Reservedruck
+  // (`dringlichkeit`), gemeldet wird nicht mehr.
+  if (stand.rueckzugSeit) return [];
 
   const faellig: WarnungFaellig[] = [];
   const abfragen = sortierteAbfragen(trupp);
@@ -581,6 +598,9 @@ export function naechsteWarnung(
   if (trupp.status !== 'imEinsatz') return undefined;
   const stand = berechneStand(trupp, jetzt, opts);
   if (!stand) return undefined;
+  // Kein Termin mehr nach der Rückzugsmeldung — s. `faelligeWarnungen`. Die
+  // Aufgabe würde zur berechneten Zeit nichts finden und nur Kosten machen.
+  if (stand.rueckzugSeit) return undefined;
 
   const verschickt = trupp.warnungen ?? {};
   const vorlauf = opts.vorlaufMin ?? RUECKZUG_VORLAUF_MIN;
@@ -632,6 +652,12 @@ export function dringlichkeit(
   stand: UeberwachungStand,
   vorlaufMin = RUECKZUG_VORLAUF_MIN,
 ): Dringlichkeit {
+  if (stand.rueckzugSeit) {
+    // Auf dem Rückweg zählt nicht mehr die Frist — sie ist erfüllt —, sondern
+    // die Reserve. Nicht „ok": Der Trupp atmet weiter aus der Flasche, und
+    // eine grüne Karte hieße „hier ist nichts zu tun".
+    return stand.vermuteterDruck <= RESERVEDRUCK_BAR ? 'kritisch' : 'achtung';
+  }
   if (stand.minutenBisRueckzug <= 0) return 'ueberschritten';
   if (stand.minutenBisRueckzug <= vorlaufMin) return 'kritisch';
   if (stand.minutenBisRueckzug <= stand.erwarteteDauerMin / 3) return 'achtung';

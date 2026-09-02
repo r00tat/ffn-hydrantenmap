@@ -608,3 +608,55 @@ describe('dringlichkeit und Fortschritt', () => {
     expect(dringlichkeit(stand)).toBe('achtung');
   });
 });
+
+describe('angetretener Rückzug', () => {
+  /** Eine Meldung „wir kommen zurück" — Druckabfrage mit `rueckzug`. */
+  const rueckzugAbfrage = (minuten: number, druck: number): Druckabfrage => ({
+    zeitpunkt: nachAbmarsch(minuten).toISOString(),
+    druck,
+    rueckzug: true,
+  });
+
+  const imRueckmarsch = trupp({
+    abmarschZeit: ABMARSCH,
+    druckAbmarsch: 300,
+    paTyp: 'standard300',
+    abfragen: [abfrage(5, 240, true), rueckzugAbfrage(15, 120)],
+  });
+
+  it('merkt sich den Zeitpunkt der ersten Rückzugsmeldung', () => {
+    const stand = berechneStand(imRueckmarsch, nachAbmarsch(18))!;
+    expect(stand.rueckzugSeit).toBe(nachAbmarsch(15).toISOString());
+  });
+
+  it('schweigt danach mit allen Warnungen', () => {
+    // Der Zweck der Warnungen ist, den Trupp zum Umkehren zu bringen. Er kehrt
+    // um — eine Warnung „Rückzug überfällig" wäre jetzt ein Fehlalarm, und der
+    // entwertet jede weitere.
+    expect(faelligeWarnungen(imRueckmarsch, nachAbmarsch(40))).toEqual([]);
+    expect(offeneWarnungen(imRueckmarsch, nachAbmarsch(40))).toEqual([]);
+  });
+
+  it('plant danach keinen Termin mehr', () => {
+    expect(naechsteWarnung(imRueckmarsch, nachAbmarsch(16))).toBeUndefined();
+  });
+
+  it('bleibt sichtbar auffällig, solange der Trupp unter Atemschutz ist', () => {
+    // Nicht „ok": Der Trupp atmet weiter aus der Flasche, und beobachtet wird
+    // jetzt der Reservedruck statt der Frist.
+    const stand = berechneStand(imRueckmarsch, nachAbmarsch(18))!;
+    expect(dringlichkeit(stand)).toBe('achtung');
+  });
+
+  it('wird kritisch, wenn die Reserve angebrochen ist', () => {
+    const knapp = trupp({
+      abmarschZeit: ABMARSCH,
+      druckAbmarsch: 300,
+      paTyp: 'standard300',
+      abfragen: [rueckzugAbfrage(20, 50)],
+    });
+    const stand = berechneStand(knapp, nachAbmarsch(21))!;
+    expect(stand.vermuteterDruck).toBeLessThan(RESERVEDRUCK_BAR);
+    expect(dringlichkeit(stand)).toBe('kritisch');
+  });
+});

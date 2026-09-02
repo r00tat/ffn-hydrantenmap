@@ -31,6 +31,11 @@ export interface TruppDialogProps {
    * wohin der Trupp geht, dort wird die Einheit erst beim Entsenden gefragt.
    */
   einheitVorschlaege?: string[];
+  /**
+   * Vorbelegung beim **Anlegen** — die eigene Einheit des Geräts bzw. die des
+   * aktiven Reiters. Am bestehenden Trupp gilt sein eigener Wert.
+   */
+  einheitVorgabe?: string;
   onClose: () => void;
   onSave: (input: TruppInput) => Promise<void>;
 }
@@ -41,6 +46,7 @@ export default function TruppDialog({
   feuerwehren,
   personSuggestions,
   einheitVorschlaege,
+  einheitVorgabe,
   onClose,
   onSave,
 }: TruppDialogProps) {
@@ -53,7 +59,9 @@ export default function TruppDialog({
     () => trupp?.mitglieder ?? [],
   );
   const [bemerkung, setBemerkung] = useState(trupp?.bemerkung ?? '');
-  const [entsendetAn, setEntsendetAn] = useState(trupp?.entsendetAn ?? '');
+  const [entsendetAn, setEntsendetAn] = useState(
+    trupp?.entsendetAn ?? einheitVorgabe ?? '',
+  );
   const [saving, setSaving] = useState(false);
 
   const input: TruppInput = {

@@ -451,6 +451,7 @@
       "einheitHint": "Remembered per device, shown as the first tab and assigned to new teams.",
       "einheitAlle": "All teams",
       "einheitKeine": "Not set",
+      "einheitKurz": "Unit",
       "zuordnung": {
         "assp": "Staging area",
         "keine": "Unassigned"
@@ -487,6 +488,19 @@
       "amZielHint": "Only the pressure on arrival allows the turn-around pressure to be derived from twice the inbound pressure drop. Leave unchecked for an ordinary interim check.",
       "amZielFehltHinweis": "No arrival at the target has been recorded for this team yet. Until then the low pressure warning at 55 bar is the withdrawal point.",
       "amZielKurz": "arrival",
+      "rueckzug": "Team has started to withdraw",
+      "rueckzugHint": "The “we are coming back” report. No further one-third or withdrawal warnings after it — only the reserve pressure is still watched.",
+      "rueckzugKurz": "Withdrawal",
+      "rueckzugSeit": "Withdrawal started",
+      "druckverlaufChart": "Pressure over time",
+      "chart": {
+        "drittel": "1/3",
+        "zweiDrittel": "2/3",
+        "ende": "calc. end",
+        "jetzt": "now",
+        "rueckzug": "Withdrawal {druck} bar",
+        "reserve": "Reserve {druck} bar"
+      },
       "bemerkung": "Note",
       "abmarschUm": "Departure",
       "seitMinuten": "for {minuten} min",
@@ -536,7 +550,8 @@
       "pushHinweis": {
         "offen": "Warnings appear on this page. For them to arrive while the screen is locked, notifications have to be allowed.",
         "ein": "Notifications are enabled — warnings also arrive while the page is in the background.",
-        "aus": "The browser does not allow notifications. Warnings then only appear while this page is open; you can allow them in the browser's site settings."
+        "aus": "The browser does not allow notifications. Warnings then only appear while this page is open; you can allow them in the browser's site settings.",
+        "nichtMoeglich": "This device cannot show notifications. Warnings only appear while this page is open."
       },
       "actions": {
         "uebernehmen": "Take over team",

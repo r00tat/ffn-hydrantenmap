@@ -252,6 +252,21 @@ export interface Druckabfrage {
    * gesetzter Haken macht den Rückmarschdruck zu einer Behauptung.
    */
   amZiel?: boolean;
+  /**
+   * Der Trupp hat den Rückzug angetreten — die Gegenmeldung zur Ankunft.
+   *
+   * Am Ende der Zeitkontrolle stand vorher nur „angekommen" und dann irgendwann
+   * „zurück". Der Rückmarsch ist aber ein eigener Abschnitt: Ab hier laufen die
+   * Fristen ins Leere, denn ihr Zweck war, den Trupp zum Umkehren zu bringen.
+   * Deshalb schweigen die Warnungen danach (`faelligeWarnungen`) — beobachtet
+   * wird noch der Reservedruck.
+   *
+   * Ein Feld an der Abfrage und kein Zeitstempel am Trupp: Die Meldung „wir
+   * kommen zurück" kommt über Funk zusammen mit einem Flaschendruck, und genau
+   * dieses Paar ist eine Druckabfrage. Ein eigenes Feld am Trupp wäre eine
+   * zweite Wahrheit über denselben Funkspruch.
+   */
+  rueckzug?: boolean;
   bemerkung?: string;
   /** Wer abgefragt hat — `uid`, für die Nachvollziehbarkeit. */
   erfasstVon?: string;
@@ -1181,6 +1196,7 @@ export function sammelplatzUebergabePatch(input: {
 export interface DruckabfrageInput {
   druck?: number;
   amZiel?: boolean;
+  rueckzug?: boolean;
   bemerkung?: string;
   /** Ohne Angabe gilt der Jetzt-Zeitpunkt des Aufrufers. */
   zeitpunkt?: string;
@@ -1210,6 +1226,7 @@ export function buildDruckabfrage(
     druck: input.druck as number,
   };
   if (input.amZiel) abfrage.amZiel = true;
+  if (input.rueckzug) abfrage.rueckzug = true;
   const bemerkung = input.bemerkung?.trim();
   if (bemerkung) abfrage.bemerkung = bemerkung;
   const uid = ctx.uid?.trim();

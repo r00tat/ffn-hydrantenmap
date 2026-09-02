@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { AtemschutzTrupp } from '../../common/atemschutz';
@@ -97,7 +97,10 @@ describe('DruckabfrageDialog', () => {
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
 
-  it('schickt einen Zeitpunkt mit — die Meldung kommt über Funk', async () => {
+  it('lässt den Zeitpunkt ohne Änderung weg — Sekunden bleiben erhalten', async () => {
+    // `datetime-local` kennt nur Minuten. Fehlt der Zeitpunkt, nimmt
+    // `buildDruckabfrage` den Moment des Speicherns samt Sekunden — sonst wäre
+    // der gemessene Verbrauch um bis zu eine Minute verschoben.
     const onSave = render();
     await userEvent.type(
       screen.getByRole('spinbutton', { name: /Geringster Druck/ }),
@@ -105,8 +108,23 @@ describe('DruckabfrageDialog', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
-    expect(onSave.mock.calls[0][0].zeitpunkt).toMatch(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/,
+    expect(onSave.mock.calls[0][0]).not.toHaveProperty('zeitpunkt');
+  });
+
+  it('schickt einen von Hand eingetippten Zeitpunkt mit', async () => {
+    // Die Meldung kommt über Funk und wird eine Minute später erfasst.
+    const onSave = render();
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /Geringster Druck/ }),
+      '180',
+    );
+    fireEvent.change(screen.getByLabelText(/Zeitpunkt der Meldung/), {
+      target: { value: '2026-09-02T10:05' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].zeitpunkt).toBe(
+      new Date('2026-09-02T10:05').toISOString(),
     );
   });
 });

@@ -34,12 +34,8 @@ import {
   sortierteAbfragen,
   type Dringlichkeit,
 } from '../../common/atemschutzUeberwachung';
-import {
-  ASSP_EINHEIT,
-  OHNE_EINHEIT,
-  istEinheitName,
-  zuordnungKey,
-} from './einheiten';
+import DruckVerlaufChart from './DruckVerlaufChart';
+import { ASSP_EINHEIT, istEinheitName, zuordnungKey } from './einheiten';
 
 export interface UeberwachungCardProps {
   trupp: AtemschutzTrupp;
@@ -68,16 +64,6 @@ interface VerlaufZeile {
   druck?: number;
   label: string;
 }
-
-/**
- * Der Chip der Zuordnung. „Nicht zugeordnet" ist gelb, weil es eine Lücke im
- * Protokoll ist; der Sammelplatz ist blau, weil er eine gewöhnliche Station im
- * Ablauf ist. Eine benannte Einheit braucht keine Farbe.
- */
-const ZUORDNUNG_FARBE: Record<string, 'info' | 'warning'> = {
-  [ASSP_EINHEIT]: 'info',
-  [OHNE_EINHEIT]: 'warning',
-};
 
 const FARBE: Record<Dringlichkeit, 'success' | 'warning' | 'error'> = {
   ok: 'success',
@@ -154,8 +140,14 @@ export default function UeberwachungCard({
       zeitpunkt: a.zeitpunkt,
       druck: a.druck,
       // Eine gewöhnliche Zwischenabfrage bleibt unbeschriftet: Stünde an jeder
-      // Zeile „Druckabfrage", fielen Ankunft und Rückkehr nicht mehr auf.
-      label: a.amZiel ? t('ueberwachung.amZielKurz') : '',
+      // Zeile „Druckabfrage", fielen Ankunft, Rückzug und Rückkehr nicht mehr
+      // auf.
+      label: [
+        a.amZiel && t('ueberwachung.amZielKurz'),
+        a.rueckzug && t('ueberwachung.rueckzugKurz'),
+      ]
+        .filter(Boolean)
+        .join(' · '),
     })),
     ...(trupp.rueckkehrZeit
       ? [
@@ -194,18 +186,6 @@ export default function UeberwachungCard({
             }
             label={t(`trupp.status.${trupp.status}`)}
           />
-          {/* Die Zuordnung gehört in den Kopf und nicht in die Detailzeile: Wer
-              auf die Karte schaut, will zuerst wissen, ob der Trupp zu *seiner*
-              Einheit gehört. Immer da, auch ohne Einheit — eine leere Stelle
-              wäre nicht von „steht am Sammelplatz" zu unterscheiden. */}
-          <Tooltip title={t('ueberwachung.truppEinheit')} describeChild>
-            <Chip
-              size="small"
-              variant="outlined"
-              color={ZUORDNUNG_FARBE[zuordnung] ?? 'default'}
-              label={zuordnungLabel}
-            />
-          </Tooltip>
           {trupp.laufendeNummer > 1 && (
             <Chip
               size="small"
@@ -272,8 +252,14 @@ export default function UeberwachungCard({
 
         <Typography variant="body2">{trupp.mitglieder.join(' · ')}</Typography>
 
+        {/* Die Zuordnung steht in der Textzeile und nicht als Chip: Im Kopf
+            stehen schon Zustand, Bereitstellung und die Vermerke der Übergabe —
+            ein weiterer Chip macht die Karte nicht klarer, sondern voller.
+            Genannt wird sie **immer**, auch ohne Einheit: Eine leere Stelle
+            wäre nicht von „steht am Sammelplatz" zu unterscheiden. */}
         <Typography variant="body2" color="text.secondary" component="div">
           {[
+            `${t('ueberwachung.einheitKurz')}: ${zuordnungLabel}`,
             trupp.einsatzziel &&
               `${t('ueberwachung.einsatzziel')}: ${trupp.einsatzziel}`,
             trupp.ueberwachtVon &&
@@ -355,25 +341,38 @@ export default function UeberwachungCard({
                   })}
                 </Typography>
               </Box>
+              {/* Nach der Rückzugsmeldung steht hier nicht mehr die Frist,
+                  sondern der Rückweg: Die Prognose ist erfüllt, und „in −8 min"
+                  wäre eine Mahnung an einen Trupp, der schon unterwegs ist. */}
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  {t('ueberwachung.rueckzugUm')}
+                  {stand.rueckzugSeit
+                    ? t('ueberwachung.rueckzugSeit')
+                    : t('ueberwachung.rueckzugUm')}
                 </Typography>
                 <Typography
                   variant="h6"
                   sx={{ fontWeight: 700 }}
                   color={`${FARBE[stufe]}.main`}
                 >
-                  {uhrzeit(stand.rueckzugZeit)}
+                  {uhrzeit(stand.rueckzugSeit ?? stand.rueckzugZeit)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {stand.minutenBisRueckzug >= 0
-                    ? t('ueberwachung.inMinuten', {
-                        minuten: rund(stand.minutenBisRueckzug),
+                  {stand.rueckzugSeit
+                    ? t('ueberwachung.seitMinuten', {
+                        minuten: rund(
+                          (jetzt.getTime() -
+                            new Date(stand.rueckzugSeit).getTime()) /
+                            60_000,
+                        ),
                       })
-                    : t('ueberwachung.ueberfaelligSeit', {
-                        minuten: rund(-stand.minutenBisRueckzug),
-                      })}
+                    : stand.minutenBisRueckzug >= 0
+                      ? t('ueberwachung.inMinuten', {
+                          minuten: rund(stand.minutenBisRueckzug),
+                        })
+                      : t('ueberwachung.ueberfaelligSeit', {
+                          minuten: rund(-stand.minutenBisRueckzug),
+                        })}
                 </Typography>
               </Box>
               <Box>
@@ -489,6 +488,12 @@ export default function UeberwachungCard({
                 </Fragment>
               ))}
             </Box>
+            {/* Die Kurve unter den Zeilen: Die Zeilen tragen die genauen
+                Werte, die Kurve die Steigung — „wie schnell geht die Luft
+                weg?" ist aus Zahlen nicht abzulesen. */}
+            {stand && (
+              <DruckVerlaufChart trupp={trupp} stand={stand} jetzt={jetzt} />
+            )}
           </>
         )}
 
