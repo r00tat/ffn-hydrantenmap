@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildIconHtml, formatRelative } from './LiveLocationMarker';
+import {
+  buildIconHtml,
+  formatRelative,
+  markerDisplayName,
+} from './LiveLocationMarker';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -24,6 +28,50 @@ describe('formatRelative', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     // future timestamp -> negative age
     expect(formatRelative(now + 5_000)).toBe('vor 0 s');
+  });
+});
+
+// Der Marker landet über `L.divIcon({ html })` per innerHTML in der Karte.
+// `name`, `email` und `deviceLabel` kommen aus dem Firestore-Dokument und sind
+// vom schreibenden Client frei wählbar — die Regeln binden nur `uid`. Ohne
+// Maskierung führt jeder im Einsatz Berechtigte (auch ein Gast über einen
+// Freigabe-Link) beliebiges HTML in der Sitzung aller anderen aus.
+describe('buildIconHtml escaping', () => {
+  it('does not emit the display name as markup', () => {
+    const html = buildIconHtml({
+      initials: 'AB',
+      color: '#1976d2',
+      displayName: '<img src=x onerror=alert(1)>',
+      opacity: 1,
+    });
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('onerror=alert(1)>');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+  });
+
+  it('does not emit the initials as markup', () => {
+    const html = buildIconHtml({
+      initials: '<s',
+      color: '#1976d2',
+      displayName: 'Anna Bauer',
+      opacity: 1,
+    });
+    expect(html).not.toContain('<s');
+    expect(html).toContain('&lt;s');
+  });
+
+  // Die Farbe steht in einem style-Attribut. Sie kommt heute aus einer festen
+  // Palette, die Maskierung hält die Stelle aber auch dann dicht, wenn dort
+  // einmal etwas anderes ankommt.
+  it('does not let the color break out of the style attribute', () => {
+    const html = buildIconHtml({
+      initials: 'AB',
+      color: '#fff" onmouseover="alert(1)',
+      displayName: 'Anna Bauer',
+      opacity: 1,
+    });
+    expect(html).not.toContain('onmouseover="alert(1)"');
+    expect(html).toContain('&quot;');
   });
 });
 
@@ -52,6 +100,48 @@ describe('buildIconHtml', () => {
   });
 });
 
+// Nachtrag zu #760: dasselbe Konto auf mehreren Geräten steht jetzt mehrfach
+// auf der Karte, und die Marker müssen unterscheidbar sein.
+describe('markerDisplayName', () => {
+  it('is the plain name for a single device', () => {
+    expect(
+      markerDisplayName({
+        name: 'Paul Wölfel',
+        email: 'paul@x.at',
+        deviceLabel: 'Android',
+        showDeviceLabel: false,
+      }),
+    ).toBe('Paul Wölfel');
+  });
+
+  it('appends the device when the person appears more than once', () => {
+    expect(
+      markerDisplayName({
+        name: 'Paul Wölfel',
+        email: 'paul@x.at',
+        deviceLabel: 'Android',
+        showDeviceLabel: true,
+      }),
+    ).toBe('Paul Wölfel (Android)');
+  });
+
+  it('stays with the plain name when the device is unknown', () => {
+    expect(
+      markerDisplayName({
+        name: 'Paul Wölfel',
+        email: 'paul@x.at',
+        showDeviceLabel: true,
+      }),
+    ).toBe('Paul Wölfel');
+  });
+
+  it('falls back to the email as the person name', () => {
+    expect(
+      markerDisplayName({ name: '', email: 'paul@x.at', showDeviceLabel: true }),
+    ).toBe('paul@x.at');
+  });
+});
+
 describe('LiveLocationMarker rendering decisions', () => {
   it('returns null when opacity is zero (stale)', async () => {
     const { default: LiveLocationMarker } = await import('./LiveLocationMarker');
@@ -71,6 +161,7 @@ describe('LiveLocationMarker rendering decisions', () => {
       updatedAt: Timestamp.fromMillis(stale),
       expiresAt: Timestamp.fromMillis(stale + 1_000_000),
       updatedAtMs: stale,
+      showDeviceLabel: false,
     };
 
     // Render without a MapContainer; component should bail out and return null

@@ -8,6 +8,13 @@ export const TTL_EXPIRY_MS = 60 * 60 * 1000; // 1 h (Firestore TTL)
 
 export interface LiveLocation {
   uid: string;
+  /**
+   * Gerät, von dem die Freigabe kommt. Fehlt bei Dokumenten aus der Zeit vor
+   * der Umstellung auf ein Dokument je Gerät — die laufen über die TTL aus.
+   */
+  deviceId?: string;
+  /** Grobe Geräteart („Android", „Windows"), nur zur Unterscheidung. */
+  deviceLabel?: string;
   name: string;
   email: string;
   lat: number;
@@ -17,6 +24,36 @@ export interface LiveLocation {
   speed?: number;
   updatedAt: Timestamp;
   expiresAt: Timestamp;
+}
+
+/**
+ * Dokument-ID einer Standortfreigabe: **ein Dokument je Gerät**, nicht je
+ * Benutzer. Vorher war die ID die bloße uid — dasselbe Konto auf Tablet und
+ * Desktop schrieb damit dasselbe Dokument, die Geräte überschrieben sich
+ * gegenseitig, und der Lesepfad filterte die eigene uid ohnehin weg. Wer
+ * mehrere Geräte auf einem Konto betreibt, sah deshalb nie eines davon.
+ *
+ * Die Firestore-Regeln hängen am Aufbau `<uid>_<deviceId>`: sie erlauben nur
+ * Dokumente, deren ID mit der eigenen uid beginnt. Der Rückfall auf die bloße
+ * uid bleibt für den Fall, dass kein `localStorage` verfügbar ist.
+ */
+export function liveLocationDocId(uid: string, deviceId: string): string {
+  return deviceId ? `${uid}_${deviceId}` : uid;
+}
+
+/**
+ * Grobe Geräteart aus dem User-Agent. Sie dient allein dazu, zwei Marker
+ * derselben Person auseinanderzuhalten — nicht der Inventarisierung. Android
+ * muss vor Linux geprüft werden, der Android-User-Agent trägt beides.
+ */
+export function deviceLabelFromUserAgent(userAgent: string): string {
+  if (/Android/i.test(userAgent)) return 'Android';
+  if (/iPhone/i.test(userAgent)) return 'iPhone';
+  if (/iPad/i.test(userAgent)) return 'iPad';
+  if (/Windows/i.test(userAgent)) return 'Windows';
+  if (/Macintosh|Mac OS X/i.test(userAgent)) return 'Mac';
+  if (/Linux/i.test(userAgent)) return 'Linux';
+  return '';
 }
 
 const PALETTE = [

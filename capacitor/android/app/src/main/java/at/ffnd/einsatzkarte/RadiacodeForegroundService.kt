@@ -105,6 +105,8 @@ class RadiacodeForegroundService : Service() {
         const val EXTRA_INITIAL_LAT = "initialLat"
         const val EXTRA_INITIAL_LNG = "initialLng"
         const val EXTRA_LIVE_UID = "liveUid"
+        const val EXTRA_LIVE_DEVICE_ID = "liveDeviceId"
+        const val EXTRA_LIVE_DEVICE_LABEL = "liveDeviceLabel"
         const val EXTRA_LIVE_NAME = "liveName"
         const val EXTRA_LIVE_EMAIL = "liveEmail"
         const val EXTRA_LIVE_INTERVAL_MS = "liveIntervalMs"
@@ -441,6 +443,8 @@ class RadiacodeForegroundService : Service() {
             ACTION_START_LIVE_SHARE -> {
                 val firecallId = intent?.getStringExtra(EXTRA_FIRECALL_ID)
                 val uid        = intent?.getStringExtra(EXTRA_LIVE_UID)
+                val deviceId   = intent?.getStringExtra(EXTRA_LIVE_DEVICE_ID) ?: ""
+                val deviceLbl  = intent?.getStringExtra(EXTRA_LIVE_DEVICE_LABEL) ?: ""
                 val nm         = intent?.getStringExtra(EXTRA_LIVE_NAME) ?: ""
                 val email      = intent?.getStringExtra(EXTRA_LIVE_EMAIL) ?: ""
                 val intervalMs = intent?.getLongExtra(EXTRA_LIVE_INTERVAL_MS, 5_000L) ?: 5_000L
@@ -451,7 +455,9 @@ class RadiacodeForegroundService : Service() {
                     Log.w(TAG, "ACTION_START_LIVE_SHARE rejected — missing firecallId/uid")
                 } else {
                     val cfg = LiveLocationConfig(
-                        firecallId = firecallId, uid = uid, name = nm, email = email,
+                        firecallId = firecallId, uid = uid,
+                        deviceId = deviceId, deviceLabel = deviceLbl,
+                        name = nm, email = email,
                     )
                     // Existierenden Pusher (anderer Firecall/UID) sauber abdrehen.
                     liveLocationPusher?.let { prev ->

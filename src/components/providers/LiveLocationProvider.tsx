@@ -14,6 +14,10 @@ import {
   nativeStartLiveShare,
   nativeStopLiveShare,
 } from '../../hooks/recording/nativeGpsTrackBridge';
+import {
+  liveLocationDeviceId,
+  liveLocationDeviceLabel,
+} from '../../common/liveLocationDevice';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecall, useFirecallId } from '../../hooks/useFirecall';
 import { useLiveLocationShare } from '../../hooks/useLiveLocationShare';
@@ -83,6 +87,11 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
   const { settings, setSettings } = useLiveLocationSettings();
   const [isSharing, setIsSharing] = useState(false);
 
+  // Ein Dokument je Gerät statt je Benutzer: dasselbe Konto auf mehreren
+  // Tablets schrieb sonst dasselbe Dokument. Siehe `liveLocationDocId`.
+  const deviceId = liveLocationDeviceId();
+  const deviceLabel = liveLocationDeviceLabel();
+
   const identity = useMemo(() => {
     if (!isSharing || !uid || !firecallId || firecallId === 'unknown') {
       return null;
@@ -90,10 +99,12 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
     return {
       firecallId,
       uid,
+      deviceId,
+      deviceLabel,
       name: displayName || email || '',
       email: email ?? '',
     };
-  }, [isSharing, uid, firecallId, displayName, email]);
+  }, [isSharing, uid, firecallId, displayName, email, deviceId, deviceLabel]);
 
   const { maybeSend, deleteOwn } = useLiveLocationShare(identity, settings);
 
@@ -102,6 +113,38 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
     if (!isSharing || !isPositionSet) return;
     void maybeSend(position, location);
   }, [isSharing, isPositionSet, position, location, maybeSend]);
+
+  // Der Heartbeat braucht einen eigenen Takt und darf nicht an den
+  // Positions-Updates hängen: `navigator.geolocation.watchPosition` liefert
+  // auf dem Desktop (Standort aus dem Netz) genau einen Fix und danach nur
+  // noch bei echter Bewegung, und in einem Hintergrund-Tab drosselt der
+  // Browser die Callbacks ganz weg. Ohne eigenen Takt bleibt `updatedAt`
+  // deshalb stehen, und wer stillsteht, verschwindet nach
+  // STALE_HARD_CUTOFF_MS (5 min) von den Karten der anderen — obwohl die
+  // Freigabe noch läuft und der Knopf weiter pulsiert.
+  //
+  // Die letzte Position kommt aus einem Ref, damit der Takt nicht bei jedem
+  // Fix neu anläuft. Gedrosselt wird weiterhin allein in
+  // `useLiveLocationShare`: der Tick öffnet nur das Zeitfenster, geschrieben
+  // wird höchstens einmal je `heartbeatMs`.
+  const latestPositionRef = useRef({ position, location });
+  useEffect(() => {
+    latestPositionRef.current = { position, location };
+  }, [position, location]);
+
+  useEffect(() => {
+    // Auf Android hält der Foreground-Service das Dokument frisch
+    // (LiveLocationPusher). Ein zweiter Takt aus dem WebView wäre nur eine
+    // Verdoppelung der Schreibvorgänge.
+    if (isNativeGpsTrackingAvailable()) return;
+    if (!isSharing || !isPositionSet) return;
+    const tickMs = Math.max(1_000, Math.round(settings.heartbeatMs / 3));
+    const timer = setInterval(() => {
+      const { position: p, location: l } = latestPositionRef.current;
+      void maybeSend(p, l);
+    }, tickMs);
+    return () => clearInterval(timer);
+  }, [isSharing, isPositionSet, maybeSend, settings.heartbeatMs]);
 
   // Auto-stop on firecall change: when the active firecall changes while
   // we are still sharing, tear down (delete the doc on the OLD path inside
@@ -130,6 +173,8 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
       await nativeStartLiveShare({
         firecallId,
         uid,
+        deviceId,
+        deviceLabel,
         name: displayName || email || '',
         email: email ?? '',
         intervalMs: settings.heartbeatMs,
@@ -139,7 +184,16 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
         console.warn('[liveLocation] native start failed', err),
       );
     }
-  }, [uid, firecallId, displayName, email, settings, firecall.name]);
+  }, [
+    uid,
+    firecallId,
+    displayName,
+    email,
+    settings,
+    firecall.name,
+    deviceId,
+    deviceLabel,
+  ]);
 
   const stop = useCallback(async () => {
     setIsSharing(false);

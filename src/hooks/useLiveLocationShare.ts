@@ -5,6 +5,7 @@ import { firestore } from '../components/firebase/firebase';
 import { deleteDoc, setDoc } from '../lib/firestoreClient';
 import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
 import {
+  liveLocationDocId,
   LIVE_LOCATION_COLLECTION_ID,
   TTL_EXPIRY_MS,
 } from '../common/liveLocation';
@@ -14,6 +15,9 @@ import type { GeoPositionObject } from '../common/geo';
 interface ShareIdentity {
   firecallId: string;
   uid: string;
+  /** Ein Dokument je Gerät, siehe `liveLocationDocId`. */
+  deviceId: string;
+  deviceLabel: string;
   name: string;
   email: string;
 }
@@ -64,6 +68,19 @@ export function useLiveLocationShare(
 ): LiveLocationShareApi {
   const lastSentMsRef = useRef<number | undefined>(undefined);
   const lastPosRef = useRef<{ lat: number; lng: number } | undefined>(undefined);
+  const legacyCleanedRef = useRef(false);
+
+  const docRefFor = useCallback(
+    (id: ShareIdentity, docId: string) =>
+      doc(
+        firestore,
+        FIRECALL_COLLECTION_ID,
+        id.firecallId,
+        LIVE_LOCATION_COLLECTION_ID,
+        docId
+      ),
+    []
+  );
 
   const maybeSend = useCallback(
     async (
@@ -83,15 +100,14 @@ export function useLiveLocationShare(
       ) {
         return;
       }
-      const ref = doc(
-        firestore,
-        FIRECALL_COLLECTION_ID,
-        identity.firecallId,
-        LIVE_LOCATION_COLLECTION_ID,
-        identity.uid
+      const ref = docRefFor(
+        identity,
+        liveLocationDocId(identity.uid, identity.deviceId)
       );
       const payload: Record<string, unknown> = {
         uid: identity.uid,
+        deviceId: identity.deviceId,
+        deviceLabel: identity.deviceLabel,
         name: identity.name,
         email: identity.email,
         lat: pos.lat,
@@ -114,30 +130,38 @@ export function useLiveLocationShare(
       await setDoc(ref, payload);
       lastSentMsRef.current = now;
       lastPosRef.current = { lat: pos.lat, lng: pos.lng };
+
+      // Beim ersten Schreiben nach dem Update liegt unter der bloßen uid noch
+      // das Dokument der Vorgängerversion. Ohne Aufräumen stünde der eigene
+      // Pin bis zum TTL-Ablauf (1 h) doppelt auf den Karten der anderen.
+      if (!legacyCleanedRef.current && identity.deviceId) {
+        legacyCleanedRef.current = true;
+        await deleteDoc(docRefFor(identity, identity.uid)).catch(() => {});
+      }
     },
-    [identity, settings]
+    [identity, settings, docRefFor]
   );
 
   const deleteOwn = useCallback(async () => {
     if (!identity) return;
-    const ref = doc(
-      firestore,
-      FIRECALL_COLLECTION_ID,
-      identity.firecallId,
-      LIVE_LOCATION_COLLECTION_ID,
-      identity.uid
-    );
-    await deleteDoc(ref).catch((err) => {
-      console.warn('[liveLocation] deleteOwn failed', err);
-    });
+    // Beide Dokumente: das dieses Geräts und — solange die Umstellung noch
+    // nicht überall durch ist — das der Vorgängerversion unter der bloßen uid.
+    const docIds = [liveLocationDocId(identity.uid, identity.deviceId)];
+    if (identity.deviceId) docIds.push(identity.uid);
+    for (const docId of docIds) {
+      await deleteDoc(docRefFor(identity, docId)).catch((err) => {
+        console.warn('[liveLocation] deleteOwn failed', err);
+      });
+    }
     lastSentMsRef.current = undefined;
     lastPosRef.current = undefined;
-  }, [identity]);
+  }, [identity, docRefFor]);
 
   // Reset internal state when identity (firecall/user) changes.
   useEffect(() => {
     lastSentMsRef.current = undefined;
     lastPosRef.current = undefined;
+    legacyCleanedRef.current = false;
   }, [identity?.firecallId, identity?.uid]);
 
   return { maybeSend, deleteOwn };
