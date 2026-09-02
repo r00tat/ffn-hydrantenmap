@@ -478,7 +478,10 @@
       "amZielFehltHinweis": "No arrival at the target has been recorded for this team yet. Until then the low pressure warning at 55 bar is the withdrawal point.",
       "amZielKurz": "arrival",
       "bemerkung": "Note",
+      "abmarschUm": "Departure",
+      "seitMinuten": "for {minuten} min",
       "vermuteterDruck": "Estimated pressure",
+      "standBasis": "extrapolated from {zeit} · {druck} bar",
       "bar": "{druck} bar",
       "rueckzugUm": "Withdraw at",
       "inMinuten": "in {minuten} min",
@@ -519,11 +522,18 @@
         "bereit": "No team ready.",
         "zurueck": "No team returned."
       },
+      "pushHinweis": {
+        "offen": "Warnings appear on this page. For them to arrive while the screen is locked, notifications have to be allowed.",
+        "ein": "Notifications are enabled — warnings also arrive while the page is in the background.",
+        "aus": "The browser does not allow notifications. Warnings then only appear while this page is open; you can allow them in the browser's site settings."
+      },
       "actions": {
         "uebernehmen": "Take over time control",
         "inDenEinsatz": "Send into action",
+        "erneutInDenEinsatz": "Send into action again",
         "druckabfrage": "Pressure check",
-        "truppErfassen": "Add team"
+        "truppErfassen": "Add team",
+        "pushErlauben": "Enable notifications"
       },
       "errors": {
         "druckMissing": "A pressure is required",

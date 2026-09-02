@@ -11,6 +11,7 @@ import {
   canTransition,
   darfFuellungAendern,
   entsendePatch,
+  erneuterEinsatz,
   findByCode,
   fuellungSperre,
   geraetDetails,
@@ -418,6 +419,101 @@ describe('nextBereitstellung', () => {
   it('lässt die alte Zeile unverändert', () => {
     const vorher = JSON.stringify(zurueck);
     nextBereitstellung(zurueck, '2026-08-29T11:30:00.000Z');
+    expect(JSON.stringify(zurueck)).toBe(vorher);
+  });
+});
+
+describe('erneuterEinsatz', () => {
+  const zurueck = trupp({
+    id: 't1',
+    status: 'zurueck',
+    laufendeNummer: 1,
+    entsendetAn: 'LFA',
+    einsatzziel: 'Stiegenhaus 3. OG',
+    ueberwachtVon: 'GRKDT Huber',
+    ueberwachungSeit: '2026-08-29T10:20:00.000Z',
+    ueberwachungUids: ['u1'],
+    paTyp: 'langzeit300',
+    flaschenAnzahl: 2,
+    flaschenVolumen: 6.8,
+    fuellDruck: 300,
+    abmarschZeit: '2026-08-29T10:30:00.000Z',
+    druckAbmarsch: 290,
+    rueckkehrZeit: '2026-08-29T11:00:00.000Z',
+    druckRueckkehr: 80,
+    abfragen: [{ zeitpunkt: '2026-08-29T10:40:00.000Z', druck: 240 }],
+    warnungen: { drittel: '2026-08-29T10:38:00.000Z' },
+  });
+
+  const entsendung = entsendePatch({
+    abmarschZeit: '2026-08-29T11:40:00.000Z',
+    druckAbmarsch: 300,
+  });
+
+  it('legt eine neue Zeile an, die sofort im Einsatz ist', () => {
+    const neu = erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu.laufendeNummer).toBe(2);
+    expect(neu.truppKey).toBe('k1');
+    expect(neu.status).toBe('imEinsatz');
+    expect(neu.abmarschZeit).toBe('2026-08-29T11:40:00.000Z');
+    expect(neu.druckAbmarsch).toBe(300);
+    expect(neu).not.toHaveProperty('id');
+  });
+
+  it('übernimmt Gerätesatz und Einheit — das bleibt derselbe Trupp', () => {
+    const neu = erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu.paTyp).toBe('langzeit300');
+    expect(neu.flaschenAnzahl).toBe(2);
+    expect(neu.flaschenVolumen).toBe(6.8);
+    expect(neu.fuellDruck).toBe(300);
+    expect(neu.entsendetAn).toBe('LFA');
+    expect(neu.ueberwachtVon).toBe('GRKDT Huber');
+  });
+
+  it('führt die Zeitkontrolle weiter und nimmt den Anleger dazu', () => {
+    const neu = erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+      uid: 'u2',
+    });
+    // Auf der neuen Zeile beginnt die Kontrolle jetzt — die alte Übernahme
+    // gilt für die alte Bereitstellung.
+    expect(neu.ueberwachungSeit).toBe('2026-08-29T11:40:00.000Z');
+    expect(neu.ueberwachungUids).toEqual(['u1', 'u2']);
+  });
+
+  it('trägt Messwerte, Warnungen und das alte Einsatzziel nicht mit', () => {
+    const neu = erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu).not.toHaveProperty('abfragen');
+    expect(neu).not.toHaveProperty('warnungen');
+    expect(neu).not.toHaveProperty('rueckkehrZeit');
+    expect(neu).not.toHaveProperty('druckRueckkehr');
+    // Das Einsatzziel ist der Auftrag *dieser* Entsendung: Der zweite Einsatz
+    // führt den Trupp oft woandershin, und ein stehengebliebenes „Stiegenhaus
+    // 3. OG" wäre eine Behauptung.
+    expect(neu).not.toHaveProperty('einsatzziel');
+  });
+
+  it('lässt die alte Zeile unverändert', () => {
+    const vorher = JSON.stringify(zurueck);
+    erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
     expect(JSON.stringify(zurueck)).toBe(vorher);
   });
 });

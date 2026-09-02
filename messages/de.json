@@ -478,7 +478,10 @@
       "amZielFehltHinweis": "Für diesen Trupp ist noch keine Ankunft am Einsatzziel erfasst. Bis dahin gilt als Rückzugszeitpunkt die Restdruckwarnung bei 55 bar.",
       "amZielKurz": "Ankunft",
       "bemerkung": "Bemerkung",
+      "abmarschUm": "Abmarsch",
+      "seitMinuten": "seit {minuten} min",
       "vermuteterDruck": "Vermuteter Druck",
+      "standBasis": "fortgeschrieben ab {zeit} · {druck} bar",
       "bar": "{druck} bar",
       "rueckzugUm": "Rückzug um",
       "inMinuten": "in {minuten} min",
@@ -519,11 +522,18 @@
         "bereit": "Kein Trupp bereit.",
         "zurueck": "Kein Trupp zurück."
       },
+      "pushHinweis": {
+        "offen": "Warnungen erscheinen auf dieser Seite. Damit sie auch bei gesperrtem Bildschirm ankommen, müssen Benachrichtigungen erlaubt sein.",
+        "ein": "Benachrichtigungen sind eingeschaltet — Warnungen kommen auch an, wenn die Seite im Hintergrund ist.",
+        "aus": "Der Browser lässt keine Benachrichtigungen zu. Warnungen erscheinen dann nur, solange diese Seite offen ist; erlauben lässt sich das in den Website-Einstellungen des Browsers."
+      },
       "actions": {
         "uebernehmen": "Zeitkontrolle übernehmen",
         "inDenEinsatz": "In den Einsatz schicken",
+        "erneutInDenEinsatz": "Erneut in den Einsatz schicken",
         "druckabfrage": "Druckabfrage",
-        "truppErfassen": "Trupp erfassen"
+        "truppErfassen": "Trupp erfassen",
+        "pushErlauben": "Benachrichtigungen einschalten"
       },
       "errors": {
         "druckMissing": "Druck muss angegeben sein",

@@ -851,6 +851,70 @@ export function nextBereitstellung(
   return neu;
 }
 
+export interface ErneuterEinsatzArgs {
+  /** Die zurückgekehrte Zeile, aus der der Trupp übernommen wird. */
+  vorherige: AtemschutzTrupp;
+  jetzt: string;
+  /** Das Ergebnis von `entsendePatch` — Zeit und Druck des neuen Abmarschs. */
+  entsendung: TruppPatch;
+  /** Wer die Zeile anlegt; bekommt damit die Warnungen dieser Bereitstellung. */
+  uid?: string;
+}
+
+/**
+ * Schickt einen zurückgekehrten Trupp erneut in den Einsatz — als *neue* Zeile
+ * und in einem Schritt.
+ *
+ * Am Sammelplatz führt der Weg über „Wieder bereitstellen": Dort wird der
+ * Trupp regeneriert, ausgerüstet und *später* von jemand anderem entsendet. Bei
+ * der Zeitkontrolle steht der Gruppenkommandant selbst davor und schickt
+ * denselben Trupp wieder hinein — der Zwischenzustand „bereit" wäre ein Klick
+ * ohne Erkenntnis und, schlimmer, ein Trupp unter Atemschutz, dessen Zeile
+ * behauptet, er stehe bereit.
+ *
+ * Übernommen wird, was am Trupp und nicht an der einzelnen Entsendung hängt:
+ * Gerätesatz, Einheit und wer die Zeitkontrolle führt. **Nicht** übernommen
+ * werden Messwerte, Warnungen und das Einsatzziel — das ist der Auftrag dieser
+ * Entsendung, und der zweite Einsatz führt den Trupp oft woandershin.
+ *
+ * `ueberwachungSeit` steht auf `jetzt`: Die Verantwortung läuft weiter, aber
+ * auf dieser Zeile beginnt sie hier.
+ */
+export function erneuterEinsatz({
+  vorherige,
+  jetzt,
+  entsendung,
+  uid,
+}: ErneuterEinsatzArgs): NeueBereitstellung {
+  const neu: NeueBereitstellung = {
+    ...nextBereitstellung(vorherige, jetzt),
+    ...entsendung,
+    ueberwachungSeit: jetzt,
+    ueberwachungUids: mitUeberwachungsUid(
+      vorherige.ueberwachungUids,
+      uid ?? '',
+    ),
+  };
+  // Einzeln und mit Prüfung, nicht als Spread der alten Zeile: Firestore lehnt
+  // `undefined` ab, und ein `paTyp: undefined` aus einem Trupp ohne Gerätesatz
+  // ließe den ganzen Schreibvorgang scheitern.
+  if (!neu.entsendetAn && vorherige.entsendetAn) {
+    neu.entsendetAn = vorherige.entsendetAn;
+  }
+  if (vorherige.ueberwachtVon) neu.ueberwachtVon = vorherige.ueberwachtVon;
+  if (vorherige.paTyp) neu.paTyp = vorherige.paTyp;
+  if (typeof vorherige.flaschenAnzahl === 'number') {
+    neu.flaschenAnzahl = vorherige.flaschenAnzahl;
+  }
+  if (typeof vorherige.flaschenVolumen === 'number') {
+    neu.flaschenVolumen = vorherige.flaschenVolumen;
+  }
+  if (typeof vorherige.fuellDruck === 'number') {
+    neu.fuellDruck = vorherige.fuellDruck;
+  }
+  return neu;
+}
+
 export interface TruppGruppen {
   bereit: AtemschutzTrupp[];
   imEinsatz: AtemschutzTrupp[];

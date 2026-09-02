@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl';
 import {
   buildDruckabfrage,
   canTransition,
+  erneuterEinsatz,
   newTruppKey,
   sanitizeMitglieder,
   sanitizeTruppGeraete,
@@ -37,6 +38,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useRegisterMessaging from '../../hooks/useRegisterMessaging';
+import { requestPermission } from '../firebase/messaging';
 import useTicker from '../../hooks/useTicker';
 import useVehicles from '../../hooks/useVehicles';
 import {
@@ -54,6 +56,7 @@ import UeberwachungCard from './UeberwachungCard';
 import UeberwachungDialog, {
   type UeberwachungEingabe,
 } from './UeberwachungDialog';
+import useUeberwachungHinweise from './useUeberwachungHinweise';
 
 /** „Alle Trupps" im Einheitenfilter. */
 const ALLE = '__alle__';
@@ -86,7 +89,13 @@ type Dialog =
   | { art: 'ueberwachung'; trupp: AtemschutzTrupp }
   | { art: 'druckabfrage'; trupp: AtemschutzTrupp }
   | { art: 'geraete'; trupp: AtemschutzTrupp }
-  | { art: 'zeit'; trupp: AtemschutzTrupp; modus: TruppZeitModus };
+  | {
+      art: 'zeit';
+      trupp: AtemschutzTrupp;
+      modus: TruppZeitModus;
+      /** Der Abmarsch legt eine *neue* Bereitstellung an (Trupp war zurück). */
+      neueZeile?: boolean;
+    };
 
 /**
  * Atemschutzüberwachung — die Einsatzzeitkontrolle des Gruppenkommandanten.
@@ -173,15 +182,57 @@ export default function UeberwachungPage() {
     [einheit],
   );
 
-  const imEinsatz = trupps.imEinsatz.filter(passt);
-  const bereit = trupps.bereit.filter(passt);
-  const zurueck = trupps.zurueck.filter(passt);
+  // Gemerkt und nicht bei jedem Render neu: Die Liste hängt am Effekt der
+  // Warnhinweise, und ein neues Array je Render ließe ihn jedes Mal laufen.
+  const imEinsatz = useMemo(
+    () => trupps.imEinsatz.filter(passt),
+    [passt, trupps.imEinsatz],
+  );
+  const bereit = useMemo(
+    () => trupps.bereit.filter(passt),
+    [passt, trupps.bereit],
+  );
+  const zurueck = useMemo(
+    () => trupps.zurueck.filter(passt),
+    [passt, trupps.zurueck],
+  );
   const aktuellIds = useMemo(
     () => new Set(trupps.aktuell.map((x) => x.id)),
     [trupps.aktuell],
   );
 
+  // Warnungen aus der offenen Seite heraus — der Serverlauf erreicht nur
+  // Geräte mit Push-Token, und in der Entwicklung gibt es keinen Zeitplan.
+  useUeberwachungHinweise({
+    firecallId,
+    firecallName: firecall?.name,
+    trupps: imEinsatz,
+    jetzt,
+    vorgabe,
+  });
+
   const [dialog, setDialog] = useState<Dialog>();
+  const [pushStatus, setPushStatus] = useState<'offen' | 'ein' | 'aus'>(
+    'offen',
+  );
+
+  /**
+   * Benachrichtigungen einschalten — als Handlung und nicht beim Laden.
+   *
+   * Der Zustand steht in `useState` und wird **nicht** aus
+   * `Notification.permission` gelesen: Die Seite wird auch auf dem Server
+   * gerendert, wo es das Objekt nicht gibt, und ein daraus abgeleiteter
+   * Startwert wäre ein Unterschied zwischen Server- und Client-Render.
+   */
+  const handlePushErlauben = useCallback(async () => {
+    const erlaubt = await requestPermission().catch(() => false);
+    if (erlaubt) {
+      await registerMessaging().catch((err) => {
+        console.warn('Push-Registrierung fehlgeschlagen', err);
+      });
+    }
+    setPushStatus(erlaubt ? 'ein' : 'aus');
+  }, [registerMessaging]);
 
   const actorNow = useCallback(
     (): AtemschutzActor => ({
@@ -224,8 +275,14 @@ export default function UeberwachungPage() {
         },
         stamp,
       );
+      // Wer hier einen Trupp erfasst, überwacht ihn ab sofort — und braucht
+      // damit die Warnungen. Ohne diesen Aufruf gäbe es für einen Trupp, der
+      // nie über eine Übernahme lief, weder Erlaubnis noch Push-Token.
+      await registerMessaging().catch((err) => {
+        console.warn('Push-Registrierung fehlgeschlagen', err);
+      });
     },
-    [actorNow, einheit, firecallId],
+    [actorNow, einheit, firecallId, registerMessaging],
   );
 
   const handleUebernahme = useCallback(
@@ -286,6 +343,26 @@ export default function UeberwachungPage() {
     [actorNow, firecallId],
   );
 
+  const handleErneuterEinsatz = useCallback(
+    async (trupp: AtemschutzTrupp, entsendung: TruppPatch) => {
+      const stamp = actorNow();
+      // Eine *neue* Zeile und kein Wechsel zurück nach `imEinsatz`: Die alte
+      // Bereitstellung ist der Nachweis über den ersten Einsatz — mit ihren
+      // Drücken, ihren Abfragen und ihrer Rückkehrzeit.
+      await addTrupp(
+        firecallId,
+        erneuterEinsatz({
+          vorherige: trupp,
+          jetzt: stamp.now,
+          entsendung,
+          uid: stamp.userId,
+        }),
+        stamp,
+      );
+    },
+    [actorNow, firecallId],
+  );
+
   const handlePatch = useCallback(
     async (trupp: AtemschutzTrupp, patch: TruppPatch) => {
       // Dieselbe Schranke wie am Sammelplatz: Zwei Geräte sehen dieselbe Karte,
@@ -310,6 +387,9 @@ export default function UeberwachungPage() {
       onGeraete={() => setDialog({ art: 'geraete', trupp })}
       onAbmarsch={() => setDialog({ art: 'zeit', trupp, modus: 'entsenden' })}
       onRueckkehr={() => setDialog({ art: 'zeit', trupp, modus: 'rueckkehr' })}
+      onErneutEinsatz={() =>
+        setDialog({ art: 'zeit', trupp, modus: 'entsenden', neueZeile: true })
+      }
     />
   );
 
@@ -356,6 +436,39 @@ export default function UeberwachungPage() {
       <Alert severity="info" sx={{ mb: 2 }}>
         {t('ueberwachung.verantwortungHinweis')}
       </Alert>
+
+      {canWrite && (
+        // Der Hinweis steht immer da und nicht nur bei fehlender Erlaubnis:
+        // Ob der Browser sie erteilt hat, lässt sich beim Rendern nicht
+        // ablesen, ohne dass Server- und Client-Render auseinanderlaufen —
+        // und die Frage „kommt eine Warnung an, wenn das Handy im Sack ist?"
+        // muss vor dem ersten Trupp beantwortbar sein.
+        <Alert
+          severity={
+            pushStatus === 'ein'
+              ? 'success'
+              : pushStatus === 'aus'
+                ? 'warning'
+                : 'info'
+          }
+          sx={{ mb: 2 }}
+          action={
+            pushStatus === 'ein' ? undefined : (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => void handlePushErlauben()}
+              >
+                {t('ueberwachung.actions.pushErlauben')}
+              </Button>
+            )
+          }
+        >
+          {t(
+            `ueberwachung.pushHinweis.${pushStatus}` as 'ueberwachung.pushHinweis.offen',
+          )}
+        </Alert>
+      )}
 
       <Stack
         direction="row"
@@ -485,7 +598,11 @@ export default function UeberwachungPage() {
           }
           entsendetAnVorschlaege={entsendetAnVorschlaege}
           onClose={() => setDialog(undefined)}
-          onConfirm={(patch) => handlePatch(dialog.trupp, patch)}
+          onConfirm={(patch) =>
+            dialog.neueZeile
+              ? handleErneuterEinsatz(dialog.trupp, patch)
+              : handlePatch(dialog.trupp, patch)
+          }
         />
       )}
     </Container>

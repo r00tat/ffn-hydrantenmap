@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   PA_SAETZE,
@@ -49,11 +49,17 @@ interface RenderOptionen {
   jetzt?: Date;
   canWrite?: boolean;
   istAktuell?: boolean;
+  onErneutEinsatz?: () => void;
 }
 
 function render(
   t: AtemschutzTrupp,
-  { jetzt = nachAbmarsch(1), canWrite = true, istAktuell = true }: RenderOptionen = {},
+  {
+    jetzt = nachAbmarsch(1),
+    canWrite = true,
+    istAktuell = true,
+    onErneutEinsatz = vi.fn(),
+  }: RenderOptionen = {},
 ) {
   renderWithIntl(
     <UeberwachungCard
@@ -68,6 +74,7 @@ function render(
       onGeraete={vi.fn()}
       onAbmarsch={vi.fn()}
       onRueckkehr={vi.fn()}
+      onErneutEinsatz={onErneutEinsatz}
     />,
   );
 }
@@ -159,6 +166,35 @@ describe('UeberwachungCard', () => {
     // trägt auch der Chip mit dem Gerätesatz.
     expect(screen.getByText(/300 bar \(Entsenden\)/)).toBeInTheDocument();
     expect(screen.getByText(/200 bar \(Ankunft\)/)).toBeInTheDocument();
+  });
+
+  it('bietet einem zurückgekehrten Trupp den erneuten Einsatz an', () => {
+    const onErneutEinsatz = vi.fn();
+    render(
+      trupp({
+        status: 'zurueck',
+        rueckkehrZeit: nachAbmarsch(30).toISOString(),
+        druckRueckkehr: 70,
+      }),
+      { jetzt: nachAbmarsch(40), onErneutEinsatz },
+    );
+    const button = screen.getByRole('button', {
+      name: 'Erneut in den Einsatz schicken',
+    });
+    fireEvent.click(button);
+    expect(onErneutEinsatz).toHaveBeenCalled();
+  });
+
+  it('nennt den Abmarsch als Grundlage der Schätzung', () => {
+    render(trupp({ abfragen: [abfrage(5, 200, true)] }), {
+      jetzt: nachAbmarsch(10),
+    });
+    expect(screen.getByText('Abmarsch')).toBeInTheDocument();
+    expect(screen.getByText('seit 10 min')).toBeInTheDocument();
+    // Fortgeschrieben wird ab dem jüngsten Messwert, nicht ab dem Abmarsch.
+    expect(
+      screen.getByText(/fortgeschrieben ab .* · 200 bar/),
+    ).toBeInTheDocument();
   });
 
   it('zeigt die Geräte am Trupp samt Träger', () => {

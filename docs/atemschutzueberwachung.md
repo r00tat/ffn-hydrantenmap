@@ -173,6 +173,15 @@ daran, dass die Ankunft für diesen Trupp noch fehlt — und dass bis dahin die
 Ein gestiegener oder gleicher Druck verwirft die Messung (Tippfehler, oder es
 war ein anderer Geräteträger) und der Anhaltswert gilt weiter.
 
+### Die Anzeige nennt die Grundlage der Schätzung
+
+Links vom vermuteten Druck steht der **Abmarsch** mit „seit *n* min", und unter
+dem vermuteten Druck, ab welchem Messwert er fortgeschrieben ist
+(`stand.letzterPunkt`). Beides ist kein Zierrat: Der vermutete Druck ist eine
+Rechnung, und wie weit man ihr trauen kann, hängt genau daran — ein Wert, der
+auf einer halben Stunde alten Ablesung beruht, ist etwas anderes als einer von
+vor zwei Minuten. Wer nur die Zahl sieht, kann das nicht unterscheiden.
+
 ## Der Gerätesatz kommt aus dem eigenen Bestand
 
 Vorbelegt wird aus den erfassten Flaschen der Gruppe: der häufigste Satz aus
@@ -219,8 +228,45 @@ schweigt die Überwachung, sobald eine vorliegt.
 **Warum serverseitig:** Die Fristen sind Vorschrift, und ein Gruppenkommandant
 hat das Telefon in der Tasche, nicht die Seite offen. Eine Warnung, die nur
 kommt, solange jemand hinsieht, ist für eine Sicherheitsfunktion keine.
-Clientseitig zeigt die Karte dieselben Warnungen zusätzlich als Meldung an; das
-ersetzt den Push nicht, es kommt ihm nur zuvor.
+
+### Zwei Wege, und warum beide nötig sind
+
+Gewarnt wird auf **zwei** Wegen, die dasselbe rechnen und sich nicht ersetzen:
+
+1. **Der Zeitplan** schickt einen Push an die Geräte in `ueberwachungUids` —
+   auch an die, die die Seite geschlossen haben.
+2. **Die offene Seite** zeigt die Warnung selbst an
+   ([useUeberwachungHinweise.ts](../src/components/Atemschutz/useUeberwachungHinweise.ts)),
+   zusätzlich zur Meldung auf der Karte.
+
+Der zweite Weg ist nachgezogen worden, weil der erste an einer langen Kette
+hängt: Cloud Scheduler, ein registrierter Push-Token, die Erlaubnis des
+Browsers. Fehlt ein Glied, kommt **nichts** — und in der Entwicklung fehlt der
+Zeitplan grundsätzlich, weshalb dort siebzehn Minuten unter Atemschutz keine
+einzige Meldung ergaben. Die geöffnete Seite rechnet die Fristen ohnehin jede
+Sekunde mit; sie darf das Ergebnis auch sagen.
+
+Zwei Feinheiten, ohne die es Doppelmeldungen oder stille Löcher gäbe:
+
+- **Beide Wege verwenden denselben `tag`** (`asue-<truppId>`). Trifft der Push
+  ein, während die Seite offen ist, ersetzt die eine Benachrichtigung die
+  andere, statt sich darunter zu stapeln.
+- **Die Seite vermerkt nichts am Dokument.** `warnungen.<key>` gehört dem
+  Zeitplan; schriebe der Browser dort mit, unterdrückte er den Push an alle
+  *anderen* Geräte — genau die, die die Seite nicht offen haben. Was dieses
+  Gerät schon gezeigt hat, merkt es sich nur bei sich (ein `useRef`, das mit der
+  Seite verschwindet).
+
+Die Seite fragt auch **nicht von selbst** nach der Erlaubnis für
+Benachrichtigungen: Ein Dialog, der aus einem Zeitgeber aufgeht, kommt ohne
+Zusammenhang. Stattdessen steht ein Hinweis mit der Schaltfläche
+„Benachrichtigungen einschalten" oben auf der Seite — dauerhaft und nicht nur
+bei fehlender Erlaubnis, weil `Notification.permission` beim Rendern nicht
+gelesen werden kann, ohne dass Server- und Client-Render auseinanderlaufen.
+Erlaubnis und Token werden außerdem beim **Übernehmen** und beim **Erfassen
+eines Trupps** geholt: Wer hier einen Trupp anlegt, überwacht ihn ab sofort —
+ohne den zweiten Aufruf hätte ein Trupp, der nie über eine Übernahme lief,
+weder Erlaubnis noch Token.
 
 Der Lauf hängt an Cloud Scheduler
 ([terraform/modules/cloud-scheduler](../terraform/modules/cloud-scheduler)) und
@@ -325,6 +371,33 @@ ist. Der Knopf schickt den Trupp aber wirklich in den Einsatz und startet die
 Zeitkontrolle, und genau das sagt er jetzt: **„In den Einsatz schicken"**. Der
 Zeitpunkt heißt dort „Abmarsch (Anschließen der Luftversorgung)" — so definiert
 ihn die Unterlage.
+
+### Ein zurückgekehrter Trupp geht in einem Schritt wieder hinein
+
+Am Sammelplatz führt der Weg über „Wieder bereitstellen": Dort wird der Trupp
+regeneriert, ausgerüstet und *später* von jemand anderem entsendet — der
+Zwischenzustand „bereit" ist dort die eigentliche Aussage. Bei der Zeitkontrolle
+ist er einer zu viel: Der Gruppenkommandant schickt denselben Trupp wieder
+hinein, und eine Zeile, die „bereit" behauptet, während der Trupp unter
+Atemschutz steht, ist schlimmer als ein gesparter Klick. Deshalb gibt es an
+einem zurückgekehrten Trupp **„Erneut in den Einsatz schicken"**
+(`erneuterEinsatz`), und das legt in einem Schritt eine neue Bereitstellung mit
+Zustand `imEinsatz` an.
+
+Eine **neue Zeile** und kein Zustandswechsel zurück: `zurueck` ist ein
+Endzustand (`TRANSITIONS`), und die alte Zeile ist der Nachweis über den ersten
+Einsatz — mit ihren Drücken, ihren Abfragen und ihrer Rückkehrzeit. Zwischen
+zwei Einsätzen wird gefüllt; ein überschriebener Abmarschdruck verlöre genau
+den Verlauf, den das Protokoll belegen soll.
+
+Übernommen wird, was am **Trupp** hängt, nicht an der einzelnen Entsendung:
+Gerätesatz (`paTyp` und die Flaschenwerte), Einheit (`entsendetAn`) und wer die
+Zeitkontrolle führt (`ueberwachtVon`, `ueberwachungUids`). Nicht übernommen
+werden Messwerte, Warnungen — und das **Einsatzziel**: Das ist der Auftrag
+dieser Entsendung, und der zweite Einsatz führt den Trupp oft woandershin; ein
+stehengebliebenes „Stiegenhaus 3. OG" wäre eine Behauptung. `ueberwachungSeit`
+steht auf jetzt: Die Verantwortung läuft weiter, aber auf dieser Zeile beginnt
+sie hier.
 
 ## Wer was sieht
 

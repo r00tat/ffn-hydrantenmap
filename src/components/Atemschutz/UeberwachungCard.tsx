@@ -48,6 +48,8 @@ export interface UeberwachungCardProps {
   onGeraete: () => void;
   onAbmarsch: () => void;
   onRueckkehr: () => void;
+  /** Zurückgekehrter Trupp geht erneut hinein — als neue Bereitstellung. */
+  onErneutEinsatz: () => void;
 }
 
 const FARBE: Record<Dringlichkeit, 'success' | 'warning' | 'error'> = {
@@ -69,6 +71,7 @@ export default function UeberwachungCard({
   onGeraete,
   onAbmarsch,
   onRueckkehr,
+  onErneutEinsatz,
 }: UeberwachungCardProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
@@ -206,6 +209,22 @@ export default function UeberwachungCard({
               spacing={2}
               sx={{ mt: 1.5, flexWrap: 'wrap', rowGap: 1 }}
             >
+              {/* Links der Abmarsch: Jede Zahl rechts davon ist von diesem
+                  Zeitpunkt aus gerechnet, und ohne ihn lässt sich nicht
+                  einschätzen, wie belastbar die Schätzung ist. */}
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  {t('ueberwachung.abmarschUm')}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {uhrzeit(trupp.abmarschZeit)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t('ueberwachung.seitMinuten', {
+                    minuten: rund(stand.einsatzMinuten),
+                  })}
+                </Typography>
+              </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   {t('ueberwachung.vermuteterDruck')}
@@ -217,6 +236,19 @@ export default function UeberwachungCard({
                   />
                   {t('ueberwachung.bar', {
                     druck: rund(stand.vermuteterDruck),
+                  })}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  component="div"
+                >
+                  {/* Woher der Wert fortgeschrieben ist — ein Wert, der auf
+                      einer halben Stunde alten Ablesung beruht, ist etwas
+                      anderes als einer von vor zwei Minuten. */}
+                  {t('ueberwachung.standBasis', {
+                    zeit: uhrzeit(stand.letzterPunkt.zeitpunkt),
+                    druck: rund(stand.letzterPunkt.druck),
                   })}
                 </Typography>
               </Box>
@@ -400,6 +432,14 @@ export default function UeberwachungCard({
                 {t('trupp.actions.rueckkehr')}
               </Button>
             </>
+          )}
+          {trupp.status === 'zurueck' && (
+            // Der Trupp hat gefüllt und geht wieder hinein. Am Sammelplatz
+            // führt der Weg über „wieder bereitstellen" — hier steht der
+            // Gruppenkommandant selbst davor und schickt ihn direkt.
+            <Button size="small" variant="contained" onClick={onErneutEinsatz}>
+              {t('ueberwachung.actions.erneutInDenEinsatz')}
+            </Button>
           )}
         </CardActions>
       )}
