@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import DeleteIcon from '@mui/icons-material/Delete';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import Button from '@mui/material/Button';
@@ -19,6 +19,7 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import {
   ATEMSCHUTZ_GERAET_TYPEN,
+  sanitizePersonen,
   truppGeraetLabel,
   truppGeraetVonGeraet,
   truppLabel,
@@ -29,15 +30,12 @@ import {
 } from '../../common/atemschutz';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 import GeraetAutocomplete from './GeraetAutocomplete';
-import PersonAutocomplete from './PersonAutocomplete';
 
 export interface TruppGeraeteDialogProps {
   open: boolean;
   trupp: AtemschutzTrupp;
   /** Der Bestand der Gruppe, in dem gesucht und gescannt wird. */
   geraete: AtemschutzGeraet[];
-  /** Die Truppmitglieder — sie kommen zuerst als Träger in Frage. */
-  personSuggestions: string[];
   onClose: () => void;
   onSave: (geraete: TruppGeraet[]) => Promise<void>;
 }
@@ -59,12 +57,38 @@ export default function TruppGeraeteDialog({
   open,
   trupp,
   geraete,
-  personSuggestions,
   onClose,
   onSave,
 }: TruppGeraeteDialogProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
+
+  /**
+   * Die möglichen Träger: die Mitglieder **dieses** Trupps.
+   *
+   * Vorher stand hier ein Freitextfeld mit Vorschlägen aus dem ganzen Einsatz.
+   * Das ist die falsche Menge: Ein Gerät trägt jemand aus diesem Trupp, alles
+   * andere ist keine Hilfe, sondern eine Fehlerquelle — auf dem Telefon liegt
+   * der falsche Name einen Fingerbreit neben dem richtigen, und eine falsche
+   * Zuordnung Flasche → Person fällt erst im Füllprotokoll auf.
+   */
+  const mitglieder = useMemo(
+    () => sanitizePersonen(trupp.mitglieder),
+    [trupp.mitglieder],
+  );
+
+  /**
+   * Ein schon erfasster Name bleibt wählbar, auch wenn er nicht (mehr) im Trupp
+   * steht: Sonst verschwände die Zuordnung stillschweigend aus dem Feld, sobald
+   * jemand die Mitgliederliste ändert — und beim nächsten Speichern wäre sie
+   * weg.
+   */
+  const traegerOptionen = (person?: string) => {
+    const name = person?.trim();
+    return name && !mitglieder.includes(name)
+      ? [...mitglieder, name]
+      : mitglieder;
+  };
 
   const [liste, setListe] = useState<TruppGeraet[]>(
     () => trupp.truppGeraete ?? [],
@@ -209,14 +233,30 @@ export default function TruppGeraeteDialog({
                           </MenuItem>
                         ))}
                       </TextField>
-                      <PersonAutocomplete
+                      <TextField
+                        select
+                        size="small"
                         label={t('ueberwachung.geraetPerson')}
                         value={g.person ?? ''}
-                        options={personSuggestions}
-                        onChange={(person) =>
-                          aendern(index, { person: person || undefined })
+                        onChange={(e) =>
+                          aendern(index, {
+                            person: e.target.value || undefined,
+                          })
                         }
-                      />
+                        sx={{ minWidth: 180 }}
+                      >
+                        {/* Leer wählbar, weil die Zuordnung freiwillig ist —
+                            ohne diesen Eintrag ließe sich ein versehentlich
+                            gesetzter Träger nicht mehr zurücknehmen. */}
+                        <MenuItem value="">
+                          {t('ueberwachung.geraetPersonKeine')}
+                        </MenuItem>
+                        {traegerOptionen(g.person).map((name) => (
+                          <MenuItem key={name} value={name}>
+                            {name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
                     </Stack>
                   </Stack>
                 </ListItem>

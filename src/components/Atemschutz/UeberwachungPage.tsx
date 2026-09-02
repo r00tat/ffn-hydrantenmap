@@ -826,7 +826,6 @@ export default function UeberwachungPage() {
           open
           trupp={dialog.trupp}
           geraete={activeGeraete}
-          personSuggestions={[...dialog.trupp.mitglieder, ...suggestions]}
           onClose={() => setDialog(undefined)}
           onSave={(geraete) => handleGeraete(dialog.trupp, geraete)}
         />

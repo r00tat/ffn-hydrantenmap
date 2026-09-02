@@ -542,6 +542,7 @@
       "geraeteLeer": "Noch kein Gerät hinterlegt.",
       "geraetTyp": "Typ",
       "geraetPerson": "Getragen von",
+      "geraetPersonKeine": "nicht zugeordnet",
       "geraetePersonHint": "Die Zuordnung Gerät → Person wird meist erst bei der Rückkehr nachgetragen.",
       "sections": {
         "imEinsatz": "Unter Atemschutz",

@@ -368,6 +368,18 @@ fest, wer welche Flasche aufnimmt; wer das erzwingt, hält den Trupp auf oder
 bekommt einen erfundenen Namen. Nachgetragen wird bei der Rückkehr — damit steht
 fest, welche Flasche im Einsatz war und gefüllt werden muss.
 
+„Getragen von" ist eine **Auswahl aus den Mitgliedern dieses Trupps** und kein
+Freitextfeld mit Vorschlägen aus dem ganzen Einsatz. Die weite Liste war die
+falsche Menge: Ein Gerät trägt jemand aus diesem Trupp, jeder andere Name ist
+keine Hilfe, sondern eine Fehlerquelle — auf dem Telefon liegt der falsche Name
+einen Fingerbreit neben dem richtigen, und eine falsche Zuordnung Flasche →
+Person fällt erst im Füllprotokoll auf, wenn niemand mehr weiß, wer sie
+getragen hat. Zwei Einträge stehen trotzdem neben den Mitgliedern: „nicht
+zugeordnet", weil die Zuordnung freiwillig bleibt und ein versehentlich
+gesetzter Träger zurücknehmbar sein muss, und ein bereits erfasster Name, der
+nicht (mehr) im Trupp steht — sonst verschwände er stillschweigend aus dem Feld,
+sobald jemand die Mitgliederliste ändert.
+
 Bezeichnung und Kennung werden aus den Stammdaten **kopiert**: Ein Jahr später
 soll noch dastehen, welche Flasche gemeint war, auch wenn der Stammdatensatz
 umbenannt oder ausgeschieden wurde. Eine Fremdflasche ohne Stammdatensatz bleibt

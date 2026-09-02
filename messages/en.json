@@ -542,6 +542,7 @@
       "geraeteLeer": "No equipment recorded yet.",
       "geraetTyp": "Type",
       "geraetPerson": "Worn by",
+      "geraetPersonKeine": "unassigned",
       "geraetePersonHint": "Assigning equipment to a person is usually done on return.",
       "sections": {
         "imEinsatz": "Under breathing apparatus",
