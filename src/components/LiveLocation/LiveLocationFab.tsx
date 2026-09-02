@@ -1,7 +1,7 @@
 'use client';
 
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
+import ShareLocationIcon from '@mui/icons-material/ShareLocation';
+import ShareLocationOutlinedIcon from '@mui/icons-material/ShareLocationOutlined';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
@@ -66,10 +66,10 @@ export default function LiveLocationFab() {
   };
 
   const tooltipTitle = isSharing
-    ? 'Live-Sharing läuft'
+    ? 'Standort wird geteilt — zum Beenden antippen'
     : isPositionPending || pendingDialogOpen
       ? 'Position wird ermittelt …'
-      : 'Live-Standort teilen';
+      : 'Eigenen Standort mit den anderen Einsatzkräften teilen';
 
   return (
     <>
@@ -84,7 +84,9 @@ export default function LiveLocationFab() {
           <Fab
             color={isSharing ? 'primary' : 'default'}
             aria-label={
-              isSharing ? 'Live-Sharing beenden' : 'Live-Standort teilen'
+              isSharing
+                ? 'Live-Standort teilen beenden'
+                : 'Live-Standort teilen'
             }
             size="small"
             onClick={handleClick}
@@ -102,7 +104,10 @@ export default function LiveLocationFab() {
               },
             }}
           >
-            {isSharing ? <LocationOnIcon /> : <LocationOnOutlinedIcon />}
+            {/* Kein LocationOn: die schlichte Kartennadel liest sich wie
+                „meine Position". Die Sendewellen von ShareLocation zeigen,
+                dass der Standort nach außen geht. */}
+            {isSharing ? <ShareLocationIcon /> : <ShareLocationOutlinedIcon />}
           </Fab>
         </Tooltip>
       </Box>

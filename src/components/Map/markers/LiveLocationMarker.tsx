@@ -3,6 +3,7 @@
 import L from 'leaflet';
 import { useEffect, useMemo, useState } from 'react';
 import { Marker, Popup } from 'react-leaflet';
+import { escapeHtml } from '../../../common/html';
 import {
   computeInitials,
   computeOpacity,
@@ -24,7 +25,35 @@ export interface IconHtmlOptions {
   opacity: number;
 }
 
-/** Pure helper: builds the divIcon HTML so it can be unit-tested. */
+/**
+ * Anzeigename am Marker. Das Gerät gehört nur dann an den Namen, wenn dieselbe
+ * Person mehrfach auf der Karte steht (`showDeviceLabel`, gesetzt in
+ * `useLiveLocations`) — bei einem Gerät je Person unterscheidet es nichts und
+ * hinge nur als Rauschen an jedem Marker.
+ */
+export function markerDisplayName(loc: {
+  name: string;
+  email: string;
+  deviceLabel?: string;
+  showDeviceLabel?: boolean;
+}): string {
+  const personName = loc.name || loc.email;
+  return loc.showDeviceLabel && loc.deviceLabel
+    ? `${personName} (${loc.deviceLabel})`
+    : personName;
+}
+
+/**
+ * Pure helper: builds the divIcon HTML so it can be unit-tested.
+ *
+ * **Alles Eingesetzte muss maskiert werden.** Leaflet setzt diesen String per
+ * `innerHTML` in die Karte, also an React vorbei. `initials` und `displayName`
+ * stammen aus `name`, `email` und `deviceLabel` des Firestore-Dokuments, und
+ * die Regeln binden dort nur `uid` — die drei Felder sind vom schreibenden
+ * Client frei wählbar. Ohne Maskierung führt jeder im Einsatz Berechtigte
+ * (auch ein Gast über einen Freigabe-Link) beliebiges HTML in der Sitzung
+ * aller anderen aus. `opacity` ist eine Zahl und damit unkritisch.
+ */
 export function buildIconHtml({
   initials,
   color,
@@ -35,17 +64,17 @@ export function buildIconHtml({
     <div style="display:flex;align-items:center;gap:4px;opacity:${opacity};pointer-events:auto;">
       <div style="
         width:32px;height:32px;border-radius:50%;
-        background:${color};color:#fff;
+        background:${escapeHtml(color)};color:#fff;
         display:flex;align-items:center;justify-content:center;
         font:bold 12px sans-serif;
         border:2px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.4);
-      ">${initials}</div>
+      ">${escapeHtml(initials)}</div>
       <div style="
         background:rgba(255,255,255,.85);
         padding:2px 6px;border-radius:4px;
         font:11px sans-serif;color:#222;white-space:nowrap;
         box-shadow:0 1px 2px rgba(0,0,0,.2);
-      ">${displayName}</div>
+      ">${escapeHtml(displayName)}</div>
     </div>`;
 }
 
@@ -63,7 +92,8 @@ export default function LiveLocationMarker({
   const opacity = computeOpacity(loc.updatedAtMs);
   const initials = computeInitials(loc.name, loc.email);
   const color = pickAvatarColor(loc.uid);
-  const displayName = loc.name || loc.email;
+  const personName = loc.name || loc.email;
+  const displayName = markerDisplayName(loc);
 
   const icon = useMemo(
     () =>
@@ -82,7 +112,13 @@ export default function LiveLocationMarker({
   return (
     <Marker position={{ lat: loc.lat, lng: loc.lng }} icon={icon}>
       <Popup>
-        <strong>{displayName}</strong>
+        <strong>{personName}</strong>
+        {loc.deviceLabel && (
+          <>
+            <br />
+            Gerät: {loc.deviceLabel}
+          </>
+        )}
         <br />
         zuletzt aktualisiert {formatRelative(loc.updatedAtMs)}
       </Popup>
