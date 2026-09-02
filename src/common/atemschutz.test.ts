@@ -988,6 +988,30 @@ describe('uebernahmePatch', () => {
     expect('einsatzziel' in patch).toBe(false);
     expect('paTyp' in patch).toBe(false);
   });
+
+  it('ordnet den Trupp einer taktischen Einheit zu', () => {
+    // Die Zuordnung fehlt, wenn der Trupp nie über einen Sammelplatz lief —
+    // und ohne sie steht nirgends, welche Einheit ihn bekommen hat.
+    const patch = uebernahmePatch({
+      trupp: {},
+      jetzt,
+      uid: 'u1',
+      entsendetAn: ' RLFA-ND ',
+    });
+    expect(patch.entsendetAn).toBe('RLFA-ND');
+  });
+
+  it('löscht eine bestehende Zuordnung nicht durch ein leeres Feld', () => {
+    // Am Sammelplatz gesetzt, hier nicht angefasst: Das Feld fehlt im Patch
+    // und der Wert am Dokument bleibt stehen.
+    const patch = uebernahmePatch({
+      trupp: {},
+      jetzt,
+      uid: 'u1',
+      entsendetAn: '   ',
+    });
+    expect('entsendetAn' in patch).toBe(false);
+  });
 });
 
 describe('buildDruckabfrage', () => {

@@ -57,11 +57,13 @@ import UeberwachungCard from './UeberwachungCard';
 import UeberwachungDialog, {
   type UeberwachungEingabe,
 } from './UeberwachungDialog';
+import {
+  ALLE_EINHEITEN as ALLE,
+  einheitOptionen,
+  truppPasstZuEinheit,
+} from './einheiten';
 import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
 import useUeberwachungHinweise from './useUeberwachungHinweise';
-
-/** „Alle Trupps" im Einheitenfilter. */
-const ALLE = '__alle__';
 
 /**
  * Die gewählte Einheit steht je **Gerät** im `localStorage`, nicht am Benutzer
@@ -154,17 +156,8 @@ export default function UeberwachungPage() {
     }
   }, []);
 
-  /** Alle Einheiten, an die in diesem Einsatz Trupps entsendet wurden. */
-  const einheiten = useMemo(() => {
-    const namen = new Set<string>();
-    for (const trupp of trupps.protokoll) {
-      const ziel = trupp.entsendetAn?.trim();
-      if (ziel) namen.add(ziel);
-    }
-    return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
-  }, [trupps.protokoll]);
-
-  const entsendetAnVorschlaege = useMemo(() => {
+  /** Fahrzeuge und taktische Einheiten des Einsatzes. */
+  const bekannteEinheiten = useMemo(() => {
     const namen: string[] = [];
     const gesehen = new Set<string>();
     const add = (value?: string) => {
@@ -178,9 +171,23 @@ export default function UeberwachungPage() {
     return namen;
   }, [vehicles, tacticalUnits]);
 
+  /**
+   * Die Einheiten für Filter und Zuordnung: die am Trupp vergebenen *und* die
+   * Fahrzeuge des Einsatzes. Nur die vergebenen wären beim ersten Trupp eine
+   * leere Liste — genau dann, wenn die Einheit zu wählen ist.
+   */
+  const einheiten = useMemo(
+    () =>
+      einheitOptionen({
+        trupps: trupps.protokoll,
+        bekannt: bekannteEinheiten,
+        gewaehlt: einheit,
+      }),
+    [bekannteEinheiten, einheit, trupps.protokoll],
+  );
+
   const passt = useCallback(
-    (trupp: AtemschutzTrupp) =>
-      einheit === ALLE || trupp.entsendetAn?.trim() === einheit,
+    (trupp: AtemschutzTrupp) => truppPasstZuEinheit(trupp, einheit),
     [einheit],
   );
 
@@ -273,6 +280,13 @@ export default function UeberwachungPage() {
         ...(input.bemerkung?.trim()
           ? { bemerkung: input.bemerkung.trim() }
           : {}),
+        // Aus dem Dialog, sonst aus dem Einheitenfilter: Wer auf sein Fahrzeug
+        // gefiltert hat, erfasst Trupps für dieses Fahrzeug.
+        ...(input.entsendetAn?.trim()
+          ? { entsendetAn: input.entsendetAn.trim() }
+          : einheit !== ALLE
+            ? { entsendetAn: einheit }
+            : {}),
       };
       if (trupp?.id) {
         await updateTrupp(firecallId, trupp.id, basis, stamp);
@@ -290,7 +304,6 @@ export default function UeberwachungPage() {
           // Umweg über ein zweites „Übernehmen" wäre ein Klick ohne Erkenntnis.
           ueberwachungSeit: stamp.now,
           ueberwachungUids: stamp.userId ? [stamp.userId] : [],
-          ...(einheit !== ALLE ? { entsendetAn: einheit } : {}),
         },
         stamp,
       );
@@ -317,6 +330,7 @@ export default function UeberwachungPage() {
           uid: stamp.userId,
           ueberwachtVon: input.ueberwachtVon,
           einsatzziel: input.einsatzziel,
+          entsendetAn: input.entsendetAn,
           paTyp: input.paTyp,
           satz: input.satz,
         }),
@@ -584,6 +598,9 @@ export default function UeberwachungPage() {
           trupp={dialog.trupp}
           feuerwehren={feuerwehren}
           personSuggestions={suggestions}
+          // Anders als am Sammelplatz: Wer den Trupp bei seiner eigenen Einheit
+          // erfasst, weiß in derselben Sekunde, zu welcher er gehört.
+          einheitVorschlaege={einheiten}
           onClose={() => setDialog(undefined)}
           onSave={(input) => handleSaveTrupp(input, dialog.trupp)}
         />
@@ -600,6 +617,7 @@ export default function UeberwachungPage() {
             displayName ?? email ?? '',
             ...suggestions,
           ].filter(Boolean)}
+          einheitVorschlaege={einheiten}
           istUebernahme={!dialog.trupp.ueberwachungSeit}
           onClose={() => setDialog(undefined)}
           onSave={(input) => handleUebernahme(dialog.trupp, input)}
@@ -636,14 +654,13 @@ export default function UeberwachungPage() {
           key={`${dialog.trupp.id}-${dialog.modus}`}
           open
           modus={dialog.modus}
-          // Beim Gruppenkommandanten entfällt „Entsendet an": Er schickt den
-          // Trupp in seinen eigenen Einsatz, es gibt niemanden, an den er ihn
-          // übergibt.
+          // Beim Gruppenkommandanten heißt das Feld „Taktische Einheit" statt
+          // „Entsendet an" — dieselbe Angabe, aber keine Übergabe.
           kontext="ueberwachung"
           entsendetAnVorschlag={
             dialog.trupp.entsendetAn ?? (einheit !== ALLE ? einheit : undefined)
           }
-          entsendetAnVorschlaege={entsendetAnVorschlaege}
+          entsendetAnVorschlaege={einheiten}
           onClose={() => setDialog(undefined)}
           onConfirm={(patch) =>
             dialog.neueZeile

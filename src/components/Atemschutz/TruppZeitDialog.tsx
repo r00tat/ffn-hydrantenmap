@@ -19,15 +19,19 @@ import {
 export type TruppZeitModus = 'entsenden' | 'rueckkehr';
 
 /**
- * Von wo aus der Dialog geöffnet wird — er beschriftet sich danach und lässt
- * ein Feld weg.
+ * Von wo aus der Dialog geöffnet wird — er beschriftet sich danach.
  *
- * Am **Sammelplatz** ist „Entsendet an" die entscheidende Angabe: Dort wird ein
- * Trupp an eine taktische Einheit *abgegeben*, und wer nicht festhält, an
- * welche, verliert die Spur. Bei der **Überwachung** steht der Gruppenkommandant
- * selbst davor — er schickt den Trupp in *seinen* Einsatz und hat niemanden, an
- * den er ihn übergibt. Das Feld wäre dort eine Frage, auf die es keine Antwort
- * gibt.
+ * Gefragt wird in beiden Fällen nach der taktischen Einheit, nur anders
+ * benannt: Am **Sammelplatz** wird der Trupp an eine Einheit *abgegeben*
+ * („Entsendet an"), bei der **Überwachung** gehört er einer Einheit an
+ * („Taktische Einheit").
+ *
+ * Vorher entfiel das Feld bei der Überwachung mit der Begründung, der
+ * Gruppenkommandant habe niemanden, an den er den Trupp übergibt. Das war ein
+ * Denkfehler: Die Angabe ist keine Übergabe, sondern die Zuordnung — und ohne
+ * sie steht am Ende des Einsatzes an keinem Trupp, welche Einheit ihn hatte.
+ * Bei einem Trupp, der nie über einen Sammelplatz lief, fehlt sie sonst
+ * vollständig.
  */
 export type TruppZeitKontext = 'sammelplatz' | 'ueberwachung';
 
@@ -84,8 +88,9 @@ export default function TruppZeitDialog({
 
   const istEntsenden = modus === 'entsenden';
   const istUeberwachung = kontext === 'ueberwachung';
-  // Nur am Sammelplatz wird nach dem Ziel gefragt — s. `TruppZeitKontext`.
-  const fragtZiel = istEntsenden && !istUeberwachung;
+  // Bei der Rückkehr entfällt die Frage: Die Einheit steht dann längst am
+  // Trupp, und der Rückkehrdialog soll zwei Felder haben, nicht drei.
+  const fragtZiel = istEntsenden;
   const druckWert = druck.trim() ? Number(druck.trim().replace(',', '.')) : undefined;
 
   const handleConfirm = async () => {
@@ -93,9 +98,8 @@ export default function TruppZeitDialog({
     try {
       const patch = istEntsenden
         ? entsendePatch({
-            // Bei der Überwachung nicht mitgeschickt und damit auch nicht
-            // gelöscht: `entsendePatch` lässt das Feld dann aus dem Patch weg,
-            // ein am Sammelplatz gesetztes Ziel bleibt also stehen.
+            // Leer heißt „nicht angefasst": `entsendePatch` lässt das Feld dann
+            // aus dem Patch weg, ein schon gesetztes Ziel bleibt also stehen.
             entsendetAn: fragtZiel ? entsendetAn : undefined,
             abmarschZeit: fromLocalInput(zeit),
             druckAbmarsch: Number.isFinite(druckWert) ? druckWert : undefined,
@@ -138,8 +142,16 @@ export default function TruppZeitDialog({
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label={t('trupp.entsendetAn')}
-                  helperText={t('trupp.entsendetAnHint')}
+                  label={
+                    istUeberwachung
+                      ? t('ueberwachung.truppEinheit')
+                      : t('trupp.entsendetAn')
+                  }
+                  helperText={
+                    istUeberwachung
+                      ? t('ueberwachung.truppEinheitHint')
+                      : t('trupp.entsendetAnHint')
+                  }
                 />
               )}
             />

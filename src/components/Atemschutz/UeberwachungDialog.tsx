@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -28,6 +29,8 @@ import {
 export interface UeberwachungEingabe {
   ueberwachtVon: string;
   einsatzziel: string;
+  /** Die taktische Einheit, der der Trupp zugeordnet ist. */
+  entsendetAn: string;
   paTyp: PaTypKey;
   satz: Geraetesatz;
 }
@@ -39,6 +42,8 @@ export interface UeberwachungDialogProps {
   vorgabe: Geraetesatz;
   /** Namen aus dem Einsatz — Mannschaft, ASSP-Leitung, Truppmitglieder. */
   personSuggestions: string[];
+  /** Fahrzeuge und taktische Einheiten des Einsatzes. */
+  einheitVorschlaege: string[];
   /** Ob die Verantwortung erstmals übernommen wird. */
   istUebernahme: boolean;
   onClose: () => void;
@@ -47,6 +52,14 @@ export interface UeberwachungDialogProps {
 
 /**
  * Die Zeitkontrolle übernehmen oder ihre Angaben ändern.
+ *
+ * Was die Übernahme *tut* — und warum sie nicht bloß ein Formular ist: Sie hält
+ * den Wechsel der Verantwortung vom Sammelplatz zum Gruppenkommandanten fest
+ * (FH-06 5.3.4), trägt das Gerät des Übernehmenden in die Empfängerliste der
+ * Warnungen ein und legt mit dem Gerätesatz die Grundlage fest, auf der Drittel-
+ * und Rückzugszeitpunkt überhaupt gerechnet werden. Deshalb steht der Hinweis
+ * oben im Dialog: „Zeitkontrolle übernehmen" allein sagt nicht, dass danach das
+ * Telefon läutet.
  *
  * Der Gerätesatz steht hier und nicht am Trupp-Dialog des Sammelplatzes: Am
  * Sammelplatz wird ausgegeben, überwacht wird beim Gruppenkommandanten, und nur
@@ -58,6 +71,7 @@ export default function UeberwachungDialog({
   trupp,
   vorgabe,
   personSuggestions,
+  einheitVorschlaege,
   istUebernahme,
   onClose,
   onSave,
@@ -67,6 +81,7 @@ export default function UeberwachungDialog({
 
   const [ueberwachtVon, setUeberwachtVon] = useState(trupp.ueberwachtVon ?? '');
   const [einsatzziel, setEinsatzziel] = useState(trupp.einsatzziel ?? '');
+  const [entsendetAn, setEntsendetAn] = useState(trupp.entsendetAn ?? '');
   const [paTyp, setPaTyp] = useState<PaTypKey>(
     // Ohne Angabe am Trupp `custom` mit der Bestandsvorgabe: Das ist genau der
     // Satz, mit dem ohnehin gerechnet würde, und er steht damit sichtbar im
@@ -92,7 +107,13 @@ export default function UeberwachungDialog({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave({ ueberwachtVon, einsatzziel, paTyp, satz: aktuellerSatz });
+      await onSave({
+        ueberwachtVon,
+        einsatzziel,
+        entsendetAn,
+        paTyp,
+        satz: aktuellerSatz,
+      });
       onClose();
     } finally {
       setSaving(false);
@@ -111,6 +132,32 @@ export default function UeberwachungDialog({
           <Typography variant="body2" color="text.secondary">
             {truppLabel(trupp)}
           </Typography>
+          {istUebernahme && (
+            // Nur bei der Übernahme: Wer den Dialog später zum Bearbeiten
+            // öffnet, hat die Kontrolle längst und braucht die Erklärung nicht
+            // mehr.
+            <Alert severity="info">{t('ueberwachung.uebernehmenHinweis')}</Alert>
+          )}
+          {/* Die Einheit steht oben: Sie ist die Frage, die vor allen anderen
+              beantwortet ist — „welches Fahrzeug hat den Trupp?" —, und sie
+              fehlt vollständig, wenn der Trupp nie über einen Sammelplatz lief. */}
+          <Autocomplete
+            freeSolo
+            fullWidth
+            options={einheitVorschlaege}
+            value={entsendetAn}
+            onInputChange={(_, next) => setEntsendetAn(next ?? '')}
+            onChange={(_, next) =>
+              setEntsendetAn(typeof next === 'string' ? next : '')
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t('ueberwachung.truppEinheit')}
+                helperText={t('ueberwachung.truppEinheitHint')}
+              />
+            )}
+          />
           <TextField
             fullWidth
             label={t('ueberwachung.einsatzziel')}

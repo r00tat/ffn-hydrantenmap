@@ -169,6 +169,14 @@ export default function UeberwachungCard({
             }
             label={t(`trupp.status.${trupp.status}`)}
           />
+          {trupp.entsendetAn && (
+            // Die Zuordnung gehört in den Kopf und nicht in die Detailzeile:
+            // Wer auf die Karte schaut, will zuerst wissen, ob der Trupp zu
+            // *seiner* Einheit gehört.
+            <Tooltip title={t('ueberwachung.truppEinheit')} describeChild>
+              <Chip size="small" variant="outlined" label={trupp.entsendetAn} />
+            </Tooltip>
+          )}
           {trupp.laufendeNummer > 1 && (
             <Chip
               size="small"
@@ -195,12 +203,14 @@ export default function UeberwachungCard({
             // „ich habe die Zeitkontrolle": Die Übergabe ist der Punkt, an dem
             // die Verantwortung wechselt, und sie soll nicht dadurch
             // stattfinden, dass jemand die Seite offen hat.
-            <Chip
-              size="small"
-              variant="outlined"
-              color="default"
-              label={t('ueberwachung.nichtUebernommen')}
-            />
+            <Tooltip title={t('ueberwachung.uebernehmenKurz')} describeChild>
+              <Chip
+                size="small"
+                variant="outlined"
+                color="default"
+                label={t('ueberwachung.nichtUebernommen')}
+              />
+            </Tooltip>
           )}
           <Box sx={{ flexGrow: 1 }} />
           {canWrite && (
@@ -235,7 +245,6 @@ export default function UeberwachungCard({
 
         <Typography variant="body2" color="text.secondary" component="div">
           {[
-            trupp.entsendetAn && `${t('trupp.entsendetAn')}: ${trupp.entsendetAn}`,
             trupp.einsatzziel &&
               `${t('ueberwachung.einsatzziel')}: ${trupp.einsatzziel}`,
             trupp.ueberwachtVon &&
@@ -480,9 +489,13 @@ export default function UeberwachungCard({
       {canWrite && istAktuell && trupp.status !== 'abgemeldet' && (
         <CardActions sx={{ flexWrap: 'wrap', rowGap: 1 }}>
           {!uebernommen && (
-            <Button size="small" variant="contained" onClick={onUebernehmen}>
-              {t('ueberwachung.actions.uebernehmen')}
-            </Button>
+            // Mit Erklärung: „Zeitkontrolle übernehmen" sagt nicht von selbst,
+            // dass danach dieses Gerät die Warnungen bekommt.
+            <Tooltip title={t('ueberwachung.uebernehmenKurz')} describeChild>
+              <Button size="small" variant="contained" onClick={onUebernehmen}>
+                {t('ueberwachung.actions.uebernehmen')}
+              </Button>
+            </Tooltip>
           )}
           {trupp.status === 'bereit' && (
             <Button

@@ -25,6 +25,12 @@ export interface TruppDialogProps {
   trupp?: AtemschutzTrupp;
   feuerwehren: string[];
   personSuggestions: string[];
+  /**
+   * Fahrzeuge und taktische Einheiten des Einsatzes. **Fehlt** die Angabe,
+   * entfällt das Feld — am Sammelplatz steht beim Erfassen noch nicht fest,
+   * wohin der Trupp geht, dort wird die Einheit erst beim Entsenden gefragt.
+   */
+  einheitVorschlaege?: string[];
   onClose: () => void;
   onSave: (input: TruppInput) => Promise<void>;
 }
@@ -34,6 +40,7 @@ export default function TruppDialog({
   trupp,
   feuerwehren,
   personSuggestions,
+  einheitVorschlaege,
   onClose,
   onSave,
 }: TruppDialogProps) {
@@ -46,9 +53,16 @@ export default function TruppDialog({
     () => trupp?.mitglieder ?? [],
   );
   const [bemerkung, setBemerkung] = useState(trupp?.bemerkung ?? '');
+  const [entsendetAn, setEntsendetAn] = useState(trupp?.entsendetAn ?? '');
   const [saving, setSaving] = useState(false);
 
-  const input: TruppInput = { truppName, feuerwehr, mitglieder, bemerkung };
+  const input: TruppInput = {
+    truppName,
+    feuerwehr,
+    mitglieder,
+    bemerkung,
+    entsendetAn,
+  };
   const fehler = validateTruppInput(input);
 
   const handleSave = async () => {
@@ -97,6 +111,25 @@ export default function TruppDialog({
             max={MAX_TRUPP_MITGLIEDER}
             onChange={setMitglieder}
           />
+          {einheitVorschlaege && (
+            <Autocomplete
+              freeSolo
+              fullWidth
+              options={einheitVorschlaege}
+              value={entsendetAn}
+              onInputChange={(_, next) => setEntsendetAn(next ?? '')}
+              onChange={(_, next) =>
+                setEntsendetAn(typeof next === 'string' ? next : '')
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={t('ueberwachung.truppEinheit')}
+                  helperText={t('ueberwachung.truppEinheitHint')}
+                />
+              )}
+            />
+          )}
           <TextField
             fullWidth
             multiline

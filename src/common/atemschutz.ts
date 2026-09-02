@@ -999,6 +999,15 @@ export interface TruppInput {
   feuerwehr: string;
   mitglieder: string[];
   bemerkung?: string;
+  /**
+   * Die taktische Einheit, der der Trupp zugeordnet ist.
+   *
+   * Nur bei der Zeitkontrolle erfragt: Am Sammelplatz steht beim Erfassen noch
+   * nicht fest, wohin der Trupp geht — das entscheidet sich beim Entsenden. Wer
+   * ihn dagegen bei seiner eigenen Einheit erfasst, weiß es in derselben
+   * Sekunde.
+   */
+  entsendetAn?: string;
 }
 
 /**
@@ -1094,6 +1103,16 @@ export interface UebernahmeInput {
   uid: string;
   ueberwachtVon?: string;
   einsatzziel?: string;
+  /**
+   * Die taktische Einheit, der der Trupp zugeordnet ist — dasselbe Feld, das
+   * der Sammelplatz beim Entsenden füllt.
+   *
+   * Auch hier zu setzen, weil ein Trupp nicht über einen Sammelplatz laufen
+   * muss: Arbeitet eine Einheit allein, gibt es niemanden, der die Zuordnung
+   * vorher eingetragen hätte — und ohne sie steht am Ende nirgends, wer den
+   * Trupp bekommen hat.
+   */
+  entsendetAn?: string;
   paTyp?: PaTypKey;
   /** Nur bei `paTyp === 'custom'` von Belang, aber immer mitgeschrieben. */
   satz?: Geraetesatz;
@@ -1123,6 +1142,10 @@ export function uebernahmePatch(input: UebernahmeInput): UeberwachungPatch {
   if (person) patch.ueberwachtVon = person;
   const ziel = input.einsatzziel?.trim();
   if (ziel) patch.einsatzziel = ziel;
+  // Leer heißt „nicht angefasst" und nicht „löschen": Eine am Sammelplatz
+  // eingetragene Einheit soll eine Übernahme ohne Angabe nicht wegwerfen.
+  const einheit = input.entsendetAn?.trim();
+  if (einheit) patch.entsendetAn = einheit;
 
   if (input.paTyp) {
     patch.paTyp = input.paTyp;

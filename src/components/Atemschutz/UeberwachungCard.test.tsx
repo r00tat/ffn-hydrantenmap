@@ -252,6 +252,13 @@ describe('UeberwachungCard', () => {
     ).toBeInTheDocument();
   });
 
+  it('zeigt die taktische Einheit im Kopf der Karte', () => {
+    // Oben und nicht in der Detailzeile: „Welche Einheit hat den Trupp?" ist
+    // die Frage, mit der jemand auf die Karte schaut.
+    render(trupp({ entsendetAn: 'RLFA-ND' }));
+    expect(screen.getByText('RLFA-ND')).toBeInTheDocument();
+  });
+
   it('zeigt die Geräte am Trupp samt Träger', () => {
     render(
       trupp({

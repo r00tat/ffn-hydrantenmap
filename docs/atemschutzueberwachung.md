@@ -49,6 +49,38 @@ erscheint hier von selbst („nicht erst, wenn ich ihn suche"), und die
 Einsatzsicherung ([useExport.ts](../src/hooks/useExport.ts)) trägt die neuen
 Felder mit, ohne dass dort etwas nachgezogen werden muss.
 
+## Was „Zeitkontrolle übernehmen" tut
+
+Der Knopf sieht nach einem Formular aus und ist in Wahrheit eine Anmeldung. Drei
+Dinge passieren gleichzeitig (`uebernahmePatch`), und keines davon ist aus dem
+Titel abzulesen — deshalb steht im Dialog ein Hinweis darüber und am Knopf ein
+Tooltip:
+
+1. **Die Verantwortung wechselt, und das wird protokolliert.**
+   `ueberwachungSeit` hält den Zeitpunkt fest, ab dem der Gruppenkommandant die
+   Zeitkontrolle führt und nicht mehr der Sammelplatz (FH-06 5.3.4). Der Stempel
+   wird **nur beim ersten Mal** gesetzt; sonst verschöbe ihn jede nachträglich
+   getippte Bemerkung nach vorn. Das Gegenstück ist `ueberwachungBis` (siehe
+   „…oder zurück an den Sammelplatz").
+2. **Dieses Gerät wird Empfänger der Warnungen.** Die eigene `uid` kommt in
+   `ueberwachungUids`, und erst danach holt die Seite den Push-Token
+   (`registerMessaging`). Die Erlaubnisfrage des Browsers gehört zu einer
+   Handlung, die sie erklärt — beim Laden der Seite gestellt, wäre sie eine
+   Frage ohne Anlass.
+3. **Der Gerätesatz wird festgelegt.** Ohne ihn rechnet die Seite mit der
+   Vorgabe aus dem Flaschenbestand. Das ist eine brauchbare Annahme, aber eine
+   Annahme; erst hier steht sie sichtbar im Formular, und mit ihr stehen
+   Drittelmarken und Rückzugszeitpunkt.
+
+Wer einen Trupp auf dieser Seite selbst erfasst, hat die Zeitkontrolle damit
+schon: `ueberwachungSeit` und die eigene `uid` werden beim Anlegen gesetzt, und
+der Knopf heißt an dieser Karte von Anfang an „Überwachung bearbeiten". Ein
+zweiter Klick auf „Übernehmen" wäre ein Klick ohne Erkenntnis.
+
+Nicht übernommen wird die *Verantwortung für den Trupp* — die bleibt beim
+Truppkommandanten und beim Kommandanten der taktischen Einheit (siehe „Was die
+Überwachung ausdrücklich nicht ist").
+
 ## Druckabfragen sind ein Array, keine Untersammlung
 
 `abfragen` ist ein Feld am Trupp-Dokument. Gründe, in dieser Reihenfolge:
@@ -427,23 +459,62 @@ dort fest `/chat`. Siehe auch
 
 ## „In den Einsatz schicken", nicht „entsenden"
 
-Am Sammelplatz wird ein Trupp **abgegeben**: „Entsendet an" ist dort die
-entscheidende Angabe, denn wer nicht festhält, an welche taktische Einheit,
-verliert die Spur. Bei der Überwachung steht der Gruppenkommandant selbst davor
-— er schickt den Trupp in *seinen* Einsatz und hat niemanden, an den er ihn
-übergibt. Das Feld wäre dort eine Frage ohne Antwort und ist deshalb
-ausgeblendet (`TruppZeitKontext` in
-[TruppZeitDialog.tsx](../src/components/Atemschutz/TruppZeitDialog.tsx)).
+Am Sammelplatz wird ein Trupp **abgegeben** — „Entsendet an". Bei der
+Überwachung schickt der Gruppenkommandant ihn in *seinen* Einsatz; dieselbe
+Angabe ist dort keine Übergabe, sondern die Zuordnung, und das Feld heißt
+deshalb „Taktische Einheit" (`TruppZeitKontext` in
+[TruppZeitDialog.tsx](../src/components/Atemschutz/TruppZeitDialog.tsx), siehe
+den nächsten Abschnitt).
 
-Ein am Sammelplatz gesetztes Ziel wird dabei **nicht** gelöscht: `entsendePatch`
-lässt das Feld aus dem Patch weg, wenn es fehlt.
+Ein schon gesetztes Ziel wird durch ein leeres Feld **nicht** gelöscht:
+`entsendePatch` lässt das Feld aus dem Patch weg, wenn es leer ist.
 
-Aus demselben Grund heißen die Beschriftungen anders. „Abmarsch erfassen" klang
+Die Beschriftungen heißen anders als am Sammelplatz. „Abmarsch erfassen" klang
 nach reiner Dokumentation — als würde etwas nachgetragen, was schon passiert
 ist. Der Knopf schickt den Trupp aber wirklich in den Einsatz und startet die
 Zeitkontrolle, und genau das sagt er jetzt: **„In den Einsatz schicken"**. Der
 Zeitpunkt heißt dort „Abmarsch (Anschließen der Luftversorgung)" — so definiert
 ihn die Unterlage.
+
+### Die taktische Einheit steht am Trupp
+
+Getragen wird die Zuordnung von `entsendetAn` — **demselben** Feld, das der
+Sammelplatz beim Entsenden füllt. Ein zweites Feld für „meine Einheit" wäre eine
+zweite Wahrheit über dieselbe Frage: Ein Trupp gehört zu genau einer Einheit,
+egal ob ihn der Sammelplatz dorthin geschickt hat oder ob die Einheit ihn selbst
+ausgerüstet hat.
+
+Zuerst war das Feld bei der Überwachung ausgeblendet, mit der Begründung, der
+Gruppenkommandant habe niemanden, an den er den Trupp übergibt. Das war ein
+Denkfehler: Die Angabe ist keine Übergabe, sondern die Zuordnung — und ohne sie
+steht am Ende des Einsatzes an keinem Trupp, welche Einheit ihn hatte. Bei einem
+Trupp, der nie über einen Sammelplatz lief, fehlte sie vollständig, und genau
+das ist der Fall, für den die Seite gebaut ist: eine Einheit, die allein
+arbeitet.
+
+Gefragt wird an **drei** Stellen, weil der Trupp an dreien in die Hand genommen
+wird: beim Erfassen (`TruppDialog`, nur bei der Zeitkontrolle — am Sammelplatz
+steht dabei noch nicht fest, wohin er geht), beim Übernehmen der Zeitkontrolle
+(`UeberwachungDialog`) und beim Abmarsch (`TruppZeitDialog`). Überall Freitext
+mit Vorschlägen: Der Trupp geht meist zu einem Fahrzeug, manchmal zu einem
+Gruppenkommandanten und gelegentlich zu einem Abschnitt, den es in keiner Liste
+gibt. Leer heißt überall „nicht angefasst" und nie „löschen".
+
+Die Vorschläge (`einheitOptionen` in
+[einheiten.ts](../src/components/Atemschutz/einheiten.ts)) sind die am Trupp
+schon vergebenen Einheiten **und** die Fahrzeuge und taktischen Einheiten des
+Einsatzes. Nur die vergebenen wären beim ersten Trupp eine leere Liste — genau
+dann, wenn die Einheit zu wählen ist; vorher konnte der Filter deshalb nie etwas
+anderes als „alle Trupps" zeigen, solange niemand über einen Sammelplatz
+entsendet hatte. Verglichen wird ohne Rücksicht auf Groß- und Kleinschreibung:
+`entsendetAn` ist Freitext, und dasselbe Fahrzeug zweimal im Filter wären zwei
+Ansichten desselben Einsatzes.
+
+Ein Trupp **ohne** Zuordnung passt zu jeder Einheit (`truppPasstZuEinheit`). Am
+Sammelplatz bereitgestellte Trupps tragen noch keine — wären sie unter einem
+Einheitenfilter unsichtbar, sähe der Gruppenkommandant eine leere Seite und
+müsste den Filter wegnehmen, um einen Trupp übernehmen zu können. Dabei entsteht
+die Zuordnung ja gerade.
 
 ### Ein zurückgekehrter Trupp geht in einem Schritt wieder hinein
 
@@ -502,11 +573,15 @@ bereit, und die neue Zeile ist an der Zeitkontrolle wieder in vollem Umfang da.
 Alle für den Einsatz berechtigten Benutzer sehen **alle** Trupps — die
 Firestore-Regeln für `call/{id}/{subitem=**}` gelten je Einsatz, nicht je
 Einheit, und die Gesamtlage muss jemand sehen können. Für „meine Trupps" gibt es
-einen Filter auf „Entsendet an", der **je Gerät und je Einsatz** im
+einen Filter auf die taktische Einheit (`entsendetAn`), der **je Gerät** im
 `localStorage` gemerkt wird: Welche Trupps die eigenen sind, hängt am Gerät in
 der Hand, nicht am Konto — auf einem Fahrzeug teilen sich mehrere Leute eines
 (siehe die Bedienung am Sammelplatz in
-[atemschutzsammelplatz.md](atemschutzsammelplatz.md)).
+[atemschutzsammelplatz.md](atemschutzsammelplatz.md)). Bewusst **nicht** je
+Einsatz: Dasselbe Fahrzeug ist im nächsten Einsatz dieselbe Einheit, und die
+Wahl wäre sonst in jedem Einsatz neu zu treffen — im ungünstigsten Moment.
+Trupps ohne Zuordnung bleiben unter jedem Filter sichtbar (siehe „Die taktische
+Einheit steht am Trupp").
 
 Die Gesamtlage ist die ungefilterte Liste. Schreiben darf, wer am Einsatz
 schreiben darf; ein Nur-Lese-Gast sieht die Überwachung, ändert sie aber nicht.
