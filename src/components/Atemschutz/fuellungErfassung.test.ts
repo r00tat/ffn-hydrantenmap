@@ -9,6 +9,7 @@ const basis: FuellungInput = {
   enddruck: 300,
   gefuelltVon: 'Paul',
   verrechnen: true,
+  zweck: 'sonstiges',
 };
 
 describe('buildFuellungDocument', () => {
@@ -44,6 +45,34 @@ describe('buildFuellungDocument', () => {
     );
     expect('feuerwehr' in doc).toBe(false);
     expect('bemerkung' in doc).toBe(false);
+  });
+
+  it('schreibt den Zweck immer mit', () => {
+    const doc = buildFuellungDocument(
+      { ...basis, zweck: 'uebung' },
+      { firecallId: '', now: 'T' },
+    );
+    expect(doc.zweck).toBe('uebung');
+  });
+
+  it('lässt den Einsatz der Eingabe den des Kontexts überstimmen', () => {
+    // Der Fall der zentralen Seite: Der Dialog stellt den Einsatz zur Wahl,
+    // der Kontext trägt nur den aktiven Filter.
+    const doc = buildFuellungDocument(
+      { ...basis, firecallId: 'e2', firecallName: 'Übung Ost' },
+      { firecallId: 'e1', firecallName: 'Brand K1', now: 'T' },
+    );
+    expect(doc.firecallId).toBe('e2');
+    expect(doc.firecallName).toBe('Übung Ost');
+  });
+
+  it('räumt den Einsatznamen mit ab, wenn die Eingabe „ohne Einsatz" wählt', () => {
+    const doc = buildFuellungDocument(
+      { ...basis, firecallId: '' },
+      { firecallId: 'e1', firecallName: 'Brand K1', now: 'T' },
+    );
+    expect(doc.firecallId).toBe('');
+    expect('firecallName' in doc).toBe(false);
   });
 
   it('nimmt den übergebenen Zeitpunkt, sonst die aktuelle Zeit', () => {

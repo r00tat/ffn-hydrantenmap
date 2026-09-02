@@ -286,16 +286,42 @@ service cloud.firestore {
       }
 
       // Füllprotokoll der Atemluftflaschen. Anders als `atemschutzGeraet`
-      // darf hier *jedes Gruppenmitglied schreiben*: Wer füllt, protokolliert,
+      // darf hier *jedes Gruppenmitglied anlegen*: Wer füllt, protokolliert,
       // und das ist selten ein Admin. Geschrieben wird clientseitig und nicht
       // über eine Server Action, weil am Sammelplatz die Verbindung schlecht
       // ist — Firestore stellt Client-Schreibvorgänge offline zurück und
       // spielt sie nach, eine Server Action scheitert.
       // Einsatz-Gäste sind keine Gruppenmitglieder und damit außen vor; sie
       // können die Geräte-Stammdaten ohnehin nicht lesen.
+      //
+      // Ändern und Löschen sind enger als Anlegen (#761): nur die *eigene*
+      // Zeile, und nur solange sie auf keiner Rechnung steht. Das Protokoll
+      // ist ein Nachweis — vorher durfte jedes Mitglied jede fremde Zeile
+      // ändern und löschen.
+      //
+      // Der Gruppen-Admin darf mehr, sieht diese Regel aber nicht: Seine
+      // Rolle steckt in keinem Custom Claim (siehe berechtigungen.md). Er
+      // korrigiert deshalb über `updateFremdeFuellung` /
+      // `deleteFremdeFuellung` mit dem Admin SDK; dieselbe Prüfung steht dort
+      // als `fuellungSperre`.
+      //
+      // `createdBy` beim Anlegen an den Aufrufer gebunden: Ohne diese
+      // Bedingung schriebe ein manipulierter Client eine fremde uid hinein und
+      // sperrte die Zeile für den, der sie zu sehen bekommt.
       match /atemschutzFuellung/{doc} {
         allow read: if fahrtenbuchMember();
-        allow write: if fahrtenbuchMember();
+        allow create: if fahrtenbuchMember()
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update: if fahrtenbuchMember()
+          && resource.data.createdBy == request.auth.uid
+          && !('rechnungId' in resource.data)
+          // Die Zeile darf nicht die Seite wechseln: weder den Erfasser
+          // verlieren noch sich selbst eine Rechnung anhängen.
+          && request.resource.data.createdBy == resource.data.createdBy
+          && !('rechnungId' in request.resource.data);
+        allow delete: if fahrtenbuchMember()
+          && resource.data.createdBy == request.auth.uid
+          && !('rechnungId' in resource.data);
       }
 
       // Verrechnung der Füllungen. Lesen setzt beides voraus: Mitgliedschaft

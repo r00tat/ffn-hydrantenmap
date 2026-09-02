@@ -24,16 +24,20 @@ import {
   DEFAULT_ENDDRUCK,
   DEFAULT_SICHTKONTROLLE,
   findByCode,
+  FUELLUNG_ZWECKE,
   geraetKennung,
   geraetLabel,
   SICHTKONTROLLE_WERTE,
   type AtemschutzFuellung,
   type AtemschutzGeraet,
   type FuellungInput,
+  type FuellungZweck,
   type Sichtkontrolle,
   validateFuellungInput,
   verrechnenVorgabe,
   waehleFuellstation,
+  zweckOf,
+  zweckVorgabe,
 } from '../../common/atemschutz';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 import GeraetAutocomplete from './GeraetAutocomplete';
@@ -47,6 +51,12 @@ import {
   type MangelEingabe,
 } from './mangelErfassung';
 import PersonAutocomplete from './PersonAutocomplete';
+
+/** Ein Einsatz, wie ihn der Dialog zur Wahl stellt. */
+export interface FuellungEinsatz {
+  id: string;
+  name: string;
+}
 
 export interface FuellungDialogProps {
   open: boolean;
@@ -66,6 +76,12 @@ export interface FuellungDialogProps {
   letzteFuellstationId?: string;
   /** `''` = an der Station. Bestimmt die Vorbelegung von `verrechnen`. */
   firecallId: string;
+  /**
+   * Die Einsätze zur Auswahl. Leer oder fehlend heißt: Der Einsatz steht fest
+   * und wird nur angezeigt — so am Sammelplatz, wo alles zu *diesem* Einsatz
+   * gehört und eine Auswahl nur eine Gelegenheit zum Verklicken wäre.
+   */
+  firecalls?: FuellungEinsatz[];
   /** Name der eigenen Feuerwehr, für dieselbe Vorbelegung. */
   eigeneFeuerwehr?: string;
   /** Meldet die gewählte Station zurück, damit sie gemerkt werden kann. */
@@ -86,6 +102,10 @@ interface FormState {
   bemerkung: string;
   fuellstationId?: string;
   verrechnen: boolean;
+  zweck: FuellungZweck;
+  firecallId: string;
+  /** Wie `<input type="datetime-local">` ihn führt: `2026-09-02T16:35`. */
+  zeitpunkt: string;
 }
 
 function toNumber(value: string): number | undefined {
@@ -93,6 +113,32 @@ function toNumber(value: string): number | undefined {
   if (!trimmed) return undefined;
   const n = Number(trimmed);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function zweiStellig(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/**
+ * Ein Zeitpunkt für `<input type="datetime-local">`: Ortszeit ohne Zone.
+ *
+ * `toISOString().slice(0, 16)` wäre UTC und zeigte im Sommer eine um zwei
+ * Stunden falsche Uhrzeit an.
+ */
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return [
+    `${d.getFullYear()}-${zweiStellig(d.getMonth() + 1)}-${zweiStellig(d.getDate())}`,
+    `${zweiStellig(d.getHours())}:${zweiStellig(d.getMinutes())}`,
+  ].join('T');
+}
+
+/** Die Rückrichtung: `new Date(...)` liest den Wert als Ortszeit. */
+function fromLocalInput(value: string): string | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
 }
 
 export default function FuellungDialog({
@@ -106,6 +152,7 @@ export default function FuellungDialog({
   fuellstationen,
   letzteFuellstationId,
   firecallId,
+  firecalls,
   eigeneFeuerwehr,
   onFuellstationChange,
   onClose,
@@ -118,6 +165,10 @@ export default function FuellungDialog({
     () => waehleFuellstation(fuellstationen, letzteFuellstationId),
     [fuellstationen, letzteFuellstationId],
   );
+
+  // Der Einsatz einer bestehenden Zeile steht am Dokument; beim Anlegen gilt
+  // der Kontext (Sammelplatz) bzw. der aktive Filter (zentrale Seite).
+  const einsatzVorgabe = fuellung?.firecallId ?? firecallId;
 
   const [form, setForm] = useState<FormState>(() => ({
     geraetId: fuellung?.geraetId,
@@ -134,9 +185,16 @@ export default function FuellungDialog({
       fuellung?.verrechnen ??
       verrechnenVorgabe({
         feuerwehr: fuellung?.feuerwehr,
-        firecallId,
+        firecallId: einsatzVorgabe,
         eigeneFeuerwehr,
       }),
+    zweck: fuellung ? zweckOf(fuellung) : zweckVorgabe(einsatzVorgabe),
+    firecallId: einsatzVorgabe,
+    // Beim Anlegen leer: Der Zeitpunkt ist dann „jetzt", und den setzt der
+    // Aufrufer beim Speichern. Ein vorbelegtes Feld wäre in dem Moment schon
+    // wieder veraltet — am Sammelplatz vergehen zwischen Öffnen und Speichern
+    // Minuten.
+    zeitpunkt: fuellung ? toLocalInput(fuellung.zeitpunkt) : '',
   }));
   // Ob der Benutzer den Schalter selbst angefasst hat. Solange nicht, zieht die
   // Vorbelegung nach: Das Feuerwehr-Feld ist beim Öffnen leer und wird meist
@@ -144,6 +202,9 @@ export default function FuellungDialog({
   // Beim Bearbeiten einer gespeicherten Füllung gilt sie als angefasst: Das
   // gespeicherte Flag ist eine getroffene Entscheidung.
   const [verrechnenBeruehrt, setVerrechnenBeruehrt] = useState(!!fuellung);
+  // Dieselbe Regel für den Zweck: Solange niemand ihn selbst gesetzt hat,
+  // folgt er dem gewählten Einsatz.
+  const [zweckBeruehrt, setZweckBeruehrt] = useState(!!fuellung);
   const [mangel, setMangel] = useState<MangelEingabe>(LEERE_MANGEL_EINGABE);
   const [saving, setSaving] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -162,10 +223,30 @@ export default function FuellungDialog({
         : {
             verrechnen: verrechnenVorgabe({
               feuerwehr: next,
-              firecallId,
+              firecallId: prev.firecallId,
               eigeneFeuerwehr,
             }),
           }),
+    }));
+
+  /**
+   * Der Einsatz zieht beides nach: „im Einsatz" heißt weder verrechnen noch
+   * „Sonstiges". Wer eines von beiden selbst angefasst hat, behält es.
+   */
+  const setEinsatz = (next: string) =>
+    setForm((prev) => ({
+      ...prev,
+      firecallId: next,
+      ...(verrechnenBeruehrt
+        ? {}
+        : {
+            verrechnen: verrechnenVorgabe({
+              feuerwehr: prev.feuerwehr,
+              firecallId: next,
+              eigeneFeuerwehr,
+            }),
+          }),
+      ...(zweckBeruehrt ? {} : { zweck: zweckVorgabe(next) }),
     }));
 
   // Die gewählte Flasche, sofern es zu ihr einen Stammdatensatz gibt.
@@ -189,6 +270,17 @@ export default function FuellungDialog({
     (s) => s.id === form.fuellstationId,
   );
 
+  const einsatzWaehlbar = (firecalls?.length ?? 0) > 0;
+  const gewaehlterEinsatz = firecalls?.find((f) => f.id === form.firecallId);
+  // Die Namenskopie bleibt erhalten, wenn der Einsatz nicht in der Liste steht
+  // — etwa ein abgeschlossener, den die Auswahl nicht mehr führt. Ohne das
+  // verlöre die Zeile beim Speichern ihren Einsatznamen.
+  const einsatzName =
+    gewaehlterEinsatz?.name ??
+    (form.firecallId && form.firecallId === fuellung?.firecallId
+      ? fuellung.firecallName
+      : undefined);
+
   const input: FuellungInput = {
     geraetId: form.geraetId,
     flaschenNummer: form.flaschenNummer,
@@ -204,6 +296,16 @@ export default function FuellungDialog({
       ? geraetLabel(gewaehlteStation)
       : undefined,
     verrechnen: form.verrechnen,
+    zweck: form.zweck,
+    // Nur mitschicken, wenn der Dialog den Einsatz überhaupt zur Wahl gestellt
+    // hat oder eine bestehende Zeile bearbeitet wird — sonst bleibt der
+    // Kontext des Aufrufers maßgeblich (`buildFuellungDocument`).
+    ...(einsatzWaehlbar || fuellung
+      ? { firecallId: form.firecallId, firecallName: einsatzName }
+      : {}),
+    ...(fromLocalInput(form.zeitpunkt)
+      ? { zeitpunkt: fromLocalInput(form.zeitpunkt) }
+      : {}),
   };
   const fehler = validateFuellungInput(input);
   if (mangelGeraet && !hatMangelEingabe(mangel)) {
@@ -236,7 +338,7 @@ export default function FuellungDialog({
           : {
               verrechnen: verrechnenVorgabe({
                 feuerwehr,
-                firecallId,
+                firecallId: prev.firecallId,
                 eigeneFeuerwehr,
               }),
             }),
@@ -448,7 +550,81 @@ export default function FuellungDialog({
               </Typography>
             </Grid>
           )}
-          <Grid size={12}>
+          {/* Der Zeitpunkt steht nur beim Bearbeiten im Formular: Beim Anlegen
+              ist er „jetzt" und ein vorbelegtes Feld wäre am Sammelplatz beim
+              Speichern schon veraltet. Beim Korrigieren ist er dagegen genau
+              das, was oft falsch ist — und ohne das Feld setzte ein Speichern
+              die Zeile stillschweigend auf die aktuelle Uhrzeit. */}
+          {fuellung && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                type="datetime-local"
+                label={t('fuellung.zeitpunkt')}
+                value={form.zeitpunkt}
+                onChange={(e) => set('zeitpunkt', e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            </Grid>
+          )}
+          {einsatzWaehlbar ? (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                select
+                fullWidth
+                label={t('filter.einsatz')}
+                value={form.firecallId}
+                onChange={(e) => setEinsatz(e.target.value)}
+              >
+                <MenuItem value="">{t('filter.ohneEinsatz')}</MenuItem>
+                {/* Ein Einsatz, der nicht mehr in der Liste steht — etwa ein
+                    abgeschlossener —, bekommt seinen eigenen Eintrag: Sonst
+                    stünde das Feld leer und ein Speichern nähme der Zeile den
+                    Einsatz. */}
+                {!!form.firecallId &&
+                  !gewaehlterEinsatz &&
+                  einsatzName !== undefined && (
+                    <MenuItem value={form.firecallId}>{einsatzName}</MenuItem>
+                  )}
+                {firecalls?.map((f) => (
+                  <MenuItem key={f.id} value={f.id}>
+                    {f.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          ) : (
+            !!fuellung?.firecallName && (
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 2 }}
+                >
+                  {t('filter.einsatz')}: {fuellung.firecallName}
+                </Typography>
+              </Grid>
+            )
+          )}
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField
+              select
+              fullWidth
+              label={t('fuellung.zweck')}
+              value={form.zweck}
+              onChange={(e) => {
+                setZweckBeruehrt(true);
+                set('zweck', e.target.value as FuellungZweck);
+              }}
+            >
+              {FUELLUNG_ZWECKE.map((wert) => (
+                <MenuItem key={wert} value={wert}>
+                  {t(`zweck.${wert}`)}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <FormControlLabel
               control={
                 <Switch

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Der Mangel-Zweig zieht die Server-Action und den Storage-Upload nach sich —
@@ -380,5 +380,154 @@ describe('FuellungDialog — Mangel aus der Sichtkontrolle', () => {
     });
 
     expect(screen.getByLabelText(/verrechnen/i)).not.toBeChecked();
+  });
+});
+
+describe('FuellungDialog — Einsatz, Zweck und Zeitpunkt', () => {
+  beforeEach(() => {
+    createAtemschutzMangelMock.mockReset();
+    uploadMangelImageMock.mockReset();
+  });
+
+  const bestehend = {
+    id: 'f1',
+    anzahl: 1,
+    enddruck: 300,
+    gefuelltVon: 'Paul',
+    feuerwehr: 'Neusiedl am See',
+    zeitpunkt: new Date(2026, 7, 29, 12, 0).toISOString(),
+    firecallId: 'e1',
+    firecallName: 'Brand K1',
+    verrechnen: false,
+    createdAt: '',
+    createdBy: 'u1',
+    updatedAt: '',
+    updatedBy: 'u1',
+  };
+
+  it('zeigt ohne Einsatzliste kein Auswahlfeld — so am Sammelplatz', () => {
+    render({ firecallId: 'e1' });
+    expect(screen.queryByLabelText('Einsatz')).not.toBeInTheDocument();
+  });
+
+  it('belegt den Zweck aus dem Einsatzbezug vor', () => {
+    render({ firecallId: 'e1' });
+    expect(screen.getByLabelText('Zweck')).toHaveTextContent('Einsatz');
+
+    cleanup();
+    render({ firecallId: '' });
+    expect(screen.getByLabelText('Zweck')).toHaveTextContent('Sonstiges');
+  });
+
+  it('zieht Zweck und verrechnen nach, wenn der Einsatz gewechselt wird', () => {
+    render({
+      firecallId: '',
+      eigeneFeuerwehr: 'Neusiedl am See',
+      firecalls: [{ id: 'e1', name: 'Brand K1' }],
+    });
+
+    fireEvent.change(screen.getByLabelText(/Feuerwehr/), {
+      target: { value: 'FF Jois' },
+    });
+    // Fremde Wehr an der Station: zu verrechnen.
+    expect(screen.getByLabelText(/verrechnen/i)).toBeChecked();
+
+    fireEvent.mouseDown(screen.getByLabelText('Einsatz'));
+    fireEvent.click(screen.getByRole('option', { name: 'Brand K1' }));
+
+    // Im Einsatz ist es Nachbarschaftshilfe, keine Dienstleistung.
+    expect(screen.getByLabelText(/verrechnen/i)).not.toBeChecked();
+    expect(screen.getByLabelText('Zweck')).toHaveTextContent('Einsatz');
+  });
+
+  it('lässt einen selbst gesetzten Zweck vom Einsatzwechsel unberührt', () => {
+    render({ firecallId: '', firecalls: [{ id: 'e1', name: 'Brand K1' }] });
+
+    fireEvent.mouseDown(screen.getByLabelText('Zweck'));
+    fireEvent.click(screen.getByRole('option', { name: 'Übung' }));
+
+    fireEvent.mouseDown(screen.getByLabelText('Einsatz'));
+    fireEvent.click(screen.getByRole('option', { name: 'Brand K1' }));
+
+    // getAll: Nach dem Öffnen des zweiten Auswahlfelds trägt neben dem
+    // sichtbaren Feld auch MUIs verstecktes Eingabefeld die Beschriftung.
+    expect(screen.getAllByLabelText('Zweck')[0]).toHaveTextContent('Übung');
+  });
+
+  it('behält beim Bearbeiten Einsatz und Zeitpunkt der Zeile', async () => {
+    // Der Kern des Fehlers aus #761: Der Dialog schickte weder Einsatz noch
+    // Zeitpunkt mit — eine unter Filter „Alle" korrigierte Einsatzfüllung
+    // verlor ihren Einsatz und bekam die aktuelle Uhrzeit.
+    const { onSave } = render({
+      firecallId: '',
+      firecalls: [{ id: 'e1', name: 'Brand K1' }],
+      fuellung: bestehend,
+    });
+
+    expect(screen.getByLabelText('Einsatz')).toHaveTextContent('Brand K1');
+    expect(screen.getByLabelText(/Zeitpunkt/)).toHaveValue('2026-08-29T12:00');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      firecallId: 'e1',
+      firecallName: 'Brand K1',
+      zeitpunkt: bestehend.zeitpunkt,
+    });
+  });
+
+  it('hält einen Einsatz, der nicht mehr in der Liste steht', async () => {
+    // Ein abgeschlossener Einsatz fällt aus der Auswahl. Ohne eigenen Eintrag
+    // stünde das Feld leer und ein Speichern nähme der Zeile den Einsatz.
+    const { onSave } = render({
+      firecallId: '',
+      firecalls: [{ id: 'e2', name: 'Anderer Einsatz' }],
+      fuellung: bestehend,
+    });
+
+    expect(screen.getByLabelText('Einsatz')).toHaveTextContent('Brand K1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      firecallId: 'e1',
+      firecallName: 'Brand K1',
+    });
+  });
+
+  it('nimmt der Zeile den Einsatz, wenn „Ohne Einsatz" gewählt wird', async () => {
+    const { onSave } = render({
+      firecallId: '',
+      firecalls: [{ id: 'e1', name: 'Brand K1' }],
+      fuellung: bestehend,
+    });
+
+    fireEvent.mouseDown(screen.getByLabelText('Einsatz'));
+    fireEvent.click(screen.getByRole('option', { name: 'Ohne Einsatz' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      firecallId: '',
+      firecallName: undefined,
+    });
+  });
+
+  it('schickt beim Anlegen ohne Einsatzliste keinen Einsatz mit', async () => {
+    // Am Sammelplatz bestimmt der Kontext den Einsatz — der Dialog darf ihn
+    // nicht überstimmen.
+    const { onSave } = render({ firecallId: 'e1' });
+
+    fireEvent.change(screen.getByLabelText(/Feuerwehr/), {
+      target: { value: 'FF Jois' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect('firecallId' in onSave.mock.calls[0][0]).toBe(false);
+  });
+
+  it('zeigt beim Anlegen kein Zeitpunkt-Feld', () => {
+    render({ firecallId: '' });
+    expect(screen.queryByLabelText(/Zeitpunkt/)).not.toBeInTheDocument();
   });
 });

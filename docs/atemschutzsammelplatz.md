@@ -202,6 +202,139 @@ ausgefüllt oder durch einen Scan gesetzt. Beim Bearbeiten einer gespeicherten
 Füllung gilt der Schalter als angefasst — der gespeicherte Wert ist eine
 getroffene Entscheidung.
 
+### Der Zweck einer Füllung
+
+`zweck` (`einsatz` | `uebung` | `sonstiges`) steht neben `verrechnen` am
+Dokument und beantwortet, was `firecallId` allein nicht kann: **Ohne Einsatz
+sind Übung und Stationsfüllung dasselbe** — beide „ohne Einsatz" —, und für die
+Jahresauswertung ist genau das der Unterschied, der zählt.
+
+Drei Werte und nicht mehr. Jeder weitere müsste am Sammelplatz in derselben
+Sekunde entschieden werden, in der die Flasche am Kompressor hängt.
+
+Vorbelegt über `zweckVorgabe`: mit Einsatz `einsatz`, ohne Einsatz
+`sonstiges` — **nicht** `uebung`. Der Regelfall an der Station ist das
+Nachfüllen nach dem Einsatz oder für den Bestand; wer geübt hat, stellt um.
+Eine falsche Vorbelegung auf „Übung" bekäme dagegen niemand zu sehen. Der Wert
+zieht mit dem gewählten Einsatz nach, solange der Benutzer ihn nicht selbst
+gesetzt hat — dieselbe Regel wie bei `verrechnen`.
+
+Anders als `verrechnen` ist das Feld **optional**: Zeilen aus der Zeit davor
+haben keines. `zweckOf` leitet ihn für sie aus `firecallId` ab, statt sie aus
+jedem Filter fallen zu lassen; eine Migration aller Bestandszeilen spart das
+ebenfalls — dieselbe Abwägung wie bei `rechnungId`. Der Zweckfilter läuft
+deshalb clientseitig, der Zeitraumfilter dagegen serverseitig: Ein Bereich auf
+`zeitpunkt`, also auf dem Sortierfeld, kostet keinen weiteren Index.
+
+### Der Einsatz ist ein Feld des Dialogs, nicht des Aufrufers
+
+Am Sammelplatz steht der Einsatz fest und der Dialog zeigt ihn nur an. Auf
+`/atemschutz/fuellprotokoll` ist er ein Auswahlfeld — sonst übernähme eine dort
+bearbeitete Zeile den *Filter* als Einsatz, und eine Einsatzfüllung, die bei
+Filter „Alle" korrigiert wird, verlöre ihren Einsatz. `buildFuellungDocument`
+gibt deshalb `input.firecallId` den Vorrang vor dem Kontext.
+
+Ein Einsatz, der nicht mehr in der Auswahl steht — die Liste führt die letzten
+50 —, bekommt einen eigenen Eintrag aus der Namenskopie am Dokument. Ohne den
+stünde das Feld leer und ein Speichern nähme der Zeile den Einsatz.
+
+Aus demselben Grund steht beim Bearbeiten der **Zeitpunkt** im Formular: Der
+Dialog schickte ihn vorher nicht mit, und `buildFuellungDocument` setzte
+mangels Angabe die aktuelle Zeit — jede Korrektur verschob die Füllung
+stillschweigend auf jetzt. Beim *Anlegen* fehlt das Feld weiterhin: Dort ist
+der Zeitpunkt „jetzt", und ein vorbelegtes Feld wäre am Sammelplatz zwischen
+Öffnen und Speichern schon wieder veraltet.
+
+### Wer eine Füllung nachträglich ändern darf
+
+Anlegen darf jedes Gruppenmitglied, **ändern und löschen nur der Erfasser oder
+ein Gruppen-Admin** — und beide nicht mehr, sobald die Zeile auf einer Rechnung
+steht. Vorher hing beides allein an `canWrite`, das auf der zentralen Seite
+`!!groupId` war: Jedes Mitglied durfte jede fremde Zeile ändern und löschen.
+
+Die Entscheidung steht als `fuellungSperre` in `common/atemschutz.ts` und wird
+an drei Stellen gebraucht — in der Liste (Knöpfe), in den Server Actions und,
+so weit sie es kann, in den Firestore-Regeln:
+
+| Zustand | Erfasser | Gruppen-Admin | anderes Mitglied |
+| --- | --- | --- | --- |
+| gewöhnlich | ändern, löschen | ändern, löschen | nur lesen |
+| `rechnungId` gesetzt | nur lesen | nur lesen | nur lesen |
+
+Die Sperre für abgerechnete Zeilen gilt **auch für den Gruppen-Admin**: Ihr
+Inhalt steht auf einem Beleg, der das Haus verlassen hat. Der Weg zurück führt
+über das Storno der Rechnung, nicht über die Zeile.
+
+Zeilen ohne `createdBy` bleiben dem Gruppen-Admin vorbehalten. Das ist die
+sichere Richtung — `createdBy: ''` gegen ein leeres `uid` zu vergleichen gäbe
+sonst jedem abgemeldeten Zustand das Recht.
+
+**Zwei Schreibwege, und warum.** Die Firestore-Regel kann nur die eigene Zeile
+freigeben: Die Gruppen-Admin-Rolle steckt in keinem Custom Claim und ist für
+Regeln nicht sichtbar (siehe [berechtigungen.md](berechtigungen.md)). Der
+Gruppen-Admin korrigiert deshalb über `updateFremdeFuellung` /
+`deleteFremdeFuellung` mit dem Admin SDK, das die Prüfung noch einmal selbst
+macht. Die Action akzeptiert nur die Felder des Dialogs — `createdBy`,
+`rechnungId` und die Zeitstempel stehen nicht darin: Wer eine fremde Zeile
+korrigiert, wird nicht ihr Erfasser.
+
+Diesen zweiten Weg gibt es **nur auf `/atemschutz/fuellprotokoll`**, nicht am
+Sammelplatz. Eine Server Action scheitert an der schlechten Verbindung am
+Sammelplatz — genau dem Grund, aus dem dort der Client schreibt. Eine fremde
+Zeile korrigiert man am Schreibtisch.
+
+Die Regel bindet zusätzlich `createdBy` beim Anlegen an den Aufrufer und
+verbietet, es beim Ändern zu verschieben oder sich selbst eine `rechnungId`
+anzuhängen. Ohne das schriebe ein manipulierter Client eine fremde uid hinein
+und sperrte die Zeile für den, der sie zu sehen bekommt.
+
+## Ausdruck, Export und Import des Füllprotokolls
+
+Das Füllprotokoll ist ein Nachweisdokument und muss das Haus verlassen können.
+Drei Wege, mit drei verschiedenen Begründungen, wo sie laufen:
+
+| Weg | läuft | warum dort |
+| --- | --- | --- |
+| **PDF** | Server Action | react-pdf gehört nicht ins Client-Bundle, und der Ausdruck soll den vollen Zeitraum abdecken, nicht nur die geladenen 500 Zeilen |
+| **CSV-Export** | Browser | Die Zeilen stehen schon auf dem Bildschirm; Datum und Uhrzeit gehören in die Ortszeit des Benutzers, und der Server läuft in UTC |
+| **CSV-Import** | zerlegt im Browser, geschrieben auf dem Server | dieselbe Zeitzonenfrage beim Lesen; der Dublettenabgleich braucht dagegen den Bestand |
+
+Der Ausdruck nennt im Kopf **den gedruckten Ausschnitt** — Einsatz, Zweck,
+„nur zu verrechnende" — und den Zeitraum. Ein Blatt, dem man nicht ansieht,
+dass es nur die Übungen eines Monats zeigt, ist als Beleg wertlos. Ohne
+gesetzten Zeitraum steht der der geladenen Zeilen im Kopf und nicht ein
+erfundenes „seit Beginn der Aufzeichnung". Gerendert wird in Teilen zu je 100
+Zeilen und danach zusammengefügt — dieselbe Speicherfalle wie beim
+Fahrtenbuch-Export (#665), nachzulesen in `renderFahrtenbuchPdf.ts`.
+
+**Import und Export teilen sich ein Format**, weil es für den Import keine
+fremde Quelle gibt: Nachgetragen werden Altbestände aus Excel-Listen, die jede
+Wehr anders geführt hat. Statt ein fremdes Layout zu erraten, gibt der Export
+die Vorlage vor — einmal exportieren, Zeilen ergänzen, zurückspielen. Die
+Spaltennamen sind deutscher Klartext und keine Schlüssel: Die Datei wird in
+einer Tabellenkalkulation geöffnet, und dort ist „Enddruck" lesbar und
+`enddruck` nicht. Semikolon und BOM, weil Excel die Datei sonst in einer
+einzigen Spalte öffnet und jeden Umlaut zerlegt.
+
+Der **Dublettenschlüssel** ist Flasche + Feuerwehr + Zeitpunkt auf die
+**Minute**, alles über `normalizeCode` vereinheitlicht. Die Minute, weil die
+Datei nur Minuten trägt — auf die Sekunde verglichen fände ein Reimport nie
+eine Dublette. Bewusst ohne Enddruck und Anzahl: Wer eine Zeile korrigiert und
+die Datei erneut einspielt, will keine zweite daneben. Geprüft wird gegen den
+Bestand *und* innerhalb der Datei, und beim Schreiben noch einmal — der Status
+kommt vom Client, und zwischen Vorschau und Import kann jemand dieselbe Datei
+eingespielt haben.
+
+Der Import setzt **keinen Einsatzbezug**: In der Datei steht nur ein Name, und
+eine geratene Einsatz-ID wäre schlimmer als keine. Der Name bleibt als
+`firecallName` stehen, damit der Nachtrag lesbar ist. Importieren darf nur der
+Gruppen-Admin — Nachtragen ist ein Verwaltungsakt, kein Protokollieren;
+derselbe Zuschnitt wie beim Geräteimport.
+
+**Offen (Punkt 7 aus #761):** Ob und wie die Füllungen nach Sybos übernommen
+werden — über die Chrome-Extension wie beim Einsatzbericht oder als Exportdatei
+zum manuellen Import — ist noch nicht entschieden.
+
 ## Verrechnung der Füllungen
 
 Was `verrechnen` markiert, wird unter `/atemschutz/verrechnung` je Feuerwehr
@@ -352,8 +485,11 @@ schlechter Verbindung.
   `call/{id}/atemschutzAusgabe`): Wer den Einsatz bearbeiten darf, führt hier
   Protokoll. Dafür ist **keine eigene Firestore-Regel nötig** — die bestehende
   `match /{subitem=**}` unter `call/{doc}` deckt jede neue Untersammlung ab.
-- **Füllprotokoll** (`groups/{groupId}/atemschutzFuellung`): lesen *und
-  schreiben* jedes Gruppenmitglied (`fahrtenbuchMember()`). Anders als bei den
+- **Füllprotokoll** (`groups/{groupId}/atemschutzFuellung`): lesen und
+  *anlegen* jedes Gruppenmitglied (`fahrtenbuchMember()`); ändern und löschen
+  nur der Erfasser, der Gruppen-Admin über eine Server Action, und beide nicht
+  mehr nach der Verrechnung — siehe „Wer eine Füllung nachträglich ändern
+  darf". Anders als bei den
   Stammdaten schreibt hier der **Client** und nicht eine Server Action: Am
   Sammelplatz ist die Verbindung schlecht, und Firestore stellt
   Client-Schreibvorgänge offline zurück und spielt sie nach — eine Server

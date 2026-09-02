@@ -34,6 +34,16 @@ export interface UseAtemschutzFuellungenOptions {
    * weiteren Index, und keine Seite fragt beides.
    */
   nurVerrechnen?: boolean;
+  /**
+   * Zeitraum als ISO-Zeitpunkte, beide eingeschlossen.
+   *
+   * Ein Bereich auf `zeitpunkt` — also auf dem Sortierfeld — braucht keinen
+   * weiteren Index: Er läuft mit `firecallId ASC, zeitpunkt DESC` genauso wie
+   * ohne Einsatzfilter. Deshalb steht der Zeitraum serverseitig und nicht wie
+   * der Verrechnen-Filter im Speicher.
+   */
+  von?: string;
+  bis?: string;
 }
 
 export interface UseAtemschutzFuellungenResult {
@@ -49,7 +59,7 @@ export default function useAtemschutzFuellungen(
   groupId?: string,
   options: UseAtemschutzFuellungenOptions = {},
 ): UseAtemschutzFuellungenResult {
-  const { firecallId, nurVerrechnen } = options;
+  const { firecallId, nurVerrechnen, von, bis } = options;
 
   const queryConstraints = useMemo<QueryConstraint[]>(() => {
     const constraints: QueryConstraint[] = [];
@@ -61,9 +71,11 @@ export default function useAtemschutzFuellungen(
     if (nurVerrechnen) {
       constraints.push(where('verrechnen', '==', true));
     }
+    if (von) constraints.push(where('zeitpunkt', '>=', von));
+    if (bis) constraints.push(where('zeitpunkt', '<=', bis));
     constraints.push(orderBy('zeitpunkt', 'desc'), limit(FUELLUNG_LIMIT));
     return constraints;
-  }, [firecallId, nurVerrechnen]);
+  }, [bis, firecallId, nurVerrechnen, von]);
 
   const fuellungen = useFirebaseCollection<AtemschutzFuellung>({
     // Leerer Name heißt: keine Subscription. Ein leeres `pathSegments`
