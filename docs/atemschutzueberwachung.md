@@ -6,7 +6,9 @@ laufend fortgeschriebener Luftvorrat, Rückzugszeitpunkt und Warnungen.
 Code: [src/common/atemschutzUeberwachung.ts](../src/common/atemschutzUeberwachung.ts)
 (die Rechnung), [src/components/Atemschutz/UeberwachungPage.tsx](../src/components/Atemschutz/UeberwachungPage.tsx)
 (die Seite), [src/components/Atemschutz/sendUeberwachungWarnungen.ts](../src/components/Atemschutz/sendUeberwachungWarnungen.ts)
-(der Zeitplan-Lauf).
+(der Lauf, der warnt und den nächsten Termin plant),
+[src/server/atemschutz/ueberwachungTasks.ts](../src/server/atemschutz/ueberwachungTasks.ts)
+(die Terminplanung über Cloud Tasks).
 
 ## Herkunft
 
@@ -242,20 +244,24 @@ schweigt die Überwachung, sobald eine vorliegt.
 hat das Telefon in der Tasche, nicht die Seite offen. Eine Warnung, die nur
 kommt, solange jemand hinsieht, ist für eine Sicherheitsfunktion keine.
 
-### Zwei Wege, und warum beide nötig sind
+### Drei Wege, und warum es alle drei gibt
 
-Gewarnt wird auf **zwei** Wegen, die dasselbe rechnen und sich nicht ersetzen:
+Gewarnt wird auf **drei** Wegen, die dasselbe rechnen und sich nicht ersetzen:
 
-1. **Der Zeitplan** schickt einen Push an die Geräte in `ueberwachungUids` —
-   auch an die, die die Seite geschlossen haben.
-2. **Die offene Seite** zeigt die Warnung selbst an
+1. **Der Termin.** Sobald ein Trupp abmarschiert ist, legt die App eine
+   Cloud-Tasks-Aufgabe auf den Zeitpunkt der nächsten Warnung. Das ist der
+   Hauptweg; der Push geht an die Geräte in `ueberwachungUids`, auch an die mit
+   geschlossener Seite.
+2. **Das Netz.** Ein Zeitplan alle zehn Minuten sucht dieselben Fristen ab und
+   plant fehlende Aufgaben nach — für den Fall, dass gar keine entstanden ist.
+3. **Die offene Seite** zeigt die Warnung selbst an
    ([useUeberwachungHinweise.ts](../src/components/Atemschutz/useUeberwachungHinweise.ts)),
    zusätzlich zur Meldung auf der Karte.
 
-Der zweite Weg ist nachgezogen worden, weil der erste an einer langen Kette
-hängt: Cloud Scheduler, ein registrierter Push-Token, die Erlaubnis des
-Browsers. Fehlt ein Glied, kommt **nichts** — und in der Entwicklung fehlt der
-Zeitplan grundsätzlich, weshalb dort siebzehn Minuten unter Atemschutz keine
+Der dritte Weg ist nachgezogen worden, weil die ersten zwei an einer langen
+Kette hängen: Zeitplan oder Queue, ein registrierter Push-Token, die Erlaubnis
+des Browsers. Fehlt ein Glied, kommt **nichts** — und in der Entwicklung fehlt
+beides grundsätzlich, weshalb dort siebzehn Minuten unter Atemschutz keine
 einzige Meldung ergaben. Die geöffnete Seite rechnet die Fristen ohnehin jede
 Sekunde mit; sie darf das Ergebnis auch sagen.
 
@@ -281,20 +287,72 @@ eines Trupps** geholt: Wer hier einen Trupp anlegt, überwacht ihn ab sofort —
 ohne den zweiten Aufruf hätte ein Trupp, der nie über eine Übernahme lief,
 weder Erlaubnis noch Token.
 
-Der Lauf hängt an Cloud Scheduler
-([terraform/modules/cloud-scheduler](../terraform/modules/cloud-scheduler)) und
-ruft `POST /api/atemschutz/ueberwachung-check` mit einem OIDC-Token auf —
-derselbe Weg und derselbe Invoker-Service-Account wie beim
-Fahrtenbuch-Wochenbericht (dessen Name deshalb historisch „fahrtenbuch" heißt).
+### Die Terminplanung (Cloud Tasks)
 
-Details, die nicht offensichtlich sind:
+Zuerst lief das anders: Cloud Scheduler rief **jede Minute**
+`POST /api/atemschutz/ueberwachung-check` auf. Das war ehrlich gerechnet
+Verschwendung — rund 44.000 Läufe im Monat, die fast immer null Trupps fanden,
+für ein paar Warnungen im Jahr. Die Termine stehen aber fest, sobald ein Trupp
+abmarschiert ist: Drittel, zwei Drittel und der Rückzugszeitpunkt mit Vorlauf
+lassen sich ausrechnen (`naechsteWarnung`). Statt nachzusehen liegt deshalb eine
+Aufgabe auf genau diesem Zeitpunkt
+([ueberwachungTasks.ts](../src/server/atemschutz/ueberwachungTasks.ts)).
 
-- **Jede Minute.** Die Drittelmarken eines Standardgerätes liegen bei rund acht
-  Minuten, die Rückzugswarnung hat drei Minuten Vorlauf; ein Lauf alle fünf
-  Minuten könnte die Vorwarnung um zwei Minuten verpassen. Der Preis: Der Dienst
-  bekommt damit rund um die Uhr eine Anfrage je Minute und skaliert praktisch
-  nicht mehr auf null. Wem das zu teuer wird, stellt `ueberwachung_schedule` um
-  — die Variable ist genau dafür da.
+Beide Aufrufer treffen denselben Endpoint mit einem OIDC-Token **desselben**
+Invoker-Service-Accounts wie der Fahrtenbuch-Wochenbericht (dessen Name deshalb
+historisch „fahrtenbuch" heißt). Die Queue liegt im Modul
+[cloud-scheduler](../terraform/modules/cloud-scheduler), obwohl sie kein
+Scheduler ist: Dort steht das Konto samt seiner `run.invoker`-Bindung, und ein
+eigenes Modul müsste es übergeben oder duplizieren.
+
+Was daran zu wissen ist:
+
+- **Immer nur eine Aufgabe je Trupp.** Die Zeitpunkte verschieben sich, sobald
+  eine Druckabfrage den gemessenen Verbrauch ändert oder der Gerätesatz
+  korrigiert wird. Drei Aufgaben im Voraus wären nach der ersten Meldung drei
+  falsche Termine. Der Lauf zum Termin plant die nächste selbst — die Kette
+  hängt sich damit immer an den aktuellen Stand.
+- **Der Aufgabenname ist die Dublettensperre**
+  (`asue-<truppId>-<warnung>-<terminminute>`). Ein zweiter Aufruf mit demselben
+  Ergebnis läuft in `ALREADY_EXISTS`, und das ist der Regelfall: Jeder
+  Schreibvorgang plant neu. Die Minute und nicht die Sekunde, weil zwei Aufrufe
+  kurz hintereinander denselben Termin mit Millisekundenunterschied ausrechnen.
+- **Ein Termin zu früh ist harmlos, ein Termin zu spät gibt es nicht.**
+  Verschiebt sich eine Frist nach hinten, bleibt die überholte Aufgabe stehen;
+  sie läuft an, findet über `offeneWarnungen` nichts Fälliges und plant nur neu.
+  Ob eine Drittelmarke wirklich zuschlägt, hängt daran, ob bis dahin eine
+  Meldung kommt — das lässt sich nicht vorhersagen und wird deshalb erst zur
+  Laufzeit entschieden.
+- **Der Lauf bleibt ein Rundumblick** über alle Trupps im Einsatz und bearbeitet
+  nicht den Trupp aus der Aufgabe. Der Rumpf der Aufgabe trägt dessen ID nur
+  fürs Log. So repariert jeder Lauf auch das, was eine verlorene Aufgabe
+  hinterlassen hätte.
+- **Geplant wird serverseitig aus dem gelesenen Dokument.** Der Client schreibt
+  direkt in Firestore und ruft danach eine Server Action
+  ([ueberwachungTaskAction.ts](../src/components/Atemschutz/ueberwachungTaskAction.ts));
+  die liest den Trupp selbst nach. Aus seinen Zeiten entsteht der Termin einer
+  Sicherheitswarnung, und den soll der Aufrufer nicht bestimmen können.
+- **Nichts weiter als einen Tag im Voraus.** `abmarschZeit` kommt aus einem
+  Formularfeld; ein vertipptes Datum ergäbe eine Aufgabe, die in Wochen anläuft.
+- **Ohne Queue wird nicht geplant** (`notConfigured`), und das ist kein Fehler:
+  Lokal gibt es keine, und dort warnt die offene Seite. Die beiden
+  Umgebungsvariablen dafür sind `ATEMSCHUTZ_TASKS_QUEUE` und
+  `ATEMSCHUTZ_TASKS_INVOKER`.
+- **Zwei Rechte, nicht eines.** Das Laufzeit-Konto des Dienstes braucht
+  `roles/cloudtasks.enqueuer` an der Queue **und**
+  `roles/iam.serviceAccountUser` am Invoker — ohne das zweite lehnt Cloud Tasks
+  das Anlegen mit `PERMISSION_DENIED` ab, obwohl das Recht an der Queue stimmt.
+- **Die Aufgabe wird wiederholt** (fünf Versuche, 10–60 s Backoff). Der Endpoint
+  ist idempotent, weil jede verschickte Warnung am Dokument vermerkt ist; ein
+  500 aus einem kalten Start darf keine Sicherheitswarnung verschlucken. Der
+  Netz-Zeitplan wiederholt dagegen **nicht** — er kommt in zehn Minuten wieder.
+
+Details des Laufs selbst, die nicht offensichtlich sind:
+
+- **Der Zeitplan ist das Netz, nicht der Hauptweg** (`ueberwachung_schedule`,
+  alle zehn Minuten). Für die Genauigkeit zählt er nicht mehr — der Termin liegt
+  auf die Sekunde. Er fängt den Fall, dass beim Abmarsch gar keine Aufgabe
+  entstanden ist: Funkloch, geschlossene App, ein Fehler in der Queue.
 - **Die Abfrage ist eine Collection-Group-Abfrage** auf `atemschutzTrupp` mit
   `where('status','==','imEinsatz')`. Ein einzelnes Feld, deshalb genügt der
   automatische Index; außerhalb eines Einsatzes liefert sie null Dokumente.
@@ -308,11 +366,13 @@ Details, die nicht offensichtlich sind:
   alle offenen. Ein Gerät, das eine Weile aus war, hätte sonst drei Meldungen
   gleichzeitig, und die wichtigste ginge zwischen zwei Erinnerungen unter.
 - **Ohne Empfänger wird nichts vermerkt.** Ein Gerät, das sich später
-  registriert, soll die Warnung noch bekommen; der Lauf kommt in einer Minute
-  ohnehin wieder und kostet ohne Empfänger nichts.
+  registriert, soll die Warnung noch bekommen; der nächste Lauf kostet ohne
+  Empfänger nichts.
 - **Die Buchführung steht am Dokument** (`warnungen.<key>`, per Punktpfad
   geschrieben, damit die anderen Einträge unberührt bleiben). Ohne sie käme jede
-  Warnung sechzigmal je Stunde erneut.
+  Warnung mit jedem Lauf erneut — und sie entscheidet zugleich, welcher Termin
+  als nächster geplant wird. Deshalb trägt der Lauf den Vermerk auch am
+  gelesenen Objekt nach, bevor er plant.
 - **Die Empfängerliste ist eine Sicherheitsgrenze.** `ueberwachungUids` steht am
   Trupp-Dokument, und schreiben darf sie jeder, der am Einsatz schreiben darf
   (`call/{id}/{subitem=**}` in den Firestore-Regeln) — einschließlich eines
@@ -331,8 +391,8 @@ Details, die nicht offensichtlich sind:
   hinaus — bei einer Sicherheitsfunktion die falsche Richtung. Kam nichts durch,
   bleibt die Warnung offen.
 - **Verschickt und nicht vermerkt ist ein eigener Zustand** (`sentUnrecorded`).
-  Scheitert der Vermerk *nach* erfolgreichem Versand, geht die Warnung in einer
-  Minute erneut hinaus; als `failed` gemeldet sähe genau das wie „nie
+  Scheitert der Vermerk *nach* erfolgreichem Versand, geht die Warnung beim
+  nächsten Lauf erneut hinaus; als `failed` gemeldet sähe genau das wie „nie
   verschickt" aus und die Wiederholung wäre nicht erklärbar.
 - **Der Lauf rechnet ohne die Bestandsvorgabe.** `berechneStand` fällt dort auf
   den Standard-Pressluftatmer zurück, während die Seite den häufigsten Satz aus

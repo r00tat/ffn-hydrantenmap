@@ -59,6 +59,7 @@ import { buildFuellungDocument } from './fuellungErfassung';
 import AusruestungTab from './AusruestungTab';
 import FuellprotokollTab from './FuellprotokollTab';
 import TruppsTab from './TruppsTab';
+import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
 
 export default function AtemschutzPage() {
   const t = useTranslations('atemschutz');
@@ -237,6 +238,12 @@ export default function AtemschutzPage() {
       await updateTrupp(firecallId, trupp.id, patch, {
         userId: actor.userId,
         now: new Date().toISOString(),
+      });
+      // Auch ein am Sammelplatz entsendeter Trupp braucht den Termin seiner
+      // ersten Warnung: Die Zeitkontrolle führt der Gruppenkommandant, der
+      // Abmarsch wird aber hier erfasst.
+      await planeUeberwachungWarnung(firecallId, trupp.id).catch((err) => {
+        console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
       });
     },
     [actor.userId, firecallId],

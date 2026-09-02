@@ -6,25 +6,39 @@ import cronRequired from '../../../../server/auth/cronRequired';
 import { ApiException } from '../../errors';
 
 /**
- * Die Fristenprüfung der Atemschutzüberwachung, angestoßen von Cloud Scheduler
- * jede Minute.
+ * Die Fristenprüfung der Atemschutzüberwachung.
  *
  * Ein Route Handler und keine Server Action: Aufrufer ist kein Browser mit
- * Session, sondern ein Zeitplan mit OIDC-Token — dieselbe Bauweise wie beim
- * Fahrtenbuch-Wochenbericht.
+ * Session, sondern eine Cloud-Tasks-Aufgabe oder ein Zeitplan mit OIDC-Token —
+ * dieselbe Bauweise wie beim Fahrtenbuch-Wochenbericht, und beide Aufrufer
+ * tragen das Token desselben Invoker-Service-Accounts.
  *
- * **Jede Minute** und nicht seltener: Die Drittelmarken eines Standardgerätes
- * liegen bei rund acht Minuten, der Rückzugszeitpunkt wird mit drei Minuten
- * Vorlauf gemeldet. Ein Lauf alle fünf Minuten könnte die Vorwarnung um zwei
- * Minuten verpassen, und das ist genau die Zeit, um die es geht. Der Lauf
- * selbst ist billig: Er liest die Trupps mit Zustand `imEinsatz`, und das sind
- * außerhalb eines Einsatzes null Dokumente.
+ * **Zwei Aufrufer, ein Endpoint:**
+ *
+ * - Eine **Cloud-Tasks-Aufgabe** zum berechneten Termin — der Hauptweg. Die
+ *   App legt sie an, sobald ein Trupp abmarschiert ist oder eine Druckabfrage
+ *   die Fristen verschiebt (`planeUeberwachungTask`).
+ * - Ein **seltener Zeitplan** als Netz: Bricht der Browser nach dem Schreiben
+ *   ab, entsteht keine Aufgabe, und ohne den Lauf wartete niemand mehr.
+ *
+ * Der Lauf ist in beiden Fällen derselbe Rundumblick über alle Trupps im
+ * Einsatz — er verschickt Fälliges und plant den nächsten Termin nach. Damit
+ * repariert der Netz-Lauf genau das, was eine verlorene Aufgabe hinterlässt.
  */
 
 interface CheckBody {
   dryRun?: boolean;
   /** ISO-Zeitpunkt für einen Nachlauf von Hand. Ohne Angabe gilt jetzt. */
   jetzt?: string;
+  /**
+   * Nur fürs Log: Die Aufgabe schreibt hinein, für welchen Trupp sie gedacht
+   * war. Der Lauf prüft ohnehin alle — eine Zielangabe würde ihn nur enger
+   * machen, als er sein soll.
+   */
+  quelle?: string;
+  firecallId?: string;
+  truppId?: string;
+  warnung?: string;
 }
 
 /**
@@ -70,6 +84,13 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await readBody(req);
+  if (body.quelle === 'task') {
+    // Ohne diese Zeile lässt sich im Log nicht unterscheiden, ob eine Warnung
+    // aus einem Termin oder aus dem Netz-Lauf kam.
+    console.info(
+      `Atemschutzüberwachung: Termin für ${body.firecallId}/${body.truppId} (${body.warnung})`,
+    );
+  }
   const jetzt = body.jetzt ? new Date(body.jetzt) : undefined;
   if (jetzt && Number.isNaN(jetzt.getTime())) {
     return NextResponse.json({ error: 'invalidJetzt' }, { status: 400 });

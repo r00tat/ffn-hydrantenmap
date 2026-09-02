@@ -13,6 +13,10 @@ import {
   offeneWarnungen,
   berechneStand,
 } from '../../common/atemschutzUeberwachung';
+import {
+  planeUeberwachungTask,
+  type TaskErgebnis,
+} from '../../server/atemschutz/ueberwachungTasks';
 import { firestore } from '../../server/firebase/admin';
 import type { Firecall } from '../firebase/firestore';
 import {
@@ -25,7 +29,8 @@ import {
 } from './ueberwachungPushModel';
 
 /**
- * Der Zeitplan-Lauf der Atemschutzüberwachung.
+ * Der Lauf der Atemschutzüberwachung: verschicken, was fällig ist, und den
+ * nächsten Termin planen.
  *
  * **Warum serverseitig und nicht im Browser:** Die Drittel-Regel und der
  * Rückzugszeitpunkt sind Vorschrift („hat die mit der Atemschutzüberwachung
@@ -34,6 +39,16 @@ import {
  * kommt, solange jemand hinsieht, ist für eine Sicherheitsfunktion keine.
  * Clientseitig zeigt die Karte die Warnung zusätzlich an — das ersetzt den Push
  * nicht, sondern kommt ihm nur zuvor.
+ *
+ * **Wer den Lauf auslöst:** Eine Cloud-Tasks-Aufgabe zum berechneten Termin
+ * (`planeUeberwachungTask`) und, als Netz, ein seltener Zeitplan. Deshalb
+ * plant jeder Lauf am Ende die nächste Aufgabe je Trupp — die Kette hängt sich
+ * damit immer an den aktuellen Stand, auch wenn eine Druckabfrage den
+ * Rückzugszeitpunkt verschoben hat.
+ *
+ * Der Lauf bleibt bewusst ein **Rundumblick** über alle Trupps im Einsatz und
+ * nicht die Bearbeitung eines Trupps aus der Aufgabe: Damit repariert jeder
+ * Lauf auch das, was eine verlorene Aufgabe hinterlassen hätte.
  *
  * Getrennt vom Route Handler, damit Reihenfolge und Fehlerverhalten ohne HTTP
  * prüfbar sind — dieselbe Aufteilung wie bei `sendWeeklyReports`.
@@ -75,10 +90,18 @@ export interface SendUeberwachungWarnungenOptions {
   uhrzeit: (iso: string) => string;
 }
 
+/** Was für einen Trupp als nächstes eingeplant wurde. */
+export interface TaskPlanung extends TaskErgebnis {
+  firecallId: string;
+  truppId: string;
+}
+
 export interface SendUeberwachungWarnungenResult {
   /** Trupps mit Status `imEinsatz`, die geprüft wurden. */
   geprueft: number;
   results: WarnungResult[];
+  /** Die Termine, die dieser Lauf für die nächste Warnung gelegt hat. */
+  tasks: TaskPlanung[];
 }
 
 /**
@@ -143,6 +166,12 @@ export async function sendUeberwachungWarnungen({
   const results: WarnungResult[] = [];
   // Ein Einsatz trägt mehrere Trupps; sein Name wird einmal gelesen.
   const firecalls = new Map<string, Firecall | undefined>();
+  /**
+   * Die Trupps, für die am Ende ein Termin geplant wird — **alle** im Einsatz,
+   * nicht nur die mit einer fälligen Warnung. Genau die ohne fällige Warnung
+   * brauchen den nächsten Termin.
+   */
+  const zuPlanen: { firecallId: string; trupp: AtemschutzTrupp }[] = [];
 
   for (const doc of snap.docs) {
     const firecallRef = doc.ref.parent.parent;
@@ -166,6 +195,8 @@ export async function sendUeberwachungWarnungen({
     // Ein gelöschter Einsatz wird nicht mehr überwacht. Dass ein Trupp darin
     // noch auf `imEinsatz` steht, heißt nur, dass niemand ihn eingerückt hat.
     if (!firecall || firecall.deleted === true) continue;
+
+    zuPlanen.push({ firecallId, trupp });
 
     const offen = offeneWarnungen(trupp, jetzt);
     if (offen.length === 0) continue;
@@ -264,6 +295,15 @@ export async function sendUeberwachungWarnungen({
       );
       try {
         await doc.ref.update(vermerke);
+        // Auch am gelesenen Objekt nachtragen: Aus ihm wird gleich der nächste
+        // Termin bestimmt, und ohne den Nachtrag plante der Lauf die eben
+        // verschickte Warnung noch einmal.
+        trupp.warnungen = {
+          ...trupp.warnungen,
+          ...Object.fromEntries(
+            offen.map((w) => [w.key, jetzt.toISOString()]),
+          ),
+        };
         results.push({ ...basis, status: 'sent' });
       } catch (err) {
         // Verschickt, aber nicht vermerkt. Getrennt gemeldet, weil sonst genau
@@ -295,5 +335,24 @@ export async function sendUeberwachungWarnungen({
     }
   }
 
-  return { geprueft: snap.size, results };
+  // Die Termine zuletzt und in einer eigenen Runde: Erst nach den Vermerken
+  // steht fest, welche Warnung als nächste ansteht. Ein `dryRun` legt nichts an
+  // — er soll nachsehen, nicht die Queue füllen.
+  const tasks: TaskPlanung[] = [];
+  if (!dryRun) {
+    for (const { firecallId, trupp } of zuPlanen) {
+      const ergebnis = await planeUeberwachungTask({
+        firecallId,
+        trupp,
+        jetzt,
+      });
+      tasks.push({
+        firecallId,
+        truppId: trupp.id as string,
+        ...ergebnis,
+      });
+    }
+  }
+
+  return { geprueft: snap.size, results, tasks };
 }

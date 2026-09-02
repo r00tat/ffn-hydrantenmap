@@ -25,6 +25,22 @@ locals {
     for suffix in ["", "-dev"] :
     "fahrtenbuch-report-invoker${suffix}@${var.project}.iam.gserviceaccount.com"
   ])
+
+  # Die Warteschlange der Atemschutz-Termine. Name und Pfad stehen hier, weil
+  # **beide** Seiten sie brauchen: das Modul legt die Queue an, der Dienst liest
+  # ihren Pfad aus der Umgebung. Aus einem Modul-Output gelesen ergäbe das
+  # denselben Zyklus wie bei `cron_invoker_emails` — der Dienst hängt am Wert,
+  # die Queue an der URL des Dienstes.
+  ueberwachung_queue = "atemschutz-ueberwachung-dev"
+  ueberwachung_queue_path = join("/", [
+    "projects", var.project,
+    "locations", var.run_region,
+    "queues", local.ueberwachung_queue,
+  ])
+
+  # Der Invoker dieser Umgebung — dasselbe Konto, mit dem auch der Zeitplan
+  # aufruft, und damit auf `cron_invoker_emails`.
+  ueberwachung_invoker = "fahrtenbuch-report-invoker-dev@${var.project}.iam.gserviceaccount.com"
 }
 
 # Die Projekt-Basis liegt in terraform/projects/ffn-utils. Dieser Root hat
@@ -86,6 +102,12 @@ module "cloud_run" {
     GOOGLE_CLOUD_PROJECT  = var.project
     CRON_INVOKER_EMAILS   = local.cron_invoker_emails
 
+    # Termine der Atemschutzwarnungen. Ohne diese beiden Werte plant der Dienst
+    # nichts und verlässt sich auf den Zeitplan als Netz — genau der Zustand in
+    # der lokalen Entwicklung. Siehe docs/atemschutzueberwachung.md.
+    ATEMSCHUTZ_TASKS_QUEUE   = local.ueberwachung_queue_path
+    ATEMSCHUTZ_TASKS_INVOKER = local.ueberwachung_invoker
+
     # NEXT_PUBLIC_* landen beim Build fest im Bundle; zur Laufzeit stehen sie
     # hier nur, weil der Server dieselben Werte für seine eigenen Aufrufe liest.
     NEXT_PUBLIC_FIREBASE_APIKEY = var.firebase_config
@@ -125,6 +147,12 @@ module "cloud_scheduler" {
   # einsatz-dev.ffnd.at, und `getBaseUrl()` leitet die erwartete Audience aus
   # dem Host des Requests ab. Ein Token auf die run.app-URL passte nicht dazu.
   service_url = var.public_url
+
+  # Die Queue, in die der Dienst seine Termine legt, und das Konto, das sie
+  # anlegt. Der Name kommt aus demselben local wie ATEMSCHUTZ_TASKS_QUEUE, damit
+  # Dienst und Queue nicht auseinanderlaufen können.
+  tasks_queue_name             = local.ueberwachung_queue
+  caller_service_account_email = "${var.run_sa}@${var.project}.iam.gserviceaccount.com"
 
   # Dev und Prod teilen das Projekt ffn-utils. Ohne eigenes Suffix legten beide
   # Roots denselben Service Account und denselben Job an, und der zweite apply

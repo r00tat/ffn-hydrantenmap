@@ -550,6 +550,55 @@ export function offeneWarnungen(
   return faelligeWarnungen(trupp, jetzt, opts).filter((w) => !verschickt[w.key]);
 }
 
+export interface WarnungPlan {
+  key: WarnungKey;
+  /** Ab wann sie fällig wird (ISO) — kann in der Vergangenheit liegen. */
+  faelligAb: string;
+}
+
+/**
+ * Die **nächste** Warnung dieses Trupps und wann sie fällig wird.
+ *
+ * Grundlage der Terminplanung: Statt jede Minute nachzusehen, wird zu genau
+ * diesem Zeitpunkt eine Aufgabe eingeplant (Cloud Tasks, siehe
+ * `docs/atemschutzueberwachung.md`).
+ *
+ * Gefiltert wird nur nach dem, was **jetzt schon feststeht** — den bereits
+ * verschickten Warnungen. Ob eine Drittelmarke wirklich zuschlägt, hängt daran,
+ * ob bis dahin eine Meldung kommt, und das lässt sich nicht vorhersagen. Diese
+ * Frage entscheidet erst der Lauf zum Termin (`offeneWarnungen`); kommt er zu
+ * früh, schickt er nichts und plant die nächste.
+ *
+ * Ein Termin in der Vergangenheit ist kein Fehler, sondern die Aussage „das ist
+ * schon fällig" — etwa bei einem nachgetragenen Abmarsch. Der Aufrufer plant
+ * dann auf jetzt.
+ */
+export function naechsteWarnung(
+  trupp: OffeneWarnungsEingabe,
+  jetzt: Date,
+  opts: WarnungOptionen = {},
+): WarnungPlan | undefined {
+  if (trupp.status !== 'imEinsatz') return undefined;
+  const stand = berechneStand(trupp, jetzt, opts);
+  if (!stand) return undefined;
+
+  const verschickt = trupp.warnungen ?? {};
+  const vorlauf = opts.vorlaufMin ?? RUECKZUG_VORLAUF_MIN;
+  const kandidaten: WarnungPlan[] = [
+    { key: 'drittel' as const, faelligAb: stand.drittelZeit },
+    { key: 'zweiDrittel' as const, faelligAb: stand.zweiDrittelZeit },
+    {
+      key: 'rueckzug' as const,
+      faelligAb: new Date(
+        zeit(stand.rueckzugZeit) - vorlauf * 60_000,
+      ).toISOString(),
+    },
+  ].filter((k) => !verschickt[k.key] && Number.isFinite(zeit(k.faelligAb)));
+
+  kandidaten.sort((a, b) => zeit(a.faelligAb) - zeit(b.faelligAb));
+  return kandidaten[0];
+}
+
 /**
  * Die dringlichste aus einer Liste fälliger Warnungen.
  *

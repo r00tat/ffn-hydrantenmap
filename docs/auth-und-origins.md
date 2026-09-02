@@ -45,7 +45,12 @@ Issuer und in der Discovery steht — eine Quelle für alle.
 
 `CRON_INVOKER_EMAILS` ist eine komma-separierte Allowlist der
 Service-Account-Adressen, die zeitplan-gesteuerte Endpoints aufrufen dürfen
-(aktuell `/api/fahrtenbuch/weekly-report`). **Pflicht für diese Endpoints:**
+(`/api/fahrtenbuch/weekly-report` und `/api/atemschutz/ueberwachung-check`).
+Beim Atemschutz ruft nicht nur Cloud Scheduler an, sondern auch eine
+Cloud-Tasks-Aufgabe zum berechneten Termin — mit dem OIDC-Token desselben
+Kontos, die Allowlist gilt also unverändert (siehe
+[atemschutzueberwachung.md](atemschutzueberwachung.md)).
+**Pflicht für diese Endpoints:**
 Ohne die Variable lehnt `cronRequired` jeden Aufruf ab (fail closed) — ein
 offener Endpoint, der Mails an gepflegte Verteilerlisten verschickt, wäre ein
 Mail-Relay. In Cloud Run setzt terraform den Wert als Env-Var des Dienstes

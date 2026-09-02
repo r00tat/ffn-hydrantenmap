@@ -18,6 +18,7 @@ import {
   gesamtVolumenLiter,
   korrekturfaktor,
   nutzbareLuftLiter,
+  naechsteWarnung,
   offeneWarnungen,
   rechnerischeEinsatzdauerMin,
   reserveLuftLiter,
@@ -469,6 +470,96 @@ describe('offeneWarnungen', () => {
     expect(
       offeneWarnungen(basis, nachAbmarsch(10)).map((w) => w.key),
     ).toEqual(['drittel']);
+  });
+});
+
+describe('naechsteWarnung', () => {
+  const basis = trupp({
+    paTyp: 'standard300',
+    abmarschZeit: ABMARSCH,
+    druckAbmarsch: 300,
+  });
+
+  it('nennt beim Abmarsch die Drittelmarke als nächsten Termin', () => {
+    // 1×6 l / 300 bar → 25,8 min rechnerisch, ein Drittel bei 8,6 min.
+    const plan = naechsteWarnung(basis, nachAbmarsch(0));
+    expect(plan?.key).toBe('drittel');
+    expect(
+      (new Date(plan?.faelligAb as string).getTime() -
+        new Date(ABMARSCH).getTime()) /
+        60_000,
+    ).toBeCloseTo(8.6, 1);
+  });
+
+  it('überspringt eine verschickte Warnung', () => {
+    const plan = naechsteWarnung(
+      trupp({ ...basis, warnungen: { drittel: nachAbmarsch(9).toISOString() } }),
+      nachAbmarsch(10),
+    );
+    expect(plan?.key).toBe('zweiDrittel');
+  });
+
+  it('plant den Rückzug mit Vorlauf, wenn die Erinnerungen erledigt sind', () => {
+    const plan = naechsteWarnung(
+      trupp({
+        ...basis,
+        warnungen: {
+          drittel: nachAbmarsch(9).toISOString(),
+          zweiDrittel: nachAbmarsch(18).toISOString(),
+        },
+      }),
+      nachAbmarsch(19),
+    );
+    expect(plan?.key).toBe('rueckzug');
+    // Ohne Ankunftsmeldung gilt die Restdruckwarnung bei 55 bar. Sie liegt bei
+    // 26,5 min (fortgeschrieben aus dem Druck, s. „Der Reservedruck ist nicht
+    // korrigiert"), abzüglich drei Minuten Vorlauf.
+    expect(
+      (new Date(plan?.faelligAb as string).getTime() -
+        new Date(ABMARSCH).getTime()) /
+        60_000,
+    ).toBeCloseTo(23.5, 1);
+  });
+
+  it('nennt einen bereits fälligen Termin in der Vergangenheit', () => {
+    // Ein nachgetragener Abmarsch: Der Termin ist vorbei, die Warnung noch
+    // offen — der Aufrufer plant dann auf jetzt.
+    const plan = naechsteWarnung(basis, nachAbmarsch(12));
+    expect(plan?.key).toBe('drittel');
+    expect(new Date(plan?.faelligAb as string).getTime()).toBeLessThan(
+      nachAbmarsch(12).getTime(),
+    );
+  });
+
+  it('plant nichts für einen Trupp, der nicht im Einsatz ist', () => {
+    expect(
+      naechsteWarnung(trupp({ ...basis, status: 'zurueck' }), nachAbmarsch(1)),
+    ).toBeUndefined();
+  });
+
+  it('plant nichts ohne Abmarschzeit', () => {
+    expect(
+      naechsteWarnung(
+        trupp({ ...basis, abmarschZeit: undefined }),
+        nachAbmarsch(1),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('plant nichts, wenn alle drei verschickt sind', () => {
+    expect(
+      naechsteWarnung(
+        trupp({
+          ...basis,
+          warnungen: {
+            drittel: ABMARSCH,
+            zweiDrittel: ABMARSCH,
+            rueckzug: ABMARSCH,
+          },
+        }),
+        nachAbmarsch(25),
+      ),
+    ).toBeUndefined();
   });
 });
 

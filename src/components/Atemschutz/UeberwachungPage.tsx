@@ -57,6 +57,7 @@ import UeberwachungCard from './UeberwachungCard';
 import UeberwachungDialog, {
   type UeberwachungEingabe,
 } from './UeberwachungDialog';
+import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
 import useUeberwachungHinweise from './useUeberwachungHinweise';
 
 /** „Alle Trupps" im Einheitenfilter. */
@@ -243,6 +244,23 @@ export default function UeberwachungPage() {
     [uid],
   );
 
+  /**
+   * Den Termin der nächsten Warnung neu planen (Cloud Tasks, serverseitig).
+   *
+   * Nach jedem Schreibvorgang, der die Fristen verschiebt — der Client schreibt
+   * direkt in Firestore, der Server bekommt das sonst nicht mit. Fehler bleiben
+   * im Log: Der Zeitplan ist das Netz darunter, und diese Seite warnt selbst.
+   */
+  const planeWarnung = useCallback(
+    async (truppId?: string) => {
+      if (!truppId || !hatEinsatz) return;
+      await planeUeberwachungWarnung(firecallId, truppId).catch((err) => {
+        console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
+      });
+    },
+    [firecallId, hatEinsatz],
+  );
+
   const handleSaveTrupp = useCallback(
     async (input: TruppInput, trupp?: AtemschutzTrupp) => {
       const stamp = actorNow();
@@ -310,8 +328,11 @@ export default function UeberwachungPage() {
       await registerMessaging().catch((err) => {
         console.warn('Push-Registrierung fehlgeschlagen', err);
       });
+      // Ein anderer Gerätesatz heißt eine andere rechnerische Einsatzdauer und
+      // damit andere Fristen.
+      await planeWarnung(trupp.id);
     },
-    [actorNow, firecallId, registerMessaging],
+    [actorNow, firecallId, planeWarnung, registerMessaging],
   );
 
   const handleDruckabfrage = useCallback(
@@ -324,8 +345,11 @@ export default function UeberwachungPage() {
         buildDruckabfrage(input, { uid: stamp.userId, jetzt: stamp.now }),
         stamp,
       );
+      // Der gemessene Verbrauch verschiebt den Rückzugszeitpunkt, und eine
+      // Meldung erledigt die nächste Drittelmarke.
+      await planeWarnung(trupp.id);
     },
-    [actorNow, firecallId],
+    [actorNow, firecallId, planeWarnung],
   );
 
   const handleGeraete = useCallback(
@@ -350,7 +374,7 @@ export default function UeberwachungPage() {
       // Eine *neue* Zeile und kein Wechsel zurück nach `imEinsatz`: Die alte
       // Bereitstellung ist der Nachweis über den ersten Einsatz — mit ihren
       // Drücken, ihren Abfragen und ihrer Rückkehrzeit.
-      await addTrupp(
+      const id = await addTrupp(
         firecallId,
         erneuterEinsatz({
           vorherige: trupp,
@@ -360,8 +384,9 @@ export default function UeberwachungPage() {
         }),
         stamp,
       );
+      await planeWarnung(id);
     },
-    [actorNow, firecallId],
+    [actorNow, firecallId, planeWarnung],
   );
 
   const handleAnSammelplatz = useCallback(
@@ -387,8 +412,11 @@ export default function UeberwachungPage() {
       // und wer eine Sekunde später drückt, arbeitet auf einem überholten Zustand.
       if (!trupp.id || !canTransition(trupp.status, patch.status)) return;
       await updateTrupp(firecallId, trupp.id, patch, actorNow());
+      // Beim Abmarsch entstehen die Fristen überhaupt erst; bei der Rückkehr
+      // fällt der Termin weg, und die Planung meldet das mit `nothingDue`.
+      await planeWarnung(trupp.id);
     },
-    [actorNow, firecallId],
+    [actorNow, firecallId, planeWarnung],
   );
 
   const karte = (trupp: AtemschutzTrupp) => (

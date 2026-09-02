@@ -466,9 +466,13 @@ Required environment variables (see `.env.local`):
   Origins; ohne sie gilt `NEXTAUTH_URL` plus localhost. Siehe
   [docs/auth-und-origins.md](docs/auth-und-origins.md).
 - `CRON_INVOKER_EMAILS` — Allowlist der Service-Account-Adressen, die
-  zeitplan-gesteuerte Endpoints aufrufen dürfen. **Pflicht:** ohne die Variable
-  lehnt `cronRequired` jeden Aufruf ab (fail closed). Siehe
-  [docs/auth-und-origins.md](docs/auth-und-origins.md).
+  zeitplan-gesteuerte Endpoints aufrufen dürfen (auch die Aufrufe aus Cloud
+  Tasks). **Pflicht:** ohne die Variable lehnt `cronRequired` jeden Aufruf ab
+  (fail closed). Siehe [docs/auth-und-origins.md](docs/auth-und-origins.md).
+- `ATEMSCHUTZ_TASKS_QUEUE`, `ATEMSCHUTZ_TASKS_INVOKER` (optional) — Queue-Pfad
+  und OIDC-Konto für die Termine der Atemschutzwarnungen. Ohne sie wird nichts
+  geplant und es bleibt beim Netz-Zeitplan; lokal der Normalfall. Siehe
+  [docs/atemschutzueberwachung.md](docs/atemschutzueberwachung.md).
 - `CRON_OIDC_AUDIENCE` (optional) — erwartete Audience des OIDC-Tokens. Ohne
   Angabe gilt `getBaseUrl()`. Nötig, wenn Cloud Scheduler auf die
   `run.app`-URL zeigt, die App aber unter der Custom Domain läuft.

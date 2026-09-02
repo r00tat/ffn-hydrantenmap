@@ -3,8 +3,9 @@ import type { AtemschutzTrupp } from '../../common/atemschutz';
 
 vi.mock('server-only', () => ({}));
 
-const { sendMock, state } = vi.hoisted(() => ({
+const { sendMock, planeMock, state } = vi.hoisted(() => ({
   sendMock: vi.fn(),
+  planeMock: vi.fn(),
   state: {
     trupps: [] as { id: string; firecallId: string; data: AtemschutzTrupp }[],
     firecalls: {} as Record<string, Record<string, unknown> | undefined>,
@@ -21,6 +22,10 @@ const { sendMock, state } = vi.hoisted(() => ({
 
 vi.mock('firebase-admin/messaging', () => ({
   getMessaging: () => ({ sendEachForMulticast: sendMock }),
+}));
+
+vi.mock('../../server/atemschutz/ueberwachungTasks', () => ({
+  planeUeberwachungTask: planeMock,
 }));
 
 vi.mock('../../server/firebase/admin', () => {
@@ -109,6 +114,8 @@ beforeEach(() => {
   state.getAllFehler = undefined;
   sendMock.mockReset();
   sendMock.mockResolvedValue({ successCount: 2, failureCount: 0 });
+  planeMock.mockReset();
+  planeMock.mockResolvedValue({ status: 'planned' });
 });
 
 describe('sendUeberwachungWarnungen', () => {
@@ -129,6 +136,51 @@ describe('sendUeberwachungWarnungen', () => {
       'warnungen.rueckzug',
       'warnungen.zweiDrittel',
     ]);
+  });
+
+  it('plant den nächsten Termin mit dem eben geschriebenen Vermerk', async () => {
+    state.trupps = [{ id: 't1', firecallId: 'f1', data: trupp() }];
+
+    const result = await sendUeberwachungWarnungen(optionen);
+
+    expect(result.tasks).toHaveLength(1);
+    expect(planeMock).toHaveBeenCalledTimes(1);
+    // Ohne den Nachtrag am gelesenen Objekt plante der Lauf genau die Warnung
+    // erneut, die er gerade verschickt hat.
+    expect(planeMock.mock.calls[0][0].trupp.warnungen).toMatchObject({
+      drittel: expect.any(String),
+      zweiDrittel: expect.any(String),
+      rueckzug: expect.any(String),
+    });
+  });
+
+  it('plant auch für einen Trupp ohne fällige Warnung', async () => {
+    // Genau dieser Trupp braucht den Termin: Er ist gerade abmarschiert.
+    state.trupps = [
+      {
+        id: 't1',
+        firecallId: 'f1',
+        data: trupp({ abmarschZeit: JETZT.toISOString() }),
+      },
+    ];
+
+    const result = await sendUeberwachungWarnungen(optionen);
+
+    expect(result.results).toHaveLength(0);
+    expect(result.tasks).toHaveLength(1);
+    expect(planeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('legt im dryRun keine Aufgabe an', async () => {
+    state.trupps = [{ id: 't1', firecallId: 'f1', data: trupp() }];
+
+    const result = await sendUeberwachungWarnungen({
+      ...optionen,
+      dryRun: true,
+    });
+
+    expect(result.tasks).toHaveLength(0);
+    expect(planeMock).not.toHaveBeenCalled();
   });
 
   it('schweigt, wenn die Warnung schon verschickt wurde', async () => {
