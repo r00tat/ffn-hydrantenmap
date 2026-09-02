@@ -64,7 +64,7 @@ describe('foerderungView', () => {
     expect(view?.warnings).not.toContain('noElevationData');
     // 1000 l/min in B 75 sind 1,50 bar je 100 m.
     expect(view?.frictionPer100m).toBeCloseTo(1.5, 6);
-    expect(view?.frictionTabulated).toBe(true);
+    expect(view?.frictionBreakdown?.source).toBe('table');
     expect(view?.result?.verstaerkerpumpen).toBeGreaterThan(0);
   });
 
@@ -120,7 +120,7 @@ describe('foerderungView', () => {
 
   it('kennzeichnet einen abgeleiteten Reibungswert', () => {
     const view = foerderungView(flach({ dimension: 'A' }));
-    expect(view?.frictionTabulated).toBe(false);
+    expect(view?.frictionBreakdown?.source).toBe('derived');
     expect(view?.frictionPer100m).toBeDefined();
   });
 

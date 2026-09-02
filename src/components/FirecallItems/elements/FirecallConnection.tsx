@@ -28,6 +28,9 @@ export class FirecallConnection extends FirecallMultiPoint {
   pumpenEingangsdruck?: number;
   pumpenNennstrom?: number;
   paralleleLeitungen?: number;
+  frictionModel?: Connection['frictionModel'];
+  rauheit?: number;
+  kupplungsverlust?: number;
   hoehenunterschied?: number;
   elevationProfile?: string;
   elevationFor?: string;
@@ -66,6 +69,9 @@ export class FirecallConnection extends FirecallMultiPoint {
         pumpenEingangsdruck: this.pumpenEingangsdruck,
         pumpenNennstrom: this.pumpenNennstrom,
         paralleleLeitungen: this.paralleleLeitungen,
+        frictionModel: this.frictionModel,
+        rauheit: this.rauheit,
+        kupplungsverlust: this.kupplungsverlust,
         hoehenunterschied: this.hoehenunterschied,
         elevationProfile: this.elevationProfile,
         elevationFor: this.elevationFor,
@@ -152,6 +158,9 @@ export class FirecallConnection extends FirecallMultiPoint {
       pumpenEingangsdruck: this.pumpenEingangsdruck,
       pumpenNennstrom: this.pumpenNennstrom,
       paralleleLeitungen: this.paralleleLeitungen,
+      frictionModel: this.frictionModel,
+      rauheit: this.rauheit,
+      kupplungsverlust: this.kupplungsverlust,
       hoehenunterschied: this.hoehenunterschied,
       elevationProfile: this.elevationProfile,
       elevationFor: this.elevationFor,

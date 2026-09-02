@@ -622,6 +622,167 @@ describe('LoeschwasserfoerderungPanel', () => {
     ).toHaveValue(100);
   });
 
+  it('stellt den Querschnitt im Panel um und rechnet die Pumpen neu', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    const vorher = pumpCount();
+    await user.click(screen.getByRole('button', { name: 'C 52' }));
+
+    // C 52 hat den 6,24-fachen Reibungsverlust von B 75 — die Pumpenzahl muss
+    // steigen, sonst wirkt der Regler nicht auf die Rechnung.
+    expect(pumpCount()).toBeGreaterThan(vorher);
+  });
+
+  it('trägt den Querschnitt kanonisch ans Element', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'C 52' }));
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+
+    // Der Buchstabe allein, weil 52 mm der Standardwert von C ist — „62
+    // C-Längen" soll sich im Popup weiter richtig lesen.
+    expect(updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ dimension: 'C' })
+    );
+  });
+
+  it('schreibt einen abweichenden Durchmesser ausgeschrieben', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'C 52' }));
+    const mm = screen.getByRole('spinbutton', { name: /Innendurchmesser/ });
+    await user.clear(mm);
+    await user.type(mm, '42');
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+
+    expect(updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ dimension: 'C 42' })
+    );
+  });
+
+  it('macht eine unlesbare Dimension im Panel behebbar', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile({ dimension: 'Storz' })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    // Kein Knopf gewählt, und das mm-Feld gesperrt: Es wird nicht geraten.
+    expect(screen.getByRole('button', { name: 'B 75' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(
+      screen.getByRole('spinbutton', { name: /Innendurchmesser/ })
+    ).toBeDisabled();
+
+    // Bisher war die Warnung eine Sackgasse — ein Knopfdruck behebt sie jetzt.
+    await user.click(screen.getByRole('button', { name: 'B 75' }));
+    expect(
+      screen.queryByText(/kein Reibungsverlust bekannt/)
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Verstärkerpumpen?$/)).toBeInTheDocument();
+  });
+
+  it('rechnet die Schlauchzahl aus der eingestellten Schlauchlänge', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    // 2000 m in 20-m-Schläuchen sind 100 Stück, in 40-m-Schläuchen 50.
+    expect(screen.getByText('100 Längen B')).toBeInTheDocument();
+    const feld = screen.getByRole('spinbutton', { name: /Schlauchlänge/ });
+    await user.clear(feld);
+    await user.type(feld, '40');
+    expect(screen.getByText('50 Längen B')).toBeInTheDocument();
+  });
+
+  it('nennt die Menge je Leitung, mit der der Reibungswert geholt wurde', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    expect(screen.getByText(/bei 1.000 l\/min$/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Weitere Werte/ }));
+    const parallel = screen.getByRole('spinbutton', {
+      name: /Parallele Leitungen/,
+    });
+    await user.clear(parallel);
+    await user.type(parallel, '2');
+
+    // Bei zwei Leitungen trägt jede die halbe Menge — ohne die Angabe wäre der
+    // Reibungswert nicht nachzurechnen.
+    expect(screen.getByText(/bei 500 l\/min je Leitung/)).toBeInTheDocument();
+  });
+
+  it('stellt auf Rohrhydraulik um und weist das Modell aus', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Weitere Werte/ }));
+    await user.click(screen.getByRole('button', { name: 'Rohrhydraulik' }));
+
+    // Bei 1000 l/min liegt das Modell mit 1,73 + 0,25 über der Tabelle (1,50):
+    // Der Chip muss die gerechnete Herkunft nennen, und der Tabellenwert steht
+    // zum Vergleich daneben.
+    expect(screen.getByText('Tabelle AT: 1,5 bar/100 m')).toBeInTheDocument();
+    expect(screen.getByText(/Rohr 1,73 \+ Kupplungen 0,25/)).toBeInTheDocument();
+  });
+
+  it('gibt das Kupplungsfeld erst mit dem Modell frei', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Weitere Werte/ }));
+    const kupplung = screen.getByRole('spinbutton', {
+      name: /Kupplungsverlust/,
+    });
+    // Gesperrt, solange die Tabelle rechnet: Sie ist an echten
+    // Schlauchleitungen gemessen und enthält die Kupplungen schon.
+    expect(kupplung).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Rohrhydraulik' }));
+    expect(kupplung).toBeEnabled();
+  });
+
+  it('speichert die Modellwahl am Element', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Weitere Werte/ }));
+    await user.click(screen.getByRole('button', { name: 'Rohrhydraulik' }));
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+
+    expect(updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        frictionModel: 'colebrook',
+        rauheit: 0.03,
+        kupplungsverlust: 0.05,
+      })
+    );
+  });
+
   it('nennt keine Quelle mehr im Panel', () => {
     renderWithIntl(
       <LoeschwasserfoerderungPanel

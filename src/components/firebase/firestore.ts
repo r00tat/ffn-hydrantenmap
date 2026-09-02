@@ -259,6 +259,14 @@ export interface MultiPointItem extends FirecallItem {
   color?: string;
   alwaysShowMarker?: string;
   /**
+   * `'true'`, wenn Länge und Schlaucheinteilung an der Linie stehen sollen —
+   * Etikett am längsten Teilstück und ein Querstrich je Schlauchgrenze.
+   *
+   * Steht hier und nicht an `Connection`: Eine Dammlinie hat eine Länge, nur
+   * keine Schläuche. Die Querstriche entfallen dort deshalb, das Etikett nicht.
+   */
+  showLength?: string;
+  /**
    * `'true'`, wenn der Verlauf der Straße folgen soll statt der Luftlinie
    * zwischen den Punkten. Angeboten wird die Option an der Leitung und an der
    * Linie; die Felder stehen hier, damit sie kein Schreibvorgang verliert.
@@ -288,6 +296,20 @@ export interface Connection extends MultiPointItem {
   type: 'connection';
   dimension?: string;
   oneHozeLength?: number;
+  /**
+   * `'colebrook'` rechnet den Reibungsverlust über Rohrhydraulik statt über die
+   * belegte AT-Tabelle. Vorbelegt ist die Tabelle — sie ist die Unterlage, mit
+   * der hier ausgebildet wird. Siehe docs/loeschwasserfoerderung.md.
+   */
+  frictionModel?: 'table' | 'colebrook';
+  /** Absolute Rauheit in mm. Nur im Rohrhydraulik-Modell wirksam. */
+  rauheit?: number;
+  /**
+   * Örtlicher Verlust je Kupplung in bar bei 1000 l/min. Nur im
+   * Rohrhydraulik-Modell wirksam: Die AT-Tabelle ist an echten
+   * Schlauchleitungen gemessen und enthält die Kupplungen bereits.
+   */
+  kupplungsverlust?: number;
   /**
    * Löschwasserförderung über lange Wegstrecke. `'true'`, wenn der Rechner an
    * dieser Leitung aktiv ist — nur dann wird ein Höhenprofil abgefragt, eine

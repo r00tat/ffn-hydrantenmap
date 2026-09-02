@@ -22,4 +22,13 @@ export const FOERDERUNG_DEFAULTS = {
   /** Nennförderstrom FPN 10-1000. */
   pumpenNennstrom: 1000,
   paralleleLeitungen: 1,
+  /**
+   * Die belegte Tabelle bleibt der Normalfall. Das Rohrhydraulik-Modell ist
+   * wählbar, aber nicht vorbelegt — siehe docs/loeschwasserfoerderung.md.
+   */
+  frictionModel: 'table' as const,
+  /** Gummierter Druckschlauch. Nur im Modell wirksam. */
+  rauheit: 0.03,
+  /** bar je Kupplung bei 1000 l/min. Nur im Modell wirksam. */
+  kupplungsverlust: 0.05,
 };

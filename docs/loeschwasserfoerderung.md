@@ -39,6 +39,11 @@ Unterschied.
 
 ### Warum die Tabelle und kein Rechenmodell
 
+Dieser Abschnitt begründet die **Vorbelegung**, nicht mehr einen Ausschluss: Ein
+Rohrhydraulik-Modell ist seit der Modellwahl je Leitung wählbar (siehe
+„Wahlweise Rohrhydraulik statt Tabelle"). Vorbelegt bleibt die Tabelle, und
+zwar aus den folgenden Gründen.
+
 Naheliegend wäre, λ aus der Tabelle zurückzurechnen und dann durchgängig mit
 Darcy-Weisbach zu arbeiten. Das geht nicht auf:
 
@@ -108,6 +113,206 @@ nachgeschlagen: Eine ausgeschriebene Zahl gewinnt gegen den Standardwert des
 Buchstabens, „C 42" ist ein anderer Schlauch als „C". Ein unbekannter Wert führt
 **nicht** zu einer geratenen Zahl, sondern zum Hinweis, dass nicht gerechnet
 wird.
+
+## Wahlweise Rohrhydraulik statt Tabelle
+
+Die Tabelle deckt **B 75** ab; alles andere ist über `(75/d)⁵` daraus
+abgeleitet. Wer stattdessen rechnen lassen will, stellt an der Leitung auf
+`frictionModel: 'colebrook'` um — der Schalter steht im Panel unter „Weitere
+Werte", die Herkunft des Werts oben am Reibungswert.
+
+λ kommt aus **Swamee-Jain**, der expliziten Näherung der impliziten
+Colebrook-White-Gleichung (unter 1 % Abweichung). Explizit, weil der Wert an
+einem Regler hängt und bei jedem Render neu gebraucht wird; eine Iteration je
+Bild wäre Aufwand ohne Gegenwert.
+
+> λ = 0,25 / [log₁₀(k/(3,7·d) + 5,74/Re⁰˒⁹)]²  ·  Δp/100 m = λ · (100/d) · (ρ/2) · v²
+
+Unter Re 2300 gilt λ = 64/Re (laminar).
+
+### Die Stoffwerte sind fest, und warum ausgerechnet 10 °C
+
+ρ = 1000 kg/m³, ν = 1,31·10⁻⁶ m²/s. Die Temperatur ist **nicht** beliebig
+gewählt: Die Reynoldszahlen der Gegenprüfung weiter oben (43k · 86k · 130k ·
+173k · 216k · 259k · 346k) sind mit genau diesem ν gerechnet. Ein anderer Wert
+entwertete die dort niedergelegte Prüfung.
+
+Eine Eingabe für die Wassertemperatur gibt es deshalb nicht — und weil sie
+nichts austrüge: Zwischen 5 und 20 °C ändert sich ν um rund 30 %, der
+Reibungswert dadurch um wenige Prozent, und das liegt weit unter der Streuung
+der Quelle.
+
+### Rauheit 0,03 mm, Kupplung 0,05 bar
+
+`rauheit` ist die absolute Rauheit k in mm, vorbelegt mit **0,03 mm** —
+gummierter Druckschlauch.
+
+`kupplungsverlust` ist der örtliche Verlust je Kupplung in bar, vorbelegt mit
+**0,05 bar**. Eingegeben wird er bei der **festen** Bezugsmenge 1000 l/min und
+mit (Q/1000)² mitgezogen:
+
+- Ein *fester* bar-Wert wäre bei anderer Fördermenge falsch — der örtliche
+  Verlust wächst mit v².
+- Ein Widerstandsbeiwert ζ wäre die lehrbuchgemäße Eingabe, ist aber keine Zahl,
+  zu der im Einsatz jemand ein Gefühl hat.
+- Bezugsmenge ist ausdrücklich **nicht** `pumpenNennstrom`: Sonst veränderte ein
+  geänderter Pumpennennwert stillschweigend den Kupplungsverlust, und niemand
+  käme auf die Ursache.
+
+Kupplungen je 100 m sind `100 / oneHozeLength`, also 5 bei 20-m-Schläuchen.
+Exakt wären *n − 1* Stöße über die ganze Leitung; die Hydraulik rechnet aber mit
+einer **gleichmäßigen** bar-je-Meter-Rate, und der Unterschied ist eine Kupplung
+auf der Gesamtstrecke. Parallele Leitungen bekommen **keinen** Faktor: Die Menge
+je Leitung ist schon geteilt, und jede Leitung hat ihre eigenen Schläuche im
+selben Abstand.
+
+### Bei der Tabelle ist das Kupplungsfeld gesperrt
+
+Die AT-Tabelle ist an **echten Schlauchleitungen** gemessene Praktikerdaten —
+die Kupplungsverluste stecken dort schon drin. Ein Aufschlag zählte sie doppelt.
+Beim Colebrook-Modell ist es umgekehrt: Das rechnet ein glattes Rohr, und dort
+fehlen sie. Deshalb liefert `frictionBreakdownPer100m` bei `model: 'table'`
+immer `kupplungen: 0`, auch wenn ein Wert übergeben wird — die Sperre sitzt im
+Rechenkern und nicht bloß in der Oberfläche.
+
+### Was das Modell gegen die Tabelle ergibt
+
+B 75, k = 0,03 mm, 0,05 bar je Kupplung, 20-m-Schläuche:
+
+| l/min | Rohr | Kupplungen | Summe | Tabelle AT |
+| --- | --- | --- | --- | --- |
+| 800 | 1,13 | 0,16 | **1,29** | 1,00 |
+| 1000 | 1,73 | 0,25 | **1,98** | 1,50 |
+| 1600 | 4,26 | 0,64 | **4,90** | 5,00 |
+
+Zwei Befunde, die das Modell überhaupt rechtfertigen:
+
+- **Bei 1600 l/min trifft Rohr + Kupplungen die Tabelle auf 2 %.** Das reine
+  Rohrmodell liegt dort 15 % darunter — die Kupplungen erklären die Lücke, die
+  dem Modell an dieser Stelle fehlte.
+- **Mit k ≈ 0,004 mm reproduziert Colebrook den AT-Anker** (1,00 bar bei
+  800 l/min). Die Tabelle ist dort also hydraulisch **glatt**; ein Modell mit
+  Praxisrauheit liegt folglich darüber.
+
+Unterhalb von etwa 1300 l/min ist das Modell damit **konservativer** als die
+Tabelle, darüber weniger. Für den zweiten Fall steht die Warnung
+`modelBelowTable` im Panel: Sie nennt beide Zahlen und sagt, dass die
+ausgewiesene Pumpenzahl zu niedrig sein kann. Der Tabellenwert wird dafür bei
+aktivem Modell **immer mitgerechnet** — ohne ihn wäre nicht zu sehen, wie weit
+das Modell von der Unterlage abweicht.
+
+Bewusst nicht dabei: eine zweite vollständige Pumpenrechnung, um „Tabelle: 4
+Pumpen" gegenzustellen. Der Reibungswert ist die Ursache, die Pumpenzahl nur
+ihre Folge, und zwei Ergebnisse nebeneinander machen die Antwort oben im Panel
+zweideutig.
+
+## Der Querschnitt ist bedienbar, bleibt aber ein Feld
+
+Der Durchmesser geht mit d⁵ in den Reibungsverlust ein und ist damit der
+wirksamste Wert überhaupt. Er stand trotzdem lange nur im generischen
+Leitungs-Dialog als Freitext und im Panel als Lesetext. Jetzt sitzt im Block
+„Lage" eine Knopfreihe (A 110 … F 152) samt mm-Feld für Sonderfälle wie C 42.
+
+**Gespeichert wird weiter ein einziges Freitextfeld**, in kanonischer Form: der
+Buchstabe allein (`B`), solange die mm dem Standardwert entsprechen, sonst
+Buchstabe plus Zahl (`C 42`). Ein zweites Feld für den Durchmesser könnte dem
+ersten widersprechen, und `info()`, `popupFn()` und die Schlauchanzahl lesen
+`dimension` mit — „62 B-Längen" soll sich weiter richtig lesen.
+
+Zwei Fallstricke, die im Code nicht zu sehen sind:
+
+- **Ein einstelliger Zwischenstand darf nicht ans Element.** `hoseInnerDiameterMm`
+  liest nur zwei- bis dreistellige Durchmesser; „C 4" ist unlesbar. Weil das
+  mm-Feld an einer lesbaren Dimension hängt (sonst wäre nicht klar, welcher
+  Buchstabe gemeint ist), sperrte es sich beim Tippen selbst — nach der ersten
+  Ziffer ging keine zweite mehr hinein. Geschrieben wird deshalb erst ab zwei
+  Ziffern.
+- **Das mm-Feld führt seinen eigenen Text.** „Leer gilt als Standardwert"
+  kollidiert mit einem gesteuerten Feld: Ein geleertes Feld schrieb `'C'`, die
+  Rückrechnung gab daraus wieder 52, das Feld füllte sich selbst — und die
+  getippte Zahl landete dahinter („C 5242").
+
+Ein unlesbarer Bestandswert („Storz") lässt keinen Knopf gewählt und die Warnung
+stehen. Neu ist, dass sie **im Panel behebbar** ist; vorher war sie eine
+Sackgasse.
+
+Daneben steht die **Schlauchlänge** (Vorbelegung 20 m) und die Schlauchzahl, die
+sich daraus ergibt. Sie ist seit dem Kupplungsverlust nicht mehr nur Logistik:
+Sie bestimmt, wie viele Kupplungen auf 100 m kommen.
+
+## Länge und Schlaucheinteilung auf der Karte
+
+Berechnet und **gezeichnet, nicht gespeichert** — dasselbe Muster wie die
+Pumpenstandorte. `HoseLengthOverlay` setzt ein Etikett („1240 m · 62 × B") an
+die Mitte des **längsten** Teilstücks; bei einer geknickten Leitung sitzt es
+damit dort, wo Platz ist, statt auf einem Knick.
+
+Dazu ein **Querstrich je Schlauchgrenze**, senkrecht auf dem Verlauf. Damit ist
+zu sehen, wo ein Schlauch endet und der nächste beginnt — und ob die Länge bis
+zur nächsten Ecke noch reicht.
+
+### Die Strichlänge steht in Pixeln, nicht in Metern
+
+Die halbe Strichlänge wird aus dem aktuellen Kartenmaßstab so gewählt, dass sie
+etwa 8 px ergibt, und bei `zoomend` neu gerechnet. In Metern fest wäre sie bei
+kleinem Zoom unsichtbar und bei großem eine Querstraße. Gerechnet wird über
+`map.distance` zweier Containerpunkte statt über eine Zoomformel — das trifft
+auch abseits des Äquators.
+
+**Unter 6 px Schlauchabstand entfallen die Striche.** 62 Striche im Abstand von
+3 px sind ein Schmierstreifen und keine Auskunft; dieselbe Schranke verhindert
+mehrere hundert Vektoren, wenn eine 10-km-Leitung ganz aus der Karte gezoomt
+wird. Das Etikett bleibt in jedem Maßstab.
+
+### Gezählt wird vom Entnahme-Ende
+
+Schläuche werden von der Entnahmestelle weg verlegt. Liegt sie bei
+`foerderungUmgekehrt === 'true'` am letzten Punkt, hinge der kurze Restschlauch
+sonst am falschen Ende. Die Grenze am Leitungsende ist keine — dort hört der
+letzte Schlauch auf.
+
+Gemessen wird entlang `displayPositions()`, also dem gerouteten Verlauf, wenn es
+einen gibt: Das ist der tatsächliche Schlauchweg, und dieselbe Grundlage nutzt
+die Höhenabtastung.
+
+Parallele Leitungen verändern die Striche nicht — jede Leitung hat ihre eigenen
+Schläuche im selben Abstand.
+
+### Ein Schalter je Element, für Leitung **und** Linie
+
+`showLength` steht auf `FirecallMultiPoint` neben `alwaysShowMarker` und nicht
+an der Leitung: Eine Dammlinie hat eine Länge, nur keine Schläuche. Das Etikett
+gilt dort also, die Querstriche entfallen, und ohne `dimension` nennt das
+Etikett nur die Meter.
+
+Geschaltet wird im Linien-Popup und nicht im Rechner-Panel — für Linien gibt es
+kein Panel. Ein globaler Layer-Schalter für alle Leitungen wäre die Alternative
+gewesen; beides gleichzeitig hieße zwei Wahrheiten für dieselbe Frage samt einer
+Vorrangregel, die man sich merken muss.
+
+### Beim Zeichnen und beim Verschieben immer
+
+Beim **Zeichnen** steht die laufende Summe am bisher Gezeichneten, dazu eine
+gestrichelte Vorschau zum Mauszeiger mit der Länge, die der nächste Klick
+ergäbe. Erst damit ist **vor** dem Setzen zu sehen, ob eine Schlauchlänge noch
+reicht. Auf Touch-Geräten gibt es kein `mousemove`; die Vorschau erscheint dort
+nie und es bleibt von selbst bei der laufenden Summe — kein Sonderfall im Code.
+
+Die Schlauchzahl steht dabei **nur** bei `type === 'connection'`: Dieselbe
+Zeichenmaschine bedient Linien und Flächen, und „12 Schläuche" an einer
+Dammlinie wäre Unsinn.
+
+Beim **Verschieben** eines Punktes hält ein `drag`-Handler die gezogene Position
+in lokalem Zustand; geschrieben wird weiterhin erst bei `dragend`. Solange
+gezogen wird, zeichnet die Polylinie aus diesem Zustand — ein Etikett mit 240 m
+an einer Linie in alter Form wäre schlechter als keines. **Bei aktivem
+Straßen-Routing fällt die Vorschau dabei auf die gerade Punktfolge zurück**,
+weil live nicht neu geroutet werden kann; nach `dragend` gilt wieder der
+gespeicherte Verlauf.
+
+Eingeschaltet ist das Etikett beim Ziehen **immer**, auch ohne `showLength`: Wer
+einen Punkt verschiebt, will die neue Länge sehen, ohne vorher einen Schalter zu
+suchen.
 
 ## Übrige Werte
 
@@ -391,8 +596,11 @@ die generische Feldliste.
 
 `foerderung`, `foerderungUmgekehrt`, `foerderMenge`, `zielDruck`,
 `pumpenAusgangsdruck`, `pumpenEingangsdruck`, `pumpenNennstrom`,
-`paralleleLeitungen`, `hoehenunterschied`, `elevationProfile`, `elevationFor`,
-`elevationFailed`.
+`paralleleLeitungen`, `frictionModel`, `rauheit`, `kupplungsverlust`,
+`hoehenunterschied`, `elevationProfile`, `elevationFor`, `elevationFailed`.
+
+`showLength` steht dagegen auf `MultiPointItem` — samt `fields()`-Eintrag, weil
+es auch für Linien gilt und dort kein eigener Dialog danebensteht.
 
 ## Was hier nicht ist
 
