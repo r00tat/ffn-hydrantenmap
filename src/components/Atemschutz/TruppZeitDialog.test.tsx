@@ -60,4 +60,35 @@ describe('TruppZeitDialog', () => {
     render({ modus: 'rueckkehr' });
     expect(screen.queryByLabelText(/Entsendet an/)).not.toBeInTheDocument();
   });
+
+  it('fragt bei der Überwachung nicht nach einem Ziel', () => {
+    // Der Gruppenkommandant schickt den Trupp in *seinen* Einsatz — es gibt
+    // niemanden, an den er ihn übergibt.
+    render({ kontext: 'ueberwachung' });
+    expect(screen.queryByLabelText(/Entsendet an/)).toBeNull();
+  });
+
+  it('beschriftet bei der Überwachung als „in den Einsatz schicken"', () => {
+    render({ kontext: 'ueberwachung' });
+    expect(
+      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Trupp in den Einsatz schicken'),
+    ).toBeInTheDocument();
+  });
+
+  it('löscht bei der Überwachung ein am Sammelplatz gesetztes Ziel nicht', async () => {
+    // `entsendePatch` lässt das Feld aus dem Patch weg, wenn es fehlt — der
+    // bestehende Wert am Dokument bleibt damit stehen.
+    const { onConfirm } = render({
+      kontext: 'ueberwachung',
+      entsendetAnVorschlag: 'RLFA 2000',
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
+    );
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][0]).not.toHaveProperty('entsendetAn');
+  });
 });

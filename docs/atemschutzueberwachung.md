@@ -138,9 +138,24 @@ greifen, und der zugehörige Punkt im Testplan des Issues wäre unerreichbar.
 
 Der maßgebliche Rückzugsdruck ist damit der **höhere** von Rückmarschdruck und
 Restdruckwarnung (55 bar) — der Druck fällt, also greift der höhere Wert früher.
-Ohne Zielmeldung ist der Rückmarschdruck nicht berechenbar; dann gilt die
+Ohne Ankunftsmeldung ist der Rückmarschdruck nicht berechenbar; dann gilt die
 Restdruckwarnung, und die Karte weist mit einem Hinweis darauf hin, dass die
-Zielmeldung fehlt.
+Ankunftsmeldung fehlt.
+
+### Die Ankunft heißt nicht „Einsatzziel erreicht"
+
+Die Unterlage nennt den Wert „Flaschendruck bei Erreichen des Einsatzzieles".
+Als Beschriftung eines Hakens gemeldet („Meldung ‚Einsatzziel erreicht'") liest
+sich das aber wie **„Auftrag erledigt"** und nicht wie „der Trupp ist
+angekommen" — genau so wurde es beim Ausprobieren verstanden. Im Formular steht
+deshalb „Trupp ist am Einsatzziel angekommen", im Druckverlauf „Ankunft".
+
+Der Haken ist außerdem **nicht vorbelegt**, obwohl die erste Abfrage nach dem
+Abmarsch meist die Ankunftsmeldung ist. Aus ihr rechnet sich der
+Rückmarschdruck; eine gewöhnliche Zwischenabfrage, die versehentlich als Ankunft
+gilt, macht ihn zu einer Behauptung. Stattdessen erinnert ein Hinweis im Dialog
+daran, dass die Ankunft für diesen Trupp noch fehlt — und dass bis dahin die
+55-bar-Warnung der Rückzugszeitpunkt ist.
 
 ## Zwei Verbrauchswerte, zwei Zwecke
 
@@ -290,6 +305,26 @@ selbst verschwinden, die Erinnerungen dürfen es. Der Klick führt über
 `notification.data.url` auf die Überwachungsseite des Einsatzes; vorher stand
 dort fest `/chat`. Siehe auch
 [service-worker-pwa.md](service-worker-pwa.md).
+
+## „In den Einsatz schicken", nicht „entsenden"
+
+Am Sammelplatz wird ein Trupp **abgegeben**: „Entsendet an" ist dort die
+entscheidende Angabe, denn wer nicht festhält, an welche taktische Einheit,
+verliert die Spur. Bei der Überwachung steht der Gruppenkommandant selbst davor
+— er schickt den Trupp in *seinen* Einsatz und hat niemanden, an den er ihn
+übergibt. Das Feld wäre dort eine Frage ohne Antwort und ist deshalb
+ausgeblendet (`TruppZeitKontext` in
+[TruppZeitDialog.tsx](../src/components/Atemschutz/TruppZeitDialog.tsx)).
+
+Ein am Sammelplatz gesetztes Ziel wird dabei **nicht** gelöscht: `entsendePatch`
+lässt das Feld aus dem Patch weg, wenn es fehlt.
+
+Aus demselben Grund heißen die Beschriftungen anders. „Abmarsch erfassen" klang
+nach reiner Dokumentation — als würde etwas nachgetragen, was schon passiert
+ist. Der Knopf schickt den Trupp aber wirklich in den Einsatz und startet die
+Zeitkontrolle, und genau das sagt er jetzt: **„In den Einsatz schicken"**. Der
+Zeitpunkt heißt dort „Abmarsch (Anschließen der Luftversorgung)" — so definiert
+ihn die Unterlage.
 
 ## Wer was sieht
 

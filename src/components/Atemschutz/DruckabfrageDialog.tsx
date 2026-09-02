@@ -25,11 +25,14 @@ export interface DruckabfrageDialogProps {
   open: boolean;
   trupp: AtemschutzTrupp;
   /**
-   * Ob die Zielmeldung noch fehlt.
+   * Ob die Ankunftsmeldung noch fehlt.
    *
-   * Steuert nur die Vorbelegung des Hakens: Solange kein Druck am Einsatzziel
-   * gemeldet ist, ist der Rückmarschdruck nicht berechenbar, und die erste
-   * Abfrage nach dem Abmarsch *ist* meist die Zielmeldung.
+   * Zeigt einen **Hinweis**, setzt aber ausdrücklich **nicht** den Haken:
+   * Vorbelegt hätte jede gewöhnliche Zwischenabfrage als Ankunft gegolten, und
+   * daraus rechnet sich der Rückmarschdruck. Ein zu früh gesetzter Haken macht
+   * ihn zu einer Behauptung — die falsche Richtung bei einer
+   * Sicherheitsfunktion. Der Hinweis erinnert stattdessen daran, dass der Wert
+   * noch fehlt.
    */
   zielMeldungFehlt: boolean;
   onClose: () => void;
@@ -54,7 +57,7 @@ export default function DruckabfrageDialog({
   const tCommon = useTranslations('common');
 
   const [druck, setDruck] = useState('');
-  const [amZiel, setAmZiel] = useState(zielMeldungFehlt);
+  const [amZiel, setAmZiel] = useState(false);
   const [bemerkung, setBemerkung] = useState('');
   // Vorbelegt mit jetzt, aber änderbar: Die Meldung kommt über Funk und wird
   // eine Minute später eingetippt — mit dem Erfassungszeitpunkt gerechnet,
@@ -122,6 +125,9 @@ export default function DruckabfrageDialog({
           <Typography variant="caption" color="text.secondary">
             {t('ueberwachung.amZielHint')}
           </Typography>
+          {zielMeldungFehlt && !amZiel && (
+            <Alert severity="info">{t('ueberwachung.amZielFehltHinweis')}</Alert>
+          )}
           <TextField
             fullWidth
             multiline

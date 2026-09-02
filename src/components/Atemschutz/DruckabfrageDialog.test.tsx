@@ -37,18 +37,36 @@ function render(zielMeldungFehlt = true) {
   return onSave;
 }
 
-const zielHaken = () =>
-  screen.getByRole('checkbox', { name: /Einsatzziel erreicht/ });
+const ankunftHaken = () =>
+  screen.getByRole('checkbox', { name: /am Einsatzziel angekommen/ });
 
 describe('DruckabfrageDialog', () => {
-  it('hakt die Zielmeldung vor, solange sie fehlt', () => {
+  it('hakt die Ankunft nie vor', () => {
+    // Vorbelegt hätte jede gewöhnliche Zwischenabfrage als Ankunft gegolten,
+    // und daraus rechnet sich der Rückmarschdruck.
     render(true);
-    expect(zielHaken()).toBeChecked();
+    expect(ankunftHaken()).not.toBeChecked();
+    expect(
+      screen.getByText(/noch keine Ankunft am Einsatzziel erfasst/),
+    ).toBeInTheDocument();
   });
 
-  it('hakt sie nicht vor, wenn das Ziel schon gemeldet wurde', () => {
+  it('erinnert nicht, wenn die Ankunft schon gemeldet wurde', () => {
     render(false);
-    expect(zielHaken()).not.toBeChecked();
+    expect(ankunftHaken()).not.toBeChecked();
+    expect(screen.queryByText(/noch keine Ankunft/)).toBeNull();
+  });
+
+  it('nimmt die Ankunft auf, wenn sie angekreuzt wird', async () => {
+    const onSave = render(true);
+    await userEvent.click(ankunftHaken());
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /Geringster Druck/ }),
+      '250',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({ druck: 250, amZiel: true });
   });
 
   it('speichert erst mit einem Druck', async () => {
@@ -64,7 +82,7 @@ describe('DruckabfrageDialog', () => {
     await userEvent.click(speichern);
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
-    expect(onSave.mock.calls[0][0]).toMatchObject({ druck: 200, amZiel: true });
+    expect(onSave.mock.calls[0][0]).toMatchObject({ druck: 200, amZiel: false });
   });
 
   it('lehnt einen unsinnig hohen Druck ab', async () => {

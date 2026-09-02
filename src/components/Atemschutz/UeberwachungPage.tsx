@@ -476,6 +476,10 @@ export default function UeberwachungPage() {
           key={`${dialog.trupp.id}-${dialog.modus}`}
           open
           modus={dialog.modus}
+          // Beim Gruppenkommandanten entfällt „Entsendet an": Er schickt den
+          // Trupp in seinen eigenen Einsatz, es gibt niemanden, an den er ihn
+          // übergibt.
+          kontext="ueberwachung"
           entsendetAnVorschlag={
             dialog.trupp.entsendetAn ?? (einheit !== ALLE ? einheit : undefined)
           }

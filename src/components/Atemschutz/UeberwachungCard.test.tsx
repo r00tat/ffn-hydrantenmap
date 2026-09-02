@@ -83,19 +83,19 @@ describe('UeberwachungCard', () => {
     expect(screen.getByRole('button', { name: 'Rückkehr' })).toBeInTheDocument();
   });
 
-  it('weist eine fehlende Zielmeldung aus', () => {
+  it('weist eine fehlende Ankunftsmeldung aus', () => {
     render(trupp());
-    expect(screen.getByText('Keine Zielmeldung')).toBeInTheDocument();
+    expect(screen.getByText('Keine Ankunftsmeldung')).toBeInTheDocument();
   });
 
-  it('nennt nach der Zielmeldung den Rückmarschdruck als Grund', () => {
+  it('nennt nach der Ankunftsmeldung den Rückmarschdruck als Grund', () => {
     // Abmarsch 300, am Ziel 200 bar → doppelter Vormarschdruckabfall 200 bar,
     // deutlich über der Restdruckwarnung.
     render(trupp({ abfragen: [abfrage(5, 200, true)] }), { jetzt: nachAbmarsch(6) });
     expect(
       screen.getByText('Rückmarschdruck 200 bar (doppelter Vormarschdruckabfall)'),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Keine Zielmeldung')).toBeNull();
+    expect(screen.queryByText('Keine Ankunftsmeldung')).toBeNull();
   });
 
   it('nennt die Restdruckwarnung, wenn der Vormarsch kurz war', () => {
@@ -134,10 +134,10 @@ describe('UeberwachungCard', () => {
     ).toBeInTheDocument();
   });
 
-  it('bietet in Bereitschaft den Abmarsch an', () => {
+  it('bietet in Bereitschaft an, den Trupp in den Einsatz zu schicken', () => {
     render(trupp({ status: 'bereit', abmarschZeit: undefined }));
     expect(
-      screen.getByRole('button', { name: 'Abmarsch erfassen' }),
+      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Vermuteter Druck')).toBeNull();
   });
@@ -158,7 +158,7 @@ describe('UeberwachungCard', () => {
     // Auf den Verlaufseintrag geprüft und nicht auf „300 bar": Denselben Wert
     // trägt auch der Chip mit dem Gerätesatz.
     expect(screen.getByText(/300 bar \(Entsenden\)/)).toBeInTheDocument();
-    expect(screen.getByText(/200 bar \(Ziel\)/)).toBeInTheDocument();
+    expect(screen.getByText(/200 bar \(Ankunft\)/)).toBeInTheDocument();
   });
 
   it('zeigt die Geräte am Trupp samt Träger', () => {

@@ -383,7 +383,7 @@ export default function UeberwachungCard({
               variant={uebernommen ? 'contained' : 'outlined'}
               onClick={onAbmarsch}
             >
-              {t('ueberwachung.actions.abmarsch')}
+              {t('ueberwachung.actions.inDenEinsatz')}
             </Button>
           )}
           {imEinsatz && (

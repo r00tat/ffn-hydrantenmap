@@ -241,11 +241,15 @@ export interface Druckabfrage {
   /** Geringster Druck im Trupp in bar. */
   druck: number;
   /**
-   * Die Meldung „Einsatzziel erreicht".
+   * Die Ankunft am Einsatzziel — in der Unterlage „Flaschendruck bei Erreichen
+   * des Einsatzzieles".
    *
    * Ohne sie ist der Rückmarschdruck aus dem doppelten Vormarschdruckabfall
    * nicht berechenbar — sie ist der einzige Wert, aus dem hervorgeht, wie viel
-   * Luft der Hinweg gekostet hat.
+   * Luft der Hinweg gekostet hat. In der Oberfläche heißt das Feld deshalb
+   * „Trupp ist am Einsatzziel angekommen" und ist **nicht** vorbelegt:
+   * „Einsatzziel erreicht" liest sich wie „Auftrag erledigt", und ein zu früh
+   * gesetzter Haken macht den Rückmarschdruck zu einer Behauptung.
    */
   amZiel?: boolean;
   bemerkung?: string;
