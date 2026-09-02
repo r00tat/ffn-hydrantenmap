@@ -1,13 +1,21 @@
 'use client';
 
-import { collection, doc, type CollectionReference } from 'firebase/firestore';
+import {
+  arrayUnion,
+  collection,
+  doc,
+  type CollectionReference,
+} from 'firebase/firestore';
 import {
   ATEMSCHUTZ_AUSGABE_COLLECTION_ID,
   ATEMSCHUTZ_FUELLUNG_COLLECTION_ID,
   ATEMSCHUTZ_TRUPP_COLLECTION_ID,
+  mitUeberwachungsUid,
   type AtemschutzAusgabe,
   type AtemschutzFuellung,
   type AtemschutzTrupp,
+  type Druckabfrage,
+  type UeberwachungPatch,
 } from '../../common/atemschutz';
 import { addDoc, deleteDoc, updateDoc } from '../../lib/firestoreClient';
 import { firestore } from '../firebase/firebase';
@@ -163,6 +171,55 @@ export async function updateAusgabe(
   actor: AtemschutzActor,
 ): Promise<void> {
   await updateDoc(doc(ausgabeCollection(firecallId), ausgabeId), {
+    ...patch,
+    ...touched(actor),
+  });
+}
+
+/**
+ * Hängt eine Druckabfrage an — mit `arrayUnion` und nicht mit einem
+ * überschriebenen Array.
+ *
+ * Am Sammelplatz und beim Gruppenkommandanten schaut mehr als ein Gerät auf
+ * denselben Trupp. Wer das Array aus seinem geladenen Zustand neu schreibt,
+ * löscht damit die Abfrage, die eine Sekunde vorher von einem anderen Gerät
+ * kam — genau den Wert, auf den es ankommt. `arrayUnion` hängt serverseitig an.
+ *
+ * `ueberwachungUids` wird dabei mitgeführt: Wer eine Abfrage erfasst, arbeitet
+ * an der Überwachung und soll die Warnungen bekommen. Das ist bewusst *kein*
+ * `arrayUnion` — es wäre eines, aber die Liste ist kurz, und `mitUeberwachungsUid`
+ * hält die Reihenfolge stabil, an der man sieht, wer zuerst übernommen hat.
+ */
+export async function addDruckabfrage(
+  firecallId: string,
+  trupp: AtemschutzTrupp,
+  abfrage: Druckabfrage,
+  actor: AtemschutzActor,
+): Promise<void> {
+  await updateDoc(doc(truppCollection(firecallId), trupp.id as string), {
+    abfragen: arrayUnion(abfrage),
+    ueberwachungUids: mitUeberwachungsUid(
+      trupp.ueberwachungUids,
+      actor.userId,
+    ),
+    ...touched(actor),
+  });
+}
+
+/**
+ * Übernahme der Zeitkontrolle und Änderungen an ihren Feldern.
+ *
+ * Eigene Funktion statt `updateTrupp`, damit der Aufrufer nicht versehentlich
+ * `status` mitschickt: Der Zustandswechsel eines Trupps läuft über
+ * `canTransition`, die Überwachung fasst ihn nicht an.
+ */
+export async function updateUeberwachung(
+  firecallId: string,
+  truppId: string,
+  patch: UeberwachungPatch,
+  actor: AtemschutzActor,
+): Promise<void> {
+  await updateDoc(doc(truppCollection(firecallId), truppId), {
     ...patch,
     ...touched(actor),
   });

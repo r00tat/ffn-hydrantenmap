@@ -1,26 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_TRUPP_MITGLIEDER,
+  MAX_UEBERWACHUNG_UIDS,
   type AtemschutzGeraet,
   type AtemschutzTrupp,
   type FuellungInput,
+  type TruppGeraet,
   type TruppInput,
   braucheDatum,
+  buildDruckabfrage,
   canTransition,
   darfFuellungAendern,
   entsendePatch,
+  erneuterEinsatz,
   findByCode,
   fuellungSperre,
   geraetDetails,
   geraetKennung,
+  gruppiereTruppGeraete,
   gruppiereTrupps,
+  istGueltigeUid,
   lookupKeys,
   matchGeraete,
+  mitUeberwachungsUid,
   nextBereitstellung,
   normalizeCode,
   rueckkehrPatch,
   sanitizeMitglieder,
   sanitizePersonen,
+  sanitizeTruppGeraete,
+  sammelplatzUebergabePatch,
+  sanitizeUeberwachungUids,
+  truppGeraetLabel,
+  truppGeraetVonGeraet,
+  uebernahmePatch,
+  validateDruckabfrage,
   validateFuellungInput,
   validateTruppInput,
   verrechnenVorgabe,
@@ -410,6 +424,185 @@ describe('nextBereitstellung', () => {
     nextBereitstellung(zurueck, '2026-08-29T11:30:00.000Z');
     expect(JSON.stringify(zurueck)).toBe(vorher);
   });
+
+  it('übernimmt Maske, Gerät und Zubehör, aber keine Flasche', () => {
+    // Maske und Pressluftatmer legt der Trupp zwischen zwei Einsätzen nicht
+    // ab; die Flaschen sind leer und werden getauscht.
+    const neu = nextBereitstellung(
+      trupp({
+        ...zurueck,
+        truppGeraete: [
+          {
+            typ: 'flasche',
+            bezeichnung: 'CFK 6,8 l',
+            kennung: '2.16.19',
+            person: 'Huber',
+          },
+          { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Huber' },
+          { typ: 'pressluftatmer', bezeichnung: 'PA 94', person: 'Huber' },
+          { typ: 'zubehoer', bezeichnung: 'Fluchthaube' },
+        ],
+      }),
+      '2026-08-29T11:30:00.000Z',
+    );
+    expect(neu.truppGeraete?.map((g) => g.bezeichnung)).toEqual([
+      'Maske FPS',
+      'PA 94',
+      'Fluchthaube',
+    ]);
+    // Und beim selben Träger: Die Maske wechselt nicht die Person.
+    expect(neu.truppGeraete?.[0].person).toBe('Huber');
+  });
+
+  it('lässt das Feld weg, wenn nur Flaschen erfasst waren', () => {
+    // Firestore lehnt `undefined` ab, ein leeres Array wäre eine Aussage über
+    // Ausrüstung, die es nicht gibt.
+    const neu = nextBereitstellung(
+      trupp({
+        ...zurueck,
+        truppGeraete: [{ typ: 'flasche', bezeichnung: 'CFK 6,8 l' }],
+      }),
+      '2026-08-29T11:30:00.000Z',
+    );
+    expect(neu).not.toHaveProperty('truppGeraete');
+  });
+});
+
+describe('sammelplatzUebergabePatch', () => {
+  it('vermerkt nur den Zeitpunkt und fasst den Zustand nicht an', () => {
+    expect(
+      sammelplatzUebergabePatch({ jetzt: '2026-08-29T11:20:00.000Z' }),
+    ).toEqual({ ueberwachungBis: '2026-08-29T11:20:00.000Z' });
+  });
+});
+
+describe('erneuterEinsatz', () => {
+  const zurueck = trupp({
+    id: 't1',
+    status: 'zurueck',
+    laufendeNummer: 1,
+    entsendetAn: 'LFA',
+    einsatzziel: 'Stiegenhaus 3. OG',
+    ueberwachtVon: 'GRKDT Huber',
+    ueberwachungSeit: '2026-08-29T10:20:00.000Z',
+    ueberwachungUids: ['u1'],
+    paTyp: 'langzeit300',
+    flaschenAnzahl: 2,
+    flaschenVolumen: 6.8,
+    fuellDruck: 300,
+    abmarschZeit: '2026-08-29T10:30:00.000Z',
+    druckAbmarsch: 290,
+    rueckkehrZeit: '2026-08-29T11:00:00.000Z',
+    druckRueckkehr: 80,
+    abfragen: [{ zeitpunkt: '2026-08-29T10:40:00.000Z', druck: 240 }],
+    warnungen: { drittel: '2026-08-29T10:38:00.000Z' },
+  });
+
+  const entsendung = entsendePatch({
+    abmarschZeit: '2026-08-29T11:40:00.000Z',
+    druckAbmarsch: 300,
+  });
+
+  it('legt eine neue Zeile an, die sofort im Einsatz ist', () => {
+    const neu = erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu.laufendeNummer).toBe(2);
+    expect(neu.truppKey).toBe('k1');
+    expect(neu.status).toBe('imEinsatz');
+    expect(neu.abmarschZeit).toBe('2026-08-29T11:40:00.000Z');
+    expect(neu.druckAbmarsch).toBe(300);
+    expect(neu).not.toHaveProperty('id');
+  });
+
+  it('übernimmt Gerätesatz und Einheit — das bleibt derselbe Trupp', () => {
+    const neu = erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu.paTyp).toBe('langzeit300');
+    expect(neu.flaschenAnzahl).toBe(2);
+    expect(neu.flaschenVolumen).toBe(6.8);
+    expect(neu.fuellDruck).toBe(300);
+    expect(neu.entsendetAn).toBe('LFA');
+    expect(neu.ueberwachtVon).toBe('GRKDT Huber');
+  });
+
+  it('nimmt Maske und Gerät mit in den zweiten Einsatz', () => {
+    // Der Trupp legt sie nicht ab — sie noch einmal zu scannen ist reine
+    // Tipparbeit. Die Flaschen sind getauscht und werden neu erfasst.
+    const neu = erneuterEinsatz({
+      vorherige: trupp({
+        ...zurueck,
+        truppGeraete: [
+          { typ: 'flasche', bezeichnung: 'CFK 6,8 l', kennung: '2.16.19' },
+          { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Huber' },
+        ],
+      }),
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu.truppGeraete).toEqual([
+      { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Huber' },
+    ]);
+  });
+
+  it('führt die Zeitkontrolle weiter und nimmt den Anleger dazu', () => {
+    const neu = erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+      uid: 'u2',
+    });
+    // Auf der neuen Zeile beginnt die Kontrolle jetzt — die alte Übernahme
+    // gilt für die alte Bereitstellung.
+    expect(neu.ueberwachungSeit).toBe('2026-08-29T11:40:00.000Z');
+    expect(neu.ueberwachungUids).toEqual(['u1', 'u2']);
+  });
+
+  it('trägt Messwerte, Warnungen und das alte Einsatzziel nicht mit', () => {
+    const neu = erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu).not.toHaveProperty('abfragen');
+    expect(neu).not.toHaveProperty('warnungen');
+    expect(neu).not.toHaveProperty('rueckkehrZeit');
+    expect(neu).not.toHaveProperty('druckRueckkehr');
+    // Das Einsatzziel ist der Auftrag *dieser* Entsendung: Der zweite Einsatz
+    // führt den Trupp oft woandershin, und ein stehengebliebenes „Stiegenhaus
+    // 3. OG" wäre eine Behauptung.
+    expect(neu).not.toHaveProperty('einsatzziel');
+  });
+
+  it('trägt eine frühere Übergabe an den Sammelplatz nicht mit', () => {
+    // Sonst wäre die neue Bereitstellung im selben Moment schon wieder
+    // abgegeben, in dem sie in den Einsatz geht.
+    const uebergeben = trupp({
+      ...zurueck,
+      ueberwachungBis: '2026-08-29T11:20:00.000Z',
+    });
+    const neu = erneuterEinsatz({
+      vorherige: uebergeben,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu).not.toHaveProperty('ueberwachungBis');
+  });
+
+  it('lässt die alte Zeile unverändert', () => {
+    const vorher = JSON.stringify(zurueck);
+    erneuterEinsatz({
+      vorherige: zurueck,
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(JSON.stringify(zurueck)).toBe(vorher);
+  });
 });
 
 describe('gruppiereTrupps', () => {
@@ -485,6 +678,34 @@ describe('gruppiereTrupps', () => {
     const gruppen = gruppiereTrupps([zweite, erste]);
     expect(gruppen.bereit.map((t) => t.id)).toEqual(['2']);
     expect(gruppen.zurueck).toEqual([]);
+  });
+
+  it('lässt in `frueher` nur, was oben nicht ohnehin steht', () => {
+    // Der gemeldete Fall: Ein Trupp im Einsatz stand oben unter „Unter
+    // Atemschutz" *und* noch einmal im Protokoll darunter.
+    const erste = trupp({ id: '1', laufendeNummer: 1, status: 'zurueck' });
+    const zweite = trupp({ id: '2', laufendeNummer: 2, status: 'imEinsatz' });
+    const gruppen = gruppiereTrupps([erste, zweite]);
+    expect(gruppen.frueher.map((t) => t.id)).toEqual(['1']);
+  });
+
+  it('behält Abgemeldete in `frueher` — oben stehen sie nirgends', () => {
+    const abgemeldet = trupp({
+      id: 'd',
+      truppKey: 'kd',
+      status: 'abgemeldet',
+    });
+    const gruppen = gruppiereTrupps([abgemeldet]);
+    expect(gruppen.frueher.map((t) => t.id)).toEqual(['d']);
+  });
+
+  it('hat ohne ältere Zeilen ein leeres `frueher`', () => {
+    const gruppen = gruppiereTrupps([
+      trupp({ id: 'a', truppKey: 'ka', status: 'bereit' }),
+      trupp({ id: 'b', truppKey: 'kb', status: 'imEinsatz' }),
+      trupp({ id: 'c', truppKey: 'kc', status: 'zurueck' }),
+    ]);
+    expect(gruppen.frueher).toEqual([]);
   });
 });
 
@@ -797,5 +1018,355 @@ describe('braucheDatum', () => {
 
   it('bleibt bei einem unlesbaren Zeitpunkt still', () => {
     expect(braucheDatum('kaputt', jetzt)).toBe(false);
+  });
+});
+
+describe('mitUeberwachungsUid', () => {
+  it('legt die Liste an', () => {
+    expect(mitUeberwachungsUid(undefined, 'u1')).toEqual(['u1']);
+  });
+
+  it('hängt an, ohne zu doppeln', () => {
+    expect(mitUeberwachungsUid(['u1'], 'u2')).toEqual(['u1', 'u2']);
+    expect(mitUeberwachungsUid(['u1', 'u2'], 'u1')).toEqual(['u1', 'u2']);
+  });
+
+  it('ignoriert eine leere uid', () => {
+    expect(mitUeberwachungsUid(['u1'], '')).toEqual(['u1']);
+    expect(mitUeberwachungsUid(undefined, ' ')).toEqual([]);
+  });
+});
+
+describe('uebernahmePatch', () => {
+  const jetzt = '2026-09-02T10:00:00.000Z';
+
+  it('protokolliert den Wechsel der Verantwortung', () => {
+    const patch = uebernahmePatch({
+      trupp: {},
+      jetzt,
+      uid: 'u1',
+      ueberwachtVon: ' Maschinist LFA ',
+      einsatzziel: ' Keller ',
+      satz: { flaschenAnzahl: 1, flaschenVolumen: 6.8, fuellDruck: 300 },
+      paTyp: 'custom',
+    });
+    expect(patch).toEqual({
+      ueberwachungSeit: jetzt,
+      ueberwachungUids: ['u1'],
+      ueberwachtVon: 'Maschinist LFA',
+      einsatzziel: 'Keller',
+      paTyp: 'custom',
+      flaschenAnzahl: 1,
+      flaschenVolumen: 6.8,
+      fuellDruck: 300,
+    });
+  });
+
+  it('lässt eine schon vermerkte Übernahme stehen', () => {
+    const patch = uebernahmePatch({
+      trupp: { ueberwachungSeit: '2026-09-02T09:00:00.000Z', ueberwachungUids: ['u1'] },
+      jetzt,
+      uid: 'u2',
+      paTyp: 'standard300',
+    });
+    expect(patch.ueberwachungSeit).toBeUndefined();
+    expect(patch.ueberwachungUids).toEqual(['u1', 'u2']);
+  });
+
+  it('schickt keine leeren Felder mit — Firestore lehnt undefined ab', () => {
+    const patch = uebernahmePatch({ trupp: {}, jetzt, uid: 'u1', ueberwachtVon: '  ' });
+    expect('ueberwachtVon' in patch).toBe(false);
+    expect('einsatzziel' in patch).toBe(false);
+    expect('paTyp' in patch).toBe(false);
+  });
+
+  it('ordnet den Trupp einer taktischen Einheit zu', () => {
+    // Die Zuordnung fehlt, wenn der Trupp nie über einen Sammelplatz lief —
+    // und ohne sie steht nirgends, welche Einheit ihn bekommen hat.
+    const patch = uebernahmePatch({
+      trupp: {},
+      jetzt,
+      uid: 'u1',
+      entsendetAn: ' RLFA-ND ',
+    });
+    expect(patch.entsendetAn).toBe('RLFA-ND');
+  });
+
+  it('löscht eine bestehende Zuordnung nicht durch ein leeres Feld', () => {
+    // Am Sammelplatz gesetzt, hier nicht angefasst: Das Feld fehlt im Patch
+    // und der Wert am Dokument bleibt stehen.
+    const patch = uebernahmePatch({
+      trupp: {},
+      jetzt,
+      uid: 'u1',
+      entsendetAn: '   ',
+    });
+    expect('entsendetAn' in patch).toBe(false);
+  });
+});
+
+describe('buildDruckabfrage', () => {
+  it('baut eine Abfrage mit Zeitpunkt und Erfasser', () => {
+    expect(
+      buildDruckabfrage(
+        { druck: 200, amZiel: true, bemerkung: ' Ziel erreicht ' },
+        { uid: 'u1', jetzt: '2026-09-02T10:05:00.000Z' },
+      ),
+    ).toEqual({
+      zeitpunkt: '2026-09-02T10:05:00.000Z',
+      druck: 200,
+      amZiel: true,
+      bemerkung: 'Ziel erreicht',
+      erfasstVon: 'u1',
+    });
+  });
+
+  it('lässt Leeres weg', () => {
+    const abfrage = buildDruckabfrage({ druck: 180 }, { uid: '', jetzt: '2026-09-02T10:05:00.000Z' });
+    expect(abfrage).toEqual({ zeitpunkt: '2026-09-02T10:05:00.000Z', druck: 180 });
+  });
+
+  it('nimmt einen vorgegebenen Zeitpunkt', () => {
+    expect(
+      buildDruckabfrage(
+        { druck: 180, zeitpunkt: '2026-09-02T10:03:00.000Z' },
+        { uid: 'u1', jetzt: '2026-09-02T10:05:00.000Z' },
+      ).zeitpunkt,
+    ).toBe('2026-09-02T10:03:00.000Z');
+  });
+});
+
+describe('validateDruckabfrage', () => {
+  it('nimmt einen plausiblen Druck', () => {
+    expect(validateDruckabfrage({ druck: 200 })).toEqual([]);
+  });
+
+  it('lehnt fehlenden, negativen und unsinnig hohen Druck ab', () => {
+    expect(validateDruckabfrage({})).toEqual(['druckMissing']);
+    expect(validateDruckabfrage({ druck: -1 })).toEqual(['druckInvalid']);
+    expect(validateDruckabfrage({ druck: 1000 })).toEqual(['druckInvalid']);
+  });
+});
+
+describe('truppGeraetVonGeraet', () => {
+  it('kopiert Bezeichnung und Kennung aus den Stammdaten', () => {
+    expect(
+      truppGeraetVonGeraet(
+        geraet({ id: 'g7', nummer: '2.16.19', bezeichnung: 'Atemluftflasche CFK 6,8 l' }),
+      ),
+    ).toEqual({
+      geraetId: 'g7',
+      typ: 'flasche',
+      bezeichnung: 'Atemluftflasche CFK 6,8 l',
+      kennung: '2.16.19',
+    });
+  });
+
+  it('lässt geraetId und kennung weg, wenn es keine gibt', () => {
+    const ohne = geraet({ nummer: undefined, inventarNr: undefined, seriennummer: undefined });
+    delete ohne.id;
+    expect(truppGeraetVonGeraet(ohne)).toEqual({
+      typ: 'flasche',
+      bezeichnung: 'Atemluftflasche Stahl 6 l',
+    });
+  });
+});
+
+describe('truppGeraetLabel', () => {
+  it('stellt die Kennung voran', () => {
+    expect(
+      truppGeraetLabel({ typ: 'flasche', bezeichnung: 'CFK 6,8 l', kennung: '2.16.19' }),
+    ).toBe('2.16.19 · CFK 6,8 l');
+  });
+
+  it('nennt ohne Kennung nur die Bezeichnung', () => {
+    expect(truppGeraetLabel({ typ: 'maske', bezeichnung: 'Maske FPS' })).toBe('Maske FPS');
+  });
+});
+
+describe('gruppiereTruppGeraete', () => {
+  const flasche = (kennung: string, person?: string): TruppGeraet => ({
+    typ: 'flasche',
+    bezeichnung: 'CFK 6,8 l',
+    kennung,
+    ...(person ? { person } : {}),
+  });
+
+  it('bündelt je Träger und sortiert die Träger', () => {
+    const gruppen = gruppiereTruppGeraete([
+      flasche('3', 'Huber'),
+      flasche('1', 'Aigner'),
+      flasche('2', 'Huber'),
+    ]);
+    expect(
+      gruppen.map((g) => [g.person, g.geraete.map((x) => x.kennung)]),
+    ).toEqual([
+      ['Aigner', ['1']],
+      ['Huber', ['2', '3']],
+    ]);
+  });
+
+  it('stellt die nicht zugeordnete Ausrüstung ans Ende', () => {
+    // Sie ist eine offene Aufgabe und kein Träger — oben zwischen den Namen
+    // läse sie sich wie eine Person.
+    const gruppen = gruppiereTruppGeraete([flasche('1'), flasche('2', 'Huber')]);
+    expect(gruppen.map((g) => g.person)).toEqual(['Huber', undefined]);
+  });
+
+  it('nimmt „huber" und „Huber" als denselben Mann', () => {
+    const gruppen = gruppiereTruppGeraete([
+      flasche('1', 'Huber'),
+      flasche('2', ' huber '),
+    ]);
+    expect(gruppen).toHaveLength(1);
+    // Angezeigt wird die erste Schreibweise.
+    expect(gruppen[0].person).toBe('Huber');
+  });
+
+  it('sortiert in der Gruppe nach Gerätetyp und dann nach Beschriftung', () => {
+    // Typ zuerst: Pressluftatmer und Flasche sind die Ausrüstung, um die es
+    // geht, Zubehör steht darunter. Innerhalb des Typs zählt die Beschriftung,
+    // und die beginnt mit der Kennung — die Flaschen stehen damit nach
+    // Flaschennummer.
+    const gruppen = gruppiereTruppGeraete([
+      { typ: 'zubehoer', bezeichnung: 'Fluchthaube', person: 'Huber' },
+      { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Huber' },
+      flasche('2', 'Huber'),
+      { typ: 'flasche', bezeichnung: 'Stahl 6 l', kennung: '1', person: 'Huber' },
+      { typ: 'pressluftatmer', bezeichnung: 'PA 94', person: 'Huber' },
+    ]);
+    expect(gruppen[0].geraete.map((g) => g.bezeichnung)).toEqual([
+      'Stahl 6 l',
+      'CFK 6,8 l',
+      'Maske FPS',
+      'PA 94',
+      'Fluchthaube',
+    ]);
+  });
+
+  it('ist ohne Ausrüstung leer', () => {
+    expect(gruppiereTruppGeraete(undefined)).toEqual([]);
+  });
+});
+
+describe('sanitizeTruppGeraete', () => {
+  it('entfernt leere Felder — Firestore lehnt undefined auch im Array ab', () => {
+    expect(
+      sanitizeTruppGeraete([
+        {
+          geraetId: ' g1 ',
+          typ: 'flasche',
+          bezeichnung: ' CFK 6,8 l ',
+          kennung: ' 2.16.19 ',
+          person: undefined,
+        },
+      ]),
+    ).toEqual([
+      {
+        geraetId: 'g1',
+        typ: 'flasche',
+        bezeichnung: 'CFK 6,8 l',
+        kennung: '2.16.19',
+      },
+    ]);
+  });
+
+  it('behält einen gesetzten Träger', () => {
+    expect(
+      sanitizeTruppGeraete([
+        { typ: 'maske', bezeichnung: 'Maske FPS', person: ' Anna ' },
+      ]),
+    ).toEqual([{ typ: 'maske', bezeichnung: 'Maske FPS', person: 'Anna' }]);
+  });
+
+  it('wirft Zeilen ohne Bezeichnung und ohne Kennung weg', () => {
+    expect(
+      sanitizeTruppGeraete([{ typ: 'flasche', bezeichnung: '   ' }]),
+    ).toEqual([]);
+  });
+
+  it('nimmt die Kennung als Bezeichnung, wenn nur sie da ist', () => {
+    expect(
+      sanitizeTruppGeraete([
+        { typ: 'flasche', bezeichnung: '', kennung: '2.16.19' },
+      ]),
+    ).toEqual([
+      { typ: 'flasche', bezeichnung: '2.16.19', kennung: '2.16.19' },
+    ]);
+  });
+});
+
+describe('istGueltigeUid', () => {
+  it('nimmt eine gewöhnliche Auth-uid', () => {
+    expect(istGueltigeUid('AbC123xyz_-')).toBe(true);
+  });
+
+  it('lehnt einen Pfad ab — er würde auf ein anderes Dokument zeigen', () => {
+    // `user/foo/geheim/bar` statt `user/foo`.
+    expect(istGueltigeUid('foo/geheim/bar')).toBe(false);
+    expect(istGueltigeUid('/foo')).toBe(false);
+  });
+
+  it('lehnt die Punkt-Segmente ab — das SDK würde werfen', () => {
+    expect(istGueltigeUid('.')).toBe(false);
+    expect(istGueltigeUid('..')).toBe(false);
+  });
+
+  it('lehnt die von Firestore reservierte Form ab', () => {
+    expect(istGueltigeUid('__name__')).toBe(false);
+  });
+
+  it('lehnt Leeres ab', () => {
+    expect(istGueltigeUid('')).toBe(false);
+    expect(istGueltigeUid('   ')).toBe(false);
+  });
+
+  it('lehnt mehr als 1500 Byte ab', () => {
+    expect(istGueltigeUid('a'.repeat(1500))).toBe(true);
+    expect(istGueltigeUid('a'.repeat(1501))).toBe(false);
+    // Mehrbyte-Zeichen zählen als Bytes, nicht als Zeichen.
+    expect(istGueltigeUid('ä'.repeat(751))).toBe(false);
+  });
+});
+
+describe('sanitizeUeberwachungUids', () => {
+  it('wirft ungültige Einträge weg und hält die Reihenfolge', () => {
+    expect(
+      sanitizeUeberwachungUids(['u1', 'foo/bar', ' u2 ', '..', '', 'u1']),
+    ).toEqual(['u1', 'u2']);
+  });
+
+  it('übergeht Einträge, die keine Zeichenketten sind', () => {
+    expect(
+      sanitizeUeberwachungUids([
+        'u1',
+        42 as unknown as string,
+        null as unknown as string,
+      ]),
+    ).toEqual(['u1']);
+  });
+
+  it('kürzt auf die Höchstzahl', () => {
+    const viele = Array.from({ length: MAX_UEBERWACHUNG_UIDS + 5 }, (_, i) => `u${i}`);
+    expect(sanitizeUeberwachungUids(viele)).toHaveLength(MAX_UEBERWACHUNG_UIDS);
+  });
+
+  it('ist ohne Liste leer', () => {
+    expect(sanitizeUeberwachungUids(undefined)).toEqual([]);
+  });
+});
+
+describe('mitUeberwachungsUid: Schranken', () => {
+  it('nimmt eine krumme uid nicht auf', () => {
+    expect(mitUeberwachungsUid(['u1'], 'foo/bar')).toEqual(['u1']);
+  });
+
+  it('räumt eine bereits verunreinigte Liste mit auf', () => {
+    expect(mitUeberwachungsUid(['u1', 'foo/bar'], 'u2')).toEqual(['u1', 'u2']);
+  });
+
+  it('hängt über der Höchstzahl nichts mehr an', () => {
+    const voll = Array.from({ length: MAX_UEBERWACHUNG_UIDS }, (_, i) => `u${i}`);
+    expect(mitUeberwachungsUid(voll, 'neu')).toEqual(voll);
   });
 });

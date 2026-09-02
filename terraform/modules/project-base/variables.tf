@@ -64,6 +64,8 @@ variable "project_services" {
     "cloudbuild.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "cloudscheduler.googleapis.com",
+    # Termine der Atemschutzüberwachung, s. docs/atemschutzueberwachung.md
+    "cloudtasks.googleapis.com",
     "cloudtrace.googleapis.com",
     "containerregistry.googleapis.com",
     "datastore.googleapis.com",

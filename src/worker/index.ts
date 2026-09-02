@@ -7,6 +7,7 @@ import {
 } from 'firebase/messaging/sw';
 import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
 import { disableNavigationPreload, Serwist } from 'serwist';
+import { isAtemschutzPush, pushTag } from '../common/atemschutzPush';
 import { ChatMessage } from '../common/chat';
 import { parseFirebaseConfig } from './firebaseConfig';
 import { isWorkerBootstrap, runtimeCaching } from './patterns';
@@ -206,6 +207,12 @@ addEventListener('notificationclick', (ev) => {
   console.log('On notification click: ', event.action);
   event.notification.close();
 
+  // Das Ziel steht an der Benachrichtigung, nicht im Code: Eine
+  // Atemschutzwarnung führt auf die Überwachungsseite ihres Einsatzes, eine
+  // Chat-Nachricht weiterhin auf /chat.
+  const data = event.notification.data as { url?: string } | undefined;
+  const ziel = data?.url || '/chat';
+
   // This looks to see if the current is already open and
   // focuses if it is
   event.waitUntil(
@@ -215,10 +222,12 @@ addEventListener('notificationclick', (ev) => {
       })
       .then((clientList) => {
         for (const client of clientList) {
-          if (client.url === '/chat' && 'focus' in client)
+          // Auf den Pfad geprüft und nicht auf Gleichheit: `client.url` ist
+          // absolut, `ziel` ein Pfad — der Vergleich traf vorher nie zu.
+          if (client.url.endsWith(ziel) && 'focus' in client)
             return (client as any)?.focus();
         }
-        if (self.clients.openWindow) return self.clients.openWindow('/chat');
+        if (self.clients.openWindow) return self.clients.openWindow(ziel);
       })
   );
 });
@@ -244,6 +253,28 @@ function startBackgroundMessaging(config: FirebaseOptions) {
     console.info(
       `[${scope}] Received fb background message ${JSON.stringify(payload)}`
     );
+
+    // Atemschutzwarnungen zuerst: Vorher wurde **jede** Data-Message als
+    // Chat-Nachricht angezeigt, eine Warnung erschiene also als „Einsatz Chat:
+    // undefined". Der Text kommt fertig vom Server — der Worker hat keinen
+    // Übersetzungskatalog.
+    if (isAtemschutzPush(payload.data)) {
+      const warnung = payload.data;
+      self.registration.showNotification(warnung.title, {
+        body: warnung.body,
+        icon: '/app-icon.png',
+        // Je Trupp: Eine neue Warnung ersetzt die alte, statt sich darunter zu
+        // stapeln.
+        tag: pushTag(warnung.truppId),
+        renotify: true,
+        // Der Rückzugszeitpunkt ist eine Sicherheitsmeldung und darf nicht von
+        // selbst verschwinden; die Erinnerungen dürfen es.
+        requireInteraction: warnung.warnung === 'rueckzug',
+        data: { url: warnung.url },
+      } as NotificationOptionsWithActions);
+      return;
+    }
+
     // Customize notification here
     if (payload.data) {
       const message: ChatMessage = payload.data as unknown as ChatMessage;

@@ -55,3 +55,25 @@ variable "weekly_report_paused" {
   type        = bool
   default     = false
 }
+
+variable "ueberwachung_schedule" {
+  description = "Cron expression of the breathing apparatus monitoring sweep. This is the safety net under the Cloud Tasks schedule, not the primary path — see docs/atemschutzueberwachung.md."
+  type        = string
+  default     = "*/10 * * * *"
+}
+
+variable "tasks_queue_name" {
+  description = "Name of the Cloud Tasks queue holding the breathing apparatus warning schedule. Must match ATEMSCHUTZ_TASKS_QUEUE in the service env — the caller builds both from the same local."
+  type        = string
+}
+
+variable "caller_service_account_email" {
+  description = "Runtime service account of the Cloud Run service. It enqueues the tasks, so it needs cloudtasks.enqueuer on the queue and serviceAccountUser on the invoker."
+  type        = string
+}
+
+variable "ueberwachung_paused" {
+  description = "Job exists but does not run. Default off in both environments: dev and prod use separate Firestore databases, and the push only reaches the devices working on that very monitoring."
+  type        = bool
+  default     = false
+}

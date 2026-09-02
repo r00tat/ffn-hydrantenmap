@@ -147,6 +147,7 @@
       "mitgliederVoll": "Höchstens {max} Namen je Trupp.",
       "bemerkung": "Bemerkung",
       "laufendeNummer": "{n}. Einsatz",
+      "vonUeberwachung": "Von der Atemschutzüberwachung übergeben ({zeit})",
       "status": {
         "bereit": "In Bereitschaft",
         "imEinsatz": "Im Einsatz",
@@ -440,6 +441,145 @@
         "identifierMissing": "Weder Flaschennummer noch Feuerwehr angegeben.",
         "anzahlInvalid": "Anzahl muss zwischen 1 und 99 liegen.",
         "startdruckAboveEnddruck": "Startdruck liegt über dem Enddruck."
+      }
+    },
+    "ueberwachung": {
+      "title": "Atemschutzüberwachung",
+      "verantwortungHinweis": "Die Atemschutzüberwachung unterstützt den Trupp bei der Überwachung seines Luftvorrats; die Verantwortung für den Trupp bleibt beim Truppkommandanten und beim Kommandanten der taktischen Einheit.",
+      "keinEinsatz": "Kein Einsatz gewählt — die Atemschutzüberwachung gehört zu einem Einsatz. Zuerst einen Einsatz wählen.",
+      "protokollLeer": "Keine früheren Bereitstellungen — jeder Trupp steht oben.",
+      "einheit": "Meine Einheit",
+      "einheitHint": "Wird je Gerät gemerkt, steht als erster Reiter und wird neuen Trupps zugeordnet.",
+      "einheitAlle": "Alle Trupps",
+      "einheitKeine": "Nicht festgelegt",
+      "einheitKurz": "Einheit",
+      "zuordnung": {
+        "assp": "ASSP",
+        "keine": "Nicht zugeordnet"
+      },
+      "truppEinheit": "Taktische Einheit",
+      "truppEinheitHint": "Fahrzeug oder Einheit, die den Trupp bekommt — z.B. RLFA-ND",
+      "nichtUebernommen": "Zeitkontrolle nicht übernommen",
+      "uebernehmenKurz": "Dieses Gerät führt danach die Einsatzzeitkontrolle für den Trupp und bekommt seine Warnungen.",
+      "uebernehmenHinweis": "Damit übernimmt dieses Gerät die Einsatzzeitkontrolle für den Trupp: Die Übernahme wird als Wechsel der Verantwortung vom Sammelplatz protokolliert, und ab jetzt kommen die Warnungen zu Drittel-, Zwei-Drittel- und Rückzugszeitpunkt hier an — auch als Push, wenn die Seite geschlossen ist. Gerechnet wird mit dem unten gewählten Gerätesatz.",
+      "einsatzziel": "Einsatzziel und -ort",
+      "einsatzzielHint": "z.B. „Stiegenhaus 3. OG“ — das „WO“ der Dokumentation",
+      "ueberwachtVon": "Überwachung durch",
+      "ueberwachtVonHint": "Gruppenkommandant oder beauftragte Person, z.B. Maschinist oder Melder",
+      "paTyp": "Gerätetype",
+      "paTypen": {
+        "standard200": "Standard-PA · 2×4 l / 200 bar",
+        "standard300": "Standard-PA · 1×6 l / 300 bar",
+        "langzeit300": "Langzeit-PA · 2×6,8 l / 300 bar",
+        "custom": "Eigene Werte"
+      },
+      "flaschenAnzahl": "Flaschen",
+      "flaschenVolumen": "Volumen je Flasche (l)",
+      "fuellDruck": "Nenndruck (bar)",
+      "rechnerischeDauer": "Rechnerische Einsatzdauer: {minuten} min (Anhaltswert bei 50 l/min und 55 bar Reservedruck)",
+      "uebernehmenTitle": "Trupp übernehmen",
+      "bearbeitenTitle": "Überwachung bearbeiten",
+      "einsatzTitle": "Trupp in den Einsatz schicken",
+      "abmarschZeit": "Abmarsch (Anschließen der Luftversorgung)",
+      "druckabfrageTitle": "Druckabfrage erfassen",
+      "druck": "Geringster Druck im Trupp (bar)",
+      "druckHint": "Maßgeblich ist der Geräteträger mit dem größten Luftverbrauch.",
+      "zeitpunkt": "Zeitpunkt der Meldung",
+      "amZiel": "Trupp ist am Einsatzziel angekommen",
+      "amZielHint": "Nur mit dem Druck bei der Ankunft lässt sich der Rückmarschdruck aus dem doppelten Vormarschdruckabfall berechnen. Nicht ankreuzen für eine gewöhnliche Zwischenabfrage.",
+      "amZielFehltHinweis": "Für diesen Trupp ist noch keine Ankunft am Einsatzziel erfasst. Bis dahin gilt als Rückzugszeitpunkt die Restdruckwarnung bei 55 bar.",
+      "amZielKurz": "Ankunft",
+      "rueckzug": "Trupp hat den Rückzug angetreten",
+      "rueckzugHint": "Die Meldung „wir kommen zurück“. Danach keine Drittel- und Rückzugswarnungen mehr — beobachtet wird noch der Reservedruck.",
+      "rueckzugKurz": "Rückzug",
+      "rueckzugSeit": "Rückzug angetreten",
+      "bereitsGemeldet": "Bereits gemeldet — der Haken bleibt gesetzt. Gerechnet wird weiterhin mit der ersten Meldung.",
+      "druckverlaufChart": "Druckverlauf über die Zeit",
+      "chart": {
+        "drittel": "1/3",
+        "zweiDrittel": "2/3",
+        "ende": "rechn. Ende",
+        "ziel": "Ankunft",
+        "rueckzugAn": "Rückzug",
+        "zurueck": "zurück",
+        "jetzt": "jetzt",
+        "gemessen": "gemessen",
+        "prognose": "fortgeschrieben",
+        "rueckzug": "Rückzug {druck} bar",
+        "reserve": "Reserve {druck} bar"
+      },
+      "bemerkung": "Bemerkung",
+      "abmarschUm": "Abmarsch",
+      "seitMinuten": "seit {minuten} min",
+      "vermuteterDruck": "Vermuteter Druck",
+      "standBasis": "fortgeschrieben ab {zeit} · {druck} bar",
+      "bar": "{druck} bar",
+      "rueckzugUm": "Rückzug um",
+      "inMinuten": "in {minuten} min",
+      "ueberfaelligSeit": "überfällig seit {minuten} min",
+      "restdruckWarnung": "Restdruckwarnung ({druck} bar)",
+      "druckverlauf": "Druckverlauf",
+      "startdruckGeschaetzt": "Abmarschdruck nicht abgelesen",
+      "zielMeldungFehlt": "Keine Ankunftsmeldung",
+      "uebergeben": "An den Sammelplatz übergeben ({zeit})",
+      "geraetesatz": "{anzahl}×{volumen} l / {druck} bar · {dauer} min rechnerisch",
+      "grund": {
+        "vormarsch": "Rückmarschdruck {druck} bar (doppelter Vormarschdruckabfall)",
+        "restdruck": "Restdruckwarnung {druck} bar"
+      },
+      "verbrauch": {
+        "standard": "Anhaltswert {liter} l/min",
+        "gemessen": "gemessen {liter} l/min ({bar} bar/min)"
+      },
+      "warnungen": {
+        "drittel": "Ein Drittel der Einsatzzeit ohne Meldung (seit {zeit}) — Flaschendrücke abfragen.",
+        "zweiDrittel": "Zwei Drittel der Einsatzzeit ohne Meldung (seit {zeit}) — Flaschendrücke abfragen.",
+        "rueckzug": "Rückzugszeitpunkt erreicht (ab {zeit}) — Trupp zum Rückzug auffordern."
+      },
+      "geraeteTitle": "Geräte am Trupp",
+      "geraetSuche": "Gerät suchen oder scannen",
+      "geraetSucheHint": "Flaschennummer, Inventar- oder Seriennummer; Enter übernimmt.",
+      "geraetOhneStammdaten": "Gerät ohne Stammdatensatz",
+      "geraeteLeer": "Noch kein Gerät hinterlegt.",
+      "geraetTyp": "Typ",
+      "geraetPerson": "Getragen von",
+      "geraetPersonKeine": "nicht zugeordnet",
+      "geraetePersonHint": "Die Zuordnung Gerät → Person wird meist erst bei der Rückkehr nachgetragen.",
+      "sections": {
+        "imEinsatz": "Unter Atemschutz",
+        "bereit": "Bereit zum Abmarsch",
+        "zurueck": "Zurück"
+      },
+      "empty": {
+        "imEinsatz": "Kein Trupp unter Atemschutz.",
+        "bereit": "Kein Trupp bereit.",
+        "zurueck": "Kein Trupp zurück."
+      },
+      "pushHinweis": {
+        "offen": "Warnungen erscheinen auf dieser Seite. Damit sie auch bei gesperrtem Bildschirm ankommen, müssen Benachrichtigungen erlaubt sein.",
+        "ein": "Benachrichtigungen sind eingeschaltet — Warnungen kommen auch an, wenn die Seite im Hintergrund ist.",
+        "aus": "Der Browser lässt keine Benachrichtigungen zu. Warnungen erscheinen dann nur, solange diese Seite offen ist; erlauben lässt sich das in den Website-Einstellungen des Browsers.",
+        "nichtMoeglich": "Dieses Gerät kann keine Benachrichtigungen anzeigen. Warnungen erscheinen nur, solange diese Seite offen ist."
+      },
+      "actions": {
+        "uebernehmen": "Trupp übernehmen",
+        "inDenEinsatz": "In den Einsatz schicken",
+        "erneutInDenEinsatz": "Erneut in den Einsatz schicken",
+        "anSammelplatz": "An den Sammelplatz übergeben",
+        "druckabfrage": "Druckabfrage",
+        "truppErfassen": "Trupp erfassen",
+        "pushErlauben": "Benachrichtigungen einschalten"
+      },
+      "errors": {
+        "druckMissing": "Druck muss angegeben sein",
+        "druckInvalid": "Druck muss zwischen 0 und 400 bar liegen"
+      },
+      "push": {
+        "truppOhneName": "Atemschutztrupp",
+        "drittel": "{trupp}: keine Meldung nach einem Drittel der Einsatzzeit",
+        "zweiDrittel": "{trupp}: keine Meldung nach zwei Dritteln der Einsatzzeit",
+        "rueckzug": "{trupp}: Rückzugszeitpunkt erreicht",
+        "body": "{einsatz} · vermutet {druck} bar · Rückzug {zeit}"
       }
     }
   },
@@ -792,6 +932,7 @@
   },
   "drawer": {
     "atemschutz": "Atemschutzsammelplatz",
+    "atemschutzueberwachung": "Atemschutzüberwachung",
     "adminAtemschutz": "Atemschutz-Ausrüstung",
     "about": "Über",
     "admin": "Administration",
@@ -2903,6 +3044,7 @@
     "bottleneckNotVehicleRouted": "Strecke nicht geroutet",
     "bufferNeeded": "Faltbehälter nötig — die Abgabe hat Lücken. Lückenlos wären {vehicles} Fahrzeuge.",
     "bufferNotNeeded": "Kein Puffer nötig — es ist immer ein Fahrzeug am Entleeren.",
+    "chartElevation": "Höhe",
     "chartSource": "Entnahme",
     "chartTarget": "Ziel",
     "close": "Schließen",

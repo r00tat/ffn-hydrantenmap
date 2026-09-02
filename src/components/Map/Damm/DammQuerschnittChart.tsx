@@ -9,9 +9,11 @@ import type { DammbauView } from '../../FirecallItems/elements/damm/sandsack';
 /**
  * Der Querschnitt des Dammes, maßstäblich gezeichnet.
  *
- * Handgeschriebenes Inline-SVG, wie `FoerderungProfileChart`: Im Projekt ist
- * keine Chart-Bibliothek, und für einen Umriss mit Sacklagen ist eine neue
- * Abhängigkeit teurer als diese Datei.
+ * Handgeschriebenes Inline-SVG, obwohl `@mui/x-charts` im Bündel liegt (siehe
+ * `FoerderungProfileChart`): Das hier ist kein Diagramm mit Achsen, sondern ein
+ * maßstäblicher Umriss mit einzeln gezeichneten Sacklagen — eine Chart-
+ * Bibliothek skaliert x und y unabhängig und nimmt genau das weg, worum es
+ * geht.
  *
  * **Gleicher Maßstab in x und y.** Das ist der ganze Sinn des Bildes: Die Frage
  * „was heißt Basisbreite 3 × Höhe?" beantwortet sich, wenn man die Böschung

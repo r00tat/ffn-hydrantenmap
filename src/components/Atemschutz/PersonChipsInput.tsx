@@ -62,8 +62,14 @@ export default function PersonChipsInput({
       fullWidth
       disabled={disabled}
       // Bereits gewählte Namen verschwinden aus der Liste: Ein Vorschlag, der
-      // schon als Chip dasteht, ist nur noch im Weg.
-      options={voll ? [] : options.filter((o) => !value.includes(o))}
+      // schon als Chip dasteht, ist nur noch im Weg. Bereinigt, weil der Name
+      // der Schlüssel der Option ist — zweimal darin, und React warnt („two
+      // children with the same key") und kann Einträge verschlucken.
+      options={
+        voll
+          ? []
+          : sanitizePersonen(options).filter((o) => !value.includes(o))
+      }
       value={value}
       inputValue={eingabe}
       onInputChange={(_, next) => setEingabe(next ?? '')}

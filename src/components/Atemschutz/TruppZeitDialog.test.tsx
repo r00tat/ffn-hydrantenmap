@@ -60,4 +60,52 @@ describe('TruppZeitDialog', () => {
     render({ modus: 'rueckkehr' });
     expect(screen.queryByLabelText(/Entsendet an/)).not.toBeInTheDocument();
   });
+
+  it('fragt bei der Überwachung nach der taktischen Einheit', async () => {
+    // Auch wer allein arbeitet, braucht die Zuordnung: Ohne sie steht am Ende
+    // nirgends, welche Einheit den Trupp bekommen hat.
+    const { onConfirm } = render({ kontext: 'ueberwachung' });
+    fireEvent.change(screen.getByLabelText(/Taktische Einheit/), {
+      target: { value: 'RLFA-ND' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
+    );
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][0].entsendetAn).toBe('RLFA-ND');
+  });
+
+  it('beschriftet bei der Überwachung als „in den Einsatz schicken"', () => {
+    render({ kontext: 'ueberwachung' });
+    expect(
+      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Trupp in den Einsatz schicken'),
+    ).toBeInTheDocument();
+  });
+
+  it('übernimmt bei der Überwachung die Einheit der vorigen Bereitstellung', async () => {
+    const { onConfirm } = render({
+      kontext: 'ueberwachung',
+      entsendetAnVorschlag: 'RLFA 2000',
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
+    );
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][0].entsendetAn).toBe('RLFA 2000');
+  });
+
+  it('löscht eine bestehende Einheit nicht durch ein geleertes Feld', async () => {
+    // `entsendePatch` lässt das Feld aus dem Patch weg, wenn es leer ist — der
+    // bestehende Wert am Dokument bleibt damit stehen.
+    const { onConfirm } = render({ entsendetAnVorschlag: 'RLFA 2000' });
+    fireEvent.change(screen.getByLabelText(/Entsendet an/), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /entsenden/i }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][0]).not.toHaveProperty('entsendetAn');
+  });
 });

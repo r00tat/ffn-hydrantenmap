@@ -46,6 +46,7 @@ import SensorsIcon from '@mui/icons-material/Sensors';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import SmsIcon from '@mui/icons-material/Sms';
 import StorageIcon from '@mui/icons-material/Storage';
+import TimerIcon from '@mui/icons-material/Timer';
 import WarningIcon from '@mui/icons-material/Warning';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import WavesIcon from '@mui/icons-material/Waves';
@@ -230,6 +231,15 @@ export default function AppDrawer({
           icon: <PlaceIcon />,
           href: '/einsatzorte',
           einsatzSection: 'einsatzorte',
+        },
+        {
+          // Vor dem Sammelplatz, weil die Zeitkontrolle vor ihm da ist: Sie
+          // beginnt mit dem ersten Atemschutztrupp, der Sammelplatz erst bei
+          // umfangreicheren Einsätzen (FH-06 5.3.3/5.3.4).
+          text: t('atemschutzueberwachung'),
+          icon: <TimerIcon />,
+          href: '/atemschutzueberwachung',
+          einsatzSection: 'atemschutzueberwachung',
         },
         {
           text: t('atemschutz'),

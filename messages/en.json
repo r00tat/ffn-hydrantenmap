@@ -147,6 +147,7 @@
       "mitgliederVoll": "At most {max} names per team.",
       "bemerkung": "Note",
       "laufendeNummer": "Deployment {n}",
+      "vonUeberwachung": "Handed over by the monitoring ({zeit})",
       "status": {
         "bereit": "Standing by",
         "imEinsatz": "Deployed",
@@ -440,6 +441,145 @@
         "identifierMissing": "Neither cylinder number nor fire brigade given.",
         "anzahlInvalid": "Quantity must be between 1 and 99.",
         "startdruckAboveEnddruck": "Initial pressure is above the final pressure."
+      }
+    },
+    "ueberwachung": {
+      "title": "Breathing apparatus monitoring",
+      "verantwortungHinweis": "Monitoring supports the team in tracking its air supply; responsibility for the team stays with the team leader and the commander of the tactical unit.",
+      "keinEinsatz": "No operation selected — monitoring belongs to an operation. Select one first.",
+      "protokollLeer": "No earlier deployments — every team is listed above.",
+      "einheit": "My unit",
+      "einheitHint": "Remembered per device, shown as the first tab and assigned to new teams.",
+      "einheitAlle": "All teams",
+      "einheitKeine": "Not set",
+      "einheitKurz": "Unit",
+      "zuordnung": {
+        "assp": "Staging area",
+        "keine": "Unassigned"
+      },
+      "truppEinheit": "Tactical unit",
+      "truppEinheitHint": "Vehicle or unit the team is assigned to — e.g. RLFA-ND",
+      "nichtUebernommen": "Time control not taken over",
+      "uebernehmenKurz": "This device then runs the operational time control for the team and receives its warnings.",
+      "uebernehmenHinweis": "This device takes over the operational time control for the team: the handover from the staging area is recorded, and from now on the warnings for the one-third, two-thirds and withdrawal times arrive here — as a push notification as well, even with the page closed. The calculation uses the apparatus set selected below.",
+      "einsatzziel": "Target and location",
+      "einsatzzielHint": "e.g. “staircase 3rd floor” — the “where” of the documentation",
+      "ueberwachtVon": "Monitored by",
+      "ueberwachtVonHint": "Group commander or an assigned person, e.g. driver or runner",
+      "paTyp": "Apparatus type",
+      "paTypen": {
+        "standard200": "Standard SCBA · 2×4 l / 200 bar",
+        "standard300": "Standard SCBA · 1×6 l / 300 bar",
+        "langzeit300": "Long-duration SCBA · 2×6.8 l / 300 bar",
+        "custom": "Custom values"
+      },
+      "flaschenAnzahl": "Cylinders",
+      "flaschenVolumen": "Volume per cylinder (l)",
+      "fuellDruck": "Nominal pressure (bar)",
+      "rechnerischeDauer": "Calculated duration: {minuten} min (guide value at 50 l/min and 55 bar reserve)",
+      "uebernehmenTitle": "Take over team",
+      "bearbeitenTitle": "Edit monitoring",
+      "einsatzTitle": "Send team into action",
+      "abmarschZeit": "Departure (connecting the air supply)",
+      "druckabfrageTitle": "Record pressure check",
+      "druck": "Lowest pressure in the team (bar)",
+      "druckHint": "The wearer with the highest air consumption is decisive.",
+      "zeitpunkt": "Time of the report",
+      "amZiel": "Team has arrived at the target",
+      "amZielHint": "Only the pressure on arrival allows the turn-around pressure to be derived from twice the inbound pressure drop. Leave unchecked for an ordinary interim check.",
+      "amZielFehltHinweis": "No arrival at the target has been recorded for this team yet. Until then the low pressure warning at 55 bar is the withdrawal point.",
+      "amZielKurz": "arrival",
+      "rueckzug": "Team has started to withdraw",
+      "rueckzugHint": "The “we are coming back” report. No further one-third or withdrawal warnings after it — only the reserve pressure is still watched.",
+      "rueckzugKurz": "Withdrawal",
+      "rueckzugSeit": "Withdrawal started",
+      "bereitsGemeldet": "Already reported — the box stays checked. The first report remains the one used in the calculation.",
+      "druckverlaufChart": "Pressure over time",
+      "chart": {
+        "drittel": "1/3",
+        "zweiDrittel": "2/3",
+        "ende": "calc. end",
+        "ziel": "arrival",
+        "rueckzugAn": "withdrawal",
+        "zurueck": "back",
+        "jetzt": "now",
+        "gemessen": "measured",
+        "prognose": "projected",
+        "rueckzug": "Withdrawal {druck} bar",
+        "reserve": "Reserve {druck} bar"
+      },
+      "bemerkung": "Note",
+      "abmarschUm": "Departure",
+      "seitMinuten": "for {minuten} min",
+      "vermuteterDruck": "Estimated pressure",
+      "standBasis": "extrapolated from {zeit} · {druck} bar",
+      "bar": "{druck} bar",
+      "rueckzugUm": "Withdraw at",
+      "inMinuten": "in {minuten} min",
+      "ueberfaelligSeit": "overdue for {minuten} min",
+      "restdruckWarnung": "Low pressure warning ({druck} bar)",
+      "druckverlauf": "Pressure history",
+      "startdruckGeschaetzt": "Departure pressure not read",
+      "zielMeldungFehlt": "No arrival report",
+      "uebergeben": "Handed back to the staging area ({zeit})",
+      "geraetesatz": "{anzahl}×{volumen} l / {druck} bar · {dauer} min calculated",
+      "grund": {
+        "vormarsch": "Turn-around pressure {druck} bar (twice the inbound drop)",
+        "restdruck": "Low pressure warning {druck} bar"
+      },
+      "verbrauch": {
+        "standard": "guide value {liter} l/min",
+        "gemessen": "measured {liter} l/min ({bar} bar/min)"
+      },
+      "warnungen": {
+        "drittel": "One third of the duration without a report (since {zeit}) — ask for cylinder pressures.",
+        "zweiDrittel": "Two thirds of the duration without a report (since {zeit}) — ask for cylinder pressures.",
+        "rueckzug": "Withdrawal time reached (from {zeit}) — order the team to withdraw."
+      },
+      "geraeteTitle": "Equipment with the team",
+      "geraetSuche": "Search or scan equipment",
+      "geraetSucheHint": "Cylinder, inventory or serial number; Enter accepts.",
+      "geraetOhneStammdaten": "Equipment without a record",
+      "geraeteLeer": "No equipment recorded yet.",
+      "geraetTyp": "Type",
+      "geraetPerson": "Worn by",
+      "geraetPersonKeine": "unassigned",
+      "geraetePersonHint": "Assigning equipment to a person is usually done on return.",
+      "sections": {
+        "imEinsatz": "Under breathing apparatus",
+        "bereit": "Ready to depart",
+        "zurueck": "Returned"
+      },
+      "empty": {
+        "imEinsatz": "No team under breathing apparatus.",
+        "bereit": "No team ready.",
+        "zurueck": "No team returned."
+      },
+      "pushHinweis": {
+        "offen": "Warnings appear on this page. For them to arrive while the screen is locked, notifications have to be allowed.",
+        "ein": "Notifications are enabled — warnings also arrive while the page is in the background.",
+        "aus": "The browser does not allow notifications. Warnings then only appear while this page is open; you can allow them in the browser's site settings.",
+        "nichtMoeglich": "This device cannot show notifications. Warnings only appear while this page is open."
+      },
+      "actions": {
+        "uebernehmen": "Take over team",
+        "inDenEinsatz": "Send into action",
+        "erneutInDenEinsatz": "Send into action again",
+        "anSammelplatz": "Hand back to the staging area",
+        "druckabfrage": "Pressure check",
+        "truppErfassen": "Add team",
+        "pushErlauben": "Enable notifications"
+      },
+      "errors": {
+        "druckMissing": "A pressure is required",
+        "druckInvalid": "Pressure must be between 0 and 400 bar"
+      },
+      "push": {
+        "truppOhneName": "Breathing apparatus team",
+        "drittel": "{trupp}: no report after one third of the duration",
+        "zweiDrittel": "{trupp}: no report after two thirds of the duration",
+        "rueckzug": "{trupp}: withdrawal time reached",
+        "body": "{einsatz} · estimated {druck} bar · withdraw {zeit}"
       }
     }
   },
@@ -792,6 +932,7 @@
   },
   "drawer": {
     "atemschutz": "Breathing apparatus",
+    "atemschutzueberwachung": "Breathing apparatus monitoring",
     "adminAtemschutz": "Breathing apparatus equipment",
     "about": "About",
     "admin": "Administration",
@@ -2903,6 +3044,7 @@
     "bottleneckNotVehicleRouted": "Distance not routed",
     "bufferNeeded": "Portable tank required — the supply has gaps. {vehicles} vehicles would make it gapless.",
     "bufferNotNeeded": "No buffer needed — a vehicle is always discharging.",
+    "chartElevation": "Elevation",
     "chartSource": "Source",
     "chartTarget": "Target",
     "close": "Close",

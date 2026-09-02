@@ -186,6 +186,128 @@ export const TRUPP_STATUSES: TruppStatus[] = [
 ];
 
 /**
+ * Vorlagen für den Gerätesatz eines Trupps, benannt nach der Lehrunterlage.
+ *
+ * Nur die drei Sätze, die FH-06 selbst durchrechnet, plus `custom`: Jeder
+ * weitere Eintrag wäre eine Behauptung darüber, was eine Feuerwehr fährt, und
+ * mit `custom` steht der Weg zu beliebigen Werten ohnehin offen.
+ */
+export type PaTypKey = 'standard200' | 'standard300' | 'langzeit300' | 'custom';
+
+export const PA_TYPEN: PaTypKey[] = [
+  'standard200',
+  'standard300',
+  'langzeit300',
+  'custom',
+];
+
+/** Was den Luftvorrat eines Trupps bestimmt. */
+export interface Geraetesatz {
+  /** Flaschen je Geräteträger. */
+  flaschenAnzahl: number;
+  /** Volumen *einer* Flasche in Liter. */
+  flaschenVolumen: number;
+  /** Nenndruck in bar — entscheidet über den Korrekturfaktor. */
+  fuellDruck: number;
+}
+
+/**
+ * Die Gerätesätze der Beispiele aus FH-06, S. 48-49.
+ *
+ * `custom` fehlt hier bewusst: Dafür gibt es keine Vorlage, sondern die Werte
+ * am Trupp.
+ */
+export const PA_SAETZE: Record<Exclude<PaTypKey, 'custom'>, Geraetesatz> = {
+  // Standardpressluftatmer, 2-Flaschengerät á 4 l mit 200 bar.
+  standard200: { flaschenAnzahl: 2, flaschenVolumen: 4, fuellDruck: 200 },
+  // Standardpressluftatmer, 1-Flaschengerät á 6 l mit 300 bar.
+  standard300: { flaschenAnzahl: 1, flaschenVolumen: 6, fuellDruck: 300 },
+  // Langzeitpressluftatmer, 2-Flaschengerät á 6,8 l mit 300 bar.
+  langzeit300: { flaschenAnzahl: 2, flaschenVolumen: 6.8, fuellDruck: 300 },
+};
+
+/**
+ * Eine protokollierte Druckabfrage.
+ *
+ * Maßgeblich ist immer der **geringste Druck im Trupp**: „Der Atemschutztrupp
+ * hat sich bei der Festlegung des Rückmarschzeitpunktes immer an dem
+ * Geräteträger mit dem größten Luftverbrauch zu orientieren." (FH-06 5.3.2)
+ * Deshalb ein Wert je Abfrage und nicht einer je Person — drei Werte
+ * abzufragen kostet Funkzeit, und gerechnet würde ohnehin nur mit dem
+ * kleinsten.
+ */
+export interface Druckabfrage {
+  zeitpunkt: string;
+  /** Geringster Druck im Trupp in bar. */
+  druck: number;
+  /**
+   * Die Ankunft am Einsatzziel — in der Unterlage „Flaschendruck bei Erreichen
+   * des Einsatzzieles".
+   *
+   * Ohne sie ist der Rückmarschdruck aus dem doppelten Vormarschdruckabfall
+   * nicht berechenbar — sie ist der einzige Wert, aus dem hervorgeht, wie viel
+   * Luft der Hinweg gekostet hat. In der Oberfläche heißt das Feld deshalb
+   * „Trupp ist am Einsatzziel angekommen" und ist **nicht** vorbelegt:
+   * „Einsatzziel erreicht" liest sich wie „Auftrag erledigt", und ein zu früh
+   * gesetzter Haken macht den Rückmarschdruck zu einer Behauptung.
+   */
+  amZiel?: boolean;
+  /**
+   * Der Trupp hat den Rückzug angetreten — die Gegenmeldung zur Ankunft.
+   *
+   * Am Ende der Zeitkontrolle stand vorher nur „angekommen" und dann irgendwann
+   * „zurück". Der Rückmarsch ist aber ein eigener Abschnitt: Ab hier laufen die
+   * Fristen ins Leere, denn ihr Zweck war, den Trupp zum Umkehren zu bringen.
+   * Deshalb schweigen die Warnungen danach (`faelligeWarnungen`) — beobachtet
+   * wird noch der Reservedruck.
+   *
+   * Ein Feld an der Abfrage und kein Zeitstempel am Trupp: Die Meldung „wir
+   * kommen zurück" kommt über Funk zusammen mit einem Flaschendruck, und genau
+   * dieses Paar ist eine Druckabfrage. Ein eigenes Feld am Trupp wäre eine
+   * zweite Wahrheit über denselben Funkspruch.
+   */
+  rueckzug?: boolean;
+  bemerkung?: string;
+  /** Wer abgefragt hat — `uid`, für die Nachvollziehbarkeit. */
+  erfasstVon?: string;
+}
+
+/**
+ * Ein Gerät am Trupp.
+ *
+ * `geraetId` fehlt bei einer Fremdflasche ohne Stammdatensatz; dann tragen
+ * `bezeichnung` und `kennung` allein. Dieselbe Abwägung wie beim Füllprotokoll:
+ * Ein Pflichtverweis in die Stammdaten hieße, dass eine Nachbarwehr nicht
+ * erfassbar ist.
+ */
+export interface TruppGeraet {
+  geraetId?: string;
+  typ: AtemschutzGeraetTyp;
+  bezeichnung: string;
+  /** Flaschennummer, Inventar- oder Seriennummer — was aufgedruckt ist. */
+  kennung?: string;
+  /**
+   * Wer das Gerät getragen hat.
+   *
+   * Wird meist erst bei der Rückkehr nachgetragen: Beim Abmarsch steht selten
+   * fest, wer welche Flasche aufnimmt, und ein Pflichtfeld hier hielte den
+   * Trupp auf.
+   */
+  person?: string;
+}
+
+/**
+ * Die Warnungen der Überwachung, in der Reihenfolge ihrer Dringlichkeit.
+ *
+ * `drittel` und `zweiDrittel` sind Erinnerungen, `rueckzug` ist die
+ * sicherheitsrelevante Warnung — die Reihenfolge entscheidet, welche verschickt
+ * wird, wenn mehrere gleichzeitig fällig sind.
+ */
+export type WarnungKey = 'drittel' | 'zweiDrittel' | 'rueckzug';
+
+export const WARNUNG_KEYS: WarnungKey[] = ['drittel', 'zweiDrittel', 'rueckzug'];
+
+/**
  * Eine Bereitstellung eines Trupps — nicht der Trupp selbst.
  *
  * Wird ein zurückgekehrter Trupp erneut bereitgestellt, entsteht ein *neues*
@@ -212,6 +334,93 @@ export interface AtemschutzTrupp {
   rueckkehrZeit?: string;
   /** Geringster Druck im Trupp bei der Rückkehr. */
   druckRueckkehr?: number;
+
+  // ---- Atemschutzüberwachung (Einsatzzeitkontrolle, FH-06 5.3.3) ----
+  //
+  // Bewusst Felder am Trupp und keine eigene Sammlung: Der Trupp am
+  // Sammelplatz und der überwachte Trupp sind derselbe. Sonst müsste die
+  // Übergabe ein zweites Dokument anlegen, das mit dem ersten in Zeit und
+  // Druck auseinanderlaufen kann — und genau darauf käme es an.
+
+  /**
+   * Einsatzziel und -ort — das „WO" der Dokumentation.
+   *
+   * Freitext: „Stiegenhaus 3. OG", „Kellerabteil links". Keine Auswahlliste,
+   * weil der Ort in der Funkmeldung genau so beschrieben wird.
+   */
+  einsatzziel?: string;
+  /**
+   * Wer die Zeitkontrolle führt, als Klartext — der Gruppenkommandant selbst
+   * oder die von ihm beauftragte Person („Maschinist LFA", „Melder").
+   *
+   * Kein Benutzerverweis: Der Beauftragte hat oft kein Gerät in der Hand, und
+   * das Protokoll soll die Funktion nennen, nicht ein Konto.
+   */
+  ueberwachtVon?: string;
+  /**
+   * Geräte, deren Benutzer eine Warnung bekommen sollen.
+   *
+   * Getrennt von `ueberwachtVon`: Der Push braucht eine `uid`, das Protokoll
+   * einen Namen. Wer die Überwachung übernimmt oder eine Druckabfrage erfasst,
+   * kommt dazu — auf einem Sammelplatz wechseln sich mehrere ab, und die
+   * Warnung soll bei allen ankommen, die schon einmal daran gearbeitet haben.
+   */
+  ueberwachungUids?: string[];
+  /**
+   * Wann die Verantwortung für die Zeitkontrolle übernommen wurde.
+   *
+   * Der Wechsel ist protokollpflichtig: Ab hier hat der Gruppenkommandant die
+   * Überwachung, nicht mehr der Sammelplatz (FH-06 5.3.4).
+   */
+  ueberwachungSeit?: string;
+  /**
+   * Wann der zurückgekehrte Trupp an den Sammelplatz übergeben wurde.
+   *
+   * Das Gegenstück zu `ueberwachungSeit`: Beide zusammen sind der Zeitraum, in
+   * dem der Gruppenkommandant die Zeitkontrolle hatte. Danach ist der Trupp
+   * Sache des Sammelplatzes — Regeneration, Flaschen füllen, neu ausrüsten —,
+   * und wer die Überwachung führte, ist damit fertig.
+   *
+   * `ueberwachungSeit` bleibt dabei stehen: Es belegt, wann die Verantwortung
+   * begann, und ein gelöschter Anfang machte das Ende unlesbar.
+   */
+  ueberwachungBis?: string;
+  /** Vorlage des Gerätesatzes; `custom` heißt: Werte von Hand oder aus der Flasche. */
+  paTyp?: PaTypKey;
+  /** Zahl der Flaschen je Geräteträger. */
+  flaschenAnzahl?: number;
+  /** Volumen *einer* Flasche in Liter. */
+  flaschenVolumen?: number;
+  /** Nenndruck der Flasche in bar — entscheidet über den Korrekturfaktor. */
+  fuellDruck?: number;
+  /**
+   * Protokollierte Druckabfragen nach dem Abmarsch, älteste zuerst.
+   *
+   * Ein Array und keine Untersammlung: Es sind ein paar Zeilen je
+   * Bereitstellung, die Anzeige braucht immer alle, `arrayUnion` hängt atomar
+   * an — und die Einsatzsicherung (`useExport`) nimmt das Feld mit, ohne dass
+   * dort etwas nachgezogen werden muss.
+   *
+   * Der Abmarsch steht **nicht** darin: Er ist `abmarschZeit` +
+   * `druckAbmarsch`. Zwei Wahrheiten über denselben Zeitpunkt wären eine zu
+   * viel.
+   */
+  abfragen?: Druckabfrage[];
+  /**
+   * Geräte am Trupp — Flasche, Maske, Pressluftatmer.
+   *
+   * Sie hängen am Trupp und nicht an der Person: Wer welche Flasche trägt,
+   * steht meist erst fest, wenn der Trupp wieder herauskommt. `person` wird
+   * deshalb später nachgetragen.
+   */
+  truppGeraete?: TruppGeraet[];
+  /**
+   * Welche Warnung wann verschickt wurde.
+   *
+   * Steht am Dokument und nicht im Server: Der Zeitplan läuft alle Minute, und
+   * ohne diese Buchführung käme jede Warnung jede Minute erneut.
+   */
+  warnungen?: Partial<Record<WarnungKey, string>>;
   bemerkung?: string;
   createdAt: string;
   createdBy: string;
@@ -652,6 +861,14 @@ export type NeueBereitstellung = Omit<
  * Mitglieder. Zeiten, Drücke, Gruppenkommandant und Bemerkung der alten Zeile
  * bleiben dort und werden hier nicht mitgeschleppt — sonst behauptete die neue
  * Bereitstellung einen Abmarsch, den es noch nicht gab.
+ *
+ * Bei der Ausrüstung geht die Grenze **nicht** zwischen den Zeilen, sondern
+ * zwischen den Gerätetypen: Maske, Pressluftatmer und Zubehör bleiben beim
+ * Träger — der Trupp legt sie zwischen zwei Einsätzen nicht ab, und sie noch
+ * einmal zu scannen ist reine Tipparbeit. Die **Flaschen** bleiben zurück: Sie
+ * sind leer und werden getauscht, und eine mitgeschleppte Flaschennummer wäre
+ * eine Falschaussage darüber, welche Flasche im zweiten Einsatz war — genau
+ * die, aus der später das Füllprotokoll wird.
  */
 export function nextBereitstellung(
   vorherige: AtemschutzTrupp,
@@ -666,6 +883,77 @@ export function nextBereitstellung(
     bereitSeit: jetzt,
   };
   if (vorherige.truppName) neu.truppName = vorherige.truppName;
+  const behalten = (vorherige.truppGeraete ?? [])
+    .filter((g) => g.typ !== 'flasche')
+    // Kopien, damit die neue Zeile keine Objekte der alten teilt.
+    .map((g) => ({ ...g }));
+  // Nur, wenn etwas übrig bleibt: Firestore lehnt `undefined` ab, und ein
+  // leeres Array wäre eine Aussage über Ausrüstung, die es nicht gibt.
+  if (behalten.length > 0) neu.truppGeraete = behalten;
+  return neu;
+}
+
+export interface ErneuterEinsatzArgs {
+  /** Die zurückgekehrte Zeile, aus der der Trupp übernommen wird. */
+  vorherige: AtemschutzTrupp;
+  jetzt: string;
+  /** Das Ergebnis von `entsendePatch` — Zeit und Druck des neuen Abmarschs. */
+  entsendung: TruppPatch;
+  /** Wer die Zeile anlegt; bekommt damit die Warnungen dieser Bereitstellung. */
+  uid?: string;
+}
+
+/**
+ * Schickt einen zurückgekehrten Trupp erneut in den Einsatz — als *neue* Zeile
+ * und in einem Schritt.
+ *
+ * Am Sammelplatz führt der Weg über „Wieder bereitstellen": Dort wird der
+ * Trupp regeneriert, ausgerüstet und *später* von jemand anderem entsendet. Bei
+ * der Zeitkontrolle steht der Gruppenkommandant selbst davor und schickt
+ * denselben Trupp wieder hinein — der Zwischenzustand „bereit" wäre ein Klick
+ * ohne Erkenntnis und, schlimmer, ein Trupp unter Atemschutz, dessen Zeile
+ * behauptet, er stehe bereit.
+ *
+ * Übernommen wird, was am Trupp und nicht an der einzelnen Entsendung hängt:
+ * Gerätesatz, Einheit und wer die Zeitkontrolle führt. **Nicht** übernommen
+ * werden Messwerte, Warnungen und das Einsatzziel — das ist der Auftrag dieser
+ * Entsendung, und der zweite Einsatz führt den Trupp oft woandershin.
+ *
+ * `ueberwachungSeit` steht auf `jetzt`: Die Verantwortung läuft weiter, aber
+ * auf dieser Zeile beginnt sie hier.
+ */
+export function erneuterEinsatz({
+  vorherige,
+  jetzt,
+  entsendung,
+  uid,
+}: ErneuterEinsatzArgs): NeueBereitstellung {
+  const neu: NeueBereitstellung = {
+    ...nextBereitstellung(vorherige, jetzt),
+    ...entsendung,
+    ueberwachungSeit: jetzt,
+    ueberwachungUids: mitUeberwachungsUid(
+      vorherige.ueberwachungUids,
+      uid ?? '',
+    ),
+  };
+  // Einzeln und mit Prüfung, nicht als Spread der alten Zeile: Firestore lehnt
+  // `undefined` ab, und ein `paTyp: undefined` aus einem Trupp ohne Gerätesatz
+  // ließe den ganzen Schreibvorgang scheitern.
+  if (!neu.entsendetAn && vorherige.entsendetAn) {
+    neu.entsendetAn = vorherige.entsendetAn;
+  }
+  if (vorherige.ueberwachtVon) neu.ueberwachtVon = vorherige.ueberwachtVon;
+  if (vorherige.paTyp) neu.paTyp = vorherige.paTyp;
+  if (typeof vorherige.flaschenAnzahl === 'number') {
+    neu.flaschenAnzahl = vorherige.flaschenAnzahl;
+  }
+  if (typeof vorherige.flaschenVolumen === 'number') {
+    neu.flaschenVolumen = vorherige.flaschenVolumen;
+  }
+  if (typeof vorherige.fuellDruck === 'number') {
+    neu.fuellDruck = vorherige.fuellDruck;
+  }
   return neu;
 }
 
@@ -681,6 +969,17 @@ export interface TruppGruppen {
   aktuell: AtemschutzTrupp[];
   /** Alle Zeilen, neueste Bereitstellung zuerst. */
   protokoll: AtemschutzTrupp[];
+  /**
+   * Das Protokoll **ohne** die Zeilen, die in den drei Abschnitten oben schon
+   * stehen: die älteren Bereitstellungen und die abgemeldeten Trupps.
+   *
+   * Der Unterschied zu `protokoll` ist eine Aussage über die Oberfläche: Ein
+   * Trupp unter Atemschutz stand bisher zweimal auf derselben Seite — oben in
+   * seinem Abschnitt und darunter noch einmal im Protokoll. Die zweite Karte
+   * trug nichts bei und ließ die Liste doppelt so lang aussehen, wie der
+   * Einsatz ist.
+   */
+  frueher: AtemschutzTrupp[];
 }
 
 /**
@@ -726,12 +1025,21 @@ export function gruppiereTrupps(trupps: AtemschutzTrupp[]): TruppGruppen {
     (t) => juengste.get(t.truppKey || (t.id ?? '')) === t,
   );
 
+  const bereit = aktuell.filter((t) => t.status === 'bereit');
+  const imEinsatz = aktuell.filter((t) => t.status === 'imEinsatz');
+  const zurueck = aktuell.filter((t) => t.status === 'zurueck');
+  // Über die Zeilen selbst und nicht über den Status: „steht oben" ist genau
+  // die Vereinigung der drei Abschnitte — ein abgemeldeter Trupp ist zwar
+  // `aktuell`, hat oben aber keine Karte und gehört ins Protokoll.
+  const oben = new Set<AtemschutzTrupp>([...bereit, ...imEinsatz, ...zurueck]);
+
   return {
-    bereit: aktuell.filter((t) => t.status === 'bereit'),
-    imEinsatz: aktuell.filter((t) => t.status === 'imEinsatz'),
-    zurueck: aktuell.filter((t) => t.status === 'zurueck'),
+    bereit,
+    imEinsatz,
+    zurueck,
     aktuell,
     protokoll,
+    frueher: protokoll.filter((t) => !oben.has(t)),
   };
 }
 
@@ -741,6 +1049,15 @@ export interface TruppInput {
   feuerwehr: string;
   mitglieder: string[];
   bemerkung?: string;
+  /**
+   * Die taktische Einheit, der der Trupp zugeordnet ist.
+   *
+   * Nur bei der Zeitkontrolle erfragt: Am Sammelplatz steht beim Erfassen noch
+   * nicht fest, wohin der Trupp geht — das entscheidet sich beim Entsenden. Wer
+   * ihn dagegen bei seiner eigenen Einheit erfasst, weiß es in derselben
+   * Sekunde.
+   */
+  entsendetAn?: string;
 }
 
 /**
@@ -798,4 +1115,346 @@ export function newTruppKey(): string {
   const c = (globalThis as { crypto?: Crypto }).crypto;
   if (c?.randomUUID) return c.randomUUID();
   return `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Nimmt eine `uid` in die Warnliste auf, ohne zu doppeln.
+ *
+ * Eine leere `uid` wird übergangen: In einem abgemeldeten Zustand ist sie `''`,
+ * und ein leerer Eintrag in der Liste wäre ein Empfänger, den es nicht gibt.
+ */
+export function mitUeberwachungsUid(
+  vorhanden: string[] | undefined,
+  uid: string,
+): string[] {
+  // Bereinigt und nicht bloß kopiert: Was hier zurückgeht, wird geschrieben,
+  // und die Liste soll schon beim Schreiben die Schranken einhalten, die der
+  // Zeitplan beim Lesen ohnehin durchsetzt (`sanitizeUeberwachungUids`).
+  const liste = sanitizeUeberwachungUids(vorhanden);
+  const wert = uid?.trim();
+  if (
+    !istGueltigeUid(wert ?? '') ||
+    liste.includes(wert as string) ||
+    liste.length >= MAX_UEBERWACHUNG_UIDS
+  ) {
+    return liste;
+  }
+  liste.push(wert as string);
+  return liste;
+}
+
+/** Was am Trupp geändert wird, ohne den Zustand anzufassen. */
+export type UeberwachungPatch = Partial<AtemschutzTrupp>;
+
+export interface UebernahmeInput {
+  /** Der bestehende Zustand — entscheidet, ob die Übernahme neu ist. */
+  trupp: Pick<AtemschutzTrupp, 'ueberwachungSeit' | 'ueberwachungUids'>;
+  jetzt: string;
+  uid: string;
+  ueberwachtVon?: string;
+  einsatzziel?: string;
+  /**
+   * Die taktische Einheit, der der Trupp zugeordnet ist — dasselbe Feld, das
+   * der Sammelplatz beim Entsenden füllt.
+   *
+   * Auch hier zu setzen, weil ein Trupp nicht über einen Sammelplatz laufen
+   * muss: Arbeitet eine Einheit allein, gibt es niemanden, der die Zuordnung
+   * vorher eingetragen hätte — und ohne sie steht am Ende nirgends, wer den
+   * Trupp bekommen hat.
+   */
+  entsendetAn?: string;
+  paTyp?: PaTypKey;
+  /** Nur bei `paTyp === 'custom'` von Belang, aber immer mitgeschrieben. */
+  satz?: Geraetesatz;
+}
+
+/**
+ * Der Patch, mit dem ein Gruppenkommandant die Zeitkontrolle übernimmt.
+ *
+ * `ueberwachungSeit` wird **nur beim ersten Mal** gesetzt: Der Zeitpunkt belegt
+ * den Wechsel der Verantwortung vom Sammelplatz zum Gruppenkommandanten
+ * (FH-06 5.3.4). Würde er bei jeder Änderung neu gestempelt, verschöbe sich der
+ * Beleg mit jeder nachträglich getippten Bemerkung nach vorn.
+ *
+ * Leere Felder fehlen im Patch, statt als `undefined` darin zu stehen —
+ * Firestore lehnt `undefined` ab, dieselbe Vorsicht wie in `entsendePatch`.
+ */
+export function uebernahmePatch(input: UebernahmeInput): UeberwachungPatch {
+  const patch: UeberwachungPatch = {
+    ueberwachungUids: mitUeberwachungsUid(
+      input.trupp.ueberwachungUids,
+      input.uid,
+    ),
+  };
+  if (!input.trupp.ueberwachungSeit) patch.ueberwachungSeit = input.jetzt;
+
+  const person = input.ueberwachtVon?.trim();
+  if (person) patch.ueberwachtVon = person;
+  const ziel = input.einsatzziel?.trim();
+  if (ziel) patch.einsatzziel = ziel;
+  // Leer heißt „nicht angefasst" und nicht „löschen": Eine am Sammelplatz
+  // eingetragene Einheit soll eine Übernahme ohne Angabe nicht wegwerfen.
+  const einheit = input.entsendetAn?.trim();
+  if (einheit) patch.entsendetAn = einheit;
+
+  if (input.paTyp) {
+    patch.paTyp = input.paTyp;
+    if (input.satz) {
+      patch.flaschenAnzahl = input.satz.flaschenAnzahl;
+      patch.flaschenVolumen = input.satz.flaschenVolumen;
+      patch.fuellDruck = input.satz.fuellDruck;
+    }
+  }
+  return patch;
+}
+
+/**
+ * Der Patch, mit dem ein zurückgekehrter Trupp an den Sammelplatz zurückgeht.
+ *
+ * Nur ein Zeitstempel und keine Zustandsänderung: `zurueck` bleibt `zurueck`.
+ * Der Trupp ist ja nicht weg, er wird regeneriert — und wer das tut, steht am
+ * Sammelplatz und nicht bei der Zeitkontrolle. Die neue Bereitstellung entsteht
+ * dort über „wieder bereitstellen" (`nextBereitstellung`).
+ *
+ * Warum überhaupt festgehalten: Die Übergabe der Verantwortung ist
+ * protokollpflichtig — in beide Richtungen. Ohne Vermerk stünde am Ende des
+ * Einsatzes an jedem Trupp ein Gruppenkommandant, der ihn „überwacht", auch
+ * Stunden nachdem er wieder Umgebungsluft atmet.
+ */
+export function sammelplatzUebergabePatch(input: {
+  jetzt: string;
+}): UeberwachungPatch {
+  return { ueberwachungBis: input.jetzt };
+}
+
+/** Die Eingabe des Druckabfrage-Dialogs. */
+export interface DruckabfrageInput {
+  druck?: number;
+  amZiel?: boolean;
+  rueckzug?: boolean;
+  bemerkung?: string;
+  /** Ohne Angabe gilt der Jetzt-Zeitpunkt des Aufrufers. */
+  zeitpunkt?: string;
+}
+
+/** Höchster plausibler Flaschendruck — ein Riegel gegen einen Tippfehler. */
+export const MAX_DRUCK_BAR = 400;
+
+/**
+ * Harte Validierung einer Druckabfrage — wenig, wie überall im Atemschutz:
+ * Wer am Funk mitschreibt, darf nicht an einem Formular hängen.
+ */
+export function validateDruckabfrage(input: DruckabfrageInput): string[] {
+  if (input.druck == null || !Number.isFinite(input.druck)) {
+    return ['druckMissing'];
+  }
+  if (input.druck < 0 || input.druck > MAX_DRUCK_BAR) return ['druckInvalid'];
+  return [];
+}
+
+export function buildDruckabfrage(
+  input: DruckabfrageInput,
+  ctx: { uid: string; jetzt: string },
+): Druckabfrage {
+  const abfrage: Druckabfrage = {
+    zeitpunkt: input.zeitpunkt?.trim() || ctx.jetzt,
+    druck: input.druck as number,
+  };
+  if (input.amZiel) abfrage.amZiel = true;
+  if (input.rueckzug) abfrage.rueckzug = true;
+  const bemerkung = input.bemerkung?.trim();
+  if (bemerkung) abfrage.bemerkung = bemerkung;
+  const uid = ctx.uid?.trim();
+  if (uid) abfrage.erfasstVon = uid;
+  return abfrage;
+}
+
+/**
+ * Ein Gerät aus den Stammdaten als Gerät am Trupp.
+ *
+ * Bezeichnung und Kennung werden **kopiert**: Die Liste am Trupp soll ohne Join
+ * lesbar bleiben, und ein Jahr später soll noch dastehen, welche Flasche
+ * gemeint war — auch wenn der Stammdatensatz zwischenzeitlich umbenannt oder
+ * ausgeschieden wurde. Dieselbe Abwägung wie bei `geraetName` an der Ausgabe.
+ */
+export function truppGeraetVonGeraet(g: AtemschutzGeraet): TruppGeraet {
+  const tg: TruppGeraet = { typ: g.typ, bezeichnung: g.bezeichnung };
+  if (g.id) tg.geraetId = g.id;
+  const kennung = geraetKennung(g);
+  if (kennung) tg.kennung = kennung;
+  return tg;
+}
+
+/** Einzeiliges Etikett eines Geräts am Trupp. */
+export function truppGeraetLabel(tg: TruppGeraet): string {
+  return tg.kennung ? `${tg.kennung} · ${tg.bezeichnung}` : tg.bezeichnung;
+}
+
+/** Die Ausrüstung eines Trupps, nach Träger gebündelt. */
+export interface TruppGeraeteGruppe {
+  /** Der Träger; fehlt bei der noch nicht zugeordneten Ausrüstung. */
+  person?: string;
+  geraete: TruppGeraet[];
+}
+
+/**
+ * Die Ausrüstung eines Trupps nach Person gruppiert und sortiert.
+ *
+ * In Erfassungsreihenfolge ist die Liste am Einsatzort nicht zu lesen: Erfasst
+ * wird Scan für Scan, gefragt ist aber „was trägt Huber?" und nicht „was wurde
+ * als Drittes gescannt". Gruppiert steht die Antwort in einer Zeile je Person.
+ *
+ * Drei Festlegungen, die man an der Reihenfolge sonst nicht sieht:
+ * - Gruppiert wird ohne Rücksicht auf Groß- und Kleinschreibung, angezeigt
+ *   wird die erste Schreibweise. Ältere Zuordnungen kommen aus einem
+ *   Freitextfeld, und „huber" und „Huber" sind derselbe Mann.
+ * - Innerhalb der Gruppe zählt der **Gerätetyp** vor der Bezeichnung, in der
+ *   Reihenfolge von `ATEMSCHUTZ_GERAET_TYPEN`: Der Pressluftatmer und die
+ *   Flasche sind die Ausrüstung, um die es geht, Zubehör steht darunter.
+ * - Die noch **nicht zugeordnete** Ausrüstung steht am Ende. Sie ist eine
+ *   offene Aufgabe und kein Träger; oben zwischen den Namen läse sie sich wie
+ *   eine Person.
+ */
+export function gruppiereTruppGeraete(
+  geraete?: TruppGeraet[],
+): TruppGeraeteGruppe[] {
+  const gruppen = new Map<string, TruppGeraeteGruppe>();
+  for (const g of geraete ?? []) {
+    const person = g.person?.trim();
+    const key = person ? person.toLowerCase() : '';
+    const gruppe = gruppen.get(key);
+    if (gruppe) {
+      gruppe.geraete.push(g);
+      continue;
+    }
+    gruppen.set(key, { ...(person ? { person } : {}), geraete: [g] });
+  }
+
+  const typRang = (typ: AtemschutzGeraetTyp) => {
+    const rang = ATEMSCHUTZ_GERAET_TYPEN.indexOf(typ);
+    return rang < 0 ? ATEMSCHUTZ_GERAET_TYPEN.length : rang;
+  };
+
+  for (const gruppe of gruppen.values()) {
+    gruppe.geraete.sort(
+      (a, b) =>
+        typRang(a.typ) - typRang(b.typ) ||
+        truppGeraetLabel(a).localeCompare(truppGeraetLabel(b), 'de'),
+    );
+  }
+
+  return [...gruppen.values()].sort((a, b) => {
+    if (!a.person) return b.person ? 1 : 0;
+    if (!b.person) return -1;
+    return a.person.localeCompare(b.person, 'de');
+  });
+}
+
+/**
+ * Der Feldpfad, mit dem eine verschickte Warnung vermerkt wird.
+ *
+ * Punktschreibweise auf das verschachtelte Feld, damit die anderen Warnungen
+ * unberührt bleiben: Ein `{ warnungen: { rueckzug } }` ersetzte die ganze Map
+ * und ließe die Erinnerungen erneut auflaufen.
+ *
+ * Hier und nicht im Client-Store: Vermerkt wird serverseitig, vom Zeitplan.
+ */
+export function warnungVermerk(
+  key: WarnungKey,
+  zeitpunkt: string,
+): Record<string, string> {
+  return { [`warnungen.${key}`]: zeitpunkt };
+}
+
+/**
+ * Bereinigt die Geräteliste eines Trupps vor dem Schreiben.
+ *
+ * Nötig, weil Firestore `undefined` ablehnt — und zwar auch **innerhalb** der
+ * Objekte eines Arrays. Wer im Dialog einen Trägernamen wieder leert, hätte
+ * sonst `person: undefined` im Element stehen, und der ganze Schreibvorgang
+ * scheitert mit „Unsupported field value: undefined". Dieselbe Vorsicht wie in
+ * `entsendePatch`, nur eine Ebene tiefer.
+ *
+ * Geräte ohne Bezeichnung *und* ohne Kennung fallen heraus: Sie wären eine
+ * Zeile, die nichts benennt.
+ */
+export function sanitizeTruppGeraete(liste: TruppGeraet[]): TruppGeraet[] {
+  const result: TruppGeraet[] = [];
+  for (const roh of liste ?? []) {
+    const bezeichnung = roh?.bezeichnung?.trim() ?? '';
+    const kennung = roh?.kennung?.trim();
+    if (!bezeichnung && !kennung) continue;
+    const sauber: TruppGeraet = {
+      typ: roh.typ,
+      bezeichnung: bezeichnung || (kennung as string),
+    };
+    if (roh.geraetId?.trim()) sauber.geraetId = roh.geraetId.trim();
+    if (kennung) sauber.kennung = kennung;
+    const person = roh.person?.trim();
+    if (person) sauber.person = person;
+    result.push(sauber);
+  }
+  return result;
+}
+
+/**
+ * Höchstzahl der Geräte, die eine Warnung der Überwachung bekommen.
+ *
+ * Eine Schranke gegen eine Liste, die niemand mehr liest — und gegen eine, die
+ * jemand aufbläht: `ueberwachungUids` steht am Trupp-Dokument, und das darf
+ * jeder schreiben, der am Einsatz schreiben darf (`call/{id}/{subitem=**}` in
+ * den Firestore-Regeln), einschließlich eines Einsatz-Gastes mit Schreibrecht.
+ * Zwanzig ist weit über dem, was ein Trupp je braucht — der Regelfall sind ein
+ * bis zwei Geräte.
+ */
+export const MAX_UEBERWACHUNG_UIDS = 20;
+
+/**
+ * Ob eine Zeichenkette als Firestore-Dokument-ID taugen kann.
+ *
+ * **Sicherheitsrelevant, nicht Kosmetik.** Die `uid`s aus `ueberwachungUids`
+ * werden serverseitig zu `user/{uid}` zusammengesetzt. Ein Wert mit
+ * Schrägstrich ergäbe einen *anderen* Pfad — `foo/geheim/bar` liest ein Dokument
+ * in einer Untersammlung von `user/foo` —, und `.` oder `..` lässt das SDK
+ * werfen. Ein Wurf wäre hier besonders teuer: Er käme aus dem Lesen der Token
+ * und damit von *außerhalb* der Fehlerbehandlung je Trupp, ein einziger
+ * krummer Eintrag hielte also die Warnungen aller anderen Trupps auf.
+ *
+ * Geprüft wird gegen die Regeln für Dokument-IDs und nicht gegen das Format von
+ * Firebase-Auth-`uid`s: Letzteres ist nirgends garantiert, die Pfadregeln sind
+ * das, worauf es hier ankommt.
+ */
+export function istGueltigeUid(uid: string): boolean {
+  const wert = (uid ?? '').trim();
+  if (!wert) return false;
+  if (wert.includes('/')) return false;
+  if (wert === '.' || wert === '..') return false;
+  // Von Firestore reservierte Form.
+  if (/^__.*__$/.test(wert)) return false;
+  // Firestore lässt höchstens 1500 Byte zu; UTF-8-Länge, nicht Zeichenzahl.
+  return new TextEncoder().encode(wert).length <= 1500;
+}
+
+/**
+ * Die brauchbaren Empfänger einer Warnung: gültig, ohne Dubletten, gekürzt.
+ *
+ * Angewendet beim **Lesen** und nicht nur beim Schreiben: Geschrieben hat die
+ * Liste möglicherweise ein anderer Client, und der Zeitplan darf sich nicht
+ * darauf verlassen, dass es dieser war.
+ */
+export function sanitizeUeberwachungUids(
+  uids: string[] | undefined,
+  max = MAX_UEBERWACHUNG_UIDS,
+): string[] {
+  const result: string[] = [];
+  const gesehen = new Set<string>();
+  for (const roh of uids ?? []) {
+    if (typeof roh !== 'string') continue;
+    const uid = roh.trim();
+    if (!istGueltigeUid(uid) || gesehen.has(uid)) continue;
+    gesehen.add(uid);
+    result.push(uid);
+    if (result.length >= max) break;
+  }
+  return result;
 }

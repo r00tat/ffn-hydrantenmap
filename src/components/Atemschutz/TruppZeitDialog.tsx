@@ -18,9 +18,28 @@ import {
 
 export type TruppZeitModus = 'entsenden' | 'rueckkehr';
 
+/**
+ * Von wo aus der Dialog geöffnet wird — er beschriftet sich danach.
+ *
+ * Gefragt wird in beiden Fällen nach der taktischen Einheit, nur anders
+ * benannt: Am **Sammelplatz** wird der Trupp an eine Einheit *abgegeben*
+ * („Entsendet an"), bei der **Überwachung** gehört er einer Einheit an
+ * („Taktische Einheit").
+ *
+ * Vorher entfiel das Feld bei der Überwachung mit der Begründung, der
+ * Gruppenkommandant habe niemanden, an den er den Trupp übergibt. Das war ein
+ * Denkfehler: Die Angabe ist keine Übergabe, sondern die Zuordnung — und ohne
+ * sie steht am Ende des Einsatzes an keinem Trupp, welche Einheit ihn hatte.
+ * Bei einem Trupp, der nie über einen Sammelplatz lief, fehlt sie sonst
+ * vollständig.
+ */
+export type TruppZeitKontext = 'sammelplatz' | 'ueberwachung';
+
 export interface TruppZeitDialogProps {
   open: boolean;
   modus: TruppZeitModus;
+  /** Ohne Angabe der Sammelplatz — der Aufrufer, den es zuerst gab. */
+  kontext?: TruppZeitKontext;
   /** Vorbelegung aus der vorigen Bereitstellung desselben Trupps. */
   entsendetAnVorschlag?: string;
   /** Fahrzeuge des Einsatzes zuerst, dann die Gruppenkommandanten. */
@@ -53,6 +72,7 @@ function fromLocalInput(value: string): string {
 export default function TruppZeitDialog({
   open,
   modus,
+  kontext = 'sammelplatz',
   entsendetAnVorschlag,
   entsendetAnVorschlaege,
   onClose,
@@ -62,24 +82,44 @@ export default function TruppZeitDialog({
   const tCommon = useTranslations('common');
 
   const [zeit, setZeit] = useState(() => toLocalInput(new Date()));
+  /**
+   * Ob die Zeit von Hand geändert wurde — entscheidet über die **Sekunden**.
+   *
+   * `datetime-local` kennt nur Minuten. Unverändert übernommen schnitte der
+   * Abmarsch auf `:00` ab, und daran hängt jede weitere Rechnung: Drittelmarken,
+   * gemessener Verbrauch, Rückzugszeitpunkt. Bis zu einer Minute Fehler beim
+   * Ankerpunkt ist mehr, als die Anzeige später auflöst — deshalb gilt ohne
+   * Änderung der genaue Zeitpunkt des Speicherns.
+   */
+  const [zeitGeaendert, setZeitGeaendert] = useState(false);
   const [druck, setDruck] = useState('');
   const [entsendetAn, setEntsendetAn] = useState(entsendetAnVorschlag ?? '');
   const [saving, setSaving] = useState(false);
 
   const istEntsenden = modus === 'entsenden';
+  const istUeberwachung = kontext === 'ueberwachung';
+  // Bei der Rückkehr entfällt die Frage: Die Einheit steht dann längst am
+  // Trupp, und der Rückkehrdialog soll zwei Felder haben, nicht drei.
+  const fragtZiel = istEntsenden;
   const druckWert = druck.trim() ? Number(druck.trim().replace(',', '.')) : undefined;
+
+  // Unverändert: der genaue Moment mit Sekunden, s. `zeitGeaendert`.
+  const zeitpunkt = () =>
+    zeitGeaendert ? fromLocalInput(zeit) : new Date().toISOString();
 
   const handleConfirm = async () => {
     setSaving(true);
     try {
       const patch = istEntsenden
         ? entsendePatch({
-            entsendetAn,
-            abmarschZeit: fromLocalInput(zeit),
+            // Leer heißt „nicht angefasst": `entsendePatch` lässt das Feld dann
+            // aus dem Patch weg, ein schon gesetztes Ziel bleibt also stehen.
+            entsendetAn: fragtZiel ? entsendetAn : undefined,
+            abmarschZeit: zeitpunkt(),
             druckAbmarsch: Number.isFinite(druckWert) ? druckWert : undefined,
           })
         : rueckkehrPatch({
-            rueckkehrZeit: fromLocalInput(zeit),
+            rueckkehrZeit: zeitpunkt(),
             druckRueckkehr: Number.isFinite(druckWert) ? druckWert : undefined,
           });
       await onConfirm(patch);
@@ -92,11 +132,15 @@ export default function TruppZeitDialog({
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>
-        {istEntsenden ? t('trupp.entsendenTitle') : t('trupp.rueckkehrTitle')}
+        {!istEntsenden
+          ? t('trupp.rueckkehrTitle')
+          : istUeberwachung
+            ? t('ueberwachung.einsatzTitle')
+            : t('trupp.entsendenTitle')}
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          {istEntsenden && (
+          {fragtZiel && (
             // Freitext mit Vorschlägen: Der Trupp geht meist zu einem
             // Fahrzeug, manchmal zu einem Gruppenkommandanten und
             // gelegentlich zu einem Abschnitt, den es in keiner Liste gibt.
@@ -112,8 +156,16 @@ export default function TruppZeitDialog({
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label={t('trupp.entsendetAn')}
-                  helperText={t('trupp.entsendetAnHint')}
+                  label={
+                    istUeberwachung
+                      ? t('ueberwachung.truppEinheit')
+                      : t('trupp.entsendetAn')
+                  }
+                  helperText={
+                    istUeberwachung
+                      ? t('ueberwachung.truppEinheitHint')
+                      : t('trupp.entsendetAnHint')
+                  }
                 />
               )}
             />
@@ -121,9 +173,20 @@ export default function TruppZeitDialog({
           <TextField
             fullWidth
             type="datetime-local"
-            label={istEntsenden ? t('trupp.abmarschZeit') : t('trupp.rueckkehrZeit')}
+            label={
+              !istEntsenden
+                ? t('trupp.rueckkehrZeit')
+                : istUeberwachung
+                  ? // Die Unterlage definiert den Zeitpunkt genau so: „Uhrzeit
+                    // beim Anschließen des Luftversorgungssystems".
+                    t('ueberwachung.abmarschZeit')
+                  : t('trupp.abmarschZeit')
+            }
             value={zeit}
-            onChange={(e) => setZeit(e.target.value)}
+            onChange={(e) => {
+              setZeit(e.target.value);
+              setZeitGeaendert(true);
+            }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
           <TextField
@@ -141,7 +204,11 @@ export default function TruppZeitDialog({
       <DialogActions>
         <Button onClick={onClose}>{tCommon('cancel')}</Button>
         <Button variant="contained" disabled={saving} onClick={handleConfirm}>
-          {istEntsenden ? t('trupp.actions.entsenden') : t('trupp.actions.rueckkehr')}
+          {!istEntsenden
+            ? t('trupp.actions.rueckkehr')
+            : istUeberwachung
+              ? t('ueberwachung.actions.inDenEinsatz')
+              : t('trupp.actions.entsenden')}
         </Button>
       </DialogActions>
     </Dialog>
