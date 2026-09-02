@@ -20,9 +20,12 @@ vi.mock('firebase/firestore', () => ({
   },
 }));
 
+const setDocMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const deleteDocMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
 vi.mock('../../lib/firestoreClient', () => ({
-  setDoc: vi.fn(() => Promise.resolve()),
-  deleteDoc: vi.fn(() => Promise.resolve()),
+  setDoc: setDocMock,
+  deleteDoc: deleteDocMock,
 }));
 
 const nativeStartLiveShare = vi.fn((_opts: unknown) => Promise.resolve());
@@ -85,6 +88,7 @@ vi.mock('../../hooks/useFirecall', () => ({
 // touch localStorage between tests, so reset before each test.
 
 // --- Imports under test --------------------------------------------------
+import { DEFAULT_HEARTBEAT_MS } from '../../hooks/useLiveLocationSettings';
 import {
   LiveLocationProvider,
   useLiveLocationContext,
@@ -221,6 +225,91 @@ describe('LiveLocationProvider', () => {
       await values.at(-1)!.stop();
     });
     expect(nativeStopLiveShare).toHaveBeenCalled();
+  });
+
+  // Der Heartbeat ist der Kern von #760: `watchPosition` liefert auf dem
+  // Desktop und in einem Hintergrund-Tab oft nur einen einzigen Fix. Ohne
+  // eigenen Takt bleibt `updatedAt` stehen und die laufende Freigabe fällt
+  // nach STALE_HARD_CUTOFF_MS aus den Karten der anderen heraus.
+  describe('heartbeat', () => {
+    it('refreshes the document while sharing even when the position never changes', async () => {
+      vi.useFakeTimers();
+      try {
+        const { values } = renderProvider();
+        await act(async () => {
+          await values.at(-1)!.start();
+        });
+        expect(setDocMock).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(DEFAULT_HEARTBEAT_MS + 1_000);
+        });
+        expect(setDocMock).toHaveBeenCalledTimes(2);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(DEFAULT_HEARTBEAT_MS + 1_000);
+        });
+        expect(setDocMock).toHaveBeenCalledTimes(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('writes nothing while not sharing', async () => {
+      vi.useFakeTimers();
+      try {
+        renderProvider();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(5 * DEFAULT_HEARTBEAT_MS);
+        });
+        expect(setDocMock).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops after stop()', async () => {
+      vi.useFakeTimers();
+      try {
+        const { values } = renderProvider();
+        await act(async () => {
+          await values.at(-1)!.start();
+        });
+        await act(async () => {
+          await values.at(-1)!.stop();
+        });
+        const callsAfterStop = setDocMock.mock.calls.length;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(5 * DEFAULT_HEARTBEAT_MS);
+        });
+        expect(setDocMock.mock.calls.length).toBe(callsAfterStop);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // Auf Android hält der Foreground-Service das Dokument frisch
+    // (LiveLocationPusher). Ein zweiter Takt aus dem WebView wäre nur eine
+    // Verdoppelung der Schreibvorgänge.
+    it('leaves the takt to the foreground service on native platforms', async () => {
+      isNativeGpsTrackingAvailable.mockReturnValue(true);
+      vi.useFakeTimers();
+      try {
+        const { values } = renderProvider();
+        await act(async () => {
+          await values.at(-1)!.start();
+        });
+        const callsAfterStart = setDocMock.mock.calls.length;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(5 * DEFAULT_HEARTBEAT_MS);
+        });
+        expect(setDocMock.mock.calls.length).toBe(callsAfterStart);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('does NOT call native bridge when not available', async () => {

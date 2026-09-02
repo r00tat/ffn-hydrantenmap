@@ -103,6 +103,38 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
     void maybeSend(position, location);
   }, [isSharing, isPositionSet, position, location, maybeSend]);
 
+  // Der Heartbeat braucht einen eigenen Takt und darf nicht an den
+  // Positions-Updates hängen: `navigator.geolocation.watchPosition` liefert
+  // auf dem Desktop (Standort aus dem Netz) genau einen Fix und danach nur
+  // noch bei echter Bewegung, und in einem Hintergrund-Tab drosselt der
+  // Browser die Callbacks ganz weg. Ohne eigenen Takt bleibt `updatedAt`
+  // deshalb stehen, und wer stillsteht, verschwindet nach
+  // STALE_HARD_CUTOFF_MS (5 min) von den Karten der anderen — obwohl die
+  // Freigabe noch läuft und der Knopf weiter pulsiert.
+  //
+  // Die letzte Position kommt aus einem Ref, damit der Takt nicht bei jedem
+  // Fix neu anläuft. Gedrosselt wird weiterhin allein in
+  // `useLiveLocationShare`: der Tick öffnet nur das Zeitfenster, geschrieben
+  // wird höchstens einmal je `heartbeatMs`.
+  const latestPositionRef = useRef({ position, location });
+  useEffect(() => {
+    latestPositionRef.current = { position, location };
+  }, [position, location]);
+
+  useEffect(() => {
+    // Auf Android hält der Foreground-Service das Dokument frisch
+    // (LiveLocationPusher). Ein zweiter Takt aus dem WebView wäre nur eine
+    // Verdoppelung der Schreibvorgänge.
+    if (isNativeGpsTrackingAvailable()) return;
+    if (!isSharing || !isPositionSet) return;
+    const tickMs = Math.max(1_000, Math.round(settings.heartbeatMs / 3));
+    const timer = setInterval(() => {
+      const { position: p, location: l } = latestPositionRef.current;
+      void maybeSend(p, l);
+    }, tickMs);
+    return () => clearInterval(timer);
+  }, [isSharing, isPositionSet, maybeSend, settings.heartbeatMs]);
+
   // Auto-stop on firecall change: when the active firecall changes while
   // we are still sharing, tear down (delete the doc on the OLD path inside
   // useLiveLocationShare which still holds the old identity, then flip to

@@ -67,6 +67,30 @@ describe('useLiveLocations', () => {
     expect(result.current[0].uid).toBe('other');
   });
 
+  // #760: Die Live-Standorte der anderen hängen bewusst nicht an der eigenen
+  // Freigabe — die Einsatzleitung teilt selbst nichts und muss die Kräfte
+  // trotzdem sehen. Ohne eigenes Dokument in der Collection darf der Filter
+  // auf die eigene uid also nichts wegnehmen.
+  it('returns other users even when the current user shares nothing', () => {
+    const now = Date.now();
+    useFirebaseCollectionMock.mockReturnValue([
+      {
+        id: 'other',
+        uid: 'other',
+        name: 'Other',
+        email: 'other@example.com',
+        lat: 1,
+        lng: 1,
+        updatedAt: makeTimestamp(now),
+        expiresAt: makeTimestamp(now + 1_000_000),
+      },
+    ]);
+
+    const { result } = renderHook(() => useLiveLocations());
+    expect(result.current).toHaveLength(1);
+    expect(result.current[0].uid).toBe('other');
+  });
+
   it('filters out stale records older than 5 minutes', () => {
     const now = Date.now();
     const stale = now - STALE_HARD_CUTOFF_MS - 1_000;
