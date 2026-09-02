@@ -3038,6 +3038,7 @@
     "bottleneckNotVehicleRouted": "Strecke nicht geroutet",
     "bufferNeeded": "Faltbehälter nötig — die Abgabe hat Lücken. Lückenlos wären {vehicles} Fahrzeuge.",
     "bufferNotNeeded": "Kein Puffer nötig — es ist immer ein Fahrzeug am Entleeren.",
+    "chartElevation": "Höhe",
     "chartSource": "Entnahme",
     "chartTarget": "Ziel",
     "close": "Schließen",

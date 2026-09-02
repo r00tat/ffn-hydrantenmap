@@ -3038,6 +3038,7 @@
     "bottleneckNotVehicleRouted": "Distance not routed",
     "bufferNeeded": "Portable tank required — the supply has gaps. {vehicles} vehicles would make it gapless.",
     "bufferNotNeeded": "No buffer needed — a vehicle is always discharging.",
+    "chartElevation": "Elevation",
     "chartSource": "Source",
     "chartTarget": "Target",
     "close": "Close",

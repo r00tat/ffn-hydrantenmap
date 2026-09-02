@@ -309,6 +309,33 @@ Eine Übersteuerung *bei vorhandenem Profil* gibt es bewusst nicht: Eine geände
 Gesamtdifferenz bei beibehaltener Profilform wäre ein Mischwert, dessen
 Abschnittshöhen zu keiner der beiden Quellen passen.
 
+### Das Höhenprofil als Diagramm
+
+Gezeichnet mit `@mui/x-charts` (`FoerderungProfileChart`), wie der Druckverlauf
+der Atemschutzüberwachung und die Wetterhistorie. Vorher stand dort ein
+handgeschriebenes Inline-SVG mit eigener Skalierung und eigenen Achsenmarken;
+die Bibliothek liegt ohnehin im Bündel, und mit ihr kommen Achsenteilung und
+der Wert unter dem Zeiger dazu.
+
+Zwei Festlegungen, die sich aus dem Code nicht ergeben:
+
+- **Die Fläche liegt auf der unteren Achsengrenze** (`baseline: 'min'`), nicht
+  auf 0. Die Höhen sind Meter über Adria: ab 0 gezeichnet wäre jede Leitung im
+  Bezirk eine 130 m hohe Wand mit gerader Oberkante, und die Steigung, um die
+  es in dem Bild überhaupt geht, verschwindet darin.
+- **Die Punkte werden vorher ausgedünnt** (`thinProfile`), und zwar über
+  Gruppen-Minimum und -Maximum statt jeden n-ten Punkt: Bei 25 m Abtastung
+  kommen bis zu 5.000 Punkte an, und eine gleichmäßige Ausdünnung verschluckt
+  genau die Kuppen, um deren Erkennung es bei der feinen Abtastung geht.
+
+Die Enden stehen als Text unter der Achse („Entnahme · 0 m", „Ziel · N m"),
+weil die Achse immer in Förderrichtung läuft — Streckenmeter allein sagen
+nicht, an welchem Ende die Entnahmestelle liegt.
+
+Der Dammquerschnitt (`DammQuerschnittChart`) bleibt bewusst ein eigenes SVG:
+Dort ist der **gleiche Maßstab in x und y** der Sinn des Bildes, und den gibt
+eine Chart-Bibliothek nicht her.
+
 ## Pumpenstandorte auf der Karte
 
 Berechnet und **gezeichnet, nicht gespeichert**: Sie wandern damit bei jeder
