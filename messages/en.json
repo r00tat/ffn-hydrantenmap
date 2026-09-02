@@ -498,6 +498,8 @@
         "zweiDrittel": "2/3",
         "ende": "calc. end",
         "jetzt": "now",
+        "gemessen": "measured",
+        "prognose": "projected",
         "rueckzug": "Withdrawal {druck} bar",
         "reserve": "Reserve {druck} bar"
       },

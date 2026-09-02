@@ -2,14 +2,12 @@
 
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
+import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
+import { LineChart } from '@mui/x-charts/LineChart';
 import { useFormatter, useTranslations } from 'next-intl';
 import type { AtemschutzTrupp } from '../../common/atemschutz';
 import type { UeberwachungStand } from '../../common/atemschutzUeberwachung';
-import {
-  baueDruckVerlauf,
-  type MarkeKey,
-  type PunktArt,
-} from './druckVerlaufModell';
+import { baueDruckVerlauf, type MarkeKey } from './druckVerlaufModell';
 
 /**
  * Der Druckverlauf eines Trupps als Kurve.
@@ -18,33 +16,24 @@ import {
  * abzulesen, und genau die ist die Frage am Einsatzort — wie schnell geht die
  * Luft weg, und reicht sie bis zur Marke? Die Kurve zeigt außerdem auf einen
  * Blick, ob der Trupp schneller verbraucht als der Anhaltswert der Unterlage:
- * Die durchgezogene Linie kommt dann vor der Marke „rechnerisches Ende" unten
- * an. Die Zeilen darüber bleiben — sie tragen die genauen Werte, die Kurve
- * trägt den Verlauf.
+ * Die durchgezogene Linie kommt dann vor der Marke „rechn. Ende" unten an. Die
+ * Zeilen darüber bleiben — sie tragen die genauen Werte, die Kurve den Verlauf.
  *
- * Handgeschriebenes Inline-SVG wie `FoerderungProfileChart`: Für eine Linie mit
- * ein paar Marken ist eine Chart-Bibliothek im Bündel teurer als diese Datei,
- * und die Farben kommen aus der Palette, damit es im Dunkelmodus lesbar bleibt.
+ * Gezeichnet mit `@mui/x-charts`, wie die Wetterhistorie und die
+ * Fahrtenbuch-Statistik: Zeitachse, Achsenbeschriftung, Tooltip und die
+ * Referenzlinien für Schwellen und Marken sind dort fertig und im Bündel
+ * ohnehin schon enthalten. Eine handgeschriebene SVG-Fläche war der erste
+ * Versuch und brauchte für dasselbe mehr Höhe und eigene Beschriftungslogik.
  */
 
-const WIDTH = 600;
-const HEIGHT = 190;
-const PADDING = { top: 10, right: 10, bottom: 34, left: 34 };
+/** Niedrig gehalten: Die Karte trägt darüber schon Zahlen und Zeilen. */
+const HOEHE = 150;
 
 export interface DruckVerlaufChartProps {
   trupp: AtemschutzTrupp;
   stand: UeberwachungStand;
   jetzt: Date;
 }
-
-/** Wie groß ein Messpunkt gezeichnet wird — die Meldungen fallen auf. */
-const PUNKT_RADIUS: Record<PunktArt, number> = {
-  abmarsch: 3.5,
-  abfrage: 2.5,
-  ziel: 4,
-  rueckzug: 4,
-  rueckkehr: 3.5,
-};
 
 export default function DruckVerlaufChart({
   trupp,
@@ -58,27 +47,35 @@ export default function DruckVerlaufChart({
   const modell = baueDruckVerlauf(trupp, stand, jetzt);
   if (!modell) return null;
 
-  const plotWidth = WIDTH - PADDING.left - PADDING.right;
-  const plotHeight = HEIGHT - PADDING.top - PADDING.bottom;
-  const spanne = modell.tEnde - modell.tStart;
-  // Die Druckachse beginnt bei 0 und nicht am kleinsten Wert: Eine gestauchte
-  // Achse macht aus einem harmlosen Verbrauch einen Sturz.
-  const druckMax = Math.max(modell.druckMax, 1);
+  const uhrzeit = (wert: Date) =>
+    format.dateTime(wert, { hour: '2-digit', minute: '2-digit' });
+  const bar = (wert: number | null) =>
+    wert == null ? '–' : t('ueberwachung.bar', { druck: Math.round(wert) });
 
-  const x = (zeitpunkt: number) =>
-    PADDING.left + ((zeitpunkt - modell.tStart) / spanne) * plotWidth;
-  const y = (druck: number) =>
-    PADDING.top + plotHeight - (Math.max(0, druck) / druckMax) * plotHeight;
+  /**
+   * Die Stützstellen der Zeitachse: die Messzeitpunkte und das Ende der
+   * Fortschreibung. Beide Reihen sind darauf ausgerichtet, `null` heißt „hier
+   * kein Wert" — so liegt die gestrichelte Linie genau zwischen letztem
+   * Messwert und Schwelle, ohne die durchgezogene zu verlängern.
+   */
+  const stuetzen = [
+    ...new Set([
+      ...modell.punkte.map((p) => p.t),
+      ...(modell.prognose ? [modell.prognose.bis.t] : []),
+    ]),
+  ].sort((a, b) => a - b);
 
-  const uhrzeit = (zeitpunkt: number) =>
-    format.dateTime(new Date(zeitpunkt), {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-  const linie = modell.punkte
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(p.t)} ${y(p.druck)}`)
-    .join(' ');
+  const gemessen = stuetzen.map(
+    (zeitpunkt) =>
+      modell.punkte.find((p) => p.t === zeitpunkt)?.druck ?? null,
+  );
+  const prognose = modell.prognose;
+  const fortgeschrieben = stuetzen.map((zeitpunkt) => {
+    if (!prognose) return null;
+    if (zeitpunkt === prognose.von.t) return prognose.von.druck;
+    if (zeitpunkt === prognose.bis.t) return prognose.bis.druck;
+    return null;
+  });
 
   const markeFarbe: Record<MarkeKey, string> = {
     drittel: theme.palette.text.disabled,
@@ -88,137 +85,105 @@ export default function DruckVerlaufChart({
   };
 
   return (
-    <Box sx={{ mt: 1, overflowX: 'auto' }}>
-      <Box
-        component="svg"
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        role="img"
-        aria-label={t('ueberwachung.druckverlaufChart')}
-        sx={{ width: '100%', minWidth: 320, display: 'block' }}
+    <Box
+      role="img"
+      aria-label={t('ueberwachung.druckverlaufChart')}
+      sx={{ mt: 0.5 }}
+    >
+      <LineChart
+        height={HOEHE}
+        margin={{ top: 14, right: 8, bottom: 0, left: 0 }}
+        hideLegend
+        grid={{ horizontal: true }}
+        xAxis={[
+          {
+            scaleType: 'time',
+            data: stuetzen.map((zeitpunkt) => new Date(zeitpunkt)),
+            // Feste Grenzen statt der Spanne der Messwerte: Die Marken für
+            // Drittel und rechnerisches Ende liegen in der Zukunft und wären
+            // sonst abgeschnitten.
+            min: new Date(modell.tStart),
+            max: new Date(modell.tEnde),
+            valueFormatter: (wert: Date) => uhrzeit(wert),
+            tickLabelStyle: { fontSize: 10 },
+          },
+        ]}
+        yAxis={[
+          {
+            // Immer ab 0: Eine gestauchte Achse macht aus einem harmlosen
+            // Verbrauch einen Sturz.
+            min: 0,
+            max: modell.druckMax,
+            width: 34,
+            tickLabelStyle: { fontSize: 10 },
+          },
+        ]}
+        series={[
+          {
+            id: 'gemessen',
+            data: gemessen,
+            label: t('ueberwachung.chart.gemessen'),
+            color: theme.palette.primary.main,
+            connectNulls: true,
+            valueFormatter: bar,
+          },
+          ...(prognose
+            ? [
+                {
+                  id: 'prognose',
+                  data: fortgeschrieben,
+                  label: t('ueberwachung.chart.prognose'),
+                  color: theme.palette.text.secondary,
+                  connectNulls: true,
+                  showMark: false,
+                  valueFormatter: bar,
+                },
+              ]
+            : []),
+        ]}
+        // Gestrichelt, weil die Fortschreibung eine Annahme ist und keine
+        // Ablesung — dieselbe Unterscheidung wie in den Wetterdiagrammen.
+        sx={{ '.MuiLineElement-series-prognose': { strokeDasharray: '5 4' } }}
       >
-        {/* Waagrechte Schwellen: Rückzugsdruck und, wenn er darüber liegt, die
-            Restdruckwarnung. Sie sind der Boden, auf den die Kurve zuläuft. */}
-        {modell.linien.map((l) => (
-          <g key={l.key}>
-            <line
-              x1={PADDING.left}
-              x2={WIDTH - PADDING.right}
-              y1={y(l.druck)}
-              y2={y(l.druck)}
-              stroke={
-                l.key === 'rueckzug'
-                  ? theme.palette.error.main
-                  : theme.palette.warning.main
-              }
-              strokeWidth={1}
-              strokeDasharray="4 3"
-            />
-            <text
-              x={PADDING.left + 2}
-              y={y(l.druck) - 3}
-              fontSize={9}
-              fill={
-                l.key === 'rueckzug'
-                  ? theme.palette.error.main
-                  : theme.palette.warning.main
-              }
-            >
-              {t(
-                `ueberwachung.chart.${l.key}` as 'ueberwachung.chart.rueckzug',
-                { druck: Math.round(l.druck) },
+        {modell.linien.map((linie) => {
+          const farbe =
+            linie.key === 'rueckzug'
+              ? theme.palette.error.main
+              : theme.palette.warning.main;
+          return (
+            <ChartsReferenceLine
+              key={linie.key}
+              y={linie.druck}
+              label={t(
+                `ueberwachung.chart.${linie.key}` as 'ueberwachung.chart.rueckzug',
+                { druck: Math.round(linie.druck) },
               )}
-            </text>
-          </g>
-        ))}
-
-        {/* Senkrechte Marken: Drittel, zwei Drittel, rechnerisches Ende, jetzt. */}
+              labelAlign="start"
+              lineStyle={{ stroke: farbe, strokeDasharray: '4 3' }}
+              labelStyle={{ fontSize: 10, fill: farbe }}
+            />
+          );
+        })}
         {modell.marken
           .filter((m) => m.t >= modell.tStart && m.t <= modell.tEnde)
-          .map((m) => (
-            <g key={m.key}>
-              <line
-                x1={x(m.t)}
-                x2={x(m.t)}
-                y1={PADDING.top}
-                y2={PADDING.top + plotHeight}
-                stroke={markeFarbe[m.key]}
-                strokeWidth={m.key === 'jetzt' ? 1.5 : 1}
-                strokeDasharray={m.key === 'jetzt' ? undefined : '2 3'}
-              />
-              <text
-                x={x(m.t)}
-                y={HEIGHT - 13}
-                fontSize={9}
-                textAnchor="middle"
-                fill={markeFarbe[m.key]}
-              >
-                {t(
-                  `ueberwachung.chart.${m.key}` as 'ueberwachung.chart.drittel',
-                )}
-              </text>
-              <text
-                x={x(m.t)}
-                y={HEIGHT - 3}
-                fontSize={9}
-                textAnchor="middle"
-                fill={theme.palette.text.secondary}
-              >
-                {uhrzeit(m.t)}
-              </text>
-            </g>
+          .map((marke) => (
+            <ChartsReferenceLine
+              key={marke.key}
+              x={new Date(marke.t)}
+              label={t(
+                `ueberwachung.chart.${marke.key}` as 'ueberwachung.chart.drittel',
+              )}
+              // „jetzt" unten, die Fristen oben: Sonst stehen vier
+              // Beschriftungen auf derselben Höhe übereinander.
+              labelAlign={marke.key === 'jetzt' ? 'end' : 'start'}
+              lineStyle={{
+                stroke: markeFarbe[marke.key],
+                strokeDasharray: marke.key === 'jetzt' ? undefined : '3 3',
+              }}
+              labelStyle={{ fontSize: 10, fill: markeFarbe[marke.key] }}
+            />
           ))}
-
-        {/* Die Fortschreibung — gestrichelt, weil sie eine Annahme ist. */}
-        {modell.prognose && (
-          <line
-            x1={x(modell.prognose.von.t)}
-            y1={y(modell.prognose.von.druck)}
-            x2={x(modell.prognose.bis.t)}
-            y2={y(modell.prognose.bis.druck)}
-            stroke={theme.palette.text.secondary}
-            strokeWidth={1.5}
-            strokeDasharray="5 4"
-          />
-        )}
-
-        <path
-          d={linie}
-          fill="none"
-          stroke={theme.palette.primary.main}
-          strokeWidth={2}
-        />
-
-        {modell.punkte.map((p) => (
-          <circle
-            key={`${p.art}-${p.t}`}
-            cx={x(p.t)}
-            cy={y(p.druck)}
-            r={PUNKT_RADIUS[p.art]}
-            fill={theme.palette.primary.main}
-          />
-        ))}
-
-        {/* Die Druckachse trägt nur die Enden: mehr Zahlen liest am Einsatzort
-            niemand, und die Schwellen sind ohnehin beschriftet. */}
-        <text
-          x={PADDING.left - 4}
-          y={y(druckMax) + 3}
-          fontSize={9}
-          textAnchor="end"
-          fill={theme.palette.text.secondary}
-        >
-          {Math.round(druckMax)}
-        </text>
-        <text
-          x={PADDING.left - 4}
-          y={y(0)}
-          fontSize={9}
-          textAnchor="end"
-          fill={theme.palette.text.secondary}
-        >
-          0
-        </text>
-      </Box>
+      </LineChart>
     </Box>
   );
 }

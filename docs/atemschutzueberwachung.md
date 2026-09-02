@@ -235,13 +235,30 @@ Unterlage) und „jetzt", waagrecht Rückzugsdruck und Restdruckwarnung. Wer
 schneller verbraucht als 50 l/min, sieht seine Linie vor der Marke „rechn. Ende"
 unten ankommen — das ist die Aussage, für die es die Grafik gibt.
 
+Gezeichnet wird mit **`@mui/x-charts`** — derselben Bibliothek wie die
+Wetterhistorie, die Fahrtenbuch-Statistik und die Dosimetrie, also ohne neue
+Abhängigkeit im Bündel. Zeitachse, Achsenbeschriftung, Tooltip und die
+`ChartsReferenceLine` für Schwellen und Marken sind dort fertig; der erste
+Versuch war ein handgeschriebenes Inline-SVG (wie beim Höhenprofil der Leitung)
+und brauchte für dasselbe mehr Höhe und eigene Beschriftungslogik. Die Kurve ist
+jetzt 150 px hoch, ohne Legende: Die Karte trägt darüber schon Zahlen und
+Zeilen, und die Reihen sind im Tooltip benannt.
+
+Zwei Reihen auf gemeinsamen Stützstellen, `null` heißt „hier kein Wert": So
+liegt die gestrichelte Fortschreibung genau zwischen letztem Messwert und
+Schwelle, ohne die durchgezogene Linie zu verlängern. Die Zeitachse bekommt
+feste Grenzen (`min`/`max`) statt der Spanne der Messwerte — die Marken für
+Drittel und rechnerisches Ende liegen in der Zukunft und wären sonst
+abgeschnitten.
+
 Das Modell liegt getrennt von der Zeichnung, weil dort die Aussagen stehen:
 welcher Wert gemessen und welcher fortgeschrieben ist, wie weit die Achse
 reicht. Eine gestauchte Druckachse macht aus einem harmlosen Verbrauch einen
 Sturz, deshalb beginnt sie immer bei 0. Gezeichnet wird erst ab dem zweiten
-Punkt — eine Grafik mit einem Punkt darin nimmt nur Platz weg. Handgeschriebenes
-Inline-SVG wie beim Höhenprofil der Leitung: Für eine Linie mit ein paar Marken
-ist eine Chart-Bibliothek im Bündel teurer als die Datei.
+Punkt — eine Grafik mit einem Punkt darin nimmt nur Platz weg. Der Test der
+Komponente mockt die Bibliothek (wie die übrigen Chart-Tests, JSDOM hat keinen
+`ResizeObserver`) und prüft die Verdrahtung: welche Werte in welche Reihe gehen
+und welche Marken entstehen.
 
 ### Sekunden werden nicht abgeschnitten
 
