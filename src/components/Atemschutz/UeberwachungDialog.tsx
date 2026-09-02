@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl';
 import {
   PA_SAETZE,
   PA_TYPEN,
+  sanitizePersonen,
   truppLabel,
   type AtemschutzTrupp,
   type Geraetesatz,
@@ -78,6 +79,22 @@ export default function UeberwachungDialog({
 }: UeberwachungDialogProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
+
+  /**
+   * Bereinigt und ohne Dubletten — hier und nicht beim Aufrufer.
+   *
+   * Der Name **ist** der Schlüssel der Autocomplete-Option; steht er zweimal in
+   * der Liste, warnt React („two children with the same key") und kann Einträge
+   * verschlucken. Die Aufrufer setzen die Liste aus mehreren Quellen zusammen
+   * (Truppmitglieder, eigener Name, Personen der Gruppe), und die überschneiden
+   * sich naturgemäß: Ein Truppmitglied ist auch eine Person der Gruppe. Die
+   * Reihenfolge bleibt dabei erhalten, der erste Treffer gewinnt — damit stehen
+   * die Namen des Trupps weiterhin oben.
+   */
+  const namen = useMemo(
+    () => sanitizePersonen(personSuggestions),
+    [personSuggestions],
+  );
 
   const [ueberwachtVon, setUeberwachtVon] = useState(trupp.ueberwachtVon ?? '');
   const [einsatzziel, setEinsatzziel] = useState(trupp.einsatzziel ?? '');
@@ -179,7 +196,7 @@ export default function UeberwachungDialog({
           <Autocomplete
             freeSolo
             fullWidth
-            options={personSuggestions}
+            options={namen}
             value={ueberwachtVon}
             onInputChange={(_, next) => setUeberwachtVon(next ?? '')}
             onChange={(_, next) =>
