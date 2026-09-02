@@ -812,6 +812,9 @@ export default function UeberwachungPage() {
           zielMeldungFehlt={
             !sortierteAbfragen(dialog.trupp).some((a) => a.amZiel)
           }
+          rueckzugGemeldet={sortierteAbfragen(dialog.trupp).some(
+            (a) => a.rueckzug,
+          )}
           onClose={() => setDialog(undefined)}
           onSave={(input) => handleDruckabfrage(dialog.trupp, input)}
         />

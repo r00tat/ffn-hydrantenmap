@@ -178,7 +178,12 @@ describe('UeberwachungCard', () => {
     expect(screen.getByText('200 bar')).toBeInTheDocument();
     expect(screen.getByText('150 bar')).toBeInTheDocument();
     expect(screen.getByText('70 bar')).toBeInTheDocument();
-    expect(screen.getByText('Ankunft')).toBeInTheDocument();
+    // „Ankunft" steht zweimal auf der Karte: als Beschriftung dieser Zeile und
+    // als senkrechte Marke in der Kurve darunter. Gemeint ist hier die Zeile,
+    // also der Absatz — die Marke ist ein `tspan` im SVG.
+    expect(
+      screen.getAllByText('Ankunft').some((n) => n.tagName === 'P'),
+    ).toBe(true);
     // Die Uhrzeiten stehen in einer eigenen Spalte, also auch als eigener Text.
     expect(screen.getAllByText(/^\d{2}:\d{2}$/).length).toBeGreaterThanOrEqual(
       4,

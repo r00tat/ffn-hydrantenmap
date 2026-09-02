@@ -19,6 +19,11 @@ import { baueDruckVerlauf, type MarkeKey } from './druckVerlaufModell';
  * Die durchgezogene Linie kommt dann vor der Marke „rechn. Ende" unten an. Die
  * Zeilen darüber bleiben — sie tragen die genauen Werte, die Kurve den Verlauf.
  *
+ * Eingezeichnet sind auch die gemeldeten **Ereignisse** — Ankunft am
+ * Einsatzziel, angetretener Rückzug, Rückkehr —, weil an ihnen die Steigung
+ * bricht: Ein steiler Abschnitt zwischen Ankunft und Rückzug ist Arbeit unter
+ * Last, derselbe Abfall auf dem Vormarsch wäre ein zu langer Anmarschweg.
+ *
  * Gezeichnet mit `@mui/x-charts`, wie die Wetterhistorie und die
  * Fahrtenbuch-Statistik: Zeitachse, Achsenbeschriftung, Tooltip und die
  * Referenzlinien für Schwellen und Marken sind dort fertig und im Bündel
@@ -77,11 +82,28 @@ export default function DruckVerlaufChart({
     return null;
   });
 
-  const markeFarbe: Record<MarkeKey, string> = {
-    drittel: theme.palette.text.disabled,
-    zweiDrittel: theme.palette.text.disabled,
-    ende: theme.palette.warning.main,
-    jetzt: theme.palette.info.main,
+  /**
+   * Wie eine senkrechte Marke aussieht — und auf welcher Höhe sie beschriftet
+   * ist.
+   *
+   * Zwei Zeilen, weil es zwei Arten von Marken gibt: **Fristen** aus der
+   * Rechnung stehen oben und gestrichelt, **gemeldete Ereignisse** unten und
+   * durchgezogen. Auf einer Höhe stünden bis zu sieben Beschriftungen
+   * übereinander, und die Trennung ist zugleich die Aussage: oben, was
+   * gerechnet ist, unten, was jemand gemeldet hat. „jetzt" steht bei den
+   * Ereignissen — es ist ebenfalls keine Frist.
+   */
+  const markeStil: Record<
+    MarkeKey,
+    { farbe: string; unten?: boolean; gestrichelt?: boolean }
+  > = {
+    drittel: { farbe: theme.palette.text.disabled, gestrichelt: true },
+    zweiDrittel: { farbe: theme.palette.text.disabled, gestrichelt: true },
+    ende: { farbe: theme.palette.warning.main, gestrichelt: true },
+    ziel: { farbe: theme.palette.success.main, unten: true },
+    rueckzugAn: { farbe: theme.palette.success.dark, unten: true },
+    zurueck: { farbe: theme.palette.text.primary, unten: true },
+    jetzt: { farbe: theme.palette.info.main, unten: true },
   };
 
   return (
@@ -125,6 +147,10 @@ export default function DruckVerlaufChart({
             label: t('ueberwachung.chart.gemessen'),
             color: theme.palette.primary.main,
             connectNulls: true,
+            // Anders als in den Wetterkurven ausdrücklich mit Punkten: Hier
+            // sind es eine Handvoll Ablesungen, und *wann* abgefragt wurde ist
+            // Teil der Aussage — der Knick der Linie liegt genau dort.
+            showMark: true,
             valueFormatter: bar,
           },
           ...(prognose
@@ -166,23 +192,24 @@ export default function DruckVerlaufChart({
         })}
         {modell.marken
           .filter((m) => m.t >= modell.tStart && m.t <= modell.tEnde)
-          .map((marke) => (
-            <ChartsReferenceLine
-              key={marke.key}
-              x={new Date(marke.t)}
-              label={t(
-                `ueberwachung.chart.${marke.key}` as 'ueberwachung.chart.drittel',
-              )}
-              // „jetzt" unten, die Fristen oben: Sonst stehen vier
-              // Beschriftungen auf derselben Höhe übereinander.
-              labelAlign={marke.key === 'jetzt' ? 'end' : 'start'}
-              lineStyle={{
-                stroke: markeFarbe[marke.key],
-                strokeDasharray: marke.key === 'jetzt' ? undefined : '3 3',
-              }}
-              labelStyle={{ fontSize: 10, fill: markeFarbe[marke.key] }}
-            />
-          ))}
+          .map((marke) => {
+            const stil = markeStil[marke.key];
+            return (
+              <ChartsReferenceLine
+                key={marke.key}
+                x={new Date(marke.t)}
+                label={t(
+                  `ueberwachung.chart.${marke.key}` as 'ueberwachung.chart.drittel',
+                )}
+                labelAlign={stil.unten ? 'end' : 'start'}
+                lineStyle={{
+                  stroke: stil.farbe,
+                  strokeDasharray: stil.gestrichelt ? '3 3' : undefined,
+                }}
+                labelStyle={{ fontSize: 10, fill: stil.farbe }}
+              />
+            );
+          })}
       </LineChart>
     </Box>
   );

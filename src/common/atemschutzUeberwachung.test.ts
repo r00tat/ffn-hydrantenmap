@@ -350,6 +350,24 @@ describe('berechneStand', () => {
     expect(stand?.minutenBisRueckzug).toBeCloseTo(0, 5);
   });
 
+  it('hält Druck und Zeitpunkt der ersten Zielmeldung fest', () => {
+    // Die erste zählt: „Flaschendruck bei Erreichen des Einsatzzieles". Eine
+    // spätere Abfrage mit gesetztem Haken ist eine Wiederholung und kein
+    // zweites Erreichen — wichtig, seit der Dialog den Haken gesetzt anbietet,
+    // sobald die Ankunft einmal gemeldet ist.
+    const stand = berechneStand(
+      trupp({
+        paTyp: 'standard300',
+        abmarschZeit: ABMARSCH,
+        druckAbmarsch: 300,
+        abfragen: [abfrage(5, 200, true), abfrage(12, 150, true)],
+      }),
+      nachAbmarsch(13),
+    );
+    expect(stand?.druckAmZiel).toBe(200);
+    expect(stand?.zielSeit).toBe(nachAbmarsch(5).toISOString());
+  });
+
   it('nimmt die Restdruckwarnung, wenn der Vormarsch kurz war', () => {
     const stand = berechneStand(
       trupp({

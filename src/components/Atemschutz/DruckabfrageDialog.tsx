@@ -27,14 +27,26 @@ export interface DruckabfrageDialogProps {
   /**
    * Ob die Ankunftsmeldung noch fehlt.
    *
-   * Zeigt einen **Hinweis**, setzt aber ausdrücklich **nicht** den Haken:
+   * Steuert **beides**: den Hinweis und die Vorbelegung des Hakens — und zwar
+   * in dieser Richtung: Solange die Ankunft fehlt, bleibt der Haken leer.
    * Vorbelegt hätte jede gewöhnliche Zwischenabfrage als Ankunft gegolten, und
-   * daraus rechnet sich der Rückmarschdruck. Ein zu früh gesetzter Haken macht
-   * ihn zu einer Behauptung — die falsche Richtung bei einer
-   * Sicherheitsfunktion. Der Hinweis erinnert stattdessen daran, dass der Wert
-   * noch fehlt.
+   * daraus rechnet sich der Rückmarschdruck; ein zu früh gesetzter Haken macht
+   * ihn zu einer Behauptung. Ist die Ankunft dagegen schon gemeldet, ist sie
+   * eine Tatsache — der Trupp *ist* am Einsatzziel, und ihn bei jeder weiteren
+   * Abfrage als nicht angekommen anzubieten, widerspricht der Lage. Auf die
+   * Rechnung wirkt das nicht: Maßgeblich bleibt die **erste** Zielmeldung
+   * (`berechneStand`).
    */
   zielMeldungFehlt: boolean;
+  /**
+   * Ob der Rückzug schon gemeldet ist.
+   *
+   * Dieselbe Überlegung wie bei der Ankunft, in dieselbe Richtung: Ungemeldet
+   * nicht vorbelegt — der Haken beendet die Warnungen, und das darf nicht aus
+   * Versehen passieren. Ist er gemeldet, sind die Warnungen längst aus, und
+   * jede weitere Abfrage kommt aus dem Rückmarsch.
+   */
+  rueckzugGemeldet: boolean;
   onClose: () => void;
   onSave: (input: DruckabfrageInput) => Promise<void>;
 }
@@ -50,6 +62,7 @@ export default function DruckabfrageDialog({
   open,
   trupp,
   zielMeldungFehlt,
+  rueckzugGemeldet,
   onClose,
   onSave,
 }: DruckabfrageDialogProps) {
@@ -57,8 +70,10 @@ export default function DruckabfrageDialog({
   const tCommon = useTranslations('common');
 
   const [druck, setDruck] = useState('');
-  const [amZiel, setAmZiel] = useState(false);
-  const [rueckzug, setRueckzug] = useState(false);
+  // Was schon gemeldet ist, bleibt angekreuzt: Beides beschreibt einen
+  // Zustand des Trupps und nicht ein Ereignis dieser einen Meldung.
+  const [amZiel, setAmZiel] = useState(!zielMeldungFehlt);
+  const [rueckzug, setRueckzug] = useState(rueckzugGemeldet);
   const [bemerkung, setBemerkung] = useState('');
   // Vorbelegt mit jetzt, aber änderbar: Die Meldung kommt über Funk und wird
   // eine Minute später eingetippt — mit dem Erfassungszeitpunkt gerechnet,
@@ -141,12 +156,17 @@ export default function DruckabfrageDialog({
             label={t('ueberwachung.amZiel')}
           />
           <Typography variant="caption" color="text.secondary">
-            {t('ueberwachung.amZielHint')}
+            {/* Der Hinweistext folgt dem Haken: Steht er schon, ist „nicht
+                ankreuzen für eine Zwischenabfrage" nicht mehr die Frage —
+                dann muss dastehen, warum er gesetzt ist. */}
+            {zielMeldungFehlt
+              ? t('ueberwachung.amZielHint')
+              : t('ueberwachung.bereitsGemeldet')}
           </Typography>
           {zielMeldungFehlt && !amZiel && (
             <Alert severity="info">{t('ueberwachung.amZielFehltHinweis')}</Alert>
           )}
-          {/* Die Gegenmeldung zur Ankunft. Ebenfalls nicht vorbelegt: Sie
+          {/* Die Gegenmeldung zur Ankunft. Ungemeldet nicht vorbelegt: Sie
               beendet die Warnungen, und das darf nicht aus Versehen
               passieren. */}
           <FormControlLabel
@@ -159,7 +179,9 @@ export default function DruckabfrageDialog({
             label={t('ueberwachung.rueckzug')}
           />
           <Typography variant="caption" color="text.secondary">
-            {t('ueberwachung.rueckzugHint')}
+            {rueckzugGemeldet
+              ? t('ueberwachung.bereitsGemeldet')
+              : t('ueberwachung.rueckzugHint')}
           </Typography>
           <TextField
             fullWidth

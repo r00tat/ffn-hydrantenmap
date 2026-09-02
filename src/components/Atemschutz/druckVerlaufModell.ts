@@ -33,8 +33,23 @@ export interface VerlaufPunkt {
   art: PunktArt;
 }
 
-/** Eine senkrechte Marke auf der Zeitachse. */
-export type MarkeKey = 'drittel' | 'zweiDrittel' | 'ende' | 'jetzt';
+/**
+ * Eine senkrechte Marke auf der Zeitachse.
+ *
+ * Zwei Arten, in der Zeichnung auch zwei Beschriftungszeilen: `drittel`,
+ * `zweiDrittel` und `ende` sind **Fristen** aus der Rechnung, `ziel`,
+ * `rueckzugAn` und `zurueck` **gemeldete Ereignisse**. Die Ereignisse sind die
+ * Zeitpunkte, an denen die Kurve ihre Steigung ändert — ohne sie ist nicht zu
+ * lesen, ob der Verbrauch am Vormarsch oder an der Arbeit am Einsatzziel hing.
+ */
+export type MarkeKey =
+  | 'drittel'
+  | 'zweiDrittel'
+  | 'ende'
+  | 'ziel'
+  | 'rueckzugAn'
+  | 'zurueck'
+  | 'jetzt';
 
 export interface Marke {
   key: MarkeKey;
@@ -137,6 +152,16 @@ export function baueDruckVerlauf(
     // Grafik: Wer schneller verbraucht, sieht seine Linie vor der Marke
     // ankommen.
     { key: 'ende' as const, t: tStart + stand.erwarteteDauerMin * 60_000 },
+    // Die gemeldeten Ereignisse. Fehlt die Meldung, liefert `zeit` NaN und der
+    // Filter unten lässt die Marke weg — dieselbe Bauweise wie bei den
+    // Fristen, statt drei bedingter Zweige.
+    { key: 'ziel' as const, t: zeit(stand.zielSeit) },
+    { key: 'rueckzugAn' as const, t: zeit(stand.rueckzugSeit) },
+    // Aus der Zeit und nicht aus dem Rückkehr-*Punkt*: Den gibt es nur mit
+    // abgelesenem Druck, und der wird beim Eintreffen oft nicht mehr
+    // abgefragt. Der Zeitpunkt steht trotzdem im Protokoll.
+    { key: 'zurueck' as const, t: tRueckkehr },
+    // „jetzt" zuletzt, damit die Linie über den anderen liegt.
     ...(imEinsatz ? [{ key: 'jetzt' as const, t: jetzt.getTime() }] : []),
   ].filter((m) => Number.isFinite(m.t));
 

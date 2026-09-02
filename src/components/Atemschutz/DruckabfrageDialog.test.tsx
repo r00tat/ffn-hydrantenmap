@@ -23,13 +23,14 @@ const trupp: AtemschutzTrupp = {
   updatedBy: '',
 };
 
-function render(zielMeldungFehlt = true) {
+function render(zielMeldungFehlt = true, rueckzugGemeldet = false) {
   const onSave = vi.fn().mockResolvedValue(undefined);
   renderWithIntl(
     <DruckabfrageDialog
       open
       trupp={trupp}
       zielMeldungFehlt={zielMeldungFehlt}
+      rueckzugGemeldet={rueckzugGemeldet}
       onClose={vi.fn()}
       onSave={onSave}
     />,
@@ -39,9 +40,11 @@ function render(zielMeldungFehlt = true) {
 
 const ankunftHaken = () =>
   screen.getByRole('checkbox', { name: /am Einsatzziel angekommen/ });
+const rueckzugHaken = () =>
+  screen.getByRole('checkbox', { name: /Rückzug angetreten/ });
 
 describe('DruckabfrageDialog', () => {
-  it('hakt die Ankunft nie vor', () => {
+  it('hakt die Ankunft nicht vor, solange sie fehlt', () => {
     // Vorbelegt hätte jede gewöhnliche Zwischenabfrage als Ankunft gegolten,
     // und daraus rechnet sich der Rückmarschdruck.
     render(true);
@@ -51,10 +54,32 @@ describe('DruckabfrageDialog', () => {
     ).toBeInTheDocument();
   });
 
-  it('erinnert nicht, wenn die Ankunft schon gemeldet wurde', () => {
-    render(false);
-    expect(ankunftHaken()).not.toBeChecked();
+  it('lässt den Haken gesetzt, wenn die Ankunft schon gemeldet ist', async () => {
+    // Der Trupp *ist* am Einsatzziel — ihn bei jeder weiteren Abfrage als nicht
+    // angekommen anzubieten, widerspricht der Lage. Gerechnet wird weiter mit
+    // der ersten Meldung, die Vorbelegung ändert daran nichts.
+    const onSave = render(false);
+    expect(ankunftHaken()).toBeChecked();
     expect(screen.queryByText(/noch keine Ankunft/)).toBeNull();
+
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /Geringster Druck/ }),
+      '150',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({ amZiel: true });
+  });
+
+  it('lässt auch den Rückzug gesetzt, wenn er schon gemeldet ist', () => {
+    render(false, true);
+    expect(rueckzugHaken()).toBeChecked();
+  });
+
+  it('hakt den Rückzug nicht vor, solange er nicht gemeldet ist', () => {
+    // Er beendet die Warnungen — das darf nicht aus Versehen passieren.
+    render(false);
+    expect(rueckzugHaken()).not.toBeChecked();
   });
 
   it('nimmt die Ankunft auf, wenn sie angekreuzt wird', async () => {

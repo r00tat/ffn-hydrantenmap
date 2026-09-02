@@ -125,6 +125,58 @@ describe('baueDruckVerlauf', () => {
     );
   });
 
+  it('markiert Ankunft, angetretenen Rückzug und Rückkehr', () => {
+    // Die drei gemeldeten Ereignisse sind die Zeitpunkte, an denen sich die
+    // Steigung ändert — ohne sie ist aus der Kurve nicht zu lesen, ob der
+    // Verbrauch am Vormarsch oder an der Arbeit am Einsatzziel hängt.
+    const { modell: m } = modell(
+      trupp({
+        status: 'zurueck',
+        abfragen: [
+          abfrage(5, 240, { amZiel: true }),
+          abfrage(15, 140, { rueckzug: true }),
+        ],
+        rueckkehrZeit: nachAbmarsch(25).toISOString(),
+        druckRueckkehr: 80,
+      }),
+      30,
+    );
+    const marken = new Map(m?.marken.map((x) => [x.key, x.t]));
+    expect(marken.get('ziel')).toBe(nachAbmarsch(5).getTime());
+    expect(marken.get('rueckzugAn')).toBe(nachAbmarsch(15).getTime());
+    expect(marken.get('zurueck')).toBe(nachAbmarsch(25).getTime());
+  });
+
+  it('markiert die Rückkehr auch ohne abgelesenen Druck', () => {
+    // Die Marke hängt an der Zeit: Der Rückkehrdruck wird oft nicht mehr
+    // abgefragt, der Zeitpunkt steht trotzdem im Protokoll.
+    const { modell: m } = modell(
+      trupp({
+        status: 'zurueck',
+        abfragen: [abfrage(10, 180)],
+        rueckkehrZeit: nachAbmarsch(20).toISOString(),
+      }),
+      25,
+    );
+    expect(m?.marken.map((x) => x.key)).toContain('zurueck');
+    expect(m?.punkte.map((p) => p.art)).not.toContain('rueckkehr');
+  });
+
+  it('markiert die erste Zielmeldung, nicht jede', () => {
+    const { modell: m } = modell(
+      trupp({
+        abfragen: [
+          abfrage(5, 240, { amZiel: true }),
+          abfrage(15, 140, { amZiel: true }),
+        ],
+      }),
+      16,
+    );
+    expect(m?.marken.filter((x) => x.key === 'ziel')).toEqual([
+      { key: 'ziel', t: nachAbmarsch(5).getTime() },
+    ]);
+  });
+
   it('zeigt Rückzugsdruck und Reserve als getrennte Linien', () => {
     const { modell: m } = modell(
       // 300 → 240 am Ziel: doppelter Vormarschdruckabfall 120 bar, klar über

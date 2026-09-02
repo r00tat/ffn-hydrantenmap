@@ -184,12 +184,23 @@ sich das aber wie **„Auftrag erledigt"** und nicht wie „der Trupp ist
 angekommen" — genau so wurde es beim Ausprobieren verstanden. Im Formular steht
 deshalb „Trupp ist am Einsatzziel angekommen", im Druckverlauf „Ankunft".
 
-Der Haken ist außerdem **nicht vorbelegt**, obwohl die erste Abfrage nach dem
-Abmarsch meist die Ankunftsmeldung ist. Aus ihr rechnet sich der
-Rückmarschdruck; eine gewöhnliche Zwischenabfrage, die versehentlich als Ankunft
-gilt, macht ihn zu einer Behauptung. Stattdessen erinnert ein Hinweis im Dialog
-daran, dass die Ankunft für diesen Trupp noch fehlt — und dass bis dahin die
-55-bar-Warnung der Rückzugszeitpunkt ist.
+Der Haken ist **nicht vorbelegt, solange die Ankunft fehlt**, obwohl die erste
+Abfrage nach dem Abmarsch meist die Ankunftsmeldung ist. Aus ihr rechnet sich
+der Rückmarschdruck; eine gewöhnliche Zwischenabfrage, die versehentlich als
+Ankunft gilt, macht ihn zu einer Behauptung. Stattdessen erinnert ein Hinweis im
+Dialog daran, dass die Ankunft für diesen Trupp noch fehlt — und dass bis dahin
+die 55-bar-Warnung der Rückzugszeitpunkt ist.
+
+Ist die Ankunft dagegen **schon gemeldet, bleibt der Haken gesetzt**. Sie
+beschreibt keinen Vorgang dieser einen Meldung, sondern einen Zustand des
+Trupps: Er *ist* am Einsatzziel, und ihn bei jeder weiteren Abfrage als nicht
+angekommen anzubieten, widerspricht der Lage — beim Ausprobieren wurde genau das
+als Fehler gelesen. Auf die Rechnung wirkt die Vorbelegung nicht: Maßgeblich ist
+die **erste** Zielmeldung („Flaschendruck bei Erreichen des Einsatzzieles"), und
+`berechneStand` nimmt sie mit `find` und nicht die letzte. Dasselbe gilt für den
+angetretenen Rückzug. Der Hinweistext unter dem Haken wechselt mit: Steht er
+schon, ist „nicht ankreuzen für eine Zwischenabfrage" nicht mehr die Frage,
+sondern warum er gesetzt ist.
 
 ## Zwei Verbrauchswerte, zwei Zwecke
 
@@ -234,6 +245,28 @@ senkrecht die Drittelmarken, das **rechnerische** Einsatzende (Anhaltswert der
 Unterlage) und „jetzt", waagrecht Rückzugsdruck und Restdruckwarnung. Wer
 schneller verbraucht als 50 l/min, sieht seine Linie vor der Marke „rechn. Ende"
 unten ankommen — das ist die Aussage, für die es die Grafik gibt.
+
+Jede Druckabfrage trägt einen **Punkt** auf der Linie (`showMark: true`, anders
+als in den Wetterkurven, die ihre Punkte ausschalten): Hier sind es eine Handvoll
+Ablesungen, und *wann* abgefragt wurde ist Teil der Aussage — der Knick der Linie
+liegt genau dort. Dazu kommen die drei gemeldeten **Ereignisse** als senkrechte
+Marken: Ankunft, angetretener Rückzug, Rückkehr. An ihnen bricht die Steigung,
+und erst mit ihnen ist zu lesen, woran der Verbrauch hing: Ein steiler Abschnitt
+zwischen Ankunft und Rückzug ist Arbeit unter Last, derselbe Abfall auf dem
+Vormarsch wäre ein zu langer Anmarschweg.
+
+Die Marken sind auf **zwei Beschriftungszeilen** verteilt: Fristen aus der
+Rechnung oben und gestrichelt, gemeldete Ereignisse (und „jetzt") unten und
+durchgezogen. Auf einer Höhe stünden bis zu sieben Beschriftungen übereinander,
+und die Trennung ist zugleich die Aussage — oben, was gerechnet ist, unten, was
+jemand gemeldet hat. Die Marke „zurück" hängt an `rueckkehrZeit` und nicht am
+Rückkehr-*Punkt* der Linie: Den gibt es nur mit abgelesenem Druck, und der wird
+beim Eintreffen oft nicht mehr abgefragt.
+
+Den Zeitpunkt der Ankunft führt `berechneStand` als `zielSeit` neben
+`druckAmZiel` mit — beides kommt aus derselben ersten Zielmeldung, und die Grafik
+müsste ihn sonst ein zweites Mal aus den Abfragen suchen, mit dem Risiko, dabei
+die letzte statt der ersten zu nehmen.
 
 Gezeichnet wird mit **`@mui/x-charts`** — derselben Bibliothek wie die
 Wetterhistorie, die Fahrtenbuch-Statistik und die Dosimetrie, also ohne neue
@@ -296,8 +329,10 @@ Restdruckwarnung zu, und `dringlichkeit` richtet sich nach der Reserve —
 nicht `ok`: Der Trupp atmet weiter aus der Flasche, und eine grüne Karte hieße
 „hier ist nichts zu tun".
 
-Wie die Ankunft ist der Haken **nicht** vorbelegt: Er beendet die Warnungen, und
-das darf nicht aus Versehen passieren.
+Wie bei der Ankunft ist der Haken **nicht** vorbelegt, solange der Rückzug nicht
+gemeldet ist: Er beendet die Warnungen, und das darf nicht aus Versehen
+passieren. Ist er gemeldet, bleibt er gesetzt — die Warnungen sind längst aus,
+und jede weitere Abfrage kommt aus dem Rückmarsch.
 
 ### Die Anzeige nennt die Grundlage der Schätzung
 

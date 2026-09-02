@@ -332,6 +332,14 @@ export interface UeberwachungStand {
   /** Druck bei Erreichen des Einsatzziels, wenn gemeldet. */
   druckAmZiel?: number;
   /**
+   * Wann der Trupp das Einsatzziel erreicht hat, wenn gemeldet (ISO).
+   *
+   * Neben dem Druck, weil beides aus derselben ersten Zielmeldung kommt und
+   * die Oberfläche den Zeitpunkt sonst ein zweites Mal aus den Abfragen suchen
+   * müsste — mit dem Risiko, dabei die *letzte* statt der ersten zu nehmen.
+   */
+  zielSeit?: string;
+  /**
    * Wann der Trupp den Rückzug angetreten hat, wenn gemeldet (ISO).
    *
    * Ab hier sind die Fristen erledigt: Sie sollten den Trupp zum Umkehren
@@ -464,7 +472,9 @@ export function berechneStand(
     einsatzMinuten: (jetzt.getTime() - abmarsch) / 60_000,
     letzterPunkt,
     vermuteterDruck,
-    ...(zielAbfrage ? { druckAmZiel: zielAbfrage.druck } : {}),
+    ...(zielAbfrage
+      ? { druckAmZiel: zielAbfrage.druck, zielSeit: zielAbfrage.zeitpunkt }
+      : {}),
     ...(rueckzugAbfrage ? { rueckzugSeit: rueckzugAbfrage.zeitpunkt } : {}),
     ...(rueckmarsch != null ? { rueckmarschDruck: rueckmarsch } : {}),
     rueckzugsDruck,

@@ -17,6 +17,7 @@ import { renderWithIntl } from '../../test-utils/intlRender';
 interface Reihe {
   id?: string;
   data: (number | null)[];
+  showMark?: boolean;
 }
 
 interface ChartProps {
@@ -31,6 +32,7 @@ vi.mock('@mui/x-charts/LineChart', () => ({
     <div
       data-testid="chart"
       data-series={JSON.stringify(series.map((s) => [s.id, s.data]))}
+      data-marks={JSON.stringify(series.map((s) => [s.id, s.showMark]))}
       data-x={JSON.stringify([xAxis[0].min, xAxis[0].max])}
       data-y={JSON.stringify([yAxis[0].min, yAxis[0].max])}
     >
@@ -89,6 +91,42 @@ describe('DruckVerlaufChart', () => {
     expect(marken).toContain('2/3');
     expect(marken).toContain('rechn. Ende');
     expect(marken).toContain('jetzt');
+  });
+
+  it('beschriftet die gemeldeten Ereignisse', () => {
+    render(
+      {
+        ...trupp,
+        status: 'zurueck',
+        abfragen: [
+          { zeitpunkt: nachAbmarsch(5).toISOString(), druck: 240, amZiel: true },
+          {
+            zeitpunkt: nachAbmarsch(15).toISOString(),
+            druck: 140,
+            rueckzug: true,
+          },
+        ],
+        rueckkehrZeit: nachAbmarsch(25).toISOString(),
+        druckRueckkehr: 80,
+      },
+      30,
+    );
+    const marken = screen.getAllByTestId('marke').map((x) => x.textContent);
+    expect(marken).toContain('Ankunft');
+    expect(marken).toContain('Rückzug');
+    expect(marken).toContain('zurück');
+  });
+
+  it('zeichnet die Druckabfragen als Punkte', () => {
+    // Ohne Punkte ist nicht zu sehen, *wann* abgefragt wurde — der Knick der
+    // Linie liegt genau dort.
+    render(trupp, 10);
+    expect(
+      JSON.parse(screen.getByTestId('chart').dataset.marks as string),
+    ).toEqual([
+      ['gemessen', true],
+      ['prognose', false],
+    ]);
   });
 
   it('trennt gemessene Werte von der Fortschreibung', () => {
