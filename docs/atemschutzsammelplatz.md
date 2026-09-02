@@ -16,6 +16,17 @@ sind in der App bewusst *anders*:
 
 Ein PDF-Export gibt es bewusst nicht: Das Protokoll lebt in der App.
 
+## Abgrenzung zur Atemschutzüberwachung
+
+Der Sammelplatz ist **Logistik**: Trupps bereitstellen, Ausrüstung ausgeben,
+Flaschen füllen. Die **Einsatzzeitkontrolle** gehört nicht hierher — „Diese
+übergeordnete Atemschutzüberwachung hat ausschließlich logistische Aufgaben; sie
+führt KEINE ZEITKONTROLLE durch." (FH-06 5.3.4). Sie liegt beim
+Gruppenkommandanten und hat eine eigene Seite:
+[atemschutzueberwachung.md](atemschutzueberwachung.md). Beide arbeiten auf
+derselben Sammlung `call/{id}/atemschutzTrupp` — ein hier entsendeter Trupp
+erscheint dort von selbst.
+
 ## Warum jede Bereitstellung eine eigene Zeile ist
 
 `atemschutzTrupp` speichert **eine Bereitstellung**, nicht einen Trupp. Ein

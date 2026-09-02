@@ -1,0 +1,489 @@
+'use client';
+
+import { useCallback, useMemo, useState } from 'react';
+import AddIcon from '@mui/icons-material/Add';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Container from '@mui/material/Container';
+import Divider from '@mui/material/Divider';
+import Fab from '@mui/material/Fab';
+import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
+import {
+  buildDruckabfrage,
+  canTransition,
+  newTruppKey,
+  sanitizeMitglieder,
+  sanitizeTruppGeraete,
+  uebernahmePatch,
+  type AtemschutzTrupp,
+  type DruckabfrageInput,
+  type TruppGeraet,
+  type TruppInput,
+  type TruppPatch,
+} from '../../common/atemschutz';
+import {
+  sortierteAbfragen,
+  vorgabeGeraetesatz,
+} from '../../common/atemschutzUeberwachung';
+import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
+import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
+import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
+import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
+import useRegisterMessaging from '../../hooks/useRegisterMessaging';
+import useTicker from '../../hooks/useTicker';
+import useVehicles from '../../hooks/useVehicles';
+import {
+  addDruckabfrage,
+  addTrupp,
+  updateTrupp,
+  updateUeberwachung,
+  type AtemschutzActor,
+} from './atemschutzStore';
+import TruppDialog from './TruppDialog';
+import TruppZeitDialog, { type TruppZeitModus } from './TruppZeitDialog';
+import TruppGeraeteDialog from './TruppGeraeteDialog';
+import DruckabfrageDialog from './DruckabfrageDialog';
+import UeberwachungCard from './UeberwachungCard';
+import UeberwachungDialog, {
+  type UeberwachungEingabe,
+} from './UeberwachungDialog';
+
+/** „Alle Trupps" im Einheitenfilter. */
+const ALLE = '__alle__';
+
+/**
+ * Die gewählte Einheit steht je **Gerät** im `localStorage`, nicht am Benutzer
+ * und nicht am Einsatz.
+ *
+ * Nicht am Benutzer, weil auf einem Fahrzeug mehrere Leute ein Konto teilen —
+ * das ist hier der Regelfall. Nicht je Einsatz, weil dasselbe Fahrzeug im
+ * nächsten Einsatz dieselbe Einheit ist; und eine Einheit, an die in *diesem*
+ * Einsatz kein Trupp entsendet wurde, fällt in der Anzeige ohnehin auf „alle"
+ * zurück.
+ */
+const EINHEIT_STORAGE_KEY = 'asue-einheit';
+
+function leseEinheit(): string {
+  if (typeof window === 'undefined') return ALLE;
+  try {
+    return window.localStorage.getItem(EINHEIT_STORAGE_KEY) || ALLE;
+  } catch {
+    // Ein Browser mit gesperrtem Speicher darf die Seite nicht mitnehmen —
+    // dann bleibt eben „alle Trupps".
+    return ALLE;
+  }
+}
+
+type Dialog =
+  | { art: 'trupp'; trupp?: AtemschutzTrupp }
+  | { art: 'ueberwachung'; trupp: AtemschutzTrupp }
+  | { art: 'druckabfrage'; trupp: AtemschutzTrupp }
+  | { art: 'geraete'; trupp: AtemschutzTrupp }
+  | { art: 'zeit'; trupp: AtemschutzTrupp; modus: TruppZeitModus };
+
+/**
+ * Atemschutzüberwachung — die Einsatzzeitkontrolle des Gruppenkommandanten.
+ *
+ * Eine eigene Seite und **kein Reiter des Sammelplatzes**: „Diese übergeordnete
+ * Atemschutzüberwachung [am ASSP] hat ausschließlich logistische Aufgaben; sie
+ * führt KEINE ZEITKONTROLLE durch." (FH-06 5.3.4). Die Zeitkontrolle beginnt
+ * mit dem ersten Trupp und muss deshalb ohne eingerichteten Sammelplatz
+ * funktionieren — hier lässt sich ein Trupp auch dann erfassen, wenn er nie
+ * über einen ASSP lief.
+ *
+ * Gearbeitet wird auf derselben Sammlung wie am Sammelplatz
+ * (`call/{id}/atemschutzTrupp`): Ein am ASSP bereitgestellter Trupp taucht
+ * damit von selbst hier auf, sobald er entsendet ist — „nicht erst, wenn ich
+ * ihn suche".
+ */
+export default function UeberwachungPage() {
+  const t = useTranslations('atemschutz');
+  const firecallId = useFirecallId();
+  const firecall = useFirecall();
+  const hatEinsatz = !!firecallId && firecallId !== 'unknown';
+  // Ohne Einsatz kein Schreiben: `firecallId` ist dann die Platzhalter-ID
+  // `unknown`, und jeder Schreibvorgang darauf endet in permission-denied.
+  const canWrite = useFirecallWriteAccess() && hatEinsatz;
+  const { uid, displayName, email } = useFirebaseLogin();
+  const jetzt = useTicker();
+  const registerMessaging = useRegisterMessaging();
+
+  const groupId = firecall?.group;
+  const { flaschen, activeGeraete, feuerwehren } =
+    useAtemschutzGeraete(groupId);
+  const { trupps } = useAtemschutzEinsatzdaten(firecallId);
+  const { vehicles, tacticalUnits } = useVehicles();
+
+  const suggestions = useAtemschutzPersonSuggestions(groupId, {
+    trupps: trupps.protokoll,
+    asspLeiter: firecall?.asspLeiter,
+    asspFuellpersonal: firecall?.asspFuellpersonal,
+  });
+
+  // Der Gerätesatz, mit dem gerechnet wird, solange am Trupp keiner steht —
+  // abgelesen aus dem eigenen Flaschenbestand.
+  const vorgabe = useMemo(() => vorgabeGeraetesatz(flaschen), [flaschen]);
+
+  const [einheit, setEinheit] = useState<string>(leseEinheit);
+
+  const waehleEinheit = useCallback((wert: string) => {
+    setEinheit(wert);
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(EINHEIT_STORAGE_KEY, wert);
+    } catch {
+      // s.o. — die Wahl gilt dann nur für diese Sitzung.
+    }
+  }, []);
+
+  /** Alle Einheiten, an die in diesem Einsatz Trupps entsendet wurden. */
+  const einheiten = useMemo(() => {
+    const namen = new Set<string>();
+    for (const trupp of trupps.protokoll) {
+      const ziel = trupp.entsendetAn?.trim();
+      if (ziel) namen.add(ziel);
+    }
+    return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
+  }, [trupps.protokoll]);
+
+  const entsendetAnVorschlaege = useMemo(() => {
+    const namen: string[] = [];
+    const gesehen = new Set<string>();
+    const add = (value?: string) => {
+      const v = value?.trim();
+      if (!v || gesehen.has(v.toLowerCase())) return;
+      gesehen.add(v.toLowerCase());
+      namen.push(v);
+    };
+    for (const fzg of vehicles) add(fzg.name);
+    for (const e of tacticalUnits) add(e.name);
+    return namen;
+  }, [vehicles, tacticalUnits]);
+
+  const passt = useCallback(
+    (trupp: AtemschutzTrupp) =>
+      einheit === ALLE || trupp.entsendetAn?.trim() === einheit,
+    [einheit],
+  );
+
+  const imEinsatz = trupps.imEinsatz.filter(passt);
+  const bereit = trupps.bereit.filter(passt);
+  const zurueck = trupps.zurueck.filter(passt);
+  const aktuellIds = useMemo(
+    () => new Set(trupps.aktuell.map((x) => x.id)),
+    [trupps.aktuell],
+  );
+
+  const [dialog, setDialog] = useState<Dialog>();
+
+  const actorNow = useCallback(
+    (): AtemschutzActor => ({
+      userId: uid ?? '',
+      now: new Date().toISOString(),
+    }),
+    [uid],
+  );
+
+  const handleSaveTrupp = useCallback(
+    async (input: TruppInput, trupp?: AtemschutzTrupp) => {
+      const stamp = actorNow();
+      const basis = {
+        feuerwehr: input.feuerwehr.trim(),
+        mitglieder: sanitizeMitglieder(input.mitglieder),
+        ...(input.truppName?.trim()
+          ? { truppName: input.truppName.trim() }
+          : {}),
+        ...(input.bemerkung?.trim()
+          ? { bemerkung: input.bemerkung.trim() }
+          : {}),
+      };
+      if (trupp?.id) {
+        await updateTrupp(firecallId, trupp.id, basis, stamp);
+        return;
+      }
+      await addTrupp(
+        firecallId,
+        {
+          ...basis,
+          truppKey: newTruppKey(),
+          laufendeNummer: 1,
+          status: 'bereit',
+          bereitSeit: stamp.now,
+          // Wer den Trupp hier erfasst, hat damit auch die Zeitkontrolle — der
+          // Umweg über ein zweites „Übernehmen" wäre ein Klick ohne Erkenntnis.
+          ueberwachungSeit: stamp.now,
+          ueberwachungUids: stamp.userId ? [stamp.userId] : [],
+          ...(einheit !== ALLE ? { entsendetAn: einheit } : {}),
+        },
+        stamp,
+      );
+    },
+    [actorNow, einheit, firecallId],
+  );
+
+  const handleUebernahme = useCallback(
+    async (trupp: AtemschutzTrupp, input: UeberwachungEingabe) => {
+      if (!trupp.id) return;
+      const stamp = actorNow();
+      await updateUeberwachung(
+        firecallId,
+        trupp.id,
+        uebernahmePatch({
+          trupp,
+          jetzt: stamp.now,
+          uid: stamp.userId,
+          ueberwachtVon: input.ueberwachtVon,
+          einsatzziel: input.einsatzziel,
+          paTyp: input.paTyp,
+          satz: input.satz,
+        }),
+        stamp,
+      );
+      // Erst hier den Push-Token holen und nicht beim Laden der Seite: Der
+      // Browser fragt dabei nach der Erlaubnis für Benachrichtigungen, und
+      // diese Frage soll zu einer Handlung gehören, die sie erklärt.
+      await registerMessaging().catch((err) => {
+        console.warn('Push-Registrierung fehlgeschlagen', err);
+      });
+    },
+    [actorNow, firecallId, registerMessaging],
+  );
+
+  const handleDruckabfrage = useCallback(
+    async (trupp: AtemschutzTrupp, input: DruckabfrageInput) => {
+      if (!trupp.id) return;
+      const stamp = actorNow();
+      await addDruckabfrage(
+        firecallId,
+        trupp,
+        buildDruckabfrage(input, { uid: stamp.userId, jetzt: stamp.now }),
+        stamp,
+      );
+    },
+    [actorNow, firecallId],
+  );
+
+  const handleGeraete = useCallback(
+    async (trupp: AtemschutzTrupp, truppGeraete: TruppGeraet[]) => {
+      if (!trupp.id) return;
+      await updateUeberwachung(
+        firecallId,
+        trupp.id,
+        // Bereinigt, weil Firestore `undefined` auch innerhalb der Objekte
+        // eines Arrays ablehnt — ein geleertes Namensfeld im Dialog ließe sonst
+        // den ganzen Schreibvorgang scheitern.
+        { truppGeraete: sanitizeTruppGeraete(truppGeraete) },
+        actorNow(),
+      );
+    },
+    [actorNow, firecallId],
+  );
+
+  const handlePatch = useCallback(
+    async (trupp: AtemschutzTrupp, patch: TruppPatch) => {
+      // Dieselbe Schranke wie am Sammelplatz: Zwei Geräte sehen dieselbe Karte,
+      // und wer eine Sekunde später drückt, arbeitet auf einem überholten Zustand.
+      if (!trupp.id || !canTransition(trupp.status, patch.status)) return;
+      await updateTrupp(firecallId, trupp.id, patch, actorNow());
+    },
+    [actorNow, firecallId],
+  );
+
+  const karte = (trupp: AtemschutzTrupp) => (
+    <UeberwachungCard
+      key={trupp.id}
+      trupp={trupp}
+      jetzt={jetzt}
+      vorgabe={vorgabe}
+      canWrite={canWrite}
+      istAktuell={aktuellIds.has(trupp.id)}
+      onUebernehmen={() => setDialog({ art: 'ueberwachung', trupp })}
+      onBearbeiten={() => setDialog({ art: 'ueberwachung', trupp })}
+      onDruckabfrage={() => setDialog({ art: 'druckabfrage', trupp })}
+      onGeraete={() => setDialog({ art: 'geraete', trupp })}
+      onAbmarsch={() => setDialog({ art: 'zeit', trupp, modus: 'entsenden' })}
+      onRueckkehr={() => setDialog({ art: 'zeit', trupp, modus: 'rueckkehr' })}
+    />
+  );
+
+  const abschnitt = (
+    key: 'imEinsatz' | 'bereit' | 'zurueck',
+    liste: AtemschutzTrupp[],
+  ) => (
+    <Box sx={{ mb: 3 }}>
+      <Typography variant="h6" gutterBottom>
+        {t(`ueberwachung.sections.${key}`)}
+        {liste.length > 0 && ` (${liste.length})`}
+      </Typography>
+      {liste.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          {t(`ueberwachung.empty.${key}`)}
+        </Typography>
+      ) : (
+        <Stack spacing={1}>{liste.map(karte)}</Stack>
+      )}
+    </Box>
+  );
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 3, pb: 12 }}>
+      <Typography variant="h4" gutterBottom>
+        {t('ueberwachung.title')}
+      </Typography>
+
+      {!hatEinsatz && (
+        // Ohne gewählten Einsatz gibt es keine Sammlung, in die geschrieben
+        // werden könnte — ein Formular anzubieten führte in ein
+        // permission-denied auf die Platzhalter-ID `unknown`.
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {t('ueberwachung.keinEinsatz')}
+        </Alert>
+      )}
+
+      {hatEinsatz && !canWrite && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {t('readOnly')}
+        </Alert>
+      )}
+
+      <Alert severity="info" sx={{ mb: 2 }}>
+        {t('ueberwachung.verantwortungHinweis')}
+      </Alert>
+
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+      >
+        <TextField
+          select
+          size="small"
+          label={t('ueberwachung.einheit')}
+          helperText={t('ueberwachung.einheitHint')}
+          value={einheiten.includes(einheit) ? einheit : ALLE}
+          onChange={(e) => waehleEinheit(e.target.value)}
+          sx={{ minWidth: 220 }}
+        >
+          <MenuItem value={ALLE}>{t('ueberwachung.einheitAlle')}</MenuItem>
+          {einheiten.map((name) => (
+            <MenuItem key={name} value={name}>
+              {name}
+            </MenuItem>
+          ))}
+        </TextField>
+        <Box sx={{ flexGrow: 1 }} />
+        {canWrite && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setDialog({ art: 'trupp' })}
+          >
+            {t('ueberwachung.actions.truppErfassen')}
+          </Button>
+        )}
+      </Stack>
+
+      {abschnitt('imEinsatz', imEinsatz)}
+      {abschnitt('bereit', bereit)}
+      {abschnitt('zurueck', zurueck)}
+
+      <Divider sx={{ my: 3 }} />
+      <Typography variant="h6" gutterBottom>
+        {t('trupp.sections.protokoll')}
+      </Typography>
+      {trupps.protokoll.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          {t('trupp.empty.protokoll')}
+        </Typography>
+      ) : (
+        <Stack spacing={1}>{trupps.protokoll.filter(passt).map(karte)}</Stack>
+      )}
+
+      {canWrite && (
+        <Fab
+          color="primary"
+          sx={{ position: 'fixed', bottom: 24, right: 24 }}
+          aria-label={t('ueberwachung.actions.truppErfassen')}
+          onClick={() => setDialog({ art: 'trupp' })}
+        >
+          <AddIcon />
+        </Fab>
+      )}
+
+      {dialog?.art === 'trupp' && (
+        <TruppDialog
+          key={dialog.trupp?.id ?? 'new'}
+          open
+          trupp={dialog.trupp}
+          feuerwehren={feuerwehren}
+          personSuggestions={suggestions}
+          onClose={() => setDialog(undefined)}
+          onSave={(input) => handleSaveTrupp(input, dialog.trupp)}
+        />
+      )}
+
+      {dialog?.art === 'ueberwachung' && (
+        <UeberwachungDialog
+          key={dialog.trupp.id}
+          open
+          trupp={dialog.trupp}
+          vorgabe={vorgabe}
+          personSuggestions={[
+            ...dialog.trupp.mitglieder,
+            displayName ?? email ?? '',
+            ...suggestions,
+          ].filter(Boolean)}
+          istUebernahme={!dialog.trupp.ueberwachungSeit}
+          onClose={() => setDialog(undefined)}
+          onSave={(input) => handleUebernahme(dialog.trupp, input)}
+        />
+      )}
+
+      {dialog?.art === 'druckabfrage' && (
+        <DruckabfrageDialog
+          key={dialog.trupp.id}
+          open
+          trupp={dialog.trupp}
+          zielMeldungFehlt={
+            !sortierteAbfragen(dialog.trupp).some((a) => a.amZiel)
+          }
+          onClose={() => setDialog(undefined)}
+          onSave={(input) => handleDruckabfrage(dialog.trupp, input)}
+        />
+      )}
+
+      {dialog?.art === 'geraete' && (
+        <TruppGeraeteDialog
+          key={dialog.trupp.id}
+          open
+          trupp={dialog.trupp}
+          geraete={activeGeraete}
+          personSuggestions={[...dialog.trupp.mitglieder, ...suggestions]}
+          onClose={() => setDialog(undefined)}
+          onSave={(geraete) => handleGeraete(dialog.trupp, geraete)}
+        />
+      )}
+
+      {dialog?.art === 'zeit' && (
+        <TruppZeitDialog
+          key={`${dialog.trupp.id}-${dialog.modus}`}
+          open
+          modus={dialog.modus}
+          entsendetAnVorschlag={
+            dialog.trupp.entsendetAn ?? (einheit !== ALLE ? einheit : undefined)
+          }
+          entsendetAnVorschlaege={entsendetAnVorschlaege}
+          onClose={() => setDialog(undefined)}
+          onConfirm={(patch) => handlePatch(dialog.trupp, patch)}
+        />
+      )}
+    </Container>
+  );
+}

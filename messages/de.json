@@ -441,6 +441,98 @@
         "anzahlInvalid": "Anzahl muss zwischen 1 und 99 liegen.",
         "startdruckAboveEnddruck": "Startdruck liegt über dem Enddruck."
       }
+    },
+    "ueberwachung": {
+      "title": "Atemschutzüberwachung",
+      "verantwortungHinweis": "Die Atemschutzüberwachung unterstützt den Trupp bei der Überwachung seines Luftvorrats; die Verantwortung für den Trupp bleibt beim Truppkommandanten und beim Kommandanten der taktischen Einheit.",
+      "keinEinsatz": "Kein Einsatz gewählt — die Atemschutzüberwachung gehört zu einem Einsatz. Zuerst einen Einsatz wählen.",
+      "einheit": "Einheit",
+      "einheitHint": "Wird je Gerät gemerkt. Ohne Auswahl sind alle Trupps des Einsatzes sichtbar.",
+      "einheitAlle": "Alle Trupps",
+      "nichtUebernommen": "Zeitkontrolle nicht übernommen",
+      "einsatzziel": "Einsatzziel und -ort",
+      "einsatzzielHint": "z.B. „Stiegenhaus 3. OG“ — das „WO“ der Dokumentation",
+      "ueberwachtVon": "Überwachung durch",
+      "ueberwachtVonHint": "Gruppenkommandant oder beauftragte Person, z.B. Maschinist oder Melder",
+      "paTyp": "Gerätetype",
+      "paTypen": {
+        "standard200": "Standard-PA · 2×4 l / 200 bar",
+        "standard300": "Standard-PA · 1×6 l / 300 bar",
+        "langzeit300": "Langzeit-PA · 2×6,8 l / 300 bar",
+        "custom": "Eigene Werte"
+      },
+      "flaschenAnzahl": "Flaschen",
+      "flaschenVolumen": "Volumen je Flasche (l)",
+      "fuellDruck": "Nenndruck (bar)",
+      "rechnerischeDauer": "Rechnerische Einsatzdauer: {minuten} min (Anhaltswert bei 50 l/min und 55 bar Reservedruck)",
+      "uebernehmenTitle": "Zeitkontrolle übernehmen",
+      "bearbeitenTitle": "Überwachung bearbeiten",
+      "druckabfrageTitle": "Druckabfrage erfassen",
+      "druck": "Geringster Druck im Trupp (bar)",
+      "druckHint": "Maßgeblich ist der Geräteträger mit dem größten Luftverbrauch.",
+      "zeitpunkt": "Zeitpunkt der Meldung",
+      "amZiel": "Meldung „Einsatzziel erreicht“",
+      "amZielHint": "Nur mit diesem Druck lässt sich der Rückmarschdruck aus dem doppelten Vormarschdruckabfall berechnen.",
+      "amZielKurz": "Ziel",
+      "bemerkung": "Bemerkung",
+      "vermuteterDruck": "Vermuteter Druck",
+      "bar": "{druck} bar",
+      "rueckzugUm": "Rückzug um",
+      "inMinuten": "in {minuten} min",
+      "ueberfaelligSeit": "überfällig seit {minuten} min",
+      "restdruckWarnung": "Restdruckwarnung ({druck} bar)",
+      "druckverlauf": "Druckverlauf",
+      "startdruckGeschaetzt": "Abmarschdruck nicht abgelesen",
+      "zielMeldungFehlt": "Keine Zielmeldung",
+      "geraetesatz": "{anzahl}×{volumen} l / {druck} bar · {dauer} min rechnerisch",
+      "grund": {
+        "vormarsch": "Rückmarschdruck {druck} bar (doppelter Vormarschdruckabfall)",
+        "restdruck": "Restdruckwarnung {druck} bar"
+      },
+      "verbrauch": {
+        "standard": "Anhaltswert {liter} l/min",
+        "gemessen": "gemessen {liter} l/min ({bar} bar/min)"
+      },
+      "warnungen": {
+        "drittel": "Ein Drittel der Einsatzzeit ohne Meldung (seit {zeit}) — Flaschendrücke abfragen.",
+        "zweiDrittel": "Zwei Drittel der Einsatzzeit ohne Meldung (seit {zeit}) — Flaschendrücke abfragen.",
+        "rueckzug": "Rückzugszeitpunkt erreicht (ab {zeit}) — Trupp zum Rückzug auffordern."
+      },
+      "geraeteTitle": "Geräte am Trupp",
+      "geraetSuche": "Gerät suchen oder scannen",
+      "geraetSucheHint": "Flaschennummer, Inventar- oder Seriennummer; Enter übernimmt.",
+      "geraetOhneStammdaten": "Gerät ohne Stammdatensatz",
+      "geraeteLeer": "Noch kein Gerät hinterlegt.",
+      "geraetTyp": "Typ",
+      "geraetPerson": "Getragen von",
+      "geraetePersonHint": "Die Zuordnung Gerät → Person wird meist erst bei der Rückkehr nachgetragen.",
+      "sections": {
+        "imEinsatz": "Unter Atemschutz",
+        "bereit": "Bereit zum Abmarsch",
+        "zurueck": "Zurück"
+      },
+      "empty": {
+        "imEinsatz": "Kein Trupp unter Atemschutz.",
+        "bereit": "Kein Trupp bereit.",
+        "zurueck": "Kein Trupp zurück."
+      },
+      "actions": {
+        "uebernehmen": "Zeitkontrolle übernehmen",
+        "abmarsch": "Abmarsch erfassen",
+        "druckabfrage": "Druckabfrage",
+        "truppErfassen": "Trupp erfassen"
+      },
+      "errors": {
+        "druckMissing": "Druck muss angegeben sein",
+        "druckInvalid": "Druck muss zwischen 0 und 400 bar liegen"
+      },
+      "push": {
+        "truppOhneName": "Atemschutztrupp",
+        "drittel": "{trupp}: keine Meldung nach einem Drittel der Einsatzzeit",
+        "zweiDrittel": "{trupp}: keine Meldung nach zwei Dritteln der Einsatzzeit",
+        "rueckzug": "{trupp}: Rückzugszeitpunkt erreicht",
+        "body": "{einsatz} · vermutet {druck} bar · Rückzug {zeit}"
+      }
     }
   },
   "common": {
@@ -792,6 +884,7 @@
   },
   "drawer": {
     "atemschutz": "Atemschutzsammelplatz",
+    "atemschutzueberwachung": "Atemschutzüberwachung",
     "adminAtemschutz": "Atemschutz-Ausrüstung",
     "about": "Über",
     "admin": "Administration",

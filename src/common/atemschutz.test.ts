@@ -6,6 +6,7 @@ import {
   type FuellungInput,
   type TruppInput,
   braucheDatum,
+  buildDruckabfrage,
   canTransition,
   darfFuellungAendern,
   entsendePatch,
@@ -16,11 +17,17 @@ import {
   gruppiereTrupps,
   lookupKeys,
   matchGeraete,
+  mitUeberwachungsUid,
   nextBereitstellung,
   normalizeCode,
   rueckkehrPatch,
   sanitizeMitglieder,
   sanitizePersonen,
+  sanitizeTruppGeraete,
+  truppGeraetLabel,
+  truppGeraetVonGeraet,
+  uebernahmePatch,
+  validateDruckabfrage,
   validateFuellungInput,
   validateTruppInput,
   verrechnenVorgabe,
@@ -797,5 +804,191 @@ describe('braucheDatum', () => {
 
   it('bleibt bei einem unlesbaren Zeitpunkt still', () => {
     expect(braucheDatum('kaputt', jetzt)).toBe(false);
+  });
+});
+
+describe('mitUeberwachungsUid', () => {
+  it('legt die Liste an', () => {
+    expect(mitUeberwachungsUid(undefined, 'u1')).toEqual(['u1']);
+  });
+
+  it('hängt an, ohne zu doppeln', () => {
+    expect(mitUeberwachungsUid(['u1'], 'u2')).toEqual(['u1', 'u2']);
+    expect(mitUeberwachungsUid(['u1', 'u2'], 'u1')).toEqual(['u1', 'u2']);
+  });
+
+  it('ignoriert eine leere uid', () => {
+    expect(mitUeberwachungsUid(['u1'], '')).toEqual(['u1']);
+    expect(mitUeberwachungsUid(undefined, ' ')).toEqual([]);
+  });
+});
+
+describe('uebernahmePatch', () => {
+  const jetzt = '2026-09-02T10:00:00.000Z';
+
+  it('protokolliert den Wechsel der Verantwortung', () => {
+    const patch = uebernahmePatch({
+      trupp: {},
+      jetzt,
+      uid: 'u1',
+      ueberwachtVon: ' Maschinist LFA ',
+      einsatzziel: ' Keller ',
+      satz: { flaschenAnzahl: 1, flaschenVolumen: 6.8, fuellDruck: 300 },
+      paTyp: 'custom',
+    });
+    expect(patch).toEqual({
+      ueberwachungSeit: jetzt,
+      ueberwachungUids: ['u1'],
+      ueberwachtVon: 'Maschinist LFA',
+      einsatzziel: 'Keller',
+      paTyp: 'custom',
+      flaschenAnzahl: 1,
+      flaschenVolumen: 6.8,
+      fuellDruck: 300,
+    });
+  });
+
+  it('lässt eine schon vermerkte Übernahme stehen', () => {
+    const patch = uebernahmePatch({
+      trupp: { ueberwachungSeit: '2026-09-02T09:00:00.000Z', ueberwachungUids: ['u1'] },
+      jetzt,
+      uid: 'u2',
+      paTyp: 'standard300',
+    });
+    expect(patch.ueberwachungSeit).toBeUndefined();
+    expect(patch.ueberwachungUids).toEqual(['u1', 'u2']);
+  });
+
+  it('schickt keine leeren Felder mit — Firestore lehnt undefined ab', () => {
+    const patch = uebernahmePatch({ trupp: {}, jetzt, uid: 'u1', ueberwachtVon: '  ' });
+    expect('ueberwachtVon' in patch).toBe(false);
+    expect('einsatzziel' in patch).toBe(false);
+    expect('paTyp' in patch).toBe(false);
+  });
+});
+
+describe('buildDruckabfrage', () => {
+  it('baut eine Abfrage mit Zeitpunkt und Erfasser', () => {
+    expect(
+      buildDruckabfrage(
+        { druck: 200, amZiel: true, bemerkung: ' Ziel erreicht ' },
+        { uid: 'u1', jetzt: '2026-09-02T10:05:00.000Z' },
+      ),
+    ).toEqual({
+      zeitpunkt: '2026-09-02T10:05:00.000Z',
+      druck: 200,
+      amZiel: true,
+      bemerkung: 'Ziel erreicht',
+      erfasstVon: 'u1',
+    });
+  });
+
+  it('lässt Leeres weg', () => {
+    const abfrage = buildDruckabfrage({ druck: 180 }, { uid: '', jetzt: '2026-09-02T10:05:00.000Z' });
+    expect(abfrage).toEqual({ zeitpunkt: '2026-09-02T10:05:00.000Z', druck: 180 });
+  });
+
+  it('nimmt einen vorgegebenen Zeitpunkt', () => {
+    expect(
+      buildDruckabfrage(
+        { druck: 180, zeitpunkt: '2026-09-02T10:03:00.000Z' },
+        { uid: 'u1', jetzt: '2026-09-02T10:05:00.000Z' },
+      ).zeitpunkt,
+    ).toBe('2026-09-02T10:03:00.000Z');
+  });
+});
+
+describe('validateDruckabfrage', () => {
+  it('nimmt einen plausiblen Druck', () => {
+    expect(validateDruckabfrage({ druck: 200 })).toEqual([]);
+  });
+
+  it('lehnt fehlenden, negativen und unsinnig hohen Druck ab', () => {
+    expect(validateDruckabfrage({})).toEqual(['druckMissing']);
+    expect(validateDruckabfrage({ druck: -1 })).toEqual(['druckInvalid']);
+    expect(validateDruckabfrage({ druck: 1000 })).toEqual(['druckInvalid']);
+  });
+});
+
+describe('truppGeraetVonGeraet', () => {
+  it('kopiert Bezeichnung und Kennung aus den Stammdaten', () => {
+    expect(
+      truppGeraetVonGeraet(
+        geraet({ id: 'g7', nummer: '2.16.19', bezeichnung: 'Atemluftflasche CFK 6,8 l' }),
+      ),
+    ).toEqual({
+      geraetId: 'g7',
+      typ: 'flasche',
+      bezeichnung: 'Atemluftflasche CFK 6,8 l',
+      kennung: '2.16.19',
+    });
+  });
+
+  it('lässt geraetId und kennung weg, wenn es keine gibt', () => {
+    const ohne = geraet({ nummer: undefined, inventarNr: undefined, seriennummer: undefined });
+    delete ohne.id;
+    expect(truppGeraetVonGeraet(ohne)).toEqual({
+      typ: 'flasche',
+      bezeichnung: 'Atemluftflasche Stahl 6 l',
+    });
+  });
+});
+
+describe('truppGeraetLabel', () => {
+  it('stellt die Kennung voran', () => {
+    expect(
+      truppGeraetLabel({ typ: 'flasche', bezeichnung: 'CFK 6,8 l', kennung: '2.16.19' }),
+    ).toBe('2.16.19 · CFK 6,8 l');
+  });
+
+  it('nennt ohne Kennung nur die Bezeichnung', () => {
+    expect(truppGeraetLabel({ typ: 'maske', bezeichnung: 'Maske FPS' })).toBe('Maske FPS');
+  });
+});
+
+describe('sanitizeTruppGeraete', () => {
+  it('entfernt leere Felder — Firestore lehnt undefined auch im Array ab', () => {
+    expect(
+      sanitizeTruppGeraete([
+        {
+          geraetId: ' g1 ',
+          typ: 'flasche',
+          bezeichnung: ' CFK 6,8 l ',
+          kennung: ' 2.16.19 ',
+          person: undefined,
+        },
+      ]),
+    ).toEqual([
+      {
+        geraetId: 'g1',
+        typ: 'flasche',
+        bezeichnung: 'CFK 6,8 l',
+        kennung: '2.16.19',
+      },
+    ]);
+  });
+
+  it('behält einen gesetzten Träger', () => {
+    expect(
+      sanitizeTruppGeraete([
+        { typ: 'maske', bezeichnung: 'Maske FPS', person: ' Anna ' },
+      ]),
+    ).toEqual([{ typ: 'maske', bezeichnung: 'Maske FPS', person: 'Anna' }]);
+  });
+
+  it('wirft Zeilen ohne Bezeichnung und ohne Kennung weg', () => {
+    expect(
+      sanitizeTruppGeraete([{ typ: 'flasche', bezeichnung: '   ' }]),
+    ).toEqual([]);
+  });
+
+  it('nimmt die Kennung als Bezeichnung, wenn nur sie da ist', () => {
+    expect(
+      sanitizeTruppGeraete([
+        { typ: 'flasche', bezeichnung: '', kennung: '2.16.19' },
+      ]),
+    ).toEqual([
+      { typ: 'flasche', bezeichnung: '2.16.19', kennung: '2.16.19' },
+    ]);
   });
 });

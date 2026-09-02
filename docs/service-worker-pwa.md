@@ -94,3 +94,35 @@ einen Rückfall aufs Netz. Dazu kommen in [index.ts](../src/worker/index.ts):
 - ein Notausstieg: die Seite kann `{ type: 'sw-reset' }` schicken, der Worker leert dann
   seine Caches und meldet sich ab. Ohne ihn bleibt einem Benutzer nur „Website-Daten
   löschen" — in einer installierten PWA am Telefon praktisch unauffindbar.
+
+## Push: die Nutzlast muss unterscheidbar sein
+
+`onBackgroundMessage` hat bis zur Atemschutzüberwachung **jede** Data-Message als
+Chat-Nachricht behandelt und aus `data.name`/`data.message` einen Titel „Einsatz Chat: …"
+gebaut. Jede weitere Art von Benachrichtigung erscheint damit als
+„Einsatz Chat: undefined".
+
+Neue Nachrichten tragen deshalb ein `kind` und werden **vor** dem Chat-Zweig geprüft. Die
+Atemschutzwarnung ist der erste Fall:
+[atemschutzPush.ts](../src/common/atemschutzPush.ts) hält Form, Prüfung (`isAtemschutzPush`)
+und die Kennung der Anzeige (`pushTag`). Das Modul ist bewusst rein und importiert nur
+Typen — der Worker kann nichts bündeln, was auf `firestore` oder `firebase-admin` zeigt.
+
+Der **Text kommt fertig vom Server**: Der Worker hat keinen Übersetzungskatalog und würde
+sonst einen Schlüssel anzeigen.
+
+Zwei Dinge an der Anzeige, die aus dem Code nicht hervorgehen:
+
+- `tag` wird je Trupp gesetzt, nicht je Warnung. Eine neue Warnung zum selben Trupp soll
+  die alte **ersetzen**; drei Meldungen untereinander sind keine dreifache Information,
+  sondern eine Liste, in der die aktuelle untergeht.
+- `requireInteraction` steht nur bei der Rückzugswarnung. Die Sicherheitsmeldung soll nicht
+  von selbst verschwinden, die Erinnerungen dürfen es.
+
+Der Klick auf eine Benachrichtigung folgt `notification.data.url`. Vorher stand dort fest
+`/chat`, und der Vergleich `client.url === '/chat'` traf nie zu: `client.url` ist absolut,
+der Pfad nicht. Jetzt wird auf das Ende der URL geprüft — ein offenes Fenster wird also
+wirklich fokussiert statt ein zweites geöffnet.
+
+Hintergrund der Warnungen selbst (Fristen, Empfänger, Zeitplan):
+[atemschutzueberwachung.md](atemschutzueberwachung.md).

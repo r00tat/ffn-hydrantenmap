@@ -2,6 +2,13 @@ locals {
   # Muss zu `local.cron_invoker_emails` im aufrufenden Root passen — sonst weist
   # cronRequired den Aufrufer ab, obwohl Token und Berechtigung stimmen. Dort
   # prüft ein `check`-Block genau diese Übereinstimmung.
+  #
+  # Der Name nennt das Fahrtenbuch, obwohl inzwischen auch die
+  # Atemschutzüberwachung darüber läuft: Eine account_id lässt sich nicht
+  # umbenennen, ein neuer Service Account hieße ein neuer Eintrag in
+  # CRON_INVOKER_EMAILS und damit ein Deploy, das genau zwischen apply und
+  # Rollout jeden Zeitplan ablehnt. Der Name ist historisch, die Rolle ist
+  # „Aufrufer der geplanten Läufe".
   invoker_account_id = "fahrtenbuch-report-invoker${var.name_suffix}"
 }
 
@@ -52,6 +59,53 @@ resource "google_cloud_scheduler_job" "fahrtenbuch_weekly_report" {
     # Leerer Body: Der Endpoint nimmt ohne Angabe die letzte abgeschlossene
     # ISO-Woche. Die Wochenrechnung gehört in die App, wo sie getestet ist, und
     # nicht in eine Scheduler-Payload.
+    body = base64encode("{}")
+
+    oidc_token {
+      service_account_email = google_service_account.fahrtenbuch_report_invoker.email
+      audience              = var.service_url
+    }
+  }
+}
+
+
+# Die Fristenprüfung der Atemschutzüberwachung.
+#
+# Jede Minute, und das ist der Punkt: Die Drittelmarken eines
+# Standard-Pressluftatmers liegen bei rund acht Minuten, die Rückzugswarnung
+# hat drei Minuten Vorlauf. Ein Lauf alle fünf Minuten könnte die Vorwarnung um
+# zwei Minuten verpassen — genau die Zeit, um die es bei einer
+# Sicherheitsfunktion geht. Der Lauf ist billig: Er liest die Trupps mit Zustand
+# `imEinsatz`, und das sind außerhalb eines Einsatzes null Dokumente.
+#
+# Anders als der Wochenbericht **nicht** pausierbar in dev: Der Push geht an die
+# Geräte, die an der jeweiligen Überwachung arbeiten, und dev und prod lesen
+# getrennte Firestore-Datenbanken. Zwei Umgebungen können sich hier also nicht
+# in die Quere kommen — im Gegensatz zur gemeinsamen Verteilerliste der Mails.
+resource "google_cloud_scheduler_job" "atemschutz_ueberwachung" {
+  project     = var.project
+  region      = var.run_region
+  name        = "atemschutz-ueberwachung${var.name_suffix}"
+  description = "Fristen der Atemschutzüberwachung prüfen und warnen"
+  schedule    = var.ueberwachung_schedule
+  time_zone   = "Europe/Vienna"
+  paused      = var.ueberwachung_paused
+
+  # Keine Wiederholung: Der nächste Lauf kommt in einer Minute ohnehin, und eine
+  # verschickte Warnung ist am Dokument vermerkt — ein Wiederholungsversuch
+  # könnte also nur dieselbe Prüfung doppelt machen.
+  retry_config {
+    retry_count = 0
+  }
+
+  http_target {
+    http_method = "POST"
+    uri         = "${var.service_url}/api/atemschutz/ueberwachung-check"
+
+    headers = {
+      "Content-Type" = "application/json"
+    }
+
     body = base64encode("{}")
 
     oidc_token {

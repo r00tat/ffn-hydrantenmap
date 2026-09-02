@@ -441,6 +441,98 @@
         "anzahlInvalid": "Quantity must be between 1 and 99.",
         "startdruckAboveEnddruck": "Initial pressure is above the final pressure."
       }
+    },
+    "ueberwachung": {
+      "title": "Breathing apparatus monitoring",
+      "verantwortungHinweis": "Monitoring supports the team in tracking its air supply; responsibility for the team stays with the team leader and the commander of the tactical unit.",
+      "keinEinsatz": "No operation selected — monitoring belongs to an operation. Select one first.",
+      "einheit": "Unit",
+      "einheitHint": "Remembered per device. Without a selection all teams of the operation are shown.",
+      "einheitAlle": "All teams",
+      "nichtUebernommen": "Time control not taken over",
+      "einsatzziel": "Target and location",
+      "einsatzzielHint": "e.g. “staircase 3rd floor” — the “where” of the documentation",
+      "ueberwachtVon": "Monitored by",
+      "ueberwachtVonHint": "Group commander or an assigned person, e.g. driver or runner",
+      "paTyp": "Apparatus type",
+      "paTypen": {
+        "standard200": "Standard SCBA · 2×4 l / 200 bar",
+        "standard300": "Standard SCBA · 1×6 l / 300 bar",
+        "langzeit300": "Long-duration SCBA · 2×6.8 l / 300 bar",
+        "custom": "Custom values"
+      },
+      "flaschenAnzahl": "Cylinders",
+      "flaschenVolumen": "Volume per cylinder (l)",
+      "fuellDruck": "Nominal pressure (bar)",
+      "rechnerischeDauer": "Calculated duration: {minuten} min (guide value at 50 l/min and 55 bar reserve)",
+      "uebernehmenTitle": "Take over time control",
+      "bearbeitenTitle": "Edit monitoring",
+      "druckabfrageTitle": "Record pressure check",
+      "druck": "Lowest pressure in the team (bar)",
+      "druckHint": "The wearer with the highest air consumption is decisive.",
+      "zeitpunkt": "Time of the report",
+      "amZiel": "Report “target reached”",
+      "amZielHint": "Only this pressure allows the turn-around pressure to be derived from twice the inbound pressure drop.",
+      "amZielKurz": "target",
+      "bemerkung": "Note",
+      "vermuteterDruck": "Estimated pressure",
+      "bar": "{druck} bar",
+      "rueckzugUm": "Withdraw at",
+      "inMinuten": "in {minuten} min",
+      "ueberfaelligSeit": "overdue for {minuten} min",
+      "restdruckWarnung": "Low pressure warning ({druck} bar)",
+      "druckverlauf": "Pressure history",
+      "startdruckGeschaetzt": "Departure pressure not read",
+      "zielMeldungFehlt": "No target report",
+      "geraetesatz": "{anzahl}×{volumen} l / {druck} bar · {dauer} min calculated",
+      "grund": {
+        "vormarsch": "Turn-around pressure {druck} bar (twice the inbound drop)",
+        "restdruck": "Low pressure warning {druck} bar"
+      },
+      "verbrauch": {
+        "standard": "guide value {liter} l/min",
+        "gemessen": "measured {liter} l/min ({bar} bar/min)"
+      },
+      "warnungen": {
+        "drittel": "One third of the duration without a report (since {zeit}) — ask for cylinder pressures.",
+        "zweiDrittel": "Two thirds of the duration without a report (since {zeit}) — ask for cylinder pressures.",
+        "rueckzug": "Withdrawal time reached (from {zeit}) — order the team to withdraw."
+      },
+      "geraeteTitle": "Equipment with the team",
+      "geraetSuche": "Search or scan equipment",
+      "geraetSucheHint": "Cylinder, inventory or serial number; Enter accepts.",
+      "geraetOhneStammdaten": "Equipment without a record",
+      "geraeteLeer": "No equipment recorded yet.",
+      "geraetTyp": "Type",
+      "geraetPerson": "Worn by",
+      "geraetePersonHint": "Assigning equipment to a person is usually done on return.",
+      "sections": {
+        "imEinsatz": "Under breathing apparatus",
+        "bereit": "Ready to depart",
+        "zurueck": "Returned"
+      },
+      "empty": {
+        "imEinsatz": "No team under breathing apparatus.",
+        "bereit": "No team ready.",
+        "zurueck": "No team returned."
+      },
+      "actions": {
+        "uebernehmen": "Take over time control",
+        "abmarsch": "Record departure",
+        "druckabfrage": "Pressure check",
+        "truppErfassen": "Add team"
+      },
+      "errors": {
+        "druckMissing": "A pressure is required",
+        "druckInvalid": "Pressure must be between 0 and 400 bar"
+      },
+      "push": {
+        "truppOhneName": "Breathing apparatus team",
+        "drittel": "{trupp}: no report after one third of the duration",
+        "zweiDrittel": "{trupp}: no report after two thirds of the duration",
+        "rueckzug": "{trupp}: withdrawal time reached",
+        "body": "{einsatz} · estimated {druck} bar · withdraw {zeit}"
+      }
     }
   },
   "common": {
@@ -792,6 +884,7 @@
   },
   "drawer": {
     "atemschutz": "Breathing apparatus",
+    "atemschutzueberwachung": "Breathing apparatus monitoring",
     "adminAtemschutz": "Breathing apparatus equipment",
     "about": "About",
     "admin": "Administration",

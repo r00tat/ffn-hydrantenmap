@@ -186,6 +186,109 @@ export const TRUPP_STATUSES: TruppStatus[] = [
 ];
 
 /**
+ * Vorlagen für den Gerätesatz eines Trupps, benannt nach der Lehrunterlage.
+ *
+ * Nur die drei Sätze, die FH-06 selbst durchrechnet, plus `custom`: Jeder
+ * weitere Eintrag wäre eine Behauptung darüber, was eine Feuerwehr fährt, und
+ * mit `custom` steht der Weg zu beliebigen Werten ohnehin offen.
+ */
+export type PaTypKey = 'standard200' | 'standard300' | 'langzeit300' | 'custom';
+
+export const PA_TYPEN: PaTypKey[] = [
+  'standard200',
+  'standard300',
+  'langzeit300',
+  'custom',
+];
+
+/** Was den Luftvorrat eines Trupps bestimmt. */
+export interface Geraetesatz {
+  /** Flaschen je Geräteträger. */
+  flaschenAnzahl: number;
+  /** Volumen *einer* Flasche in Liter. */
+  flaschenVolumen: number;
+  /** Nenndruck in bar — entscheidet über den Korrekturfaktor. */
+  fuellDruck: number;
+}
+
+/**
+ * Die Gerätesätze der Beispiele aus FH-06, S. 48-49.
+ *
+ * `custom` fehlt hier bewusst: Dafür gibt es keine Vorlage, sondern die Werte
+ * am Trupp.
+ */
+export const PA_SAETZE: Record<Exclude<PaTypKey, 'custom'>, Geraetesatz> = {
+  // Standardpressluftatmer, 2-Flaschengerät á 4 l mit 200 bar.
+  standard200: { flaschenAnzahl: 2, flaschenVolumen: 4, fuellDruck: 200 },
+  // Standardpressluftatmer, 1-Flaschengerät á 6 l mit 300 bar.
+  standard300: { flaschenAnzahl: 1, flaschenVolumen: 6, fuellDruck: 300 },
+  // Langzeitpressluftatmer, 2-Flaschengerät á 6,8 l mit 300 bar.
+  langzeit300: { flaschenAnzahl: 2, flaschenVolumen: 6.8, fuellDruck: 300 },
+};
+
+/**
+ * Eine protokollierte Druckabfrage.
+ *
+ * Maßgeblich ist immer der **geringste Druck im Trupp**: „Der Atemschutztrupp
+ * hat sich bei der Festlegung des Rückmarschzeitpunktes immer an dem
+ * Geräteträger mit dem größten Luftverbrauch zu orientieren." (FH-06 5.3.2)
+ * Deshalb ein Wert je Abfrage und nicht einer je Person — drei Werte
+ * abzufragen kostet Funkzeit, und gerechnet würde ohnehin nur mit dem
+ * kleinsten.
+ */
+export interface Druckabfrage {
+  zeitpunkt: string;
+  /** Geringster Druck im Trupp in bar. */
+  druck: number;
+  /**
+   * Die Meldung „Einsatzziel erreicht".
+   *
+   * Ohne sie ist der Rückmarschdruck aus dem doppelten Vormarschdruckabfall
+   * nicht berechenbar — sie ist der einzige Wert, aus dem hervorgeht, wie viel
+   * Luft der Hinweg gekostet hat.
+   */
+  amZiel?: boolean;
+  bemerkung?: string;
+  /** Wer abgefragt hat — `uid`, für die Nachvollziehbarkeit. */
+  erfasstVon?: string;
+}
+
+/**
+ * Ein Gerät am Trupp.
+ *
+ * `geraetId` fehlt bei einer Fremdflasche ohne Stammdatensatz; dann tragen
+ * `bezeichnung` und `kennung` allein. Dieselbe Abwägung wie beim Füllprotokoll:
+ * Ein Pflichtverweis in die Stammdaten hieße, dass eine Nachbarwehr nicht
+ * erfassbar ist.
+ */
+export interface TruppGeraet {
+  geraetId?: string;
+  typ: AtemschutzGeraetTyp;
+  bezeichnung: string;
+  /** Flaschennummer, Inventar- oder Seriennummer — was aufgedruckt ist. */
+  kennung?: string;
+  /**
+   * Wer das Gerät getragen hat.
+   *
+   * Wird meist erst bei der Rückkehr nachgetragen: Beim Abmarsch steht selten
+   * fest, wer welche Flasche aufnimmt, und ein Pflichtfeld hier hielte den
+   * Trupp auf.
+   */
+  person?: string;
+}
+
+/**
+ * Die Warnungen der Überwachung, in der Reihenfolge ihrer Dringlichkeit.
+ *
+ * `drittel` und `zweiDrittel` sind Erinnerungen, `rueckzug` ist die
+ * sicherheitsrelevante Warnung — die Reihenfolge entscheidet, welche verschickt
+ * wird, wenn mehrere gleichzeitig fällig sind.
+ */
+export type WarnungKey = 'drittel' | 'zweiDrittel' | 'rueckzug';
+
+export const WARNUNG_KEYS: WarnungKey[] = ['drittel', 'zweiDrittel', 'rueckzug'];
+
+/**
  * Eine Bereitstellung eines Trupps — nicht der Trupp selbst.
  *
  * Wird ein zurückgekehrter Trupp erneut bereitgestellt, entsteht ein *neues*
@@ -212,6 +315,81 @@ export interface AtemschutzTrupp {
   rueckkehrZeit?: string;
   /** Geringster Druck im Trupp bei der Rückkehr. */
   druckRueckkehr?: number;
+
+  // ---- Atemschutzüberwachung (Einsatzzeitkontrolle, FH-06 5.3.3) ----
+  //
+  // Bewusst Felder am Trupp und keine eigene Sammlung: Der Trupp am
+  // Sammelplatz und der überwachte Trupp sind derselbe. Sonst müsste die
+  // Übergabe ein zweites Dokument anlegen, das mit dem ersten in Zeit und
+  // Druck auseinanderlaufen kann — und genau darauf käme es an.
+
+  /**
+   * Einsatzziel und -ort — das „WO" der Dokumentation.
+   *
+   * Freitext: „Stiegenhaus 3. OG", „Kellerabteil links". Keine Auswahlliste,
+   * weil der Ort in der Funkmeldung genau so beschrieben wird.
+   */
+  einsatzziel?: string;
+  /**
+   * Wer die Zeitkontrolle führt, als Klartext — der Gruppenkommandant selbst
+   * oder die von ihm beauftragte Person („Maschinist LFA", „Melder").
+   *
+   * Kein Benutzerverweis: Der Beauftragte hat oft kein Gerät in der Hand, und
+   * das Protokoll soll die Funktion nennen, nicht ein Konto.
+   */
+  ueberwachtVon?: string;
+  /**
+   * Geräte, deren Benutzer eine Warnung bekommen sollen.
+   *
+   * Getrennt von `ueberwachtVon`: Der Push braucht eine `uid`, das Protokoll
+   * einen Namen. Wer die Überwachung übernimmt oder eine Druckabfrage erfasst,
+   * kommt dazu — auf einem Sammelplatz wechseln sich mehrere ab, und die
+   * Warnung soll bei allen ankommen, die schon einmal daran gearbeitet haben.
+   */
+  ueberwachungUids?: string[];
+  /**
+   * Wann die Verantwortung für die Zeitkontrolle übernommen wurde.
+   *
+   * Der Wechsel ist protokollpflichtig: Ab hier hat der Gruppenkommandant die
+   * Überwachung, nicht mehr der Sammelplatz (FH-06 5.3.4).
+   */
+  ueberwachungSeit?: string;
+  /** Vorlage des Gerätesatzes; `custom` heißt: Werte von Hand oder aus der Flasche. */
+  paTyp?: PaTypKey;
+  /** Zahl der Flaschen je Geräteträger. */
+  flaschenAnzahl?: number;
+  /** Volumen *einer* Flasche in Liter. */
+  flaschenVolumen?: number;
+  /** Nenndruck der Flasche in bar — entscheidet über den Korrekturfaktor. */
+  fuellDruck?: number;
+  /**
+   * Protokollierte Druckabfragen nach dem Abmarsch, älteste zuerst.
+   *
+   * Ein Array und keine Untersammlung: Es sind ein paar Zeilen je
+   * Bereitstellung, die Anzeige braucht immer alle, `arrayUnion` hängt atomar
+   * an — und die Einsatzsicherung (`useExport`) nimmt das Feld mit, ohne dass
+   * dort etwas nachgezogen werden muss.
+   *
+   * Der Abmarsch steht **nicht** darin: Er ist `abmarschZeit` +
+   * `druckAbmarsch`. Zwei Wahrheiten über denselben Zeitpunkt wären eine zu
+   * viel.
+   */
+  abfragen?: Druckabfrage[];
+  /**
+   * Geräte am Trupp — Flasche, Maske, Pressluftatmer.
+   *
+   * Sie hängen am Trupp und nicht an der Person: Wer welche Flasche trägt,
+   * steht meist erst fest, wenn der Trupp wieder herauskommt. `person` wird
+   * deshalb später nachgetragen.
+   */
+  truppGeraete?: TruppGeraet[];
+  /**
+   * Welche Warnung wann verschickt wurde.
+   *
+   * Steht am Dokument und nicht im Server: Der Zeitplan läuft alle Minute, und
+   * ohne diese Buchführung käme jede Warnung jede Minute erneut.
+   */
+  warnungen?: Partial<Record<WarnungKey, string>>;
   bemerkung?: string;
   createdAt: string;
   createdBy: string;
@@ -798,4 +976,180 @@ export function newTruppKey(): string {
   const c = (globalThis as { crypto?: Crypto }).crypto;
   if (c?.randomUUID) return c.randomUUID();
   return `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Nimmt eine `uid` in die Warnliste auf, ohne zu doppeln.
+ *
+ * Eine leere `uid` wird übergangen: In einem abgemeldeten Zustand ist sie `''`,
+ * und ein leerer Eintrag in der Liste wäre ein Empfänger, den es nicht gibt.
+ */
+export function mitUeberwachungsUid(
+  vorhanden: string[] | undefined,
+  uid: string,
+): string[] {
+  const liste = [...(vorhanden ?? [])];
+  const wert = uid?.trim();
+  if (!wert || liste.includes(wert)) return liste;
+  liste.push(wert);
+  return liste;
+}
+
+/** Was am Trupp geändert wird, ohne den Zustand anzufassen. */
+export type UeberwachungPatch = Partial<AtemschutzTrupp>;
+
+export interface UebernahmeInput {
+  /** Der bestehende Zustand — entscheidet, ob die Übernahme neu ist. */
+  trupp: Pick<AtemschutzTrupp, 'ueberwachungSeit' | 'ueberwachungUids'>;
+  jetzt: string;
+  uid: string;
+  ueberwachtVon?: string;
+  einsatzziel?: string;
+  paTyp?: PaTypKey;
+  /** Nur bei `paTyp === 'custom'` von Belang, aber immer mitgeschrieben. */
+  satz?: Geraetesatz;
+}
+
+/**
+ * Der Patch, mit dem ein Gruppenkommandant die Zeitkontrolle übernimmt.
+ *
+ * `ueberwachungSeit` wird **nur beim ersten Mal** gesetzt: Der Zeitpunkt belegt
+ * den Wechsel der Verantwortung vom Sammelplatz zum Gruppenkommandanten
+ * (FH-06 5.3.4). Würde er bei jeder Änderung neu gestempelt, verschöbe sich der
+ * Beleg mit jeder nachträglich getippten Bemerkung nach vorn.
+ *
+ * Leere Felder fehlen im Patch, statt als `undefined` darin zu stehen —
+ * Firestore lehnt `undefined` ab, dieselbe Vorsicht wie in `entsendePatch`.
+ */
+export function uebernahmePatch(input: UebernahmeInput): UeberwachungPatch {
+  const patch: UeberwachungPatch = {
+    ueberwachungUids: mitUeberwachungsUid(
+      input.trupp.ueberwachungUids,
+      input.uid,
+    ),
+  };
+  if (!input.trupp.ueberwachungSeit) patch.ueberwachungSeit = input.jetzt;
+
+  const person = input.ueberwachtVon?.trim();
+  if (person) patch.ueberwachtVon = person;
+  const ziel = input.einsatzziel?.trim();
+  if (ziel) patch.einsatzziel = ziel;
+
+  if (input.paTyp) {
+    patch.paTyp = input.paTyp;
+    if (input.satz) {
+      patch.flaschenAnzahl = input.satz.flaschenAnzahl;
+      patch.flaschenVolumen = input.satz.flaschenVolumen;
+      patch.fuellDruck = input.satz.fuellDruck;
+    }
+  }
+  return patch;
+}
+
+/** Die Eingabe des Druckabfrage-Dialogs. */
+export interface DruckabfrageInput {
+  druck?: number;
+  amZiel?: boolean;
+  bemerkung?: string;
+  /** Ohne Angabe gilt der Jetzt-Zeitpunkt des Aufrufers. */
+  zeitpunkt?: string;
+}
+
+/** Höchster plausibler Flaschendruck — ein Riegel gegen einen Tippfehler. */
+export const MAX_DRUCK_BAR = 400;
+
+/**
+ * Harte Validierung einer Druckabfrage — wenig, wie überall im Atemschutz:
+ * Wer am Funk mitschreibt, darf nicht an einem Formular hängen.
+ */
+export function validateDruckabfrage(input: DruckabfrageInput): string[] {
+  if (input.druck == null || !Number.isFinite(input.druck)) {
+    return ['druckMissing'];
+  }
+  if (input.druck < 0 || input.druck > MAX_DRUCK_BAR) return ['druckInvalid'];
+  return [];
+}
+
+export function buildDruckabfrage(
+  input: DruckabfrageInput,
+  ctx: { uid: string; jetzt: string },
+): Druckabfrage {
+  const abfrage: Druckabfrage = {
+    zeitpunkt: input.zeitpunkt?.trim() || ctx.jetzt,
+    druck: input.druck as number,
+  };
+  if (input.amZiel) abfrage.amZiel = true;
+  const bemerkung = input.bemerkung?.trim();
+  if (bemerkung) abfrage.bemerkung = bemerkung;
+  const uid = ctx.uid?.trim();
+  if (uid) abfrage.erfasstVon = uid;
+  return abfrage;
+}
+
+/**
+ * Ein Gerät aus den Stammdaten als Gerät am Trupp.
+ *
+ * Bezeichnung und Kennung werden **kopiert**: Die Liste am Trupp soll ohne Join
+ * lesbar bleiben, und ein Jahr später soll noch dastehen, welche Flasche
+ * gemeint war — auch wenn der Stammdatensatz zwischenzeitlich umbenannt oder
+ * ausgeschieden wurde. Dieselbe Abwägung wie bei `geraetName` an der Ausgabe.
+ */
+export function truppGeraetVonGeraet(g: AtemschutzGeraet): TruppGeraet {
+  const tg: TruppGeraet = { typ: g.typ, bezeichnung: g.bezeichnung };
+  if (g.id) tg.geraetId = g.id;
+  const kennung = geraetKennung(g);
+  if (kennung) tg.kennung = kennung;
+  return tg;
+}
+
+/** Einzeiliges Etikett eines Geräts am Trupp. */
+export function truppGeraetLabel(tg: TruppGeraet): string {
+  return tg.kennung ? `${tg.kennung} · ${tg.bezeichnung}` : tg.bezeichnung;
+}
+
+/**
+ * Der Feldpfad, mit dem eine verschickte Warnung vermerkt wird.
+ *
+ * Punktschreibweise auf das verschachtelte Feld, damit die anderen Warnungen
+ * unberührt bleiben: Ein `{ warnungen: { rueckzug } }` ersetzte die ganze Map
+ * und ließe die Erinnerungen erneut auflaufen.
+ *
+ * Hier und nicht im Client-Store: Vermerkt wird serverseitig, vom Zeitplan.
+ */
+export function warnungVermerk(
+  key: WarnungKey,
+  zeitpunkt: string,
+): Record<string, string> {
+  return { [`warnungen.${key}`]: zeitpunkt };
+}
+
+/**
+ * Bereinigt die Geräteliste eines Trupps vor dem Schreiben.
+ *
+ * Nötig, weil Firestore `undefined` ablehnt — und zwar auch **innerhalb** der
+ * Objekte eines Arrays. Wer im Dialog einen Trägernamen wieder leert, hätte
+ * sonst `person: undefined` im Element stehen, und der ganze Schreibvorgang
+ * scheitert mit „Unsupported field value: undefined". Dieselbe Vorsicht wie in
+ * `entsendePatch`, nur eine Ebene tiefer.
+ *
+ * Geräte ohne Bezeichnung *und* ohne Kennung fallen heraus: Sie wären eine
+ * Zeile, die nichts benennt.
+ */
+export function sanitizeTruppGeraete(liste: TruppGeraet[]): TruppGeraet[] {
+  const result: TruppGeraet[] = [];
+  for (const roh of liste ?? []) {
+    const bezeichnung = roh?.bezeichnung?.trim() ?? '';
+    const kennung = roh?.kennung?.trim();
+    if (!bezeichnung && !kennung) continue;
+    const sauber: TruppGeraet = {
+      typ: roh.typ,
+      bezeichnung: bezeichnung || (kennung as string),
+    };
+    if (roh.geraetId?.trim()) sauber.geraetId = roh.geraetId.trim();
+    if (kennung) sauber.kennung = kennung;
+    const person = roh.person?.trim();
+    if (person) sauber.person = person;
+    result.push(sauber);
+  }
+  return result;
 }

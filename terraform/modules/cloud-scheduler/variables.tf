@@ -55,3 +55,15 @@ variable "weekly_report_paused" {
   type        = bool
   default     = false
 }
+
+variable "ueberwachung_schedule" {
+  description = "Cron expression of the breathing apparatus monitoring check"
+  type        = string
+  default     = "* * * * *"
+}
+
+variable "ueberwachung_paused" {
+  description = "Job exists but does not run. Default off in both environments: dev and prod use separate Firestore databases, and the push only reaches the devices working on that very monitoring."
+  type        = bool
+  default     = false
+}

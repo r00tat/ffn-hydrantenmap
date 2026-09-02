@@ -36,6 +36,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/lagekarte-austausch.md](docs/lagekarte-austausch.md) | Import und Export für lagekarte.info: beobachtetes Format, Kupplungsmarker, `ffnd`-Block, Symbolkatalog und seine Lücken |
 | [docs/eigene-kartenebenen.md](docs/eigene-kartenebenen.md) | Eigene WMS-/WMTS-Kartenebenen je Einsatz: Abgrenzung „Kartenebene" gegen „Ebene", Berechtigungen und warum die Firestore-Regeln nichts prüfen, GetCapabilities über den Server, Darstellung im Layer-Control |
 | [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md) | Atemschutzsammelplatz: warum jede Bereitstellung eines Trupps eine eigene Zeile ist, die sechs Kennungen der Flaschensuche und warum die Barcode-Spalte des Sybos-Exports nicht allein trägt, Dublettenbehandlung im Import, Berechtigungen, Kamera in der Android-App, Mangel-Verallgemeinerung, warum das Füllprotokoll unter der Gruppe liegt, Füllstation als Gerätetyp, Vorbelegung von `verrechnen` und `zweck`, wer eine Füllung nachträglich ändern darf, Ausdruck/CSV-Export/CSV-Import des Füllprotokolls, Verrechnung der Füllungen: Tarifwahl, Berechtigung, Storno |
+| [docs/atemschutzueberwachung.md](docs/atemschutzueberwachung.md) | Atemschutzüberwachung (Einsatzzeitkontrolle): warum eine eigene Seite und nicht ein Reiter des Sammelplatzes, warum dieselbe Trupp-Sammlung, Druckabfragen als Array, rechnerische Einsatzdauer und ihre Gegenprüfung an FH-06, Rückmarschdruck = doppelter Vormarschdruckabfall, Drittelmarken gegen gemessenen Verbrauch, Gerätesatz aus dem Bestand, Geräte am Trupp, serverseitige Warnungen über Cloud Scheduler und FCM, Nutzlast im Service Worker |
 | [docs/gruppen-stammdaten.md](docs/gruppen-stammdaten.md) | Absender, Bankverbindung und Logo je Gruppe: warum sie gemeinsam liegen, warum ohne sie kein Beleg entsteht, warum das Logo kein SVG sein darf, Storage-Pfad und Signierung |
 | [docs/rettungskarten.md](docs/rettungskarten.md) | Rettungskarten aus dem Euro-Rescue-Katalog: warum kein Deep Link in die App geht, die offene API von Euro NCAP, Cache, Zuordnung Zulassung → Variante |
 
@@ -426,7 +427,8 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 - `atemschutzRechnung`, `atemschutzEmpfaenger`, `atemschutzConfig` - Verrechnung der Flaschenfüllungen je Gruppe; **ohne** Absender und Bankverbindung, die liegen in `groupConfig` (siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
 - `groupConfig` - Stammdaten einer Gruppe: Absender, Bankverbindung und Logo (`groups/{groupId}/groupConfig/stammdaten`). Von Kostenersatz **und** Atemschutz-Verrechnung gelesen (siehe [docs/gruppen-stammdaten.md](docs/gruppen-stammdaten.md))
 - `kostenersatzConfig` - Mailvorlagen des Kostenersatzes je Gruppe (`groups/{groupId}/kostenersatzConfig/email`)
-- `atemschutzTrupp`, `atemschutzAusgabe` - Protokolle des Atemschutzsammelplatzes je Einsatz
+- `atemschutzTrupp` - Bereitstellungen der Atemschutztrupps je Einsatz (`call/{firecallId}/atemschutzTrupp`). Trägt **beides**: die Logistik des Sammelplatzes und die Felder der Atemschutzüberwachung (`abfragen`, `ueberwachungUids`, `warnungen`, Gerätesatz) — ein Trupp ist ein Trupp (siehe [docs/atemschutzueberwachung.md](docs/atemschutzueberwachung.md))
+- `atemschutzAusgabe` - Ausgabe der Ausrüstung am Sammelplatz je Einsatz
 - `oauthClients`, `oauthAuthCodes`, `oauthRefreshTokens`, `oauthConsents` - OAuth-Authorization-Server des MCP-Zugangs, rein serverseitig (siehe [docs/mcp-server.md](docs/mcp-server.md))
 
 ## Bug Reports / Feedback
