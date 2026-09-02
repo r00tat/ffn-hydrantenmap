@@ -274,21 +274,30 @@ describe('UeberwachungCard', () => {
     expect(screen.getByText(/Einheit: Nicht zugeordnet/)).toBeInTheDocument();
   });
 
-  it('zeigt die Geräte am Trupp samt Träger', () => {
+  it('zeigt die Geräte am Trupp nach Träger gruppiert', () => {
     render(
       trupp({
         truppGeraete: [
+          { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Bert Beispiel' },
           {
             typ: 'flasche',
             bezeichnung: 'CFK 6,8 l',
             kennung: '2.16.19',
             person: 'Anna Beispiel',
           },
+          { typ: 'flasche', bezeichnung: 'Stahl 6 l', kennung: '2.16.20' },
         ],
       }),
     );
-    expect(
-      screen.getByText('2.16.19 · CFK 6,8 l — Anna Beispiel'),
-    ).toBeInTheDocument();
+    // Eine Zeile je Träger, alphabetisch, die nicht zugeordnete Ausrüstung
+    // zuletzt.
+    const zeilen = screen
+      .getAllByText(/CFK 6,8 l|Maske FPS|Stahl 6 l/)
+      .map((n) => n.textContent);
+    expect(zeilen).toEqual([
+      'Anna Beispiel: 2.16.19 · CFK 6,8 l',
+      'Bert Beispiel: Maske FPS',
+      'nicht zugeordnet: 2.16.20 · Stahl 6 l',
+    ]);
   });
 });

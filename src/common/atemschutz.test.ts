@@ -5,6 +5,7 @@ import {
   type AtemschutzGeraet,
   type AtemschutzTrupp,
   type FuellungInput,
+  type TruppGeraet,
   type TruppInput,
   braucheDatum,
   buildDruckabfrage,
@@ -16,6 +17,7 @@ import {
   fuellungSperre,
   geraetDetails,
   geraetKennung,
+  gruppiereTruppGeraete,
   gruppiereTrupps,
   istGueltigeUid,
   lookupKeys,
@@ -422,6 +424,48 @@ describe('nextBereitstellung', () => {
     nextBereitstellung(zurueck, '2026-08-29T11:30:00.000Z');
     expect(JSON.stringify(zurueck)).toBe(vorher);
   });
+
+  it('übernimmt Maske, Gerät und Zubehör, aber keine Flasche', () => {
+    // Maske und Pressluftatmer legt der Trupp zwischen zwei Einsätzen nicht
+    // ab; die Flaschen sind leer und werden getauscht.
+    const neu = nextBereitstellung(
+      trupp({
+        ...zurueck,
+        truppGeraete: [
+          {
+            typ: 'flasche',
+            bezeichnung: 'CFK 6,8 l',
+            kennung: '2.16.19',
+            person: 'Huber',
+          },
+          { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Huber' },
+          { typ: 'pressluftatmer', bezeichnung: 'PA 94', person: 'Huber' },
+          { typ: 'zubehoer', bezeichnung: 'Fluchthaube' },
+        ],
+      }),
+      '2026-08-29T11:30:00.000Z',
+    );
+    expect(neu.truppGeraete?.map((g) => g.bezeichnung)).toEqual([
+      'Maske FPS',
+      'PA 94',
+      'Fluchthaube',
+    ]);
+    // Und beim selben Träger: Die Maske wechselt nicht die Person.
+    expect(neu.truppGeraete?.[0].person).toBe('Huber');
+  });
+
+  it('lässt das Feld weg, wenn nur Flaschen erfasst waren', () => {
+    // Firestore lehnt `undefined` ab, ein leeres Array wäre eine Aussage über
+    // Ausrüstung, die es nicht gibt.
+    const neu = nextBereitstellung(
+      trupp({
+        ...zurueck,
+        truppGeraete: [{ typ: 'flasche', bezeichnung: 'CFK 6,8 l' }],
+      }),
+      '2026-08-29T11:30:00.000Z',
+    );
+    expect(neu).not.toHaveProperty('truppGeraete');
+  });
 });
 
 describe('sammelplatzUebergabePatch', () => {
@@ -485,6 +529,25 @@ describe('erneuterEinsatz', () => {
     expect(neu.fuellDruck).toBe(300);
     expect(neu.entsendetAn).toBe('LFA');
     expect(neu.ueberwachtVon).toBe('GRKDT Huber');
+  });
+
+  it('nimmt Maske und Gerät mit in den zweiten Einsatz', () => {
+    // Der Trupp legt sie nicht ab — sie noch einmal zu scannen ist reine
+    // Tipparbeit. Die Flaschen sind getauscht und werden neu erfasst.
+    const neu = erneuterEinsatz({
+      vorherige: trupp({
+        ...zurueck,
+        truppGeraete: [
+          { typ: 'flasche', bezeichnung: 'CFK 6,8 l', kennung: '2.16.19' },
+          { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Huber' },
+        ],
+      }),
+      jetzt: '2026-08-29T11:40:00.000Z',
+      entsendung,
+    });
+    expect(neu.truppGeraete).toEqual([
+      { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Huber' },
+    ]);
   });
 
   it('führt die Zeitkontrolle weiter und nimmt den Anleger dazu', () => {
@@ -615,6 +678,34 @@ describe('gruppiereTrupps', () => {
     const gruppen = gruppiereTrupps([zweite, erste]);
     expect(gruppen.bereit.map((t) => t.id)).toEqual(['2']);
     expect(gruppen.zurueck).toEqual([]);
+  });
+
+  it('lässt in `frueher` nur, was oben nicht ohnehin steht', () => {
+    // Der gemeldete Fall: Ein Trupp im Einsatz stand oben unter „Unter
+    // Atemschutz" *und* noch einmal im Protokoll darunter.
+    const erste = trupp({ id: '1', laufendeNummer: 1, status: 'zurueck' });
+    const zweite = trupp({ id: '2', laufendeNummer: 2, status: 'imEinsatz' });
+    const gruppen = gruppiereTrupps([erste, zweite]);
+    expect(gruppen.frueher.map((t) => t.id)).toEqual(['1']);
+  });
+
+  it('behält Abgemeldete in `frueher` — oben stehen sie nirgends', () => {
+    const abgemeldet = trupp({
+      id: 'd',
+      truppKey: 'kd',
+      status: 'abgemeldet',
+    });
+    const gruppen = gruppiereTrupps([abgemeldet]);
+    expect(gruppen.frueher.map((t) => t.id)).toEqual(['d']);
+  });
+
+  it('hat ohne ältere Zeilen ein leeres `frueher`', () => {
+    const gruppen = gruppiereTrupps([
+      trupp({ id: 'a', truppKey: 'ka', status: 'bereit' }),
+      trupp({ id: 'b', truppKey: 'kb', status: 'imEinsatz' }),
+      trupp({ id: 'c', truppKey: 'kc', status: 'zurueck' }),
+    ]);
+    expect(gruppen.frueher).toEqual([]);
   });
 });
 
@@ -1090,6 +1181,71 @@ describe('truppGeraetLabel', () => {
 
   it('nennt ohne Kennung nur die Bezeichnung', () => {
     expect(truppGeraetLabel({ typ: 'maske', bezeichnung: 'Maske FPS' })).toBe('Maske FPS');
+  });
+});
+
+describe('gruppiereTruppGeraete', () => {
+  const flasche = (kennung: string, person?: string): TruppGeraet => ({
+    typ: 'flasche',
+    bezeichnung: 'CFK 6,8 l',
+    kennung,
+    ...(person ? { person } : {}),
+  });
+
+  it('bündelt je Träger und sortiert die Träger', () => {
+    const gruppen = gruppiereTruppGeraete([
+      flasche('3', 'Huber'),
+      flasche('1', 'Aigner'),
+      flasche('2', 'Huber'),
+    ]);
+    expect(
+      gruppen.map((g) => [g.person, g.geraete.map((x) => x.kennung)]),
+    ).toEqual([
+      ['Aigner', ['1']],
+      ['Huber', ['2', '3']],
+    ]);
+  });
+
+  it('stellt die nicht zugeordnete Ausrüstung ans Ende', () => {
+    // Sie ist eine offene Aufgabe und kein Träger — oben zwischen den Namen
+    // läse sie sich wie eine Person.
+    const gruppen = gruppiereTruppGeraete([flasche('1'), flasche('2', 'Huber')]);
+    expect(gruppen.map((g) => g.person)).toEqual(['Huber', undefined]);
+  });
+
+  it('nimmt „huber" und „Huber" als denselben Mann', () => {
+    const gruppen = gruppiereTruppGeraete([
+      flasche('1', 'Huber'),
+      flasche('2', ' huber '),
+    ]);
+    expect(gruppen).toHaveLength(1);
+    // Angezeigt wird die erste Schreibweise.
+    expect(gruppen[0].person).toBe('Huber');
+  });
+
+  it('sortiert in der Gruppe nach Gerätetyp und dann nach Beschriftung', () => {
+    // Typ zuerst: Pressluftatmer und Flasche sind die Ausrüstung, um die es
+    // geht, Zubehör steht darunter. Innerhalb des Typs zählt die Beschriftung,
+    // und die beginnt mit der Kennung — die Flaschen stehen damit nach
+    // Flaschennummer.
+    const gruppen = gruppiereTruppGeraete([
+      { typ: 'zubehoer', bezeichnung: 'Fluchthaube', person: 'Huber' },
+      { typ: 'maske', bezeichnung: 'Maske FPS', person: 'Huber' },
+      flasche('2', 'Huber'),
+      { typ: 'flasche', bezeichnung: 'Stahl 6 l', kennung: '1', person: 'Huber' },
+      { typ: 'pressluftatmer', bezeichnung: 'PA 94', person: 'Huber' },
+    ]);
+    expect(gruppen[0].geraete.map((g) => g.bezeichnung)).toEqual([
+      'Stahl 6 l',
+      'CFK 6,8 l',
+      'Maske FPS',
+      'PA 94',
+      'Fluchthaube',
+    ]);
+  });
+
+  it('ist ohne Ausrüstung leer', () => {
+    expect(gruppiereTruppGeraete(undefined)).toEqual([]);
   });
 });
 

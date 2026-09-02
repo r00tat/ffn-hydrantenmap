@@ -20,6 +20,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import {
+  gruppiereTruppGeraete,
   truppGeraetLabel,
   truppLabel,
   type AtemschutzTrupp,
@@ -105,6 +106,7 @@ export default function UeberwachungCard({
     ? faelligeWarnungen(trupp, jetzt, { vorgabe })
     : [];
   const abfragen = sortierteAbfragen(trupp);
+  const geraeteGruppen = gruppiereTruppGeraete(trupp.truppGeraete);
   const uebernommen = !!trupp.ueberwachungSeit;
   const uebergeben = !!trupp.ueberwachungBis;
 
@@ -497,20 +499,27 @@ export default function UeberwachungCard({
           </>
         )}
 
-        {trupp.truppGeraete && trupp.truppGeraete.length > 0 && (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            component="div"
-            sx={{ mt: 1 }}
-          >
-            {trupp.truppGeraete
-              .map(
-                (g) =>
-                  `${truppGeraetLabel(g)}${g.person ? ` — ${g.person}` : ''}`,
-              )
-              .join(' · ')}
-          </Typography>
+        {/* Eine Zeile je Träger und nicht eine Kette aus allem: Gefragt ist
+            „was trägt Huber?", nicht „was wurde als Drittes gescannt". Bei
+            einem Trupp zu drei Personen mit Flasche, Maske und Gerät stehen
+            sonst neun Angaben mit angehängten Namen in einem Absatz. */}
+        {geraeteGruppen.length > 0 && (
+          <Box sx={{ mt: 1 }}>
+            {geraeteGruppen.map((gruppe) => (
+              <Typography
+                key={gruppe.person ?? ''}
+                variant="body2"
+                color="text.secondary"
+                component="div"
+              >
+                <Box component="span" sx={{ fontWeight: 600 }}>
+                  {gruppe.person ?? t('ueberwachung.geraetPersonKeine')}
+                </Box>
+                {': '}
+                {gruppe.geraete.map(truppGeraetLabel).join(' · ')}
+              </Typography>
+            ))}
+          </Box>
         )}
 
         {trupp.bemerkung && (

@@ -447,6 +447,7 @@
       "title": "Breathing apparatus monitoring",
       "verantwortungHinweis": "Monitoring supports the team in tracking its air supply; responsibility for the team stays with the team leader and the commander of the tactical unit.",
       "keinEinsatz": "No operation selected — monitoring belongs to an operation. Select one first.",
+      "protokollLeer": "No earlier deployments — every team is listed above.",
       "einheit": "My unit",
       "einheitHint": "Remembered per device, shown as the first tab and assigned to new teams.",
       "einheitAlle": "All teams",

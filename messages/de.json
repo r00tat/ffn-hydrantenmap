@@ -447,6 +447,7 @@
       "title": "Atemschutzüberwachung",
       "verantwortungHinweis": "Die Atemschutzüberwachung unterstützt den Trupp bei der Überwachung seines Luftvorrats; die Verantwortung für den Trupp bleibt beim Truppkommandanten und beim Kommandanten der taktischen Einheit.",
       "keinEinsatz": "Kein Einsatz gewählt — die Atemschutzüberwachung gehört zu einem Einsatz. Zuerst einen Einsatz wählen.",
+      "protokollLeer": "Keine früheren Bereitstellungen — jeder Trupp steht oben.",
       "einheit": "Meine Einheit",
       "einheitHint": "Wird je Gerät gemerkt, steht als erster Reiter und wird neuen Trupps zugeordnet.",
       "einheitAlle": "Alle Trupps",

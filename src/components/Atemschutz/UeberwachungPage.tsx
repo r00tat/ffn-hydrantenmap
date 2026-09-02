@@ -272,9 +272,12 @@ export default function UeberwachungPage() {
     () => trupps.zurueck.filter(passt),
     [passt, trupps.zurueck],
   );
+  // `frueher` und nicht `protokoll`: Ein Trupp unter Atemschutz stand sonst
+  // zweimal auf der Seite — oben in seinem Abschnitt und darunter noch einmal
+  // als Protokollkarte, die nichts beitrug.
   const protokoll = useMemo(
-    () => trupps.protokoll.filter(passt),
-    [passt, trupps.protokoll],
+    () => trupps.frueher.filter(passt),
+    [passt, trupps.frueher],
   );
   const aktuellIds = useMemo(
     () => new Set(trupps.aktuell.map((x) => x.id)),
@@ -751,7 +754,7 @@ export default function UeberwachungPage() {
               ohne eigene Zeilen eine leere Fläche ohne Erklärung stehen. */}
           {protokoll.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              {t('trupp.empty.protokoll')}
+              {t('ueberwachung.protokollLeer')}
             </Typography>
           ) : (
             <Stack spacing={1}>{protokoll.map(karte)}</Stack>

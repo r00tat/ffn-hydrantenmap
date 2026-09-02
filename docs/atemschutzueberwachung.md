@@ -380,6 +380,23 @@ gesetzter Träger zurücknehmbar sein muss, und ein bereits erfasster Name, der
 nicht (mehr) im Trupp steht — sonst verschwände er stillschweigend aus dem Feld,
 sobald jemand die Mitgliederliste ändert.
 
+Auf der Karte steht die Ausrüstung **nach Träger gebündelt**, eine Zeile je
+Person (`gruppiereTruppGeraete`): Gefragt ist „was trägt Huber?" und nicht „was
+wurde als Drittes gescannt". Bei einem Trupp zu drei Personen mit Flasche, Maske
+und Gerät standen sonst neun Angaben mit angehängten Namen in einem Absatz.
+Sortiert wird nach Person, innerhalb der Person nach Gerätetyp (Reihenfolge von
+`ATEMSCHUTZ_GERAET_TYPEN`, also Flasche und Maske vor dem Zubehör) und dann nach
+der Beschriftung — die mit der Kennung beginnt, womit die Flaschen nach
+Flaschennummer stehen. Gruppiert wird ohne Rücksicht auf Groß- und
+Kleinschreibung: Ältere Zuordnungen kommen aus einem Freitextfeld, und „huber"
+und „Huber" sind derselbe Mann. Die noch **nicht zugeordnete** Ausrüstung steht
+am Ende — sie ist eine offene Aufgabe und kein Träger; zwischen den Namen läse
+sie sich wie eine Person.
+
+Im Bearbeiten-Dialog bleibt die **Erfassungsreihenfolge**: Dort wird gescannt,
+und eine Liste, die sich nach jeder Personenwahl neu sortiert, verschiebt die
+Zeile unter dem Finger.
+
 Bezeichnung und Kennung werden aus den Stammdaten **kopiert**: Ein Jahr später
 soll noch dastehen, welche Flasche gemeint war, auch wenn der Stammdatensatz
 umbenannt oder ausgeschieden wurde. Eine Fremdflasche ohne Stammdatensatz bleibt
@@ -712,6 +729,15 @@ Das **Protokoll** unter den drei Abschnitten ist eingeklappt (Accordion mit
 nach oben aus dem Blick. Eingeklappt werden seine Karten samt ihrer Kurven auch
 gar nicht gezeichnet.
 
+Es zeigt außerdem nur, was oben **nicht** ohnehin steht — `gruppiereTrupps`
+liefert dafür `frueher` neben `protokoll`. Vorher stand jeder Trupp unter
+Atemschutz zweimal auf derselben Seite: oben in seinem Abschnitt und darunter
+noch einmal als Protokollkarte, die nichts beitrug und die Seite doppelt so lang
+aussehen ließ, wie der Einsatz ist. Übrig bleiben damit genau die Zeilen ohne
+Karte oben: die älteren Bereitstellungen erneut entsendeter Trupps und die
+abgemeldeten. Abgegrenzt wird über die Zeilen selbst und nicht über den Status —
+ein abgemeldeter Trupp ist `aktuell`, hat oben aber keine Karte.
+
 ### „Meine Einheit" ist kein Filter
 
 Die Auswahl über der Reiterzeile ist eine Angabe über *dieses Gerät*: Sie stellt
@@ -760,6 +786,17 @@ dieser Entsendung, und der zweite Einsatz führt den Trupp oft woandershin; ein
 stehengebliebenes „Stiegenhaus 3. OG" wäre eine Behauptung. `ueberwachungSeit`
 steht auf jetzt: Die Verantwortung läuft weiter, aber auf dieser Zeile beginnt
 sie hier.
+
+Bei der **Ausrüstung** geht die Grenze nicht zwischen den Zeilen, sondern
+zwischen den Gerätetypen — festgelegt in `nextBereitstellung`, also auch für
+„Wieder bereitstellen" am Sammelplatz, weil es dieselbe Lage ist: Maske,
+Pressluftatmer und Zubehör bleiben beim Träger, denn der Trupp legt sie zwischen
+zwei Einsätzen nicht ab, und sie noch einmal zu scannen ist reine Tipparbeit.
+Die **Flaschen** bleiben zurück: Sie sind leer und werden getauscht, und eine
+mitgeschleppte Flaschennummer wäre eine Falschaussage darüber, welche Flasche im
+zweiten Einsatz war — genau die, aus der später das Füllprotokoll wird. Bleibt
+nichts übrig, fehlt das Feld ganz; ein leeres Array wäre eine Aussage über
+Ausrüstung, die es nicht gibt, und Firestore lehnt `undefined` ab.
 
 ### …oder zurück an den Sammelplatz
 

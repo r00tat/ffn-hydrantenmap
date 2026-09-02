@@ -861,6 +861,14 @@ export type NeueBereitstellung = Omit<
  * Mitglieder. Zeiten, Drücke, Gruppenkommandant und Bemerkung der alten Zeile
  * bleiben dort und werden hier nicht mitgeschleppt — sonst behauptete die neue
  * Bereitstellung einen Abmarsch, den es noch nicht gab.
+ *
+ * Bei der Ausrüstung geht die Grenze **nicht** zwischen den Zeilen, sondern
+ * zwischen den Gerätetypen: Maske, Pressluftatmer und Zubehör bleiben beim
+ * Träger — der Trupp legt sie zwischen zwei Einsätzen nicht ab, und sie noch
+ * einmal zu scannen ist reine Tipparbeit. Die **Flaschen** bleiben zurück: Sie
+ * sind leer und werden getauscht, und eine mitgeschleppte Flaschennummer wäre
+ * eine Falschaussage darüber, welche Flasche im zweiten Einsatz war — genau
+ * die, aus der später das Füllprotokoll wird.
  */
 export function nextBereitstellung(
   vorherige: AtemschutzTrupp,
@@ -875,6 +883,13 @@ export function nextBereitstellung(
     bereitSeit: jetzt,
   };
   if (vorherige.truppName) neu.truppName = vorherige.truppName;
+  const behalten = (vorherige.truppGeraete ?? [])
+    .filter((g) => g.typ !== 'flasche')
+    // Kopien, damit die neue Zeile keine Objekte der alten teilt.
+    .map((g) => ({ ...g }));
+  // Nur, wenn etwas übrig bleibt: Firestore lehnt `undefined` ab, und ein
+  // leeres Array wäre eine Aussage über Ausrüstung, die es nicht gibt.
+  if (behalten.length > 0) neu.truppGeraete = behalten;
   return neu;
 }
 
@@ -954,6 +969,17 @@ export interface TruppGruppen {
   aktuell: AtemschutzTrupp[];
   /** Alle Zeilen, neueste Bereitstellung zuerst. */
   protokoll: AtemschutzTrupp[];
+  /**
+   * Das Protokoll **ohne** die Zeilen, die in den drei Abschnitten oben schon
+   * stehen: die älteren Bereitstellungen und die abgemeldeten Trupps.
+   *
+   * Der Unterschied zu `protokoll` ist eine Aussage über die Oberfläche: Ein
+   * Trupp unter Atemschutz stand bisher zweimal auf derselben Seite — oben in
+   * seinem Abschnitt und darunter noch einmal im Protokoll. Die zweite Karte
+   * trug nichts bei und ließ die Liste doppelt so lang aussehen, wie der
+   * Einsatz ist.
+   */
+  frueher: AtemschutzTrupp[];
 }
 
 /**
@@ -999,12 +1025,21 @@ export function gruppiereTrupps(trupps: AtemschutzTrupp[]): TruppGruppen {
     (t) => juengste.get(t.truppKey || (t.id ?? '')) === t,
   );
 
+  const bereit = aktuell.filter((t) => t.status === 'bereit');
+  const imEinsatz = aktuell.filter((t) => t.status === 'imEinsatz');
+  const zurueck = aktuell.filter((t) => t.status === 'zurueck');
+  // Über die Zeilen selbst und nicht über den Status: „steht oben" ist genau
+  // die Vereinigung der drei Abschnitte — ein abgemeldeter Trupp ist zwar
+  // `aktuell`, hat oben aber keine Karte und gehört ins Protokoll.
+  const oben = new Set<AtemschutzTrupp>([...bereit, ...imEinsatz, ...zurueck]);
+
   return {
-    bereit: aktuell.filter((t) => t.status === 'bereit'),
-    imEinsatz: aktuell.filter((t) => t.status === 'imEinsatz'),
-    zurueck: aktuell.filter((t) => t.status === 'zurueck'),
+    bereit,
+    imEinsatz,
+    zurueck,
     aktuell,
     protokoll,
+    frueher: protokoll.filter((t) => !oben.has(t)),
   };
 }
 
@@ -1253,6 +1288,66 @@ export function truppGeraetVonGeraet(g: AtemschutzGeraet): TruppGeraet {
 /** Einzeiliges Etikett eines Geräts am Trupp. */
 export function truppGeraetLabel(tg: TruppGeraet): string {
   return tg.kennung ? `${tg.kennung} · ${tg.bezeichnung}` : tg.bezeichnung;
+}
+
+/** Die Ausrüstung eines Trupps, nach Träger gebündelt. */
+export interface TruppGeraeteGruppe {
+  /** Der Träger; fehlt bei der noch nicht zugeordneten Ausrüstung. */
+  person?: string;
+  geraete: TruppGeraet[];
+}
+
+/**
+ * Die Ausrüstung eines Trupps nach Person gruppiert und sortiert.
+ *
+ * In Erfassungsreihenfolge ist die Liste am Einsatzort nicht zu lesen: Erfasst
+ * wird Scan für Scan, gefragt ist aber „was trägt Huber?" und nicht „was wurde
+ * als Drittes gescannt". Gruppiert steht die Antwort in einer Zeile je Person.
+ *
+ * Drei Festlegungen, die man an der Reihenfolge sonst nicht sieht:
+ * - Gruppiert wird ohne Rücksicht auf Groß- und Kleinschreibung, angezeigt
+ *   wird die erste Schreibweise. Ältere Zuordnungen kommen aus einem
+ *   Freitextfeld, und „huber" und „Huber" sind derselbe Mann.
+ * - Innerhalb der Gruppe zählt der **Gerätetyp** vor der Bezeichnung, in der
+ *   Reihenfolge von `ATEMSCHUTZ_GERAET_TYPEN`: Der Pressluftatmer und die
+ *   Flasche sind die Ausrüstung, um die es geht, Zubehör steht darunter.
+ * - Die noch **nicht zugeordnete** Ausrüstung steht am Ende. Sie ist eine
+ *   offene Aufgabe und kein Träger; oben zwischen den Namen läse sie sich wie
+ *   eine Person.
+ */
+export function gruppiereTruppGeraete(
+  geraete?: TruppGeraet[],
+): TruppGeraeteGruppe[] {
+  const gruppen = new Map<string, TruppGeraeteGruppe>();
+  for (const g of geraete ?? []) {
+    const person = g.person?.trim();
+    const key = person ? person.toLowerCase() : '';
+    const gruppe = gruppen.get(key);
+    if (gruppe) {
+      gruppe.geraete.push(g);
+      continue;
+    }
+    gruppen.set(key, { ...(person ? { person } : {}), geraete: [g] });
+  }
+
+  const typRang = (typ: AtemschutzGeraetTyp) => {
+    const rang = ATEMSCHUTZ_GERAET_TYPEN.indexOf(typ);
+    return rang < 0 ? ATEMSCHUTZ_GERAET_TYPEN.length : rang;
+  };
+
+  for (const gruppe of gruppen.values()) {
+    gruppe.geraete.sort(
+      (a, b) =>
+        typRang(a.typ) - typRang(b.typ) ||
+        truppGeraetLabel(a).localeCompare(truppGeraetLabel(b), 'de'),
+    );
+  }
+
+  return [...gruppen.values()].sort((a, b) => {
+    if (!a.person) return b.person ? 1 : 0;
+    if (!b.person) return -1;
+    return a.person.localeCompare(b.person, 'de');
+  });
 }
 
 /**
