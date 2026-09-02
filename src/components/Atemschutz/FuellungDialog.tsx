@@ -567,63 +567,10 @@ export default function FuellungDialog({
               />
             </Grid>
           )}
-          {einsatzWaehlbar ? (
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                select
-                fullWidth
-                label={t('filter.einsatz')}
-                value={form.firecallId}
-                onChange={(e) => setEinsatz(e.target.value)}
-              >
-                <MenuItem value="">{t('filter.ohneEinsatz')}</MenuItem>
-                {/* Ein Einsatz, der nicht mehr in der Liste steht — etwa ein
-                    abgeschlossener —, bekommt seinen eigenen Eintrag: Sonst
-                    stünde das Feld leer und ein Speichern nähme der Zeile den
-                    Einsatz. */}
-                {!!form.firecallId &&
-                  !gewaehlterEinsatz &&
-                  einsatzName !== undefined && (
-                    <MenuItem value={form.firecallId}>{einsatzName}</MenuItem>
-                  )}
-                {firecalls?.map((f) => (
-                  <MenuItem key={f.id} value={f.id}>
-                    {f.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-          ) : (
-            !!fuellung?.firecallName && (
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mt: 2 }}
-                >
-                  {t('filter.einsatz')}: {fuellung.firecallName}
-                </Typography>
-              </Grid>
-            )
-          )}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              select
-              fullWidth
-              label={t('fuellung.zweck')}
-              value={form.zweck}
-              onChange={(e) => {
-                setZweckBeruehrt(true);
-                set('zweck', e.target.value as FuellungZweck);
-              }}
-            >
-              {FUELLUNG_ZWECKE.map((wert) => (
-                <MenuItem key={wert} value={wert}>
-                  {t(`zweck.${wert}`)}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
+          {/* „Zu verrechnen" steht neben der Füllstation, Zweck und Einsatz
+              stehen in der Zeile darunter beieinander: Beide beantworten
+              denselben Punkt — wozu gefüllt wurde —, und nebeneinander gelesen
+              fällt ein Widerspruch auf („Übung" an einem Einsatz). */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <FormControlLabel
               control={
@@ -637,6 +584,74 @@ export default function FuellungDialog({
               }
               label={t('fuellung.verrechnen')}
             />
+          </Grid>
+          {/* Eine eigene Zeile mit eigenem Raster statt zweier Halbfelder im
+              äußeren: Über diesem Block stehen je nach Lage null, ein oder zwei
+              Felder — Füllstation nur, wenn eine gepflegt ist, Zeitpunkt nur
+              beim Bearbeiten. Als gewöhnliche Halbfelder würden Zweck und
+              Einsatz dann bei jeder zweiten Kombination auseinandergerissen. */}
+          <Grid size={12}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  select
+                  fullWidth
+                  label={t('fuellung.zweck')}
+                  value={form.zweck}
+                  onChange={(e) => {
+                    setZweckBeruehrt(true);
+                    set('zweck', e.target.value as FuellungZweck);
+                  }}
+                >
+                  {FUELLUNG_ZWECKE.map((wert) => (
+                    <MenuItem key={wert} value={wert}>
+                      {t(`zweck.${wert}`)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              {einsatzWaehlbar ? (
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    label={t('filter.einsatz')}
+                    value={form.firecallId}
+                    onChange={(e) => setEinsatz(e.target.value)}
+                  >
+                    <MenuItem value="">{t('filter.ohneEinsatz')}</MenuItem>
+                    {/* Ein Einsatz, der nicht mehr in der Liste steht — etwa
+                        ein abgeschlossener —, bekommt seinen eigenen Eintrag:
+                        Sonst stünde das Feld leer und ein Speichern nähme der
+                        Zeile den Einsatz. */}
+                    {!!form.firecallId &&
+                      !gewaehlterEinsatz &&
+                      einsatzName !== undefined && (
+                        <MenuItem value={form.firecallId}>
+                          {einsatzName}
+                        </MenuItem>
+                      )}
+                    {firecalls?.map((f) => (
+                      <MenuItem key={f.id} value={f.id}>
+                        {f.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+              ) : (
+                !!fuellung?.firecallName && (
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 2 }}
+                    >
+                      {t('filter.einsatz')}: {fuellung.firecallName}
+                    </Typography>
+                  </Grid>
+                )
+              )}
+            </Grid>
           </Grid>
           <Grid size={12}>
             <TextField
