@@ -12,7 +12,12 @@ import {
   isFoerderungReversed,
   storedElevations,
 } from './elevationProfile';
-import { frictionLossPer100m, isTabulatedDimension } from './frictionLoss';
+import {
+  DEFAULT_HOSE_LENGTH_M,
+  frictionBreakdownPer100m,
+  type FrictionBreakdown,
+  type FrictionModel,
+} from './frictionLoss';
 
 export { FOERDERUNG_DEFAULTS } from './defaults';
 import {
@@ -31,9 +36,6 @@ import {
  * das Profil wird nachgezogen, die Pumpen wandern mit.
  */
 
-/** Länge eines Schlauches, wenn an der Leitung keine hinterlegt ist. */
-const DEFAULT_HOSE_LENGTH = 20;
-
 /**
  * Die aufgefüllten Parameter. Eigenes Interface statt `typeof
  * FOERDERUNG_DEFAULTS`, damit die Werte Zahlen sind und nicht die Literale der
@@ -46,6 +48,12 @@ export interface FoerderungParams {
   pumpenEingangsdruck: number;
   pumpenNennstrom: number;
   paralleleLeitungen: number;
+  /** Tabelle oder Rohrhydraulik — siehe docs/loeschwasserfoerderung.md. */
+  frictionModel: FrictionModel;
+  /** Absolute Rauheit in mm. Nur im Modell wirksam. */
+  rauheit: number;
+  /** bar je Kupplung bei 1000 l/min. Nur im Modell wirksam. */
+  kupplungsverlust: number;
 }
 
 export type FoerderungWarning =
@@ -63,6 +71,12 @@ export type FoerderungWarning =
    */
   | 'elevationFailed'
   | 'flowAbovePumpRating'
+  /**
+   * Das Rohrhydraulik-Modell liegt **unter** dem Wert der Ausbildungsunterlage.
+   * Dann weist die Rechnung womöglich eine Pumpe zu wenig aus, und das muss
+   * dastehen — die Tabelle ist die Grundlage, auf die sich hier jeder beruft.
+   */
+  | 'modelBelowTable'
   | 'notFeasible';
 
 export interface FoerderungPumpMarker {
@@ -98,9 +112,19 @@ export interface FoerderungView {
   elevationSpacingM?: number;
   /** Reibungsverlust in bar je 100 m; `undefined` bei unbekannter Dimension. */
   frictionPer100m?: number;
-  /** Ob der Reibungswert aus der Tabelle stammt oder abgeleitet ist. */
-  frictionTabulated: boolean;
+  /** Schlauch und Kupplungen getrennt, samt Herkunft des Werts. */
+  frictionBreakdown?: FrictionBreakdown;
+  /**
+   * Der Tabellenwert zum Vergleich — nur gesetzt, wenn das Modell rechnet.
+   *
+   * Er ist der Grund, dass überhaupt zweimal gerechnet wird: Ohne ihn wäre
+   * nicht zu sehen, wie weit das Modell von der belegten Unterlage abweicht,
+   * und `modelBelowTable` hätte keine Grundlage.
+   */
+  frictionTableValue?: number;
   dimension: string;
+  /** Länge eines Schlauchs in m — bestimmt Schlauchzahl und Kupplungen. */
+  hoseLengthM: number;
   profile: FoerderungProfilePoint[];
   pumps: FoerderungPumpMarker[];
   result?: FoerderungResult;
@@ -169,6 +193,15 @@ export function foerderungParams(item: Connection): FoerderungParams {
         )
       )
     ),
+    frictionModel:
+      item.frictionModel === 'colebrook'
+        ? 'colebrook'
+        : FOERDERUNG_DEFAULTS.frictionModel,
+    rauheit: numberOr(item.rauheit, FOERDERUNG_DEFAULTS.rauheit),
+    kupplungsverlust: numberOr(
+      item.kupplungsverlust,
+      FOERDERUNG_DEFAULTS.kupplungsverlust
+    ),
   };
 }
 
@@ -232,12 +265,31 @@ export function foerderungView(
   }
 
   const dimension = item.dimension || 'B';
-  const frictionPer100m = frictionLossPer100m(
-    params.foerderMenge / params.paralleleLeitungen,
-    dimension
-  );
+  const hoseLengthM = item.oneHozeLength || DEFAULT_HOSE_LENGTH_M;
+  // Der Reibungswert hängt an der Menge **je Leitung**, nicht an der Sollmenge:
+  // Parallele Leitungen tragen je Q/n.
+  const flowPerLine = params.foerderMenge / params.paralleleLeitungen;
+  const frictionBreakdown = frictionBreakdownPer100m(flowPerLine, dimension, {
+    model: params.frictionModel,
+    roughnessMm: params.rauheit,
+    couplingBarAtNominal: params.kupplungsverlust,
+    hoseLengthM,
+  });
+  const frictionPer100m = frictionBreakdown?.total;
+  // Zum Vergleich immer auch der Tabellenwert, sobald das Modell rechnet.
+  const frictionTableValue =
+    frictionBreakdown?.source === 'model'
+      ? frictionBreakdownPer100m(flowPerLine, dimension)?.total
+      : undefined;
   if (frictionPer100m === undefined) {
     warnings.push('unknownDimension');
+  }
+  if (
+    frictionPer100m !== undefined &&
+    frictionTableValue !== undefined &&
+    frictionPer100m < frictionTableValue
+  ) {
+    warnings.push('modelBelowTable');
   }
   if (params.foerderMenge > params.pumpenNennstrom) {
     warnings.push('flowAbovePumpRating');
@@ -271,15 +323,15 @@ export function foerderungView(
     elevationLevel: stored?.level,
     elevationSpacingM: stored?.spacingM,
     frictionPer100m,
-    frictionTabulated: isTabulatedDimension(dimension),
+    frictionBreakdown,
+    frictionTableValue,
     dimension,
+    hoseLengthM,
     profile,
     // Parallele Leitungen wirken hier als Faktor und bei der Fördermenge als
     // Teiler: Zwei B-Leitungen brauchen die doppelte Zahl an B-Längen, tragen
     // aber je die halbe Menge.
-    hoseCount:
-      Math.ceil(length / (item.oneHozeLength || DEFAULT_HOSE_LENGTH)) *
-      params.paralleleLeitungen,
+    hoseCount: Math.ceil(length / hoseLengthM) * params.paralleleLeitungen,
     pumps: (result?.pumps ?? []).map((pump) => ({
       position: positionAtDistance(samples, pump.distance),
       distance: pump.distance,

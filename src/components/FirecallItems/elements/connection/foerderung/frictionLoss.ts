@@ -23,8 +23,13 @@
  * docs/loeschwasserfoerderung.md
  */
 
-/** Innendurchmesser in mm je Kurzbezeichnung. */
-const HOSE_DIAMETERS: Record<string, number> = {
+/**
+ * Innendurchmesser in mm je Kurzbezeichnung.
+ *
+ * Exportiert, weil die Knopfreihe im Panel dieselbe Liste braucht — zwei
+ * gepflegte Aufzählungen derselben Schläuche liefen auseinander.
+ */
+export const HOSE_DIAMETERS: Record<string, number> = {
   A: 110,
   B: 75,
   C: 52,
@@ -45,6 +50,43 @@ export function hoseInnerDiameterMm(dimension?: string): number | undefined {
   if (!match) return undefined;
   const explicit = match[2] ? Number(match[2]) : undefined;
   return explicit ?? HOSE_DIAMETERS[match[1].toUpperCase()];
+}
+
+/**
+ * Buchstabe und Durchmesser einer Dimensionsangabe — der Rückweg zu
+ * `hoseInnerDiameterMm`, damit das Panel zwei Bedienelemente füllen kann.
+ *
+ * Unlesbares gibt ein leeres Ergebnis und **keinen** geratenen Buchstaben: Im
+ * Panel bleibt dann kein Knopf gewählt, und die Warnung steht weiter.
+ */
+export function splitDimension(dimension?: string): {
+  letter?: string;
+  diameterMm?: number;
+} {
+  if (!dimension) return {};
+  const match = /^\s*([A-Fa-f])\s*-?\s*(\d{2,3})?\s*$/.exec(dimension);
+  if (!match) return {};
+  const letter = match[1].toUpperCase();
+  const diameterMm = match[2] ? Number(match[2]) : HOSE_DIAMETERS[letter];
+  return diameterMm ? { letter, diameterMm } : { letter };
+}
+
+/**
+ * Die Schreibweise, die am Element landet: der Buchstabe allein, solange die mm
+ * dem Standardwert entsprechen, sonst Buchstabe plus Zahl.
+ *
+ * Gespeichert wird weiter **ein** Freitextfeld, obwohl das Panel zwei
+ * Bedienelemente zeigt. Ein zweites Feld für den Durchmesser könnte dem ersten
+ * widersprechen, und `info()`, `popupFn()` und die Schlauchanzahl lesen
+ * `dimension` mit — „62 B-Längen" soll sich weiter richtig lesen.
+ */
+export function canonicalDimension(
+  letter: string,
+  diameterMm?: number
+): string {
+  const key = letter.toUpperCase();
+  if (!diameterMm || HOSE_DIAMETERS[key] === diameterMm) return key;
+  return `${key} ${diameterMm}`;
 }
 
 /** Stützstellen der belegten B-75-Tabelle: l/min → bar je 100 m. */
@@ -90,12 +132,165 @@ function b75LossPer100m(flow: number): number {
 }
 
 /**
- * Ob der Wert direkt aus der belegten Tabelle stammt oder aus ihr abgeleitet
- * ist. Der Dialog weist das aus, damit eine Zahl aus der Formel nicht für einen
- * Tabellenwert genommen wird.
+ * Wahlweise reale Rohrhydraulik statt der Tabelle.
+ *
+ * Die Tabelle bleibt die **Vorbelegung** — sie ist die Unterlage, mit der hier
+ * ausgebildet wird, und der Abschnitt „Warum die Tabelle und kein
+ * Rechenmodell" in docs/loeschwasserfoerderung.md begründet weiterhin, warum
+ * sie nicht ersetzt *werden muss*. Wer sie dennoch gegen ein Modell tauschen
+ * will, kann das hier; die Anzeige nennt dann immer, welches Modell gerechnet
+ * hat.
  */
-export const isTabulatedDimension = (dimension?: string): boolean =>
-  hoseInnerDiameterMm(dimension) === B75_DIAMETER;
+export type FrictionModel = 'table' | 'colebrook';
+
+/** Absolute Rauheit eines gummierten Druckschlauchs. */
+export const DEFAULT_ROUGHNESS_MM = 0.03;
+
+/** Örtlicher Verlust einer Storz-Kupplung bei der Bezugsmenge. */
+export const DEFAULT_COUPLING_BAR = 0.05;
+
+/**
+ * Bezugsmenge des Kupplungsverlusts.
+ *
+ * Eine **feste** Zahl und ausdrücklich nicht `pumpenNennstrom`: Sonst
+ * veränderte ein geänderter Pumpennennwert stillschweigend den
+ * Kupplungsverlust, und niemand käme auf die Ursache.
+ */
+export const COUPLING_REFERENCE_FLOW = 1000;
+
+/** Übliche Länge eines Druckschlauchs. */
+export const DEFAULT_HOSE_LENGTH_M = 20;
+
+/**
+ * Stoffwerte des Wassers bei **10 °C**.
+ *
+ * Die Temperatur ist nicht beliebig gewählt: Die Reynoldszahlen der
+ * Gegenprüfung in docs/loeschwasserfoerderung.md (43k · 86k · 130k · 173k ·
+ * 216k · 259k · 346k) sind mit genau diesem ν gerechnet. Ein anderer Wert
+ * entwertete die dort niedergelegte Prüfung, ohne am Ergebnis mehr als wenige
+ * Prozent zu ändern — deshalb auch keine Eingabe für die Wassertemperatur.
+ */
+const KINEMATIC_VISCOSITY = 1.31e-6;
+const WATER_DENSITY = 1000;
+
+/** Ab hier gilt die turbulente Formel; darunter λ = 64/Re. */
+const LAMINAR_LIMIT_RE = 2300;
+
+export interface FrictionOptions {
+  /** Vorbelegung `'table'` — der Tabellenweg bleibt der Normalfall. */
+  model?: FrictionModel;
+  roughnessMm?: number;
+  /** bar je Kupplung bei `COUPLING_REFERENCE_FLOW`. Nur im Modell wirksam. */
+  couplingBarAtNominal?: number;
+  hoseLengthM?: number;
+}
+
+export interface FrictionBreakdown {
+  /** Reibungsverlust des Schlauchs in bar je 100 m. */
+  rohr: number;
+  /** Örtliche Verluste der Kupplungen in bar je 100 m; bei `'table'` immer 0. */
+  kupplungen: number;
+  total: number;
+  /**
+   * Woher der Wert stammt: aus der belegten Tabelle, über die d⁵-Skalierung
+   * daraus abgeleitet, oder gerechnet. Drei Herkünfte, deshalb ein Begriff und
+   * kein Boolean.
+   */
+  source: 'table' | 'derived' | 'model';
+}
+
+/**
+ * Darcy-Weisbach mit λ aus **Swamee-Jain**, der expliziten Näherung der
+ * impliziten Colebrook-White-Gleichung (unter 1 % Abweichung). Explizit, damit
+ * ohne Iteration gerechnet wird — der Wert hängt an einem Regler und wird bei
+ * jedem Render neu gebraucht.
+ */
+function colebrookLossPer100m(
+  flow: number,
+  diameterMm: number,
+  roughnessMm: number
+): number {
+  if (flow <= 0) return 0;
+
+  const d = diameterMm / 1000;
+  const k = roughnessMm / 1000;
+  const area = (Math.PI * d * d) / 4;
+  const v = flow / 60000 / area;
+  const re = (v * d) / KINEMATIC_VISCOSITY;
+
+  const lambda =
+    re < LAMINAR_LIMIT_RE
+      ? 64 / re
+      : 0.25 / Math.log10(k / (3.7 * d) + 5.74 / re ** 0.9) ** 2;
+
+  return (lambda * (100 / d) * (WATER_DENSITY / 2) * v * v) / 1e5;
+}
+
+/**
+ * Die Kupplungen als gleichmäßige Rate je 100 m.
+ *
+ * Eingegeben wird in bar bei der Bezugsmenge und mit (Q/Q₀)² mitgezogen: Ein
+ * *fester* bar-Wert wäre bei anderer Fördermenge falsch, weil der örtliche
+ * Verlust mit v² wächst. Ein Widerstandsbeiwert ζ wäre die lehrbuchgemäße
+ * Eingabe, ist aber keine Zahl, zu der im Einsatz jemand ein Gefühl hat.
+ *
+ * Exakt wären *n − 1* Stöße über die ganze Leitung. Die Hydraulik rechnet
+ * jedoch mit einer gleichmäßigen bar-je-Meter-Rate; der Unterschied ist eine
+ * Kupplung auf der Gesamtstrecke. Parallele Leitungen bekommen **keinen**
+ * Faktor: Die Menge je Leitung ist schon geteilt, und jede Leitung hat ihre
+ * eigenen Schläuche im selben Abstand.
+ */
+function couplingLossPer100m(
+  flow: number,
+  barAtNominal: number,
+  hoseLengthM: number
+): number {
+  if (flow <= 0 || barAtNominal <= 0 || hoseLengthM <= 0) return 0;
+  const couplingsPer100m = 100 / hoseLengthM;
+  return (
+    barAtNominal * (flow / COUPLING_REFERENCE_FLOW) ** 2 * couplingsPer100m
+  );
+}
+
+/**
+ * Reibungsverlust je 100 m, aufgeschlüsselt in Schlauch und Kupplungen.
+ *
+ * **Bei `model: 'table'` bleiben die Kupplungen 0**, auch wenn ein Wert
+ * übergeben wird: Die AT-Tabelle ist an echten Schlauchleitungen gemessene
+ * Praktikerdaten, die Kupplungsverluste stecken dort schon drin. Ein Aufschlag
+ * zählte sie doppelt. Im Colebrook-Weg ist es umgekehrt — der rechnet ein
+ * glattes Rohr, und dort fehlen sie.
+ */
+export function frictionBreakdownPer100m(
+  flow: number,
+  dimension?: string,
+  options?: FrictionOptions
+): FrictionBreakdown | undefined {
+  const diameter = hoseInnerDiameterMm(dimension);
+  if (!diameter) return undefined;
+
+  if (options?.model === 'colebrook') {
+    const rohr = colebrookLossPer100m(
+      flow,
+      diameter,
+      options.roughnessMm ?? DEFAULT_ROUGHNESS_MM
+    );
+    const kupplungen = couplingLossPer100m(
+      flow,
+      options.couplingBarAtNominal ?? DEFAULT_COUPLING_BAR,
+      options.hoseLengthM ?? DEFAULT_HOSE_LENGTH_M
+    );
+    return { rohr, kupplungen, total: rohr + kupplungen, source: 'model' };
+  }
+
+  const rohr = b75LossPer100m(flow) * (B75_DIAMETER / diameter) ** 5;
+  return {
+    rohr,
+    kupplungen: 0,
+    total: rohr,
+    source: diameter === B75_DIAMETER ? 'table' : 'derived',
+  };
+}
 
 /**
  * Reibungsverlust in bar je 100 m, oder `undefined`, wenn die Dimension keinen
@@ -109,9 +304,8 @@ export const isTabulatedDimension = (dimension?: string): boolean =>
  */
 export function frictionLossPer100m(
   flow: number,
-  dimension?: string
+  dimension?: string,
+  options?: FrictionOptions
 ): number | undefined {
-  const diameter = hoseInnerDiameterMm(dimension);
-  if (!diameter) return undefined;
-  return b75LossPer100m(flow) * (B75_DIAMETER / diameter) ** 5;
+  return frictionBreakdownPer100m(flow, dimension, options)?.total;
 }

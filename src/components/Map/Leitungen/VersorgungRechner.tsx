@@ -128,6 +128,12 @@ export default function VersorgungRechner({
     pumpenRuestzeit: item.pumpenRuestzeit,
   }));
   const [manualClimb, setManualClimb] = useState(item.hoehenunterschied ?? 0);
+  // Querschnitt und Schlauchlänge liegen **nicht** in `params`: Das sind die
+  // überschreibbaren Rechenwerte, diese beiden beschreiben die Leitung selbst,
+  // und Popup wie Schlauchanzahl lesen sie mit. Also derselbe Weg wie
+  // `manualClimb` — eigener Zustand, in den Entwurf, beim Speichern ans Element.
+  const [dimension, setDimension] = useState(item.dimension || 'B');
+  const [hoseLength, setHoseLength] = useState(item.oneHozeLength || 20);
   const [placed, setPlaced] = useState(false);
   const [derivedBusy, setDerivedBusy] = useState(false);
   const [derivedTimedOut, setDerivedTimedOut] = useState(false);
@@ -142,8 +148,10 @@ export default function VersorgungRechner({
         foerderungUmgekehrt: reversed ? 'true' : 'false',
         versorgungsart: mode,
         hoehenunterschied: manualClimb,
+        dimension,
+        oneHozeLength: hoseLength,
       }) as Connection,
-    [item, enabled, reversed, mode, manualClimb]
+    [item, enabled, reversed, mode, manualClimb, dimension, hoseLength]
   );
 
   // Die Entnahmestelle ist das erste Ende in Förderrichtung. Der Hydrant dort
@@ -210,6 +218,8 @@ export default function VersorgungRechner({
       verlegeleistung: annahmen.verlegeleistung,
       pumpenRuestzeit: annahmen.pumpenRuestzeit,
       hoehenunterschied: manualClimb,
+      dimension,
+      oneHozeLength: hoseLength,
     } as Connection);
   };
 
@@ -593,6 +603,10 @@ export default function VersorgungRechner({
             view={view}
             params={params}
             onParamChange={set}
+            dimension={dimension}
+            onDimensionChange={setDimension}
+            hoseLength={hoseLength}
+            onHoseLengthChange={setHoseLength}
             manualClimb={manualClimb}
             onManualClimbChange={setManualClimb}
             elevationBusy={derivedBusy}

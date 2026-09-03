@@ -21,8 +21,14 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
 import type { Connection } from '../../firebase/firestore';
 import { FALLBACK_SAMPLE_SPACING_M } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
+import {
+  canonicalDimension,
+  HOSE_DIAMETERS,
+  splitDimension,
+} from '../../FirecallItems/elements/connection/foerderung/frictionLoss';
 import type {
   FoerderungParams,
   FoerderungView,
@@ -43,6 +49,15 @@ import usePanelNumber from './usePanelNumber';
 
 const OUTPUT_PRESSURES = [6, 8, 10];
 
+/**
+ * Die Knopfreihe des Querschnitts, aus derselben Aufzählung wie der Rechenkern
+ * — zwei gepflegte Listen derselben Schläuche liefen auseinander. Sortiert nach
+ * Durchmesser, damit die Reihe von grob nach fein läuft.
+ */
+const HOSE_CHOICES = Object.entries(HOSE_DIAMETERS).sort(
+  ([, a], [, b]) => b - a
+);
+
 export interface FoerderungSectionProps {
   item: Connection;
   view: FoerderungView;
@@ -53,6 +68,11 @@ export interface FoerderungSectionProps {
     key: K,
     value: FoerderungParams[K]
   ) => void;
+  /** Die Dimension der Leitung — kanonisch, also `'B'` oder `'C 42'`. */
+  dimension: string;
+  onDimensionChange: (value: string) => void;
+  hoseLength: number;
+  onHoseLengthChange: (value: number) => void;
   manualClimb: number;
   onManualClimbChange: (value: number) => void;
   /** Solange die Höhen unterwegs sind, wäre „keine Höhendaten" voreilig. */
@@ -65,6 +85,10 @@ export default function FoerderungSection({
   onRetryElevation,
   params,
   onParamChange,
+  dimension,
+  onDimensionChange,
+  hoseLength,
+  onHoseLengthChange,
   manualClimb,
   onManualClimbChange,
   elevationBusy,
@@ -72,6 +96,22 @@ export default function FoerderungSection({
   const t = useTranslations('loeschwasserfoerderung');
   const num = usePanelNumber();
   const hasProfile = view.elevationSource === 'profile';
+
+  // Buchstabe und Durchmesser getrennt bedient, am Element bleibt **ein**
+  // Freitextfeld. Unlesbares („Storz") lässt beides leer — dann steht kein Knopf
+  // gewählt, die Warnung bleibt, und ein Knopfdruck behebt sie.
+  const { letter, diameterMm } = splitDimension(dimension);
+  /**
+   * Der Rohtext des mm-Felds.
+   *
+   * Nötig, weil „leer gilt als Standardwert" mit einem gesteuerten Feld
+   * kollidiert: Ein geleertes Feld schrieb `'C'` ans Element, `splitDimension`
+   * gab daraus wieder 52 zurück, das Feld füllte sich selbst — und die getippte
+   * Zahl landete dahinter („C 5242"). Der Text führt also, das Element folgt.
+   */
+  const [diameterText, setDiameterText] = useState<string>();
+  const modelActive = params.frictionModel === 'colebrook';
+  const flowPerLine = params.foerderMenge / params.paralleleLeitungen;
 
   /**
    * Woher die Höhen kommen und wie fein abgetastet wurde.
@@ -137,6 +177,11 @@ export default function FoerderungSection({
               t('warningFlowAbovePumpRating', {
                 rating: params.pumpenNennstrom,
               })}
+            {warning === 'modelBelowTable' &&
+              t('warningModelBelowTable', {
+                model: num(view.frictionPer100m ?? 0, 2),
+                table: num(view.frictionTableValue ?? 0, 2),
+              })}
             {warning === 'notFeasible' && t('warningNotFeasible')}
           </Alert>
         ))}
@@ -155,28 +200,60 @@ export default function FoerderungSection({
                 {t('frictionPer100m', {
                   value: num(view.frictionPer100m ?? 0, 2),
                 })}
-                {!view.frictionTabulated && (
+                {/* Drei Herkünfte, zwei davon gekennzeichnet: Ein Wert aus der
+                    belegten Tabelle trägt keinen Chip, ein abgeleiteter und ein
+                    gerechneter je einen. Sonst würde eine Zahl aus der Formel
+                    für einen Tabellenwert genommen. */}
+                {view.frictionBreakdown?.source === 'derived' && (
                   <Tooltip title={t('frictionDerivedHint')}>
                     <Chip
                       size="small"
-                      label={t('frictionDerived')}
+                      label={t('frictionModelDerived')}
                       sx={{ ml: 0.5 }}
                     />
                   </Tooltip>
                 )}
+                {view.frictionBreakdown?.source === 'model' && (
+                  <Chip
+                    size="small"
+                    color="info"
+                    label={t('frictionModelColebrook')}
+                    sx={{ ml: 0.5 }}
+                  />
+                )}
               </Typography>
+              {/* Aufschlüsselung und Tabellenwert nur beim Modell: Dort ist die
+                  Zahl gerechnet und muss gegen die Unterlage einordenbar
+                  bleiben. */}
+              {view.frictionBreakdown?.source === 'model' && (
+                <>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: 'block' }}
+                  >
+                    {t('frictionSplit', {
+                      rohr: num(view.frictionBreakdown.rohr, 2),
+                      kupplungen: num(view.frictionBreakdown.kupplungen, 2),
+                    })}
+                  </Typography>
+                  {view.frictionTableValue !== undefined && (
+                    <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: 'block' }}
+                  >
+                      {t('frictionTableComparison', {
+                        value: num(view.frictionTableValue, 2),
+                      })}
+                    </Typography>
+                  )}
+                </>
+              )}
             </Grid>
-            <Grid size={{ xs: 6 }}>
-              <Typography variant="caption" color="text.secondary">
-                {t('hoseCount')}
-              </Typography>
-              <Typography variant="body2">
-                {t('hoseCountValue', {
-                  count: view.hoseCount,
-                  dimension: view.dimension,
-                })}
-              </Typography>
-            </Grid>
+            {/* Die Schlauchzahl steht bei der Schlauchlänge unter „Lage" —
+                dort wird sie eingestellt, und dort ist sie auch ohne Ergebnis
+                zu sehen. */}
             <Grid size={{ xs: 6 }}>
               <Typography variant="caption" color="text.secondary">
                 {t('frictionTotal')}
@@ -212,15 +289,93 @@ export default function FoerderungSection({
         </Grid>
         <Grid size={{ xs: 6 }}>
           <Typography variant="caption" color="text.secondary">
-            {t('dimension')}
+            {t('hoseCount')}
           </Typography>
-          <Typography variant="body2">{view.dimension}</Typography>
+          <Typography variant="body2">
+            {t('hoseCountValue', {
+              count: view.hoseCount,
+              dimension: view.dimension,
+            })}
+          </Typography>
+        </Grid>
+
+        {/* Der Querschnitt geht mit d⁵ in den Reibungsverlust ein und ist damit
+            der wirksamste Wert überhaupt — er gehört bedienbar dorthin, wo er
+            bisher nur ablesbar war. Eigene Zeile über die volle Breite: Fünf
+            Knöpfe passen nicht in eine halbe Spalte. */}
+        <Grid size={{ xs: 12 }}>
+          <Typography variant="caption" color="text.secondary">
+            {t('crossSection')}
+          </Typography>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={letter ?? null}
+            onChange={(_event, value) => {
+              if (value === null) return;
+              // Der Knopf setzt den Standardwert des Buchstabens; ein vorher
+              // getippter Sonderdurchmesser gilt dann nicht weiter.
+              setDiameterText(undefined);
+              onDimensionChange(
+                canonicalDimension(value as string, HOSE_DIAMETERS[value])
+              );
+            }}
+            sx={{ display: 'block', mt: 0.5 }}
+          >
+            {HOSE_CHOICES.map(([key, mm]) => (
+              <ToggleButton key={key} value={key}>
+                {key} {mm}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </Grid>
         <Grid size={{ xs: 6 }}>
+          <TextField
+            size="small"
+            type="number"
+            fullWidth
+            label={`${t('innerDiameter')} (mm)`}
+            value={diameterText ?? diameterMm ?? ''}
+            // Ein leeres Feld gilt als Standardwert des Buchstabens und nicht
+            // als 0 — sonst rechnete ein halb getippter Wert mit Durchmesser 0.
+            onChange={(event) => {
+              if (!letter) return;
+              const text = event.target.value;
+              setDiameterText(text);
+              const mm = parseNumber(text, 0);
+              // Erst ab zwei Ziffern ans Element: `hoseInnerDiameterMm` liest
+              // nur zwei- bis dreistellige Durchmesser. Ein einstelliger
+              // Zwischenstand („C 4") wäre unlesbar, und weil das mm-Feld an
+              // einer lesbaren Dimension hängt, sperrte es sich beim Tippen
+              // selbst — nach der ersten Ziffer ging keine zweite mehr hinein.
+              onDimensionChange(
+                canonicalDimension(letter, mm >= 10 ? mm : undefined)
+              );
+            }}
+            disabled={!letter}
+          />
+        </Grid>
+        <Grid size={{ xs: 6 }}>
+          <TextField
+            size="small"
+            type="number"
+            fullWidth
+            label={`${t('hoseLengthLabel')} (${t('metre')})`}
+            value={hoseLength}
+            onChange={(event) =>
+              onHoseLengthChange(parseNumber(event.target.value, hoseLength))
+            }
+          />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          {/* Die Menge, mit der der Reibungswert nachgeschlagen wurde. Bei
+              parallelen Leitungen ist das nicht die Sollmenge, und ohne die
+              Angabe ist der Wert nicht nachzurechnen. */}
           <Typography variant="caption" color="text.secondary">
-            {t('hoseLength')}
+            {params.paralleleLeitungen > 1
+              ? t('effectiveFlowPerLine', { flow: num(flowPerLine, 0) })
+              : t('effectiveFlow', { flow: num(flowPerLine, 0) })}
           </Typography>
-          <Typography variant="body2">{item.oneHozeLength || 20} m</Typography>
         </Grid>
         <Grid size={{ xs: 6 }}>
           <TextField
@@ -277,6 +432,73 @@ export default function FoerderungSection({
               </ToggleButton>
             ))}
           </ToggleButtonGroup>
+
+          {/* Die Modellwahl ist eine Grundsatzentscheidung, die man einmal
+              trifft — kein Regler, an dem man im Einsatz probiert. Deshalb hier
+              im Aufklapper. Dass sie aktiv ist, steht trotzdem immer sichtbar
+              oben am Reibungswert. */}
+          <Typography variant="caption" color="text.secondary">
+            {t('frictionModelLabel')}
+          </Typography>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={params.frictionModel}
+            onChange={(_event, value) =>
+              value !== null &&
+              onParamChange(
+                'frictionModel',
+                value as FoerderungParams['frictionModel']
+              )
+            }
+            sx={{ display: 'block', mt: 0.5, mb: 2 }}
+          >
+            <ToggleButton value="table">{t('frictionModelTable')}</ToggleButton>
+            <ToggleButton value="colebrook">
+              {t('frictionModelColebrook')}
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid size={{ xs: 6 }}>
+              <TextField
+                size="small"
+                type="number"
+                fullWidth
+                disabled={!modelActive}
+                label={`${t('roughness')} (mm)`}
+                value={params.rauheit}
+                onChange={(event) =>
+                  onParamChange(
+                    'rauheit',
+                    parseNumber(event.target.value, params.rauheit)
+                  )
+                }
+              />
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              {/* Bei der Tabelle gesperrt, und der Hilfetext sagt warum: Die
+                  Unterlage ist an echten Schlauchleitungen gemessen, die
+                  Kupplungen stecken darin schon. Ein Aufschlag zählte doppelt. */}
+              <TextField
+                size="small"
+                type="number"
+                fullWidth
+                disabled={!modelActive}
+                label={`${t('couplingLoss')} (${t('bar')})`}
+                value={params.kupplungsverlust}
+                helperText={
+                  modelActive ? t('couplingLossHint') : t('couplingLossTableHint')
+                }
+                onChange={(event) =>
+                  onParamChange(
+                    'kupplungsverlust',
+                    parseNumber(event.target.value, params.kupplungsverlust)
+                  )
+                }
+              />
+            </Grid>
+          </Grid>
 
           <Grid container spacing={2}>
             <Grid size={{ xs: 6 }}>

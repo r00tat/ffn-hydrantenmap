@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import StraightenIcon from '@mui/icons-material/Straighten';
 import FoundationIcon from '@mui/icons-material/Foundation';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import CircleIcon from '@mui/icons-material/Circle';
@@ -13,9 +14,15 @@ import { Marker, Polyline, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
+import useFirecallItemUpdate from '../../../../hooks/useFirecallItemUpdate';
 import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
-import { Connection, FirecallItem, Line } from '../../../firebase/firestore';
+import {
+  Connection,
+  FirecallItem,
+  Line,
+  MultiPointItem,
+} from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
@@ -33,6 +40,7 @@ import LoeschwasserfoerderungPanel from '../../../Map/Leitungen/Loeschwasserfoer
 // Aus demselben Grund statisch importiert wie das Panel darüber.
 import DammbauPanel from '../../../Map/Damm/DammbauPanel';
 import { foerderungView } from './foerderung/foerderung';
+import HoseLengthOverlay from './HoseLengthOverlay';
 import { versorgungsart } from './pendel/pendelRoute';
 import { nearestInsertIndex } from './pointGeometry';
 import {
@@ -68,9 +76,19 @@ export default function ConnectionMarker({
     top: number;
     left: number;
   }>();
+  /**
+   * Die Punktfolge, solange ein Punkt gezogen wird.
+   *
+   * Nur lokal: Der Schreibvorgang bleibt bei `dragend`, ein `drag` schreibt
+   * nichts. Ohne diesen Zustand stünde am Etikett schon die neue Länge, während
+   * die Linie noch die alte Form zeigt — schlechter als kein Etikett.
+   */
+  const [dragPositions, setDragPositions] = useState<LatLngPosition[]>();
   const [foerderungOpen, setFoerderungOpen] = useState(false);
   const [dammbauOpen, setDammbauOpen] = useState(false);
   const editable = useMapEditable();
+  const updateItem = useFirecallItemUpdate();
+  const showLength = record.get<string>('showLength') === 'true';
 
   const positions: LatLngPosition[] = useMemo(() => {
     let p: LatLngPosition[] = [
@@ -174,7 +192,21 @@ export default function ConnectionMarker({
                 draggable={editable}
                 autoPan={false}
                 eventHandlers={{
+                  // `drag` und nicht erst `dragend`: Länge und Schlauchzahl
+                  // sollen beim Ziehen mitlaufen. Geschrieben wird trotzdem
+                  // erst am Ende.
+                  drag: (event) => {
+                    const moved = (event.target as L.Marker)?.getLatLng();
+                    setDragPositions(
+                      positions.map((p, i) =>
+                        i === index
+                          ? ([moved.lat, moved.lng] as LatLngPosition)
+                          : p
+                      )
+                    );
+                  },
                   dragend: (event) => {
+                    setDragPositions(undefined);
                     updateFirecallPositions(
                       firecallId,
                       (event.target as L.Marker)?.getLatLng(),
@@ -244,7 +276,9 @@ export default function ConnectionMarker({
             )
         )}
       <Polyline
-        positions={linePositions.filter(([pLat, pLng]) => pLat && pLng)}
+        positions={(dragPositions ?? linePositions).filter(
+          ([pLat, pLng]) => pLat && pLng
+        )}
         {...(pane ? { pane } : {})}
         pathOptions={{
           color: record.color || '#0000ff',
@@ -321,6 +355,31 @@ export default function ConnectionMarker({
               </IconButton>
             </Tooltip>
           )}
+          {/* Der Schalter sitzt im Popup und nicht im Rechner-Panel: Er gilt
+              auch für Linien, und dort gibt es kein Panel. */}
+          {editable && (
+            <Tooltip
+              title={
+                showLength ? tf('showLengthOff') : tf('showLengthOn')
+              }
+            >
+              <IconButton
+                sx={{ marginLeft: 'auto', float: 'right' }}
+                aria-label={
+                  showLength ? tf('showLengthOff') : tf('showLengthOn')
+                }
+                color={showLength ? 'primary' : 'default'}
+                onClick={() =>
+                  void updateItem({
+                    ...record.data(),
+                    showLength: showLength ? 'false' : 'true',
+                  } as MultiPointItem)
+                }
+              >
+                <StraightenIcon />
+              </IconButton>
+            </Tooltip>
+          )}
           {record.type === 'connection' && (
             <Tooltip title={tf('openCalculator')}>
               <IconButton
@@ -335,6 +394,24 @@ export default function ConnectionMarker({
           {record.popupFn()}
         </Popup>
       </Polyline>
+
+      {/* Beim Ziehen immer, sonst nur wenn eingeschaltet: Wer einen Punkt
+          verschiebt, will die neue Länge sehen, ohne vorher einen Schalter zu
+          suchen. */}
+      {(showLength || dragPositions) && (
+        <HoseLengthOverlay
+          positions={dragPositions ?? linePositions}
+          dimension={
+            record.type === 'connection'
+              ? record.get<string>('dimension') || 'B'
+              : undefined
+          }
+          hoseLengthM={record.get<number>('oneHozeLength') || 20}
+          color={record.color}
+          fromEnd={foerderungUmgekehrt === 'true'}
+          {...(pane ? { pane } : {})}
+        />
+      )}
 
       {/* Berechnet, nicht gespeichert: Die Standorte wandern mit der Leitung.
           Im reinen Pendelverkehr weichen sie — dort wird keine Leitung gelegt. */}
