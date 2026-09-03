@@ -3,6 +3,9 @@
 Die Einsatzzeitkontrolle des Gruppenkommandanten: protokollierte Druckabfragen,
 laufend fortgeschriebener Luftvorrat, Rückzugszeitpunkt und Warnungen.
 
+Wer im Zusammenspiel mit dem Sammelplatz was tut — und was der Ablauf ohne
+Sammelplatz ist —, steht in [atemschutz-ablauf.md](atemschutz-ablauf.md).
+
 Code: [src/common/atemschutzUeberwachung.ts](../src/common/atemschutzUeberwachung.ts)
 (die Rechnung), [src/components/Atemschutz/UeberwachungPage.tsx](../src/components/Atemschutz/UeberwachungPage.tsx)
 (die Seite), [src/components/Atemschutz/sendUeberwachungWarnungen.ts](../src/components/Atemschutz/sendUeberwachungWarnungen.ts)
@@ -77,6 +80,14 @@ schon: `ueberwachungSeit` und die eigene `uid` werden beim Anlegen gesetzt, und
 der Knopf heißt an dieser Karte von Anfang an „Überwachung bearbeiten". Ein
 zweiter Klick auf „Übernehmen" wäre ein Klick ohne Erkenntnis.
 
+**Der Einsatzauftrag tut dasselbe.** Wer einen Trupp unter Atemschutz schickt,
+hat ab diesem Moment die Verantwortung (FH-06 5.3.4) — `entsendePatch` setzt
+deshalb `ueberwachungSeit` und die eigene `uid` gleich mit. Ein
+vorgeschalteter Klick auf „Trupp übernehmen" wäre derselbe Klick ohne
+Erkenntnis. Der Knopf bleibt trotzdem: Er ist der protokollierte **Wechsel**
+der überwachenden Stelle und trägt Gerätesatz, Auftrag, Einsatzziel und den
+Namen der überwachenden Person nach.
+
 Nicht übernommen wird die *Verantwortung für den Trupp* — die bleibt beim
 Truppkommandanten und beim Kommandanten der taktischen Einheit (siehe „Was die
 Überwachung ausdrücklich nicht ist").
@@ -95,6 +106,22 @@ Truppkommandanten und beim Kommandanten der taktischen Einheit (siehe „Was die
 
 Der Abmarsch steht **nicht** in `abfragen`, sondern bleibt `abmarschZeit` +
 `druckAbmarsch`: Zwei Wahrheiten über denselben Zeitpunkt wären eine zu viel.
+
+**Der Druck ist optional.** Derselbe Dialog nimmt auch eine reine
+Statusmeldung auf — über Funk kommt nicht jede Meldung mit einer Zahl, „starke
+Verrauchung, wir arbeiten weiter" ist eine Meldung ohne Druck. Der Knopf heißt
+deshalb „Druckabfrage / Status". Abgewiesen wird nur die Meldung, die gar
+nichts sagt (`leereMeldung`): ohne Druck, ohne Ankunft, ohne Rückzug, ohne
+Bemerkung.
+
+Alles, was **rechnet**, lässt solche Zeilen aus — `berechneStand`,
+`baueDruckVerlauf` und die Fälligkeitsprüfung der Warnungen filtern mit
+`hatDruck`. Sie sind ein Ereignis, kein Messpunkt. Bei den Warnungen ist das
+kein Nebeneffekt, sondern Absicht: Die Drittel-Erinnerung will einen
+Flaschendruck aus dem Trupp holen, und eine Meldung ohne Zahl beantwortet die
+Frage nicht, auf die sie zielt. `sortierteAbfragen` dagegen gibt alle
+Meldungen heraus — der Verlauf zeigt sie, und „Trupp am Einsatzziel, kein
+Druck durchgegeben" muss als Ankunft erkannt werden.
 
 ## Ein Druck je Abfrage, nicht einer je Person
 
@@ -716,24 +743,124 @@ selbst verschwinden, die Erinnerungen dürfen es. Der Klick führt über
 dort fest `/chat`. Siehe auch
 [service-worker-pwa.md](service-worker-pwa.md).
 
-## „In den Einsatz schicken", nicht „entsenden"
+## Der Einsatzauftrag
 
-Am Sammelplatz wird ein Trupp **abgegeben** — „Entsendet an". Bei der
-Überwachung schickt der Gruppenkommandant ihn in *seinen* Einsatz; dieselbe
-Angabe ist dort keine Übergabe, sondern die Zuordnung, und das Feld heißt
-deshalb „Taktische Einheit" (`TruppZeitKontext` in
-[TruppZeitDialog.tsx](../src/components/Atemschutz/TruppZeitDialog.tsx), siehe
-den nächsten Abschnitt).
+Am Sammelplatz wird ein Trupp einer Einheit **zugeteilt** — er ist dann
+`zugeteilt` und rüstet sich aus. Unter Atemschutz geht er erst mit dem
+**Einsatzauftrag** der Einheit, und der hat einen eigenen Dialog:
+[EinsatzauftragDialog.tsx](../src/components/Atemschutz/EinsatzauftragDialog.tsx).
+
+Warum nicht derselbe Dialog wie am Sammelplatz: Die beiden tun verschiedene
+Dinge. Der Sammelplatz bucht eine Ressource um und weiß weder Auftrag noch Ziel
+— er entsendet einen Trupp nur *zu einer Einheit*. Die Einheit gibt den Befehl.
+Ein Dialog, der sich je nach Aufrufer anders beschriftet und einen anderen
+Patch schreibt, war einer zu wenig.
+
+Sechs Felder, in der Reihenfolge, in der der Befehl gegeben wird:
+
+| Feld | Bedeutung |
+| --- | --- |
+| Taktische Einheit | Zuordnung, vorbelegt aus `entsendetAn` oder dem Reiter |
+| **Auftrag** | Das WAS — „Menschenrettung", „Brandbekämpfung", „Erkundung" |
+| **Einsatzziel und -ort** | Das WO — „Keller Stiegenhaus links" |
+| Überwachung durch | Wer die Zeitkontrolle führt, als Klartext |
+| Abmarsch | „Uhrzeit beim Anschließen des Luftversorgungssystems" (FH-06) |
+| Druck beim Abmarsch | Vorbelegt aus `druckUebergabe` — dazwischen ändert er sich nicht |
+
+`auftrag` und `einsatzziel` sind zwei Felder und nicht eines: In FH-06 sind das
+die zwei Teile desselben Befehls. Beide sind Freitext — eine Auswahlliste wäre
+eine Behauptung darüber, welche Aufträge es gibt.
+
+Der Gerätesatz fehlt bewusst. Im Regelfall ist er die Vorgabe aus dem eigenen
+Flaschenbestand, und wenn er abweicht, steht er im Übernahme-Dialog. Sechs
+Felder sind schon viel für ein Formular, das jemand mit Handschuhen bedient.
+
+**Der Auftrag übernimmt zugleich die Zeitkontrolle** — `ueberwachungSeit` und
+die eigene `uid` in `ueberwachungUids`, siehe „Was ‚Trupp übernehmen' tut". Erst
+danach holt die Seite den Push-Token: Die Erlaubnisfrage des Browsers gehört zu
+einer Handlung, die sie erklärt.
 
 Ein schon gesetztes Ziel wird durch ein leeres Feld **nicht** gelöscht:
 `entsendePatch` lässt das Feld aus dem Patch weg, wenn es leer ist.
 
-Die Beschriftungen heißen anders als am Sammelplatz. „Abmarsch erfassen" klang
-nach reiner Dokumentation — als würde etwas nachgetragen, was schon passiert
-ist. Der Knopf schickt den Trupp aber wirklich in den Einsatz und startet die
-Zeitkontrolle, und genau das sagt er jetzt: **„In den Einsatz schicken"**. Der
-Zeitpunkt heißt dort „Abmarsch (Anschließen der Luftversorgung)" — so definiert
-ihn die Unterlage.
+„Abmarsch erfassen" hieß der Knopf einmal und klang nach reiner Dokumentation —
+als würde etwas nachgetragen, was schon passiert ist. Er schickt den Trupp aber
+wirklich in den Einsatz und startet die Zeitkontrolle, und genau das sagt er
+jetzt: **„In den Einsatz schicken"**.
+
+### Zugeteilt und bereit stehen zusammen
+
+Auf dieser Seite stehen `bereit` und `zugeteilt` unter einer Überschrift: Aus
+Sicht der Zeitkontrolle wartet beides auf den Einsatzauftrag. Der Unterschied —
+hat schon eine Einheit oder nicht — steht auf der Karte, nicht in der
+Überschrift. Am Sammelplatz liegt die Grenze genau andersherum: Dort stehen
+`zugeteilt` und `imEinsatz` zusammen, weil der Trupp in beiden Fällen weg ist.
+
+Ein zurückgekehrter Trupp kann über **„Bereit zum Abmarsch"** wieder auf
+`zugeteilt` gesetzt werden — als neue Zeile (`naechsteZuteilung`). Das ist der
+Weg ohne Sammelplatz: Die Einheit behält den Trupp, lässt ihn regenerieren und
+schickt ihn später erneut. `ueberwachungBis` bleibt dabei ungesetzt, die
+Zeitkontrolle wechselt nicht.
+
+## Was ins Einsatztagebuch geht
+
+Vier Ereignisse, jedes genau einmal je Bereitstellung: **Einsatzauftrag**,
+**Ankunft am Einsatzziel**, **Rückzug angetreten**, **Rückkehr**. Sie sind
+einsatzrelevant und gehören damit in das Dokument der Einsatzleitung.
+
+Dazu die **freie Statusmeldung**: Im Dialog „Druckabfrage / Status" gibt es den
+Haken *Eintrag ins Einsatztagebuch*, vorbelegt **aus**. Eine gewöhnliche
+Zwischenabfrage ist Sache der Zeitkontrolle, nicht der Einsatzleitung; stünde
+jede darin, gingen die vier wichtigen Zeilen unter. Bei einer neu gemeldeten
+Ankunft oder einem neu gemeldeten Rückzug ist der Haken gesetzt **und
+gesperrt** — der Eintrag entsteht ohnehin, und ein Dialog, der ihn verneint,
+wäre eine Überraschung. Eine Meldung, die zugleich Ankunft oder Rückzug ist,
+erzeugt dann nur die eine Zeile: Zwei oder drei Einträge über denselben
+Funkspruch sind zwei zu viel.
+
+Nicht ins Tagebuch gehen die Zuteilung durch den Sammelplatz, die Übergabe
+zurück an den Sammelplatz und die Wiederbereitstellung. Das sind
+Ressourcenbuchungen, keine Einsatzereignisse.
+
+Gebaut wird der Text in
+[truppDiaryEntry.ts](../src/components/Atemschutz/truppDiaryEntry.ts) — rein
+und ohne React, die Wörter kommen als Labels vom Aufrufer (dasselbe Muster wie
+`buildFoerderungDiaryEntry`). Geschrieben wird er in
+[useTruppTagebuch.ts](../src/components/Atemschutz/useTruppTagebuch.ts), den
+beide Seiten benutzen: Die Rückkehr eines Trupps ist dasselbe Ereignis, egal ob
+sie am Sammelplatz oder bei der Einheit erfasst wird.
+
+**Der Merker `tagebuch` steht am Dokument**, nicht im Code — aus demselben
+Grund wie `warnungen`: Zwei Geräte sehen denselben Trupp, und ohne diese
+Buchführung entstünde der Eintrag ein zweites Mal, sobald jemand einen Dialog
+erneut speichert. Geschrieben wird er als **Punktpfad** (`tagebuch.amZiel`,
+`tagebuchVermerk`): Ein ganzes `tagebuch`-Objekt zu schreiben löschte den
+Schlüssel, den ein zweites Gerät eine Sekunde vorher gesetzt hat.
+
+Die freie Statusmeldung bekommt keinen Merker — ein zweiter Haken ist eine
+zweite Meldung.
+
+Schlägt der Eintrag fehl, wird er verschluckt und nur in der Konsole vermerkt.
+Der Zustandswechsel oder die Druckabfrage sind zu dem Zeitpunkt schon
+geschrieben, und ein fehlender Tagebucheintrag darf eine Druckabfrage nicht
+mitreißen — dasselbe Muster wie bei `planeWarnung`.
+
+## Überwachung ohne Übernahme
+
+Wer „meine Einheit" gesetzt hat, ist für deren Trupps zuständig, ohne dass
+jemand „Trupp übernehmen" drückt: Die Seite trägt das eigene Konto still in
+`ueberwachungUids` ein.
+
+Nötig ist das für den **Push**. Die offene Seite warnt ohnehin
+(`useUeberwachungHinweise` rechnet über `zuUeberwachen`), aber der Serverlauf
+schickt nur an `ueberwachungUids` — ohne Eintrag bliebe das Telefon stumm,
+sobald die Seite zu ist. Und genau dann soll es läuten.
+
+Drei Schranken, damit ein Seitenaufruf nicht in den halben Einsatz schreibt:
+nur Benutzer mit Schreibrecht, nur die jüngsten Zeilen (`trupps.aktuell`), nur
+die nicht abgemeldeten. Dazu ein `useRef` mit den schon eingetragenen IDs —
+ohne das liefe der Schreibvorgang bei jedem Tick der Uhr erneut, denn der
+Effekt sieht seine eigene Wirkung erst, wenn Firestore sie zurückgespielt hat.
 
 ### Die taktische Einheit steht am Trupp
 
@@ -754,7 +881,8 @@ arbeitet.
 Gefragt wird an **drei** Stellen, weil der Trupp an dreien in die Hand genommen
 wird: beim Erfassen (`TruppDialog`, nur bei der Zeitkontrolle — am Sammelplatz
 steht dabei noch nicht fest, wohin er geht), beim Übernehmen der Zeitkontrolle
-(`UeberwachungDialog`) und beim Abmarsch (`TruppZeitDialog`). Überall Freitext
+(`UeberwachungDialog`) und beim Einsatzauftrag (`EinsatzauftragDialog`).
+Überall Freitext
 mit Vorschlägen: Der Trupp geht meist zu einem Fahrzeug, manchmal zu einem
 Gruppenkommandanten und gelegentlich zu einem Abschnitt, den es in keiner Liste
 gibt. Leer heißt überall „nicht angefasst" und nie „löschen".
