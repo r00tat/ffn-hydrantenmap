@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_TRUPP_MITGLIEDER,
   MAX_UEBERWACHUNG_UIDS,
+  TRUPP_STATUSES,
   type AtemschutzGeraet,
   type AtemschutzTrupp,
   type FuellungInput,
   type TruppGeraet,
   type TruppInput,
+  type TruppStatus,
   braucheDatum,
   buildDruckabfrage,
   canTransition,
@@ -23,6 +25,7 @@ import {
   lookupKeys,
   matchGeraete,
   mitUeberwachungsUid,
+  naechsteZuteilung,
   nextBereitstellung,
   normalizeCode,
   rueckkehrPatch,
@@ -31,6 +34,7 @@ import {
   sanitizeTruppGeraete,
   sammelplatzUebergabePatch,
   sanitizeUeberwachungUids,
+  tagebuchVermerk,
   truppGeraetLabel,
   truppGeraetVonGeraet,
   uebernahmePatch,
@@ -39,6 +43,7 @@ import {
   validateTruppInput,
   verrechnenVorgabe,
   waehleFuellstation,
+  zuteilungPatch,
   zweckOf,
   zweckVorgabe,
 } from './atemschutz';
@@ -340,7 +345,7 @@ describe('canTransition', () => {
 });
 
 describe('entsendePatch', () => {
-  it('setzt Gruppenkommandant, Zeit und Druck', () => {
+  it('setzt Einheit, Zeit und Druck — und beginnt die Zeitkontrolle', () => {
     const patch = entsendePatch({
       entsendetAn: 'GRKDT Huber',
       abmarschZeit: '2026-08-29T10:30:00.000Z',
@@ -351,6 +356,9 @@ describe('entsendePatch', () => {
       entsendetAn: 'GRKDT Huber',
       abmarschZeit: '2026-08-29T10:30:00.000Z',
       druckAbmarsch: 290,
+      // Wer losschickt, führt ab da die Zeitkontrolle. Ohne `uid` im Input
+      // gibt es keine Warnliste, der Beginn steht trotzdem.
+      ueberwachungSeit: '2026-08-29T10:30:00.000Z',
     });
   });
 
@@ -1141,10 +1149,15 @@ describe('validateDruckabfrage', () => {
     expect(validateDruckabfrage({ druck: 200 })).toEqual([]);
   });
 
-  it('lehnt fehlenden, negativen und unsinnig hohen Druck ab', () => {
-    expect(validateDruckabfrage({})).toEqual(['druckMissing']);
+  it('lehnt negativen und unsinnig hohen Druck ab', () => {
     expect(validateDruckabfrage({ druck: -1 })).toEqual(['druckInvalid']);
     expect(validateDruckabfrage({ druck: 1000 })).toEqual(['druckInvalid']);
+  });
+
+  it('lehnt die vollständig leere Meldung ab', () => {
+    // Kein `druckMissing` mehr: Ohne Druck ist die Meldung zulässig, solange
+    // sie überhaupt etwas sagt.
+    expect(validateDruckabfrage({})).toEqual(['leereMeldung']);
   });
 });
 
@@ -1368,5 +1381,258 @@ describe('mitUeberwachungsUid: Schranken', () => {
   it('hängt über der Höchstzahl nichts mehr an', () => {
     const voll = Array.from({ length: MAX_UEBERWACHUNG_UIDS }, (_, i) => `u${i}`);
     expect(mitUeberwachungsUid(voll, 'neu')).toEqual(voll);
+  });
+});
+
+describe('canTransition mit zugeteilt', () => {
+  it('erlaubt die Zuteilung und den direkten Abmarsch aus der Bereitschaft', () => {
+    expect(canTransition('bereit', 'zugeteilt')).toBe(true);
+    // Ein Trupp, der nie über einen Sammelplatz lief, wird in der
+    // Überwachung erfasst und direkt losgeschickt.
+    expect(canTransition('bereit', 'imEinsatz')).toBe(true);
+    expect(canTransition('bereit', 'abgemeldet')).toBe(true);
+  });
+
+  it('lässt einen zugeteilten Trupp in den Einsatz oder zurück', () => {
+    expect(canTransition('zugeteilt', 'imEinsatz')).toBe(true);
+    // Der Trupp wurde doch nicht gebraucht und kommt zurück, ohne im
+    // Einsatz gewesen zu sein.
+    expect(canTransition('zugeteilt', 'zurueck')).toBe(true);
+  });
+
+  it('lässt einen zugeteilten Trupp weder zurück in die Bereitschaft noch abmelden', () => {
+    // Erholung läuft über eine neue Zeile (`nextBereitstellung`), damit die
+    // alte als Nachweis stehen bleibt.
+    expect(canTransition('zugeteilt', 'bereit')).toBe(false);
+    // Wie bei `imEinsatz`: Wer irgendwo draußen ist, muss erst zurückkommen,
+    // sonst behauptet das Protokoll, niemand sei mehr unterwegs.
+    expect(canTransition('zugeteilt', 'abgemeldet')).toBe(false);
+  });
+
+  it('führt zugeteilt in der Statusliste zwischen bereit und imEinsatz', () => {
+    expect(TRUPP_STATUSES).toEqual([
+      'bereit',
+      'zugeteilt',
+      'imEinsatz',
+      'zurueck',
+      'abgemeldet',
+    ]);
+  });
+});
+
+describe('zuteilungPatch', () => {
+  it('setzt zugeteilt und die Übergabezeit, nie den Abmarsch', () => {
+    const patch = zuteilungPatch({
+      entsendetAn: ' LFA ',
+      uebergabeZeit: '2026-09-03T08:10:00.000Z',
+      druckUebergabe: 300,
+    });
+    expect(patch).toEqual({
+      status: 'zugeteilt',
+      uebergabeZeit: '2026-09-03T08:10:00.000Z',
+      entsendetAn: 'LFA',
+      druckUebergabe: 300,
+    });
+    // Der Ankerpunkt der Zeitkontrolle gehört der taktischen Einheit.
+    expect('abmarschZeit' in patch).toBe(false);
+  });
+
+  it('lässt leere Angaben weg — Firestore lehnt undefined ab', () => {
+    const patch = zuteilungPatch({
+      entsendetAn: '   ',
+      uebergabeZeit: '2026-09-03T08:10:00.000Z',
+    });
+    expect('entsendetAn' in patch).toBe(false);
+    expect('druckUebergabe' in patch).toBe(false);
+  });
+});
+
+describe('entsendePatch als Einsatzauftrag', () => {
+  const bereit = trupp({ truppName: 'Trupp 1' });
+
+  it('setzt Abmarsch, Auftrag, Ziel und übernimmt die Zeitkontrolle', () => {
+    const patch = entsendePatch({
+      entsendetAn: 'LFA',
+      abmarschZeit: '2026-09-03T08:30:00.000Z',
+      druckAbmarsch: 300,
+      auftrag: ' Menschenrettung ',
+      einsatzziel: ' Keller Stiegenhaus links ',
+      ueberwachtVon: 'Maschinist LFA',
+      trupp: bereit,
+      uid: 'uid-1',
+    });
+    expect(patch.status).toBe('imEinsatz');
+    expect(patch.abmarschZeit).toBe('2026-09-03T08:30:00.000Z');
+    expect(patch.auftrag).toBe('Menschenrettung');
+    expect(patch.einsatzziel).toBe('Keller Stiegenhaus links');
+    expect(patch.ueberwachtVon).toBe('Maschinist LFA');
+    // Wer losschickt, führt ab da die Zeitkontrolle (FH-06 5.3.4).
+    expect(patch.ueberwachungUids).toEqual(['uid-1']);
+    expect(patch.ueberwachungSeit).toBe('2026-09-03T08:30:00.000Z');
+  });
+
+  it('lässt eine schon laufende Zeitkontrolle stehen', () => {
+    const patch = entsendePatch({
+      abmarschZeit: '2026-09-03T08:30:00.000Z',
+      trupp: trupp({ ueberwachungSeit: '2026-09-03T08:05:00.000Z' }),
+      uid: 'uid-2',
+    });
+    expect('ueberwachungSeit' in patch).toBe(false);
+  });
+
+  it('lässt leere Angaben weg', () => {
+    const patch = entsendePatch({
+      abmarschZeit: '2026-09-03T08:30:00.000Z',
+      auftrag: '  ',
+      einsatzziel: '',
+      trupp: bereit,
+    });
+    expect('auftrag' in patch).toBe(false);
+    expect('einsatzziel' in patch).toBe(false);
+    expect('druckAbmarsch' in patch).toBe(false);
+  });
+});
+
+describe('naechsteZuteilung', () => {
+  const zurueck = trupp({
+    truppName: 'Trupp 1',
+    status: 'zurueck',
+    entsendetAn: 'LFA',
+    ueberwachtVon: 'Maschinist LFA',
+    paTyp: 'langzeit300',
+    flaschenAnzahl: 2,
+    flaschenVolumen: 6.8,
+    fuellDruck: 300,
+    abmarschZeit: '2026-09-03T08:30:00.000Z',
+    druckAbmarsch: 300,
+    rueckkehrZeit: '2026-09-03T08:55:00.000Z',
+    druckRueckkehr: 90,
+    einsatzziel: 'Keller Stiegenhaus links',
+    auftrag: 'Menschenrettung',
+    abfragen: [{ zeitpunkt: '2026-09-03T08:35:00.000Z', druck: 240 }],
+    tagebuch: { auftrag: '2026-09-03T08:30:00.000Z' },
+    ueberwachungUids: ['uid-1'],
+  });
+
+  it('legt eine neue Zeile bei derselben Einheit an', () => {
+    const neu = naechsteZuteilung({
+      vorherige: zurueck,
+      jetzt: '2026-09-03T09:10:00.000Z',
+      uid: 'uid-2',
+    });
+    expect(neu.status).toBe('zugeteilt');
+    expect(neu.laufendeNummer).toBe(2);
+    expect(neu.entsendetAn).toBe('LFA');
+    expect(neu.uebergabeZeit).toBe('2026-09-03T09:10:00.000Z');
+    // Gerätesatz und wer überwacht hängen am Trupp, nicht an der Entsendung.
+    expect(neu.paTyp).toBe('langzeit300');
+    expect(neu.ueberwachtVon).toBe('Maschinist LFA');
+    expect(neu.ueberwachungUids).toEqual(['uid-1', 'uid-2']);
+  });
+
+  it('schleppt Messwerte, Auftrag und den Tagebuch-Merker nicht mit', () => {
+    const neu = naechsteZuteilung({
+      vorherige: zurueck,
+      jetzt: '2026-09-03T09:10:00.000Z',
+    });
+    for (const feld of [
+      'abmarschZeit',
+      'druckAbmarsch',
+      'rueckkehrZeit',
+      'druckRueckkehr',
+      'abfragen',
+      'einsatzziel',
+      'auftrag',
+      'tagebuch',
+    ]) {
+      expect(feld in neu).toBe(false);
+    }
+  });
+});
+
+describe('tagebuchVermerk', () => {
+  it('schreibt einen Punktpfad, damit ein Nachbarschlüssel bleibt', () => {
+    expect(tagebuchVermerk('amZiel', '2026-09-03T08:35:00.000Z')).toEqual({
+      'tagebuch.amZiel': '2026-09-03T08:35:00.000Z',
+    });
+  });
+});
+
+describe('validateDruckabfrage ohne Druck', () => {
+  it('nimmt eine Meldung mit Bemerkung ohne Druck an', () => {
+    // Über Funk kommt nicht jede Meldung mit einer Zahl.
+    expect(validateDruckabfrage({ bemerkung: 'starke Verrauchung' })).toEqual(
+      [],
+    );
+  });
+
+  it('nimmt Ankunft und Rückzug ohne Druck an', () => {
+    expect(validateDruckabfrage({ amZiel: true })).toEqual([]);
+    expect(validateDruckabfrage({ rueckzug: true })).toEqual([]);
+  });
+
+  it('weist die vollständig leere Meldung ab', () => {
+    // Eine Meldung ohne jeden Inhalt ist ein Fehlklick.
+    expect(validateDruckabfrage({})).toEqual(['leereMeldung']);
+    expect(validateDruckabfrage({ bemerkung: '   ' })).toEqual(['leereMeldung']);
+  });
+
+  it('prüft weiterhin den Bereich, wenn ein Druck dasteht', () => {
+    expect(validateDruckabfrage({ druck: 500 })).toEqual(['druckInvalid']);
+    expect(validateDruckabfrage({ druck: -1 })).toEqual(['druckInvalid']);
+    expect(validateDruckabfrage({ druck: Number.NaN })).toEqual([
+      'druckInvalid',
+    ]);
+    expect(validateDruckabfrage({ druck: 240 })).toEqual([]);
+    // 0 bar ist ein zulässiger, wenn auch schlechter Wert.
+    expect(validateDruckabfrage({ druck: 0 })).toEqual([]);
+  });
+});
+
+describe('buildDruckabfrage ohne Druck', () => {
+  it('legt kein Druckfeld an', () => {
+    const abfrage = buildDruckabfrage(
+      { bemerkung: 'starke Verrauchung' },
+      { uid: 'uid-1', jetzt: '2026-09-03T08:40:00.000Z' },
+    );
+    expect('druck' in abfrage).toBe(false);
+    expect(abfrage.bemerkung).toBe('starke Verrauchung');
+    expect(abfrage.zeitpunkt).toBe('2026-09-03T08:40:00.000Z');
+  });
+});
+
+describe('gruppiereTrupps mit zugeteilt', () => {
+  const zeile = (
+    id: string,
+    status: TruppStatus,
+    truppKey = id,
+    laufendeNummer = 1,
+  ): AtemschutzTrupp =>
+    trupp({
+      id,
+      truppKey,
+      laufendeNummer,
+      status,
+      bereitSeit: `2026-09-03T0${laufendeNummer}:00:00.000Z`,
+    });
+
+  it('trennt zugeteilte von Trupps im Einsatz', () => {
+    const g = gruppiereTrupps([
+      zeile('a', 'bereit'),
+      zeile('b', 'zugeteilt'),
+      zeile('c', 'imEinsatz'),
+      zeile('d', 'zurueck'),
+    ]);
+    expect(g.bereit.map((t) => t.id)).toEqual(['a']);
+    expect(g.zugeteilt.map((t) => t.id)).toEqual(['b']);
+    expect(g.imEinsatz.map((t) => t.id)).toEqual(['c']);
+    expect(g.zurueck.map((t) => t.id)).toEqual(['d']);
+  });
+
+  it('lässt eine zugeteilte Karte nicht zusätzlich im Protokoll stehen', () => {
+    // Sonst stünde derselbe Trupp zweimal auf der Seite.
+    const g = gruppiereTrupps([zeile('b', 'zugeteilt')]);
+    expect(g.frueher).toEqual([]);
+    expect(g.protokoll.map((t) => t.id)).toEqual(['b']);
   });
 });

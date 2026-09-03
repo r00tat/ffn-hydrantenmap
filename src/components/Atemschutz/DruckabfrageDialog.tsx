@@ -90,16 +90,28 @@ export default function DruckabfrageDialog({
    * genaue Zeitpunkt des Speicherns (`buildDruckabfrage` nimmt dann `jetzt`).
    */
   const [zeitGeaendert, setZeitGeaendert] = useState(false);
+  /**
+   * Ob diese Meldung ins Einsatztagebuch soll. Vorgabe **aus**: Eine
+   * gewöhnliche Zwischenabfrage ist Sache der Zeitkontrolle, nicht der
+   * Einsatzleitung — stünde jede darin, gingen die vier wichtigen Zeilen unter.
+   */
+  const [tagebuch, setTagebuch] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const druckWert = druck.trim()
     ? Number(druck.trim().replace(',', '.'))
     : undefined;
+  // Ankunft und Rückzug sind Einsatzereignisse und gehen **immer** ins
+  // Tagebuch. Der Haken ist dann gesetzt und gesperrt statt still übergangen:
+  // Ein Eintrag, den der Dialog verneint hat, wäre eine Überraschung.
+  const zwingend =
+    (zielMeldungFehlt && amZiel) || (!rueckzugGemeldet && rueckzug);
   const input: DruckabfrageInput = {
     druck: druckWert,
     amZiel,
     rueckzug,
     bemerkung,
+    tagebuch: tagebuch || zwingend,
     // Ohne Änderung kein Zeitpunkt im Input — dann gilt der Moment des
     // Speicherns, samt Sekunden.
     ...(zeitGeaendert ? { zeitpunkt: fromLocalInput(zeit) } : {}),
@@ -126,11 +138,10 @@ export default function DruckabfrageDialog({
           </Typography>
           <TextField
             fullWidth
-            required
             autoFocus
             type="number"
             label={t('ueberwachung.druck')}
-            helperText={t('ueberwachung.druckHint')}
+            helperText={`${t('ueberwachung.druckHint')} ${t('ueberwachung.druckOptionalHint')}`}
             value={druck}
             slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             onChange={(e) => setDruck(e.target.value)}
@@ -191,12 +202,31 @@ export default function DruckabfrageDialog({
             value={bemerkung}
             onChange={(e) => setBemerkung(e.target.value)}
           />
-          {fehler.length > 0 && druck.trim() !== '' && (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={tagebuch || zwingend}
+                disabled={zwingend}
+                onChange={(e) => setTagebuch(e.target.checked)}
+              />
+            }
+            label={t('ueberwachung.tagebuch')}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {zwingend
+              ? t('ueberwachung.tagebuchImmer')
+              : t('ueberwachung.tagebuchHint')}
+          </Typography>
+          {/* Vorher an „Druck ist getippt" gehängt, weil der leere Dialog
+              sonst sofort meckerte. Jetzt hat der Fehler einen anderen Sinn:
+              `leereMeldung` heißt „hier steht gar nichts" und darf erst
+              erscheinen, wenn jemand etwas angefasst hat. */}
+          {fehler.length > 0 && (druck.trim() !== '' || bemerkung !== '') && (
             <Alert severity="warning">
               {fehler
                 .map((key) =>
                   t(
-                    `ueberwachung.errors.${key}` as 'ueberwachung.errors.druckMissing',
+                    `ueberwachung.errors.${key}` as 'ueberwachung.errors.druckInvalid',
                   ),
                 )
                 .join(' · ')}

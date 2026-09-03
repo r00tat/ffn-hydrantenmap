@@ -849,3 +849,79 @@ describe('angetretener Rückzug', () => {
     expect(dringlichkeit(stand)).toBe('kritisch');
   });
 });
+
+describe('berechneStand mit Meldungen ohne Druck', () => {
+  const basis = trupp({
+    mitglieder: ['Huber'],
+    abmarschZeit: '2026-09-03T08:00:00.000Z',
+    druckAbmarsch: 300,
+    paTyp: 'standard300',
+  });
+  const vorgabe = PA_SAETZE.standard300;
+  const jetzt = new Date('2026-09-03T08:20:00.000Z');
+
+  it('ändert Verbrauch und Prognose nicht', () => {
+    const ohne = berechneStand(
+      {
+        ...basis,
+        abfragen: [
+          { zeitpunkt: '2026-09-03T08:05:00.000Z', druck: 260 },
+          { zeitpunkt: '2026-09-03T08:15:00.000Z', druck: 180 },
+        ],
+      },
+      jetzt,
+      { vorgabe },
+    );
+    const mit = berechneStand(
+      {
+        ...basis,
+        abfragen: [
+          { zeitpunkt: '2026-09-03T08:05:00.000Z', druck: 260 },
+          // Eine Statusmeldung dazwischen — ein Ereignis, kein Messpunkt.
+          {
+            zeitpunkt: '2026-09-03T08:10:00.000Z',
+            bemerkung: 'starke Verrauchung',
+          },
+          { zeitpunkt: '2026-09-03T08:15:00.000Z', druck: 180 },
+        ],
+      },
+      jetzt,
+      { vorgabe },
+    );
+    expect(mit?.verbrauch.barProMin).toBeCloseTo(
+      ohne?.verbrauch.barProMin as number,
+      6,
+    );
+    expect(mit?.vermuteterDruck).toBeCloseTo(ohne?.vermuteterDruck as number, 6);
+    expect(mit?.letzterPunkt.druck).toBe(180);
+  });
+
+  it('fällt ohne Druck bei der Ankunft auf die Restdruckwarnung zurück', () => {
+    // Ohne Flaschendruck bei Erreichen des Ziels ist der Rückmarschdruck aus
+    // dem doppelten Vormarschdruckabfall nicht berechenbar.
+    const stand = berechneStand(
+      {
+        ...basis,
+        abfragen: [{ zeitpunkt: '2026-09-03T08:05:00.000Z', amZiel: true }],
+      },
+      jetzt,
+      { vorgabe },
+    );
+    expect(stand?.druckAmZiel).toBeUndefined();
+    expect(stand?.zielSeit).toBe('2026-09-03T08:05:00.000Z');
+    expect(stand?.rueckzugsGrund).toBe('restdruck');
+  });
+
+  it('rechnet mit dem Abmarschdruck, wenn keine Abfrage einen Druck trägt', () => {
+    const stand = berechneStand(
+      {
+        ...basis,
+        abfragen: [{ zeitpunkt: '2026-09-03T08:05:00.000Z', rueckzug: true }],
+      },
+      jetzt,
+      { vorgabe },
+    );
+    expect(stand?.letzterPunkt.druck).toBe(300);
+    expect(stand?.letzterPunkt.zeitpunkt).toBe('2026-09-03T08:00:00.000Z');
+  });
+});

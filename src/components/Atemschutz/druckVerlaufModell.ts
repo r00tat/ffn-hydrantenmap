@@ -1,6 +1,7 @@
 import type { AtemschutzTrupp } from '../../common/atemschutz';
 import {
   RESERVEDRUCK_BAR,
+  hatDruck,
   sortierteAbfragen,
   type UeberwachungStand,
 } from '../../common/atemschutzUeberwachung';
@@ -105,13 +106,22 @@ export function baueDruckVerlauf(
 
   const punkte: VerlaufPunkt[] = [
     { t: tStart, druck: stand.startdruck, art: 'abmarsch' },
-    ...sortierteAbfragen(trupp).map((a) => ({
-      t: zeit(a.zeitpunkt),
-      druck: a.druck,
-      // Rückzug schlägt Ankunft: Trägt eine Meldung beides, ist der Rückzug
-      // die jüngere und für den Verlauf die wichtigere Aussage.
-      art: (a.rueckzug ? 'rueckzug' : a.amZiel ? 'ziel' : 'abfrage') as PunktArt,
-    })),
+    // Nur Meldungen mit Druck ergeben einen Kurvenpunkt. Ankunft und Rückzug
+    // ohne Druck gehen dabei nicht verloren: Ihre senkrechten Marken kommen
+    // aus `stand.zielSeit` und `stand.rueckzugSeit`, nicht aus dem Punkt.
+    ...sortierteAbfragen(trupp)
+      .filter(hatDruck)
+      .map((a) => ({
+        t: zeit(a.zeitpunkt),
+        druck: a.druck as number,
+        // Rückzug schlägt Ankunft: Trägt eine Meldung beides, ist der Rückzug
+        // die jüngere und für den Verlauf die wichtigere Aussage.
+        art: (a.rueckzug
+          ? 'rueckzug'
+          : a.amZiel
+            ? 'ziel'
+            : 'abfrage') as PunktArt,
+      })),
   ];
 
   const tRueckkehr = zeit(trupp.rueckkehrZeit);

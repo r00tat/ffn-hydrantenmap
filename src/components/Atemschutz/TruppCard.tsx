@@ -38,6 +38,9 @@ const STATUS_FARBE: Record<
   'success' | 'warning' | 'info' | 'default'
 > = {
   bereit: 'success',
+  // Dieselbe Farbe wie „im Einsatz": Aus Sicht des Sammelplatzes ist der Trupp
+  // weg — ob er schon anliegt, weiß hier niemand.
+  zugeteilt: 'warning',
   imEinsatz: 'warning',
   zurueck: 'info',
   abgemeldet: 'default',
@@ -123,6 +126,13 @@ export default function TruppCard({
         <Typography variant="body2" color="text.secondary" component="div">
           {trupp.status === 'bereit' &&
             t('trupp.seit', { zeit: uhrzeit(trupp.bereitSeit) })}
+          {trupp.status === 'zugeteilt' && (
+            <>
+              {t('trupp.zugeteiltAn')}: {trupp.entsendetAn} ·{' '}
+              {t('trupp.uebergabeZeit')} {uhrzeit(trupp.uebergabeZeit)}
+              {trupp.druckUebergabe != null && ` · ${trupp.druckUebergabe} bar`}
+            </>
+          )}
           {trupp.status === 'imEinsatz' && (
             <>
               {t('trupp.entsendetAn')}: {trupp.entsendetAn} ·{' '}
@@ -170,7 +180,9 @@ export default function TruppCard({
               </Button>
             </>
           )}
-          {trupp.status === 'imEinsatz' && (
+          {/* Auch bei `zugeteilt`: Ein Trupp, der doch nicht gebraucht wurde,
+              hinge sonst am Sammelplatz fest. */}
+          {(trupp.status === 'zugeteilt' || trupp.status === 'imEinsatz') && (
             <Button size="small" variant="contained" onClick={onRueckkehr}>
               {t('trupp.actions.rueckkehr')}
             </Button>

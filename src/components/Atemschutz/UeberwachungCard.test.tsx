@@ -74,7 +74,8 @@ function render(
       onBearbeiten={vi.fn()}
       onDruckabfrage={vi.fn()}
       onGeraete={vi.fn()}
-      onAbmarsch={vi.fn()}
+      onEinsatzauftrag={vi.fn()}
+      onBereitZumAbmarsch={vi.fn()}
       onRueckkehr={vi.fn()}
       onErneutEinsatz={onErneutEinsatz}
       onAnSammelplatz={onAnSammelplatz}
@@ -88,7 +89,7 @@ describe('UeberwachungCard', () => {
     expect(screen.getByText('Vermuteter Druck')).toBeInTheDocument();
     expect(screen.getByText('Rückzug um')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Druckabfrage' }),
+      screen.getByRole('button', { name: 'Druckabfrage / Status' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Rückkehr' })).toBeInTheDocument();
   });
@@ -178,12 +179,12 @@ describe('UeberwachungCard', () => {
 
   it('blendet ohne Schreibrecht alle Aktionen aus', () => {
     render(trupp(), { canWrite: false });
-    expect(screen.queryByRole('button', { name: 'Druckabfrage' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Druckabfrage / Status' })).toBeNull();
   });
 
   it('bietet an einer älteren Bereitstellung keine Aktion an', () => {
     render(trupp(), { istAktuell: false });
-    expect(screen.queryByRole('button', { name: 'Druckabfrage' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Druckabfrage / Status' })).toBeNull();
   });
 
   it('zeigt den Druckverlauf als eigene Zeile je Wert', () => {
@@ -323,5 +324,50 @@ describe('UeberwachungCard', () => {
       'Bert Beispiel: Maske FPS',
       'nicht zugeordnet: 2.16.20 · Stahl 6 l',
     ]);
+  });
+});
+
+describe('UeberwachungCard mit zugeteilten Trupps', () => {
+  it('bietet dem zugeteilten Trupp den Einsatzauftrag an', () => {
+    render(trupp({ status: 'zugeteilt', entsendetAn: 'LFA' }));
+    expect(
+      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
+    ).toBeInTheDocument();
+    // Er ist noch nicht unter Atemschutz — es gibt nichts abzufragen.
+    expect(screen.queryByRole('button', { name: /Druckabfrage/ })).toBeNull();
+  });
+
+  it('zeigt den Auftrag neben dem Einsatzziel', () => {
+    render(
+      trupp({
+        status: 'imEinsatz',
+        auftrag: 'Menschenrettung',
+        einsatzziel: 'Keller Stiegenhaus links',
+      }),
+    );
+    expect(screen.getByText(/Menschenrettung/)).toBeInTheDocument();
+    expect(screen.getByText(/Keller Stiegenhaus links/)).toBeInTheDocument();
+  });
+
+  it('bietet dem zurückgekehrten Trupp „bereit zum Abmarsch" an', () => {
+    render(trupp({ status: 'zurueck' }));
+    expect(
+      screen.getByRole('button', { name: 'Bereit zum Abmarsch' }),
+    ).toBeInTheDocument();
+  });
+
+  it('beschriftet eine Statusmeldung ohne Druck mit ihrer Bemerkung', () => {
+    render(
+      trupp({
+        status: 'imEinsatz',
+        abfragen: [
+          {
+            zeitpunkt: '2026-09-03T08:12:00.000Z',
+            bemerkung: 'starke Verrauchung',
+          },
+        ],
+      }),
+    );
+    expect(screen.getByText('starke Verrauchung')).toBeInTheDocument();
   });
 });

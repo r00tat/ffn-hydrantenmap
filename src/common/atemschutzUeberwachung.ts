@@ -467,12 +467,32 @@ export interface StandOptionen {
   vorgabe?: Geraetesatz;
 }
 
-/** Die Druckabfragen eines Trupps, aufsteigend und ohne Unbrauchbares. */
+/**
+ * Ob eine Meldung einen brauchbaren Flaschendruck trägt.
+ *
+ * Die Grenze zwischen „Ereignis" und „Messpunkt": Alles, was rechnet, nimmt
+ * nur Meldungen mit Druck (`berechneStand`, `baueDruckVerlauf`,
+ * `faelligeWarnungen`); alles, was den Verlauf zeigt oder nach einer Ankunft
+ * sucht, nimmt sie alle.
+ */
+export function hatDruck(a: Druckabfrage): boolean {
+  return typeof a.druck === 'number' && Number.isFinite(a.druck);
+}
+
+/**
+ * Die Meldungen eines Trupps, aufsteigend und ohne unbrauchbaren Zeitstempel.
+ *
+ * **Meldungen ohne Druck bleiben drin.** Seit derselbe Dialog auch eine
+ * Statusmeldung aufnimmt, ist eine Meldung nicht mehr zwingend ein Messwert —
+ * und „Trupp am Einsatzziel, kein Druck durchgegeben" ist genau die Meldung,
+ * die der Verlauf zeigen und `berechneStand` als Ankunft erkennen muss. Wer
+ * rechnet, filtert selbst mit `hatDruck`.
+ */
 export function sortierteAbfragen(trupp: {
   abfragen?: Druckabfrage[];
 }): Druckabfrage[] {
   return [...(trupp.abfragen ?? [])]
-    .filter((a) => istPunkt(a))
+    .filter((a) => Number.isFinite(zeit(a.zeitpunkt)))
     .sort((a, b) => zeit(a.zeitpunkt) - zeit(b.zeitpunkt));
 }
 
@@ -503,9 +523,14 @@ export function berechneStand(
     : (trupp.druckAbmarsch as number);
 
   const abfragen = sortierteAbfragen(trupp);
+  // Meldungen ohne Druck stehen im Verlauf, sind aber kein Messpunkt: Sie
+  // tragen weder zum gemessenen Verbrauch noch zum vermuteten Druck bei, und
+  // als `letzterPunkt` machten sie beide Rechnungen unmöglich.
   const punkte: DruckPunkt[] = [
     { zeitpunkt: trupp.abmarschZeit as string, druck: startdruck },
-    ...abfragen.map((a) => ({ zeitpunkt: a.zeitpunkt, druck: a.druck })),
+    ...abfragen
+      .filter(hatDruck)
+      .map((a) => ({ zeitpunkt: a.zeitpunkt, druck: a.druck as number })),
   ];
 
   const verbrauch = massgeblicherVerbrauch(
@@ -565,7 +590,14 @@ export function berechneStand(
     letzterPunkt,
     vermuteterDruck,
     ...(zielAbfrage
-      ? { druckAmZiel: zielAbfrage.druck, zielSeit: zielAbfrage.zeitpunkt }
+      ? {
+          // Der Druck kann fehlen — die Ankunft kann auch ohne Zahl gemeldet
+          // werden. `zielSeit` steht trotzdem, die Meldung gab es ja.
+          ...(typeof zielAbfrage.druck === 'number'
+            ? { druckAmZiel: zielAbfrage.druck }
+            : {}),
+          zielSeit: zielAbfrage.zeitpunkt,
+        }
       : {}),
     ...(rueckzugAbfrage ? { rueckzugSeit: rueckzugAbfrage.zeitpunkt } : {}),
     ...(rueckmarsch != null ? { rueckmarschDruck: rueckmarsch } : {}),
@@ -624,7 +656,11 @@ export function faelligeWarnungen(
   if (stand.rueckzugSeit) return [];
 
   const faellig: WarnungFaellig[] = [];
-  const abfragen = sortierteAbfragen(trupp);
+  // Nur Meldungen **mit Druck** stellen die Erinnerung zufrieden: Ihr Zweck
+  // ist, einen Flaschendruck aus dem Trupp zu bekommen. Ein „wir arbeiten
+  // weiter" ohne Zahl brächte sie sonst zum Schweigen, ohne die Frage zu
+  // beantworten, auf die sie zielt.
+  const abfragen = sortierteAbfragen(trupp).filter(hatDruck);
   const letzte = abfragen[abfragen.length - 1];
   const jetztMs = jetzt.getTime();
 

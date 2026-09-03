@@ -153,3 +153,48 @@ describe('DruckabfrageDialog', () => {
     );
   });
 });
+
+const tagebuchHaken = () =>
+  screen.getByRole('checkbox', { name: /Eintrag ins Einsatztagebuch/ });
+
+describe('DruckabfrageDialog als Statusmeldung', () => {
+  it('speichert eine Meldung ohne Druck, wenn eine Bemerkung dasteht', async () => {
+    const onSave = render();
+    fireEvent.change(screen.getByLabelText(/Bemerkung/), {
+      target: { value: 'starke Verrauchung' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      bemerkung: 'starke Verrauchung',
+    });
+    expect(onSave.mock.calls[0][0].druck).toBeUndefined();
+  });
+
+  it('lässt das Tagebuch-Häkchen leer — Zwischenabfragen bleiben draußen', () => {
+    render();
+    expect(tagebuchHaken()).not.toBeChecked();
+    expect(tagebuchHaken()).not.toBeDisabled();
+  });
+
+  it('setzt und sperrt das Häkchen, sobald die Ankunft neu gemeldet wird', async () => {
+    // Ankunft und Rückzug sind Einsatzereignisse — der Eintrag entsteht
+    // unabhängig vom Haken, und das soll man sehen.
+    const onSave = render(true);
+    fireEvent.click(ankunftHaken());
+    expect(tagebuchHaken()).toBeChecked();
+    expect(tagebuchHaken()).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Geringster Druck/), {
+      target: { value: '240' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].tagebuch).toBe(true);
+  });
+
+  it('sperrt das Häkchen nicht, wenn die Ankunft längst gemeldet ist', () => {
+    // Dann ist die Abfrage eine gewöhnliche Zwischenmeldung.
+    render(false);
+    expect(tagebuchHaken()).not.toBeDisabled();
+  });
+});

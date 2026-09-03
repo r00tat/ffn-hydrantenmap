@@ -176,10 +176,31 @@ export interface AtemschutzFuellung {
   updatedBy: string;
 }
 
-export type TruppStatus = 'bereit' | 'imEinsatz' | 'zurueck' | 'abgemeldet';
+/**
+ * Der Zustand einer Bereitstellung.
+ *
+ * `zugeteilt` steht zwischen `bereit` und `imEinsatz`: Wird ein Trupp vom
+ * Sammelplatz entsendet, ist er einer taktischen Einheit **zugeordnet und in
+ * Vorbereitung**, aber noch nicht unter Atemschutz. Der Sammelplatz weiß gar
+ * nicht, wann er es wird — das entscheidet die Einheit mit dem Einsatzauftrag.
+ *
+ * Warum das ein eigener Zustand sein muss und nicht bloß eine Beschriftung:
+ * `abmarschZeit` ist der Ankerpunkt jeder Rechnung der Zeitkontrolle. Wurde er
+ * schon bei der Übergabe gesetzt, liefen Drittelmarken, gemessener Verbrauch
+ * und Rückzugszeitpunkt, während der Trupp noch anlegt — ein um 10:00
+ * übergebener Trupp, der um 10:20 anschließt, bekam seine Warnungen zwanzig
+ * Minuten zu früh.
+ */
+export type TruppStatus =
+  | 'bereit'
+  | 'zugeteilt'
+  | 'imEinsatz'
+  | 'zurueck'
+  | 'abgemeldet';
 
 export const TRUPP_STATUSES: TruppStatus[] = [
   'bereit',
+  'zugeteilt',
   'imEinsatz',
   'zurueck',
   'abgemeldet',
@@ -238,8 +259,16 @@ export const PA_SAETZE: Record<Exclude<PaTypKey, 'custom'>, Geraetesatz> = {
  */
 export interface Druckabfrage {
   zeitpunkt: string;
-  /** Geringster Druck im Trupp in bar. */
-  druck: number;
+  /**
+   * Geringster Druck im Trupp in bar.
+   *
+   * **Optional**, seit derselbe Dialog auch eine Statusmeldung aufnimmt: Über
+   * Funk kommt nicht jede Meldung mit einer Zahl — „starke Verrauchung, wir
+   * arbeiten weiter" ist eine Meldung ohne Druck. Alles, was rechnet, lässt
+   * solche Zeilen aus (`berechneStand`, `baueDruckVerlauf`): Sie sind ein
+   * Ereignis, kein Messpunkt.
+   */
+  druck?: number;
   /**
    * Die Ankunft am Einsatzziel — in der Unterlage „Flaschendruck bei Erreichen
    * des Einsatzzieles".
@@ -308,6 +337,19 @@ export type WarnungKey = 'drittel' | 'zweiDrittel' | 'rueckzug';
 export const WARNUNG_KEYS: WarnungKey[] = ['drittel', 'zweiDrittel', 'rueckzug'];
 
 /**
+ * Die Ereignisse, die genau einmal je Bereitstellung ins Einsatztagebuch
+ * gehen. Der Zustandswechsel bzw. die erste Meldung löst sie aus.
+ */
+export type TagebuchEreignis = 'auftrag' | 'amZiel' | 'rueckzug' | 'rueckkehr';
+
+export const TAGEBUCH_EREIGNISSE: TagebuchEreignis[] = [
+  'auftrag',
+  'amZiel',
+  'rueckzug',
+  'rueckkehr',
+];
+
+/**
  * Eine Bereitstellung eines Trupps — nicht der Trupp selbst.
  *
  * Wird ein zurückgekehrter Trupp erneut bereitgestellt, entsteht ein *neues*
@@ -334,6 +376,17 @@ export interface AtemschutzTrupp {
   rueckkehrZeit?: string;
   /** Geringster Druck im Trupp bei der Rückkehr. */
   druckRueckkehr?: number;
+  /**
+   * Wann der Sammelplatz den Trupp der taktischen Einheit übergeben hat.
+   *
+   * Getrennt von `abmarschZeit`, siehe `TruppStatus`: Der Sammelplatz weiß
+   * nicht, wann der Trupp anschließt, und an `abmarschZeit` hängt jede
+   * Rechnung der Zeitkontrolle.
+   */
+  uebergabeZeit?: string;
+  /** Geringster Druck im Trupp bei der Übergabe. Optional wie `druckAbmarsch`:
+   *  Am Sammelplatz liest nicht immer jemand ab. */
+  druckUebergabe?: number;
 
   // ---- Atemschutzüberwachung (Einsatzzeitkontrolle, FH-06 5.3.3) ----
   //
@@ -342,6 +395,15 @@ export interface AtemschutzTrupp {
   // Übergabe ein zweites Dokument anlegen, das mit dem ersten in Zeit und
   // Druck auseinanderlaufen kann — und genau darauf käme es an.
 
+  /**
+   * Was der Trupp tun soll — „Menschenrettung", „Brandbekämpfung",
+   * „Erkundung".
+   *
+   * Freitext neben `einsatzziel`: In FH-06 sind das die zwei Teile desselben
+   * Befehls, das WAS und das WO. Eine Auswahlliste wäre eine Behauptung
+   * darüber, welche Aufträge es gibt.
+   */
+  auftrag?: string;
   /**
    * Einsatzziel und -ort — das „WO" der Dokumentation.
    *
@@ -421,6 +483,17 @@ export interface AtemschutzTrupp {
    * ohne diese Buchführung käme jede Warnung jede Minute erneut.
    */
   warnungen?: Partial<Record<WarnungKey, string>>;
+  /**
+   * Welche Ereignisse dieser Bereitstellung schon im Einsatztagebuch stehen.
+   *
+   * Am Dokument und nicht im Code, aus demselben Grund wie `warnungen`: Zwei
+   * Geräte sehen denselben Trupp, und ohne diese Buchführung entstünde der
+   * Eintrag ein zweites Mal, sobald jemand einen Dialog erneut speichert.
+   *
+   * Die freie Statusmeldung steht nicht darin: Sie entsteht nur durch einen
+   * gesetzten Haken, und ein zweiter Haken ist eine zweite Meldung.
+   */
+  tagebuch?: Partial<Record<TagebuchEreignis, string>>;
   bemerkung?: string;
   createdAt: string;
   createdBy: string;
@@ -786,12 +859,16 @@ export function braucheDatum(zeitpunkt: string, jetzt: Date): boolean {
  *
  * `zurueck` ist ein Endzustand: Ein regenerierter Trupp bekommt eine neue
  * Zeile (`nextBereitstellung`), damit die alte als Nachweis stehen bleibt.
- * `imEinsatz → abgemeldet` fehlt bewusst — ein Trupp, der draußen ist, muss
- * erst zurückkommen, sonst behauptet das Protokoll, niemand sei mehr im
- * Einsatz.
+ *
+ * `imEinsatz → abgemeldet` und `zugeteilt → abgemeldet` fehlen bewusst — ein
+ * Trupp, der draußen ist, muss erst zurückkommen, sonst behauptet das
+ * Protokoll, niemand sei mehr im Einsatz. `zugeteilt → bereit` fehlt aus dem
+ * Grund darüber: Zurückgenommen wird über eine neue Zeile, nicht durch
+ * Umschreiben der alten.
  */
 const TRANSITIONS: Record<TruppStatus, TruppStatus[]> = {
-  bereit: ['imEinsatz', 'abgemeldet'],
+  bereit: ['zugeteilt', 'imEinsatz', 'abgemeldet'],
+  zugeteilt: ['imEinsatz', 'zurueck'],
   imEinsatz: ['zurueck'],
   zurueck: ['abgemeldet'],
   abgemeldet: [],
@@ -801,22 +878,74 @@ export function canTransition(from: TruppStatus, to: TruppStatus): boolean {
   return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-export interface EntsendeInput {
-  /**
-   * Fahrzeug oder Gruppenkommandant, dem der Trupp unterstellt wird.
-   *
-   * Optional: Am Sammelplatz steht oft nur fest, *dass* der Trupp abmarschiert
-   * — wohin, klärt sich auf dem Weg. Ein Pflichtfeld führte hier zu einem
-   * erfundenen Eintrag oder zu gar keiner Protokollzeile.
-   */
+export interface ZuteilungInput {
+  /** Fahrzeug oder taktische Einheit, der der Trupp unterstellt wird. */
   entsendetAn?: string;
-  abmarschZeit: string;
+  uebergabeZeit: string;
   /** Geringster Druck im Trupp; fehlt, wenn niemand abgelesen hat. */
-  druckAbmarsch?: number;
+  druckUebergabe?: number;
 }
 
 export type TruppPatch = Partial<AtemschutzTrupp> & { status: TruppStatus };
 
+/**
+ * Der Sammelplatz übergibt einen Trupp an eine taktische Einheit.
+ *
+ * Bewusst **kein** `abmarschZeit`: Das ist der Zeitpunkt des Anschließens der
+ * Luftversorgung und Sache der Einheit (`entsendePatch`). Der Sammelplatz
+ * bucht hier eine Ressource um, er startet keine Zeitkontrolle.
+ */
+export function zuteilungPatch(input: ZuteilungInput): TruppPatch {
+  const patch: TruppPatch = {
+    status: 'zugeteilt',
+    uebergabeZeit: input.uebergabeZeit,
+  };
+  const ziel = input.entsendetAn?.trim();
+  if (ziel) patch.entsendetAn = ziel;
+  // Nicht direkt zuweisen: Firestore lehnt `undefined` ab.
+  if (typeof input.druckUebergabe === 'number') {
+    patch.druckUebergabe = input.druckUebergabe;
+  }
+  return patch;
+}
+
+export interface EntsendeInput {
+  /**
+   * Fahrzeug oder taktische Einheit, der der Trupp unterstellt ist.
+   *
+   * Optional: Bei einem Trupp, der über den Sammelplatz kam, steht sie schon
+   * am Dokument, und ein leerer Wert soll sie nicht löschen.
+   */
+  entsendetAn?: string;
+  /** „Uhrzeit beim Anschließen des Luftversorgungssystems" (FH-06). */
+  abmarschZeit: string;
+  /** Geringster Druck im Trupp; fehlt, wenn niemand abgelesen hat. */
+  druckAbmarsch?: number;
+  /** Das WAS des Befehls — „Menschenrettung". */
+  auftrag?: string;
+  /** Das WO — „Keller Stiegenhaus links". */
+  einsatzziel?: string;
+  /** Wer die Zeitkontrolle führt, als Klartext. */
+  ueberwachtVon?: string;
+  /**
+   * Der bisherige Zustand der Zeile — für `ueberwachungSeit` und die
+   * Warnliste. Optional, damit ältere Aufrufer ohne Übernahme weiterlaufen.
+   */
+  trupp?: Pick<AtemschutzTrupp, 'ueberwachungSeit' | 'ueberwachungUids'>;
+  /** Wer losschickt; bekommt damit die Warnungen dieser Bereitstellung. */
+  uid?: string;
+}
+
+/**
+ * Der Einsatzauftrag der taktischen Einheit — hier geht der Trupp unter
+ * Atemschutz.
+ *
+ * Der Patch **ist zugleich die Übernahme der Zeitkontrolle**: Wer einen Trupp
+ * unter Atemschutz schickt, hat ab diesem Moment die Verantwortung (FH-06
+ * 5.3.4). Ein zweiter Klick auf „Zeitkontrolle übernehmen" wäre ein Klick ohne
+ * Erkenntnis — derselbe Gedanke, aus dem ein direkt in der Überwachung
+ * erfasster Trupp `ueberwachungSeit` schon beim Anlegen bekommt.
+ */
 export function entsendePatch(input: EntsendeInput): TruppPatch {
   const patch: TruppPatch = {
     status: 'imEinsatz',
@@ -828,6 +957,23 @@ export function entsendePatch(input: EntsendeInput): TruppPatch {
   // `undefined` ab — dieselbe Vorsicht wie in `buildMangelDocument`.
   if (typeof input.druckAbmarsch === 'number') {
     patch.druckAbmarsch = input.druckAbmarsch;
+  }
+  const auftrag = input.auftrag?.trim();
+  if (auftrag) patch.auftrag = auftrag;
+  const einsatzziel = input.einsatzziel?.trim();
+  if (einsatzziel) patch.einsatzziel = einsatzziel;
+  const person = input.ueberwachtVon?.trim();
+  if (person) patch.ueberwachtVon = person;
+  if (input.uid) {
+    patch.ueberwachungUids = mitUeberwachungsUid(
+      input.trupp?.ueberwachungUids,
+      input.uid,
+    );
+  }
+  // Nur, wenn sie noch nicht läuft: Ein überschriebener Anfang machte den
+  // protokollierten Wechsel der Verantwortung unlesbar.
+  if (!input.trupp?.ueberwachungSeit) {
+    patch.ueberwachungSeit = input.abmarschZeit;
   }
   return patch;
 }
@@ -922,24 +1068,18 @@ export interface ErneuterEinsatzArgs {
  * `ueberwachungSeit` steht auf `jetzt`: Die Verantwortung läuft weiter, aber
  * auf dieser Zeile beginnt sie hier.
  */
-export function erneuterEinsatz({
-  vorherige,
-  jetzt,
-  entsendung,
-  uid,
-}: ErneuterEinsatzArgs): NeueBereitstellung {
-  const neu: NeueBereitstellung = {
-    ...nextBereitstellung(vorherige, jetzt),
-    ...entsendung,
-    ueberwachungSeit: jetzt,
-    ueberwachungUids: mitUeberwachungsUid(
-      vorherige.ueberwachungUids,
-      uid ?? '',
-    ),
-  };
-  // Einzeln und mit Prüfung, nicht als Spread der alten Zeile: Firestore lehnt
-  // `undefined` ab, und ein `paTyp: undefined` aus einem Trupp ohne Gerätesatz
-  // ließe den ganzen Schreibvorgang scheitern.
+/**
+ * Was von der vorigen Zeile an einer neuen hängen bleibt: Gerätesatz, Einheit
+ * und wer die Zeitkontrolle führt.
+ *
+ * Einzeln und mit Prüfung, nicht als Spread der alten Zeile: Firestore lehnt
+ * `undefined` ab, und ein `paTyp: undefined` aus einem Trupp ohne Gerätesatz
+ * ließe den ganzen Schreibvorgang scheitern.
+ */
+function uebernimmTruppMerkmale(
+  neu: NeueBereitstellung,
+  vorherige: AtemschutzTrupp,
+): NeueBereitstellung {
   if (!neu.entsendetAn && vorherige.entsendetAn) {
     neu.entsendetAn = vorherige.entsendetAn;
   }
@@ -957,8 +1097,77 @@ export function erneuterEinsatz({
   return neu;
 }
 
+export function erneuterEinsatz({
+  vorherige,
+  jetzt,
+  entsendung,
+  uid,
+}: ErneuterEinsatzArgs): NeueBereitstellung {
+  return uebernimmTruppMerkmale(
+    {
+      ...nextBereitstellung(vorherige, jetzt),
+      ...entsendung,
+      ueberwachungSeit: jetzt,
+      ueberwachungUids: mitUeberwachungsUid(
+        vorherige.ueberwachungUids,
+        uid ?? '',
+      ),
+    },
+    vorherige,
+  );
+}
+
+export interface NaechsteZuteilungArgs {
+  /** Die zurückgekehrte Zeile, aus der der Trupp übernommen wird. */
+  vorherige: AtemschutzTrupp;
+  jetzt: string;
+  uid?: string;
+}
+
+/**
+ * Stellt einen zurückgekehrten Trupp bei **derselben** Einheit wieder bereit —
+ * als neue Zeile, aber ohne Abmarsch.
+ *
+ * Für den Einsatz ohne Sammelplatz: Dort führt der Weg über „wieder
+ * bereitstellen" am ASSP, hier behält die taktische Einheit den Trupp und
+ * schickt ihn später erneut. `ueberwachungBis` wird deshalb nicht gesetzt.
+ *
+ * Der Unterschied zu `erneuterEinsatz` ist genau der fehlende Abmarsch: Dort
+ * geht der Trupp in einem Schritt wieder hinein, hier steht er erst wieder
+ * bereit.
+ */
+export function naechsteZuteilung({
+  vorherige,
+  jetzt,
+  uid,
+}: NaechsteZuteilungArgs): NeueBereitstellung {
+  return uebernimmTruppMerkmale(
+    {
+      ...nextBereitstellung(vorherige, jetzt),
+      status: 'zugeteilt',
+      uebergabeZeit: jetzt,
+      ueberwachungSeit: jetzt,
+      ueberwachungUids: mitUeberwachungsUid(
+        vorherige.ueberwachungUids,
+        uid ?? '',
+      ),
+    },
+    vorherige,
+  );
+}
+
 export interface TruppGruppen {
   bereit: AtemschutzTrupp[];
+  /**
+   * Einer taktischen Einheit zugeteilt, aber noch nicht unter Atemschutz.
+   *
+   * Eine eigene Liste und kein vierter Abschnitt in beiden Oberflächen: Der
+   * **Sammelplatz** zeigt sie zusammen mit `imEinsatz` — er weiß nicht, wann
+   * der Trupp wirklich anschließt. Die **Überwachung** zeigt sie zusammen mit
+   * `bereit`: Dort ist ein zugeteilter Trupp genau das, ein Trupp, der auf
+   * seinen Einsatzauftrag wartet.
+   */
+  zugeteilt: AtemschutzTrupp[];
   imEinsatz: AtemschutzTrupp[];
   zurueck: AtemschutzTrupp[];
   /**
@@ -988,7 +1197,9 @@ export interface TruppGruppen {
  * Am Sammelplatz stehen Trupps mehrerer Wehren, und „Trupp 1" gibt es dann
  * mehrfach. Die Wehr steht deshalb vorn und nicht klein darunter.
  */
-export function truppLabel(trupp: AtemschutzTrupp): string {
+export function truppLabel(
+  trupp: Pick<AtemschutzTrupp, 'feuerwehr' | 'truppName'>,
+): string {
   return [trupp.feuerwehr, trupp.truppName].filter(Boolean).join(' ').trim();
 }
 
@@ -1026,15 +1237,22 @@ export function gruppiereTrupps(trupps: AtemschutzTrupp[]): TruppGruppen {
   );
 
   const bereit = aktuell.filter((t) => t.status === 'bereit');
+  const zugeteilt = aktuell.filter((t) => t.status === 'zugeteilt');
   const imEinsatz = aktuell.filter((t) => t.status === 'imEinsatz');
   const zurueck = aktuell.filter((t) => t.status === 'zurueck');
   // Über die Zeilen selbst und nicht über den Status: „steht oben" ist genau
-  // die Vereinigung der drei Abschnitte — ein abgemeldeter Trupp ist zwar
+  // die Vereinigung der Abschnitte — ein abgemeldeter Trupp ist zwar
   // `aktuell`, hat oben aber keine Karte und gehört ins Protokoll.
-  const oben = new Set<AtemschutzTrupp>([...bereit, ...imEinsatz, ...zurueck]);
+  const oben = new Set<AtemschutzTrupp>([
+    ...bereit,
+    ...zugeteilt,
+    ...imEinsatz,
+    ...zurueck,
+  ]);
 
   return {
     bereit,
+    zugeteilt,
     imEinsatz,
     zurueck,
     aktuell,
@@ -1153,6 +1371,8 @@ export interface UebernahmeInput {
   uid: string;
   ueberwachtVon?: string;
   einsatzziel?: string;
+  /** Das WAS des Befehls — nachgetragen oder geändert. */
+  auftrag?: string;
   /**
    * Die taktische Einheit, der der Trupp zugeordnet ist — dasselbe Feld, das
    * der Sammelplatz beim Entsenden füllt.
@@ -1192,6 +1412,8 @@ export function uebernahmePatch(input: UebernahmeInput): UeberwachungPatch {
   if (person) patch.ueberwachtVon = person;
   const ziel = input.einsatzziel?.trim();
   if (ziel) patch.einsatzziel = ziel;
+  const auftrag = input.auftrag?.trim();
+  if (auftrag) patch.auftrag = auftrag;
   // Leer heißt „nicht angefasst" und nicht „löschen": Eine am Sammelplatz
   // eingetragene Einheit soll eine Übernahme ohne Angabe nicht wegwerfen.
   const einheit = input.entsendetAn?.trim();
@@ -1235,6 +1457,14 @@ export interface DruckabfrageInput {
   bemerkung?: string;
   /** Ohne Angabe gilt der Jetzt-Zeitpunkt des Aufrufers. */
   zeitpunkt?: string;
+  /**
+   * Ob diese Meldung ins Einsatztagebuch soll.
+   *
+   * Gilt nur für die freie Statusmeldung: Ankunft und Rückzug gehen immer
+   * hinein, unabhängig vom Haken — sie sind Einsatzereignisse, und ein
+   * vergessener Haken machte das Tagebuch lückenhaft.
+   */
+  tagebuch?: boolean;
 }
 
 /** Höchster plausibler Flaschendruck — ein Riegel gegen einen Tippfehler. */
@@ -1243,13 +1473,18 @@ export const MAX_DRUCK_BAR = 400;
 /**
  * Harte Validierung einer Druckabfrage — wenig, wie überall im Atemschutz:
  * Wer am Funk mitschreibt, darf nicht an einem Formular hängen.
+ *
+ * Kein `druckMissing` mehr: Der Dialog nimmt auch eine Statusmeldung auf.
+ * Abgewiesen wird nur die Meldung, die gar nichts sagt.
  */
 export function validateDruckabfrage(input: DruckabfrageInput): string[] {
-  if (input.druck == null || !Number.isFinite(input.druck)) {
-    return ['druckMissing'];
+  if (input.druck != null) {
+    if (!Number.isFinite(input.druck)) return ['druckInvalid'];
+    if (input.druck < 0 || input.druck > MAX_DRUCK_BAR) return ['druckInvalid'];
+    return [];
   }
-  if (input.druck < 0 || input.druck > MAX_DRUCK_BAR) return ['druckInvalid'];
-  return [];
+  if (input.amZiel || input.rueckzug || input.bemerkung?.trim()) return [];
+  return ['leereMeldung'];
 }
 
 export function buildDruckabfrage(
@@ -1258,8 +1493,10 @@ export function buildDruckabfrage(
 ): Druckabfrage {
   const abfrage: Druckabfrage = {
     zeitpunkt: input.zeitpunkt?.trim() || ctx.jetzt,
-    druck: input.druck as number,
   };
+  if (typeof input.druck === 'number' && Number.isFinite(input.druck)) {
+    abfrage.druck = input.druck;
+  }
   if (input.amZiel) abfrage.amZiel = true;
   if (input.rueckzug) abfrage.rueckzug = true;
   const bemerkung = input.bemerkung?.trim();
@@ -1364,6 +1601,19 @@ export function warnungVermerk(
   zeitpunkt: string,
 ): Record<string, string> {
   return { [`warnungen.${key}`]: zeitpunkt };
+}
+
+/**
+ * Der Vermerk, dass ein Ereignis im Einsatztagebuch steht — als **Punktpfad**.
+ *
+ * Wie `warnungVermerk`: Ein ganzes `tagebuch`-Objekt zu schreiben löschte den
+ * Schlüssel, den ein zweites Gerät eine Sekunde vorher gesetzt hat.
+ */
+export function tagebuchVermerk(
+  ereignis: TagebuchEreignis,
+  zeitpunkt: string,
+): Record<string, string> {
+  return { [`tagebuch.${ereignis}`]: zeitpunkt };
 }
 
 /**

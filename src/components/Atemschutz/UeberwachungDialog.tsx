@@ -30,6 +30,8 @@ import {
 export interface UeberwachungEingabe {
   ueberwachtVon: string;
   einsatzziel: string;
+  /** Das WAS des Befehls — hier nachgetragen oder geändert. */
+  auftrag: string;
   /** Die taktische Einheit, der der Trupp zugeordnet ist. */
   entsendetAn: string;
   paTyp: PaTypKey;
@@ -98,6 +100,7 @@ export default function UeberwachungDialog({
 
   const [ueberwachtVon, setUeberwachtVon] = useState(trupp.ueberwachtVon ?? '');
   const [einsatzziel, setEinsatzziel] = useState(trupp.einsatzziel ?? '');
+  const [auftrag, setAuftrag] = useState(trupp.auftrag ?? '');
   const [entsendetAn, setEntsendetAn] = useState(trupp.entsendetAn ?? '');
   const [paTyp, setPaTyp] = useState<PaTypKey>(
     // Ohne Angabe am Trupp `custom` mit der Bestandsvorgabe: Das ist genau der
@@ -127,6 +130,7 @@ export default function UeberwachungDialog({
       await onSave({
         ueberwachtVon,
         einsatzziel,
+        auftrag,
         entsendetAn,
         paTyp,
         satz: aktuellerSatz,
@@ -185,6 +189,15 @@ export default function UeberwachungDialog({
                 helperText={t('ueberwachung.truppEinheitHint')}
               />
             )}
+          />
+          {/* Das WAS vor dem WO — dieselbe Reihenfolge wie im
+              `EinsatzauftragDialog` und die, in der der Befehl gegeben wird. */}
+          <TextField
+            fullWidth
+            label={t('ueberwachung.auftrag')}
+            helperText={t('ueberwachung.auftragHint')}
+            value={auftrag}
+            onChange={(e) => setAuftrag(e.target.value)}
           />
           <TextField
             fullWidth

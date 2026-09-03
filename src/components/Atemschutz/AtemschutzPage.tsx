@@ -60,6 +60,7 @@ import AusruestungTab from './AusruestungTab';
 import FuellprotokollTab from './FuellprotokollTab';
 import TruppsTab from './TruppsTab';
 import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
+import useTruppTagebuch from './useTruppTagebuch';
 
 export default function AtemschutzPage() {
   const t = useTranslations('atemschutz');
@@ -159,6 +160,8 @@ export default function AtemschutzPage() {
 
   const benutzerName = displayName ?? email ?? '';
 
+  const schreibeTagebuch = useTruppTagebuch();
+
   const handleSaveLeitung = useCallback(
     async (leiter: string, fuellpersonal: string[]) => {
       if (!firecallId || firecallId === 'unknown') return;
@@ -235,18 +238,25 @@ export default function AtemschutzPage() {
       // Sammelplatz sehen dieselbe Karte, und wer sie eine Sekunde später
       // drückt, arbeitet auf einem überholten Zustand.
       if (!trupp.id || !canTransition(trupp.status, patch.status)) return;
+      // Vor dem Schreiben gemerkt: Danach steht am Objekt der neue Zustand.
+      const warImEinsatz = trupp.status === 'imEinsatz';
       await updateTrupp(firecallId, trupp.id, patch, {
         userId: actor.userId,
         now: new Date().toISOString(),
       });
-      // Auch ein am Sammelplatz entsendeter Trupp braucht den Termin seiner
-      // ersten Warnung: Die Zeitkontrolle führt der Gruppenkommandant, der
-      // Abmarsch wird aber hier erfasst.
+      // Die Rückkehr **aus dem Einsatz** ist ein Einsatzereignis, egal wo sie
+      // erfasst wird. Die Rückkehr eines nur zugeteilten Trupps ist keines: Er
+      // war nie unter Atemschutz.
+      if (warImEinsatz && patch.status === 'zurueck') {
+        await schreibeTagebuch({ ...trupp, ...patch }, 'rueckkehr');
+      }
+      // Auch ein am Sammelplatz zugeteilter Trupp braucht die Terminplanung —
+      // sie stellt fest, dass für ihn (noch) nichts fällig ist.
       await planeUeberwachungWarnung(firecallId, trupp.id).catch((err) => {
         console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
       });
     },
-    [actor.userId, firecallId],
+    [actor.userId, firecallId, schreibeTagebuch],
   );
 
   const handleWiederBereit = useCallback(
