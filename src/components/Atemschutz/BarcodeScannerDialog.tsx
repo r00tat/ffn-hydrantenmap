@@ -20,8 +20,11 @@ import {
   geraetLabel,
   type AtemschutzGeraet,
 } from '../../common/atemschutz';
-import useBarcodeScanner from '../../hooks/useBarcodeScanner';
+import useBarcodeScanner, {
+  type BarcodeScanEvent,
+} from '../../hooks/useBarcodeScanner';
 import GeraetAutocomplete from './GeraetAutocomplete';
+import ScanHinweis, { ScanLauf } from './ScanHinweis';
 
 export interface BarcodeScannerDialogProps {
   open: boolean;
@@ -31,8 +34,17 @@ export interface BarcodeScannerDialogProps {
   /**
    * Genau ein Treffer, oder keiner. Bei `geraet === undefined` ist `code` der
    * rohe Scan — der Aufrufer trägt ihn als Flaschennummer ein.
+   *
+   * `scan` steht nur, wenn der Code von der Kamera kam, und reist mit, damit
+   * der Folgedialog zeigen kann, was tatsächlich gelesen wurde. Bei einem
+   * eindeutigen Treffer schließt sich dieser Dialog sofort — dort ist es die
+   * einzige Stelle, an der die Rohlesung noch sichtbar werden kann.
    */
-  onPicked: (code: string, geraet?: AtemschutzGeraet) => void;
+  onPicked: (
+    code: string,
+    geraet?: AtemschutzGeraet,
+    scan?: BarcodeScanEvent,
+  ) => void;
 }
 
 export default function BarcodeScannerDialog({
@@ -46,6 +58,9 @@ export default function BarcodeScannerDialog({
 
   const [code, setCode] = useState('');
   const [manuell, setManuell] = useState('');
+  // Bleibt leer, wenn von Hand eingegeben wurde — dann gibt es keine Rohlesung,
+  // über die man etwas aussagen könnte.
+  const [scan, setScan] = useState<BarcodeScanEvent>();
 
   const treffer = useMemo(
     () => (code ? findByCode(geraete, code) : []),
@@ -54,17 +69,21 @@ export default function BarcodeScannerDialog({
 
   // Der Scanner läuft weiter, solange kein Code steht: Ein Fehlscan soll den
   // Dialog nicht sperren.
-  const handleDetected = useCallback((next: string) => {
-    setCode((prev) => (prev ? prev : next));
+  const handleDetected = useCallback((next: BarcodeScanEvent) => {
+    // Beide behalten den ersten Treffer, damit Code und Rohlesung nie
+    // auseinanderlaufen.
+    setCode((prev) => (prev ? prev : next.value));
+    setScan((prev) => prev ?? next);
   }, []);
 
-  const { videoRef, status, errorMessage } = useBarcodeScanner({
-    active: open && !code,
-    onDetected: handleDetected,
-  });
+  const { videoRef, status, errorMessage, engine, frameSize, frames } =
+    useBarcodeScanner({
+      active: open && !code,
+      onDetected: handleDetected,
+    });
 
   const uebernehmen = (geraet?: AtemschutzGeraet) => {
-    onPicked(code || manuell.trim(), geraet);
+    onPicked(code || manuell.trim(), geraet, scan);
     onClose();
   };
 
@@ -73,19 +92,20 @@ export default function BarcodeScannerDialog({
   // zweimal ausführt.
   useEffect(() => {
     if (open && code && treffer.length === 1) {
-      onPicked(code, treffer[0]);
+      onPicked(code, treffer[0], scan);
       onClose();
     }
     // `onPicked`/`onClose` bewusst nicht in der Liste: Ein bei jedem Render neu
     // erzeugter Callback des Aufrufers löste den Effekt sonst erneut aus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, code, treffer]);
+  }, [open, code, treffer, scan]);
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{t('scanner.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
+          {scan && <ScanHinweis scan={scan} />}
           {!code && (
             <>
               {status === 'starting' && (
@@ -127,9 +147,16 @@ export default function BarcodeScannerDialog({
                 />
               </Box>
               {status === 'running' && (
-                <Typography variant="body2" color="text.secondary">
-                  {t('scanner.hint')}
-                </Typography>
+                <>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('scanner.hint')}
+                  </Typography>
+                  <ScanLauf
+                    engine={engine}
+                    frameSize={frameSize}
+                    frames={frames}
+                  />
+                </>
               )}
               <GeraetAutocomplete
                 label={t('scanner.manual')}
@@ -140,7 +167,7 @@ export default function BarcodeScannerDialog({
                 // Aus der Liste gewählt: Es gibt nichts mehr aufzulösen, das
                 // Gerät steht fest.
                 onGeraetChange={(g) => {
-                  onPicked(geraetKennung(g) ?? g.bezeichnung, g);
+                  onPicked(geraetKennung(g) ?? g.bezeichnung, g, undefined);
                   onClose();
                 }}
                 // Ein externer Handscanner tippt den Code in dieses Feld und
@@ -155,7 +182,7 @@ export default function BarcodeScannerDialog({
                     setCode(value);
                     return;
                   }
-                  onPicked(value, vorschlaege[0]);
+                  onPicked(value, vorschlaege[0], undefined);
                   onClose();
                 }}
               />

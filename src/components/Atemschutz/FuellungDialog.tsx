@@ -39,6 +39,7 @@ import {
   zweckOf,
   zweckVorgabe,
 } from '../../common/atemschutz';
+import type { BarcodeScanEvent } from '../../hooks/useBarcodeScanner';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 import GeraetAutocomplete from './GeraetAutocomplete';
 import GeraetBestaetigung from './GeraetBestaetigung';
@@ -216,6 +217,10 @@ export default function FuellungDialog({
   const [mangel, setMangel] = useState<MangelEingabe>(LEERE_MANGEL_EINGABE);
   const [saving, setSaving] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  // Die Rohlesung des Scans, der die Flasche gesetzt hat. Wird bei jeder
+  // Neuwahl mitgesetzt — auch auf `undefined`, sonst bliebe sie an einem Gerät
+  // stehen, das gar nicht mehr gescannt wurde.
+  const [scan, setScan] = useState<BarcodeScanEvent>();
   const [fehlermeldung, setFehlermeldung] = useState<string>();
   const fehlerText = useMangelFehlerText();
 
@@ -336,7 +341,11 @@ export default function FuellungDialog({
    * überschriebe ein nachträglich getippter Enddruck sich beim nächsten Render
    * selbst.
    */
-  const uebernehmeFlasche = (treffer: AtemschutzGeraet) => {
+  const uebernehmeFlasche = (
+    treffer: AtemschutzGeraet,
+    scanEvent?: BarcodeScanEvent,
+  ) => {
+    setScan(scanEvent);
     setForm((prev) => {
       const feuerwehr = treffer.feuerwehr || prev.feuerwehr;
       return {
@@ -438,7 +447,7 @@ export default function FuellungDialog({
           </Grid>
           {gewaehlt && (
             <Grid size={12}>
-              <GeraetBestaetigung bestaetigt geraet={gewaehlt} />
+              <GeraetBestaetigung bestaetigt geraet={gewaehlt} scan={scan} />
             </Grid>
           )}
           <Grid size={{ xs: 12, sm: hatFlaschennummer ? 12 : 8 }}>
@@ -713,11 +722,12 @@ export default function FuellungDialog({
           open
           geraete={flaschen}
           onClose={() => setScannerOpen(false)}
-          onPicked={(code, treffer) => {
+          onPicked={(code, treffer, scanEvent) => {
             if (treffer) {
-              uebernehmeFlasche(treffer);
+              uebernehmeFlasche(treffer, scanEvent);
               return;
             }
+            setScan(scanEvent);
             // Kein Stammdatensatz: Der rohe Code wird die Flaschennummer.
             // Besser eine fremde Nummer im Protokoll als gar keine.
             setForm((prev) => ({

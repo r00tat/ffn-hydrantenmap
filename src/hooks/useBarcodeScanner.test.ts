@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import useBarcodeScanner from './useBarcodeScanner';
+import useBarcodeScanner, {
+  normalizeFormatName,
+  toScanEvent,
+} from './useBarcodeScanner';
 
 function mockMediaDevices(getUserMedia: () => Promise<MediaStream>) {
   Object.defineProperty(globalThis.navigator, 'mediaDevices', {
@@ -63,5 +66,46 @@ describe('useBarcodeScanner', () => {
     await waitFor(() => expect(result.current.status).not.toBe('idle'));
     unmount();
     await waitFor(() => expect(stop).toHaveBeenCalled());
+  });
+});
+
+describe('normalizeFormatName', () => {
+  it('übersetzt den ZXing-Enumnamen in die Schreibweise des nativen Detektors', () => {
+    expect(normalizeFormatName('CODE_128')).toBe('code_128');
+    expect(normalizeFormatName('QR_CODE')).toBe('qr_code');
+  });
+
+  it('liefert undefined, wenn kein Name herauskam', () => {
+    // Fällt der Rücklookup des Enums aus, steht dort eine Zahl — dann lieber
+    // gar kein Format als eine Zahl, mit der am Sammelplatz niemand etwas
+    // anfangen kann.
+    expect(normalizeFormatName(4)).toBeUndefined();
+    expect(normalizeFormatName(undefined)).toBeUndefined();
+    expect(normalizeFormatName('')).toBeUndefined();
+  });
+});
+
+describe('toScanEvent', () => {
+  it('übernimmt den ersten Rohtreffer und behält alle', () => {
+    const scan = toScanEvent(
+      [
+        { rawValue: ' *2N16Q19* ', format: 'code_39' },
+        { rawValue: '2016-MU-046', format: 'code_128' },
+      ],
+      'zxing',
+    );
+    expect(scan).toEqual({
+      value: '*2N16Q19*',
+      engine: 'zxing',
+      results: [
+        { rawValue: ' *2N16Q19* ', format: 'code_39' },
+        { rawValue: '2016-MU-046', format: 'code_128' },
+      ],
+    });
+  });
+
+  it('meldet nichts, wenn das Bild nichts Brauchbares hergab', () => {
+    expect(toScanEvent([], 'native')).toBeUndefined();
+    expect(toScanEvent([{ rawValue: '   ' }], 'native')).toBeUndefined();
   });
 });

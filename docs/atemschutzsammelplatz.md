@@ -685,6 +685,41 @@ Zwei Fallstricke:
   nächsten App-Release. Bis dahin steht die Handeingabe gleichwertig daneben —
   die Seite ist ohne Kamera vollständig bedienbar.
 
+### Was gelesen wurde, steht am Bildschirm
+
+Der Scan zeigt **Rohtext, Symbologie und Detektor** an — dauerhaft und für alle,
+nicht hinter dem Debug-Schalter. Der Grund ist eine Fehlersuche, die ohne diese
+Angaben nicht zu führen war: Wird ein Gerät vorgeschlagen, das nicht zur Flasche
+in der Hand passt, sind zwei völlig verschiedene Ursachen möglich, und der
+Bildschirm zeigte bisher keine davon.
+
+- Steht dort ein **falscher Text** oder eine falsche Symbologie — ein Etikett in
+  Code 128, gemeldet als `code_39` —, ist es ein Fehllesen.
+- Steht dort der **richtige** Text, wurde er falsch aufgelöst: `normalizeCode()`
+  wirft Trennzeichen weg und `lookupKeys()` durchsucht sechs Felder, zwei
+  Stücke können also auf demselben normalisierten Code landen.
+
+`BarcodeScanEvent` trägt deshalb **alle** Rohtreffer eines Bildes, nicht nur den
+übernommenen: Liest der native Detektor dasselbe Etikett zugleich als `code_128`
+und als `code_39`, entscheidet allein die Reihenfolge, und genau das sieht man
+sonst nirgends. Der ZXing-Fallback liefert immer nur einen Eintrag — sein
+`MultiFormatReader` bricht beim ersten Leser ab, der etwas herausbekommt.
+
+Die Zeile reist mit dem Treffer weiter bis an `GeraetBestaetigung` im
+Folgedialog. Sie dort und nicht nur im Scanner-Dialog zu zeigen ist der
+eigentliche Punkt: Bei **genau einem** Treffer schließt sich der Scanner sofort,
+und die Ausgabe- oder Füllmaske ist die einzige Stelle, an der die Rohlesung
+neben dem gewählten Stück steht — also dort, wo die Verwechslung auffällt.
+
+Solange nichts gelesen ist, steht stattdessen die **Auflösung des Videobildes
+und die Zahl der geprüften Bilder** da. „Kamera läuft, Decoder findet nichts"
+sah vorher aus wie ein Hänger, und die Auflösung erklärt den Fall: Ein
+Strichcode braucht Pixel je Modul. Ein Code-128-Etikett aus 30 cm Abstand ist in
+einem 640×480-Bild nachweislich nicht lesbar — der Hook zeichnet das Videobild
+1:1 ins Canvas, ohne Zuschnitt auf den Zielrahmen und ohne Hochskalierung. Der
+Rahmen im Dialog (`inset: '30% 10%'`) ist reine Dekoration; ausgewertet wird das
+ganze Bild.
+
 ## Mangel-Verallgemeinerung
 
 `Mangel` trägt seit diesem Feature `itemType`, `itemId` und `itemName`;

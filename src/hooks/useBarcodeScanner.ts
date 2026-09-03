@@ -25,8 +25,82 @@ export type ScannerStatus =
   | 'denied'
   | 'error';
 
+/**
+ * Welcher Detektor gelesen hat.
+ *
+ * Der Unterschied ist keine Feinheit: Die beiden Engines gewichten dieselben
+ * Symbologien verschieden, und ein Fehllesen ist deshalb je nach Engine anders
+ * zu erklären. Wer ein Scan-Protokoll deutet, muss wissen, welche es war.
+ */
+export type ScannerEngine = 'native' | 'zxing';
+
+/**
+ * Ein Rohtreffer des Detektors: der gelesene Text und die Symbologie, in der
+ * er gelesen wurde.
+ *
+ * Das Format steht hier, weil es sonst nirgends ankommt — und ohne das Format
+ * sieht man am Ende nur einen Code, der kein Gerät trifft, und sucht an der
+ * falschen Stelle. Ein Etikett in Code 128, das als `code_39` gemeldet wird,
+ * ist ein Fehllesen und keine unbekannte Flasche.
+ */
+export interface BarcodeScan {
+  rawValue: string;
+  /**
+   * `code_128`, `code_39`, `qr_code` … in der Schreibweise des nativen
+   * Detektors. Fehlt, wenn der Detektor keines meldet.
+   */
+  format?: string;
+}
+
+/** Was ein einzelnes Kamerabild geliefert hat. */
+export interface BarcodeScanEvent {
+  /** Der übernommene Text: der erste Rohtreffer, getrimmt. */
+  value: string;
+  /**
+   * Alle Rohtreffer des Bildes, in der Reihenfolge des Detektors.
+   *
+   * Übernommen wird `results[0]`; die übrigen stehen trotzdem hier, weil genau
+   * sie den Fehlgriff zeigen. Liest der native Detektor dasselbe Etikett
+   * zugleich als `code_128` und als `code_39`, entscheidet allein die
+   * Reihenfolge — und die sieht man sonst nirgends.
+   *
+   * Der ZXing-Fallback liefert hier immer genau einen Eintrag: Sein
+   * `MultiFormatReader` bricht beim ersten Leser ab, der etwas herausbekommt.
+   */
+  results: BarcodeScan[];
+  engine: ScannerEngine;
+}
+
+/**
+ * Ein Formatname in der Schreibweise des nativen Detektors: `QR_CODE` →
+ * `qr_code`.
+ *
+ * ZXing meldet ein Enum, der native `BarcodeDetector` einen Kleinschrift-String.
+ * Beide sollen dasselbe Vokabular sprechen, sonst hinge die Deutung eines
+ * Protokolls daran, auf welchem Gerät es entstanden ist.
+ */
+export function normalizeFormatName(name?: string | number): string | undefined {
+  return typeof name === 'string' && name ? name.toLowerCase() : undefined;
+}
+
+/**
+ * Der Treffer eines Bildes, so wie ihn der Aufrufer sieht — oder `undefined`,
+ * wenn nichts Brauchbares dabei war.
+ *
+ * Eigenständig und ohne React, damit die Regel „der erste Rohtreffer gewinnt"
+ * prüfbar bleibt, ohne eine Kamera zu mocken.
+ */
+export function toScanEvent(
+  results: BarcodeScan[],
+  engine: ScannerEngine,
+): BarcodeScanEvent | undefined {
+  const value = results[0]?.rawValue?.trim();
+  if (!value) return undefined;
+  return { value, results, engine };
+}
+
 interface BarcodeDetectorLike {
-  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
+  detect(source: CanvasImageSource): Promise<BarcodeScan[]>;
 }
 
 interface BarcodeDetectorCtor {
@@ -67,7 +141,16 @@ async function zxingDetector(): Promise<BarcodeDetectorLike> {
       // das ist der Normalfall zwischen zwei Treffern, kein Fehler.
       try {
         const result = reader.decodeFromCanvas(source as HTMLCanvasElement);
-        return result ? [{ rawValue: result.getText() }] : [];
+        if (!result) return [];
+        return [
+          {
+            rawValue: result.getText(),
+            // Über die Rücklookup-Seite des Enums: `BarcodeFormat[2]` ist
+            // `'CODE_39'`. Ohne diesen Namen stünde im Protokoll eine Zahl,
+            // mit der niemand am Sammelplatz etwas anfangen kann.
+            format: normalizeFormatName(BarcodeFormat[result.getBarcodeFormat()]),
+          },
+        ];
       } catch {
         return [];
       }
@@ -78,7 +161,7 @@ async function zxingDetector(): Promise<BarcodeDetectorLike> {
 export interface UseBarcodeScannerOptions {
   /** Solange `false`, wird die Kamera nicht angefasst. */
   active: boolean;
-  onDetected: (code: string) => void;
+  onDetected: (scan: BarcodeScanEvent) => void;
 }
 
 export interface UseBarcodeScannerResult {
@@ -86,6 +169,25 @@ export interface UseBarcodeScannerResult {
   status: ScannerStatus;
   /** Nur bei `status === 'error'` gesetzt. */
   errorMessage?: string;
+  /** Steht, sobald der Detektor gebaut ist — auch vor dem ersten Treffer. */
+  engine?: ScannerEngine;
+  /**
+   * Die Auflösung, in der ausgewertet wird — die des Videobildes.
+   *
+   * Sie entscheidet mit, ob ein Etikett überhaupt lesbar ist: Ein Strichcode
+   * braucht Pixel je Modul, und was die Kamera von sich aus liefert, reicht
+   * dafür nicht immer. Ohne diese Zahl ist „er liest nichts" nicht von „er
+   * liest falsch" zu unterscheiden.
+   */
+  frameSize?: { width: number; height: number };
+  /**
+   * Wie viele Bilder bereits ausgewertet wurden.
+   *
+   * Steigt die Zahl, ohne dass ein Treffer kommt, läuft die Kamera und der
+   * Decoder findet schlicht nichts — ein Zustand, der sonst wie ein Hänger
+   * aussieht.
+   */
+  frames: number;
 }
 
 /** Wie oft ein Einzelbild ausgewertet wird. 100 ms reicht für die Hand. */
@@ -98,6 +200,9 @@ export default function useBarcodeScanner({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [status, setStatus] = useState<ScannerStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [engine, setEngine] = useState<ScannerEngine>();
+  const [frameSize, setFrameSize] = useState<{ width: number; height: number }>();
+  const [frames, setFrames] = useState(0);
 
   // Über eine Ref, damit ein neu erzeugter Callback des Aufrufers nicht die
   // Kamera neu startet — das ließe das Bild bei jedem Tastendruck flackern.
@@ -162,6 +267,7 @@ export default function useBarcodeScanner({
       await video.play().catch(() => undefined);
 
       const Native = nativeDetector();
+      const engineInUse: ScannerEngine = Native ? 'native' : 'zxing';
       let detector: BarcodeDetectorLike;
       try {
         detector = Native
@@ -179,11 +285,34 @@ export default function useBarcodeScanner({
         return;
       }
 
+      // Einmal beim Start: welcher Detektor liest und welche Symbologien er
+      // überhaupt kann. Der native Detektor nimmt die Formatliste entgegen,
+      // ohne sich zu beschweren, wenn er eine davon nicht beherrscht — dann
+      // wird schlicht nie danach gesucht, und das sieht man ihm nicht an.
+      // `console.info` genügt: `useFirebaseDebugging` hängt sich in `console.*`
+      // ein, der Eintrag landet also von selbst im Bug-Report, sobald jemand
+      // „Debug Informationen anzeigen" eingeschaltet hat.
+      const unterstuetzt = await Native?.getSupportedFormats?.().catch(
+        () => undefined,
+      );
+      console.info('Atemschutz-Scanner bereit:', {
+        engine: engineInUse,
+        angefragt: [...BARCODE_FORMATS],
+        unterstuetzt,
+      });
+      if (cancelled) {
+        stop(stream);
+        return;
+      }
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
+      setEngine(engineInUse);
       setStatus('running');
 
       let busy = false;
+      let geprueft = 0;
+      let gemeldeteBreite = 0;
       timer = setInterval(() => {
         // Ohne diese Sperre stapeln sich die Auswertungen, sobald eine länger
         // als das Intervall braucht — auf schwächeren Geräten der Regelfall.
@@ -192,11 +321,33 @@ export default function useBarcodeScanner({
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0);
+
+        // Die Auflösung steht erst, wenn das erste Bild da ist, und ändert sich
+        // danach praktisch nie — deshalb nur beim Wechsel in den State.
+        if (canvas.width !== gemeldeteBreite) {
+          gemeldeteBreite = canvas.width;
+          setFrameSize({ width: canvas.width, height: canvas.height });
+        }
+        geprueft += 1;
+        // Nur jedes zehnte Bild in den State: Bei 100 ms Takt wäre das sonst
+        // zehn Rerender je Sekunde, und die Zahl soll bloß zeigen, dass
+        // überhaupt etwas läuft.
+        if (geprueft % 10 === 0) setFrames(geprueft);
         void detector
           .detect(Native ? video : canvas)
           .then((results) => {
-            const code = results[0]?.rawValue?.trim();
-            if (code) onDetectedRef.current(code);
+            const scan = toScanEvent(results, engineInUse);
+            if (!scan) return;
+            console.info('Atemschutz-Scan:', {
+              engine: scan.engine,
+              bild: `${canvas.width}x${canvas.height}`,
+              nachBildern: geprueft,
+              value: scan.value,
+              results: scan.results.map(
+                (r) => `${r.format ?? 'unbekannt'}: ${r.rawValue}`,
+              ),
+            });
+            onDetectedRef.current(scan);
           })
           .catch(() => undefined)
           .finally(() => {
@@ -218,5 +369,8 @@ export default function useBarcodeScanner({
     videoRef,
     status: active ? status : 'idle',
     errorMessage: active ? errorMessage : undefined,
+    engine: active ? engine : undefined,
+    frameSize: active ? frameSize : undefined,
+    frames: active ? frames : 0,
   };
 }

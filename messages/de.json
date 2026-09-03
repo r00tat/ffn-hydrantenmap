@@ -133,7 +133,16 @@
       "manualHint": "Flaschennummer, Inventar-Nr., Seriennummer oder Feuerwehr — mit Enter übernehmen",
       "noMatch": "Kein Gerät zu „{code}“ gefunden. Der Code wird als Flaschennummer übernommen.",
       "multiple": "{count} Geräte tragen diesen Code — bitte wählen:",
-      "use": "Übernehmen"
+      "use": "Übernehmen",
+      "read": "Gelesen: „{code}“ · {format}",
+      "formatUnknown": "Format unbekannt",
+      "engine": "Erkennung: {engine}",
+      "engineNative": "BarcodeDetector (nativ)",
+      "engineZxing": "ZXing (Fallback)",
+      "engineUnknown": "noch unbestimmt",
+      "alsoRead": "ebenfalls im Bild: {list}",
+      "progress": "{engine} · Bild {size} · {frames} Bilder geprüft, noch nichts gelesen",
+      "frameUnknown": "Auflösung noch unbekannt"
     },
     "trupp": {
       "add": "Trupp erfassen",

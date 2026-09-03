@@ -33,6 +33,7 @@ import AusgabeDialog, {
 } from './AusgabeDialog';
 import AtemschutzZeile from './AtemschutzZeile';
 import AusruestungMangelDialog from './AusruestungMangelDialog';
+import type { BarcodeScanEvent } from '../../hooks/useBarcodeScanner';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 
 type TypFilter = AtemschutzGeraetTyp | 'alle';
@@ -70,6 +71,8 @@ export default function AusruestungTab({
   const [ausgabeDialog, setAusgabeDialog] = useState<{
     geraet: AtemschutzGeraet;
     modus: AusgabeModus;
+    /** Nur gesetzt, wenn der Dialog aus einem Scan heraus aufging. */
+    scan?: BarcodeScanEvent;
   }>();
   const [mangelGeraet, setMangelGeraet] = useState<AtemschutzGeraet>();
 
@@ -95,11 +98,12 @@ export default function AusruestungTab({
    * Öffnet für ein Stück den passenden Dialog: Was draußen ist, kommt zurück,
    * alles andere geht hinaus.
    */
-  const oeffneFuerGeraet = (g: AtemschutzGeraet) => {
+  const oeffneFuerGeraet = (g: AtemschutzGeraet, scan?: BarcodeScanEvent) => {
     const status = ausgabeByGeraet.get(g.id as string)?.status ?? 'amPlatz';
     setAusgabeDialog({
       geraet: g,
       modus: status === 'ausgegeben' ? 'zuruecknehmen' : 'ausgeben',
+      scan,
     });
   };
 
@@ -272,13 +276,13 @@ export default function AusruestungTab({
           open
           geraete={ausgebbare}
           onClose={() => setScannerOpen(false)}
-          onPicked={(code, treffer) => {
+          onPicked={(code, treffer, scan) => {
             // Wer scannt, will das Stück ausgeben oder zurücknehmen — die
             // Liste danach zu filtern wäre ein Zwischenschritt, den niemand
             // mit Handschuhen tippen will. Welcher der beiden Wege es ist,
             // ergibt sich aus dem Zustand: Was draußen ist, kommt zurück.
             if (treffer && canWrite) {
-              oeffneFuerGeraet(treffer);
+              oeffneFuerGeraet(treffer, scan);
               return;
             }
             // Kein Stammdatensatz oder nur Lesezugriff: Dann bleibt die
@@ -302,6 +306,7 @@ export default function AusruestungTab({
           ausgegebenAn={
             ausgabeByGeraet.get(ausgabeDialog.geraet.id as string)?.ausgegebenAn
           }
+          scan={ausgabeDialog.scan}
           onClose={() => setAusgabeDialog(undefined)}
           onConfirm={(patch) => onPatch(ausgabeDialog.geraet, patch)}
         />
