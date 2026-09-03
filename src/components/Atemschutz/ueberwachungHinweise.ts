@@ -1,4 +1,8 @@
-import type { AtemschutzTrupp, WarnungKey } from '../../common/atemschutz';
+import {
+  WARNUNG_KEYS,
+  type AtemschutzTrupp,
+  type WarnungKey,
+} from '../../common/atemschutz';
 import {
   berechneStand,
   dringlichsteWarnung,
@@ -72,4 +76,29 @@ export function neueHinweise(
   }
 
   return hinweise;
+}
+
+/**
+ * Der dringlichste Hinweis eines Ticks.
+ *
+ * `dringlichsteWarnung` arbeitet auf `WarnungFaellig[]`; hier wird der ganze
+ * `Hinweis` gebraucht, weil die Anzeige Trupp und Stand mit ausgibt.
+ *
+ * Nur einer geht auf die Seite, wie im Serverlauf („es wird nur eine
+ * verschickt"): Drei Snackbars übereinander sind keine Meldung mehr, und die
+ * wichtigste ginge zwischen zwei Erinnerungen unter. Die übrigen stehen als
+ * Alert auf ihrer Trupp-Karte.
+ */
+export function dringlichsterHinweis(hinweise: Hinweis[]): Hinweis | undefined {
+  let beste: Hinweis | undefined;
+  for (const h of hinweise ?? []) {
+    if (
+      !beste ||
+      WARNUNG_KEYS.indexOf(h.warnung.key) >
+        WARNUNG_KEYS.indexOf(beste.warnung.key)
+    ) {
+      beste = h;
+    }
+  }
+  return beste;
 }

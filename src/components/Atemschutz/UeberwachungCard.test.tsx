@@ -136,6 +136,30 @@ describe('UeberwachungCard', () => {
     ).toBeNull();
   });
 
+  it('warnt vor dem Rückzugszeitpunkt als Vorwarnung', () => {
+    // Ohne Ankunftsmeldung gilt die Restdruckwarnung bei 26,5 min. Bei 26 min
+    // ist die Warnung fällig (Vorlauf 1 min), der Zeitpunkt aber nicht erreicht.
+    render(trupp(), { jetzt: nachAbmarsch(26) });
+    expect(screen.getByText(/Rückzugszeitpunkt in 1 min/)).toBeInTheDocument();
+    expect(screen.queryByText(/Rückzugszeitpunkt erreicht/)).toBeNull();
+  });
+
+  it('fordert ab dem Rückzugszeitpunkt zum Rückzug auf', () => {
+    render(trupp(), { jetzt: nachAbmarsch(30) });
+    expect(
+      screen.getByText(/Rückzugszeitpunkt erreicht \(seit 4 min\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('nennt einen noch nicht belastbaren Verbrauch vorläufig', () => {
+    // Zwei Minuten Messfenster liegen unter dem Mindestfenster von drei:
+    // 300 → 240 bar sind 30 bar/min, also 162 l/min.
+    render(trupp({ abfragen: [abfrage(2, 240, true)] }), {
+      jetzt: nachAbmarsch(3),
+    });
+    expect(screen.getByText(/vorläufig 162 l\/min/)).toBeInTheDocument();
+  });
+
   it('bietet einem noch nicht übernommenen Trupp die Übernahme an', () => {
     render(trupp({ ueberwachungSeit: undefined }));
     expect(screen.getByText('Zeitkontrolle nicht übernommen')).toBeInTheDocument();

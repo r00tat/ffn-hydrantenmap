@@ -529,12 +529,14 @@
       },
       "verbrauch": {
         "standard": "Anhaltswert {liter} l/min",
-        "gemessen": "gemessen {liter} l/min ({bar} bar/min)"
+        "gemessen": "gemessen {liter} l/min ({bar} bar/min)",
+        "vorlaeufig": "vorläufig {liter} l/min ({bar} bar/min)"
       },
       "warnungen": {
         "drittel": "Ein Drittel der Einsatzzeit ohne Meldung (seit {zeit}) — Flaschendrücke abfragen.",
         "zweiDrittel": "Zwei Drittel der Einsatzzeit ohne Meldung (seit {zeit}) — Flaschendrücke abfragen.",
-        "rueckzug": "Rückzugszeitpunkt erreicht (ab {zeit}) — Trupp zum Rückzug auffordern."
+        "rueckzug": "Rückzugszeitpunkt erreicht (seit {minuten} min) — Trupp zum Rückzug auffordern.",
+        "rueckzugVoraus": "Rückzugszeitpunkt in {minuten} min (um {zeit}) — Trupp vorwarnen."
       },
       "geraeteTitle": "Geräte am Trupp",
       "geraetSuche": "Gerät suchen oder scannen",
@@ -579,7 +581,9 @@
         "drittel": "{trupp}: keine Meldung nach einem Drittel der Einsatzzeit",
         "zweiDrittel": "{trupp}: keine Meldung nach zwei Dritteln der Einsatzzeit",
         "rueckzug": "{trupp}: Rückzugszeitpunkt erreicht",
-        "body": "{einsatz} · vermutet {druck} bar · Rückzug {zeit}"
+        "rueckzugVoraus": "{trupp}: Rückzug in {minuten} min",
+        "body": "{einsatz} · vermutet {druck} bar · Rückzug {zeit}",
+        "zeile": "{titel} · vermutet {druck} bar · Rückzug {zeit}"
       }
     }
   },

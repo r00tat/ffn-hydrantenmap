@@ -25,13 +25,22 @@ interface SnackbarState {
   message: string;
   severity: Severity;
   action?: SnackbarAction;
-  autoHide: boolean;
+  /** Anzeigedauer in ms; `null` heißt: bleibt stehen, bis jemand schließt. */
+  autoHideMs: number | null;
 }
 
 type ShowSnackbar = (
   message: string,
   severity: Severity,
   action?: SnackbarAction,
+  /**
+   * Anzeigedauer in ms. Ohne Angabe gilt die Vorgabe: Erfolg und Hinweis gehen
+   * nach `AUTO_HIDE_MS` von selbst, Warnung und Fehler bleiben stehen. Wer eine
+   * Dauer mitgibt, bekommt sie **auch** für Warnung und Fehler — die
+   * Atemschutzüberwachung will ihre Meldung wieder loswerden, weil sie am
+   * Telefon sonst die Karte darunter verdeckt.
+   */
+  autoHideMs?: number,
 ) => void;
 
 const SnackbarContext = createContext<ShowSnackbar>(() => {});
@@ -40,11 +49,14 @@ export function useSnackbar(): ShowSnackbar {
   return useContext(SnackbarContext);
 }
 
+/** Vorgabe für die Meldungen, die von selbst gehen dürfen. */
+const AUTO_HIDE_MS = 5000;
+
 const initialState: SnackbarState = {
   open: false,
   message: '',
   severity: 'info',
-  autoHide: true,
+  autoHideMs: AUTO_HIDE_MS,
 };
 
 export default function SnackbarProvider({
@@ -55,13 +67,15 @@ export default function SnackbarProvider({
   const [state, setState] = useState<SnackbarState>(initialState);
 
   const showSnackbar: ShowSnackbar = useCallback(
-    (message, severity, action) => {
+    (message, severity, action, autoHideMs) => {
       setState({
         open: true,
         message,
         severity,
         action,
-        autoHide: severity === 'success' || severity === 'info',
+        autoHideMs:
+          autoHideMs ??
+          (severity === 'success' || severity === 'info' ? AUTO_HIDE_MS : null),
       });
     },
     [],
@@ -80,7 +94,7 @@ export default function SnackbarProvider({
       {children}
       <Snackbar
         open={state.open}
-        autoHideDuration={state.autoHide ? 5000 : null}
+        autoHideDuration={state.autoHideMs}
         onClose={handleClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >

@@ -32,6 +32,7 @@ import {
   dringlichkeit,
   faelligeWarnungen,
   fortschrittProzent,
+  istVorwarnung,
   sortierteAbfragen,
   type Dringlichkeit,
 } from '../../common/atemschutzUeberwachung';
@@ -273,18 +274,35 @@ export default function UeberwachungCard({
 
         {imEinsatz && stand && (
           <>
-            {warnungen.map((w) => (
-              <Alert
-                key={w.key}
-                severity={w.key === 'rueckzug' ? 'error' : 'warning'}
-                sx={{ mt: 1 }}
-              >
-                {t(
+            {warnungen.map((w) => {
+              // Vor dem Zeitpunkt orange und „vorwarnen", ab dem Zeitpunkt rot
+              // und „auffordern": Ein roter Fehler-Alert mit dem Wort
+              // „vorwarnen" wäre ein Widerspruch in sich.
+              const vorwarnung = istVorwarnung(stand, w.key);
+              const severity =
+                w.key === 'rueckzug' && !vorwarnung ? 'error' : 'warning';
+              let text: string;
+              if (vorwarnung) {
+                text = t('ueberwachung.warnungen.rueckzugVoraus', {
+                  minuten: Math.max(1, rund(stand.minutenBisRueckzug)),
+                  zeit: uhrzeit(stand.rueckzugZeit),
+                });
+              } else if (w.key === 'rueckzug') {
+                text = t('ueberwachung.warnungen.rueckzug', {
+                  minuten: rund(-stand.minutenBisRueckzug),
+                });
+              } else {
+                text = t(
                   `ueberwachung.warnungen.${w.key}` as 'ueberwachung.warnungen.drittel',
                   { zeit: uhrzeit(w.faelligSeit) },
-                )}
-              </Alert>
-            ))}
+                );
+              }
+              return (
+                <Alert key={w.key} severity={severity} sx={{ mt: 1 }}>
+                  {text}
+                </Alert>
+              );
+            })}
 
             <Box sx={{ mt: 1.5 }}>
               <LinearProgress

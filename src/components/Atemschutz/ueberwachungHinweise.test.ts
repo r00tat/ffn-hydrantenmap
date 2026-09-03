@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { AtemschutzTrupp } from '../../common/atemschutz';
-import { hinweisId, neueHinweise } from './ueberwachungHinweise';
+import {
+  dringlichsterHinweis,
+  hinweisId,
+  neueHinweise,
+} from './ueberwachungHinweise';
 
 function trupp(over: Partial<AtemschutzTrupp> = {}): AtemschutzTrupp {
   return {
@@ -94,5 +98,30 @@ describe('neueHinweise', () => {
       abfragen: [{ zeitpunkt: '2026-09-02T10:08:00.000Z', druck: 250 }],
     });
     expect(neueHinweise([gemeldetHat], NACH_DRITTEL)).toEqual([]);
+  });
+});
+
+describe('dringlichsterHinweis', () => {
+  it('ist ohne Hinweise undefined', () => {
+    expect(dringlichsterHinweis([])).toBeUndefined();
+  });
+
+  it('nimmt den Rückzug vor den Erinnerungen', () => {
+    const hinweise = neueHinweise(
+      [
+        trupp({ id: 't1' }),
+        // Ein zweiter Trupp, der eine halbe Stunde unterwegs ist: Sein
+        // Rückzugszeitpunkt ist überschritten.
+        trupp({
+          id: 't2',
+          abmarschZeit: '2026-09-02T09:40:00.000Z',
+          bereitSeit: '2026-09-02T09:40:00.000Z',
+        }),
+      ],
+      NACH_DRITTEL,
+    );
+    expect(hinweise).toHaveLength(2);
+    expect(dringlichsterHinweis(hinweise)?.warnung.key).toBe('rueckzug');
+    expect(dringlichsterHinweis(hinweise)?.trupp.id).toBe('t2');
   });
 });

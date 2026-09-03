@@ -74,8 +74,16 @@ vi.mock('../../server/firebase/admin', () => {
 import { sendUeberwachungWarnungen } from './sendUeberwachungWarnungen';
 
 const ABMARSCH = '2026-09-02T10:00:00.000Z';
-/** 20 Minuten nach dem Abmarsch: zwei Drittel und Rückzugsvorlauf sind um. */
-const JETZT = new Date('2026-09-02T10:24:00.000Z');
+/**
+ * 30 Minuten nach dem Abmarsch: Alle drei Fristen sind um, der
+ * Rückzugszeitpunkt (26,5 min) ist überschritten.
+ *
+ * Hinter dem Zeitpunkt und nicht bloß in seinem Vorlauf, weil der Vorlauf mit
+ * einer Minute knapp ist und die Meldung dort noch eine Vorwarnung wäre
+ * (`istVorwarnung`) — geprüft werden soll hier die Aufforderung zum Rückzug als
+ * dringlichste von drei fälligen Warnungen.
+ */
+const JETZT = new Date('2026-09-02T10:30:00.000Z');
 
 function trupp(over: Partial<AtemschutzTrupp> = {}): AtemschutzTrupp {
   return {

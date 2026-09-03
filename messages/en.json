@@ -529,12 +529,14 @@
       },
       "verbrauch": {
         "standard": "guide value {liter} l/min",
-        "gemessen": "measured {liter} l/min ({bar} bar/min)"
+        "gemessen": "measured {liter} l/min ({bar} bar/min)",
+        "vorlaeufig": "provisional {liter} l/min ({bar} bar/min)"
       },
       "warnungen": {
         "drittel": "One third of the duration without a report (since {zeit}) — ask for cylinder pressures.",
         "zweiDrittel": "Two thirds of the duration without a report (since {zeit}) — ask for cylinder pressures.",
-        "rueckzug": "Withdrawal time reached (from {zeit}) — order the team to withdraw."
+        "rueckzug": "Withdrawal time reached ({minuten} min ago) — order the team to withdraw.",
+        "rueckzugVoraus": "Withdrawal time in {minuten} min (at {zeit}) — put the team on notice."
       },
       "geraeteTitle": "Equipment with the team",
       "geraetSuche": "Search or scan equipment",
@@ -579,7 +581,9 @@
         "drittel": "{trupp}: no report after one third of the duration",
         "zweiDrittel": "{trupp}: no report after two thirds of the duration",
         "rueckzug": "{trupp}: withdrawal time reached",
-        "body": "{einsatz} · estimated {druck} bar · withdraw {zeit}"
+        "rueckzugVoraus": "{trupp}: withdraw in {minuten} min",
+        "body": "{einsatz} · estimated {druck} bar · withdraw {zeit}",
+        "zeile": "{titel} · est. {druck} bar · withdraw {zeit}"
       }
     }
   },

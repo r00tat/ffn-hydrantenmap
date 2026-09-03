@@ -6,6 +6,8 @@ import {
   type Druckabfrage,
 } from './atemschutz';
 import {
+  KRITISCH_AB_MIN,
+  MESSFENSTER_MIN_MIN,
   RESERVEDRUCK_BAR,
   RUECKZUG_VORLAUF_MIN,
   VERBRAUCH_MITTEL_L_MIN,
@@ -16,6 +18,7 @@ import {
   fortschrittProzent,
   geraetesatzVon,
   gesamtVolumenLiter,
+  istVorwarnung,
   korrekturfaktor,
   nutzbareLuftLiter,
   naechsteWarnung,
@@ -251,6 +254,81 @@ describe('verbrauchAusPunkten', () => {
         satz,
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('Mindestmessfenster', () => {
+  const basis = (over: Partial<AtemschutzTrupp> = {}) =>
+    trupp({
+      paTyp: 'standard300',
+      abmarschZeit: ABMARSCH,
+      druckAbmarsch: 300,
+      ...over,
+    });
+
+  it('nennt das Messfenster am gemessenen Verbrauch', () => {
+    const v = verbrauchAusPunkten(
+      [
+        { zeitpunkt: ABMARSCH, druck: 300 },
+        { zeitpunkt: nachAbmarsch(4).toISOString(), druck: 260 },
+      ],
+      PA_SAETZE.standard300,
+    );
+    expect(v?.fensterMin).toBeCloseTo(4, 3);
+  });
+
+  it('nimmt eine Messung über dem Mindestfenster für sich', () => {
+    // 300 → 260 bar in 4 min = 10 bar/min, über dem Anhaltswert von 9,26.
+    const stand = berechneStand(
+      basis({ abfragen: [abfrage(4, 260)] }),
+      nachAbmarsch(5),
+    )!;
+    expect(stand.verbrauch.quelle).toBe('gemessen');
+    expect(stand.verbrauch.barProMin).toBeCloseTo(10, 3);
+  });
+
+  it('nimmt auch einen sparsamen Trupp, sobald das Fenster trägt', () => {
+    // 300 → 290 bar in 5 min = 2 bar/min, deutlich unter dem Anhaltswert. Die
+    // Messung gewinnt trotzdem — der Trupp soll seine längere Restzeit sehen.
+    const stand = berechneStand(
+      basis({ abfragen: [abfrage(5, 290)] }),
+      nachAbmarsch(6),
+    )!;
+    expect(stand.verbrauch.quelle).toBe('gemessen');
+    expect(stand.verbrauch.barProMin).toBeCloseTo(2, 3);
+  });
+
+  it('nimmt unter dem Mindestfenster die höhere Rate und nennt sie vorläufig', () => {
+    // Der beobachtete dev-Fall: 270 → 200 bar in 2,3 min ≈ 30,4 bar/min.
+    const stand = berechneStand(
+      basis({ druckAbmarsch: 270, abfragen: [abfrage(2.3, 200, true)] }),
+      nachAbmarsch(2.4),
+    )!;
+    expect(stand.verbrauch.quelle).toBe('vorlaeufig');
+    expect(stand.verbrauch.barProMin).toBeCloseTo(70 / 2.3, 3);
+    expect(stand.verbrauch.fensterMin).toBeCloseTo(2.3, 3);
+  });
+
+  it('bleibt unter dem Mindestfenster beim Anhaltswert, wenn die Messung kleiner ist', () => {
+    // 300 → 298 bar in 1 min = 2 bar/min, unter dem Anhaltswert von 9,26.
+    const stand = berechneStand(
+      basis({ abfragen: [abfrage(1, 298)] }),
+      nachAbmarsch(1.1),
+    )!;
+    expect(stand.verbrauch.quelle).toBe('vorlaeufig');
+    expect(stand.verbrauch.literProMin).toBe(VERBRAUCH_MITTEL_L_MIN);
+    // Das Fenster der verworfenen Messung bleibt dran — es ist der Grund.
+    expect(stand.verbrauch.fensterMin).toBeCloseTo(1, 3);
+  });
+
+  it('bleibt ohne jede Messung beim Anhaltswert und ohne Messfenster', () => {
+    const stand = berechneStand(basis(), nachAbmarsch(1))!;
+    expect(stand.verbrauch.quelle).toBe('standard');
+    expect(stand.verbrauch.fensterMin).toBeUndefined();
+  });
+
+  it('hält das Mindestfenster bei drei Minuten', () => {
+    expect(MESSFENSTER_MIN_MIN).toBe(3);
   });
 });
 
@@ -531,12 +609,12 @@ describe('naechsteWarnung', () => {
     expect(plan?.key).toBe('rueckzug');
     // Ohne Ankunftsmeldung gilt die Restdruckwarnung bei 55 bar. Sie liegt bei
     // 26,5 min (fortgeschrieben aus dem Druck, s. „Der Reservedruck ist nicht
-    // korrigiert"), abzüglich drei Minuten Vorlauf.
+    // korrigiert"), abzüglich einer Minute Vorlauf.
     expect(
       (new Date(plan?.faelligAb as string).getTime() -
         new Date(ABMARSCH).getTime()) /
         60_000,
-    ).toBeCloseTo(23.5, 1);
+    ).toBeCloseTo(25.5, 1);
   });
 
   it('nennt einen bereits fälligen Termin in der Vergangenheit', () => {
@@ -624,6 +702,99 @@ describe('dringlichkeit und Fortschritt', () => {
   it('warnt im letzten Drittel', () => {
     const stand = berechneStand(basis, nachAbmarsch(20))!;
     expect(dringlichkeit(stand)).toBe('achtung');
+  });
+});
+
+describe('Vorlauf und Farbe sind zwei Zahlen', () => {
+  const basis = trupp({
+    paTyp: 'standard300',
+    abmarschZeit: ABMARSCH,
+    druckAbmarsch: 300,
+  });
+  // Ohne Ankunftsmeldung gilt die Restdruckwarnung: 26,5 min nach Abmarsch.
+
+  it('warnt erst eine Minute vor dem Rückzugszeitpunkt', () => {
+    expect(RUECKZUG_VORLAUF_MIN).toBe(1);
+    const frueh = faelligeWarnungen(basis, nachAbmarsch(25)).map((w) => w.key);
+    expect(frueh).not.toContain('rueckzug');
+    const spaet = faelligeWarnungen(basis, nachAbmarsch(26)).map((w) => w.key);
+    expect(spaet).toContain('rueckzug');
+  });
+
+  it('ist drei Minuten vorher schon kritisch, ohne zu melden', () => {
+    expect(KRITISCH_AB_MIN).toBe(3);
+    const stand = berechneStand(basis, nachAbmarsch(24))!;
+    // 2,5 min bis zum Rückzug: über dem Warnvorlauf, unter der Farbschwelle.
+    expect(stand.minutenBisRueckzug).toBeGreaterThan(RUECKZUG_VORLAUF_MIN);
+    expect(stand.minutenBisRueckzug).toBeLessThan(KRITISCH_AB_MIN);
+    expect(dringlichkeit(stand)).toBe('kritisch');
+    expect(
+      faelligeWarnungen(basis, nachAbmarsch(24)).map((w) => w.key),
+    ).not.toContain('rueckzug');
+  });
+
+  it('nennt eine Rückzugswarnung vor dem Zeitpunkt eine Vorwarnung', () => {
+    const stand = berechneStand(basis, nachAbmarsch(26))!;
+    expect(istVorwarnung(stand, 'rueckzug')).toBe(true);
+    expect(istVorwarnung(stand, 'drittel')).toBe(false);
+  });
+
+  it('nennt sie ab dem Zeitpunkt keine Vorwarnung mehr', () => {
+    const stand = berechneStand(basis, nachAbmarsch(30))!;
+    expect(istVorwarnung(stand, 'rueckzug')).toBe(false);
+  });
+});
+
+describe('überholte Drittelmarke', () => {
+  // Der dev-Fall: Abmarsch 270 bar, Ankunft 200 bar nach 2,3 min. Der
+  // vorläufige Verbrauch von rund 30,4 bar/min schiebt den Rückzug auf 4,3 min
+  // nach dem Abmarsch — beide Drittelmarken (7,5 und 15,0 min) liegen dahinter.
+  const basis = trupp({
+    paTyp: 'standard300',
+    abmarschZeit: ABMARSCH,
+    druckAbmarsch: 270,
+    abfragen: [abfrage(2.3, 200, true)],
+  });
+
+  it('liegt hinter dem prognostizierten Rückzugszeitpunkt', () => {
+    const stand = berechneStand(basis, nachAbmarsch(2.4))!;
+    expect(new Date(stand.drittelZeit).getTime()).toBeGreaterThan(
+      new Date(stand.rueckzugZeit).getTime(),
+    );
+    expect(new Date(stand.zweiDrittelZeit).getTime()).toBeGreaterThan(
+      new Date(stand.rueckzugZeit).getTime(),
+    );
+  });
+
+  it('löst keine Erinnerung nach zwei Dritteln mehr aus', () => {
+    // Die Abfrage von 2,3 min liegt vor der Drittelmarke — ohne den Abgleich
+    // wäre die Zwei-Drittel-Erinnerung ab 15 min fällig, obwohl der Trupp seit
+    // 4,3 min zum Rückzug aufgefordert ist.
+    const keys = faelligeWarnungen(basis, nachAbmarsch(16)).map((w) => w.key);
+    expect(keys).not.toContain('drittel');
+    expect(keys).not.toContain('zweiDrittel');
+    expect(keys).toEqual(['rueckzug']);
+  });
+
+  it('wird nicht mehr eingeplant, und danach kommt kein Termin mehr', () => {
+    const nachWarnung = trupp({
+      ...basis,
+      warnungen: { rueckzug: nachAbmarsch(4).toISOString() },
+    });
+    expect(naechsteWarnung(nachWarnung, nachAbmarsch(16))).toBeUndefined();
+  });
+
+  it('lässt eine Drittelmarke vor dem Rückzug unberührt', () => {
+    // Gegenprobe ohne Abfrage: Der Rückzug liegt bei 26,5 min, die
+    // Drittelmarke bei 8,6 min — sie bleibt eine Warnung.
+    const ohneAbfrage = trupp({
+      paTyp: 'standard300',
+      abmarschZeit: ABMARSCH,
+      druckAbmarsch: 300,
+    });
+    expect(
+      faelligeWarnungen(ohneAbfrage, nachAbmarsch(9)).map((w) => w.key),
+    ).toContain('drittel');
   });
 });
 
