@@ -371,3 +371,78 @@ describe('UeberwachungCard mit zugeteilten Trupps', () => {
     expect(screen.getByText('starke Verrauchung')).toBeInTheDocument();
   });
 });
+
+describe('UeberwachungCard: Ankunft und Rückzug sind Ereignisse', () => {
+  it('beschriftet nur die erste Ankunftsmeldung mit „Ankunft"', () => {
+    // Bestandsdaten tragen `amZiel` an jeder Folgeabfrage — maßgeblich ist die
+    // erste, und nur die soll im Verlauf so heißen.
+    render(
+      trupp({
+        abfragen: [
+          { zeitpunkt: nachAbmarsch(5).toISOString(), druck: 240, amZiel: true },
+          { zeitpunkt: nachAbmarsch(9).toISOString(), druck: 200, amZiel: true },
+        ],
+      }),
+      { jetzt: nachAbmarsch(10) },
+    );
+    // Die Marke im SVG darunter trägt denselben Text — gemeint ist die Zeile.
+    expect(
+      screen.getAllByText('Ankunft').filter((n) => n.tagName === 'P'),
+    ).toHaveLength(1);
+  });
+
+  it('beschriftet nur die erste Rückzugsmeldung mit „Rückzug"', () => {
+    render(
+      trupp({
+        abfragen: [
+          {
+            zeitpunkt: nachAbmarsch(5).toISOString(),
+            druck: 200,
+            rueckzug: true,
+          },
+          {
+            zeitpunkt: nachAbmarsch(9).toISOString(),
+            druck: 150,
+            rueckzug: true,
+          },
+        ],
+      }),
+      { jetzt: nachAbmarsch(10) },
+    );
+    expect(
+      screen.getAllByText('Rückzug').filter((n) => n.tagName === 'P'),
+    ).toHaveLength(1);
+  });
+
+  it('meldet keine fehlende Ankunft, wenn sie ohne Druck gemeldet wurde', () => {
+    // Über Funk kommt die Ankunft auch ohne Zahl. Der Hinweis fragt nach der
+    // **Meldung**, nicht nach dem Druck.
+    render(
+      trupp({
+        abfragen: [
+          { zeitpunkt: nachAbmarsch(5).toISOString(), amZiel: true },
+        ],
+      }),
+      { jetzt: nachAbmarsch(10) },
+    );
+    expect(screen.queryByText('Keine Ankunftsmeldung')).toBeNull();
+  });
+
+  it('meldet keine fehlende Ankunft mehr, sobald der Rückzug läuft', () => {
+    // Der Hinweis zielt darauf, eine Ankunft nachzutragen, damit der
+    // Rückmarschdruck rechenbar wird. Auf dem Rückweg ist das erledigt.
+    render(
+      trupp({
+        abfragen: [
+          {
+            zeitpunkt: nachAbmarsch(5).toISOString(),
+            druck: 200,
+            rueckzug: true,
+          },
+        ],
+      }),
+      { jetzt: nachAbmarsch(10) },
+    );
+    expect(screen.queryByText('Keine Ankunftsmeldung')).toBeNull();
+  });
+});

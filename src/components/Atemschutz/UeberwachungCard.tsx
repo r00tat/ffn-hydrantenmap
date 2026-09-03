@@ -115,6 +115,11 @@ export default function UeberwachungCard({
     ? faelligeWarnungen(trupp, jetzt, { vorgabe })
     : [];
   const abfragen = sortierteAbfragen(trupp);
+  // Die *ersten* Meldungen je Ereignis — dieselbe Wahl wie in
+  // `berechneStand`: „Flaschendruck bei Erreichen des Einsatzzieles" gibt es
+  // einmal, eine spätere Zeile mit demselben Haken ist keine zweite Ankunft.
+  const ersteZielmeldung = abfragen.find((a) => a.amZiel === true);
+  const ersteRueckzugsmeldung = abfragen.find((a) => a.rueckzug === true);
   const geraeteGruppen = gruppiereTruppGeraete(trupp.truppGeraete);
   const uebernommen = !!trupp.ueberwachungSeit;
   const uebergeben = !!trupp.ueberwachungBis;
@@ -154,10 +159,16 @@ export default function UeberwachungCard({
       // Zeile „Druckabfrage", fielen Ankunft, Rückzug und Rückkehr nicht mehr
       // auf. Eine Statusmeldung trägt dagegen ihre Bemerkung — sonst stünde
       // dort eine Zeile aus Uhrzeit und Gedankenstrich.
+      //
+      // Beschriftet wird nur die **erste** Meldung je Ereignis — dieselbe, mit
+      // der `berechneStand` rechnet. Zeilen aus der Zeit, als der Dialog den
+      // Haken vorbelegte, tragen `amZiel` an jeder Folgeabfrage; stünde
+      // „Ankunft" an allen, wäre die eine, auf die es ankommt, nicht zu
+      // finden.
       label:
         [
-          a.amZiel && t('ueberwachung.amZielKurz'),
-          a.rueckzug && t('ueberwachung.rueckzugKurz'),
+          a === ersteZielmeldung && t('ueberwachung.amZielKurz'),
+          a === ersteRueckzugsmeldung && t('ueberwachung.rueckzugKurz'),
         ]
           .filter(Boolean)
           .join(' · ') || (a.bemerkung ?? ''),
@@ -460,7 +471,13 @@ export default function UeberwachungCard({
                   label={t('ueberwachung.startdruckGeschaetzt')}
                 />
               )}
-              {stand.druckAmZiel == null && (
+              {/* „Keine Ankunftsmeldung" fragt nach der **Meldung**, nicht
+                  nach dem Druck: Über Funk kommt die Ankunft auch ohne Zahl,
+                  und dann stand hier ein Hinweis auf etwas, das längst
+                  erfasst war. Auf dem Rückweg entfällt er ganz — er zielt
+                  darauf, eine Ankunft nachzutragen, damit der Rückmarschdruck
+                  rechenbar wird, und dafür ist es dann zu spät. */}
+              {stand.zielSeit == null && stand.rueckzugSeit == null && (
                 <Chip
                   size="small"
                   color="warning"

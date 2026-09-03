@@ -525,7 +525,6 @@
       "rueckzugHint": "Die Meldung „wir kommen zurück“. Danach keine Drittel- und Rückzugswarnungen mehr — beobachtet wird noch der Reservedruck.",
       "rueckzugKurz": "Rückzug",
       "rueckzugSeit": "Rückzug angetreten",
-      "bereitsGemeldet": "Bereits gemeldet — der Haken bleibt gesetzt. Gerechnet wird weiterhin mit der ersten Meldung.",
       "druckverlaufChart": "Druckverlauf über die Zeit",
       "chart": {
         "drittel": "1/3",

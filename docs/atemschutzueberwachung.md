@@ -218,16 +218,20 @@ Ankunft gilt, macht ihn zu einer Behauptung. Stattdessen erinnert ein Hinweis im
 Dialog daran, dass die Ankunft für diesen Trupp noch fehlt — und dass bis dahin
 die 55-bar-Warnung der Rückzugszeitpunkt ist.
 
-Ist die Ankunft dagegen **schon gemeldet, bleibt der Haken gesetzt**. Sie
-beschreibt keinen Vorgang dieser einen Meldung, sondern einen Zustand des
-Trupps: Er *ist* am Einsatzziel, und ihn bei jeder weiteren Abfrage als nicht
-angekommen anzubieten, widerspricht der Lage — beim Ausprobieren wurde genau das
-als Fehler gelesen. Auf die Rechnung wirkt die Vorbelegung nicht: Maßgeblich ist
-die **erste** Zielmeldung („Flaschendruck bei Erreichen des Einsatzzieles"), und
-`berechneStand` nimmt sie mit `find` und nicht die letzte. Dasselbe gilt für den
-angetretenen Rückzug. Der Hinweistext unter dem Haken wechselt mit: Steht er
-schon, ist „nicht ankreuzen für eine Zwischenabfrage" nicht mehr die Frage,
-sondern warum er gesetzt ist.
+Ist die Ankunft dagegen **schon gemeldet, entfällt der Haken ganz**. Sie ist
+ein Ereignis und kein Zustand: Es gibt sie genau einmal, und maßgeblich ist die
+**erste** Zielmeldung („Flaschendruck bei Erreichen des Einsatzzieles") —
+`berechneStand` nimmt sie mit `find` und nicht die letzte. Die nächste Abfrage
+hat dazu also nichts mehr zu sagen; ein Haken wäre eine Frage ohne
+Antwortmöglichkeit. Dasselbe gilt für den angetretenen Rückzug.
+
+Zwischenzeitlich war der Haken in diesem Fall **vorbelegt**, mit der Begründung,
+der Trupp *sei* ja am Einsatzziel. Das war ein Fehler: Vorbelegt schrieb jede
+weitere Abfrage erneut `amZiel` in das Dokument, und im Druckverlauf stand
+danach an jeder Zeile „Ankunft" — die eine Meldung, auf die es ankommt, war
+nicht mehr zu finden. Die Rechnung blieb zwar richtig (`find` nimmt die erste),
+die Anzeige log. Für Zeilen aus dieser Zeit beschriftet die Karte deshalb nur
+die erste Meldung je Ereignis, unabhängig davon, wie viele das Flag tragen.
 
 ## Zwei Verbrauchswerte, zwei Zwecke
 
@@ -381,8 +385,16 @@ nicht `ok`: Der Trupp atmet weiter aus der Flasche, und eine grüne Karte hieße
 
 Wie bei der Ankunft ist der Haken **nicht** vorbelegt, solange der Rückzug nicht
 gemeldet ist: Er beendet die Warnungen, und das darf nicht aus Versehen
-passieren. Ist er gemeldet, bleibt er gesetzt — die Warnungen sind längst aus,
-und jede weitere Abfrage kommt aus dem Rückmarsch.
+passieren. Ist er gemeldet, entfällt er — ein zweites „Rückzug angetreten" gibt
+es nicht, und jede weitere Abfrage kommt aus dem Rückmarsch.
+
+Auf dem Rückweg entfällt auch der Hinweis **„Keine Ankunftsmeldung"**. Er zielt
+darauf, eine Ankunft nachzutragen, damit sich der Rückmarschdruck aus dem
+doppelten Vormarschdruckabfall rechnen lässt; sobald der Trupp zurückkommt, ist
+das erledigt. Er fragt außerdem nach der **Meldung** und nicht nach dem Druck:
+Seit die Ankunft auch ohne Zahl gemeldet werden kann, sind das zwei
+verschiedene Dinge, und an `druckAmZiel` gehängt stand der Hinweis an einem
+Trupp, dessen Ankunft längst erfasst war.
 
 ### Die Anzeige nennt die Grundlage der Schätzung
 

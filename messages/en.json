@@ -525,7 +525,6 @@
       "rueckzugHint": "The “we are coming back” report. No further one-third or withdrawal warnings after it — only the reserve pressure is still watched.",
       "rueckzugKurz": "Withdrawal",
       "rueckzugSeit": "Withdrawal started",
-      "bereitsGemeldet": "Already reported — the box stays checked. The first report remains the one used in the calculation.",
       "druckverlaufChart": "Pressure over time",
       "chart": {
         "drittel": "1/3",

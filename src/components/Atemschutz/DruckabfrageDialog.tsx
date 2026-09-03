@@ -27,24 +27,24 @@ export interface DruckabfrageDialogProps {
   /**
    * Ob die Ankunftsmeldung noch fehlt.
    *
-   * Steuert **beides**: den Hinweis und die Vorbelegung des Hakens — und zwar
-   * in dieser Richtung: Solange die Ankunft fehlt, bleibt der Haken leer.
-   * Vorbelegt hätte jede gewöhnliche Zwischenabfrage als Ankunft gegolten, und
-   * daraus rechnet sich der Rückmarschdruck; ein zu früh gesetzter Haken macht
-   * ihn zu einer Behauptung. Ist die Ankunft dagegen schon gemeldet, ist sie
-   * eine Tatsache — der Trupp *ist* am Einsatzziel, und ihn bei jeder weiteren
-   * Abfrage als nicht angekommen anzubieten, widerspricht der Lage. Auf die
-   * Rechnung wirkt das nicht: Maßgeblich bleibt die **erste** Zielmeldung
-   * (`berechneStand`).
+   * Entscheidet, ob der Haken **überhaupt erscheint**: Die Ankunft am
+   * Einsatzziel ist ein Ereignis und kein Zustand — es gibt sie genau einmal,
+   * und maßgeblich ist die erste Meldung (`berechneStand`). Ist sie erfasst,
+   * hat die nächste Abfrage dazu nichts mehr zu sagen; der Haken wäre eine
+   * Frage ohne Antwortmöglichkeit.
+   *
+   * Vorher war er in diesem Fall vorbelegt. Das schrieb `amZiel` an *jede*
+   * weitere Abfrage, und im Druckverlauf stand danach an jeder Zeile
+   * „Ankunft" — die eine Meldung, auf die es ankommt, war nicht mehr zu
+   * finden.
    */
   zielMeldungFehlt: boolean;
   /**
-   * Ob der Rückzug schon gemeldet ist.
+   * Ob der Rückzug schon angetreten ist.
    *
-   * Dieselbe Überlegung wie bei der Ankunft, in dieselbe Richtung: Ungemeldet
-   * nicht vorbelegt — der Haken beendet die Warnungen, und das darf nicht aus
-   * Versehen passieren. Ist er gemeldet, sind die Warnungen längst aus, und
-   * jede weitere Abfrage kommt aus dem Rückmarsch.
+   * Dieselbe Überlegung wie bei der Ankunft: Ein zweites „Rückzug angetreten"
+   * gibt es nicht. Solange er fehlt, ist der Haken da und **leer** — er
+   * beendet die Warnungen, und das darf nicht aus Versehen passieren.
    */
   rueckzugGemeldet: boolean;
   onClose: () => void;
@@ -70,10 +70,10 @@ export default function DruckabfrageDialog({
   const tCommon = useTranslations('common');
 
   const [druck, setDruck] = useState('');
-  // Was schon gemeldet ist, bleibt angekreuzt: Beides beschreibt einen
-  // Zustand des Trupps und nicht ein Ereignis dieser einen Meldung.
-  const [amZiel, setAmZiel] = useState(!zielMeldungFehlt);
-  const [rueckzug, setRueckzug] = useState(rueckzugGemeldet);
+  // Nie vorbelegt: Beides ist ein Ereignis *dieser* Meldung. Was schon
+  // gemeldet ist, wird gar nicht erst angeboten — s. `zielMeldungFehlt`.
+  const [amZiel, setAmZiel] = useState(false);
+  const [rueckzug, setRueckzug] = useState(false);
   const [bemerkung, setBemerkung] = useState('');
   // Vorbelegt mit jetzt, aber änderbar: Die Meldung kommt über Funk und wird
   // eine Minute später eingetippt — mit dem Erfassungszeitpunkt gerechnet,
@@ -104,8 +104,10 @@ export default function DruckabfrageDialog({
   // Ankunft und Rückzug sind Einsatzereignisse und gehen **immer** ins
   // Tagebuch. Der Haken ist dann gesetzt und gesperrt statt still übergangen:
   // Ein Eintrag, den der Dialog verneint hat, wäre eine Überraschung.
-  const zwingend =
-    (zielMeldungFehlt && amZiel) || (!rueckzugGemeldet && rueckzug);
+  //
+  // Ohne weitere Bedingung: Beide Haken gibt es nur, solange das Ereignis
+  // noch nicht gemeldet ist — gesetzt heißt hier also immer „neu".
+  const zwingend = amZiel || rueckzug;
   const input: DruckabfrageInput = {
     druck: druckWert,
     amZiel,
@@ -157,43 +159,52 @@ export default function DruckabfrageDialog({
             }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={amZiel}
-                onChange={(e) => setAmZiel(e.target.checked)}
+          {/* Nur solange die Ankunft fehlt. Ist sie gemeldet, hat diese
+              Abfrage dazu nichts zu sagen — und ein vorbelegter Haken schrieb
+              sie an jede weitere Zeile. */}
+          {zielMeldungFehlt && (
+            <>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={amZiel}
+                    onChange={(e) => setAmZiel(e.target.checked)}
+                  />
+                }
+                label={t('ueberwachung.amZiel')}
               />
-            }
-            label={t('ueberwachung.amZiel')}
-          />
-          <Typography variant="caption" color="text.secondary">
-            {/* Der Hinweistext folgt dem Haken: Steht er schon, ist „nicht
-                ankreuzen für eine Zwischenabfrage" nicht mehr die Frage —
-                dann muss dastehen, warum er gesetzt ist. */}
-            {zielMeldungFehlt
-              ? t('ueberwachung.amZielHint')
-              : t('ueberwachung.bereitsGemeldet')}
-          </Typography>
-          {zielMeldungFehlt && !amZiel && (
-            <Alert severity="info">{t('ueberwachung.amZielFehltHinweis')}</Alert>
+              <Typography variant="caption" color="text.secondary">
+                {t('ueberwachung.amZielHint')}
+              </Typography>
+              {/* Nicht mehr, sobald dieselbe Meldung den Rückzug trägt: Dann
+                  ist die Ankunft nachzutragen zwecklos, der Trupp kommt
+                  zurück. */}
+              {!amZiel && !rueckzug && (
+                <Alert severity="info">
+                  {t('ueberwachung.amZielFehltHinweis')}
+                </Alert>
+              )}
+            </>
           )}
-          {/* Die Gegenmeldung zur Ankunft. Ungemeldet nicht vorbelegt: Sie
-              beendet die Warnungen, und das darf nicht aus Versehen
-              passieren. */}
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={rueckzug}
-                onChange={(e) => setRueckzug(e.target.checked)}
+          {/* Die Gegenmeldung zur Ankunft, ebenfalls nur einmal. Ungemeldet
+              nicht vorbelegt: Sie beendet die Warnungen, und das darf nicht
+              aus Versehen passieren. */}
+          {!rueckzugGemeldet && (
+            <>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={rueckzug}
+                    onChange={(e) => setRueckzug(e.target.checked)}
+                  />
+                }
+                label={t('ueberwachung.rueckzug')}
               />
-            }
-            label={t('ueberwachung.rueckzug')}
-          />
-          <Typography variant="caption" color="text.secondary">
-            {rueckzugGemeldet
-              ? t('ueberwachung.bereitsGemeldet')
-              : t('ueberwachung.rueckzugHint')}
-          </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {t('ueberwachung.rueckzugHint')}
+              </Typography>
+            </>
+          )}
           <TextField
             fullWidth
             multiline
