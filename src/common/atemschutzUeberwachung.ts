@@ -56,12 +56,39 @@ export const VERBRAUCH_SCHWER_L_MIN = 90;
 /**
  * Vorlauf der Rückzugswarnung.
  *
- * Drei Minuten, damit die Warnung zum Absetzen einer Funkmeldung reicht und
- * nicht erst kommt, wenn der Trupp schon hätte umkehren müssen. Länger nicht:
- * Bei einer erwarteten Einsatzzeit von rund 25 Minuten wäre eine
- * Fünf-Minuten-Warnung ein Fünftel der Zeit und würde als Fehlalarm gelesen.
+ * Eine Minute — sie soll für das Absetzen einer Funkmeldung reichen und nicht
+ * mehr. Vorher standen hier drei Minuten, und das war zu viel: Bei rund 25
+ * Minuten rechnerischer Einsatzdauer ist das ein Achtel, und die Meldung
+ * („Rückzugszeitpunkt erreicht — Trupp zum Rückzug auffordern") wurde als
+ * „jetzt umkehren" gelesen. Damit nahm der Vorlauf Einsatzzeit, ohne den
+ * Rückzugszeitpunkt zu verschieben.
+ *
+ * Die Farbe der Karte hängt bewusst **nicht** daran, s. `KRITISCH_AB_MIN`.
  */
-export const RUECKZUG_VORLAUF_MIN = 3;
+export const RUECKZUG_VORLAUF_MIN = 1;
+
+/**
+ * Ab wann die Karte eines Trupps auf `kritisch` geht.
+ *
+ * Getrennt vom Warnvorlauf, weil beides Verschiedenes tut: Die Farbe warnt
+ * still und fordert niemanden zum Umkehren auf, die Meldung tut genau das.
+ * Hinge `kritisch` am Vorlauf, würde die Karte erst in der letzten Minute rot.
+ */
+export const KRITISCH_AB_MIN = 3;
+
+/**
+ * Mindestlänge des Messfensters, ab der der gemessene Verbrauch für sich
+ * trägt.
+ *
+ * Am Manometer wird auf etwa 10 bar genau abgelesen. Über drei Minuten fallen
+ * bei einem Standard-PA (1×6 l / 300 bar) nach dem Anhaltswert rund 28 bar —
+ * ein Ablesefehler von 10 bar ist dann ein Drittel der Rate; über eine Minute
+ * wäre er die ganze Rate. Darunter ist der Wert kein Trend, sondern ein
+ * Abschnitt: Beobachtet wurden 164 l/min aus 70 bar über 2:18 min, also weit
+ * über „schwere Arbeit" — und daraus eine Prognose zu ziehen ergab einen
+ * Rückzugszeitpunkt, der vor seiner eigenen Warnschwelle lag.
+ */
+export const MESSFENSTER_MIN_MIN = 3;
 
 /**
  * Der Korrekturfaktor eines Gerätesatzes.
@@ -229,8 +256,23 @@ export interface DruckPunkt {
 export interface Verbrauch {
   barProMin: number;
   literProMin: number;
-  /** `standard` heißt: der Anhaltswert der Unterlage, noch nichts gemessen. */
-  quelle: 'standard' | 'gemessen';
+  /**
+   * `standard` heißt: der Anhaltswert der Unterlage, noch nichts gemessen.
+   * `gemessen` heißt: aus zwei Druckwerten über einem tragfähigen Messfenster.
+   * `vorlaeufig` heißt: es liegt eine Messung vor, aber ihr Fenster ist kürzer
+   * als `MESSFENSTER_MIN_MIN` — gerechnet wird dann mit der höheren der beiden
+   * Raten.
+   */
+  quelle: 'standard' | 'gemessen' | 'vorlaeufig';
+  /**
+   * Der Zeitraum in Minuten, über den gemessen wurde.
+   *
+   * Optional, weil es beim reinen Anhaltswert ohne jede Messung keinen
+   * Messzeitraum gibt. Bei `vorlaeufig` trägt es immer den gemessenen Zeitraum
+   * — auch wenn der Anhaltswert die höhere Rate war, denn er ist der Grund,
+   * warum das Fenster noch nicht trägt.
+   */
+  fensterMin?: number;
 }
 
 function zeit(iso?: string): number {
@@ -273,7 +315,64 @@ export function verbrauchAusPunkten(
     literProMin:
       barProMin * gesamtVolumenLiter(satz) * korrekturfaktor(satz.fuellDruck),
     quelle: 'gemessen',
+    fensterMin: dauerMin,
   };
+}
+
+/**
+ * Der Anhaltswert der Unterlage als `Verbrauch` dieses Gerätesatzes.
+ *
+ * Aus 50 l/min geteilt durch das korrigierte Volumen. So passt die
+ * Druckprognose zu derselben Luftmenge, mit der auch die rechnerische
+ * Einsatzdauer gebildet wird.
+ */
+export function anhaltswertVerbrauch(satz: Geraetesatz): Verbrauch {
+  return {
+    barProMin:
+      VERBRAUCH_MITTEL_L_MIN /
+      (gesamtVolumenLiter(satz) * korrekturfaktor(satz.fuellDruck)),
+    literProMin: VERBRAUCH_MITTEL_L_MIN,
+    quelle: 'standard',
+  };
+}
+
+/**
+ * Der Verbrauch, mit dem gerechnet wird.
+ *
+ * Trägt das Messfenster, gilt die Messung — auch wenn sie unter dem
+ * Anhaltswert liegt; ein sparsamer Trupp soll seine längere Restzeit sehen.
+ * Trägt es nicht, gilt die **höhere** der beiden Raten.
+ *
+ * Warum die höhere und nicht der Rückfall auf den Anhaltswert: Der Rückfall
+ * ist die unsichere Richtung. Für den beobachteten Trupp (270 bar Abmarsch,
+ * 200 bar nach 2:18 min) ergäbe er einen Rückzug fast fünf Minuten später —
+ * wenn er wirklich so schnell verbraucht, käme die Warnung dann zu spät. Eine
+ * kurze Messung darf die Prognose verkürzen, aber nicht verlängern.
+ */
+export function massgeblicherVerbrauch(
+  gemessen: Verbrauch | undefined,
+  satz: Geraetesatz,
+): Verbrauch {
+  const anhaltswert = anhaltswertVerbrauch(satz);
+  if (!gemessen) return anhaltswert;
+  if ((gemessen.fensterMin ?? 0) >= MESSFENSTER_MIN_MIN) return gemessen;
+  const hoeher =
+    gemessen.barProMin >= anhaltswert.barProMin ? gemessen : anhaltswert;
+  return { ...hoeher, quelle: 'vorlaeufig', fensterMin: gemessen.fensterMin };
+}
+
+/**
+ * Ob eine Rückzugswarnung noch eine **Vorwarnung** ist.
+ *
+ * Eine Stelle für die Regel, weil sie an drei Orten gebraucht wird: Karte,
+ * Benachrichtigungstext und Snackbar. Solange der Zeitpunkt nicht erreicht ist,
+ * heißt die Meldung „vorwarnen" und nicht „umkehren".
+ */
+export function istVorwarnung(
+  stand: UeberwachungStand,
+  key: WarnungKey,
+): boolean {
+  return key === 'rueckzug' && stand.minutenBisRueckzug > 0;
 }
 
 /**
@@ -409,17 +508,10 @@ export function berechneStand(
     ...abfragen.map((a) => ({ zeitpunkt: a.zeitpunkt, druck: a.druck })),
   ];
 
-  const gemessen = verbrauchAusPunkten(punkte, satz);
-  const verbrauch: Verbrauch = gemessen ?? {
-    // Aus dem Anhaltswert in bar/min: 50 l/min geteilt durch das korrigierte
-    // Volumen. So passt die Druckprognose zu derselben Luftmenge, mit der auch
-    // die rechnerische Einsatzdauer gebildet wird.
-    barProMin:
-      VERBRAUCH_MITTEL_L_MIN /
-      (gesamtVolumenLiter(satz) * korrekturfaktor(satz.fuellDruck)),
-    literProMin: VERBRAUCH_MITTEL_L_MIN,
-    quelle: 'standard',
-  };
+  const verbrauch = massgeblicherVerbrauch(
+    verbrauchAusPunkten(punkte, satz),
+    satz,
+  );
 
   const letzterPunkt = punkte[punkte.length - 1];
   const seitLetztemMin = (jetzt.getTime() - zeit(letzterPunkt.zeitpunkt)) / 60_000;
@@ -536,12 +628,26 @@ export function faelligeWarnungen(
   const letzte = abfragen[abfragen.length - 1];
   const jetztMs = jetzt.getTime();
 
-  if (jetztMs >= zeit(stand.drittelZeit) && !letzte) {
+  // Eine Drittelmarke hinter dem prognostizierten Rückzugszeitpunkt ist
+  // überholt: Der Trupp ist dann längst zum Umkehren aufgefordert, und eine
+  // Erinnerung „keine Meldung nach einem Drittel" wäre ein Fehlalarm. Die
+  // Marken selbst bleiben fest ab Abmarsch (Meldedisziplin) und stehen weiter
+  // in `UeberwachungStand` — sichtbar bleibt, dass der Verbrauch die erwartete
+  // Dauer überholt hat.
+  const vorDemRueckzug = (marke: string) =>
+    zeit(marke) <= zeit(stand.rueckzugZeit);
+
+  if (
+    jetztMs >= zeit(stand.drittelZeit) &&
+    !letzte &&
+    vorDemRueckzug(stand.drittelZeit)
+  ) {
     faellig.push({ key: 'drittel', faelligSeit: stand.drittelZeit });
   }
   if (
     jetztMs >= zeit(stand.zweiDrittelZeit) &&
-    (!letzte || zeit(letzte.zeitpunkt) < zeit(stand.drittelZeit))
+    (!letzte || zeit(letzte.zeitpunkt) < zeit(stand.drittelZeit)) &&
+    vorDemRueckzug(stand.zweiDrittelZeit)
   ) {
     faellig.push({ key: 'zweiDrittel', faelligSeit: stand.zweiDrittelZeit });
   }
@@ -623,7 +729,16 @@ export function naechsteWarnung(
         zeit(stand.rueckzugZeit) - vorlauf * 60_000,
       ).toISOString(),
     },
-  ].filter((k) => !verschickt[k.key] && Number.isFinite(zeit(k.faelligAb)));
+  ].filter(
+    (k) =>
+      !verschickt[k.key] &&
+      Number.isFinite(zeit(k.faelligAb)) &&
+      // Eine überholte Drittelmarke bekommt keinen Termin — s.
+      // `faelligeWarnungen`. Liegen beide hinter dem Rückzug, plant dieser Lauf
+      // nach der Rückzugswarnung nichts mehr: Der Rückzug war die letzte
+      // Aussage, die die Rechnung zu machen hat.
+      (k.key === 'rueckzug' || zeit(k.faelligAb) <= zeit(stand.rueckzugZeit)),
+  );
 
   kandidaten.sort((a, b) => zeit(a.faelligAb) - zeit(b.faelligAb));
   return kandidaten[0];
@@ -649,18 +764,22 @@ export function dringlichsteWarnung(
 }
 
 /**
- * Wie dringend die Lage eines Trupps ist — die Grundlage für Farbe und
- * Reihenfolge in der Anzeige.
+ * Wie dringend die Lage eines Trupps ist — die Grundlage für die **Farbe** der
+ * Karte.
  *
  * Die Schwellen hängen an der Rückzugsprognose und nicht an einer festen
  * Minutenzahl: Ein Langzeit-PA hat 58 Minuten, ein Standardgerät 24 — dieselben
  * „fünf Minuten Restzeit" bedeuten dort Verschiedenes.
+ *
+ * `kritisch` ab `KRITISCH_AB_MIN` und **nicht** ab dem Warnvorlauf: Die Farbe
+ * darf früher warnen als die Meldung. Zwischen drei und einer Minute steht die
+ * Karte damit rot, ohne dass eine Benachrichtigung hinausgeht.
  */
 export type Dringlichkeit = 'ok' | 'achtung' | 'kritisch' | 'ueberschritten';
 
 export function dringlichkeit(
   stand: UeberwachungStand,
-  vorlaufMin = RUECKZUG_VORLAUF_MIN,
+  kritischAbMin = KRITISCH_AB_MIN,
 ): Dringlichkeit {
   if (stand.rueckzugSeit) {
     // Auf dem Rückweg zählt nicht mehr die Frist — sie ist erfüllt —, sondern
@@ -669,7 +788,7 @@ export function dringlichkeit(
     return stand.vermuteterDruck <= RESERVEDRUCK_BAR ? 'kritisch' : 'achtung';
   }
   if (stand.minutenBisRueckzug <= 0) return 'ueberschritten';
-  if (stand.minutenBisRueckzug <= vorlaufMin) return 'kritisch';
+  if (stand.minutenBisRueckzug <= kritischAbMin) return 'kritisch';
   if (stand.minutenBisRueckzug <= stand.erwarteteDauerMin / 3) return 'achtung';
   return 'ok';
 }

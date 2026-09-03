@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SnackbarProvider, { useSnackbar } from './SnackbarProvider';
 
@@ -24,6 +30,14 @@ function TestConsumer() {
         }
       >
         show-action
+      </button>
+      <button
+        onClick={() => showSnackbar('Geht weg!', 'error', undefined, 100)}
+      >
+        show-timed
+      </button>
+      <button onClick={() => showSnackbar('Bleibt!', 'error')}>
+        show-sticky
       </button>
     </>
   );
@@ -99,5 +113,33 @@ describe('SnackbarProvider', () => {
 
     const closeButton = screen.getByRole('button', { name: 'Close' });
     expect(closeButton).toBeInTheDocument();
+  });
+
+  it('lässt eine Meldung mit Anzeigedauer von selbst verschwinden', async () => {
+    render(
+      <SnackbarProvider>
+        <TestConsumer />
+      </SnackbarProvider>,
+    );
+
+    fireEvent.click(screen.getByText('show-timed'));
+    expect(screen.getByText('Geht weg!')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Geht weg!')).toBeNull(), {
+      timeout: 3000,
+    });
+  });
+
+  it('lässt einen Fehler ohne Anzeigedauer stehen', async () => {
+    render(
+      <SnackbarProvider>
+        <TestConsumer />
+      </SnackbarProvider>,
+    );
+
+    fireEvent.click(screen.getByText('show-sticky'));
+    // Ein kurzes Warten und nicht `waitFor`: Geprüft wird eine Nicht-Änderung,
+    // und dafür gibt es keine Bedingung, auf die man warten könnte.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(screen.getByText('Bleibt!')).toBeInTheDocument();
   });
 });

@@ -90,4 +90,48 @@ describe('buildUeberwachungPush', () => {
     });
     expect(push.title).toContain('push.truppOhneName');
   });
+
+  it('warnt vor dem Rückzugszeitpunkt vor und fordert nicht auf', () => {
+    // `stand` steht auf 10:09, der Rückzug liegt bei 10:26 — 17 min hin.
+    const push = buildUeberwachungPush({
+      firecallId: 'f1',
+      trupp,
+      stand,
+      warnung: { key: 'rueckzug', faelligSeit: ABMARSCH },
+      t,
+      uhrzeit,
+    });
+    expect(push.title).toContain('push.rueckzugVoraus(');
+    expect(push.title).toContain('"minuten":17');
+  });
+
+  it('fordert ab dem Rückzugszeitpunkt zum Rückzug auf', () => {
+    const spaet = berechneStand(trupp, new Date('2026-09-02T10:40:00.000Z'))!;
+    const push = buildUeberwachungPush({
+      firecallId: 'f1',
+      trupp,
+      stand: spaet,
+      warnung: { key: 'rueckzug', faelligSeit: ABMARSCH },
+      t,
+      uhrzeit,
+    });
+    expect(push.title).toContain('push.rueckzug(');
+    expect(push.title).not.toContain('rueckzugVoraus');
+  });
+
+  it('liefert eine einzeilige Fassung mit Titel statt Einsatznamen', () => {
+    const push = buildUeberwachungPush({
+      firecallId: 'f1',
+      firecallName: 'Zimmerbrand Hauptstraße',
+      trupp,
+      stand,
+      warnung: { key: 'drittel', faelligSeit: ABMARSCH },
+      t,
+      uhrzeit,
+    });
+    expect(push.zeile).toContain('push.zeile(');
+    expect(push.zeile).toContain('push.drittel(');
+    expect(push.zeile).toContain('10:26');
+    expect(push.zeile).not.toContain('Zimmerbrand');
+  });
 });

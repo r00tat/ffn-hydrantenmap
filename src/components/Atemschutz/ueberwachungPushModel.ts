@@ -9,9 +9,10 @@ import {
   ueberwachungUrl,
   type AtemschutzPushData,
 } from '../../common/atemschutzPush';
-import type {
-  UeberwachungStand,
-  WarnungFaellig,
+import {
+  istVorwarnung,
+  type UeberwachungStand,
+  type WarnungFaellig,
 } from '../../common/atemschutzUeberwachung';
 
 /**
@@ -33,6 +34,8 @@ import type {
  */
 export type PushKey =
   | `push.${WarnungKey}`
+  | 'push.rueckzugVoraus'
+  | 'push.zeile'
   | 'push.body'
   | 'push.truppOhneName';
 
@@ -56,6 +59,13 @@ export interface UeberwachungPushArgs {
 export interface UeberwachungPush {
   title: string;
   body: string;
+  /**
+   * Einzeilige Fassung für die Anzeige auf der **eigenen Seite** (Snackbar).
+   *
+   * Wie `body`, aber mit dem Titel anstelle des Einsatznamens: Auf der eigenen
+   * Seite ist der Einsatz bekannt, der Trupp und die Frist sind es nicht.
+   */
+  zeile: string;
   tag: string;
   data: AtemschutzPushData;
 }
@@ -69,9 +79,19 @@ export function buildUeberwachungPush({
   t,
   uhrzeit,
 }: UeberwachungPushArgs): UeberwachungPush {
-  const title = t(`push.${warnung.key}`, {
-    trupp: truppLabel(trupp) || t('push.truppOhneName'),
-  });
+  const truppName = truppLabel(trupp) || t('push.truppOhneName');
+  // Vor dem Zeitpunkt eine Vorwarnung, ab dem Zeitpunkt die Aufforderung: Mit
+  // einem Vorlauf von einer Minute darf die Meldung nicht „jetzt umkehren"
+  // heißen, solange noch eine Minute Arbeitszeit ist.
+  const vorwarnung = istVorwarnung(stand, warnung.key);
+  const title = vorwarnung
+    ? t('push.rueckzugVoraus', {
+        trupp: truppName,
+        // Nie „in 0 min": Aufgerundet auf die nächste ganze Minute, mindestens
+        // eine — die Meldung soll eine Frist nennen, keine Null.
+        minuten: Math.max(1, Math.round(stand.minutenBisRueckzug)),
+      })
+    : t(`push.${warnung.key}`, { trupp: truppName });
   // Der Körper trägt die drei Zahlen, auf die es am Funkgerät ankommt: welcher
   // Einsatz, wie viel Luft vermutlich noch da ist, und wann umgekehrt werden
   // muss. Mehr passt in eine Benachrichtigung nicht hinein.
@@ -80,10 +100,16 @@ export function buildUeberwachungPush({
     druck: Math.round(stand.vermuteterDruck),
     zeit: uhrzeit(stand.rueckzugZeit),
   });
+  const zeile = t('push.zeile', {
+    titel: title,
+    druck: Math.round(stand.vermuteterDruck),
+    zeit: uhrzeit(stand.rueckzugZeit),
+  });
 
   return {
     title,
     body,
+    zeile,
     tag: pushTag(trupp.id ?? firecallId),
     data: {
       kind: ASUE_PUSH_KIND,

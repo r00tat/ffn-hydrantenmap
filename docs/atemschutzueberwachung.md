@@ -218,6 +218,29 @@ sondern warum er gesetzt ist.
 Ein gestiegener oder gleicher Druck verwirft die Messung (Tippfehler, oder es
 war ein anderer Geräteträger) und der Anhaltswert gilt weiter.
 
+### Das Messfenster muss tragen
+
+Eine Messung über weniger als `MESSFENSTER_MIN_MIN` = 3 Minuten ist kein Trend,
+sondern ein Abschnitt. Beobachtet in dev: 70 bar über 2:18 min ergaben
+30,3 bar/min, also rund 164 l/min — weit über „schwere Arbeit" (80–100 l/min),
+weil das Fenster genau den Vormarsch traf. Die Prognose daraus setzte den
+Rückzugszeitpunkt zwei Minuten in die Zukunft, und seine Warnschwelle damit
+**eine Minute in die Vergangenheit**: Die Warnung kam im selben Augenblick, in
+dem die Druckabfrage gespeichert wurde.
+
+Die drei Minuten kommen aus der Ableseschärfe: Am Manometer wird auf etwa 10 bar
+genau gelesen. Über drei Minuten fallen bei einem Standard-PA nach dem
+Anhaltswert rund 28 bar — ein Ablesefehler ist dann ein Drittel der Rate; über
+eine Minute wäre er die ganze Rate.
+
+Unterhalb des Fensters gilt die **höhere** der beiden Raten, gekennzeichnet als
+`vorlaeufig`. Nicht der Rückfall auf den Anhaltswert: Der wäre die unsichere
+Richtung — er ergäbe für den beobachteten Trupp einen Rückzug fast fünf Minuten
+später, und wenn der Trupp wirklich so schnell verbraucht, käme die Warnung dann
+zu spät. Eine kurze Messung darf die Prognose verkürzen, aber nicht verlängern.
+Ein zusätzlicher Mindestdruckabfall erübrigt sich damit: Eine winzige Differenz
+ergibt eine kleine Rate, und dann greift ohnehin der Anhaltswert.
+
 ### Der Druckverlauf steht zeilenweise
 
 Die Werte standen zuerst als Kette in einer Zeile („10:00 300 bar → 10:05
@@ -410,7 +433,7 @@ Drei Warnungen, in dieser Reihenfolge der Dringlichkeit:
 | --- | --- | --- |
 | `drittel` | nach ⅓ der erwarteten Einsatzzeit, wenn seit dem Abmarsch keine Druckabfrage erfasst wurde | „Erfolgt nach einem Drittel der zu erwartenden Einsatzzeit keine Lage- und Flaschendruckmeldung durch den Trupp, hat die mit der Atemschutzüberwachung betraute Person die Flaschendrücke abzufragen." |
 | `zweiDrittel` | nach ⅔, wenn seit der ⅓-Marke keine Abfrage kam | Erinnerung je Drittel ohne Meldung |
-| `rueckzug` | 3 Minuten vor dem prognostizierten Rückzugszeitpunkt | 5.3.2 |
+| `rueckzug` | 1 Minute vor dem prognostizierten Rückzugszeitpunkt | 5.3.2 |
 
 Eine erfasste Druckabfrage **ist** die Lage- und Flaschendruckmeldung — deshalb
 schweigt die Überwachung, sobald eine vorliegt.
@@ -418,6 +441,71 @@ schweigt die Überwachung, sobald eine vorliegt.
 **Warum serverseitig:** Die Fristen sind Vorschrift, und ein Gruppenkommandant
 hat das Telefon in der Tasche, nicht die Seite offen. Eine Warnung, die nur
 kommt, solange jemand hinsieht, ist für eine Sicherheitsfunktion keine.
+
+### Der Vorlauf ist eine Minute, die Farbe drei
+
+Zwei Zahlen, weil sie Verschiedenes tun. `RUECKZUG_VORLAUF_MIN` = 1 ist der
+Vorlauf der **Meldung**: Er soll für das Absetzen einer Funkmeldung reichen und
+nicht mehr. Vorher standen dort drei Minuten — bei rund 25 Minuten rechnerischer
+Einsatzdauer ein Achtel, und die Meldung („Rückzugszeitpunkt erreicht — Trupp
+zum Rückzug auffordern") wurde als „jetzt umkehren" gelesen. Damit nahm der
+Vorlauf Einsatzzeit, ohne den Rückzugszeitpunkt zu verschieben.
+
+`KRITISCH_AB_MIN` = 3 ist die **Farbe** der Karte. Sie warnt still und fordert
+niemanden zum Umkehren auf; hinge `kritisch` am Vorlauf, würde die Karte erst in
+der letzten Minute rot. Zwischen drei und einer Minute steht die Karte damit rot,
+ohne dass eine Benachrichtigung hinausgeht — und wenn die Rückzugswarnung kommt,
+ist die Karte immer schon `kritisch` oder `ueberschritten`. Das ist gewollt: Eine
+Meldung, die bei gelber Karte einträfe, wäre ein Widerspruch. Die
+Drittel-Erinnerungen können weiter bei `ok` oder `achtung` kommen — sie hängen an
+der Meldedisziplin, nicht an der Restzeit.
+
+Solange der Zeitpunkt nicht erreicht ist, sagt die Meldung „Rückzugszeitpunkt in
+n min — Trupp vorwarnen" und ist orange; ab dem Zeitpunkt „erreicht seit n min —
+Trupp zum Rückzug auffordern" und rot (`istVorwarnung`). Ein roter Fehler-Alert
+mit dem Wort „vorwarnen" wäre ein Widerspruch in sich.
+
+### Eine überholte Drittelmarke warnt nicht mehr
+
+Liegt eine ⅓-/⅔-Marke **hinter** dem prognostizierten Rückzugszeitpunkt, ist sie
+überholt: Der Trupp ist dann längst zum Umkehren aufgefordert, und eine
+Erinnerung „keine Meldung nach einem Drittel" wäre ein Fehlalarm. Beobachtet in
+dev lag die ⅓-Marke bei 7,5 min, der Rückzug bei 4,3 min. `faelligeWarnungen` und
+`naechsteWarnung` überspringen solche Marken.
+
+Die Marken selbst bleiben **fest** ab Abmarsch mit 50 l/min — die Begründung
+oben gilt unverändert — und stehen weiter in `UeberwachungStand`, also in Karte
+und Druckverlauf-Grafik. Dass eine Marke hinter dem Rückzug liegt, ist die
+Information, dass der Verbrauch die erwartete Dauer überholt hat; sie soll nicht
+verschwinden.
+
+Folge für die Terminplanung: Liegen beide Marken hinter dem Rückzug, plant
+`naechsteWarnung` nach der Rückzugswarnung keinen Termin mehr. Das ist richtig —
+der Rückzug war die letzte Aussage, die die Rechnung zu machen hat — und spart
+Cloud-Tasks-Termine. Eine Eskalation „Zeitpunkt überschritten und keine
+Rückzugsmeldung" gibt es bewusst nicht.
+
+### Auf der Seite eine Snackbar, nicht nur eine Benachrichtigung
+
+`useUeberwachungHinweise` stieg vorher **vor** allem anderen aus, wenn
+`Notification.permission` nicht `granted` war. Ohne erteilte Erlaubnis wurde
+damit nicht einmal gerechnet, und auf der offenen Seite war von einer fälligen
+Warnung nichts zu sehen — bei einer Sicherheitsfunktion die falsche Reihenfolge.
+Jetzt ist die Anzeige auf der Seite der verlässliche Weg: Hinweise werden immer
+gerechnet und vermerkt, die dringlichste geht als Snackbar hinaus, und die
+Systembenachrichtigung ist die Zugabe für Geräte mit Erlaubnis — sie erreicht den
+gesperrten Bildschirm, die Snackbar nur die offene Seite.
+
+Nur die **dringlichste** je Tick, wie im Serverlauf: Drei Snackbars übereinander
+sind keine Meldung mehr. Vermerkt werden trotzdem alle, sonst käme die überholte
+Erinnerung im nächsten Tick nach. Die übrigen stehen als Alert auf ihrer
+Trupp-Karte.
+
+Die Snackbar **verschwindet von selbst** — 10 s beim Rückzug, 6 s bei den
+Erinnerungen. Am Telefon verdeckt eine stehende Snackbar die Karte darunter, und
+genau die trägt die Zahlen. Die Dauer gibt der Aufrufer mit und ist nicht an der
+`severity` festgemacht: Der globale `SnackbarProvider` lässt `warning` und
+`error` bewusst stehen, und das soll für seine 23 übrigen Aufrufer so bleiben.
 
 ### Der Push-Hinweis fragt nicht zweimal
 
