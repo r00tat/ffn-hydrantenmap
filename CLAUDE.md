@@ -15,6 +15,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | Dokument | Wann lesen |
 | --- | --- |
 | [docs/build-und-toolchain.md](docs/build-und-toolchain.md) | TypeScript 6/7 parallel, Turbopack-Cache, Android-Build (JDK 21) |
+| [docs/internationalisierung.md](docs/internationalisierung.md) | Neue UI-Strings, Message-Kataloge `messages/{de,en}.json`, Namespaces und Schlüsselkonventionen, `useTranslations`/`getTranslations`, `renderWithIntl` in Tests, Markdown-Doku unter `content/docs/` |
 | [docs/deployment.md](docs/deployment.md) | Cloud Run, Terraform, Traffic-Tags, Rollback, Projekt-Basis |
 | [docs/releases.md](docs/releases.md) | Ein Release erstellen |
 | [docs/service-worker-pwa.md](docs/service-worker-pwa.md) | Änderungen unter `src/worker/`, Push, Precaching |
@@ -107,47 +108,9 @@ cp .env.local .worktrees/<branch-name>/
 ### Arbeiten an GitHub-Issues
 
 Wird die Arbeit an einem Issue beauftragt (z.B. „arbeite an #123", „fix #123"), gilt
-standardmäßig dieser Ablauf — ohne Rückfrage, es sei denn, es wird ausdrücklich etwas
-anderes verlangt:
-
-1. **Issue lesen und übernehmen:** `gh issue view <nr> --comments` — Kommentare gehören zur
-   Anforderung. Danach `gh issue edit <nr> --add-assignee r00tat`, damit im Issue-Tracker
-   sichtbar ist, dass daran gearbeitet wird.
-2. **Worktree anlegen** statt im Hauptverzeichnis zu arbeiten. Branch nach
-   Conventional-Commit-Typ und Issue-Nummer, Worktree-Verzeichnis mit `-` statt `/`:
-
-   ```bash
-   git worktree add -b fix/123-kurzbeschreibung .worktrees/fix-123-kurzbeschreibung main
-   cp .env.local .worktrees/fix-123-kurzbeschreibung/
-   cd .worktrees/fix-123-kurzbeschreibung && npm install --ignore-scripts
-   ```
-
-   `node_modules/` ist nicht Teil des Worktrees und fehlt sonst.
-3. **Implementieren und committen** im Worktree (Conventional Commits, siehe oben).
-4. **Vor dem Push** die Checks einzeln laufen lassen (`npm run typecheck`, `npx eslint`,
-   `npx vitest run`, `npx next build`).
-5. **PR erstellen** nach der Vorlage unten, inklusive `Closes #123`, passendem Label und
-   `--assignee r00tat`.
-6. **Worktree entfernen**, sobald der PR steht:
-
-   ```bash
-   cd /Users/paul/Documents/Feuerwehr/hydranten-map
-   git worktree remove .worktrees/fix-123-kurzbeschreibung
-   ```
-
-Zu Schritt 6:
-
-- **Erst aus dem Worktree herausgehen.** `git worktree remove` scheitert, solange das
-  aktuelle Arbeitsverzeichnis darin liegt.
-- **Nur entfernen, wenn alles gepusht ist.** Vorher `git status` und
-  `git log origin/<branch>..HEAD` prüfen — nicht gepushte Commits sind nach dem Entfernen
-  nur noch über das Reflog erreichbar. Niemals `--force` verwenden, um über einen
-  schmutzigen Worktree hinwegzugehen; in dem Fall nachfragen.
-- **Der lokale Branch bleibt bestehen** und ist damit nicht verloren. Kommen später
-  CI-Fehler oder Review-Kommentare, wird der Worktree für denselben Branch einfach neu
-  angelegt: `git worktree add .worktrees/fix-123-kurzbeschreibung fix/123-kurzbeschreibung`
-  (ohne `-b`).
-- Nach dem Merge räumt `/clean_gone` die verwaisten Branches und Worktrees auf.
+standardmäßig der Ablauf aus dem Skill `github-issue-workflow` — Issue übernehmen,
+Worktree anlegen, implementieren, Checks, PR, Worktree entfernen — ohne Rückfrage, es sei
+denn, es wird ausdrücklich etwas anderes verlangt.
 
 ### Plan- und Spec-Dokumente (Superpowers)
 
@@ -191,54 +154,9 @@ feat!: neues Auth-System ersetzt bisheriges Login
 
 ### Pull Requests
 
-**Vor dem Erstellen eines PRs** muss `npm run check` erfolgreich durchlaufen (keine Errors, keine Warnings).
-
-**Sprache:** PR-Titel folgt dem Conventional Commit Format (englisch erlaubt), die **Beschreibung ist auf Deutsch**.
-
-**Labels:** Auf jedem PR muss automatisch das passende Label gesetzt werden, basierend auf dem Commit-Typ:
-
-- `feat:` → `feature`
-- `fix:` → `bug`
-- `docs:` → `documentation`
-- `chore(deps):` / Dependabot → `dependencies`
-- Sonstige Verbesserungen → `enhancement`
-
-**Assignee:** Auf jedem PR wird `r00tat` als Assignee gesetzt (`gh pr create --assignee
-r00tat`) — GitHub trägt den Autor nicht von selbst ein. Bei einem PR zu einem Issue wird
-auch das Issue selbst zugewiesen (`gh issue edit <nr> --add-assignee r00tat`).
-
-**Issue-Verknüpfung:** Wird mit dem PR ein GitHub-Issue bearbeitet, muss die
-PR-Beschreibung `Closes #<issue>` enthalten — dann schließt GitHub das Issue beim Merge
-automatisch. Zu beachten:
-
-- Das Schlüsselwort gehört in die **PR-Beschreibung** (Body), nicht in den Titel; im Titel
-  wird es von GitHub ignoriert.
-- Bei mehreren Issues wird das Schlüsselwort je Issue wiederholt:
-  `Closes #123, closes #124` — ein `Closes #123, #124` schließt nur das erste.
-- Betrifft der PR ein Issue, das **nicht** geschlossen werden soll (Teilarbeit), stattdessen
-  ohne Schlüsselwort referenzieren: `Teil von #123`.
-
-**PR-Beschreibung** (Deutsch, Markdown):
-
-```markdown
-## Zusammenfassung
-
-<Kurze Beschreibung aller Änderungen im Branch gegenüber main>
-
-## Änderungen
-
-- <Auflistung der wesentlichen Änderungen>
-
-## Test plan
-
-- [ ] <Testschritte>
-
-Closes #<issue>
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-```
-
-Beispiel (siehe PR #462): Zusammenfassung beschreibt das Feature, Änderungen listen alle wesentlichen Punkte, Testplan enthält konkrete Schritte.
+PR-Titel im Conventional-Commit-Format, Beschreibung auf Deutsch, Label nach Commit-Typ,
+Assignee `r00tat`, `Closes #<issue>` im Body. Vorlage und Details:
+Skill `github-issue-workflow`.
 
 ### Releases
 
@@ -317,55 +235,6 @@ einem `<p>`, also ungültiges HTML, und React warnt zur Laufzeit mit
   <Chip size="small" label="abgeleitet" />
 </Typography>
 ```
-
-## Internationalization (i18n)
-
-Übersetzungen laufen über [`next-intl`](https://next-intl.dev). Unterstützt sind aktuell `de` (default/fallback) und `en`. Die Sprache wird pro Benutzer im Firestore-Profil gespeichert; die aktive Locale wird serverseitig in `src/i18n/getLocale.ts` ermittelt und über den Provider in `src/components/providers/` an Client-Komponenten weitergereicht.
-
-**Message-Kataloge** liegen in `messages/<locale>.json` (z.B. `messages/de.json`, `messages/en.json`). Beide Dateien müssen denselben Schlüsselbaum haben — fehlende Schlüssel in `en.json` werden zur Laufzeit auf den deutschen Wert zurückfallen, fehlende Schlüssel in `de.json` führen zu Fehlern.
-
-**Konventionen:**
-
-- Namespaces folgen dem Feature/Komponenten-Kontext (`drawer`, `einsaetze`, `kostenersatz`, `docsNav`, …).
-- Keine deutschen Wörter als Schlüssel — Schlüssel sind immer englisch und camelCase (`addEntry`, `noResults`, `deleteConfirm`).
-- ICU-Platzhalter wie `{name}`, `{count}` werden via `t('key', { name, count })` befüllt. Pluralisierung über die `{count, plural, …}`-Syntax.
-- Datums-/Zahl-/Listformatierung über `useFormatter()` statt manueller Strings.
-
-**Verwendung in Komponenten:**
-
-```tsx
-// Client Component
-'use client';
-import { useTranslations } from 'next-intl';
-
-export function MyButton() {
-  const t = useTranslations('common');
-  return <Button>{t('save')}</Button>;
-}
-
-// Server Component / Server Action
-import { getTranslations } from 'next-intl/server';
-
-export default async function Page() {
-  const t = await getTranslations('einsaetze');
-  return <h1>{t('title')}</h1>;
-}
-```
-
-**Statisch typisierte Schlüssel:** Beim Iterieren über Schlüssel (z.B. Sidebar-Listen) muss das Array `as const` getypt werden, sonst beschwert sich TypeScript über die `NamespacedMessageKeys`-Constraint von `next-intl`.
-
-**Markdown-Doku:** Statische Texte unter `/docs/<slug>` liegen in `content/docs/{de,en}/<slug>.md` und werden von `loadDocsContent(slug, locale)` geladen. Fehlt eine englische Übersetzung, wird automatisch die deutsche Version verwendet.
-
-**Neue UI-Strings:**
-
-1. Beide Locale-Dateien gleichzeitig erweitern (Schlüssel in beiden, Wert übersetzt).
-2. Komponente auf `useTranslations`/`getTranslations` umstellen — keine hartkodierten deutschen Strings im JSX.
-3. Komponenten-Tests müssen mit `renderWithIntl` aus `src/test-utils/intlRender.tsx` gerendert werden — das wrappt den Tree in einen `NextIntlClientProvider` mit der `messages/de.json` als Katalog.
-
-Meldet `npm run typecheck` einen eben ergänzten Schlüssel als `not assignable to
-parameter of type NamespacedMessageKeys`, ist es der inkrementelle Cache von TS 7:
-`rm -f tsconfig.tsbuildinfo && npm run typecheck`. Siehe
-[docs/build-und-toolchain.md](docs/build-und-toolchain.md).
 
 ## Architecture
 
