@@ -142,7 +142,14 @@
       "engineUnknown": "not yet determined",
       "alsoRead": "also in frame: {list}",
       "progress": "{engine} · frame {size} · {frames} frames checked, nothing read yet",
-      "frameUnknown": "resolution not yet known"
+      "frameUnknown": "resolution not yet known",
+      "matchedBy": "matched on {fields}",
+      "fieldBarcodes": "barcode",
+      "fieldNummer": "number",
+      "fieldInventarNr": "inventory number",
+      "fieldZusatzInventarNr": "additional inventory number",
+      "fieldSeriennummer": "serial number",
+      "fieldExterneId": "external ID"
     },
     "trupp": {
       "add": "Add team",

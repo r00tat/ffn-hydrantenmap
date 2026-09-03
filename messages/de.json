@@ -142,7 +142,14 @@
       "engineUnknown": "noch unbestimmt",
       "alsoRead": "ebenfalls im Bild: {list}",
       "progress": "{engine} · Bild {size} · {frames} Bilder geprüft, noch nichts gelesen",
-      "frameUnknown": "Auflösung noch unbekannt"
+      "frameUnknown": "Auflösung noch unbekannt",
+      "matchedBy": "getroffen über {fields}",
+      "fieldBarcodes": "Barcode",
+      "fieldNummer": "Nummer",
+      "fieldInventarNr": "Inventarnummer",
+      "fieldZusatzInventarNr": "Zusatz-Inventarnummer",
+      "fieldSeriennummer": "Seriennummer",
+      "fieldExterneId": "externe ID"
     },
     "trupp": {
       "add": "Trupp erfassen",

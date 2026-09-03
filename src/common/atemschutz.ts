@@ -461,26 +461,97 @@ export function normalizeCode(raw: string): string {
   return (raw ?? '').toUpperCase().replace(/[\s.\-/_]/g, '');
 }
 
+/** Ein Feld, über das ein Scan ein Gerät treffen kann. */
+export type KennungFeld =
+  | 'barcodes'
+  | 'nummer'
+  | 'inventarNr'
+  | 'zusatzInventarNr'
+  | 'seriennummer'
+  | 'externeId';
+
 /**
- * Alle Kennungen eines Geräts, über die ein Scan treffen darf.
+ * Die Kennungen, auf die Verlass ist: Sie stehen am Stück oder wurden dort
+ * angelernt.
+ *
+ * `seriennummer` und `externeId` fehlen mit Absicht. Die Seriennummer wird im
+ * Bestand nachweislich zweckentfremdet — sechs Masken tragen dort die
+ * *Inventarnummer einer anderen Maske*, was jeden Scan dieses Etiketts
+ * mehrdeutig macht. Die externe ID ist eine Zahl aus dem Fremdsystem und steht
+ * auf keinem Aufkleber. Beide bleiben suchbar, dürfen aber einen Treffer über
+ * eine echte Kennung nicht verwässern.
+ *
+ * `zusatzInventarNr` zählt als stark, weil `nummer` beim Import genau daraus
+ * abgeleitet wird — die beiden verschieden zu gewichten wäre willkürlich.
+ */
+const STARKE_FELDER: readonly KennungFeld[] = [
+  'barcodes',
+  'nummer',
+  'inventarNr',
+  'zusatzInventarNr',
+];
+
+export function istStarkesFeld(feld: KennungFeld): boolean {
+  return STARKE_FELDER.includes(feld);
+}
+
+/** Eine normalisierte Kennung samt dem Feld, aus dem sie stammt. */
+export interface Kennung {
+  feld: KennungFeld;
+  code: string;
+}
+
+/**
+ * Alle Kennungen eines Geräts, über die ein Scan treffen darf — mit ihrer
+ * Herkunft.
+ *
+ * Das Feld wird mitgeführt, weil ein Treffer ohne es nicht zu beurteilen ist:
+ * Ob ein Code die Inventarnummer vom Etikett oder eine falsch erfasste
+ * Seriennummer traf, entscheidet, welches Stück gemeint ist.
  *
  * `barcodes` steht bewusst mit drin, obwohl die Spalte im heutigen Export fast
  * leer ist: sobald sie gepflegt wird, soll ein Scan darüber treffen, ohne dass
  * hier etwas nachgezogen werden muss.
  */
-export function lookupKeys(g: AtemschutzGeraet): string[] {
-  const raw = [
-    ...(g.barcodes ?? []),
-    g.nummer,
-    g.inventarNr,
-    g.zusatzInventarNr,
-    g.seriennummer,
-    g.externeId,
+export function lookupEntries(g: AtemschutzGeraet): Kennung[] {
+  const raw: [KennungFeld, string | undefined][] = [
+    ...(g.barcodes ?? []).map(
+      (b) => ['barcodes', b] as [KennungFeld, string | undefined],
+    ),
+    ['nummer', g.nummer],
+    ['inventarNr', g.inventarNr],
+    ['zusatzInventarNr', g.zusatzInventarNr],
+    ['seriennummer', g.seriennummer],
+    ['externeId', g.externeId],
   ];
-  const keys = raw
-    .map((value) => normalizeCode(value ?? ''))
-    .filter((value) => value.length > 0);
-  return [...new Set(keys)];
+  const gesehen = new Set<string>();
+  const entries: Kennung[] = [];
+  for (const [feld, value] of raw) {
+    const code = normalizeCode(value ?? '');
+    // Derselbe Code aus zwei Feldern zählt einmal — das erste gewinnt, und die
+    // Reihenfolge oben ist die der Aussagekraft.
+    if (!code || gesehen.has(code)) continue;
+    gesehen.add(code);
+    entries.push({ feld, code });
+  }
+  return entries;
+}
+
+/** Nur die Codes — für die Teilstück-Suche, der die Herkunft gleich ist. */
+export function lookupKeys(g: AtemschutzGeraet): string[] {
+  return lookupEntries(g).map((e) => e.code);
+}
+
+/** Über welche Felder ein Code ein Gerät trifft. Leer heißt: gar nicht. */
+export function matchedFields(
+  g: AtemschutzGeraet,
+  raw: string,
+): KennungFeld[] {
+  const needle = normalizeCode(raw);
+  if (!needle) return [];
+  return lookupEntries(g)
+    .filter((e) => e.code === needle)
+    .map((e) => e.feld);
 }
 
 /**
@@ -490,6 +561,18 @@ export function lookupKeys(g: AtemschutzGeraet): string[] {
  * Artikeltyp, nicht das einzelne Stück — sobald die Barcode-Spalte gepflegt
  * ist, können sich mehrere Flaschen einen Code teilen. Der Dialog fragt dann
  * nach, statt still den ersten Treffer zu nehmen.
+ *
+ * **Eine starke Kennung verdrängt eine schwache.** Trifft ein Code mindestens
+ * ein Gerät über Barcode, Nummer oder Inventarnummer, fallen Treffer weg, die
+ * nur an Seriennummer oder externer ID hängen. Der Anlass steht im Bestand:
+ * Der Scan der Inventarnummer `2016-MU-046` traf zwei Masken — die richtige
+ * über ihre Inventarnummer, eine zweite über ihre Seriennummer, in der genau
+ * diese fremde Inventarnummer erfasst ist. Ohne die Verdrängung fragt die App
+ * bei jedem Scan einer dieser Masken nach, obwohl die Antwort feststeht.
+ *
+ * Die schwachen Felder bleiben trotzdem suchbar: Sind sie der *einzige*
+ * Treffer, wird er geliefert. Eine Flasche über ihre eingeprägte Seriennummer
+ * zu finden, muss weiter gehen.
  */
 export function findByCode(
   geraete: AtemschutzGeraet[],
@@ -497,7 +580,11 @@ export function findByCode(
 ): AtemschutzGeraet[] {
   const needle = normalizeCode(raw);
   if (!needle) return [];
-  return geraete.filter((g) => lookupKeys(g).includes(needle));
+  const treffer = geraete
+    .map((g) => ({ g, felder: matchedFields(g, needle) }))
+    .filter((t) => t.felder.length > 0);
+  const stark = treffer.filter((t) => t.felder.some(istStarkesFeld));
+  return (stark.length > 0 ? stark : treffer).map((t) => t.g);
 }
 
 /** Vorgabe für die Trefferzahl der Suche — eine Liste, die man überblickt. */
@@ -535,16 +622,22 @@ export function matchGeraete(
 }
 
 /**
- * Die führende Kennung eines Geräts — die, unter der es am Sammelplatz
- * angesprochen wird.
+ * Die führende Kennung eines Geräts — die, unter der es angesprochen wird.
  *
- * Die Reihenfolge ist die der Lesbarkeit am Stück: Die Flaschennummer steht
- * groß auf der Flasche, die Inventarnummer klein auf dem Etikett, die
- * Seriennummer eingeprägt am Hals. Fehlt alles drei, gibt es keine Kennung —
- * dann bleibt nur die Bezeichnung, und die ist Sache des Aufrufers.
+ * **Die Inventarnummer führt**, für jeden Typ. Sie ist die, die auf dem
+ * aufgeklebten Etikett steht und die gescannt wird; sie im zweiten Glied zu
+ * führen hieß, dass ein Scan von `2016-MU-046` eine Maske namens `2.16.36`
+ * vorschlägt — dieselbe Maske, aber nicht wiederzuerkennen.
+ *
+ * `nummer` steht dahinter, obwohl sie am Sammelplatz gesprochen wird: Der
+ * Import leitet sie aus der Zusatz-Inventar-Nr. ab, und die trägt außerhalb
+ * der Flaschen alles Mögliche — bei einer Maske stand dort schon der
+ * Modellname `XPLORE4`. Die Seriennummer bleibt der letzte Ausweg. Fehlt alles
+ * drei, gibt es keine Kennung; dann bleibt nur die Bezeichnung, und die ist
+ * Sache des Aufrufers.
  */
 export function geraetKennung(g: AtemschutzGeraet): string | undefined {
-  return g.nummer ?? g.inventarNr ?? g.seriennummer ?? undefined;
+  return g.inventarNr ?? g.nummer ?? g.seriennummer ?? undefined;
 }
 
 /** Einzeiliges Etikett eines Geräts für Auswahllisten. */

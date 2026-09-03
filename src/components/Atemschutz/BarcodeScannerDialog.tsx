@@ -18,7 +18,9 @@ import {
   findByCode,
   geraetKennung,
   geraetLabel,
+  matchedFields,
   type AtemschutzGeraet,
+  type KennungFeld,
 } from '../../common/atemschutz';
 import useBarcodeScanner, {
   type BarcodeScanEvent,
@@ -55,6 +57,18 @@ export default function BarcodeScannerDialog({
 }: BarcodeScannerDialogProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
+
+  // Bleibt eine Auswahl übrig, muss dabeistehen, *warum* jedes Stück in der
+  // Liste ist: Ein Treffer über die Inventarnummer wiegt anders als einer über
+  // eine Seriennummer, in der eine fremde Inventarnummer erfasst wurde.
+  const feldLabel: Record<KennungFeld, string> = {
+    barcodes: t('scanner.fieldBarcodes'),
+    nummer: t('scanner.fieldNummer'),
+    inventarNr: t('scanner.fieldInventarNr'),
+    zusatzInventarNr: t('scanner.fieldZusatzInventarNr'),
+    seriennummer: t('scanner.fieldSeriennummer'),
+    externeId: t('scanner.fieldExterneId'),
+  };
 
   const [code, setCode] = useState('');
   const [manuell, setManuell] = useState('');
@@ -203,7 +217,16 @@ export default function BarcodeScannerDialog({
                   <ListItemButton key={g.id} onClick={() => uebernehmen(g)}>
                     <ListItemText
                       primary={geraetLabel(g)}
-                      secondary={g.feuerwehr}
+                      secondary={[
+                        g.feuerwehr,
+                        t('scanner.matchedBy', {
+                          fields: matchedFields(g, code)
+                            .map((f) => feldLabel[f])
+                            .join(', '),
+                        }),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                       slotProps={{ primary: { variant: 'h6' } }}
                     />
                   </ListItemButton>

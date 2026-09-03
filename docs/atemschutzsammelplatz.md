@@ -52,12 +52,56 @@ gefüllt, und dieser eine Wert (`4026056001293`) ist eine EAN-13, die den
 
 Daraus folgen zwei Dinge im Code:
 
-- `lookupKeys()` sammelt **sechs** Kennungen: `barcodes`, `nummer`,
-  `inventarNr`, `zusatzInventarNr`, `seriennummer`, `externeId`. Die wichtigste
-  Brücke zur ASSP-Liste ist `zusatzInventarNr` (`AF-2.16.19` → `2.16.19`).
+- `lookupEntries()` sammelt **sechs** Kennungen: `barcodes`, `nummer`,
+  `inventarNr`, `zusatzInventarNr`, `seriennummer`, `externeId` — jede mit dem
+  Feld, aus dem sie stammt. Die wichtigste Brücke zur ASSP-Liste ist
+  `zusatzInventarNr` (`AF-2.16.19` → `2.16.19`).
 - `findByCode()` gibt eine **Liste** zurück, nicht ein Gerät. Sobald die
   Barcode-Spalte gepflegt wird, können sich mehrere Flaschen einen Code teilen;
   der Dialog fragt dann nach, statt still den ersten Treffer zu nehmen.
+
+### Starke Kennung verdrängt schwache
+
+`barcodes`, `nummer`, `inventarNr` und `zusatzInventarNr` gelten als **stark**:
+Sie stehen am Stück oder wurden dort angelernt. `seriennummer` und `externeId`
+gelten als **schwach**. Trifft ein Code mindestens ein Gerät über ein starkes
+Feld, fallen die Treffer weg, die nur an einem schwachen hängen.
+
+Der Anlass steht im Bestand und ist kein Sonderfall: **42 der Codes sind
+mehrdeutig**, 11 davon nur wegen der Seriennummer. Sechs Masken der Serie
+„Vollatemmaske Normaldruck 2–8" tragen in `seriennummer` die *Inventarnummer
+einer anderen Maske* — ein Erfassungsfehler in Sybos. Ein Scan des Etiketts
+`2016-MU-046` traf deshalb zwei Masken, und die App fragte bei jedem einzelnen
+Scan nach, obwohl die Antwort feststeht.
+
+Die schwachen Felder bleiben suchbar: Sind sie der *einzige* Treffer, wird er
+geliefert — eine Flasche über ihre eingeprägte Seriennummer zu finden, muss
+weiter gehen. Und wo eine Auswahl übrig bleibt, nennt der Scanner-Dialog je
+Zeile das treffende Feld (`matchedFields()`), damit „getroffen über
+Inventarnummer" von „getroffen über Seriennummer" zu unterscheiden ist.
+
+Das behebt die Ursache nicht — die liegt in Sybos. Es sorgt nur dafür, dass ein
+Erfassungsfehler in einem Feld, das auf keinem Aufkleber steht, nicht bei jedem
+Scan einen Handgriff kostet.
+
+### Welche Kennung führt
+
+`geraetKennung()` ist `inventarNr ?? nummer ?? seriennummer` — **die
+Inventarnummer führt, für jeden Typ.** Sie steht auf dem aufgeklebten Etikett
+und ist die, die gescannt wird.
+
+Vorher führte `nummer`, und das ging schief: Der Import leitet `nummer` aus der
+Zusatz-Inventar-Nr. ab (gedacht für die ASSP-Flaschennummer `AF-2.16.19`),
+wendet das aber auf jeden Typ an. Bei **allen 81 Masken** stand damit eine
+andere Kennung am Bildschirm als auf dem Etikett — ein Scan von `2016-MU-046`
+schlug eine Maske `2.16.36` vor, dieselbe Maske, nur nicht wiederzuerkennen.
+Bei einer Maske stand als „Kennung" sogar der Modellname `XPLORE4`.
+
+**Folge für gespeicherte Daten:** `flaschenNummer` am Füllprotokoll und
+`kennung` am Trupp-Gerät sind Kopien der führenden Kennung. Neue Einträge
+tragen daher die Inventarnummer, ältere behalten, was zum Zeitpunkt der
+Erfassung galt. Beides bleibt über `geraetId` mit dem Stammdatensatz
+verbunden.
 
 Für Flaschen ohne brauchbaren Barcode lassen sich eigene QR-Etiketten drucken,
 und ein gescannter unbekannter Code kann am Gerät als weiterer `barcodes`-

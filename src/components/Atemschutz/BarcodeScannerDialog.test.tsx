@@ -101,6 +101,55 @@ describe('BarcodeScannerDialog', () => {
     expect(onPicked).toHaveBeenCalledWith('2016-MU-046', treffer, scan());
   });
 
+  it('übergeht eine falsch erfasste Seriennummer zugunsten der Inventarnummer', () => {
+    const onPicked = vi.fn();
+    const echt = geraet({ id: 'echt', inventarNr: '2016-MU-046' });
+    const falschErfasst = geraet({
+      id: 'falsch',
+      bezeichnung: 'Vollatemmaske Normaldruck 4',
+      inventarNr: '9001-MU-704',
+      seriennummer: '2016-MU-046',
+    });
+    renderWithIntl(
+      <BarcodeScannerDialog
+        open
+        geraete={[echt, falschErfasst]}
+        onClose={vi.fn()}
+        onPicked={onPicked}
+      />,
+    );
+    // Ohne die Verdrängung stünde hier eine Auswahl aus zwei Masken.
+    act(() => melde?.(scan()));
+    expect(onPicked).toHaveBeenCalledWith('2016-MU-046', echt, scan());
+  });
+
+  it('nennt bei echter Mehrdeutigkeit je Zeile das treffende Feld', () => {
+    const a = geraet({ id: 'a', barcodes: ['4026056001293'] });
+    const b = geraet({
+      id: 'b',
+      bezeichnung: 'Atemluftflasche CFK 6,8 l',
+      nummer: '4026056001293',
+    });
+    renderWithIntl(
+      <BarcodeScannerDialog
+        open
+        geraete={[a, b]}
+        onClose={vi.fn()}
+        onPicked={vi.fn()}
+      />,
+    );
+    act(() =>
+      melde?.(
+        scan({
+          value: '4026056001293',
+          results: [{ rawValue: '4026056001293', format: 'ean_13' }],
+        }),
+      ),
+    );
+    expect(screen.getByText(/getroffen über Barcode/)).toBeInTheDocument();
+    expect(screen.getByText(/getroffen über Nummer/)).toBeInTheDocument();
+  });
+
   it('nennt bei mehreren Treffern im Bild auch die nicht übernommenen', () => {
     renderWithIntl(
       <BarcodeScannerDialog
