@@ -36,6 +36,7 @@ resource "google_project_iam_member" "terraform_iam" {
     "roles/secretmanager.admin",             # Secret Manager
     "roles/cloudbuild.builds.editor",        # Cloud Build Trigger
     "roles/cloudscheduler.admin",            # Scheduler-Jobs (modules/cloud-scheduler)
+    "roles/cloudtasks.admin",                # Task-Queue + deren IAM (modules/cloud-scheduler)
     "roles/run.admin",                       # Cloud-Run-Dienst (modules/cloud-run)
   ])
   member  = google_service_account.terraform_sa.member
