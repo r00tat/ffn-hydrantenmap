@@ -169,6 +169,14 @@ Behauptung — im Vorschaudialog ist jeder Wert änderbar. Ebenso die
 Bezirksreserve: Im Export steht bei diesen 25 Flaschen als Dienststelle
 trotzdem „Neusiedl am See", nur die Bezeichnung verrät sie.
 
+**Nenndruck und Volumen gibt es nur an der Flasche** — im Import, im
+Gerätedialog (dort sind die beiden Felder bei jedem anderen Typ ausgeblendet)
+und in `buildGeraetPayload`, damit die Regel nicht auf der Ehrlichkeit des
+Clients steht. An einer Maske wären beide Werte eine Erfindung, und die
+Ableitung aus dem Klartext greift dort daneben: „Atemluftkompressor Mobil 300
+l/min" ergab eine 300-Liter-Flasche. Gelesen werden sie ohnehin nur an
+Flaschen — `vorgabeGeraetesatz()` überspringt jeden anderen Typ.
+
 ### Füllstationen kommen aus einem zweiten Export
 
 Sybos gibt die Atemlufterzeugung in einem eigenen Lauf aus, mit eigenem

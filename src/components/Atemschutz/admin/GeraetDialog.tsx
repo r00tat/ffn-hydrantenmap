@@ -102,12 +102,19 @@ const TEXT_FELDER = [
   'zusatzInventarNr',
   'seriennummer',
   'externeId',
-  'nenndruck',
-  'volumenLiter',
   'material',
   'hersteller',
   'baujahr',
 ] as const;
+
+/**
+ * Was nur die Flasche hat.
+ *
+ * An einer Maske oder einem Kompressor wäre beides eine Erfindung — der
+ * Import lässt die Felder dort aus demselben Grund weg, und
+ * `vorgabeGeraetesatz` liest sie ohnehin nur an Flaschen.
+ */
+const FLASCHEN_FELDER = ['nenndruck', 'volumenLiter'] as const;
 
 export default function GeraetDialog({
   open,
@@ -130,6 +137,7 @@ export default function GeraetDialog({
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const istFuellstation = form.typ === 'fuellstation';
+  const istFlasche = form.typ === 'flasche';
 
   const handleSave = async () => {
     setSaving(true);
@@ -147,8 +155,10 @@ export default function GeraetDialog({
           .split(/[,;\n]/)
           .map((b) => b.trim())
           .filter(Boolean),
-        nenndruck: toNumber(form.nenndruck),
-        volumenLiter: toNumber(form.volumenLiter),
+        // Wie beim Standort der Füllstation: Wer den Typ wegdreht, soll keine
+        // Flaschenwerte behalten.
+        nenndruck: istFlasche ? toNumber(form.nenndruck) : undefined,
+        volumenLiter: istFlasche ? toNumber(form.volumenLiter) : undefined,
         material: form.material,
         hersteller: form.hersteller,
         baujahr: toNumber(form.baujahr),
@@ -306,16 +316,18 @@ export default function GeraetDialog({
               )}
             />
           </Grid>
-          {TEXT_FELDER.map((key) => (
-            <Grid size={{ xs: 12, sm: 6 }} key={key}>
-              <TextField
-                fullWidth
-                label={t(`geraet.${key}`)}
-                value={form[key]}
-                onChange={(e) => set(key, e.target.value)}
-              />
-            </Grid>
-          ))}
+          {[...TEXT_FELDER, ...(istFlasche ? FLASCHEN_FELDER : [])].map(
+            (key) => (
+              <Grid size={{ xs: 12, sm: 6 }} key={key}>
+                <TextField
+                  fullWidth
+                  label={t(`geraet.${key}`)}
+                  value={form[key]}
+                  onChange={(e) => set(key, e.target.value)}
+                />
+              </Grid>
+            ),
+          )}
           <Grid size={12}>
             <TextField
               fullWidth

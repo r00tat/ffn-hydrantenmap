@@ -119,10 +119,15 @@ function buildGeraetPayload(input: GeraetInput): Record<string, unknown> {
     : [];
   if (barcodes.length > 0) payload.barcodes = barcodes;
 
-  const nenndruck = positiveNumber(input.nenndruck);
-  if (nenndruck) payload.nenndruck = nenndruck;
-  const volumen = positiveNumber(input.volumenLiter);
-  if (volumen) payload.volumenLiter = volumen;
+  // Nenndruck und Volumen beschreiben die Flasche. An einer Maske oder einem
+  // Kompressor wären sie eine Erfindung — dieselbe Regel wie im Import und im
+  // Dialog, hier nur nicht auf die Ehrlichkeit des Clients gebaut.
+  if (typ === 'flasche') {
+    const nenndruck = positiveNumber(input.nenndruck);
+    if (nenndruck) payload.nenndruck = nenndruck;
+    const volumen = positiveNumber(input.volumenLiter);
+    if (volumen) payload.volumenLiter = volumen;
+  }
   const baujahr = positiveNumber(input.baujahr);
   if (baujahr) payload.baujahr = baujahr;
 
