@@ -29,9 +29,12 @@ locals {
   # denselben Zyklus wie bei `cron_invoker_emails` — der Dienst hängt am Wert,
   # die Queue an der URL des Dienstes.
   ueberwachung_queue = "atemschutz-ueberwachung"
+  # Die Region der Queue ist `var.tasks_region` und nicht `var.run_region`:
+  # Cloud Tasks kennt in einem Projekt mit App-Engine-Anwendung nur deren
+  # Region. Siehe modules/cloud-scheduler.
   ueberwachung_queue_path = join("/", [
     "projects", var.project,
-    "locations", var.run_region,
+    "locations", var.tasks_region,
     "queues", local.ueberwachung_queue,
   ])
 
@@ -158,6 +161,7 @@ module "cloud_scheduler" {
   # anlegt. Der Name kommt aus demselben local wie ATEMSCHUTZ_TASKS_QUEUE, damit
   # Dienst und Queue nicht auseinanderlaufen können.
   tasks_queue_name             = local.ueberwachung_queue
+  tasks_region                 = var.tasks_region
   caller_service_account_email = "${var.run_sa}@${var.project}.iam.gserviceaccount.com"
 
 }
@@ -172,5 +176,17 @@ check "cron_invoker_on_allowlist" {
       module.cloud_scheduler.invoker_service_account_email,
     )
     error_message = "Der Invoker-Service-Account steht nicht auf CRON_INVOKER_EMAILS — cronRequired würde den Wochenbericht mit 403 abweisen."
+  }
+}
+
+# Der Pfad der Queue steht in der Umgebung des Dienstes und wird — wie die
+# Invoker-Allowlist — als Zeichenkette gebaut, weil eine Referenz auf das Modul
+# einen Zyklus ergäbe. Läuft die Region auseinander, legt terraform die Queue
+# an, der Dienst schreibt aber in eine, die es nicht gibt: Die Termine fielen
+# still auf den Netz-Zeitplan zurück.
+check "tasks_queue_path_matches" {
+  assert {
+    condition     = local.ueberwachung_queue_path == module.cloud_scheduler.tasks_queue_path
+    error_message = "ATEMSCHUTZ_TASKS_QUEUE zeigt nicht auf die angelegte Cloud-Tasks-Queue — die Termine der Atemschutzüberwachung würden ins Leere laufen."
   }
 }

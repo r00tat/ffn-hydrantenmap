@@ -81,10 +81,18 @@ resource "google_cloud_scheduler_job" "fahrtenbuch_weekly_report" {
 # Beide rufen denselben Endpoint mit dem OIDC-Token *desselben* Service Accounts
 # auf, und der steht hier samt seiner run.invoker-Bindung. Ein eigenes Modul
 # müsste ihn übergeben oder duplizieren.
+#
+# Sie liegt aber **nicht** in der Region des Dienstes: Hat ein Projekt eine
+# App-Engine-Anwendung, kennt Cloud Tasks nur deren Region — für ffn-utils
+# europe-west1. `location = europe-west4` scheitert dort mit „Location
+# 'europe-west4' is not a valid location". Das schadet nichts, weil das Ziel
+# einer Aufgabe eine beliebige HTTPS-URL sein darf; einzig der Pfad in
+# ATEMSCHUTZ_TASKS_QUEUE muss dieselbe Region nennen — der `check`-Block im
+# aufrufenden Root prüft genau das.
 resource "google_cloud_tasks_queue" "atemschutz_ueberwachung" {
   project  = var.project
   name     = var.tasks_queue_name
-  location = var.run_region
+  location = var.tasks_region
 
   rate_limits {
     # Die Aufgaben stehen zeitlich weit auseinander; die Grenzen sind Riegel
@@ -180,4 +188,17 @@ resource "google_cloud_scheduler_job" "atemschutz_ueberwachung" {
 output "invoker_service_account_email" {
   description = "Service account the Cloud Scheduler job authenticates as"
   value       = google_service_account.fahrtenbuch_report_invoker.email
+}
+
+# Der Pfad, den der Dienst in ATEMSCHUTZ_TASKS_QUEUE erwartet. Der aufrufende
+# Root baut denselben Pfad aus seinen eigenen Werten zusammen — er kann ihn
+# nicht von hier lesen, das ergäbe denselben Zyklus wie bei den Invoker-Mails.
+# Der Output ist deshalb nur zum Gegenprüfen da.
+output "tasks_queue_path" {
+  description = "Full resource path of the Cloud Tasks queue, for the check block in the calling root"
+  value = join("/", [
+    "projects", var.project,
+    "locations", google_cloud_tasks_queue.atemschutz_ueberwachung.location,
+    "queues", google_cloud_tasks_queue.atemschutz_ueberwachung.name,
+  ])
 }

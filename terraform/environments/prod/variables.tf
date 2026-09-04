@@ -31,6 +31,16 @@ variable "run_region" {
   default     = "europe-west4"
 }
 
+# Nicht `run_region`: Hat ein Projekt eine App-Engine-Anwendung — ffn-utils hat
+# eine in europe-west1 —, kennt Cloud Tasks ausschließlich deren Region, und
+# eine Queue in europe-west4 wird mit „not a valid location" abgelehnt. Für das
+# Ziel der Aufgabe spielt die Region keine Rolle, es ist eine HTTPS-URL.
+variable "tasks_region" {
+  description = "Region of the Cloud Tasks queue. Bound to the App Engine region of the project, not to run_region."
+  type        = string
+  default     = "europe-west1"
+}
+
 variable "name" {
   description = "service name"
   type        = string
