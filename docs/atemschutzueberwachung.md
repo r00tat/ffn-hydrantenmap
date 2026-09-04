@@ -673,6 +673,16 @@ Was daran zu wissen ist:
   angelegte Queue, sonst schriebe der Dienst in eine, die es nicht gibt, und die
   Termine fielen still auf den Netz-Zeitplan zurück. Ein `check`-Block in beiden
   Terraform-Roots vergleicht deshalb Pfad und Queue.
+- **Der Queue-Name endet auf eine Zufallskennung** (`random_id` im jeweiligen
+  Terraform-Root, z. B. `atemschutz-ueberwachung-dev-3f9c1a2b`). Cloud Tasks
+  gibt einen gelöschten Queue-Namen erst nach sieben Tagen wieder frei: In dev
+  war `atemschutz-ueberwachung-dev` einmal angelegt und gelöscht worden, danach
+  scheiterte jedes `apply` mit „a queue with this name existed too recently" —
+  eine Woche rote Pipeline für einen Namen, den niemand von außen kennt. Die
+  Kennung liegt im State und bleibt über Applies hinweg stehen; ist ein Name
+  doch einmal verbrannt, holt `tofu apply -replace='random_id.ueberwachung_queue'`
+  einen neuen. Der Name darf sich frei ändern, weil der Dienst den Pfad aus
+  `ATEMSCHUTZ_TASKS_QUEUE` liest und nicht selbst bildet.
 - **Ohne Queue wird nicht geplant** (`notConfigured`), und das ist kein Fehler:
   Lokal gibt es keine, und dort warnt die offene Seite. Die beiden
   Umgebungsvariablen dafür sind `ATEMSCHUTZ_TASKS_QUEUE` und
