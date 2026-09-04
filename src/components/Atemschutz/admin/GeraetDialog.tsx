@@ -91,9 +91,14 @@ function toNumber(value: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Die Felder, die als halbbreites Textfeld nach demselben Muster laufen. */
+/**
+ * Die Felder, die als halbbreites Textfeld nach demselben Muster laufen.
+ *
+ * Die Inventarnummer steht **nicht** darin: Sie ist die führende Kennung und
+ * hat deshalb ihren Platz in der ersten Zeile, neben dem Typ.
+ */
 const TEXT_FELDER = [
-  'inventarNr',
+  'nummer',
   'zusatzInventarNr',
   'seriennummer',
   'externeId',
@@ -172,7 +177,11 @@ export default function GeraetDialog({
         {geraet ? t('geraet.dialogTitleEdit') : t('geraet.dialogTitleNew')}
       </DialogTitle>
       <DialogContent>
-        <Grid container spacing={2} sx={{ mt: 0 }}>
+        {/* `mt` und nicht `0`: `DialogContent` direkt unter `DialogTitle` hat
+            in MUI kein oberes Padding, und das nach oben versetzte Label eines
+            Outlined-Feldes der ersten Zeile wird sonst vom Scroll-Container
+            beschnitten. */}
+        <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
@@ -191,9 +200,9 @@ export default function GeraetDialog({
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               fullWidth
-              label={t('geraet.nummer')}
-              value={form.nummer}
-              onChange={(e) => set('nummer', e.target.value)}
+              label={t('geraet.inventarNr')}
+              value={form.inventarNr}
+              onChange={(e) => set('inventarNr', e.target.value)}
             />
           </Grid>
           {istFuellstation && (

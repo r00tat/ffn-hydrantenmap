@@ -114,13 +114,31 @@ tragen daher die Inventarnummer, ältere behalten, was zum Zeitpunkt der
 Erfassung galt. Beides bleibt über `geraetId` mit dem Stammdatensatz
 verbunden.
 
+Die Regel gilt **überall dort, wo ein Gerät angezeigt wird**, nicht nur beim
+Scan: Geräteverwaltung, Import-Vorschau, QR-Etikett, Gerätedialog und der Name,
+der an einen Mangel kopiert wird, gehen alle über `geraetKennung()` bzw.
+`geraetLabel()`. Die Geräteliste zeigte davor `nummer` als Überschrift — also
+bei jeder Maske und jedem Pressluftatmer eine Nummer, die auf dem Stück gar
+nicht steht.
+
+Was **nicht** führt, verschwindet trotzdem nicht: `geraetNebenkennungen()`
+liefert die übrigen Kennungen (Flaschennummer, Zusatz-Inventar-Nr.,
+Seriennummer) für die Zeile unter dem Etikett — ohne die führende zu
+wiederholen und ohne Dubletten, denn der Import leitet `nummer` aus der
+Zusatz-Inventar-Nr. ab, und beide Felder tragen dann denselben Text. Am
+Sammelplatz wird die Flaschennummer gesprochen; sie muss lesbar bleiben, nur
+eben als Zusatz.
+
 Für Flaschen ohne brauchbaren Barcode lassen sich eigene QR-Etiketten drucken,
 und ein gescannter unbekannter Code kann am Gerät als weiterer `barcodes`-
 Eintrag angelernt werden (`addAtemschutzBarcode`).
 
-Das Etikett trägt die **Flaschennummer im Klartext**, nicht die Firestore-ID:
-Sie steht auch lesbar darauf, `lookupKeys()` findet sie, und das Etikett
-überlebt so einen Neuimport der Stammdaten. Gedruckt wird über
+Das Etikett trägt die **führende Kennung im Klartext** — im Regelfall also die
+Inventarnummer —, nicht die Firestore-ID: Sie steht auch lesbar darauf,
+`lookupKeys()` findet sie, und das Etikett überlebt so einen Neuimport der
+Stammdaten. Ältere Etiketten mit der Flaschennummer bleiben gültig, weil
+`lookupKeys()` beide Felder abdeckt. Ein Stück, das nur eine Inventarnummer
+hat, war davor gar nicht etikettierbar. Gedruckt wird über
 `printShareLinkQr` aus dem Fahrtenbuch — eine `@media print`-Regel im Dialog
 nähme dessen Overlay- und Scroll-Container mit auf den Ausdruck, deshalb baut
 jene Funktion ein eigenständiges Dokument in einem neuen Fenster.
@@ -621,7 +639,7 @@ stammen:
   ein Zwischenschritt, den niemand mit Handschuhen tippt. Ohne Stammdatensatz
   oder ohne Schreibrecht bleibt es beim Setzen der Suche.
 - **Die Flaschennummer im Füllprotokoll ist die führende Kennung**
-  (`geraetKennung`: Nummer → Inventar-Nr. → Seriennummer), nicht die
+  (`geraetKennung`: Inventar-Nr. → Nummer → Seriennummer), nicht die
   Bezeichnung. Eine Flasche ohne eigene Nummer stand sonst als „Atemluftflasche
   CFK 6,8 l" im Protokoll und war von der Nachbarflasche desselben Typs nicht
   zu unterscheiden. Welche Flasche gewählt ist, steht als `geraetDetails` unter

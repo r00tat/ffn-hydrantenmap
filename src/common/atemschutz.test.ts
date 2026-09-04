@@ -19,6 +19,7 @@ import {
   fuellungSperre,
   geraetDetails,
   geraetKennung,
+  geraetNebenkennungen,
   matchedFields,
   gruppiereTruppGeraete,
   gruppiereTrupps,
@@ -863,6 +864,55 @@ describe('geraetKennung', () => {
   });
 });
 
+describe('geraetNebenkennungen', () => {
+  it('lässt die führende Kennung weg — sie steht schon im Etikett', () => {
+    expect(
+      geraetNebenkennungen(
+        geraet({
+          inventarNr: '2016-FL-035',
+          nummer: '2.16.35',
+          seriennummer: 'BA66937',
+        }),
+      ),
+    ).toEqual(['2.16.35', 'BA66937']);
+  });
+
+  it('nennt die Zusatz-Inventar-Nr., wenn sie etwas anderes trägt als die Nummer', () => {
+    // Bei einer Maske stand dort schon der Modellname — genau deshalb ist sie
+    // Zusatz und nicht Hauptkennung.
+    expect(
+      geraetNebenkennungen(
+        geraet({
+          typ: 'maske',
+          inventarNr: '2016-MU-046',
+          nummer: '2.16.36',
+          zusatzInventarNr: 'XPLORE4',
+        }),
+      ),
+    ).toEqual(['2.16.36', 'XPLORE4']);
+  });
+
+  it('nennt die Zusatz-Inventar-Nr. nicht doppelt, wenn die Nummer daraus stammt', () => {
+    // Der Import leitet `nummer` aus der Zusatz-Inventar-Nr. ab; beide Felder
+    // tragen dann denselben Text.
+    expect(
+      geraetNebenkennungen(
+        geraet({
+          inventarNr: '2016-FL-035',
+          nummer: '2.16.35',
+          zusatzInventarNr: '2.16.35',
+        }),
+      ),
+    ).toEqual(['2.16.35']);
+  });
+
+  it('liefert nichts, wenn das Gerät nur eine Kennung hat', () => {
+    expect(geraetNebenkennungen(geraet({ inventarNr: '2901-FL-001' }))).toEqual(
+      [],
+    );
+  });
+});
+
 describe('geraetDetails', () => {
   it('stellt die Bezeichnung voran und lässt Leeres weg', () => {
     expect(
@@ -874,7 +924,23 @@ describe('geraetDetails', () => {
           seriennummer: undefined,
         }),
       ),
-    ).toBe('Atemluftflasche CFK 6,8 l · Bezirksreserve · 2901-FL-001');
+    ).toBe('Atemluftflasche CFK 6,8 l · Bezirksreserve');
+  });
+
+  it('wiederholt die Inventarnummer nicht, sondern nennt die Nebenkennungen', () => {
+    expect(
+      geraetDetails(
+        geraet({
+          bezeichnung: 'Atemluftflasche CFK 6,8 l',
+          feuerwehr: 'Bezirksreserve',
+          inventarNr: '2901-FL-001',
+          nummer: '29.01.1',
+          seriennummer: 'BA66937',
+        }),
+      ),
+    ).toBe(
+      'Atemluftflasche CFK 6,8 l · Bezirksreserve · 29.01.1 · BA66937',
+    );
   });
 });
 

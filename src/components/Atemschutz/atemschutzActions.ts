@@ -4,6 +4,7 @@ import 'server-only';
 import {
   ATEMSCHUTZ_GERAET_TYPEN,
   FUELLSTATION_STANDORTE,
+  geraetLabel,
   type AtemschutzGeraet,
   type AtemschutzGeraetTyp,
   type FuellstationStandort,
@@ -394,9 +395,7 @@ export async function createAtemschutzMangel(
     // Mängelliste soll ohne Join lesbar sein — dieselbe Bauweise wie
     // `Mangel.vehicleName`.
     const geraet = await loadGeraet(groupId, input.geraetId);
-    const name = geraet.nummer
-      ? `${geraet.nummer} · ${geraet.bezeichnung}`
-      : geraet.bezeichnung;
+    const name = geraetLabel(geraet);
 
     const doc = buildMangelDocument(
       {

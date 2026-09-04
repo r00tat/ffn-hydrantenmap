@@ -12,7 +12,10 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Typography from '@mui/material/Typography';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { AtemschutzGeraet } from '../../../common/atemschutz';
+import {
+  geraetKennung,
+  type AtemschutzGeraet,
+} from '../../../common/atemschutz';
 import {
   PrintWindowBlockedError,
   printShareLinkQr,
@@ -30,9 +33,11 @@ export interface GeraetQrDialogProps {
  * Die Barcode-Spalte des Artikelexports ist in einer von 214 Zeilen gefüllt.
  * Ohne selbst gedruckte Etiketten bliebe der Scanner für den Bestand nutzlos.
  *
- * Der Code trägt die **Flaschennummer im Klartext** (`2.16.19`), nicht die
- * Firestore-ID: Sie steht auch lesbar auf dem Etikett, `lookupKeys` findet sie,
- * und das Etikett überlebt einen Neuimport der Stammdaten.
+ * Der Code trägt die **führende Kennung im Klartext** (`geraetKennung`, also im
+ * Regelfall die Inventarnummer), nicht die Firestore-ID: Sie steht auch lesbar
+ * auf dem Etikett, `lookupKeys` findet sie, und das Etikett überlebt einen
+ * Neuimport der Stammdaten. Ältere Etiketten mit der Flaschennummer bleiben
+ * gültig — `lookupKeys` deckt beide Felder ab.
  *
  * Gedruckt wird über `printShareLinkQr` — dieselbe Mechanik wie beim
  * Fahrtenbuch-Share-Link. Eine `@media print`-Regel im Dialog nähme dessen
@@ -50,7 +55,7 @@ export default function GeraetQrDialog({
   const qrRef = useRef<HTMLDivElement>(null);
   const [fehler, setFehler] = useState<'failed' | 'blocked'>();
 
-  const code = geraet.nummer?.trim();
+  const code = geraetKennung(geraet)?.trim();
 
   const drucken = useCallback(() => {
     setFehler(undefined);

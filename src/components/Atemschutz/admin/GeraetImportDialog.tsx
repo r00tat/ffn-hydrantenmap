@@ -17,6 +17,10 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import {
+  geraetLabel,
+  geraetNebenkennungen,
+} from '../../../common/atemschutz';
 import type { ImportPlanZeile } from '../../../common/atemschutzImport';
 import {
   importAtemschutzGeraete,
@@ -187,13 +191,12 @@ export default function GeraetImportDialog({
                   }
                 >
                   <ListItemText
-                    primary={`${zeile.geraet.nummer ? `${zeile.geraet.nummer} · ` : ''}${zeile.geraet.bezeichnung}`}
+                    primary={geraetLabel(zeile.geraet)}
                     secondary={
                       <>
                         {[
                           zeile.geraet.feuerwehr,
-                          zeile.geraet.inventarNr,
-                          zeile.geraet.seriennummer,
+                          ...geraetNebenkennungen(zeile.geraet),
                         ]
                           .filter(Boolean)
                           .join(' · ')}
