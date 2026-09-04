@@ -9,6 +9,9 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -16,10 +19,15 @@ import {
   geraetKennung,
   type AtemschutzGeraet,
 } from '../../../common/atemschutz';
+import { code128Supported } from '../../../common/code128';
 import {
   PrintWindowBlockedError,
   printShareLinkQr,
 } from '../../Fahrtenbuch/admin/shareLinkQr';
+import Code128Svg from './Code128Svg';
+
+/** Die Codearten, die das Etikett tragen kann. */
+type CodeArt = 'qr' | 'code128';
 
 export interface GeraetQrDialogProps {
   open: boolean;
@@ -39,10 +47,18 @@ export interface GeraetQrDialogProps {
  * Neuimport der Stammdaten. Ältere Etiketten mit der Flaschennummer bleiben
  * gültig — `lookupKeys` deckt beide Felder ab.
  *
+ * **QR oder Code 128**, wählbar am Dialog. QR ist die Vorgabe: Er trägt mehr
+ * auf weniger Fläche und verzeiht Knicke. Code 128 gibt es, weil viele
+ * Handscanner und Lagergeräte nur Strichcodes lesen und weil er auf ein
+ * schmales Flaschenetikett besser passt. Beide liest der Scanner der App —
+ * `useBarcodeScanner` hat `CODE_128` in der Formatliste.
+ *
  * Gedruckt wird über `printShareLinkQr` — dieselbe Mechanik wie beim
  * Fahrtenbuch-Share-Link. Eine `@media print`-Regel im Dialog nähme dessen
  * Overlay- und Scroll-Container mit auf den Ausdruck; deshalb baut jene
- * Funktion ein eigenständiges Dokument in einem neuen Fenster.
+ * Funktion ein eigenständiges Dokument in einem neuen Fenster. Die Codeart
+ * geht als `codeShape` mit: Ein Strichcode in ein Quadrat gezwängt wäre so
+ * schmal, dass ihn kein Scanner mehr liest.
  */
 export default function GeraetQrDialog({
   open,
@@ -54,8 +70,14 @@ export default function GeraetQrDialog({
   const locale = useLocale();
   const qrRef = useRef<HTMLDivElement>(null);
   const [fehler, setFehler] = useState<'failed' | 'blocked'>();
+  const [codeArt, setCodeArt] = useState<CodeArt>('qr');
 
   const code = geraetKennung(geraet)?.trim();
+  // Codeset B endet bei `~`. Eine Kennung mit Umlaut ist nicht vorgesehen,
+  // aber eintippbar — dann bleibt es beim QR-Code, statt beim Zeichnen zu
+  // scheitern.
+  const code128Moeglich = !!code && code128Supported(code);
+  const zeigeCode128 = codeArt === 'code128' && code128Moeglich;
 
   const drucken = useCallback(() => {
     setFehler(undefined);
@@ -76,12 +98,13 @@ export default function GeraetQrDialog({
         hint: t('qr.hint'),
         url: code,
         locale,
+        codeShape: zeigeCode128 ? 'linear' : 'square',
       });
     } catch (err) {
       console.error('Atemschutz QR print failed:', err);
       setFehler(err instanceof PrintWindowBlockedError ? 'blocked' : 'failed');
     }
-  }, [code, geraet.bezeichnung, geraet.feuerwehr, locale, t]);
+  }, [code, geraet.bezeichnung, geraet.feuerwehr, locale, t, zeigeCode128]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
@@ -91,27 +114,54 @@ export default function GeraetQrDialog({
           <Alert severity="warning">{t('qr.noNumber')}</Alert>
         ) : (
           <>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={zeigeCode128 ? 'code128' : 'qr'}
+              onChange={(_, next: CodeArt | null) => next && setCodeArt(next)}
+              aria-label={t('qr.codeArt')}
+              sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}
+            >
+              <ToggleButton value="qr">{t('qr.codeArtQr')}</ToggleButton>
+              {/* Der `span` trägt die Events des gesperrten Buttons — ohne ihn
+                  bliebe der Tooltip stumm. */}
+              <Tooltip
+                title={code128Moeglich ? '' : t('qr.code128Unmoeglich')}
+              >
+                <span style={{ display: 'flex' }}>
+                  <ToggleButton value="code128" disabled={!code128Moeglich}>
+                    {t('qr.codeArtCode128')}
+                  </ToggleButton>
+                </span>
+              </Tooltip>
+            </ToggleButtonGroup>
+
             {/* Weißer Grund, `level="M"` und volle Quiet Zone wie beim
                 Share-Link-Code: Das Etikett klebt an einer Flasche und bekommt
                 Schmutz und Knicke ab; die Defaults von qrcode.react (`L`,
-                `marginSize=0`) sind dafür die schwächste Stufe. */}
+                `marginSize=0`) sind dafür die schwächste Stufe. Beim Code 128
+                steckt die Ruhezone in der `viewBox`. */}
             <Box
               ref={qrRef}
               sx={{
                 p: 2,
                 bgcolor: 'white',
                 borderRadius: 1,
-                width: 'fit-content',
+                width: zeigeCode128 ? '100%' : 'fit-content',
                 mx: 'auto',
               }}
             >
-              <QRCodeSVG
-                value={code}
-                size={200}
-                level="M"
-                marginSize={4}
-                title={code}
-              />
+              {zeigeCode128 ? (
+                <Code128Svg value={code} />
+              ) : (
+                <QRCodeSVG
+                  value={code}
+                  size={200}
+                  level="M"
+                  marginSize={4}
+                  title={code}
+                />
+              )}
             </Box>
             <Box sx={{ textAlign: 'center', mt: 1 }}>
               <Typography variant="h6">{code}</Typography>

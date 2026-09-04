@@ -114,13 +114,17 @@
       }
     },
     "qr": {
-      "title": "QR-Etikett",
-      "button": "QR-Etikett",
+      "title": "Geräteetikett",
+      "button": "Etikett",
       "hint": "Der Code enthält die Kennung des Geräts (im Regelfall die Inventarnummer). Nach dem Ausdrucken auf das Gerät kleben.",
       "noNumber": "Dieses Gerät hat keine Kennung — bitte zuerst eine Inventarnummer eintragen.",
       "print": "Drucken",
       "printBlocked": "Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.",
-      "exportFailed": "Das Etikett ließ sich nicht erzeugen."
+      "exportFailed": "Das Etikett ließ sich nicht erzeugen.",
+      "codeArt": "Codeart",
+      "codeArtQr": "QR-Code",
+      "codeArtCode128": "Code 128",
+      "code128Unmoeglich": "Die Kennung enthält ein Zeichen, das Code 128 nicht darstellen kann — etwa einen Umlaut."
     },
     "scanner": {
       "title": "Barcode scannen",

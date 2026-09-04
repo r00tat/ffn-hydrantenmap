@@ -116,6 +116,24 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Die Gestalt des gedruckten Codes.
+ *
+ * `square` ist der QR-Code, `linear` ein Strichcode. Ein Aufzählungswert statt
+ * freier Maße, damit nichts Ungeprüftes ins `<style>` der Druckseite gerät.
+ */
+export type CodeShape = 'square' | 'linear';
+
+/**
+ * Die Maße je Gestalt. Beim Strichcode ist die Höhe frei wählbar — 30 mm ist
+ * genug, um den Lesestrahl auch schräg zu treffen, ohne das Etikett zu füllen.
+ * Die Breite bleibt unter der Satzbreite von A4 abzüglich der Ränder.
+ */
+const CODE_SIZES: Record<CodeShape, { width: string; height: string }> = {
+  square: { width: '120mm', height: '120mm' },
+  linear: { width: '170mm', height: '30mm' },
+};
+
 export interface QrPrintLabels {
   /** Überschrift der Druckseite. */
   heading: string;
@@ -129,6 +147,8 @@ export interface QrPrintLabels {
   url: string;
   /** `lang`-Attribut der Druckseite. */
   locale: string;
+  /** Ohne Angabe quadratisch — der bisherige und häufigere Fall. */
+  codeShape?: CodeShape;
 }
 
 /**
@@ -143,8 +163,17 @@ export interface QrPrintLabels {
  */
 export function qrPrintDocument(
   svgMarkup: string,
-  { heading, groupName, vehicleName, hint, url, locale }: QrPrintLabels,
+  {
+    heading,
+    groupName,
+    vehicleName,
+    hint,
+    url,
+    locale,
+    codeShape = 'square',
+  }: QrPrintLabels,
 ): string {
+  const { width, height } = CODE_SIZES[codeShape] ?? CODE_SIZES.square;
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(locale)}">
 <head>
@@ -170,7 +199,7 @@ export function qrPrintDocument(
   .vehicle { font-size: 22pt; font-weight: bold; }
   .hint { font-size: 13pt; margin: 8mm 0 4mm; }
   .url { font-size: 10pt; color: #333; word-break: break-all; }
-  svg { width: 120mm; height: 120mm; }
+  svg { width: ${width}; height: ${height}; }
 </style>
 </head>
 <body>

@@ -143,6 +143,45 @@ hat, war davor gar nicht etikettierbar. Gedruckt wird über
 nähme dessen Overlay- und Scroll-Container mit auf den Ausdruck, deshalb baut
 jene Funktion ein eigenständiges Dokument in einem neuen Fenster.
 
+### QR oder Code 128
+
+Die Codeart ist am Dialog wählbar. **QR ist die Vorgabe** — mehr Inhalt auf
+weniger Fläche, und er verzeiht Knicke und Schmutz, die ein Etikett an einer
+Flasche zwangsläufig abbekommt. **Code 128** gibt es, weil viele Handscanner
+und Lagergeräte nur Strichcodes lesen und weil er auf ein schmales
+Flaschenetikett besser passt. Beide liest der Scanner der App:
+`useBarcodeScanner` führt `CODE_128` in seiner Formatliste.
+
+Der Encoder steht in `src/common/code128.ts` und ist **selbst gerechnet**.
+`@zxing/library` liegt zwar im Projekt, bringt aber nur Reader mit — im
+`MultiFormatWriter` ist alles außer QR auskommentiert. Für 107 Zeilen
+Mustertabelle und eine Modulo-103-Prüfziffer eine weitere Abhängigkeit
+aufzunehmen wäre unverhältnismäßig.
+
+Drei Festlegungen, die man dem Code sonst nicht ansieht:
+
+- **Nur Codeset B.** Es deckt die druckbaren ASCII-Zeichen ab und damit jede
+  vorkommende Kennung (`2016-FL-035`, `2.16.19`, `2016/031`). Codeset C würde
+  reine Ziffernpaare halb so breit drucken, aber die Inventarnummern sind
+  gemischt — die Umschaltlogik wäre reine Fehlerquelle. Eine Kennung mit
+  Umlaut sperrt die Auswahl, statt beim Zeichnen zu scheitern.
+- **Die Ruhezone steckt in der `viewBox`**, nicht im Rand des umgebenden
+  Elements. Gedruckt wird das serialisierte SVG allein; ohne die zehn hellen
+  Module links und rechts findet kein Decoder den Anfang des Symbols, und das
+  Etikett wäre stumm. Das ist der häufigste Fehler bei selbst gebauten
+  Strichcodes.
+- **Die Druckseite kennt zwei Gestalten** (`codeShape`): `square` für QR,
+  `linear` für den Strichcode. In das quadratische 120-mm-Feld des QR-Codes
+  gezwängt wäre ein Code 128 so schmal, dass ihn kein Scanner mehr liest. Ein
+  Aufzählungswert und keine freien Maße, damit nichts Ungeprüftes ins
+  `<style>` der Druckseite gerät.
+
+Geprüft wird der Encoder über den **Rückweg**: `code128.test.ts` und der
+Dialogtest lesen jedes erzeugte Symbol mit dem ZXing-`Code128Reader` zurück.
+Eine 107-Zeilen-Tabelle von Hand gegen die Norm zu prüfen wäre unzuverlässig;
+sie gegen den Decoder zu prüfen, der die Etiketten später wirklich liest, ist
+die Aussage, auf die es ankommt.
+
 ## Warum der Import Dubletten behandeln muss
 
 Im Export sind die Kennungen **nicht eindeutig**: 205 verschiedene IDs bei 214
