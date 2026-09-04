@@ -28,8 +28,10 @@ import {
   type AtemschutzTrupp,
   type TruppGeraet,
 } from '../../common/atemschutz';
+import type { BarcodeScanEvent } from '../../hooks/useBarcodeScanner';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 import GeraetAutocomplete from './GeraetAutocomplete';
+import ScanHinweis from './ScanHinweis';
 
 export interface TruppGeraeteDialogProps {
   open: boolean;
@@ -95,6 +97,9 @@ export default function TruppGeraeteDialog({
   );
   const [suche, setSuche] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
+  // Die Rohlesung des zuletzt gescannten Stücks. Eine Handeingabe setzt sie
+  // zurück, damit die Zeile nie zu einem Gerät steht, das nicht gescannt wurde.
+  const [scan, setScan] = useState<BarcodeScanEvent>();
   const [saving, setSaving] = useState(false);
 
   const uebernehmen = (neu: TruppGeraet) => {
@@ -155,12 +160,16 @@ export default function TruppGeraeteDialog({
               value={suche}
               geraete={geraete}
               onTextChange={setSuche}
-              onGeraetChange={(g) => uebernehmen(truppGeraetVonGeraet(g))}
+              onGeraetChange={(g) => {
+                setScan(undefined);
+                uebernehmen(truppGeraetVonGeraet(g));
+              }}
               // Ein externer Handscanner tippt den Code und schickt ein Enter
               // hinterher. Bleibt genau ein Vorschlag übrig, ist er gemeint;
               // sonst wird der rohe Code als Kennung übernommen — eine
               // Fremdflasche hat hier keinen Stammdatensatz.
               onSubmit={(value, vorschlaege) => {
+                setScan(undefined);
                 if (vorschlaege.length === 1) {
                   uebernehmen(truppGeraetVonGeraet(vorschlaege[0]));
                   return;
@@ -179,6 +188,8 @@ export default function TruppGeraeteDialog({
               </span>
             </Tooltip>
           </Stack>
+
+          {scan && <ScanHinweis scan={scan} />}
 
           {liste.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
@@ -281,7 +292,8 @@ export default function TruppGeraeteDialog({
           open
           geraete={geraete}
           onClose={() => setScannerOpen(false)}
-          onPicked={(code, treffer) => {
+          onPicked={(code, treffer, scanEvent) => {
+            setScan(scanEvent);
             if (treffer) {
               uebernehmen(truppGeraetVonGeraet(treffer));
             } else {

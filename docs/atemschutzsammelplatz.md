@@ -63,12 +63,56 @@ gefüllt, und dieser eine Wert (`4026056001293`) ist eine EAN-13, die den
 
 Daraus folgen zwei Dinge im Code:
 
-- `lookupKeys()` sammelt **sechs** Kennungen: `barcodes`, `nummer`,
-  `inventarNr`, `zusatzInventarNr`, `seriennummer`, `externeId`. Die wichtigste
-  Brücke zur ASSP-Liste ist `zusatzInventarNr` (`AF-2.16.19` → `2.16.19`).
+- `lookupEntries()` sammelt **sechs** Kennungen: `barcodes`, `nummer`,
+  `inventarNr`, `zusatzInventarNr`, `seriennummer`, `externeId` — jede mit dem
+  Feld, aus dem sie stammt. Die wichtigste Brücke zur ASSP-Liste ist
+  `zusatzInventarNr` (`AF-2.16.19` → `2.16.19`).
 - `findByCode()` gibt eine **Liste** zurück, nicht ein Gerät. Sobald die
   Barcode-Spalte gepflegt wird, können sich mehrere Flaschen einen Code teilen;
   der Dialog fragt dann nach, statt still den ersten Treffer zu nehmen.
+
+### Starke Kennung verdrängt schwache
+
+`barcodes`, `nummer`, `inventarNr` und `zusatzInventarNr` gelten als **stark**:
+Sie stehen am Stück oder wurden dort angelernt. `seriennummer` und `externeId`
+gelten als **schwach**. Trifft ein Code mindestens ein Gerät über ein starkes
+Feld, fallen die Treffer weg, die nur an einem schwachen hängen.
+
+Der Anlass steht im Bestand und ist kein Sonderfall: **42 der Codes sind
+mehrdeutig**, 11 davon nur wegen der Seriennummer. Sechs Masken der Serie
+„Vollatemmaske Normaldruck 2–8" tragen in `seriennummer` die *Inventarnummer
+einer anderen Maske* — ein Erfassungsfehler in Sybos. Ein Scan des Etiketts
+`2016-MU-046` traf deshalb zwei Masken, und die App fragte bei jedem einzelnen
+Scan nach, obwohl die Antwort feststeht.
+
+Die schwachen Felder bleiben suchbar: Sind sie der *einzige* Treffer, wird er
+geliefert — eine Flasche über ihre eingeprägte Seriennummer zu finden, muss
+weiter gehen. Und wo eine Auswahl übrig bleibt, nennt der Scanner-Dialog je
+Zeile das treffende Feld (`matchedFields()`), damit „getroffen über
+Inventarnummer" von „getroffen über Seriennummer" zu unterscheiden ist.
+
+Das behebt die Ursache nicht — die liegt in Sybos. Es sorgt nur dafür, dass ein
+Erfassungsfehler in einem Feld, das auf keinem Aufkleber steht, nicht bei jedem
+Scan einen Handgriff kostet.
+
+### Welche Kennung führt
+
+`geraetKennung()` ist `inventarNr ?? nummer ?? seriennummer` — **die
+Inventarnummer führt, für jeden Typ.** Sie steht auf dem aufgeklebten Etikett
+und ist die, die gescannt wird.
+
+Vorher führte `nummer`, und das ging schief: Der Import leitet `nummer` aus der
+Zusatz-Inventar-Nr. ab (gedacht für die ASSP-Flaschennummer `AF-2.16.19`),
+wendet das aber auf jeden Typ an. Bei **allen 81 Masken** stand damit eine
+andere Kennung am Bildschirm als auf dem Etikett — ein Scan von `2016-MU-046`
+schlug eine Maske `2.16.36` vor, dieselbe Maske, nur nicht wiederzuerkennen.
+Bei einer Maske stand als „Kennung" sogar der Modellname `XPLORE4`.
+
+**Folge für gespeicherte Daten:** `flaschenNummer` am Füllprotokoll und
+`kennung` am Trupp-Gerät sind Kopien der führenden Kennung. Neue Einträge
+tragen daher die Inventarnummer, ältere behalten, was zum Zeitpunkt der
+Erfassung galt. Beides bleibt über `geraetId` mit dem Stammdatensatz
+verbunden.
 
 Für Flaschen ohne brauchbaren Barcode lassen sich eigene QR-Etiketten drucken,
 und ein gescannter unbekannter Code kann am Gerät als weiterer `barcodes`-
@@ -706,6 +750,41 @@ Zwei Fallstricke:
   WebView auf `einsatz.ffnd.at`, die Berechtigung wirkt daher erst mit dem
   nächsten App-Release. Bis dahin steht die Handeingabe gleichwertig daneben —
   die Seite ist ohne Kamera vollständig bedienbar.
+
+### Was gelesen wurde, steht am Bildschirm
+
+Der Scan zeigt **Rohtext, Symbologie und Detektor** an — dauerhaft und für alle,
+nicht hinter dem Debug-Schalter. Der Grund ist eine Fehlersuche, die ohne diese
+Angaben nicht zu führen war: Wird ein Gerät vorgeschlagen, das nicht zur Flasche
+in der Hand passt, sind zwei völlig verschiedene Ursachen möglich, und der
+Bildschirm zeigte bisher keine davon.
+
+- Steht dort ein **falscher Text** oder eine falsche Symbologie — ein Etikett in
+  Code 128, gemeldet als `code_39` —, ist es ein Fehllesen.
+- Steht dort der **richtige** Text, wurde er falsch aufgelöst: `normalizeCode()`
+  wirft Trennzeichen weg und `lookupKeys()` durchsucht sechs Felder, zwei
+  Stücke können also auf demselben normalisierten Code landen.
+
+`BarcodeScanEvent` trägt deshalb **alle** Rohtreffer eines Bildes, nicht nur den
+übernommenen: Liest der native Detektor dasselbe Etikett zugleich als `code_128`
+und als `code_39`, entscheidet allein die Reihenfolge, und genau das sieht man
+sonst nirgends. Der ZXing-Fallback liefert immer nur einen Eintrag — sein
+`MultiFormatReader` bricht beim ersten Leser ab, der etwas herausbekommt.
+
+Die Zeile reist mit dem Treffer weiter bis an `GeraetBestaetigung` im
+Folgedialog. Sie dort und nicht nur im Scanner-Dialog zu zeigen ist der
+eigentliche Punkt: Bei **genau einem** Treffer schließt sich der Scanner sofort,
+und die Ausgabe- oder Füllmaske ist die einzige Stelle, an der die Rohlesung
+neben dem gewählten Stück steht — also dort, wo die Verwechslung auffällt.
+
+Solange nichts gelesen ist, steht stattdessen die **Auflösung des Videobildes
+und die Zahl der geprüften Bilder** da. „Kamera läuft, Decoder findet nichts"
+sah vorher aus wie ein Hänger, und die Auflösung erklärt den Fall: Ein
+Strichcode braucht Pixel je Modul. Ein Code-128-Etikett aus 30 cm Abstand ist in
+einem 640×480-Bild nachweislich nicht lesbar — der Hook zeichnet das Videobild
+1:1 ins Canvas, ohne Zuschnitt auf den Zielrahmen und ohne Hochskalierung. Der
+Rahmen im Dialog (`inset: '30% 10%'`) ist reine Dekoration; ausgewertet wird das
+ganze Bild.
 
 ## Mangel-Verallgemeinerung
 

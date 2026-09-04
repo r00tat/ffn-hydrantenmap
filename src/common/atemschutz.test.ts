@@ -19,6 +19,7 @@ import {
   fuellungSperre,
   geraetDetails,
   geraetKennung,
+  matchedFields,
   gruppiereTruppGeraete,
   gruppiereTrupps,
   istGueltigeUid,
@@ -148,6 +149,62 @@ describe('findByCode', () => {
 
   it('liefert für eine leere Eingabe eine leere Liste', () => {
     expect(findByCode([a, b], '  ')).toEqual([]);
+  });
+
+  it('lässt eine starke Kennung eine Seriennummer verdrängen', () => {
+    // Der Fall aus dem Bestand: Die Maske trägt "2016-MU-046" als
+    // Inventarnummer, eine zweite dieselbe Zeichenkette in ihrer
+    // Seriennummer. Ohne Verdrängung fragt der Scan bei jedem Etikett nach.
+    const echt = geraet({ id: 'echt', typ: 'maske', inventarNr: '2016-MU-046' });
+    const falschErfasst = geraet({
+      id: 'falsch',
+      typ: 'maske',
+      inventarNr: '9001-MU-704',
+      seriennummer: '2016-MU-046',
+    });
+    expect(
+      findByCode([echt, falschErfasst], '2016-MU-046').map((g) => g.id),
+    ).toEqual(['echt']);
+  });
+
+  it('findet weiterhin über die Seriennummer, wenn sie der einzige Treffer ist', () => {
+    const nurSerie = geraet({ id: 's', seriennummer: 'BA66937' });
+    expect(findByCode([a, nurSerie], 'BA66937').map((g) => g.id)).toEqual(['s']);
+  });
+
+  it('verdrängt auch die externe ID des Fremdsystems', () => {
+    const perNummer = geraet({ id: 'n', nummer: '80546' });
+    const perExterneId = geraet({ id: 'e', externeId: '80546' });
+    expect(
+      findByCode([perNummer, perExterneId], '80546').map((g) => g.id),
+    ).toEqual(['n']);
+  });
+});
+
+describe('matchedFields', () => {
+  it('nennt das Feld, über das ein Code trifft', () => {
+    expect(
+      matchedFields(geraet({ inventarNr: '2016-MU-046' }), '2016-MU-046'),
+    ).toEqual(['inventarNr']);
+    expect(
+      matchedFields(geraet({ seriennummer: '2016-MU-046' }), '2016mu046'),
+    ).toEqual(['seriennummer']);
+  });
+
+  it('zählt denselben Code aus zwei Feldern einmal, das aussagekräftigere gewinnt', () => {
+    // Im Bestand steht die Zusatz-Inventar-Nr. oft wortgleich auch in der
+    // Seriennummer. Beide zu melden hieße "getroffen über Zusatz-Inventar-Nr.,
+    // Seriennummer" — eine Genauigkeit, die es nicht gibt.
+    expect(
+      matchedFields(
+        geraet({ zusatzInventarNr: '2.16.36', seriennummer: '2.16.36' }),
+        '2.16.36',
+      ),
+    ).toEqual(['zusatzInventarNr']);
+  });
+
+  it('liefert nichts, wenn der Code nicht trifft', () => {
+    expect(matchedFields(geraet({ nummer: '2.16.19' }), '9999')).toEqual([]);
   });
 });
 
@@ -765,16 +822,24 @@ describe('sanitizeMitglieder', () => {
 });
 
 describe('geraetKennung', () => {
-  it('nimmt die Flaschennummer', () => {
-    expect(geraetKennung(geraet({ nummer: '2.16.03' }))).toBe('2.16.03');
-  });
-
-  it('fällt auf die Inventarnummer zurück', () => {
+  it('führt die Inventarnummer — sie steht auf dem gescannten Etikett', () => {
+    // Der Anlass: Ein Scan von "2016-MU-046" schlug eine Maske "2.16.36" vor.
+    // Dieselbe Maske, aber am Etikett nicht wiederzuerkennen.
     expect(
       geraetKennung(
-        geraet({ nummer: undefined, inventarNr: '2016-FL-003' }),
+        geraet({ typ: 'maske', nummer: '2.16.36', inventarNr: '2016-MU-046' }),
       ),
-    ).toBe('2016-FL-003');
+    ).toBe('2016-MU-046');
+  });
+
+  it('gilt auch für Flaschen', () => {
+    expect(
+      geraetKennung(geraet({ nummer: '2.16.35', inventarNr: '2016-FL-035' })),
+    ).toBe('2016-FL-035');
+  });
+
+  it('fällt auf die Nummer zurück, wenn keine Inventarnummer gepflegt ist', () => {
+    expect(geraetKennung(geraet({ nummer: '2.16.03' }))).toBe('2.16.03');
   });
 
   it('fällt auf die Seriennummer zurück', () => {

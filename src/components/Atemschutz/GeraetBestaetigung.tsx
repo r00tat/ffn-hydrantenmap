@@ -9,11 +9,21 @@ import {
   geraetKennung,
   type AtemschutzGeraet,
 } from '../../common/atemschutz';
+import type { BarcodeScanEvent } from '../../hooks/useBarcodeScanner';
+import ScanHinweis from './ScanHinweis';
 
 export interface GeraetBestaetigungProps {
   geraet: AtemschutzGeraet;
   /** Hakerl davor — dort, wo gerade eben ausgewählt oder gescannt wurde. */
   bestaetigt?: boolean;
+  /**
+   * Die Rohlesung, wenn das Stück gescannt wurde.
+   *
+   * Sie steht hier und nicht im Scanner-Dialog, weil der sich bei einem
+   * eindeutigen Treffer sofort schließt: Wer prüfen will, ob das gezeigte Stück
+   * wirklich das gescannte ist, sieht beides erst hier nebeneinander.
+   */
+  scan?: BarcodeScanEvent;
 }
 
 /**
@@ -28,6 +38,7 @@ export interface GeraetBestaetigungProps {
 export default function GeraetBestaetigung({
   geraet,
   bestaetigt,
+  scan,
 }: GeraetBestaetigungProps) {
   const kennung = geraetKennung(geraet);
   const details = [geraet.feuerwehr, geraet.inventarNr, geraet.seriennummer]
@@ -62,6 +73,7 @@ export default function GeraetBestaetigung({
               {details}
             </Typography>
           )}
+          {scan && <ScanHinweis scan={scan} />}
         </Box>
       </Stack>
     </Paper>

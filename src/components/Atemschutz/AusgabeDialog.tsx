@@ -19,6 +19,7 @@ import {
   type AtemschutzGeraet,
   type Sichtkontrolle,
 } from '../../common/atemschutz';
+import type { BarcodeScanEvent } from '../../hooks/useBarcodeScanner';
 import GeraetBestaetigung from './GeraetBestaetigung';
 import MangelFelder from './MangelFelder';
 import {
@@ -52,6 +53,8 @@ export interface AusgabeDialogProps {
   empfaengerVorschlaege: string[];
   /** Vorbelegung beim Zurücknehmen. */
   ausgegebenAn?: string;
+  /** Die Rohlesung, wenn der Dialog aus einem Scan heraus geöffnet wurde. */
+  scan?: BarcodeScanEvent;
   onClose: () => void;
   onConfirm: (patch: AusgabePatch) => Promise<void>;
 }
@@ -78,6 +81,7 @@ export default function AusgabeDialog({
   geraet,
   empfaengerVorschlaege,
   ausgegebenAn,
+  scan,
   onClose,
   onConfirm,
 }: AusgabeDialogProps) {
@@ -146,7 +150,7 @@ export default function AusgabeDialog({
       <DialogContent>
         {saving && <LinearProgress sx={{ mb: 2 }} />}
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <GeraetBestaetigung geraet={geraet} />
+          <GeraetBestaetigung geraet={geraet} scan={scan} />
           {istAusgabe && (
             <Autocomplete
               freeSolo
