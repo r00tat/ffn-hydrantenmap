@@ -664,6 +664,15 @@ Was daran zu wissen ist:
   Sicherheitswarnung, und den soll der Aufrufer nicht bestimmen können.
 - **Nichts weiter als einen Tag im Voraus.** `abmarschZeit` kommt aus einem
   Formularfeld; ein vertipptes Datum ergäbe eine Aufgabe, die in Wochen anläuft.
+- **Die Queue liegt in `europe-west1`, der Dienst in `europe-west4`.** Nicht aus
+  Nachlässigkeit: Hat ein Projekt eine App-Engine-Anwendung — `ffn-utils` hat
+  eine in `europe-west1` —, kennt Cloud Tasks ausschließlich deren Region und
+  lehnt jede andere mit „Location 'europe-west4' is not a valid location" ab.
+  Das Ziel der Aufgabe ist eine HTTPS-URL und von der Region unabhängig; einzig
+  der Pfad in `ATEMSCHUTZ_TASKS_QUEUE` muss dieselbe Region nennen wie die
+  angelegte Queue, sonst schriebe der Dienst in eine, die es nicht gibt, und die
+  Termine fielen still auf den Netz-Zeitplan zurück. Ein `check`-Block in beiden
+  Terraform-Roots vergleicht deshalb Pfad und Queue.
 - **Ohne Queue wird nicht geplant** (`notConfigured`), und das ist kein Fehler:
   Lokal gibt es keine, und dort warnt die offene Seite. Die beiden
   Umgebungsvariablen dafür sind `ATEMSCHUTZ_TASKS_QUEUE` und

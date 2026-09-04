@@ -77,3 +77,13 @@ variable "ueberwachung_paused" {
   type        = bool
   default     = false
 }
+
+# Cloud Tasks hängt in einem Projekt mit App-Engine-Anwendung an deren Region:
+# ffn-utils hat eine in europe-west1, der Dienst läuft in europe-west4, und ein
+# `location = europe-west4` scheitert deshalb mit „Location 'europe-west4' is
+# not a valid location". Die Region der Queue ist frei wählbar gegenüber dem
+# Ziel des Aufrufs — Cloud Tasks ruft eine beliebige HTTPS-URL auf.
+variable "tasks_region" {
+  description = "Region of the Cloud Tasks queue. Pinned to the App Engine region of the project (europe-west1), not the Cloud Run region. Must match the region in ATEMSCHUTZ_TASKS_QUEUE — the caller builds both from the same variable."
+  type        = string
+}
