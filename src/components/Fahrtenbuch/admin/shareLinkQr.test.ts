@@ -102,6 +102,23 @@ describe('qrPrintDocument', () => {
     expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
   });
 
+  it('druckt den Code quadratisch, solange nichts anderes gesagt ist', () => {
+    const html = qrPrintDocument('<svg></svg>', labels);
+    expect(html).toContain('width: 120mm');
+    expect(html).toContain('height: 120mm');
+  });
+
+  it('druckt einen Strichcode breit statt quadratisch', () => {
+    // Ein Code 128 in ein Quadrat gezwängt wäre so schmal, dass ihn kein
+    // Scanner mehr liest. Die Höhe ist bei einem 1D-Code frei wählbar.
+    const html = qrPrintDocument('<svg></svg>', {
+      ...labels,
+      codeShape: 'linear',
+    });
+    expect(html).not.toContain('height: 120mm');
+    expect(html).toContain('height: 30mm');
+  });
+
   it('stellt das vorbelegte Fahrzeug heraus', () => {
     const html = qrPrintDocument('<svg></svg>', {
       ...labels,

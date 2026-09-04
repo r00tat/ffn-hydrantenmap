@@ -114,16 +114,73 @@ tragen daher die Inventarnummer, ältere behalten, was zum Zeitpunkt der
 Erfassung galt. Beides bleibt über `geraetId` mit dem Stammdatensatz
 verbunden.
 
+Die Regel gilt **überall dort, wo ein Gerät angezeigt wird**, nicht nur beim
+Scan: Geräteverwaltung, Import-Vorschau, QR-Etikett, Gerätedialog und der Name,
+der an einen Mangel kopiert wird, gehen alle über `geraetKennung()` bzw.
+`geraetLabel()`. Die Geräteliste zeigte davor `nummer` als Überschrift — also
+bei jeder Maske und jedem Pressluftatmer eine Nummer, die auf dem Stück gar
+nicht steht.
+
+Was **nicht** führt, verschwindet trotzdem nicht: `geraetNebenkennungen()`
+liefert die übrigen Kennungen (Flaschennummer, Zusatz-Inventar-Nr.,
+Seriennummer) für die Zeile unter dem Etikett — ohne die führende zu
+wiederholen und ohne Dubletten, denn der Import leitet `nummer` aus der
+Zusatz-Inventar-Nr. ab, und beide Felder tragen dann denselben Text. Am
+Sammelplatz wird die Flaschennummer gesprochen; sie muss lesbar bleiben, nur
+eben als Zusatz.
+
 Für Flaschen ohne brauchbaren Barcode lassen sich eigene QR-Etiketten drucken,
 und ein gescannter unbekannter Code kann am Gerät als weiterer `barcodes`-
 Eintrag angelernt werden (`addAtemschutzBarcode`).
 
-Das Etikett trägt die **Flaschennummer im Klartext**, nicht die Firestore-ID:
-Sie steht auch lesbar darauf, `lookupKeys()` findet sie, und das Etikett
-überlebt so einen Neuimport der Stammdaten. Gedruckt wird über
+Das Etikett trägt die **führende Kennung im Klartext** — im Regelfall also die
+Inventarnummer —, nicht die Firestore-ID: Sie steht auch lesbar darauf,
+`lookupKeys()` findet sie, und das Etikett überlebt so einen Neuimport der
+Stammdaten. Ältere Etiketten mit der Flaschennummer bleiben gültig, weil
+`lookupKeys()` beide Felder abdeckt. Ein Stück, das nur eine Inventarnummer
+hat, war davor gar nicht etikettierbar. Gedruckt wird über
 `printShareLinkQr` aus dem Fahrtenbuch — eine `@media print`-Regel im Dialog
 nähme dessen Overlay- und Scroll-Container mit auf den Ausdruck, deshalb baut
 jene Funktion ein eigenständiges Dokument in einem neuen Fenster.
+
+### QR oder Code 128
+
+Die Codeart ist am Dialog wählbar. **QR ist die Vorgabe** — mehr Inhalt auf
+weniger Fläche, und er verzeiht Knicke und Schmutz, die ein Etikett an einer
+Flasche zwangsläufig abbekommt. **Code 128** gibt es, weil viele Handscanner
+und Lagergeräte nur Strichcodes lesen und weil er auf ein schmales
+Flaschenetikett besser passt. Beide liest der Scanner der App:
+`useBarcodeScanner` führt `CODE_128` in seiner Formatliste.
+
+Der Encoder steht in `src/common/code128.ts` und ist **selbst gerechnet**.
+`@zxing/library` liegt zwar im Projekt, bringt aber nur Reader mit — im
+`MultiFormatWriter` ist alles außer QR auskommentiert. Für 107 Zeilen
+Mustertabelle und eine Modulo-103-Prüfziffer eine weitere Abhängigkeit
+aufzunehmen wäre unverhältnismäßig.
+
+Drei Festlegungen, die man dem Code sonst nicht ansieht:
+
+- **Nur Codeset B.** Es deckt die druckbaren ASCII-Zeichen ab und damit jede
+  vorkommende Kennung (`2016-FL-035`, `2.16.19`, `2016/031`). Codeset C würde
+  reine Ziffernpaare halb so breit drucken, aber die Inventarnummern sind
+  gemischt — die Umschaltlogik wäre reine Fehlerquelle. Eine Kennung mit
+  Umlaut sperrt die Auswahl, statt beim Zeichnen zu scheitern.
+- **Die Ruhezone steckt in der `viewBox`**, nicht im Rand des umgebenden
+  Elements. Gedruckt wird das serialisierte SVG allein; ohne die zehn hellen
+  Module links und rechts findet kein Decoder den Anfang des Symbols, und das
+  Etikett wäre stumm. Das ist der häufigste Fehler bei selbst gebauten
+  Strichcodes.
+- **Die Druckseite kennt zwei Gestalten** (`codeShape`): `square` für QR,
+  `linear` für den Strichcode. In das quadratische 120-mm-Feld des QR-Codes
+  gezwängt wäre ein Code 128 so schmal, dass ihn kein Scanner mehr liest. Ein
+  Aufzählungswert und keine freien Maße, damit nichts Ungeprüftes ins
+  `<style>` der Druckseite gerät.
+
+Geprüft wird der Encoder über den **Rückweg**: `code128.test.ts` und der
+Dialogtest lesen jedes erzeugte Symbol mit dem ZXing-`Code128Reader` zurück.
+Eine 107-Zeilen-Tabelle von Hand gegen die Norm zu prüfen wäre unzuverlässig;
+sie gegen den Decoder zu prüfen, der die Etiketten später wirklich liest, ist
+die Aussage, auf die es ankommt.
 
 ## Warum der Import Dubletten behandeln muss
 
@@ -150,6 +207,14 @@ einer Bemerkung wie „200BAR". Die Ableitung ist eine Erleichterung, keine
 Behauptung — im Vorschaudialog ist jeder Wert änderbar. Ebenso die
 Bezirksreserve: Im Export steht bei diesen 25 Flaschen als Dienststelle
 trotzdem „Neusiedl am See", nur die Bezeichnung verrät sie.
+
+**Nenndruck und Volumen gibt es nur an der Flasche** — im Import, im
+Gerätedialog (dort sind die beiden Felder bei jedem anderen Typ ausgeblendet)
+und in `buildGeraetPayload`, damit die Regel nicht auf der Ehrlichkeit des
+Clients steht. An einer Maske wären beide Werte eine Erfindung, und die
+Ableitung aus dem Klartext greift dort daneben: „Atemluftkompressor Mobil 300
+l/min" ergab eine 300-Liter-Flasche. Gelesen werden sie ohnehin nur an
+Flaschen — `vorgabeGeraetesatz()` überspringt jeden anderen Typ.
 
 ### Füllstationen kommen aus einem zweiten Export
 
@@ -621,7 +686,7 @@ stammen:
   ein Zwischenschritt, den niemand mit Handschuhen tippt. Ohne Stammdatensatz
   oder ohne Schreibrecht bleibt es beim Setzen der Suche.
 - **Die Flaschennummer im Füllprotokoll ist die führende Kennung**
-  (`geraetKennung`: Nummer → Inventar-Nr. → Seriennummer), nicht die
+  (`geraetKennung`: Inventar-Nr. → Nummer → Seriennummer), nicht die
   Bezeichnung. Eine Flasche ohne eigene Nummer stand sonst als „Atemluftflasche
   CFK 6,8 l" im Protokoll und war von der Nachbarflasche desselben Typs nicht
   zu unterscheiden. Welche Flasche gewählt ist, steht als `geraetDetails` unter

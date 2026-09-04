@@ -293,6 +293,25 @@ describe('rowsToGeraete', () => {
     expect(geraet.nenndruck).toBeUndefined();
   });
 
+  it('setzt kein Volumen für eine Füllstation', () => {
+    // Volumen und Nenndruck sind Felder der Flasche. Die Ableitung aus dem
+    // Klartext greift sonst daneben: „300 l/min" ist die Förderleistung eines
+    // Kompressors und keine 300-Liter-Flasche.
+    const [geraet] = rowsToGeraete([
+      KOPF,
+      row({
+        ID: '29219',
+        Bezeichnung: 'Atemluftkompressor Mobil 300 l/min',
+        'Klasse 1': 'Atemlufterzeugung',
+        'Klasse 2': 'Atemluftkompressor',
+        Dienststelle: 'Neusiedl am See',
+        Status: 'aktiv',
+      }),
+    ]);
+    expect(geraet.typ).toBe('fuellstation');
+    expect(geraet.volumenLiter).toBeUndefined();
+  });
+
   it('setzt keinen Standort für Flaschen und Masken', () => {
     // "Atemluftflasche Stahl 6 l mobil" gibt es nicht, aber die Regel soll
     // nicht am Klartext hängen: Standort ist ein Feld der Füllstation.

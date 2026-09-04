@@ -114,13 +114,17 @@
       }
     },
     "qr": {
-      "title": "QR label",
-      "button": "QR label",
-      "hint": "The code contains the cylinder number. Print and attach to the cylinder.",
-      "noNumber": "This item has no cylinder number — please enter one first.",
+      "title": "Equipment label",
+      "button": "Label",
+      "hint": "The code contains the item identifier (usually the inventory number). Print and attach to the item.",
+      "noNumber": "This item has no identifier — please enter an inventory number first.",
       "print": "Print",
       "printBlocked": "The browser blocked the print window. Please allow pop-ups for this page.",
-      "exportFailed": "The label could not be created."
+      "exportFailed": "The label could not be created.",
+      "codeArt": "Code type",
+      "codeArtQr": "QR code",
+      "codeArtCode128": "Code 128",
+      "code128Unmoeglich": "The identifier contains a character Code 128 cannot encode, such as an umlaut."
     },
     "scanner": {
       "title": "Scan barcode",

@@ -398,7 +398,9 @@ export default function FuellungDialog({
       </DialogTitle>
       <DialogContent>
         {saving && <LinearProgress sx={{ mb: 2 }} />}
-        <Grid container spacing={2} sx={{ mt: 0 }}>
+        {/* `mt` wie im Gerätedialog: ohne oberes Padding beschneidet der
+            Scroll-Container das Label der ersten Zeile. */}
+        <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid size={12}>
             <Stack
               direction="row"

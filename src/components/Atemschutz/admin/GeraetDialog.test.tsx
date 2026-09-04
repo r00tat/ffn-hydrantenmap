@@ -134,4 +134,68 @@ describe('GeraetDialog', () => {
     render(kompressor({ standort: 'fix' }));
     expect(screen.queryByLabelText(/Fahrzeug oder Anhänger/)).toBeNull();
   });
+
+  it('zeigt Nenndruck und Volumen nur bei einer Flasche', async () => {
+    // Beide Felder beschreiben die Flasche. An einer Maske oder einem
+    // Kompressor stünde dort eine Erfindung — der Import lässt sie dort aus
+    // demselben Grund weg.
+    const user = userEvent.setup();
+    render(kompressor({ typ: 'flasche' }));
+
+    expect(screen.getByLabelText('Nenndruck (bar)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Volumen (l)')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Typ'));
+    await user.click(await screen.findByRole('option', { name: 'Atemmaske' }));
+
+    expect(screen.queryByLabelText('Nenndruck (bar)')).toBeNull();
+    expect(screen.queryByLabelText('Volumen (l)')).toBeNull();
+  });
+
+  it('schickt Nenndruck und Volumen nicht mit, wenn der Typ keine Flasche ist', async () => {
+    const user = userEvent.setup();
+    render(kompressor({ typ: 'flasche', nenndruck: 300, volumenLiter: 6.8 }));
+
+    await user.click(screen.getByLabelText('Typ'));
+    await user.click(await screen.findByRole('option', { name: 'Atemmaske' }));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nenndruck: undefined,
+          volumenLiter: undefined,
+        }),
+      ),
+    );
+  });
+
+  it('stellt die Inventarnummer vor die Flaschennummer', () => {
+    // Die Inventarnummer ist die führende Kennung — sie steht auf dem
+    // Etikett, das gescannt wird. Sie gehört deshalb in die erste Zeile und
+    // nicht hinter die Flaschennummer.
+    render(kompressor({ typ: 'flasche' }));
+
+    const felder = screen.getAllByRole('textbox');
+    const namen = felder.map(
+      (f) => f.getAttribute('id') ?? f.getAttribute('name') ?? '',
+    );
+    const inventar = felder.indexOf(screen.getByLabelText('Inventar-Nr.'));
+    const flasche = felder.indexOf(screen.getByLabelText('Flaschennummer'));
+
+    expect(inventar).toBeGreaterThanOrEqual(0);
+    expect(flasche).toBeGreaterThanOrEqual(0);
+    expect(inventar, namen.join(', ')).toBeLessThan(flasche);
+  });
+
+  it('lässt oben Platz, damit das Label der ersten Zeile nicht abgeschnitten wird', () => {
+    // `DialogContent` direkt unter `DialogTitle` hat in MUI kein oberes
+    // Padding; das nach oben versetzte Label eines Outlined-Feldes wird sonst
+    // vom Scroll-Container beschnitten.
+    render(kompressor());
+    const inhalt = document.querySelector('.MuiDialogContent-root');
+    const grid = inhalt?.firstElementChild;
+    expect(grid).toBeTruthy();
+    expect(getComputedStyle(grid as Element).marginTop).not.toBe('0px');
+  });
 });

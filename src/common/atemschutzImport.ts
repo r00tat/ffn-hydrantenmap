@@ -268,10 +268,12 @@ export function rowsToGeraete(rows: string[][]): ImportGeraet[] {
     if (nummer) geraet.nummer = nummer;
 
     if (werte.material) geraet.material = werte.material;
-    if (werte.volumenLiter) geraet.volumenLiter = werte.volumenLiter;
 
-    // Nenndruck nur für Flaschen: Bei einer Maske wäre er eine Erfindung.
+    // Volumen und Nenndruck nur für Flaschen: Bei einer Maske wären sie eine
+    // Erfindung, und die Ableitung aus dem Klartext greift daneben — „300
+    // l/min" ist die Förderleistung eines Kompressors und keine 300-l-Flasche.
     if (typ === 'flasche') {
+      if (werte.volumenLiter) geraet.volumenLiter = werte.volumenLiter;
       geraet.nenndruck = nenndruckAusBemerkung(bemerkung) ?? 300;
     }
 

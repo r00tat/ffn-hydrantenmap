@@ -695,6 +695,20 @@ export function matchGeraete(
 }
 
 /**
+ * Die Kennungsfelder eines Geräts — mehr braucht kein Etikett.
+ *
+ * Bewusst nicht `AtemschutzGeraet`: Eine Zeile aus dem Sybos-Import hat noch
+ * keine Systemfelder, soll in der Vorschau aber schon so heißen wie später im
+ * Bestand.
+ */
+export type GeraetKennungFelder = Partial<
+  Pick<
+    AtemschutzGeraet,
+    'inventarNr' | 'nummer' | 'zusatzInventarNr' | 'seriennummer'
+  >
+>;
+
+/**
  * Die führende Kennung eines Geräts — die, unter der es angesprochen wird.
  *
  * **Die Inventarnummer führt**, für jeden Typ. Sie ist die, die auf dem
@@ -709,24 +723,60 @@ export function matchGeraete(
  * drei, gibt es keine Kennung; dann bleibt nur die Bezeichnung, und die ist
  * Sache des Aufrufers.
  */
-export function geraetKennung(g: AtemschutzGeraet): string | undefined {
+export function geraetKennung(g: GeraetKennungFelder): string | undefined {
   return g.inventarNr ?? g.nummer ?? g.seriennummer ?? undefined;
 }
 
 /** Einzeiliges Etikett eines Geräts für Auswahllisten. */
-export function geraetLabel(g: AtemschutzGeraet): string {
+export function geraetLabel(
+  g: GeraetKennungFelder & Pick<AtemschutzGeraet, 'bezeichnung'>,
+): string {
   const kopf = geraetKennung(g);
   return kopf ? `${kopf} · ${g.bezeichnung}` : g.bezeichnung;
+}
+
+/**
+ * Die weiteren Kennungen eines Geräts — alles außer der führenden.
+ *
+ * Gedacht für die Zeile unter dem Etikett: Am Sammelplatz wird die
+ * Flaschennummer gesprochen, am Etikett steht die Inventarnummer, und im
+ * Sybos-Export steht beides. Die führende Kennung steht schon im Etikett und
+ * würde sich sonst wiederholen.
+ *
+ * Dubletten fallen weg: Der Import leitet `nummer` aus der Zusatz-Inventar-Nr.
+ * ab, beide Felder tragen dann denselben Text. Steht dort etwas anderes — bei
+ * einer Maske schon einmal der Modellname —, wird es zusätzlich genannt.
+ */
+export function geraetNebenkennungen(g: GeraetKennungFelder): string[] {
+  const gesehen = new Set<string>();
+  const kennung = geraetKennung(g);
+  if (kennung) gesehen.add(kennung);
+  const weitere: string[] = [];
+  for (const feld of [
+    g.inventarNr,
+    g.nummer,
+    g.zusatzInventarNr,
+    g.seriennummer,
+  ]) {
+    const wert = feld?.trim();
+    if (!wert || gesehen.has(wert)) continue;
+    gesehen.add(wert);
+    weitere.push(wert);
+  }
+  return weitere;
 }
 
 /**
  * Die Zeile unter dem Etikett: woran man erkennt, dass es *dieses* Stück ist.
  *
  * Die Bezeichnung steht vorn, weil eine Nummer allein nicht sagt, ob eine
- * 6-Liter-Stahlflasche oder eine 6,8-Liter-CFK gemeint ist.
+ * 6-Liter-Stahlflasche oder eine 6,8-Liter-CFK gemeint ist. Danach die
+ * besitzende Wehr und die Kennungen, die *nicht* schon im Etikett stehen.
  */
-export function geraetDetails(g: AtemschutzGeraet): string {
-  return [g.bezeichnung, g.feuerwehr, g.inventarNr, g.seriennummer]
+export function geraetDetails(
+  g: GeraetKennungFelder & Pick<AtemschutzGeraet, 'bezeichnung' | 'feuerwehr'>,
+): string {
+  return [g.bezeichnung, g.feuerwehr, ...geraetNebenkennungen(g)]
     .filter(Boolean)
     .join(' · ');
 }

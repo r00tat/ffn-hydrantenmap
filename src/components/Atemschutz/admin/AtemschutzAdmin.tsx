@@ -28,6 +28,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   ATEMSCHUTZ_GERAET_TYPEN,
+  geraetLabel,
+  geraetNebenkennungen,
   normalizeCode,
   lookupKeys,
   type AtemschutzGeraet,
@@ -265,10 +267,12 @@ export default function AtemschutzAdmin() {
                             spacing={1}
                             sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                           >
-                            <span>
-                              {g.nummer ? `${g.nummer} · ` : ''}
-                              {g.bezeichnung}
-                            </span>
+                            {/* Die Inventarnummer führt, nicht die
+                                Flaschennummer: Sie steht auf dem aufgeklebten
+                                Etikett und ist die, nach der gesucht und
+                                gescannt wird. Die übrigen Kennungen stehen in
+                                der Zeile darunter. */}
+                            <span>{geraetLabel(g)}</span>
                             <Chip size="small" label={t(`typ.${g.typ}`)} />
                             {g.active === false && (
                               <Chip
@@ -280,7 +284,7 @@ export default function AtemschutzAdmin() {
                             )}
                           </Stack>
                         }
-                        secondary={[g.feuerwehr, g.inventarNr, g.seriennummer]
+                        secondary={[g.feuerwehr, ...geraetNebenkennungen(g)]
                           .filter(Boolean)
                           .join(' · ')}
                       />
