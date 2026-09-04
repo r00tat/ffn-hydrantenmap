@@ -18,7 +18,8 @@ import {
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import TruppCard from './TruppCard';
 import TruppDialog from './TruppDialog';
-import TruppZeitDialog, { type TruppZeitModus } from './TruppZeitDialog';
+import TruppZeitDialog from './TruppZeitDialog';
+import TruppZuteilungDialog from './TruppZuteilungDialog';
 
 export interface TruppsTabProps {
   trupps: TruppGruppen;
@@ -35,6 +36,18 @@ export interface TruppsTabProps {
 
 type Abschnitt = 'bereit' | 'imEinsatz' | 'zurueck';
 const ABSCHNITTE: Abschnitt[] = ['bereit', 'imEinsatz', 'zurueck'];
+
+/**
+ * Welche Zeilen unter welcher Überschrift stehen.
+ *
+ * „Zugeteilt" und „im Einsatz" liegen am Sammelplatz **zusammen**: Er entsendet
+ * den Trupp zu einer Einheit und weiß danach nicht, wann der Einsatzauftrag
+ * kommt. Zwei Überschriften behaupteten eine Auskunft, die es hier nicht gibt.
+ */
+const zeilenVon = (trupps: TruppGruppen, abschnitt: Abschnitt) =>
+  abschnitt === 'imEinsatz'
+    ? [...trupps.zugeteilt, ...trupps.imEinsatz]
+    : trupps[abschnitt];
 
 export default function TruppsTab({
   trupps,
@@ -54,7 +67,7 @@ export default function TruppsTab({
   const [edit, setEdit] = useState<AtemschutzTrupp | undefined>();
   const [zeitDialog, setZeitDialog] = useState<{
     trupp: AtemschutzTrupp;
-    modus: TruppZeitModus;
+    art: 'zuteilen' | 'rueckkehr';
   }>();
   const [loeschKandidat, setLoeschKandidat] = useState<AtemschutzTrupp>();
   const [abmeldeKandidat, setAbmeldeKandidat] = useState<AtemschutzTrupp>();
@@ -74,8 +87,8 @@ export default function TruppsTab({
       trupp={trupp}
       canWrite={canWrite}
       istAktuell={aktuellIds.has(trupp.id)}
-      onEntsenden={() => setZeitDialog({ trupp, modus: 'entsenden' })}
-      onRueckkehr={() => setZeitDialog({ trupp, modus: 'rueckkehr' })}
+      onEntsenden={() => setZeitDialog({ trupp, art: 'zuteilen' })}
+      onRueckkehr={() => setZeitDialog({ trupp, art: 'rueckkehr' })}
       onWiederBereit={() => void onWiederBereit(trupp)}
       onAbmelden={() => setAbmeldeKandidat(trupp)}
       onEdit={() => {
@@ -99,21 +112,24 @@ export default function TruppsTab({
         </Stack>
       )}
 
-      {ABSCHNITTE.map((abschnitt) => (
-        <Box key={abschnitt} sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            {t(`trupp.sections.${abschnitt}`)}
-            {trupps[abschnitt].length > 0 && ` (${trupps[abschnitt].length})`}
-          </Typography>
-          {trupps[abschnitt].length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              {t(`trupp.empty.${abschnitt}`)}
+      {ABSCHNITTE.map((abschnitt) => {
+        const liste = zeilenVon(trupps, abschnitt);
+        return (
+          <Box key={abschnitt} sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              {t(`trupp.sections.${abschnitt}`)}
+              {liste.length > 0 && ` (${liste.length})`}
             </Typography>
-          ) : (
-            <Stack spacing={1}>{trupps[abschnitt].map(karte)}</Stack>
-          )}
-        </Box>
-      ))}
+            {liste.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                {t(`trupp.empty.${abschnitt}`)}
+              </Typography>
+            ) : (
+              <Stack spacing={1}>{liste.map(karte)}</Stack>
+            )}
+          </Box>
+        );
+      })}
 
       <Divider sx={{ my: 3 }} />
 
@@ -153,13 +169,21 @@ export default function TruppsTab({
         />
       )}
 
-      {zeitDialog && (
-        <TruppZeitDialog
-          key={`${zeitDialog.trupp.id}-${zeitDialog.modus}`}
+      {zeitDialog?.art === 'zuteilen' && (
+        <TruppZuteilungDialog
+          key={`${zeitDialog.trupp.id}-zuteilen`}
           open
-          modus={zeitDialog.modus}
           entsendetAnVorschlag={zeitDialog.trupp.entsendetAn}
           entsendetAnVorschlaege={entsendetAnVorschlaege}
+          onClose={() => setZeitDialog(undefined)}
+          onConfirm={(patch) => onPatch(zeitDialog.trupp, patch)}
+        />
+      )}
+
+      {zeitDialog?.art === 'rueckkehr' && (
+        <TruppZeitDialog
+          key={`${zeitDialog.trupp.id}-rueckkehr`}
+          open
           onClose={() => setZeitDialog(undefined)}
           onConfirm={(patch) => onPatch(zeitDialog.trupp, patch)}
         />

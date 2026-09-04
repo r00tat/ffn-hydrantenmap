@@ -4,108 +4,31 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import TruppZeitDialog from './TruppZeitDialog';
 
-function render(
-  props: Partial<React.ComponentProps<typeof TruppZeitDialog>> = {},
-) {
+function render() {
   const onConfirm = vi.fn().mockResolvedValue(undefined);
   renderWithIntl(
-    <TruppZeitDialog
-      open
-      modus="entsenden"
-      entsendetAnVorschlaege={['RLFA 2000', 'KDOF', 'Anna Huber']}
-      onClose={vi.fn()}
-      onConfirm={onConfirm}
-      {...props}
-    />,
+    <TruppZeitDialog open onClose={vi.fn()} onConfirm={onConfirm} />,
   );
-  return { onConfirm };
+  return onConfirm;
 }
 
 describe('TruppZeitDialog', () => {
-  it('entsendet auch ohne Angabe eines Ziels', async () => {
-    // Am Sammelplatz steht oft nur fest, *dass* der Trupp abmarschiert.
-    const { onConfirm } = render();
-    fireEvent.click(screen.getByRole('button', { name: /entsenden/i }));
+  it('schreibt die Rückkehr mit Zeit und Druck', async () => {
+    const onConfirm = render();
+    fireEvent.change(screen.getByLabelText(/Druck bei Rückkehr/), {
+      target: { value: '90' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rückkehr' }));
     await waitFor(() => expect(onConfirm).toHaveBeenCalled());
-    expect(onConfirm.mock.calls[0][0]).not.toHaveProperty('entsendetAn');
-    expect(onConfirm.mock.calls[0][0].status).toBe('imEinsatz');
+    expect(onConfirm.mock.calls[0][0]).toMatchObject({
+      status: 'zurueck',
+      druckRueckkehr: 90,
+    });
   });
 
-  it('schlägt die Fahrzeuge des Einsatzes vor', () => {
+  it('fragt nicht mehr nach der Einheit — das tut die Zuteilung', () => {
     render();
-    const feld = screen.getByLabelText(/Entsendet an/);
-    fireEvent.focus(feld);
-    fireEvent.keyDown(feld, { key: 'ArrowDown' });
-    expect(screen.getByRole('option', { name: 'RLFA 2000' })).toBeInTheDocument();
-  });
-
-  it('übernimmt ein frei eingetragenes Ziel', async () => {
-    const { onConfirm } = render();
-    fireEvent.change(screen.getByLabelText(/Entsendet an/), {
-      target: { value: 'Abschnitt Ost' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /entsenden/i }));
-    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
-    expect(onConfirm.mock.calls[0][0].entsendetAn).toBe('Abschnitt Ost');
-  });
-
-  it('übernimmt beim Entsenden die Vorbelegung der vorigen Bereitstellung', async () => {
-    const { onConfirm } = render({ entsendetAnVorschlag: 'KDOF' });
-    fireEvent.click(screen.getByRole('button', { name: /entsenden/i }));
-    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
-    expect(onConfirm.mock.calls[0][0].entsendetAn).toBe('KDOF');
-  });
-
-  it('zeigt bei der Rückkehr kein Zielfeld', () => {
-    render({ modus: 'rueckkehr' });
-    expect(screen.queryByLabelText(/Entsendet an/)).not.toBeInTheDocument();
-  });
-
-  it('fragt bei der Überwachung nach der taktischen Einheit', async () => {
-    // Auch wer allein arbeitet, braucht die Zuordnung: Ohne sie steht am Ende
-    // nirgends, welche Einheit den Trupp bekommen hat.
-    const { onConfirm } = render({ kontext: 'ueberwachung' });
-    fireEvent.change(screen.getByLabelText(/Taktische Einheit/), {
-      target: { value: 'RLFA-ND' },
-    });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
-    );
-    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
-    expect(onConfirm.mock.calls[0][0].entsendetAn).toBe('RLFA-ND');
-  });
-
-  it('beschriftet bei der Überwachung als „in den Einsatz schicken"', () => {
-    render({ kontext: 'ueberwachung' });
-    expect(
-      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Trupp in den Einsatz schicken'),
-    ).toBeInTheDocument();
-  });
-
-  it('übernimmt bei der Überwachung die Einheit der vorigen Bereitstellung', async () => {
-    const { onConfirm } = render({
-      kontext: 'ueberwachung',
-      entsendetAnVorschlag: 'RLFA 2000',
-    });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'In den Einsatz schicken' }),
-    );
-    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
-    expect(onConfirm.mock.calls[0][0].entsendetAn).toBe('RLFA 2000');
-  });
-
-  it('löscht eine bestehende Einheit nicht durch ein geleertes Feld', async () => {
-    // `entsendePatch` lässt das Feld aus dem Patch weg, wenn es leer ist — der
-    // bestehende Wert am Dokument bleibt damit stehen.
-    const { onConfirm } = render({ entsendetAnVorschlag: 'RLFA 2000' });
-    fireEvent.change(screen.getByLabelText(/Entsendet an/), {
-      target: { value: '' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /entsenden/i }));
-    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
-    expect(onConfirm.mock.calls[0][0]).not.toHaveProperty('entsendetAn');
+    expect(screen.queryByLabelText(/Entsendet an/)).toBeNull();
+    expect(screen.queryByLabelText(/Taktische Einheit/)).toBeNull();
   });
 });

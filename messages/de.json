@@ -166,6 +166,7 @@
       "vonUeberwachung": "Von der Atemschutzüberwachung übergeben ({zeit})",
       "status": {
         "bereit": "In Bereitschaft",
+        "zugeteilt": "Zugeteilt",
         "imEinsatz": "Im Einsatz",
         "zurueck": "Zurück & Regeneration",
         "abgemeldet": "Abgemeldet"
@@ -196,6 +197,11 @@
       "druckRueckkehr": "Geringster Druck bei Rückkehr (bar)",
       "entsendenTitle": "Trupp entsenden",
       "rueckkehrTitle": "Rückkehr protokollieren",
+      "zuteilenTitle": "Trupp einer Einheit zuteilen",
+      "zuteilenHinweis": "Der Trupp ist danach der Einheit zugeordnet und rüstet sich aus. Unter Atemschutz geht er erst mit dem Einsatzauftrag der Einheit — dann startet die Zeitkontrolle.",
+      "uebergabeZeit": "Übergabe an die Einheit",
+      "druckUebergabe": "Geringster Druck bei der Übergabe (bar)",
+      "zugeteiltAn": "Zugeteilt an",
       "seit": "seit {zeit}",
       "delete": "Trupp löschen",
       "deleteConfirm": "Soll diese Zeile wirklich gelöscht werden? Frühere Bereitstellungen desselben Trupps bleiben bestehen.",
@@ -459,6 +465,22 @@
         "startdruckAboveEnddruck": "Startdruck liegt über dem Enddruck."
       }
     },
+    "tagebuch": {
+      "auftragMitZiel": "{trupp} zur {auftrag} in {ziel}",
+      "auftragNurAuftrag": "{trupp} zur {auftrag}",
+      "auftragNurZiel": "{trupp} in den Einsatz — {ziel}",
+      "auftragOhne": "{trupp} in den Einsatz",
+      "amZielMitZiel": "{trupp} am Einsatzziel {ziel}",
+      "amZielOhne": "{trupp} am Einsatzziel",
+      "rueckzug": "{trupp} tritt den Rückzug an",
+      "rueckkehrMitEinheit": "{trupp} zurück bei {einheit}",
+      "rueckkehrOhne": "{trupp} zurück",
+      "meldung": "{trupp} meldet: {text}",
+      "meldungOhneText": "{trupp} meldet",
+      "druck": "Druck: {druck} bar",
+      "abmarschdruck": "Abmarschdruck: {druck} bar",
+      "einsatzdauer": "Einsatzdauer: {minuten} min"
+    },
     "ueberwachung": {
       "title": "Atemschutzüberwachung",
       "verantwortungHinweis": "Die Atemschutzüberwachung unterstützt den Trupp bei der Überwachung seines Luftvorrats; die Verantwortung für den Trupp bleibt beim Truppkommandanten und beim Kommandanten der taktischen Einheit.",
@@ -480,6 +502,12 @@
       "uebernehmenHinweis": "Damit übernimmt dieses Gerät die Einsatzzeitkontrolle für den Trupp: Die Übernahme wird als Wechsel der Verantwortung vom Sammelplatz protokolliert, und ab jetzt kommen die Warnungen zu Drittel-, Zwei-Drittel- und Rückzugszeitpunkt hier an — auch als Push, wenn die Seite geschlossen ist. Gerechnet wird mit dem unten gewählten Gerätesatz.",
       "einsatzziel": "Einsatzziel und -ort",
       "einsatzzielHint": "z.B. „Stiegenhaus 3. OG“ — das „WO“ der Dokumentation",
+      "auftrag": "Auftrag",
+      "auftragHint": "Was der Trupp tun soll — z.B. „Menschenrettung“, „Brandbekämpfung“, „Erkundung“.",
+      "auftragKurz": "Auftrag",
+      "einsatzauftragTitle": "Einsatzauftrag erteilen",
+      "einsatzauftragHinweis": "Mit dem Einsatzauftrag geht der Trupp unter Atemschutz: Ab hier läuft die Zeitkontrolle, dieses Gerät bekommt die Warnungen, und der Auftrag steht im Einsatztagebuch.",
+      "zugeteiltSeit": "zugeteilt seit {zeit}",
       "ueberwachtVon": "Überwachung durch",
       "ueberwachtVonHint": "Gruppenkommandant oder beauftragte Person, z.B. Maschinist oder Melder",
       "paTyp": "Gerätetype",
@@ -497,9 +525,13 @@
       "bearbeitenTitle": "Überwachung bearbeiten",
       "einsatzTitle": "Trupp in den Einsatz schicken",
       "abmarschZeit": "Abmarsch (Anschließen der Luftversorgung)",
-      "druckabfrageTitle": "Druckabfrage erfassen",
-      "druck": "Geringster Druck im Trupp (bar)",
+      "druckabfrageTitle": "Druckabfrage / Status",
+      "druck": "Geringster Druck im Trupp (bar) — optional",
       "druckHint": "Maßgeblich ist der Geräteträger mit dem größten Luftverbrauch.",
+      "druckOptionalHint": "Ohne Druck wird die Meldung als Statusmeldung gespeichert.",
+      "tagebuch": "Eintrag ins Einsatztagebuch",
+      "tagebuchHint": "Meldungen ohne Ankunft und Rückzug kommen nur mit Haken ins Tagebuch.",
+      "tagebuchImmer": "Ankunft und Rückzug kommen immer ins Einsatztagebuch.",
       "zeitpunkt": "Zeitpunkt der Meldung",
       "amZiel": "Trupp ist am Einsatzziel angekommen",
       "amZielHint": "Nur mit dem Druck bei der Ankunft lässt sich der Rückmarschdruck aus dem doppelten Vormarschdruckabfall berechnen. Nicht ankreuzen für eine gewöhnliche Zwischenabfrage.",
@@ -509,7 +541,6 @@
       "rueckzugHint": "Die Meldung „wir kommen zurück“. Danach keine Drittel- und Rückzugswarnungen mehr — beobachtet wird noch der Reservedruck.",
       "rueckzugKurz": "Rückzug",
       "rueckzugSeit": "Rückzug angetreten",
-      "bereitsGemeldet": "Bereits gemeldet — der Haken bleibt gesetzt. Gerechnet wird weiterhin mit der ersten Meldung.",
       "druckverlaufChart": "Druckverlauf über die Zeit",
       "chart": {
         "drittel": "1/3",
@@ -584,13 +615,15 @@
         "inDenEinsatz": "In den Einsatz schicken",
         "erneutInDenEinsatz": "Erneut in den Einsatz schicken",
         "anSammelplatz": "An den Sammelplatz übergeben",
-        "druckabfrage": "Druckabfrage",
+        "druckabfrage": "Druckabfrage / Status",
+        "einsatzauftrag": "In den Einsatz schicken",
+        "bereitZumAbmarsch": "Bereit zum Abmarsch",
         "truppErfassen": "Trupp erfassen",
         "pushErlauben": "Benachrichtigungen einschalten"
       },
       "errors": {
-        "druckMissing": "Druck muss angegeben sein",
-        "druckInvalid": "Druck muss zwischen 0 und 400 bar liegen"
+        "druckInvalid": "Druck muss zwischen 0 und 400 bar liegen",
+        "leereMeldung": "Ohne Druck braucht die Meldung eine Ankunft, einen Rückzug oder eine Bemerkung"
       },
       "push": {
         "truppOhneName": "Atemschutztrupp",
