@@ -1,5 +1,7 @@
 'use client';
 
+import Alert from '@mui/material/Alert';
+import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -9,43 +11,45 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { rueckkehrPatch, type TruppPatch } from '../../common/atemschutz';
+import { zuteilungPatch, type TruppPatch } from '../../common/atemschutz';
 import { fromLocalInput, toLocalInput } from '../../common/zeitEingabe';
 
-export interface TruppZeitDialogProps {
+export interface TruppZuteilungDialogProps {
   open: boolean;
+  /** Vorbelegung aus der vorigen Bereitstellung desselben Trupps. */
+  entsendetAnVorschlag?: string;
+  /** Fahrzeuge und taktische Einheiten des Einsatzes. */
+  entsendetAnVorschlaege: string[];
   onClose: () => void;
   onConfirm: (patch: TruppPatch) => Promise<void>;
 }
 
 /**
- * Die Rückkehr eines Trupps — Zeit und Druck.
+ * Der Sammelplatz übergibt einen Trupp an eine taktische Einheit.
  *
- * Nur noch die Rückkehr: Das Entsenden ist in zwei Dialoge zerfallen, die
- * verschiedene Dinge tun — `TruppZuteilungDialog` übergibt an eine Einheit,
- * `EinsatzauftragDialog` schickt unter Atemschutz. Ein Dialog, der sich je
- * nach Aufrufer anders beschriftet und einen anderen Patch schreibt, war einer
- * zu wenig.
- *
- * Wo die Rückkehr erfasst wird — Sammelplatz oder Überwachung —, spielt keine
- * Rolle: Das Ereignis ist der Zustandswechsel, nicht die Seite.
+ * Drei Felder und **kein** Einsatzziel und kein Auftrag: Der Sammelplatz
+ * entsendet einen Trupp nur zu einer Einheit, den Einsatzauftrag gibt die
+ * Einheit. Ein Zielfeld hier führte zu einer Angabe, die niemand kennt.
  */
-export default function TruppZeitDialog({
+export default function TruppZuteilungDialog({
   open,
+  entsendetAnVorschlag,
+  entsendetAnVorschlaege,
   onClose,
   onConfirm,
-}: TruppZeitDialogProps) {
+}: TruppZuteilungDialogProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
 
   const [zeit, setZeit] = useState(() => toLocalInput(new Date()));
   /**
    * Ob die Zeit von Hand geändert wurde — entscheidet über die **Sekunden**.
-   * `datetime-local` kennt nur Minuten, und aus Abmarsch und Rückkehr
-   * errechnet sich die Einsatzdauer im Tagebuch.
+   * `datetime-local` kennt nur Minuten; unverändert gilt der genaue Zeitpunkt
+   * des Speicherns.
    */
   const [zeitGeaendert, setZeitGeaendert] = useState(false);
   const [druck, setDruck] = useState('');
+  const [entsendetAn, setEntsendetAn] = useState(entsendetAnVorschlag ?? '');
   const [saving, setSaving] = useState(false);
 
   const druckWert = druck.trim()
@@ -56,11 +60,12 @@ export default function TruppZeitDialog({
     setSaving(true);
     try {
       await onConfirm(
-        rueckkehrPatch({
-          rueckkehrZeit:
+        zuteilungPatch({
+          entsendetAn,
+          uebergabeZeit:
             (zeitGeaendert ? fromLocalInput(zeit) : undefined) ??
             new Date().toISOString(),
-          druckRueckkehr: Number.isFinite(druckWert) ? druckWert : undefined,
+          druckUebergabe: Number.isFinite(druckWert) ? druckWert : undefined,
         }),
       );
       onClose();
@@ -71,13 +76,36 @@ export default function TruppZeitDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{t('trupp.rueckkehrTitle')}</DialogTitle>
+      <DialogTitle>{t('trupp.zuteilenTitle')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
+          {/* Warum das kein Abmarsch ist, steht im Dialog: „Entsenden" klang
+              vorher nach „geht jetzt unter Atemschutz", und daran hängt jede
+              Rechnung der Zeitkontrolle. */}
+          <Alert severity="info">{t('trupp.zuteilenHinweis')}</Alert>
+          {/* Freitext mit Vorschlägen: Der Trupp geht meist zu einem Fahrzeug,
+              manchmal zu einem Abschnitt, den es in keiner Liste gibt. */}
+          <Autocomplete
+            freeSolo
+            fullWidth
+            options={entsendetAnVorschlaege}
+            value={entsendetAn}
+            onInputChange={(_, next) => setEntsendetAn(next ?? '')}
+            onChange={(_, next) =>
+              setEntsendetAn(typeof next === 'string' ? next : '')
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t('trupp.entsendetAn')}
+                helperText={t('trupp.entsendetAnHint')}
+              />
+            )}
+          />
           <TextField
             fullWidth
             type="datetime-local"
-            label={t('trupp.rueckkehrZeit')}
+            label={t('trupp.uebergabeZeit')}
             value={zeit}
             onChange={(e) => {
               setZeit(e.target.value);
@@ -88,7 +116,7 @@ export default function TruppZeitDialog({
           <TextField
             fullWidth
             type="number"
-            label={t('trupp.druckRueckkehr')}
+            label={t('trupp.druckUebergabe')}
             value={druck}
             slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             onChange={(e) => setDruck(e.target.value)}
@@ -98,7 +126,7 @@ export default function TruppZeitDialog({
       <DialogActions>
         <Button onClick={onClose}>{tCommon('cancel')}</Button>
         <Button variant="contained" disabled={saving} onClick={handleConfirm}>
-          {t('trupp.actions.rueckkehr')}
+          {t('trupp.actions.entsenden')}
         </Button>
       </DialogActions>
     </Dialog>

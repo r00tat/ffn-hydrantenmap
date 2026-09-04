@@ -1,5 +1,8 @@
 # Atemschutzsammelplatz
 
+Wer im Zusammenspiel mit der taktischen Einheit was tut — mit und ohne
+Sammelplatz —, steht in [atemschutz-ablauf.md](atemschutz-ablauf.md).
+
 ## Herkunft
 
 Die Seite löst eine Excel ab (`ASSP.xlsx`, sieben Blätter: Deckblatt,
@@ -24,8 +27,16 @@ Flaschen füllen. Die **Einsatzzeitkontrolle** gehört nicht hierher — „Dies
 führt KEINE ZEITKONTROLLE durch." (FH-06 5.3.4). Sie liegt beim
 Gruppenkommandanten und hat eine eigene Seite:
 [atemschutzueberwachung.md](atemschutzueberwachung.md). Beide arbeiten auf
-derselben Sammlung `call/{id}/atemschutzTrupp` — ein hier entsendeter Trupp
+derselben Sammlung `call/{id}/atemschutzTrupp` — ein hier zugeteilter Trupp
 erscheint dort von selbst.
+
+Die Grenze verläuft entlang zweier Zustände: Der Sammelplatz **teilt zu**
+(`zugeteilt`) — er übergibt eine Ressource an eine taktische Einheit. Die
+Einheit **schickt in den Einsatz** (`imEinsatz`) — sie gibt den Einsatzauftrag,
+und erst damit beginnt die Zeitkontrolle. Der Sammelplatz weiß nicht, wann der
+Trupp anschließt; ihn das entscheiden zu lassen hieße, die Fristen zu früh
+starten zu lassen. Der ganze Ablauf steht in
+[atemschutz-ablauf.md](atemschutz-ablauf.md).
 
 ## Warum jede Bereitstellung eine eigene Zeile ist
 
@@ -539,12 +550,23 @@ stammen:
   `freeSolo` den offenen Text, sobald das Feld verlassen wird — der zuletzt
   getippte Name ginge beim Klick auf „Speichern" verloren. Betrifft
   Füllpersonal und Truppmitglieder.
+- **„Entsenden" übergibt an eine Einheit und setzt keinen Abmarsch.** Der
+  Dialog fragt nach der Einheit, der **Übergabezeit** und dem Druck *bei der
+  Übergabe*; der Trupp steht danach auf `zugeteilt`. Den Abmarsch
+  (`abmarschZeit`) setzt erst der Einsatzauftrag der Einheit — an ihm hängt
+  jede Rechnung der Zeitkontrolle, und ein hier gesetzter Wert ließe die
+  Fristen laufen, während der Trupp noch anlegt. Begründung und Zahlen:
+  [atemschutz-ablauf.md](atemschutz-ablauf.md).
+- **„Zugeteilt" und „Im Einsatz" stehen unter einer Überschrift.** Aus Sicht
+  des Sammelplatzes ist der Trupp in beiden Fällen weg; ob er schon anliegt,
+  weiß hier niemand. Zwei Überschriften behaupteten eine Auskunft, die es an
+  dieser Stelle nicht gibt.
 - **„Entsendet an" ist optional** und schlägt **Fahrzeuge und taktische
   Einheiten** des Einsatzes vor — bewusst **keine Personen**. Ein Trupp wird
   einer Einheit unterstellt, nicht einem Menschen; wer sie gerade führt, steht
   an der Einheit und kann wechseln, während der Trupp draußen ist. Ein
   Personenname im Protokoll wäre dann falsch, ohne dass es auffällt. Und am
-  Sammelplatz steht oft nur fest, *dass* der Trupp abmarschiert — ein
+  Sammelplatz steht oft nur fest, *dass* der Trupp einer Einheit zugeht — ein
   Pflichtfeld führte zu einem erfundenen Eintrag oder zu gar keiner Zeile.
 - **Die Anzahl ist nur für Flaschen ohne Nummer da.** Sobald eine Nummer
   dasteht — getippt oder aus dem Bestand gewählt —, verschwindet das Feld und

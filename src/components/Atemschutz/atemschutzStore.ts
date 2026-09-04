@@ -11,10 +11,12 @@ import {
   ATEMSCHUTZ_FUELLUNG_COLLECTION_ID,
   ATEMSCHUTZ_TRUPP_COLLECTION_ID,
   mitUeberwachungsUid,
+  tagebuchVermerk,
   type AtemschutzAusgabe,
   type AtemschutzFuellung,
   type AtemschutzTrupp,
   type Druckabfrage,
+  type TagebuchEreignis,
   type UeberwachungPatch,
 } from '../../common/atemschutz';
 import { addDoc, deleteDoc, updateDoc } from '../../lib/firestoreClient';
@@ -221,6 +223,26 @@ export async function updateUeberwachung(
 ): Promise<void> {
   await updateDoc(doc(truppCollection(firecallId), truppId), {
     ...patch,
+    ...touched(actor),
+  });
+}
+
+/**
+ * Vermerkt am Trupp, dass ein Ereignis im Einsatztagebuch steht.
+ *
+ * Eigene Funktion statt `updateUeberwachung`, weil `tagebuchVermerk` einen
+ * **Punktpfad** liefert (`tagebuch.amZiel`): Ein ganzes `tagebuch`-Objekt zu
+ * schreiben löschte den Schlüssel, den ein zweites Gerät eine Sekunde vorher
+ * gesetzt hat — dieselbe Überlegung wie bei `addDruckabfrage` und `arrayUnion`.
+ */
+export async function vermerkeTagebuch(
+  firecallId: string,
+  truppId: string,
+  ereignis: TagebuchEreignis,
+  actor: AtemschutzActor,
+): Promise<void> {
+  await updateDoc(doc(truppCollection(firecallId), truppId), {
+    ...tagebuchVermerk(ereignis, actor.now),
     ...touched(actor),
   });
 }

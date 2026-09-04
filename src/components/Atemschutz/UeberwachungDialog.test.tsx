@@ -97,3 +97,17 @@ describe('UeberwachungDialog', () => {
     expect(onSave.mock.calls[0][0].entsendetAn).toBe('RLFA-ND');
   });
 });
+
+describe('UeberwachungDialog: Auftrag', () => {
+  it('gibt einen nachgetragenen Auftrag heraus', async () => {
+    // Ein Trupp kann ohne Auftrag losgeschickt worden sein; dann steht er
+    // hier — im Tagebuch bleibt es beim knappen Satz des Abmarschs.
+    const { onSave } = render();
+    fireEvent.change(screen.getByLabelText(/^Auftrag/), {
+      target: { value: 'Brandbekämpfung' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Trupp übernehmen' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].auftrag).toBe('Brandbekämpfung');
+  });
+});

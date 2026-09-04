@@ -54,12 +54,14 @@ describe('DruckabfrageDialog', () => {
     ).toBeInTheDocument();
   });
 
-  it('lässt den Haken gesetzt, wenn die Ankunft schon gemeldet ist', async () => {
-    // Der Trupp *ist* am Einsatzziel — ihn bei jeder weiteren Abfrage als nicht
-    // angekommen anzubieten, widerspricht der Lage. Gerechnet wird weiter mit
-    // der ersten Meldung, die Vorbelegung ändert daran nichts.
+  it('blendet die Ankunft aus, sobald sie gemeldet ist', async () => {
+    // Die Ankunft ist ein **Ereignis** und kein Zustand: Sie gibt es genau
+    // einmal. Vorbelegt schrieb jede weitere Abfrage erneut `amZiel`, und im
+    // Verlauf stand dann an jeder Zeile „Ankunft".
     const onSave = render(false);
-    expect(ankunftHaken()).toBeChecked();
+    expect(
+      screen.queryByRole('checkbox', { name: /am Einsatzziel angekommen/ }),
+    ).toBeNull();
     expect(screen.queryByText(/noch keine Ankunft/)).toBeNull();
 
     await userEvent.type(
@@ -68,12 +70,23 @@ describe('DruckabfrageDialog', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
-    expect(onSave.mock.calls[0][0]).toMatchObject({ amZiel: true });
+    expect(onSave.mock.calls[0][0].amZiel).toBe(false);
   });
 
-  it('lässt auch den Rückzug gesetzt, wenn er schon gemeldet ist', () => {
-    render(false, true);
-    expect(rueckzugHaken()).toBeChecked();
+  it('blendet den Rückzug aus, sobald er angetreten ist', async () => {
+    // Aus demselben Grund: Ein zweites „Rückzug angetreten" gibt es nicht.
+    const onSave = render(false, true);
+    expect(
+      screen.queryByRole('checkbox', { name: /Rückzug angetreten/ }),
+    ).toBeNull();
+
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /Geringster Druck/ }),
+      '80',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].rueckzug).toBe(false);
   });
 
   it('hakt den Rückzug nicht vor, solange er nicht gemeldet ist', () => {
@@ -151,5 +164,50 @@ describe('DruckabfrageDialog', () => {
     expect(onSave.mock.calls[0][0].zeitpunkt).toBe(
       new Date('2026-09-02T10:05').toISOString(),
     );
+  });
+});
+
+const tagebuchHaken = () =>
+  screen.getByRole('checkbox', { name: /Eintrag ins Einsatztagebuch/ });
+
+describe('DruckabfrageDialog als Statusmeldung', () => {
+  it('speichert eine Meldung ohne Druck, wenn eine Bemerkung dasteht', async () => {
+    const onSave = render();
+    fireEvent.change(screen.getByLabelText(/Bemerkung/), {
+      target: { value: 'starke Verrauchung' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      bemerkung: 'starke Verrauchung',
+    });
+    expect(onSave.mock.calls[0][0].druck).toBeUndefined();
+  });
+
+  it('lässt das Tagebuch-Häkchen leer — Zwischenabfragen bleiben draußen', () => {
+    render();
+    expect(tagebuchHaken()).not.toBeChecked();
+    expect(tagebuchHaken()).not.toBeDisabled();
+  });
+
+  it('setzt und sperrt das Häkchen, sobald die Ankunft neu gemeldet wird', async () => {
+    // Ankunft und Rückzug sind Einsatzereignisse — der Eintrag entsteht
+    // unabhängig vom Haken, und das soll man sehen.
+    const onSave = render(true);
+    fireEvent.click(ankunftHaken());
+    expect(tagebuchHaken()).toBeChecked();
+    expect(tagebuchHaken()).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Geringster Druck/), {
+      target: { value: '240' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].tagebuch).toBe(true);
+  });
+
+  it('sperrt das Häkchen nicht, wenn die Ankunft längst gemeldet ist', () => {
+    // Dann ist die Abfrage eine gewöhnliche Zwischenmeldung.
+    render(false);
+    expect(tagebuchHaken()).not.toBeDisabled();
   });
 });

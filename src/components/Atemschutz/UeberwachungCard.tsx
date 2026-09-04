@@ -51,7 +51,9 @@ export interface UeberwachungCardProps {
   onBearbeiten: () => void;
   onDruckabfrage: () => void;
   onGeraete: () => void;
-  onAbmarsch: () => void;
+  onEinsatzauftrag: () => void;
+  /** Erneut bereitstellen bei derselben Einheit — ohne Abmarsch. */
+  onBereitZumAbmarsch: () => void;
   onRueckkehr: () => void;
   /** Zurückgekehrter Trupp geht erneut hinein — als neue Bereitstellung. */
   onErneutEinsatz: () => void;
@@ -84,7 +86,8 @@ export default function UeberwachungCard({
   onBearbeiten,
   onDruckabfrage,
   onGeraete,
-  onAbmarsch,
+  onEinsatzauftrag,
+  onBereitZumAbmarsch,
   onRueckkehr,
   onErneutEinsatz,
   onAnSammelplatz,
@@ -102,11 +105,21 @@ export default function UeberwachungCard({
 
   const stand = berechneStand(trupp, jetzt, { vorgabe });
   const imEinsatz = trupp.status === 'imEinsatz';
+  // Aus Sicht der Zeitkontrolle wartet ein zugeteilter Trupp auf seinen
+  // Einsatzauftrag — genau wie ein bereitgestellter. Erst der Auftrag schickt
+  // ihn unter Atemschutz.
+  const wartetAufAuftrag =
+    trupp.status === 'bereit' || trupp.status === 'zugeteilt';
   const stufe = stand && imEinsatz ? dringlichkeit(stand) : 'ok';
   const warnungen = imEinsatz
     ? faelligeWarnungen(trupp, jetzt, { vorgabe })
     : [];
   const abfragen = sortierteAbfragen(trupp);
+  // Die *ersten* Meldungen je Ereignis — dieselbe Wahl wie in
+  // `berechneStand`: „Flaschendruck bei Erreichen des Einsatzzieles" gibt es
+  // einmal, eine spätere Zeile mit demselben Haken ist keine zweite Ankunft.
+  const ersteZielmeldung = abfragen.find((a) => a.amZiel === true);
+  const ersteRueckzugsmeldung = abfragen.find((a) => a.rueckzug === true);
   const geraeteGruppen = gruppiereTruppGeraete(trupp.truppGeraete);
   const uebernommen = !!trupp.ueberwachungSeit;
   const uebergeben = !!trupp.ueberwachungBis;
@@ -144,13 +157,21 @@ export default function UeberwachungCard({
       druck: a.druck,
       // Eine gewöhnliche Zwischenabfrage bleibt unbeschriftet: Stünde an jeder
       // Zeile „Druckabfrage", fielen Ankunft, Rückzug und Rückkehr nicht mehr
-      // auf.
-      label: [
-        a.amZiel && t('ueberwachung.amZielKurz'),
-        a.rueckzug && t('ueberwachung.rueckzugKurz'),
-      ]
-        .filter(Boolean)
-        .join(' · '),
+      // auf. Eine Statusmeldung trägt dagegen ihre Bemerkung — sonst stünde
+      // dort eine Zeile aus Uhrzeit und Gedankenstrich.
+      //
+      // Beschriftet wird nur die **erste** Meldung je Ereignis — dieselbe, mit
+      // der `berechneStand` rechnet. Zeilen aus der Zeit, als der Dialog den
+      // Haken vorbelegte, tragen `amZiel` an jeder Folgeabfrage; stünde
+      // „Ankunft" an allen, wäre die eine, auf die es ankommt, nicht zu
+      // finden.
+      label:
+        [
+          a === ersteZielmeldung && t('ueberwachung.amZielKurz'),
+          a === ersteRueckzugsmeldung && t('ueberwachung.rueckzugKurz'),
+        ]
+          .filter(Boolean)
+          .join(' · ') || (a.bemerkung ?? ''),
     })),
     ...(trupp.rueckkehrZeit
       ? [
@@ -184,9 +205,7 @@ export default function UeberwachungCard({
           </Typography>
           <Chip
             size="small"
-            color={
-              imEinsatz ? 'warning' : trupp.status === 'bereit' ? 'success' : 'info'
-            }
+            color={imEinsatz ? 'warning' : wartetAufAuftrag ? 'success' : 'info'}
             label={t(`trupp.status.${trupp.status}`)}
           />
           {trupp.laufendeNummer > 1 && (
@@ -263,6 +282,8 @@ export default function UeberwachungCard({
         <Typography variant="body2" color="text.secondary" component="div">
           {[
             `${t('ueberwachung.einheitKurz')}: ${zuordnungLabel}`,
+            trupp.auftrag &&
+              `${t('ueberwachung.auftragKurz')}: ${trupp.auftrag}`,
             trupp.einsatzziel &&
               `${t('ueberwachung.einsatzziel')}: ${trupp.einsatzziel}`,
             trupp.ueberwachtVon &&
@@ -450,7 +471,13 @@ export default function UeberwachungCard({
                   label={t('ueberwachung.startdruckGeschaetzt')}
                 />
               )}
-              {stand.druckAmZiel == null && (
+              {/* „Keine Ankunftsmeldung" fragt nach der **Meldung**, nicht
+                  nach dem Druck: Über Funk kommt die Ankunft auch ohne Zahl,
+                  und dann stand hier ein Hinweis auf etwas, das längst
+                  erfasst war. Auf dem Rückweg entfällt er ganz — er zielt
+                  darauf, eine Ankunft nachzutragen, damit der Rückmarschdruck
+                  rechenbar wird, und dafür ist es dann zu spät. */}
+              {stand.zielSeit == null && stand.rueckzugSeit == null && (
                 <Chip
                   size="small"
                   color="warning"
@@ -462,9 +489,13 @@ export default function UeberwachungCard({
           </>
         )}
 
-        {trupp.status === 'bereit' && (
+        {wartetAufAuftrag && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {t('trupp.seit', { zeit: uhrzeit(trupp.bereitSeit) })}
+            {trupp.status === 'zugeteilt' && trupp.uebergabeZeit
+              ? t('ueberwachung.zugeteiltSeit', {
+                  zeit: uhrzeit(trupp.uebergabeZeit),
+                })
+              : t('trupp.seit', { zeit: uhrzeit(trupp.bereitSeit) })}
           </Typography>
         )}
 
@@ -558,13 +589,13 @@ export default function UeberwachungCard({
               </Button>
             </Tooltip>
           )}
-          {trupp.status === 'bereit' && (
+          {wartetAufAuftrag && (
             <Button
               size="small"
               variant={uebernommen ? 'contained' : 'outlined'}
-              onClick={onAbmarsch}
+              onClick={onEinsatzauftrag}
             >
-              {t('ueberwachung.actions.inDenEinsatz')}
+              {t('ueberwachung.actions.einsatzauftrag')}
             </Button>
           )}
           {imEinsatz && (
@@ -593,6 +624,11 @@ export default function UeberwachungCard({
                 onClick={onErneutEinsatz}
               >
                 {t('ueberwachung.actions.erneutInDenEinsatz')}
+              </Button>
+              {/* Ohne Sammelplatz: Die Einheit behält den Trupp, lässt ihn
+                  regenerieren und schickt ihn später erneut. */}
+              <Button size="small" onClick={onBereitZumAbmarsch}>
+                {t('ueberwachung.actions.bereitZumAbmarsch')}
               </Button>
               {/* Oder eben nicht — dann ist der Trupp Sache des
                   Sammelplatzes, und die Zeitkontrolle ist hier zu Ende. */}

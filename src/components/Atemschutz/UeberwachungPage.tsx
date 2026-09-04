@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Accordion from '@mui/material/Accordion';
@@ -23,7 +23,10 @@ import { useTranslations } from 'next-intl';
 import {
   buildDruckabfrage,
   canTransition,
+  entsendePatch,
   erneuterEinsatz,
+  mitUeberwachungsUid,
+  naechsteZuteilung,
   newTruppKey,
   sammelplatzUebergabePatch,
   sanitizeMitglieder,
@@ -61,9 +64,12 @@ import {
   type AtemschutzActor,
 } from './atemschutzStore';
 import TruppDialog from './TruppDialog';
-import TruppZeitDialog, { type TruppZeitModus } from './TruppZeitDialog';
+import TruppZeitDialog from './TruppZeitDialog';
 import TruppGeraeteDialog from './TruppGeraeteDialog';
 import DruckabfrageDialog from './DruckabfrageDialog';
+import EinsatzauftragDialog, {
+  type EinsatzauftragEingabe,
+} from './EinsatzauftragDialog';
 import UeberwachungCard from './UeberwachungCard';
 import UeberwachungDialog, {
   type UeberwachungEingabe,
@@ -78,6 +84,7 @@ import {
   type EinheitTab,
 } from './einheiten';
 import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
+import useTruppTagebuch from './useTruppTagebuch';
 import useUeberwachungHinweise from './useUeberwachungHinweise';
 
 /**
@@ -125,12 +132,12 @@ type Dialog =
   | { art: 'druckabfrage'; trupp: AtemschutzTrupp }
   | { art: 'geraete'; trupp: AtemschutzTrupp }
   | {
-      art: 'zeit';
+      art: 'einsatzauftrag';
       trupp: AtemschutzTrupp;
-      modus: TruppZeitModus;
-      /** Der Abmarsch legt eine *neue* Bereitstellung an (Trupp war zurück). */
+      /** Der Auftrag legt eine *neue* Bereitstellung an (Trupp war zurück). */
       neueZeile?: boolean;
-    };
+    }
+  | { art: 'rueckkehr'; trupp: AtemschutzTrupp };
 
 /**
  * Atemschutzüberwachung — die Einsatzzeitkontrolle des Gruppenkommandanten.
@@ -264,9 +271,12 @@ export default function UeberwachungPage() {
     () => trupps.imEinsatz.filter(passt),
     [passt, trupps.imEinsatz],
   );
+  // Bereitgestellt **und** zugeteilt: Aus Sicht der Zeitkontrolle wartet
+  // beides auf den Einsatzauftrag. Der Unterschied — hat schon eine Einheit
+  // oder nicht — steht auf der Karte, nicht in der Überschrift.
   const bereit = useMemo(
-    () => trupps.bereit.filter(passt),
-    [passt, trupps.bereit],
+    () => [...trupps.bereit, ...trupps.zugeteilt].filter(passt),
+    [passt, trupps.bereit, trupps.zugeteilt],
   );
   const zurueck = useMemo(
     () => trupps.zurueck.filter(passt),
@@ -304,6 +314,17 @@ export default function UeberwachungPage() {
         (!!uid && !!t.ueberwachungUids?.includes(uid)),
     );
   }, [meineEinheit, trupps.imEinsatz, uid]);
+
+  const schreibeTagebuch = useTruppTagebuch();
+
+  /**
+   * Trupps, die dieses Gerät schon einmal eingetragen hat — je Sitzung.
+   *
+   * Ohne das liefe der Schreibvorgang bei jedem Tick der Uhr erneut: Der
+   * Effekt unten sieht seine eigene Wirkung erst, wenn Firestore sie
+   * zurückgespielt hat.
+   */
+  const eingetragen = useRef(new Set<string>());
 
   // Warnungen aus der offenen Seite heraus — der Serverlauf erreicht nur
   // Geräte mit Push-Token, und in der Entwicklung gibt es keinen Zeitplan.
@@ -374,6 +395,37 @@ export default function UeberwachungPage() {
     }),
     [uid],
   );
+
+  /**
+   * Wer „meine Einheit" gesetzt hat, ist für deren Trupps zuständig — ohne
+   * dass jemand „übernehmen" drückt.
+   *
+   * Nötig ist das für den **Push**: Die offene Seite warnt ohnehin
+   * (`zuUeberwachen`), aber der Serverlauf schickt nur an `ueberwachungUids`.
+   * Ohne Eintrag bliebe das Telefon stumm, sobald die Seite zu ist — und genau
+   * dann soll es läuten.
+   *
+   * Beschränkt auf die jüngsten Zeilen und die nicht abgemeldeten: Ein
+   * Seitenaufruf soll nicht in jede historische Zeile des Einsatzes schreiben.
+   */
+  useEffect(() => {
+    if (!canWrite || !uid || !istEinheitName(meineEinheit)) return;
+    for (const trupp of trupps.aktuell) {
+      if (!trupp.id || eingetragen.current.has(trupp.id)) continue;
+      if (trupp.status === 'abgemeldet') continue;
+      if (!truppPasstZuEinheit(trupp, meineEinheit)) continue;
+      if (trupp.ueberwachungUids?.includes(uid)) continue;
+      eingetragen.current.add(trupp.id);
+      void updateUeberwachung(
+        firecallId,
+        trupp.id,
+        { ueberwachungUids: mitUeberwachungsUid(trupp.ueberwachungUids, uid) },
+        actorNow(),
+      ).catch((err) => {
+        console.warn('Eintragen in die Warnliste fehlgeschlagen', err);
+      });
+    }
+  }, [actorNow, canWrite, firecallId, meineEinheit, trupps.aktuell, uid]);
 
   /**
    * Den Termin der nächsten Warnung neu planen (Cloud Tasks, serverseitig).
@@ -454,6 +506,7 @@ export default function UeberwachungPage() {
           uid: stamp.userId,
           ueberwachtVon: input.ueberwachtVon,
           einsatzziel: input.einsatzziel,
+          auftrag: input.auftrag,
           entsendetAn: input.entsendetAn,
           paTyp: input.paTyp,
           satz: input.satz,
@@ -477,17 +530,33 @@ export default function UeberwachungPage() {
     async (trupp: AtemschutzTrupp, input: DruckabfrageInput) => {
       if (!trupp.id) return;
       const stamp = actorNow();
-      await addDruckabfrage(
-        firecallId,
-        trupp,
-        buildDruckabfrage(input, { uid: stamp.userId, jetzt: stamp.now }),
-        stamp,
-      );
+      const abfrage = buildDruckabfrage(input, {
+        uid: stamp.userId,
+        jetzt: stamp.now,
+      });
+      // Vor dem Schreiben bestimmt: Danach steht die neue Meldung mit drin,
+      // und „ist das die erste?" wäre nicht mehr zu beantworten.
+      const bisher = sortierteAbfragen(trupp);
+      const zielNeu = !!abfrage.amZiel && !bisher.some((a) => a.amZiel);
+      const rueckzugNeu = !!abfrage.rueckzug && !bisher.some((a) => a.rueckzug);
+
+      await addDruckabfrage(firecallId, trupp, abfrage, stamp);
+
+      // Ankunft und Rückzug sind Einsatzereignisse und gehen immer hinein.
+      if (zielNeu) await schreibeTagebuch(trupp, 'amZiel', abfrage);
+      if (rueckzugNeu) await schreibeTagebuch(trupp, 'rueckzug', abfrage);
+      // Die freie Meldung nur mit Haken — und nur, wenn sie nicht ohnehin
+      // schon als Ankunft oder Rückzug im Tagebuch steht. Sonst stünden zwei
+      // oder drei Zeilen über denselben Funkspruch.
+      if (input.tagebuch && !zielNeu && !rueckzugNeu) {
+        await schreibeTagebuch(trupp, 'meldung', abfrage);
+      }
+
       // Der gemessene Verbrauch verschiebt den Rückzugszeitpunkt, und eine
       // Meldung erledigt die nächste Drittelmarke.
       await planeWarnung(trupp.id);
     },
-    [actorNow, firecallId, planeWarnung],
+    [actorNow, firecallId, planeWarnung, schreibeTagebuch],
   );
 
   const handleGeraete = useCallback(
@@ -506,25 +575,62 @@ export default function UeberwachungPage() {
     [actorNow, firecallId],
   );
 
+  const handleEinsatzauftrag = useCallback(
+    async (trupp: AtemschutzTrupp, eingabe: EinsatzauftragEingabe) => {
+      if (!trupp.id || !canTransition(trupp.status, 'imEinsatz')) return;
+      const stamp = actorNow();
+      const patch = entsendePatch({ ...eingabe, trupp, uid: stamp.userId });
+      await updateTrupp(firecallId, trupp.id, patch, stamp);
+      // Der Trupp **nach** dem Schreibvorgang: Das lokale Objekt kennt den
+      // eben gegebenen Auftrag noch nicht.
+      await schreibeTagebuch({ ...trupp, ...patch }, 'auftrag');
+      // Erst hier den Push-Token holen: Der Browser fragt dabei nach der
+      // Erlaubnis, und die Frage soll zu einer Handlung gehören, die sie
+      // erklärt.
+      await registerMessaging().catch((err) => {
+        console.warn('Push-Registrierung fehlgeschlagen', err);
+      });
+      // Ab hier laufen die Fristen — vorher gab es keine.
+      await planeWarnung(trupp.id);
+    },
+    [actorNow, firecallId, planeWarnung, registerMessaging, schreibeTagebuch],
+  );
+
   const handleErneuterEinsatz = useCallback(
-    async (trupp: AtemschutzTrupp, entsendung: TruppPatch) => {
+    async (trupp: AtemschutzTrupp, eingabe: EinsatzauftragEingabe) => {
       const stamp = actorNow();
       // Eine *neue* Zeile und kein Wechsel zurück nach `imEinsatz`: Die alte
       // Bereitstellung ist der Nachweis über den ersten Einsatz — mit ihren
       // Drücken, ihren Abfragen und ihrer Rückkehrzeit.
-      const id = await addTrupp(
+      const neu = erneuterEinsatz({
+        vorherige: trupp,
+        jetzt: stamp.now,
+        entsendung: entsendePatch({ ...eingabe, trupp, uid: stamp.userId }),
+        uid: stamp.userId,
+      });
+      const id = await addTrupp(firecallId, neu, stamp);
+      await schreibeTagebuch({ ...neu, id }, 'auftrag');
+      await planeWarnung(id);
+    },
+    [actorNow, firecallId, planeWarnung, schreibeTagebuch],
+  );
+
+  const handleBereitZumAbmarsch = useCallback(
+    async (trupp: AtemschutzTrupp) => {
+      const stamp = actorNow();
+      // Wie „erneut in den Einsatz", nur ohne Abmarsch: Der Trupp steht wieder
+      // bereit, die Einheit behält ihn.
+      await addTrupp(
         firecallId,
-        erneuterEinsatz({
+        naechsteZuteilung({
           vorherige: trupp,
           jetzt: stamp.now,
-          entsendung,
           uid: stamp.userId,
         }),
         stamp,
       );
-      await planeWarnung(id);
     },
-    [actorNow, firecallId, planeWarnung],
+    [actorNow, firecallId],
   );
 
   const handleAnSammelplatz = useCallback(
@@ -544,17 +650,22 @@ export default function UeberwachungPage() {
     [actorNow, firecallId],
   );
 
-  const handlePatch = useCallback(
+  const handleRueckkehr = useCallback(
     async (trupp: AtemschutzTrupp, patch: TruppPatch) => {
-      // Dieselbe Schranke wie am Sammelplatz: Zwei Geräte sehen dieselbe Karte,
-      // und wer eine Sekunde später drückt, arbeitet auf einem überholten Zustand.
+      // Dieselbe Schranke wie am Sammelplatz: Zwei Geräte sehen dieselbe
+      // Karte, und wer eine Sekunde später drückt, arbeitet auf einem
+      // überholten Zustand.
       if (!trupp.id || !canTransition(trupp.status, patch.status)) return;
+      const warImEinsatz = trupp.status === 'imEinsatz';
       await updateTrupp(firecallId, trupp.id, patch, actorNow());
-      // Beim Abmarsch entstehen die Fristen überhaupt erst; bei der Rückkehr
-      // fällt der Termin weg, und die Planung meldet das mit `nothingDue`.
+      if (warImEinsatz && patch.status === 'zurueck') {
+        await schreibeTagebuch({ ...trupp, ...patch }, 'rueckkehr');
+      }
+      // Bei der Rückkehr fällt der Termin weg; die Planung meldet das mit
+      // `nothingDue`.
       await planeWarnung(trupp.id);
     },
-    [actorNow, firecallId, planeWarnung],
+    [actorNow, firecallId, planeWarnung, schreibeTagebuch],
   );
 
   const karte = (trupp: AtemschutzTrupp) => (
@@ -569,11 +680,12 @@ export default function UeberwachungPage() {
       onBearbeiten={() => setDialog({ art: 'ueberwachung', trupp })}
       onDruckabfrage={() => setDialog({ art: 'druckabfrage', trupp })}
       onGeraete={() => setDialog({ art: 'geraete', trupp })}
-      onAbmarsch={() => setDialog({ art: 'zeit', trupp, modus: 'entsenden' })}
-      onRueckkehr={() => setDialog({ art: 'zeit', trupp, modus: 'rueckkehr' })}
+      onEinsatzauftrag={() => setDialog({ art: 'einsatzauftrag', trupp })}
+      onRueckkehr={() => setDialog({ art: 'rueckkehr', trupp })}
       onErneutEinsatz={() =>
-        setDialog({ art: 'zeit', trupp, modus: 'entsenden', neueZeile: true })
+        setDialog({ art: 'einsatzauftrag', trupp, neueZeile: true })
       }
+      onBereitZumAbmarsch={() => void handleBereitZumAbmarsch(trupp)}
       onAnSammelplatz={() => void handleAnSammelplatz(trupp)}
     />
   );
@@ -834,24 +946,33 @@ export default function UeberwachungPage() {
         />
       )}
 
-      {dialog?.art === 'zeit' && (
-        <TruppZeitDialog
-          key={`${dialog.trupp.id}-${dialog.modus}`}
+      {dialog?.art === 'einsatzauftrag' && (
+        <EinsatzauftragDialog
+          key={`${dialog.trupp.id}-auftrag`}
           open
-          modus={dialog.modus}
-          // Beim Gruppenkommandanten heißt das Feld „Taktische Einheit" statt
-          // „Entsendet an" — dieselbe Angabe, aber keine Übergabe.
-          kontext="ueberwachung"
-          entsendetAnVorschlag={
-            dialog.trupp.entsendetAn ?? zielEinheit
-          }
-          entsendetAnVorschlaege={einheiten}
+          trupp={dialog.trupp}
+          einheitVorschlaege={einheiten}
+          personSuggestions={[
+            ...dialog.trupp.mitglieder,
+            displayName ?? email ?? '',
+            ...suggestions,
+          ].filter(Boolean)}
+          einheitVorgabe={zielEinheit}
           onClose={() => setDialog(undefined)}
-          onConfirm={(patch) =>
+          onSave={(eingabe) =>
             dialog.neueZeile
-              ? handleErneuterEinsatz(dialog.trupp, patch)
-              : handlePatch(dialog.trupp, patch)
+              ? handleErneuterEinsatz(dialog.trupp, eingabe)
+              : handleEinsatzauftrag(dialog.trupp, eingabe)
           }
+        />
+      )}
+
+      {dialog?.art === 'rueckkehr' && (
+        <TruppZeitDialog
+          key={`${dialog.trupp.id}-rueckkehr`}
+          open
+          onClose={() => setDialog(undefined)}
+          onConfirm={(patch) => handleRueckkehr(dialog.trupp, patch)}
         />
       )}
     </Container>

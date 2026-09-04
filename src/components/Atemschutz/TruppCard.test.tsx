@@ -129,3 +129,30 @@ describe('TruppCard', () => {
     ).toBeNull();
   });
 });
+
+describe('TruppCard: zugeteilt', () => {
+  const zugeteilt = () =>
+    trupp({
+      status: 'zugeteilt',
+      entsendetAn: 'LFA',
+      uebergabeZeit: '2026-09-03T08:10:00.000Z',
+      druckUebergabe: 300,
+    });
+
+  it('zeigt einem zugeteilten Trupp die Rückkehr — sonst hinge er fest', () => {
+    // Ein Trupp, der doch nicht gebraucht wurde, muss zurückgebucht werden
+    // können, ohne je unter Atemschutz gewesen zu sein.
+    render(zugeteilt());
+    expect(
+      screen.getByRole('button', { name: 'Rückkehr' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Entsenden' })).toBeNull();
+  });
+
+  it('nennt beim zugeteilten Trupp Einheit, Übergabezeit und Druck', () => {
+    render(zugeteilt());
+    expect(screen.getByText(/Zugeteilt an/)).toBeInTheDocument();
+    expect(screen.getByText(/LFA/)).toBeInTheDocument();
+    expect(screen.getByText(/300 bar/)).toBeInTheDocument();
+  });
+});

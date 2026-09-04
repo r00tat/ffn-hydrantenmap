@@ -150,6 +150,7 @@
       "vonUeberwachung": "Handed over by the monitoring ({zeit})",
       "status": {
         "bereit": "Standing by",
+        "zugeteilt": "Assigned",
         "imEinsatz": "Deployed",
         "zurueck": "Back & recovering",
         "abgemeldet": "Signed off"
@@ -180,6 +181,11 @@
       "druckRueckkehr": "Lowest pressure on return (bar)",
       "entsendenTitle": "Deploy team",
       "rueckkehrTitle": "Record return",
+      "zuteilenTitle": "Assign team to a unit",
+      "zuteilenHinweis": "The team is then assigned to the unit and gets ready. It only goes under breathing apparatus with the unit's deployment order — that is when time control starts.",
+      "uebergabeZeit": "Handover to the unit",
+      "druckUebergabe": "Lowest cylinder pressure at handover (bar)",
+      "zugeteiltAn": "Assigned to",
       "seit": "since {zeit}",
       "delete": "Delete team",
       "deleteConfirm": "Really delete this row? Earlier deployments of the same team remain.",
@@ -443,6 +449,22 @@
         "startdruckAboveEnddruck": "Initial pressure is above the final pressure."
       }
     },
+    "tagebuch": {
+      "auftragMitZiel": "{trupp} — {auftrag} at {ziel}",
+      "auftragNurAuftrag": "{trupp} — {auftrag}",
+      "auftragNurZiel": "{trupp} sent in — {ziel}",
+      "auftragOhne": "{trupp} sent in",
+      "amZielMitZiel": "{trupp} reached {ziel}",
+      "amZielOhne": "{trupp} reached the objective",
+      "rueckzug": "{trupp} is withdrawing",
+      "rueckkehrMitEinheit": "{trupp} back at {einheit}",
+      "rueckkehrOhne": "{trupp} back",
+      "meldung": "{trupp} reports: {text}",
+      "meldungOhneText": "{trupp} reports",
+      "druck": "Pressure: {druck} bar",
+      "abmarschdruck": "Pressure on moving out: {druck} bar",
+      "einsatzdauer": "Time under air: {minuten} min"
+    },
     "ueberwachung": {
       "title": "Breathing apparatus monitoring",
       "verantwortungHinweis": "Monitoring supports the team in tracking its air supply; responsibility for the team stays with the team leader and the commander of the tactical unit.",
@@ -464,6 +486,12 @@
       "uebernehmenHinweis": "This device takes over the operational time control for the team: the handover from the staging area is recorded, and from now on the warnings for the one-third, two-thirds and withdrawal times arrive here — as a push notification as well, even with the page closed. The calculation uses the apparatus set selected below.",
       "einsatzziel": "Target and location",
       "einsatzzielHint": "e.g. “staircase 3rd floor” — the “where” of the documentation",
+      "auftrag": "Task",
+      "auftragHint": "What the team is to do — e.g. “rescue”, “firefighting”, “reconnaissance”.",
+      "auftragKurz": "Task",
+      "einsatzauftragTitle": "Issue deployment order",
+      "einsatzauftragHinweis": "With the deployment order the team goes under breathing apparatus: time control starts, this device receives the alerts, and the order is written to the operations log.",
+      "zugeteiltSeit": "assigned since {zeit}",
       "ueberwachtVon": "Monitored by",
       "ueberwachtVonHint": "Group commander or an assigned person, e.g. driver or runner",
       "paTyp": "Apparatus type",
@@ -481,9 +509,13 @@
       "bearbeitenTitle": "Edit monitoring",
       "einsatzTitle": "Send team into action",
       "abmarschZeit": "Departure (connecting the air supply)",
-      "druckabfrageTitle": "Record pressure check",
-      "druck": "Lowest pressure in the team (bar)",
+      "druckabfrageTitle": "Pressure check / status",
+      "druck": "Lowest cylinder pressure (bar) — optional",
       "druckHint": "The wearer with the highest air consumption is decisive.",
+      "druckOptionalHint": "Without a pressure the entry is saved as a status report.",
+      "tagebuch": "Add to operations log",
+      "tagebuchHint": "Reports without arrival or withdrawal only reach the log when ticked.",
+      "tagebuchImmer": "Arrival and withdrawal always go to the operations log.",
       "zeitpunkt": "Time of the report",
       "amZiel": "Team has arrived at the target",
       "amZielHint": "Only the pressure on arrival allows the turn-around pressure to be derived from twice the inbound pressure drop. Leave unchecked for an ordinary interim check.",
@@ -493,7 +525,6 @@
       "rueckzugHint": "The “we are coming back” report. No further one-third or withdrawal warnings after it — only the reserve pressure is still watched.",
       "rueckzugKurz": "Withdrawal",
       "rueckzugSeit": "Withdrawal started",
-      "bereitsGemeldet": "Already reported — the box stays checked. The first report remains the one used in the calculation.",
       "druckverlaufChart": "Pressure over time",
       "chart": {
         "drittel": "1/3",
@@ -568,13 +599,15 @@
         "inDenEinsatz": "Send into action",
         "erneutInDenEinsatz": "Send into action again",
         "anSammelplatz": "Hand back to the staging area",
-        "druckabfrage": "Pressure check",
+        "druckabfrage": "Pressure check / status",
+        "einsatzauftrag": "Send in",
+        "bereitZumAbmarsch": "Ready to move out",
         "truppErfassen": "Add team",
         "pushErlauben": "Enable notifications"
       },
       "errors": {
-        "druckMissing": "A pressure is required",
-        "druckInvalid": "Pressure must be between 0 and 400 bar"
+        "druckInvalid": "Pressure must be between 0 and 400 bar",
+        "leereMeldung": "Without a pressure the report needs an arrival, a withdrawal or a note"
       },
       "push": {
         "truppOhneName": "Breathing apparatus team",
