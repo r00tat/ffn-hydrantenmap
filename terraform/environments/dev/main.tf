@@ -1,3 +1,10 @@
+# Die Zufallskennung im Namen der Atemschutz-Queue. Sie steht hier und nicht im
+# Modul, weil der Name in `locals` gebraucht wird — der Dienst bekommt den
+# Queue-Pfad als Umgebungsvariable, lange bevor das Modul die Queue anlegt.
+resource "random_id" "ueberwachung_queue" {
+  byte_length = 4
+}
+
 locals {
   # Repository-Wurzel, von terraform/environments/dev aus gesehen.
   repo_root = "${path.root}/../../.."
@@ -31,7 +38,16 @@ locals {
   # ihren Pfad aus der Umgebung. Aus einem Modul-Output gelesen ergäbe das
   # denselben Zyklus wie bei `cron_invoker_emails` — der Dienst hängt am Wert,
   # die Queue an der URL des Dienstes.
-  ueberwachung_queue = "atemschutz-ueberwachung-dev"
+  #
+  # Der Name endet auf eine Zufallskennung, weil Cloud Tasks einen gelöschten
+  # Queue-Namen erst nach sieben Tagen wieder freigibt: `…-dev` wurde angelegt
+  # und wieder gelöscht, seither scheitert jedes Apply mit „a queue with this
+  # name existed too recently" — sieben Tage rote Pipeline für einen Namen.
+  # Die Kennung liegt im State und bleibt damit über Applies hinweg stehen;
+  # ist ein Name doch einmal verbrannt, holt `tofu apply -replace` einen
+  # neuen, statt eine Woche zu warten. Der Name ist frei wählbar, weil ihn
+  # niemand von außen kennt: der Dienst liest den Pfad aus der Umgebung.
+  ueberwachung_queue = "atemschutz-ueberwachung-dev-${random_id.ueberwachung_queue.hex}"
   # Die Region der Queue ist `var.tasks_region` und nicht `var.run_region`:
   # Cloud Tasks kennt in einem Projekt mit App-Engine-Anwendung nur deren
   # Region. Siehe modules/cloud-scheduler.
