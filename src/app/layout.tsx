@@ -4,13 +4,16 @@ import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import React from 'react';
+import { withEnvironmentPrefix } from '../common/appEnvironment';
 import { SERWIST_SW_URL } from '../common/serviceWorker';
 import AppProviders from '../components/providers/AppProviders';
 import '../styles/globals.css';
 
-const APP_NAME = 'Einsatzkarte FFN';
-const APP_DEFAULT_TITLE = 'Einsatzkarte FFN';
-const APP_TITLE_TEMPLATE = '%s - PWA App';
+// In der Dev-Umgebung vorangestellt gekennzeichnet, damit Tab und installierte
+// PWA von der Produktion unterscheidbar sind — s. common/appEnvironment.ts.
+const APP_NAME = withEnvironmentPrefix('Einsatzkarte FFN');
+const APP_DEFAULT_TITLE = withEnvironmentPrefix('Einsatzkarte FFN');
+const APP_TITLE_TEMPLATE = withEnvironmentPrefix('%s - PWA App');
 const APP_DESCRIPTION = 'Hydranten und Einsatzkarte der FF Neusiedl am See';
 
 export const metadata: Metadata = {
@@ -76,14 +79,13 @@ export default async function RootLayout({
     // Attribute dieses einen Elements, nicht fuer den Teilbaum darunter.
     <html lang={locale} suppressHydrationWarning>
       <head>
-        <title>Einsatzkarte</title>
-        <meta
-          name="description"
-          content="Einsatzkarte der Freiwilligen Feuerwehr Neusiedl am See"
-        />
+        {/* Titel und Beschreibung kommen aus `metadata` oben. Ein hart
+            kodiertes <title> hier verdoppelte sie nicht nur, es unterdrückte
+            auch die Titel der Unterseiten aus APP_TITLE_TEMPLATE. Den
+            <link rel="manifest"> setzt Next selbst, seit das Manifest aus
+            app/manifest.ts kommt. */}
         <link rel="icon" href="/favicon.ico" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#1976d2" />
 
         <link
