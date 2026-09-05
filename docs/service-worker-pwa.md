@@ -126,3 +126,30 @@ wirklich fokussiert statt ein zweites geöffnet.
 
 Hintergrund der Warnungen selbst (Fristen, Empfänger, Zeitplan):
 [atemschutzueberwachung.md](atemschutzueberwachung.md).
+
+## Die Dev-Variante trägt ihre Kennzeichnung im Namen
+
+Dev und Produktion sehen identisch aus. Wer beide als PWA installiert hat, muss
+am Namen erkennen, in welcher er gerade schreibt — in dev angelegte Einträge
+fehlen im echten Einsatz. Deshalb stellt `withEnvironmentPrefix`
+([src/common/appEnvironment.ts](../src/common/appEnvironment.ts)) dem Titel und
+den Manifest-Namen in dev `🚧 DEV ` **voran**. Vorangestellt, weil Browser-Tab
+und Homescreen-Label hinten abschneiden und „Einsatzkarte" das Label schon
+allein ausfüllt.
+
+Zwei Folgen davon:
+
+- Das Manifest ist keine statische `manifest.json` mehr, sondern
+  [src/app/manifest.ts](../src/app/manifest.ts) — statisches JSON kann nicht von
+  der Umgebung abhängen. Next liefert es unter `/manifest.webmanifest` und setzt
+  den `<link rel="manifest">` selbst; im Layout steht deshalb keiner mehr.
+- Unterschieden wird an `NEXT_PUBLIC_FIRESTORE_DB` (prod leer, sonst `ffndev`),
+  nicht an einer eigenen Variable. Die gäbe es nur um des Namens willen, müsste
+  aber durch Dockerfile, Deploy-Workflow, beide Terraform-Umgebungen und
+  `.env.local` gezogen werden — `publicBuildEnv.test.ts` erzwingt die Kette. Der
+  lokale Entwicklungsserver zählt damit ebenfalls als Dev-Variante.
+
+Die native Android-App bleibt bewusst außen vor: es gibt genau ein APK, das über
+die Einstellung „Server-URL (Override)" mal auf prod und mal auf dev zeigt. Ein
+`DEV` im `app_name` der `strings.xml` wäre für dieselbe Installation also mal
+richtig und mal falsch.
