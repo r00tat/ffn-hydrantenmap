@@ -22,6 +22,7 @@ import {
   type RechenwegFormat,
 } from '../rechenweg';
 import { FOERDERUNG_DEFAULTS } from './defaults';
+import { COUPLING_REFERENCE_FLOW } from './frictionLoss';
 import type { FoerderungView } from './foerderung';
 import { BAR_PER_METER_ELEVATION } from './hydraulics';
 
@@ -104,10 +105,16 @@ export function foerderungRechenweg(
     if (breakdown.kupplungen > 0) {
       schritte.push({
         label: 'stepFrictionCouplings',
+        // Die Bezugsmenge steht **nicht** als Literal hier: Ändert sie sich in
+        // `frictionLoss.ts`, zeigte der Rechenweg sonst eine Rechnung, die
+        // seinen eigenen Wert nicht mehr ergibt.
         rechnung: `${fmt(params.kupplungsverlust, 2)} bar · (${fmt(
           flowPerLine,
           0
-        )} / 1000)² · 100 m / ${fmt(view.hoseLengthM, 0)} m`,
+        )} / ${fmt(COUPLING_REFERENCE_FLOW, 0)})² · 100 m / ${fmt(
+          view.hoseLengthM,
+          0
+        )} m`,
         wert: fmt(breakdown.kupplungen, 2),
         einheit: 'bar/100 m',
         herkunft: 'gerechnet',

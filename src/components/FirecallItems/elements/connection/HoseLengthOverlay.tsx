@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { CircleMarker, Polyline, Tooltip, useMap, useMapEvent } from 'react-leaflet';
 import type { LatLngPosition } from '../../../../common/geo';
 import { calculateDistance } from './distance';
@@ -72,7 +72,15 @@ export interface HoseLengthOverlayProps {
  * Pumpenstandorte. Damit wandert die Einteilung bei jeder Änderung mit, ohne
  * dass ungefragt Elemente entstehen.
  */
-export default function HoseLengthOverlay({
+/**
+ * `memo`, weil das Overlay seit der ungefragten Einteilung an **jeder** Leitung
+ * hängt: Die Elementliste baut bei jedem Firestore-Schnappschuss neue
+ * `record`-Instanzen, und ohne die Sperre rechnete jede Leitung dabei Länge und
+ * Kupplungsgrenzen neu, obwohl sich an ihr nichts geändert hat. Alle Angaben
+ * sind einfache Werte oder schon gemerkte Punktfolgen, der Vergleich also
+ * belastbar.
+ */
+function HoseLengthOverlay({
   positions,
   dimension,
   hoseLengthM = 20,
@@ -180,3 +188,5 @@ export default function HoseLengthOverlay({
     </>
   );
 }
+
+export default memo(HoseLengthOverlay);
