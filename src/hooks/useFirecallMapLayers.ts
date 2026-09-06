@@ -18,6 +18,13 @@ import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 
 /**
+ * Nicht gelöschte Kartenebenen. Modulweit konstant, damit die Referenz über
+ * Renders stabil bleibt — eine inline definierte Funktion wäre bei jedem Render
+ * eine neue und ließe den Firestore-Listener flattern.
+ */
+const isActiveMapLayer = (layer: FirecallMapLayer) => layer.deleted !== true;
+
+/**
  * Die eigenen Kartenebenen eines Einsatzes, von unten nach oben gestapelt.
  *
  * Bewusst **ohne** die Historien-Pfadsegmente: eine Kartenebene ist keine
@@ -31,7 +38,7 @@ export function useFirecallMapLayers(): FirecallMapLayer[] {
   const layers = useFirebaseCollection<FirecallMapLayer>({
     collectionName: FIRECALL_COLLECTION_ID,
     pathSegments: [firecallId, FIRECALL_MAP_LAYERS_COLLECTION_ID],
-    filterFn: (layer) => layer.deleted !== true,
+    filterFn: isActiveMapLayer,
   });
 
   return useMemo(() => sortMapLayers(layers), [layers]);
