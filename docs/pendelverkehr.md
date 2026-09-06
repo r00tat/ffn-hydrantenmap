@@ -124,7 +124,16 @@ hergibt — und genau der Regler ist der Zweck des Panels.
 
 ### Abgeleitet, ohne weitere Annahme
 
-- **Benötigte Fahrzeuge** für die geforderte Menge: `⌈Q_soll · t_umlauf / V⌉`
+- **Benötigte Fahrzeuge** für die geforderte Menge: `⌈Q_soll · t_umlauf / V⌉` —
+  **kein Wert**, wenn die Füllstelle unter der Sollmenge deckelt. Dieselbe
+  Begründung wie beim Kipppunkt gleich darunter, und derselbe Fall: Wo
+  `V/t_füll < Q_soll` ist, trägt *keine* Fahrzeugzahl die Menge.
+
+  Die Zahl stand hier trotzdem, und das war der sichtbare Widerspruch: Der
+  Rechner nannte fünf Fahrzeuge und meldete daneben, fünf seien zu wenig — wer
+  fünf einstellte, sah dieselben zwei Sätze wieder. Statt der Zahl steht jetzt
+  „mit keiner Zahl erreichbar", und die Meldung nennt die Ergiebigkeit der
+  Entnahmestelle und die einzige Abhilfe: eine zweite.
 - **Kipppunkt** — die einfache Fahrstrecke, ab der die Menge nicht mehr getragen
   wird. Geschlossen gelöst, nicht gesucht: Aus `n·V / t_umlauf = Q_soll` folgt
   die zulässige Umlaufzeit `n·V/Q_soll`; was davon nach Füllen und Entleeren
@@ -161,6 +170,13 @@ Tabellenwerte.
 Neben der Rangierzeit steht die **gesamte** Füllzeit, die daraus folgt, und neben
 der Entleerzeit die Leistung, die sie bedeutet. Beides hält die Zahlen
 nachprüfbar, ohne sie zweimal eingeben zu lassen.
+
+Die Füllzeit steht dabei **aufgeteilt** da: „2,3 min = 1,3 min füllen + 1,0 min
+rangieren". Ohne die Aufteilung ist sie nicht nachzurechnen — „2,3 min für 2000 l
+an einem Hydranten mit 1500 l/min" liest sich als Rechenfehler, weil 2000/1500 =
+1,3 ist und die Rangierzeit im Wort „Füllzeit" nicht vorkommt. Die Zahl war
+richtig, die Anzeige nicht prüfbar, und eine Zahl, die man nicht nachrechnen
+kann, ist im Führungsvorgang keine.
 
 ## Fahrstrecke: die gezeichnete Leitung
 

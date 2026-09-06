@@ -40,7 +40,9 @@ import LoeschwasserfoerderungPanel from '../../../Map/Leitungen/Loeschwasserfoer
 // Aus demselben Grund statisch importiert wie das Panel darüber.
 import DammbauPanel from '../../../Map/Damm/DammbauPanel';
 import { foerderungView } from './foerderung/foerderung';
-import HoseLengthOverlay from './HoseLengthOverlay';
+import HoseLengthOverlay, {
+  AUTO_MIN_TICK_SPACING_PX,
+} from './HoseLengthOverlay';
 import { versorgungsart } from './pendel/pendelRoute';
 import { nearestInsertIndex } from './pointGeometry';
 import {
@@ -89,6 +91,11 @@ export default function ConnectionMarker({
   const editable = useMapEditable();
   const updateItem = useFirecallItemUpdate();
   const showLength = record.get<string>('showLength') === 'true';
+  /**
+   * Ob das Etikett mit Länge und Schlauchzahl dasteht — angefordert oder weil
+   * gerade ein Punkt gezogen wird. Die Querstriche hängen **nicht** daran.
+   */
+  const showLabel = showLength || dragPositions !== undefined;
 
   const positions: LatLngPosition[] = useMemo(() => {
     let p: LatLngPosition[] = [
@@ -243,6 +250,32 @@ export default function ConnectionMarker({
                     </strong>
                   </div>
                   <PopupNavigateButton lat={p[0]} lng={p[1]} />
+                  {/* Derselbe Rechner-Knopf wie im Popup der Linie: Sobald die
+                      Punktmarker sichtbar sind, trifft ein Tippen den Punkt und
+                      nicht die Leitung, und dann war der Rechner von der Karte
+                      aus gar nicht mehr zu erreichen. */}
+                  {record.type === 'connection' && (
+                    <Tooltip title={tf('openCalculator')}>
+                      <IconButton
+                        sx={{ marginLeft: 'auto', float: 'right' }}
+                        aria-label={tf('openCalculator')}
+                        onClick={() => setFoerderungOpen(true)}
+                      >
+                        <WaterDropIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {record.type === 'line' && (
+                    <Tooltip title={td('openCalculator')}>
+                      <IconButton
+                        sx={{ marginLeft: 'auto', float: 'right' }}
+                        aria-label={td('openCalculator')}
+                        onClick={() => setDammbauOpen(true)}
+                      >
+                        <FoundationIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                   {editable && (
                     <>
                       <Tooltip title={t('editLine')}>
@@ -395,10 +428,19 @@ export default function ConnectionMarker({
         </Popup>
       </Polyline>
 
-      {/* Beim Ziehen immer, sonst nur wenn eingeschaltet: Wer einen Punkt
+      {/* Die Schlaucheinteilung steht an jeder Leitung, ohne dass sie jemand
+          einschaltet — dieselben Querstriche wie beim Zeichnen, und aus
+          demselben Grund: „Wo endet der dritte B-Schlauch?" ist beim
+          Verlegen dieselbe Frage wie beim Planen. Sie erscheint erst, wenn der
+          Maßstab sie trägt (`AUTO_MIN_TICK_SPACING_PX`); zu dicht wären die
+          Striche ein schraffiertes Band und keine Auskunft.
+
+          Das **Etikett** bleibt am Schalter: Fünf Leitungen auf einer Karte
+          sind fünf dauerhafte Beschriftungen, und die verdecken, was sie
+          beschriften. Beim Ziehen steht es trotzdem da — wer einen Punkt
           verschiebt, will die neue Länge sehen, ohne vorher einen Schalter zu
           suchen. */}
-      {(showLength || dragPositions) && (
+      {(showLabel || record.type === 'connection') && (
         <HoseLengthOverlay
           positions={dragPositions ?? linePositions}
           dimension={
@@ -409,6 +451,8 @@ export default function ConnectionMarker({
           hoseLengthM={record.get<number>('oneHozeLength') || 20}
           color={record.color}
           fromEnd={foerderungUmgekehrt === 'true'}
+          label={showLabel}
+          minTickSpacingPx={showLabel ? undefined : AUTO_MIN_TICK_SPACING_PX}
           {...(pane ? { pane } : {})}
         />
       )}

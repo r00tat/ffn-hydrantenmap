@@ -190,6 +190,155 @@ function dropAt(
   return drop[drop.length - 1];
 }
 
+/**
+ * Pumpen, Abschnitte und Enddruck zu einer gegebenen Folge von Standorten.
+ *
+ * Getrennt von der Suche, weil die Standorte zweimal entstehen: einmal aus dem
+ * Vorwärtslauf, der die *Zahl* der Pumpen bestimmt, und danach noch einmal
+ * gleichmäßig verteilt (`balancedDistances`). Beide Male ist daraus dasselbe
+ * Ergebnis zu bauen.
+ */
+function layout(
+  profile: FoerderungProfilePoint[],
+  drop: number[],
+  distances: number[],
+  totalDistance: number,
+  totalDrop: number,
+  ausgangsdruck: number
+): {
+  pumps: FoerderungPump[];
+  abschnitte: FoerderungAbschnitt[];
+  enddruck: number;
+} {
+  const pumps: FoerderungPump[] = [{ distance: 0, ausgangsdruck }];
+  const abschnitte: FoerderungAbschnitt[] = [];
+  let currentDistance = 0;
+  let currentDrop = 0;
+
+  const pushAbschnitt = (toDistance: number, toDrop: number) => {
+    const druckverlust = toDrop - currentDrop;
+    abschnitte.push({
+      vonMeter: currentDistance,
+      bisMeter: toDistance,
+      hoehenunterschied:
+        elevationAt(profile, toDistance) - elevationAt(profile, currentDistance),
+      druckverlust,
+      enddruck: ausgangsdruck - druckverlust,
+    });
+  };
+
+  for (const distance of distances) {
+    const nextDrop = dropAt(profile, drop, distance);
+    pushAbschnitt(distance, nextDrop);
+    pumps.push({
+      distance,
+      eingangsdruck: ausgangsdruck - (nextDrop - currentDrop),
+      ausgangsdruck,
+    });
+    currentDistance = distance;
+    currentDrop = nextDrop;
+  }
+
+  pushAbschnitt(totalDistance, totalDrop);
+
+  return {
+    pumps,
+    abschnitte,
+    enddruck: ausgangsdruck - (totalDrop - currentDrop),
+  };
+}
+
+/**
+ * Dieselbe Pumpenzahl, aber gleichmäßig über die Strecke verteilt.
+ *
+ * Der Vorwärtslauf schöpft jeden Abschnitt bis zum Mindest-Eingangsdruck aus.
+ * Die Zahl der Pumpen ist damit die kleinstmögliche — die **Standorte** aber
+ * sind es nicht: Was nach den vollen Abschnitten übrig bleibt, sammelt sich am
+ * Ende, und die letzte Verstärkerpumpe rückt an ihre Vorgängerin heran. Auf
+ * 2000 m mit 100 m Steigung stehen die Pumpen so bei 433, 867, 1300, 1733 und
+ * **1867** m: viermal 433 m Abstand und dann 133 m. Zwei Pumpen 133 m
+ * nebeneinander sind kein Standort, sondern das Ergebnis einer Grenze, die
+ * hinten nicht mehr aufgeht — im Einsatz ist das nicht umzusetzen und sieht
+ * auf der Karte aus wie ein Rechenfehler.
+ *
+ * Verteilt wird über die **Auslastung**, nicht über die Strecke: Jeder
+ * Abschnitt bekommt denselben Anteil seiner eigenen Kapazität. Das ist nötig,
+ * weil die Abschnitte ungleiche Kapazitäten haben — zwischen zwei Pumpen sind
+ * es `Ausgangsdruck − Eingangsdruck`, vor dem Verteiler nur
+ * `Ausgangsdruck − Zieldruck`. Ein gleicher Druckanteil je Abschnitt würde den
+ * letzten überfordern; ein gleicher **Meter**abstand ebenso, sobald das Gelände
+ * nicht eben ist. Mit gleicher Auslastung hat jeder Abschnitt dieselbe Reserve,
+ * und keiner steht am Anschlag.
+ *
+ * `undefined`, wenn sich die Standorte so nicht setzen lassen — dann bleibt es
+ * beim Ergebnis des Vorwärtslaufs.
+ */
+function balancedDistances(
+  profile: FoerderungProfilePoint[],
+  drop: number[],
+  sections: number,
+  totalDrop: number,
+  ausgangsdruck: number,
+  eingangsdruck: number,
+  zieldruck: number
+): number[] | undefined {
+  const zwischenKapazitaet = ausgangsdruck - eingangsdruck;
+  const letzteKapazitaet = ausgangsdruck - zieldruck;
+  const kapazitaet = (sections - 1) * zwischenKapazitaet + letzteKapazitaet;
+  if (!(kapazitaet > 0) || !(totalDrop > 0)) return undefined;
+
+  const auslastung = Math.min(1, totalDrop / kapazitaet);
+  const distances: number[] = [];
+  let previous = 0;
+  for (let k = 1; k < sections; k += 1) {
+    const target = k * zwischenKapazitaet * auslastung;
+    const distance = distanceAtDrop(profile, drop, target, previous);
+    // Kein Standort für diesen Anteil — etwa weil ein Gefälle die Abnahme
+    // zurückgehen lässt. Dann wird nicht verschoben.
+    if (distance === undefined) return undefined;
+    if (distance <= previous + EPS) return undefined;
+    distances.push(distance);
+    previous = distance;
+  }
+  return distances;
+}
+
+/**
+ * Ob eine Standortfolge die Drücke einhält: jeder Zwischenabschnitt bis
+ * höchstens auf den Mindest-Eingangsdruck, der letzte bis höchstens auf den
+ * Zieldruck.
+ *
+ * Die verteilten Standorte sind rechnerisch immer zulässig; geprüft wird
+ * trotzdem, weil `distanceAtDrop` auf Abschnitten ohne Abnahme den Anfang
+ * zurückgibt und die Standorte damit von den Sollwerten abweichen können. Eine
+ * Verteilung, die die Förderung nicht mehr trägt, ist keine Verbesserung.
+ */
+function isFeasible(
+  profile: FoerderungProfilePoint[],
+  drop: number[],
+  distances: number[],
+  totalDistance: number,
+  totalDrop: number,
+  ausgangsdruck: number,
+  eingangsdruck: number,
+  zieldruck: number
+): boolean {
+  let currentDrop = 0;
+  let currentDistance = 0;
+  for (const distance of distances) {
+    if (!(distance > currentDistance) || distance >= totalDistance - EPS) {
+      return false;
+    }
+    const nextDrop = dropAt(profile, drop, distance);
+    if (nextDrop - currentDrop > ausgangsdruck - eingangsdruck + EPS) {
+      return false;
+    }
+    currentDistance = distance;
+    currentDrop = nextDrop;
+  }
+  return totalDrop - currentDrop <= ausgangsdruck - zieldruck + EPS;
+}
+
 export function computeFoerderung(input: FoerderungInput): FoerderungResult {
   const {
     profile,
@@ -204,44 +353,23 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
   const drop = cumulativeDrop(profile, frictionBarPerMeter);
   const totalDrop = drop[last];
 
-  const pumps: FoerderungPump[] = [{ distance: 0, ausgangsdruck }];
-  const abschnitte: FoerderungAbschnitt[] = [];
+  // Der Vorwärtslauf bestimmt die *Zahl* der Pumpen. Die Standorte, die er
+  // dabei findet, sind nur der Ausgangspunkt — verteilt wird danach.
+  const distances: number[] = [];
   let darstellbar = true;
-  let enddruck = ausgangsdruck;
-
+  let exceeded = false;
   let currentDistance = 0;
   let currentDrop = 0;
 
-  const pushAbschnitt = (
-    toDistance: number,
-    toDrop: number,
-    fromDistance: number,
-    fromDrop: number
-  ) => {
-    const druckverlust = toDrop - fromDrop;
-    abschnitte.push({
-      vonMeter: fromDistance,
-      bisMeter: toDistance,
-      hoehenunterschied:
-        elevationAt(profile, toDistance) - elevationAt(profile, fromDistance),
-      druckverlust,
-      enddruck: ausgangsdruck - druckverlust,
-    });
-  };
-
-  let exceeded = false;
   for (let guard = 0; ; guard += 1) {
     if (guard > MAX_PUMPS) {
       // Mehr Pumpen, als eine Lage trägt — und gleichzeitig der Schutz gegen
       // eine Schleife, die keinen Fortschritt macht.
       exceeded = true;
-      enddruck = ausgangsdruck - (totalDrop - currentDrop);
       break;
     }
     // Reicht der Ausgangsdruck bis zum Ende, ist die Leitung fertig.
     if (totalDrop - currentDrop <= ausgangsdruck - zieldruck + EPS) {
-      enddruck = ausgangsdruck - (totalDrop - currentDrop);
-      pushAbschnitt(totalDistance, totalDrop, currentDistance, currentDrop);
       break;
     }
 
@@ -263,25 +391,64 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
     if (nextDistance === undefined || nextDistance >= totalDistance - EPS) {
       // Kein Standort vor dem Verteiler, von dem aus es weitergeht.
       darstellbar = false;
-      enddruck = ausgangsdruck - (totalDrop - currentDrop);
-      pushAbschnitt(totalDistance, totalDrop, currentDistance, currentDrop);
       break;
     }
 
-    const nextDrop = dropAt(profile, drop, nextDistance);
-    pushAbschnitt(nextDistance, nextDrop, currentDistance, currentDrop);
-    pumps.push({
-      distance: nextDistance,
-      eingangsdruck: ausgangsdruck - (nextDrop - currentDrop),
-      ausgangsdruck,
-    });
+    distances.push(nextDistance);
     currentDistance = nextDistance;
-    currentDrop = nextDrop;
+    currentDrop = dropAt(profile, drop, nextDistance);
   }
 
+  // Erst wenn die Lage trägt, werden die Standorte gleichmäßig verteilt: Bei
+  // einer Leitung, die so nicht zu legen ist, wäre eine schönere Verteilung
+  // eine Aussage über etwas, das es nicht gibt.
+  let placed = distances;
+  if (darstellbar && !exceeded && distances.length > 0) {
+    const balanced = balancedDistances(
+      profile,
+      drop,
+      distances.length + 1,
+      totalDrop,
+      ausgangsdruck,
+      eingangsdruck,
+      zieldruck
+    );
+    if (
+      balanced &&
+      isFeasible(
+        profile,
+        drop,
+        balanced,
+        totalDistance,
+        totalDrop,
+        ausgangsdruck,
+        eingangsdruck,
+        zieldruck
+      )
+    ) {
+      placed = balanced;
+    }
+  }
+
+  const built = layout(
+    profile,
+    drop,
+    placed,
+    totalDistance,
+    totalDrop,
+    ausgangsdruck
+  );
+
+  // Der Abbruch an `MAX_PUMPS` hat kein Ende der Leitung erreicht; ein letzter
+  // Abschnitt bis zum Verteiler wäre dort erfunden.
+  const abschnitte = exceeded ? built.abschnitte.slice(0, -1) : built.abschnitte;
+  const enddruck = exceeded
+    ? ausgangsdruck - (totalDrop - currentDrop)
+    : built.enddruck;
+
   return {
-    pumps,
-    verstaerkerpumpen: pumps.length - 1,
+    pumps: built.pumps,
+    verstaerkerpumpen: built.pumps.length - 1,
     abschnitte,
     reibungsverlustBar:
       (profile[last].distance - profile[0].distance) * frictionBarPerMeter,

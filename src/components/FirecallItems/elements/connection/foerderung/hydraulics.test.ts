@@ -49,13 +49,36 @@ describe('computeFoerderung', () => {
     expect(result.darstellbar).toBe(true);
   });
 
-  it('setzt die erste Pumpe auf 650 m — die Faustregel „etwa alle 600 m"', () => {
-    // (8 − 1,5) / 0,01 = 650 m. Veröffentlicht ist „etwa alle 600 m eine
-    // Verstärkerpumpe" bei 800 l/min in der Ebene.
+  it('setzt die erste Pumpe auf 605 m — die Faustregel „etwa alle 600 m"', () => {
+    // Der weiteste Standort wäre (8 − 1,5) / 0,01 = 650 m. Verteilt wird auf
+    // gleiche Auslastung: 20 bar auf 3 · 6,5 + 2 = 21,5 bar Kapazität sind
+    // 93,0 %, je Zwischenabschnitt also 6,047 bar = 604,7 m. Veröffentlicht ist
+    // „etwa alle 600 m eine Verstärkerpumpe" bei 800 l/min in der Ebene.
     const result = computeFoerderung(input(profile(2000)));
-    expect(result.pumps[1].distance).toBeCloseTo(650, 6);
-    expect(result.pumps[1].eingangsdruck).toBeCloseTo(1.5, 6);
+    expect(result.pumps[1].distance).toBeCloseTo(604.65, 2);
+    // Mit Reserve statt am Anschlag: 8 − 6,047 = 1,95 bar statt 1,5.
+    expect(result.pumps[1].eingangsdruck).toBeCloseTo(1.953, 3);
     expect(result.verstaerkerpumpen).toBe(3);
+  });
+
+  it('verteilt die Pumpen gleichmäßig, statt die letzte anzuhängen', () => {
+    // 2000 m mit 100 m Steigung, 0,015 bar/m: Der Vorwärtslauf schöpft jeden
+    // Abschnitt aus und setzt die Pumpen auf 433, 867, 1300, 1733 — und die
+    // fünfte auf 1867, also 133 m neben die vierte. Das ist kein Standort,
+    // sondern eine Grenze, die hinten nicht mehr aufgeht.
+    const result = computeFoerderung(input(profile(2000, 100)));
+    expect(result.verstaerkerpumpen).toBe(5);
+
+    const abstaende = result.pumps
+      .slice(1)
+      .map((pump, index) => pump.distance - result.pumps[index].distance);
+    // Alle Abstände gleich — und keiner mehr in der Nähe der alten 133 m.
+    for (const abstand of abstaende) {
+      expect(abstand).toBeCloseTo(abstaende[0], 6);
+      expect(abstand).toBeGreaterThan(300);
+    }
+    expect(result.darstellbar).toBe(true);
+    expect(result.enddruck).toBeGreaterThanOrEqual(6 - 1e-9);
   });
 
   it('erreicht das Ende nie unter dem Zieldruck', () => {
@@ -69,10 +92,11 @@ describe('computeFoerderung', () => {
   });
 
   it('setzt die letzte Pumpe nicht unmittelbar vor den Verteiler', () => {
-    // Der weiteste erreichbare Punkt wäre 1950 m — 50 m vor dem Ende.
+    // Der weiteste erreichbare Punkt wäre 1950 m — 50 m vor dem Ende. Mit der
+    // gleichmäßigen Verteilung sind es 3 · 6,047 bar = 1814 m.
     const result = computeFoerderung(input(profile(2000)));
     const letzte = result.pumps[result.pumps.length - 1];
-    expect(letzte.distance).toBeCloseTo(1800, 6);
+    expect(letzte.distance).toBeCloseTo(1813.95, 2);
   });
 
   it('braucht bei Steigung mehr Pumpen als in der Ebene', () => {
@@ -128,7 +152,10 @@ describe('computeFoerderung', () => {
       zieldruck: 6,
     });
 
-    expect(result.pumps[1].distance).toBeCloseTo(130, 6);
+    // Verteilt: 100 bar auf 16 · 6,5 + 2 = 106 bar sind 94,3 % Auslastung,
+    // je Abschnitt 6,132 bar = 122,6 m. Ohne die Verteilung stünden die
+    // letzten beiden Pumpen auf 1950 und 1960 m — 10 m nebeneinander.
+    expect(result.pumps[1].distance).toBeCloseTo(122.64, 2);
     expect(result.verstaerkerpumpen).toBeLessThanOrEqual(17);
     expect(result.darstellbar).toBe(true);
     expect(result.enddruck).toBeGreaterThanOrEqual(6 - 1e-9);
@@ -158,12 +185,14 @@ describe('computeFoerderung', () => {
     const result = computeFoerderung(input(profile(2000)));
     expect(result.abschnitte).toHaveLength(result.pumps.length);
     expect(result.abschnitte[0].vonMeter).toBe(0);
-    expect(result.abschnitte[0].bisMeter).toBeCloseTo(650, 6);
+    expect(result.abschnitte[0].bisMeter).toBeCloseTo(604.65, 2);
     expect(result.abschnitte[0].hoehenunterschied).toBeCloseTo(0, 6);
-    expect(result.abschnitte[0].druckverlust).toBeCloseTo(6.5, 6);
-    // Zwischenabschnitte enden auf dem Mindest-Eingangsdruck, weil die Pumpe am
-    // weitesten erreichbaren Punkt steht.
-    expect(result.abschnitte[0].enddruck).toBeCloseTo(1.5, 6);
+    expect(result.abschnitte[0].druckverlust).toBeCloseTo(6.047, 3);
+    // Zwischenabschnitte enden **über** dem Mindest-Eingangsdruck: Die
+    // Standorte sind gleichmäßig verteilt, also hat jeder Abschnitt dieselbe
+    // Reserve, statt dass der erste sie aufbraucht.
+    expect(result.abschnitte[0].enddruck).toBeCloseTo(1.953, 3);
+    expect(result.abschnitte[0].enddruck).toBeGreaterThan(1.5);
     // Der letzte Abschnitt endet auf dem Zieldruck oder darüber.
     const letzter = result.abschnitte[result.abschnitte.length - 1];
     expect(letzter.bisMeter).toBeCloseTo(2000, 6);

@@ -22,6 +22,20 @@ const TICK_HALF_PX = 8;
  */
 const MIN_TICK_SPACING_PX = 6;
 
+/**
+ * Dieselbe Schranke für die Einteilung, die **ungefragt** erscheint.
+ *
+ * An einer fertig gezeichneten Leitung steht die Einteilung da, ohne dass sie
+ * jemand eingeschaltet hat (siehe `ConnectionComponent`). Was man selbst
+ * anfordert, darf eng werden — was von allein kommt, muss auf den ersten Blick
+ * als Reihe einzelner Kupplungen lesbar sein und nicht als schraffiertes Band.
+ *
+ * 12 px gegen 3 px Strichstärke: Die Lücke ist viermal so breit wie der Strich.
+ * Ein 20-m-B-Schlauch erreicht das ab etwa Zoom 16 — dem Maßstab, in dem man
+ * ohnehin die Straße vor sich hat.
+ */
+export const AUTO_MIN_TICK_SPACING_PX = 12;
+
 export interface HoseLengthOverlayProps {
   positions: LatLngPosition[];
   /**
@@ -37,6 +51,17 @@ export interface HoseLengthOverlayProps {
    * Restschlauch sonst am falschen Ende.
    */
   fromEnd?: boolean;
+  /**
+   * Das Etikett „1240 m · 62 × B" zeichnen.
+   *
+   * Getrennt von den Querstrichen, weil die Einteilung an jeder Leitung von
+   * selbst erscheinen soll, ein dauerhaftes Etikett an jeder aber nicht: Auf
+   * einer Karte mit fünf Leitungen sind fünf Etiketten Beschriftungssalat, die
+   * Kupplungen dagegen sind die Linie selbst.
+   */
+  label?: boolean;
+  /** Mindestabstand der Querstriche in Pixeln. */
+  minTickSpacingPx?: number;
   pane?: string;
 }
 
@@ -54,6 +79,8 @@ export default function HoseLengthOverlay({
   hoseLengthM = 20,
   color,
   fromEnd,
+  label = true,
+  minTickSpacingPx = MIN_TICK_SPACING_PX,
   pane,
 }: HoseLengthOverlayProps) {
   const map = useMap();
@@ -61,12 +88,19 @@ export default function HoseLengthOverlay({
   // ihre Meterlänge und wüchsen beim Hineinzoomen zu Querstraßen.
   const [zoom, setZoom] = useState(() => map.getZoom());
   useMapEvent('zoomend', () => setZoom(map.getZoom()));
+  // Und am Ausschnitt, seit die Striche nur noch im Sichtfeld entstehen.
+  const [, setMoved] = useState(0);
+  useMapEvent('moveend', () => setMoved((count) => count + 1));
 
   const clean = positions.filter(([lat, lng]) => lat && lng);
   if (clean.length < 2) return null;
 
   const distance = calculateDistance(clean);
   if (distance <= 0) return null;
+
+  // Der sichtbare Ausschnitt mit Rand. `getBounds` gibt es nur an einer echten
+  // Leaflet-Karte; fehlt es, wird nicht beschnitten.
+  const visible = map.getBounds?.()?.pad(0.5);
 
   // Meter je Bildschirmpixel an der aktuellen Stelle. Über die Karte gerechnet
   // statt über eine Zoomformel: Das trifft auch abseits des Äquators.
@@ -80,7 +114,7 @@ export default function HoseLengthOverlay({
     Boolean(dimension) &&
     hoseLengthM > 0 &&
     metresPerPixel > 0 &&
-    hoseLengthM / metresPerPixel >= MIN_TICK_SPACING_PX;
+    hoseLengthM / metresPerPixel >= minTickSpacingPx;
 
   const ticks = showTicks
     ? hoseBoundaryTicks(
@@ -89,6 +123,15 @@ export default function HoseLengthOverlay({
         TICK_HALF_PX * metresPerPixel,
         fromEnd
       )
+        // Nur, was im Ausschnitt liegt: Eine 10-km-Leitung hat bei Zoom 17
+        // fünfhundert Grenzen, von denen keine fünfzig zu sehen sind. Seit die
+        // Einteilung an *jeder* Leitung von selbst erscheint, ist das der
+        // Unterschied zwischen einer Karte, die sich schieben lässt, und einer,
+        // die ruckelt. Der Rand ist großzügig, damit beim Schieben nicht erst
+        // nachwächst, was schon sichtbar sein müsste.
+        .filter(([from, to]) =>
+          visible ? visible.contains(from) || visible.contains(to) : true
+        )
     : [];
 
   const stroke = color || '#0000ff';
@@ -111,16 +154,18 @@ export default function HoseLengthOverlay({
       ))}
       {/* Unsichtbarer Träger, weil ein Tooltip an einem Layer hängen muss und
           hier nur seine Beschriftung erwünscht ist. */}
-      <CircleMarker
-        center={longestSegmentMidpoint(clean)}
-        radius={1}
-        {...(pane ? { pane } : {})}
-        pathOptions={{ opacity: 0, fillOpacity: 0, interactive: false }}
-      >
-        <Tooltip permanent direction="center" offset={[0, 0]}>
-          {hoseLabel(distance, dimension, hoseLengthM)}
-        </Tooltip>
-      </CircleMarker>
+      {label && (
+        <CircleMarker
+          center={longestSegmentMidpoint(clean)}
+          radius={1}
+          {...(pane ? { pane } : {})}
+          pathOptions={{ opacity: 0, fillOpacity: 0, interactive: false }}
+        >
+          <Tooltip permanent direction="center" offset={[0, 0]}>
+            {hoseLabel(distance, dimension, hoseLengthM)}
+          </Tooltip>
+        </CircleMarker>
+      )}
     </>
   );
 }

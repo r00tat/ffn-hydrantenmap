@@ -45,6 +45,15 @@ export interface ShuttleResult {
   fahrzeit: number;
   /** Füllen plus Rangieren in min — die Zeit, in der die Entnahmestelle besetzt ist. */
   fuellzeit: number;
+  /**
+   * Nur das Füllen selbst in min: Tankinhalt durch Ergiebigkeit.
+   *
+   * Getrennt ausgewiesen, weil `fuellzeit` sonst nicht nachzurechnen ist: „2,3
+   * min für 2000 l an einem Hydranten mit 1500 l/min" liest sich als Fehler,
+   * solange nicht dabeisteht, dass 1,3 min davon das Füllen sind und 1,0 min
+   * das Rangieren. Die Zahl war richtig, die Anzeige nicht prüfbar.
+   */
+  nettoFuellzeit: number;
   /** Fahrzeit plus Füllen plus Entleeren, in min. */
   umlaufzeit: number;
   /** Dauerhaft lieferbare Menge in l/min, Füllstelle eingerechnet. */
@@ -62,8 +71,18 @@ export interface ShuttleResult {
   begrenztDurchFuellstelle: boolean;
   /** Fahrzeuge, die die Füllstelle noch auslasten kann (nicht gerundet). */
   fahrzeugeFuellstelle: number;
-  /** Fahrzeuge für die Sollmenge, ohne die Schranke der Füllstelle. */
-  fahrzeugeFuerSollmenge: number;
+  /**
+   * Fahrzeuge für die Sollmenge.
+   *
+   * `undefined`, wenn die Entnahmestelle **unter** der Sollmenge deckelt: Dann
+   * trägt keine Zahl von Fahrzeugen sie, und eine Zahl an dieser Stelle wäre
+   * eine Anweisung, die nichts ändert. Genau das stand hier — der Rechner
+   * nannte fünf Fahrzeuge und meldete daneben, fünf seien zu wenig.
+   *
+   * Dieselbe Begründung wie beim `kipppunkt`: Wo die Füllstelle die harte
+   * Grenze ist, ist die Antwort nicht „mehr davon".
+   */
+  fahrzeugeFuerSollmenge?: number;
   /** Ob die Lage die Sollmenge dauerhaft trägt. */
   traegtSollmenge: boolean;
   /**
@@ -119,7 +138,8 @@ export function computeShuttle(input: ShuttleInput): ShuttleResult | undefined {
 
   // Die Füllzeit ist gerechnet, nicht gesetzt: Tankinhalt durch Ergiebigkeit,
   // plus An- und Abfahren.
-  const fuellzeit = tankinhalt / fuellleistung + rangierzeit;
+  const nettoFuellzeit = tankinhalt / fuellleistung;
+  const fuellzeit = nettoFuellzeit + rangierzeit;
   const fahrzeit = (2 * strecke) / metrePerMinute(geschwindigkeit);
   const umlaufzeit = fahrzeit + fuellzeit + entleerzeit;
 
@@ -135,9 +155,15 @@ export function computeShuttle(input: ShuttleInput): ShuttleResult | undefined {
   // ein Puffer.
   const fahrzeugeOhnePuffer = Math.ceil(umlaufzeit / entleerzeit - EPS);
 
+  // Was die Entnahmestelle hergibt, ist die harte Grenze: Sie entscheidet, ob
+  // die Sollmenge überhaupt erreichbar ist — und nicht erst, wie viele
+  // Fahrzeuge es dafür braucht.
+  const fuellstelleTraegtSollmenge = fuellstellenLeistung + EPS >= sollMenge;
+
   return {
     fahrzeit,
     fuellzeit,
+    nettoFuellzeit,
     umlaufzeit,
     menge,
     mengeOhneFuellstelle,
@@ -145,7 +171,12 @@ export function computeShuttle(input: ShuttleInput): ShuttleResult | undefined {
     begrenztDurchFuellstelle:
       mengeOhneFuellstelle > fuellstellenLeistung + EPS,
     fahrzeugeFuellstelle: umlaufzeit / fuellzeit,
-    fahrzeugeFuerSollmenge: Math.ceil((sollMenge * umlaufzeit) / tankinhalt),
+    fahrzeugeFuerSollmenge:
+      sollMenge > 0 && fuellstelleTraegtSollmenge
+        ? // `− EPS`, damit eine Fahrzeugzahl, die rechnerisch genau aufgeht,
+          // nicht an der letzten Binärstelle um eines nach oben rutscht.
+          Math.max(1, Math.ceil((sollMenge * umlaufzeit) / tankinhalt - EPS))
+        : undefined,
     traegtSollmenge: menge + EPS >= sollMenge,
     kipppunkt: tippingDistance(input),
     faltbehaelter: fahrzeuge < fahrzeugeOhnePuffer,

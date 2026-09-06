@@ -251,6 +251,33 @@ Dazu ein **Querstrich je Schlauchgrenze**, senkrecht auf dem Verlauf. Damit ist
 zu sehen, wo ein Schlauch endet und der nächste beginnt — und ob die Länge bis
 zur nächsten Ecke noch reicht.
 
+### Die Einteilung steht ungefragt da, das Etikett nicht
+
+Die Querstriche brauchen keinen Schalter: An jeder Leitung sind sie dieselbe
+Auskunft wie beim Zeichnen, und „wo endet der dritte B-Schlauch?" ist beim
+Verlegen dieselbe Frage wie beim Planen. Vorher waren sie an `showLength`
+gebunden und damit nach dem Zeichnen weg — man sah die Einteilung genau so lange,
+wie man sie noch nicht brauchte.
+
+Das **Etikett** bleibt am Schalter. Es ist ein dauerhafter Tooltip; auf einer
+Karte mit fünf Leitungen sind das fünf Beschriftungen, die verdecken, was sie
+beschriften. Beim Ziehen eines Punktes steht es trotzdem da — wer verschiebt,
+will die neue Länge sehen, ohne vorher einen Schalter zu suchen.
+
+Zwei Schranken, weil zweierlei gefragt ist:
+
+| | Mindestabstand | warum |
+| --- | --- | --- |
+| eingeschaltet oder beim Ziehen | 6 px | Wer sie anfordert, nimmt auch enge Striche in Kauf |
+| ungefragt | **12 px** | Viermal die Strichstärke: eine Reihe einzelner Kupplungen, kein schraffiertes Band. Ein 20-m-B-Schlauch erreicht das ab etwa Zoom 16 |
+
+Gezeichnet wird außerdem nur, was im **Ausschnitt** liegt (mit großzügigem Rand,
+neu gerechnet bei `moveend`). Eine 10-km-Leitung hat bei Zoom 17 fünfhundert
+Grenzen, von denen keine fünfzig zu sehen sind; solange die Einteilung an einer
+einzelnen eingeschalteten Leitung hing, war das zu verschmerzen — an allen
+zugleich ist es der Unterschied zwischen einer Karte, die sich schieben lässt,
+und einer, die ruckelt.
+
 ### Die Strichlänge steht in Pixeln, nicht in Metern
 
 Die halbe Strichlänge wird aus dem aktuellen Kartenmaßstab so gewählt, dass sie
@@ -345,6 +372,45 @@ Ende unter dem Zieldruck — es würde **eine Pumpe zu wenig** ausweisen.
 Der erste Treffer statt des weitesten für die letzte Pumpe: Auf 2000 m flach wäre
 der weiteste Punkt 1950 m — 50 m vor dem Verteiler, ein unsinniger Standort. Die
 Pumpenzahl ist dieselbe, die Reserve am Ende größer.
+
+### Der Vorwärtslauf bestimmt die Zahl, nicht die Standorte
+
+Er schöpft jeden Abschnitt bis auf den Mindest-Eingangsdruck aus. Damit ist die
+Pumpen**zahl** die kleinstmögliche — die **Standorte** sind es nicht: Was nach
+den vollen Abschnitten übrig bleibt, sammelt sich hinten, und die letzte
+Verstärkerpumpe rückt an ihre Vorgängerin heran.
+
+Auf 2000 m mit 100 m Steigung standen die Pumpen deshalb bei 433, 867, 1300,
+1733 — und die fünfte bei **1867 m**, also 133 m neben der vierten. Zwei Pumpen
+133 m nebeneinander sind kein Standort, sondern eine Grenze, die hinten nicht
+mehr aufgeht; im Einsatz ist das nicht umzusetzen und auf der Karte sieht es aus
+wie ein Rechenfehler.
+
+Nach dem Vorwärtslauf werden die Standorte deshalb noch einmal gesetzt, mit
+derselben Pumpenzahl und **gleicher Auslastung** je Abschnitt:
+
+```
+Kapazität  = (n−1)·(Ausgangsdruck − Eingangsdruck) + (Ausgangsdruck − Zieldruck)
+Auslastung = Gesamtabnahme / Kapazität
+Sollabnahme der k-ten Pumpe = k · (Ausgangsdruck − Eingangsdruck) · Auslastung
+```
+
+Verteilt wird über die Auslastung und **nicht** über die Strecke, weil die
+Abschnitte ungleiche Kapazitäten haben: zwischen zwei Pumpen sind es 6,5 bar, vor
+dem Verteiler nur 2,0. Ein gleicher Druckanteil je Abschnitt überforderte den
+letzten, ein gleicher Meterabstand jeden Abschnitt im Gelände. Mit gleicher
+Auslastung hat jeder Abschnitt dieselbe Reserve, und keiner steht am Anschlag.
+
+Auf 2000 m flach heißt das 605, 1209 und 1814 m statt 650, 1300 und 1800 — die
+erste Pumpe liegt damit sogar näher an der Faustregel „etwa alle 600 m", und die
+Zwischenabschnitte enden auf 1,95 statt auf 1,5 bar.
+
+Verschoben wird nur, wenn die Lage überhaupt trägt: Bei einer Leitung, die so
+nicht zu legen ist, wäre eine schönere Verteilung eine Aussage über etwas, das es
+nicht gibt. Und die verteilten Standorte werden gegengeprüft (`isFeasible`) —
+`distanceAtDrop` gibt auf Abschnitten ohne Abnahme den Anfang zurück, die
+Standorte können also von den Sollwerten abweichen. Hält eine Verteilung die
+Drücke nicht ein, bleibt es beim Ergebnis des Vorwärtslaufs.
 
 ### Die Standorte werden auf der Strecke gelöst, nicht aufs Raster gerundet
 
@@ -553,6 +619,17 @@ neuer Item-Typ — und schreibt **einen** Tagebucheintrag (`type: 'diary'`). Nur
 beim Ablegen, nicht beim Rechnen: Am Regler wird probiert, nur die getroffene
 Entscheidung gehört in den Verlauf. Die Pumpe an der Entnahmestelle wird
 mitabgelegt, aber als solche benannt.
+
+## Der Rechner-Knopf sitzt auch an den Punkten der Leitung
+
+Im Popup der Leitung **und** in dem jedes einzelnen Punkts. Nicht doppelt gemoppelt:
+Sobald ein Punktpopup offen war, bleiben die Punktmarker sichtbar
+(`popupopen`/`popupclose` in `ConnectionComponent`), und ein Tippen trifft dann
+den Punkt statt der Linie. Der Rechner war von der Karte aus damit gar nicht mehr
+zu erreichen — man musste erst danebentippen, um das Popup der Leitung zu bekommen.
+
+Dasselbe gilt für den Sandsackrechner an der Linie: gleicher Aufbau, gleiche
+Ursache.
 
 ## Ein Panel über der Karte, kein Dialog
 

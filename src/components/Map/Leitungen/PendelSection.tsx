@@ -194,11 +194,19 @@ export default function PendelSection({
                 value: num(result?.fuellstellenLeistung ?? 0, 0),
                 vehicles: Math.floor(result?.fahrzeugeFuellstelle ?? 0),
               })}
+            {/* Ohne erreichbare Fahrzeugzahl **keine** Zahl: Die
+                Entnahmestelle ist dann die Grenze, und „nötig wären 5" neben
+                einem eingestellten 5 ist ein Widerspruch, kein Auftrag. */}
             {warning === 'sollMengeNotReached' &&
-              t('warningRequiredFlowMissed', {
-                required: num(view.sollMenge, 0),
-                vehicles: result?.fahrzeugeFuerSollmenge ?? 0,
-              })}
+              (result?.fahrzeugeFuerSollmenge !== undefined
+                ? t('warningRequiredFlowMissed', {
+                    required: num(view.sollMenge, 0),
+                    vehicles: result.fahrzeugeFuerSollmenge,
+                  })
+                : t('warningRequiredFlowImpossible', {
+                    required: num(view.sollMenge, 0),
+                    value: num(result?.fuellstellenLeistung ?? 0, 0),
+                  }))}
             {warning === 'notComputable' && t('warningShuttleNotComputable')}
           </Alert>
         ))}
@@ -247,7 +255,8 @@ export default function PendelSection({
                 {t('vehiclesForRequiredFlow')}
               </Typography>
               <Typography variant="body2">
-                {result.fahrzeugeFuerSollmenge}
+                {result.fahrzeugeFuerSollmenge ??
+                  t('vehiclesForRequiredFlowNone')}
               </Typography>
             </Grid>
             <Grid size={{ xs: 6 }}>
@@ -331,7 +340,11 @@ export default function PendelSection({
                 // Ergebnis, damit die Zahl nachprüfbar bleibt.
                 helperText={
                   result
-                    ? t('fillTimeHint', { value: num(result.fuellzeit) })
+                    ? t('fillTimeHint', {
+                        value: num(result.fuellzeit),
+                        filling: num(result.nettoFuellzeit),
+                        shunting: num(params.rangierzeit),
+                      })
                     : t('shuntTimeHint')
                 }
                 onChange={(event) =>
