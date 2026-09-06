@@ -13,6 +13,11 @@ const polylines = vi.hoisted(() => ({ props: [] as any[] }));
 const map = vi.hoisted(() => ({
   /** Meter je 100 px — über die Karte gerechnet, hier gestellt. */
   metresPer100px: 1000,
+  /**
+   * Die Südgrenze des sichtbaren Ausschnitts. `-90` heißt „alles sichtbar".
+   * Eine echte Leaflet-Karte hat immer einen Ausschnitt, der Mock deshalb auch.
+   */
+  visibleNorthOf: -90,
 }));
 
 vi.mock('react-leaflet', () => ({
@@ -31,6 +36,11 @@ vi.mock('react-leaflet', () => ({
       lng: 16.8 + x,
     }),
     distance: () => map.metresPer100px,
+    getBounds: () => ({
+      pad: () => ({
+        contains: ([lat]: [number, number]) => lat >= map.visibleNorthOf,
+      }),
+    }),
   }),
   useMapEvent: () => undefined,
 }));
@@ -49,6 +59,7 @@ describe('HoseLengthOverlay', () => {
     // 10 m je Pixel: Ein 20-m-Schlauch ist damit 2 px — bewusst grob, damit
     // jeder Test seinen Maßstab selbst setzt.
     map.metresPer100px = 1000;
+    map.visibleNorthOf = -90;
   });
 
   it('beschriftet Länge und Schlauchzahl', () => {
@@ -114,6 +125,59 @@ describe('HoseLengthOverlay', () => {
     render(<HoseLengthOverlay positions={[[47.9, 16.8]]} dimension="B" />);
     expect(screen.queryByTestId('label')).not.toBeInTheDocument();
     expect(polylines.props).toHaveLength(0);
+  });
+
+  it('zeichnet die Einteilung auch ohne Etikett', () => {
+    // An einer fertig gezeichneten Leitung stehen die Querstriche von selbst
+    // da; das Etikett hängt weiter am Schalter, sonst trüge jede Leitung auf
+    // der Karte eine dauerhafte Beschriftung.
+    map.metresPer100px = 100; // 1 m je Pixel
+    render(
+      <HoseLengthOverlay
+        positions={gerade}
+        dimension="B"
+        hoseLengthM={20}
+        label={false}
+      />
+    );
+    expect(polylines.props).toHaveLength(19);
+    expect(screen.queryByTestId('label')).not.toBeInTheDocument();
+  });
+
+  it('hält die ungefragte Einteilung an der eigenen Schranke', () => {
+    // 2 m je Pixel: Ein 20-m-Schlauch ist 10 px breit. Angefordert (6 px)
+    // stünden die Striche, ungefragt (12 px) nicht — dort wären sie ein
+    // schraffiertes Band statt einer Reihe von Kupplungen.
+    map.metresPer100px = 200;
+    render(
+      <HoseLengthOverlay positions={gerade} dimension="B" hoseLengthM={20} />
+    );
+    expect(polylines.props.length).toBeGreaterThan(0);
+
+    polylines.props = [];
+    render(
+      <HoseLengthOverlay
+        positions={gerade}
+        dimension="B"
+        hoseLengthM={20}
+        label={false}
+      />
+    );
+    expect(polylines.props).toHaveLength(0);
+  });
+
+  it('zeichnet nur die Striche im sichtbaren Ausschnitt', () => {
+    // Die Leitung läuft 400 m nach Norden; sichtbar ist nur ihre nördliche
+    // Hälfte. Eine 10-km-Leitung hätte sonst fünfhundert Grenzen, von denen
+    // keine fünfzig zu sehen sind.
+    map.metresPer100px = 100;
+    map.visibleNorthOf = 47.9 + 200 / 111_320;
+    render(
+      <HoseLengthOverlay positions={gerade} dimension="B" hoseLengthM={20} />
+    );
+    // Von 19 Grenzen liegen die auf 200 m und darüber im Ausschnitt.
+    expect(polylines.props.length).toBeGreaterThan(0);
+    expect(polylines.props.length).toBeLessThan(19);
   });
 
   it('gibt die Linienfarbe an die Striche weiter', () => {

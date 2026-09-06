@@ -21,7 +21,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Connection } from '../../firebase/firestore';
 import { FALLBACK_SAMPLE_SPACING_M } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
 import {
@@ -35,6 +35,8 @@ import type {
 } from '../../FirecallItems/elements/connection/foerderung/foerderung';
 import FoerderungProfileChart from './FoerderungProfileChart';
 import { parseNumber } from '../panelNumbers';
+import { foerderungRechenweg } from '../../FirecallItems/elements/connection/foerderung/rechenweg';
+import RechenwegTabelle from './RechenwegTabelle';
 import usePanelNumber from './usePanelNumber';
 
 /**
@@ -96,6 +98,7 @@ export default function FoerderungSection({
   const t = useTranslations('loeschwasserfoerderung');
   const num = usePanelNumber();
   const hasProfile = view.elevationSource === 'profile';
+  const schritte = useMemo(() => foerderungRechenweg(view, num), [view, num]);
 
   // Buchstabe und Durchmesser getrennt bedient, am Element bleibt **ein**
   // Freitextfeld. Unlesbares („Storz") lässt beides leer — dann steht kein Knopf
@@ -610,6 +613,22 @@ export default function FoerderungSection({
           </AccordionDetails>
         </Accordion>
       )}
+
+      {/* Ganz unten und zugeklappt — dieselbe Begründung wie im
+          Pendelverkehr. Die Abschnittstabelle darüber ist die *Ausgabe* der
+          Standortsuche, der Rechenweg die Herleitung ihrer Eingangsgrößen. */}
+      <Accordion
+        disableGutters
+        elevation={0}
+        slotProps={{ transition: { unmountOnExit: true } }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2">{t('calculationSteps')}</Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ px: 0 }}>
+          <RechenwegTabelle schritte={schritte} />
+        </AccordionDetails>
+      </Accordion>
     </>
   );
 }

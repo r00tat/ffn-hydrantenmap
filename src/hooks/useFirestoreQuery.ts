@@ -1,7 +1,7 @@
 'use client';
 
 import { onSnapshot, Query, QuerySnapshot } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 /**
  * Represents the return value of the `useFirestoreQuery` hook.
@@ -19,6 +19,9 @@ export type UseFirestoreQueryResult<T> = {
   records: Array<T>;
 };
 
+/** Stabiles leeres Ergebnis, damit ein noch leerer Listener keine Renders auslöst. */
+const EMPTY_RECORDS: Array<never> = [];
+
 /**
  * A React hook that subscribes to a Firestore query and returns the data, loading state, and error.
  *
@@ -26,6 +29,12 @@ export type UseFirestoreQueryResult<T> = {
  * @param {Query<T> | null} query The Firestore query to subscribe to.
  *   **Important:** This query object should be memoized (e.g., with `useMemo`) to prevent
  *   unnecessary re-subscriptions on component re-renders.
+ * @param {(element: T) => boolean} [filterFn] Filter über das Ergebnis. Der Filter
+ *   wird auf den zuletzt empfangenen Snapshot angewendet und hängt bewusst
+ *   **nicht** am Listener: eine inline definierte Funktion ist bei jedem Render
+ *   eine neue Referenz, und ein daran hängender Listener meldete den Firestore-
+ *   Target bei jedem Render ab und neu an. Da jeder Snapshot wieder einen Render
+ *   auslöste, lief das endlos.
  * @returns {UseFirestoreQueryResult<T>} An object containing the query snapshot, loading state, and any error.
  */
 export const useFirestoreQuery = <T>(
@@ -35,7 +44,6 @@ export const useFirestoreQuery = <T>(
   const [value, setValue] = useState<QuerySnapshot<T> | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | undefined>(undefined);
-  const [records, setRecords] = useState<Array<T>>([]);
 
   useEffect(() => {
     if (!query) {
@@ -54,12 +62,6 @@ export const useFirestoreQuery = <T>(
       query,
       (snapshot) => {
         setValue(snapshot as QuerySnapshot<T>);
-
-        const newRecords = snapshot.docs.map(
-          (doc) =>
-            ({ ...doc.data({ serverTimestamps: 'estimate' }), id: doc.id } as T)
-        );
-        setRecords(filterFn ? newRecords.filter(filterFn) : newRecords);
         setLoading(false);
       },
       (err: Error) => {
@@ -70,7 +72,18 @@ export const useFirestoreQuery = <T>(
     );
 
     return () => unsubscribe();
-  }, [filterFn, query]);
+  }, [query]);
+
+  const records = useMemo(() => {
+    if (!value) {
+      return EMPTY_RECORDS as Array<T>;
+    }
+    const newRecords = value.docs.map(
+      (doc) =>
+        ({ ...doc.data({ serverTimestamps: 'estimate' }), id: doc.id } as T)
+    );
+    return filterFn ? newRecords.filter(filterFn) : newRecords;
+  }, [value, filterFn]);
 
   return { value, loading, error, records };
 };

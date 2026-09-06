@@ -15,12 +15,15 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import { useMemo } from 'react';
 import type {
   PendelParams,
   PendelView,
 } from '../../FirecallItems/elements/connection/pendel/pendelverkehr';
 import type { HydrantOhneLeistung } from '../../FirecallItems/elements/connection/pendel/fuellstelle';
-import { parseNumber } from '../panelNumbers';
+import { pendelRechenweg } from '../../FirecallItems/elements/connection/pendel/rechenweg';
+import { parseNumber, round } from '../panelNumbers';
+import RechenwegTabelle from './RechenwegTabelle';
 import usePanelNumber from './usePanelNumber';
 
 /**
@@ -67,6 +70,7 @@ export default function PendelSection({
   const t = useTranslations('loeschwasserfoerderung');
   const num = usePanelNumber();
   const result = view.result;
+  const schritte = useMemo(() => pendelRechenweg(view, num), [view, num]);
 
   return (
     <>
@@ -194,11 +198,21 @@ export default function PendelSection({
                 value: num(result?.fuellstellenLeistung ?? 0, 0),
                 vehicles: Math.floor(result?.fahrzeugeFuellstelle ?? 0),
               })}
+            {/* Ohne erreichbare Fahrzeugzahl **keine** Zahl: Die
+                Entnahmestelle ist dann die Grenze, und „nötig wären 5" neben
+                einem eingestellten 5 ist ein Widerspruch, kein Auftrag. Welcher
+                der beiden Sätze gilt, sagt das Ergebnis und nicht die fehlende
+                Zahl. */}
             {warning === 'sollMengeNotReached' &&
-              t('warningRequiredFlowMissed', {
-                required: num(view.sollMenge, 0),
-                vehicles: result?.fahrzeugeFuerSollmenge ?? 0,
-              })}
+              (result?.fuellstelleUnterSollmenge
+                ? t('warningRequiredFlowImpossible', {
+                    required: num(view.sollMenge, 0),
+                    value: num(result.fuellstellenLeistung, 0),
+                  })
+                : t('warningRequiredFlowMissed', {
+                    required: num(view.sollMenge, 0),
+                    vehicles: result?.fahrzeugeFuerSollmenge ?? 0,
+                  }))}
             {warning === 'notComputable' && t('warningShuttleNotComputable')}
           </Alert>
         ))}
@@ -246,8 +260,15 @@ export default function PendelSection({
               <Typography variant="caption" color="text.secondary">
                 {t('vehiclesForRequiredFlow')}
               </Typography>
+              {/* Der Satz „mit keiner Zahl erreichbar" gehört zur deckelnden
+                  Entnahmestelle. Fehlt die Zahl, weil gar keine Menge
+                  gefordert ist, steht ein Gedankenstrich — eine Begründung
+                  über die Ergiebigkeit wäre dort falsch. */}
               <Typography variant="body2">
-                {result.fahrzeugeFuerSollmenge}
+                {result.fahrzeugeFuerSollmenge ??
+                  (result.fuellstelleUnterSollmenge
+                    ? t('vehiclesForRequiredFlowNone')
+                    : '—')}
               </Typography>
             </Grid>
             <Grid size={{ xs: 6 }}>
@@ -331,7 +352,18 @@ export default function PendelSection({
                 // Ergebnis, damit die Zahl nachprüfbar bleibt.
                 helperText={
                   result
-                    ? t('fillTimeHint', { value: num(result.fuellzeit) })
+                    ? t('fillTimeHint', {
+                        // Die Summe aus den **gerundeten** Summanden: Sonst
+                        // steht „2,5 = 1,3 + 1,1" da, und eine Anzeige, die
+                        // sich selbst widerspricht, ist genau der Vorwurf
+                        // gewesen, der die Aufteilung nötig gemacht hat.
+                        value: num(
+                          round(result.nettoFuellzeit) +
+                            round(params.rangierzeit)
+                        ),
+                        filling: num(result.nettoFuellzeit),
+                        shunting: num(params.rangierzeit),
+                      })
                     : t('shuntTimeHint')
                 }
                 onChange={(event) =>
@@ -361,6 +393,26 @@ export default function PendelSection({
               />
             </Grid>
           </Grid>
+        </AccordionDetails>
+      </Accordion>
+
+      {/* Der Rechenweg steht ganz unten und zugeklappt: Er ist die Kontrolle
+          des Ergebnisses, nicht der Weg dorthin. Wer ihn aufklappt, will
+          nachrechnen — und dann ist die Reihenfolge die der Formel und nicht
+          die des Panels.
+
+          `unmountOnExit`: zwanzig Zeilen, die bei jedem Ruck am Regler neu
+          entstünden, ohne dass sie jemand sieht. */}
+      <Accordion
+        disableGutters
+        elevation={0}
+        slotProps={{ transition: { unmountOnExit: true } }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2">{t('calculationSteps')}</Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ px: 0 }}>
+          <RechenwegTabelle schritte={schritte} />
         </AccordionDetails>
       </Accordion>
     </>

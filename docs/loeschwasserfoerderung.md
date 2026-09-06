@@ -251,6 +251,44 @@ Dazu ein **Querstrich je Schlauchgrenze**, senkrecht auf dem Verlauf. Damit ist
 zu sehen, wo ein Schlauch endet und der nächste beginnt — und ob die Länge bis
 zur nächsten Ecke noch reicht.
 
+### Die Einteilung steht ungefragt da, das Etikett nicht
+
+Die Querstriche brauchen keinen Schalter: An jeder Leitung sind sie dieselbe
+Auskunft wie beim Zeichnen, und „wo endet der dritte B-Schlauch?" ist beim
+Verlegen dieselbe Frage wie beim Planen. Vorher waren sie an `showLength`
+gebunden und damit nach dem Zeichnen weg — man sah die Einteilung genau so lange,
+wie man sie noch nicht brauchte.
+
+Das **Etikett** bleibt am Schalter. Es ist ein dauerhafter Tooltip; auf einer
+Karte mit fünf Leitungen sind das fünf Beschriftungen, die verdecken, was sie
+beschriften. Beim Ziehen eines Punktes steht es trotzdem da — wer verschiebt,
+will die neue Länge sehen, ohne vorher einen Schalter zu suchen.
+
+**Nicht im reinen Pendelverkehr.** Dort ist die Linie eine Fahrstrecke und keine
+Schlauchleitung; Kupplungsmarken alle 20 m entlang der Straße behaupten eine
+Verlegung, die es nicht gibt. Aus demselben Grund weichen dort schon die
+Pumpenmarker (`mode !== 'pendel'`). Wer die Fahrstrecke messen will, schaltet
+Länge und Schläuche ein — angefordert erscheint beides auch dort.
+
+Zwei Schranken, weil zweierlei gefragt ist:
+
+| | Mindestabstand | warum |
+| --- | --- | --- |
+| eingeschaltet oder beim Ziehen | 6 px | Wer sie anfordert, nimmt auch enge Striche in Kauf |
+| ungefragt | **12 px** | Viermal die Strichstärke: eine Reihe einzelner Kupplungen, kein schraffiertes Band. Ein 20-m-B-Schlauch erreicht das ab etwa Zoom 16 |
+
+Welche der beiden gilt, folgt aus dem Etikett und ist **kein** zweiter Schalter:
+Zwei Regler für eine Entscheidung ließen sich gegeneinander stellen, und enge
+Striche ohne Etikett wären genau das Band, gegen das die strengere Schranke
+eingeführt wurde.
+
+Gezeichnet wird außerdem nur, was im **Ausschnitt** liegt (mit großzügigem Rand,
+neu gerechnet bei `moveend`). Eine 10-km-Leitung hat bei Zoom 17 fünfhundert
+Grenzen, von denen keine fünfzig zu sehen sind; solange die Einteilung an einer
+einzelnen eingeschalteten Leitung hing, war das zu verschmerzen — an allen
+zugleich ist es der Unterschied zwischen einer Karte, die sich schieben lässt,
+und einer, die ruckelt.
+
 ### Die Strichlänge steht in Pixeln, nicht in Metern
 
 Die halbe Strichlänge wird aus dem aktuellen Kartenmaßstab so gewählt, dass sie
@@ -346,6 +384,61 @@ Der erste Treffer statt des weitesten für die letzte Pumpe: Auf 2000 m flach w�
 der weiteste Punkt 1950 m — 50 m vor dem Verteiler, ein unsinniger Standort. Die
 Pumpenzahl ist dieselbe, die Reserve am Ende größer.
 
+### Der Vorwärtslauf bestimmt die Zahl, nicht die Standorte
+
+Er schöpft jeden Abschnitt bis auf den Mindest-Eingangsdruck aus. Damit ist die
+Pumpen**zahl** die kleinstmögliche — die **Standorte** sind es nicht: Was nach
+den vollen Abschnitten übrig bleibt, sammelt sich hinten, und die letzte
+Verstärkerpumpe rückt an ihre Vorgängerin heran.
+
+Auf 2000 m mit 100 m Steigung standen die Pumpen deshalb bei 433, 867, 1300,
+1733 — und die fünfte bei **1867 m**, also 133 m neben der vierten. Zwei Pumpen
+133 m nebeneinander sind kein Standort, sondern eine Grenze, die hinten nicht
+mehr aufgeht; im Einsatz ist das nicht umzusetzen und auf der Karte sieht es aus
+wie ein Rechenfehler.
+
+Nach dem Vorwärtslauf werden die Standorte deshalb noch einmal gesetzt, mit
+derselben Pumpenzahl und **gleicher Auslastung** je Abschnitt:
+
+```
+Kapazität  = (n−1)·(Ausgangsdruck − Eingangsdruck) + (Ausgangsdruck − Zieldruck)
+Auslastung = Gesamtabnahme / Kapazität
+Sollabnahme der k-ten Pumpe = k · (Ausgangsdruck − Eingangsdruck) · Auslastung
+```
+
+Verteilt wird über die Auslastung und **nicht** über die Strecke, weil die
+Abschnitte ungleiche Kapazitäten haben: zwischen zwei Pumpen sind es 6,5 bar, vor
+dem Verteiler nur 2,0. Ein gleicher Druckanteil je Abschnitt überforderte den
+letzten, ein gleicher Meterabstand jeden Abschnitt im Gelände. Mit gleicher
+Auslastung hat jeder Abschnitt dieselbe Reserve, und keiner steht am Anschlag.
+
+Auf 2000 m flach heißt das 605, 1209 und 1814 m statt 650, 1300 und 1800 — die
+erste Pumpe liegt damit sogar näher an der Faustregel „etwa alle 600 m", und die
+Zwischenabschnitte enden auf 1,95 statt auf 1,5 bar.
+
+Verschoben wird nur, wenn die Lage überhaupt trägt: Bei einer Leitung, die so
+nicht zu legen ist, wäre eine schönere Verteilung eine Aussage über etwas, das es
+nicht gibt. Und die verteilten Standorte werden gegengeprüft (`isFeasible`) —
+`distanceAtDrop` gibt auf Abschnitten ohne Abnahme den Anfang zurück, die
+Standorte können also von den Sollwerten abweichen. Hält eine Verteilung die
+Drücke nicht ein, bleibt es beim Ergebnis des Vorwärtslaufs.
+
+### Gemessen wird die höchste Stelle im Abschnitt, nicht sein Ende
+
+Ein Abschnitt ist nicht dadurch zulässig, dass an seinem Ende noch Druck steht:
+Eine Kuppe dazwischen kostet den Aufstieg, und das Gefälle danach gibt ihn
+zurück. Wer nur Anfang und Ende vergleicht, hält eine Leitung für darstellbar,
+in der oben auf der Kuppe rechnerisch ein negativer Druck steht — dort fließt
+kein Wasser mehr, egal was am Verteiler ankäme.
+
+Deshalb prüfen sowohl der Vorwärtslauf als auch `isFeasible` die **größte**
+kumulierte Abnahme im Abschnitt (`maxDropBetween`) gegen den
+Mindest-Eingangsdruck, und der letzte Abschnitt zusätzlich sein Ende gegen den
+Zieldruck. Beispiel: 500 m eben, dann 200 m hinauf, dann wieder hinunter. Netto
+verliert die Strecke wenig, die Kuppe kostet 20 bar — ohne diese Prüfung meldete
+der Rechner zwei Verstärkerpumpen und „darstellbar", während an der Kuppe −9 bar
+stünden.
+
 ### Die Standorte werden auf der Strecke gelöst, nicht aufs Raster gerundet
 
 Gerechnet wird über die kumulierte Druckabnahme, und der Standort einer Pumpe ist
@@ -376,8 +469,11 @@ Antwort „nicht mit diesen Mitteln", und dieselbe Schranke schützt die Schleif
 gegen eine Lage ohne Fortschritt.
 
 **Prüfstein:** 800 l/min flach in B 75 mit 8 bar Ausgangs- und 1,5 bar
-Eingangsdruck ergibt (8 − 1,5) / 0,01 = **650 m** Pumpenabstand. Veröffentlicht
-ist „etwa alle 600 m eine Verstärkerpumpe". Das steht als Testzusicherung in
+Eingangsdruck ergibt (8 − 1,5) / 0,01 = **650 m** als weitesten Standort.
+Gesetzt wird die Pumpe näher, weil die Standorte danach auf gleiche Auslastung
+verteilt werden: auf 2000 m sind es **605 m**. Veröffentlicht ist „etwa alle
+600 m eine Verstärkerpumpe" — die verteilten Standorte liegen also näher an der
+Faustregel als die ausgeschöpften. Beide Zahlen stehen als Testzusicherung in
 `hydraulics.test.ts`.
 
 **Die Pumpe an der Entnahmestelle zählt nicht als Verstärkerpumpe.** Sie steht
@@ -553,6 +649,108 @@ neuer Item-Typ — und schreibt **einen** Tagebucheintrag (`type: 'diary'`). Nur
 beim Ablegen, nicht beim Rechnen: Am Regler wird probiert, nur die getroffene
 Entscheidung gehört in den Verlauf. Die Pumpe an der Entnahmestelle wird
 mitabgelegt, aber als solche benannt.
+
+## Der Rechner-Knopf sitzt auch an den Punkten der Leitung
+
+Im Popup der Leitung **und** in dem jedes einzelnen Punkts. Nicht doppelt gemoppelt:
+Sobald ein Punktpopup offen war, bleiben die Punktmarker sichtbar
+(`popupopen`/`popupclose` in `ConnectionComponent`), und ein Tippen trifft dann
+den Punkt statt der Linie. Der Rechner war von der Karte aus damit gar nicht mehr
+zu erreichen — man musste erst danebentippen, um das Popup der Leitung zu bekommen.
+
+Dasselbe gilt für den Sandsackrechner an der Linie: gleicher Aufbau, gleiche
+Ursache.
+
+## Der Rechenweg
+
+Beide Rechner geben am Ende wenige große Zahlen aus: „5 Verstärkerpumpen",
+„530 l/min dauerhaft". Wer damit eine Entscheidung trifft, muss sie nachrechnen
+können. Die Herleitung stand bisher nur hier und im Quelltext — an der
+Einsatzstelle hat niemand beides.
+
+Der Aufklapper **„Rechenweg"** am Ende jeder Sektion führt sie als Tabelle vor:
+Größe, Rechnung, Wert, Herkunft.
+
+### Die Rechnung mit eingesetzten Zahlen, nicht die Formel
+
+`2 · 2000 m / 666,7 m/min` ist nachzurechnen, `2·s/v` nicht. Eine Formel, deren
+Symbole man erst auflösen muss, ist keine Kontrolle, sondern eine zweite
+Aufgabe. Deshalb steht in der Spalte auch keine allgemeine Schreibweise, sondern
+genau die Zahlen dieses Falls — dieselben, die im Ergebnis stecken.
+
+Zwischenschritte, die im Panel sonst nirgends stehen, bekommen eine eigene
+Zeile: die Geschwindigkeit in m/min, das reine Füllen ohne Rangieren, die Menge
+vor der Schranke der Entnahmestelle. Ohne sie stünde in der nächsten Zeile eine
+Zahl, die nirgends herkommt.
+
+### Die Herkunft ist der eigentliche Punkt
+
+Eine Kette von Rechnungen sagt für sich nur, dass richtig gerechnet wurde.
+Belastbar ist ein Ergebnis aber nur so weit wie seine **schwächste
+Eingangsgröße** — und im Ergebnis sieht ein Planungswert genauso aus wie ein
+Tabellenwert.
+
+| Herkunft | Bedeutung |
+| --- | --- |
+| gemessen | Karte, Höhenmodell, GIS-Bestand |
+| Eingabe | von Hand eingetragen |
+| **Planungswert** | geschätzt, **durch nichts belegt** — hervorgehoben |
+| Tabelle | aus der Ausbildungsunterlage |
+| abgeleitet | aus einem Tabellenwert umgerechnet (d⁵-Skalierung), nicht selbst tabelliert |
+| gerechnet | aus den Zeilen darüber |
+
+Planungswert und Eingabe unterscheiden sich am **Wert** und nicht daran, ob das
+Feld angefasst wurde: Ein Vorgabewert, den jemand ausdrücklich bestätigt hat,
+ist immer noch ein Vorgabewert. Die Alternative wäre ein zweites Feld je Größe,
+nur um „von Hand gesetzt" zu vermerken.
+
+### Wo keine Zahl steht, steht warum
+
+Fehlt ein Wert — keine Fahrzeugzahl trägt die Menge, kein Kipppunkt existiert —,
+steht ein Gedankenstrich und darunter der Grund. Eine leere Zelle ließe offen,
+ob nicht gerechnet wurde oder nichts herauskam.
+
+### Was der Rechenweg nicht zeigt
+
+Die **Standortsuche** der Förderung. Sie ist eine Schleife über das Höhenprofil
+und keine Kette von Zwischenergebnissen; ihre Ausgabe steht schon als
+Abschnittstabelle im Panel. Der Rechenweg nennt stattdessen die Größen, aus
+denen die Zahl der Abschnitte folgt, und die Verteilung, die sie danach auf die
+Strecke setzt — Kapazität, Auslastung, Abnahme je Abschnitt.
+
+Diese drei Zeilen erscheinen nur, wenn tatsächlich verteilt wurde — und sie
+nennen die Zahlen, die `computeFoerderung` dabei benutzt hat (`verteilung` am
+Ergebnis), nicht nachgerechnete. Ein Rechenweg, der seine eigenen Zwischenwerte
+bildet, führt eine Rechnung vor, die das Ergebnis nicht erzeugt hat, sobald die
+Verteilung sich ändert; das ist schlimmer als keine.
+
+Ist es beim Ergebnis des Vorwärtslaufs geblieben, sagt die Zeile das — aber nur,
+wenn es überhaupt einen Zwischenabschnitt gibt. Eine Leitung ohne
+Verstärkerpumpe hat keinen, der „bis zum Mindest-Eingangsdruck ausgeschöpft"
+sein könnte, und dann entfällt die Zeile ganz.
+
+### Aufbau
+
+| Datei | Inhalt |
+| --- | --- |
+| `connection/rechenweg.ts` | Schritt, Herkunft, geprüfte Beschriftungsschlüssel |
+| `foerderung/rechenweg.ts` | die Schritte der Förderung |
+| `pendel/rechenweg.ts` | die Schritte des Pendelverkehrs |
+| `Map/Leitungen/RechenwegTabelle.tsx` | die Anzeige, für beide dieselbe |
+
+Die Bauer sind **Reinmodule**: kein React, kein Firestore, formatiert wird über
+eine übergebene Funktion. Ein Test reicht `toFixed` herein und prüft damit die
+Rechnung, ohne dass eine Sprache im Spiel ist — und kann widerlegen, dass der
+vorgeführte Weg derselbe ist wie der gegangene.
+
+Die Beschriftungen sind eine **Aufzählung von Nachrichtenschlüsseln** und kein
+zusammengesetzter `t(`step_${name}`)`: next-intl prüft die Schlüssel statisch,
+ein zusammengesetzter wäre zu `string` verbreitert und ungeprüft. So scheitert
+stattdessen der Typecheck, wenn ein Schritt eine Beschriftung nennt, die im
+Katalog fehlt.
+
+Der Aufklapper trägt `unmountOnExit`: fünfundzwanzig Zeilen, die bei jedem Ruck
+am Regler neu entstünden, ohne dass sie jemand sieht.
 
 ## Ein Panel über der Karte, kein Dialog
 

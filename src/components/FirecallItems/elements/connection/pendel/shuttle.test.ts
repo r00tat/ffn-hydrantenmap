@@ -79,12 +79,52 @@ describe('computeShuttle', () => {
     expect(result.menge).toBeCloseTo(800, 6);
   });
 
-  it('nennt die Fahrzeuge, die die Sollmenge tragen', () => {
-    // 1000 l/min · 12,5 min / 2000 l = 6,25 → 7 Fahrzeuge. Die Füllstelle gibt
-    // aber nur 571 l/min her, also trägt keine Zahl von Fahrzeugen die Menge.
+  it('nennt keine Fahrzeugzahl, wenn die Füllstelle unter der Sollmenge deckelt', () => {
+    // 1000 l/min · 12,5 min / 2000 l wären rechnerisch 6,25 → 7 Fahrzeuge. Die
+    // Füllstelle gibt aber nur 571 l/min her: Es trägt **keine** Zahl von
+    // Fahrzeugen die Menge, und „nötig wären 7" wäre eine Anweisung, die nichts
+    // ändert — der Rechner nannte sie und meldete daneben, sie reichten nicht.
     const result = run({ sollMenge: 1000 });
-    expect(result.fahrzeugeFuerSollmenge).toBe(7);
+    expect(result.fahrzeugeFuerSollmenge).toBeUndefined();
     expect(result.traegtSollmenge).toBe(false);
+  });
+
+  it('nennt den Grund, aus dem keine Fahrzeugzahl dasteht', () => {
+    // Ohne den Grund liest die Oberfläche „keine Zahl" als „die Entnahmestelle
+    // deckelt". Bei einer Sollmenge von 0 stimmt das nicht: Dann gibt es nur
+    // nichts zu erreichen, und ein Satz über die Ergiebigkeit wäre falsch.
+    expect(run({ sollMenge: 1000 }).fuellstelleUnterSollmenge).toBe(true);
+
+    const ohneAnforderung = run({ sollMenge: 0 });
+    expect(ohneAnforderung.fahrzeugeFuerSollmenge).toBeUndefined();
+    expect(ohneAnforderung.fuellstelleUnterSollmenge).toBe(false);
+  });
+
+  it('nennt die Fahrzeuge, die die Sollmenge tragen', () => {
+    // 500 l/min · 12,5 min / 2000 l = 3,125 → 4 Fahrzeuge, und die Füllstelle
+    // trägt mit 571 l/min die geforderten 500.
+    const result = run({ sollMenge: 500, fahrzeuge: 4 });
+    expect(result.fahrzeugeFuerSollmenge).toBe(4);
+    expect(result.traegtSollmenge).toBe(true);
+  });
+
+  it('nennt die Zahl, die genau aufgeht, und nicht eine mehr', () => {
+    // 320 l/min · 12,5 min / 2000 l = genau 2. Ohne Rundungsreserve entschiede
+    // die letzte Binärstelle darüber, ob hier 2 oder 3 steht — und mit 3 stünde
+    // neben einem eingestellten Zweiergespann, es sei zu klein.
+    const result = run({ sollMenge: 320, fahrzeuge: 2 });
+    expect(result.fahrzeugeFuerSollmenge).toBe(2);
+    expect(result.traegtSollmenge).toBe(true);
+  });
+
+  it('weist das reine Füllen getrennt vom Rangieren aus', () => {
+    // 2000 l an einem Hydranten mit 1500 l/min sind 1,33 min füllen; mit 1 min
+    // Rangieren steht 2,3 min am Feld. Ohne die Aufteilung ist diese Zahl nicht
+    // nachzurechnen und liest sich als Fehler.
+    const result = run({ fuellleistung: 1500 });
+    expect(result.nettoFuellzeit).toBeCloseTo(2000 / 1500, 9);
+    expect(result.fuellzeit).toBeCloseTo(2000 / 1500 + 1, 9);
+    expect(result.fuellzeit - result.nettoFuellzeit).toBeCloseTo(1, 9);
   });
 
   it('trägt die Sollmenge, sobald Fahrzeuge und Füllstelle reichen', () => {
