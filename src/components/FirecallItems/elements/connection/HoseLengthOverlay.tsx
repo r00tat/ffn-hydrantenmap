@@ -23,7 +23,8 @@ const TICK_HALF_PX = 8;
 const MIN_TICK_SPACING_PX = 6;
 
 /**
- * Dieselbe Schranke für die Einteilung, die **ungefragt** erscheint.
+ * Dieselbe Schranke für die Einteilung, die **ungefragt** erscheint — also
+ * überall dort, wo kein Etikett angefordert wurde.
  *
  * An einer fertig gezeichneten Leitung steht die Einteilung da, ohne dass sie
  * jemand eingeschaltet hat (siehe `ConnectionComponent`). Was man selbst
@@ -34,7 +35,7 @@ const MIN_TICK_SPACING_PX = 6;
  * Ein 20-m-B-Schlauch erreicht das ab etwa Zoom 16 — dem Maßstab, in dem man
  * ohnehin die Straße vor sich hat.
  */
-export const AUTO_MIN_TICK_SPACING_PX = 12;
+const AUTO_MIN_TICK_SPACING_PX = 12;
 
 export interface HoseLengthOverlayProps {
   positions: LatLngPosition[];
@@ -60,8 +61,6 @@ export interface HoseLengthOverlayProps {
    * Kupplungen dagegen sind die Linie selbst.
    */
   label?: boolean;
-  /** Mindestabstand der Querstriche in Pixeln. */
-  minTickSpacingPx?: number;
   pane?: string;
 }
 
@@ -80,7 +79,6 @@ export default function HoseLengthOverlay({
   color,
   fromEnd,
   label = true,
-  minTickSpacingPx = MIN_TICK_SPACING_PX,
   pane,
 }: HoseLengthOverlayProps) {
   const map = useMap();
@@ -98,9 +96,8 @@ export default function HoseLengthOverlay({
   const distance = calculateDistance(clean);
   if (distance <= 0) return null;
 
-  // Der sichtbare Ausschnitt mit Rand. `getBounds` gibt es nur an einer echten
-  // Leaflet-Karte; fehlt es, wird nicht beschnitten.
-  const visible = map.getBounds?.()?.pad(0.5);
+  // Der sichtbare Ausschnitt mit Rand.
+  const visible = map.getBounds().pad(0.5);
 
   // Meter je Bildschirmpixel an der aktuellen Stelle. Über die Karte gerechnet
   // statt über eine Zoomformel: Das trifft auch abseits des Äquators.
@@ -109,6 +106,13 @@ export default function HoseLengthOverlay({
       map.containerPointToLatLng([0, 0]),
       map.containerPointToLatLng([100, 0])
     ) / 100;
+
+  // Angefordert darf die Einteilung eng werden, ungefragt nicht — die Schranke
+  // folgt daher aus dem Etikett und ist kein zweiter Schalter. Zwei Regler für
+  // eine Entscheidung ließen sich gegeneinander stellen: enge Striche ohne
+  // Etikett wären genau das schraffierte Band, gegen das die strengere Schranke
+  // eingeführt wurde.
+  const minTickSpacingPx = label ? MIN_TICK_SPACING_PX : AUTO_MIN_TICK_SPACING_PX;
 
   const showTicks =
     Boolean(dimension) &&
@@ -123,14 +127,21 @@ export default function HoseLengthOverlay({
         TICK_HALF_PX * metresPerPixel,
         fromEnd
       )
+        // Die Nummer der Kupplung wird mitgeführt, **bevor** gefiltert wird:
+        // Sie ist der Schlüssel der Striche. Der Platz in der gefilterten Liste
+        // taugt nicht dafür — er verschiebt sich bei jedem Schieben der Karte
+        // um eins, und React zeichnete dann jeden sichtbaren Strich neu, statt
+        // an den Rändern einen hinzuzunehmen und einen wegzulassen.
+        .map((tick, index) => ({ tick, index }))
         // Nur, was im Ausschnitt liegt: Eine 10-km-Leitung hat bei Zoom 17
         // fünfhundert Grenzen, von denen keine fünfzig zu sehen sind. Seit die
         // Einteilung an *jeder* Leitung von selbst erscheint, ist das der
         // Unterschied zwischen einer Karte, die sich schieben lässt, und einer,
         // die ruckelt. Der Rand ist großzügig, damit beim Schieben nicht erst
         // nachwächst, was schon sichtbar sein müsste.
-        .filter(([from, to]) =>
-          visible ? visible.contains(from) || visible.contains(to) : true
+        .filter(
+          ({ tick: [from, to] }) =>
+            visible.contains(from) || visible.contains(to)
         )
     : [];
 
@@ -138,7 +149,7 @@ export default function HoseLengthOverlay({
 
   return (
     <>
-      {ticks.map((tick, index) => (
+      {ticks.map(({ tick, index }) => (
         <Polyline
           key={`tick-${index}`}
           positions={tick}

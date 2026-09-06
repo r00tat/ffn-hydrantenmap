@@ -108,8 +108,10 @@ export type RechenwegLabel =
 export type RechenwegHinweis =
   | 'hintNoValueFillStation'
   | 'hintNoValueNoVehicles'
+  | 'hintNoValueNoRequirement'
   | 'hintDrawnDistance'
   | 'hintManualElevation'
+  | 'hintAssumedFlat'
   | 'hintNotFeasible'
   | 'hintGreedyPlacement'
   | 'hintTableIncludesCouplings';
@@ -139,3 +141,20 @@ export interface RechenSchritt {
  * nicht die Formatierung.
  */
 export type RechenwegFormat = (value: number, digits?: number) => string;
+
+/**
+ * Ob eine Zahl noch die Vorbelegung ist.
+ *
+ * Ein Planungswert, den jemand ausdrücklich bestätigt hat, ist immer noch ein
+ * Planungswert — verglichen wird deshalb der Wert und nicht, ob das Feld
+ * angefasst wurde. Die Verwechslungsgefahr ist gering und die Alternative wäre
+ * ein zweites Feld je Größe, nur um „von Hand gesetzt" zu vermerken.
+ *
+ * Einmal hier und nicht je Rechner: Die Regel ist dieselbe, und zwei Kopien
+ * würden auseinanderlaufen, während beide durch dieselbe Legende erklärt
+ * werden.
+ */
+export const herkunftVonVorgabe = (
+  value: number,
+  vorgabe: number
+): RechenwegHerkunft => (value === vorgabe ? 'vorgabe' : 'eingabe');

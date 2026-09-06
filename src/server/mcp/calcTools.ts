@@ -165,7 +165,20 @@ export function registerCalculationTools(server: McpServer): void {
           'Mit diesen Eingaben lässt sich der Pendelverkehr nicht rechnen — Geschwindigkeit, Tankinhalt und Entleerzeit müssen größer als null sein.',
         );
       }
-      return jsonResult({ eingaben: input, ergebnis: result });
+      // Ohne Fahrzeugzahl steht der Grund dabei. Ein fehlendes Feld ist im
+      // JSON nicht von „nicht gerechnet" zu unterscheiden, und die Beschreibung
+      // des Werkzeugs verspricht die Zahl — wer sie sucht und nichts findet,
+      // braucht den Satz, der in der Oberfläche daneben steht.
+      const hinweis = result.fuellstelleUnterSollmenge
+        ? `Die geforderten ${input.sollMenge} l/min sind mit dieser Entnahmestelle nicht zu erreichen: ` +
+          `Sie gibt als Füllstelle nur ${Math.round(result.fuellstellenLeistung)} l/min her. ` +
+          'Keine Fahrzeugzahl trägt die Menge — nötig ist eine zweite Entnahmestelle.'
+        : undefined;
+      return jsonResult({
+        eingaben: input,
+        ergebnis: result,
+        ...(hinweis ? { hinweis } : {}),
+      });
     },
   );
 

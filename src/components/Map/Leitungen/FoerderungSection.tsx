@@ -623,7 +623,7 @@ export default function FoerderungSection({
         slotProps={{ transition: { unmountOnExit: true } }}
       >
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="subtitle2">{t('rechenweg')}</Typography>
+          <Typography variant="subtitle2">{t('calculationSteps')}</Typography>
         </AccordionSummary>
         <AccordionDetails sx={{ px: 0 }}>
           <RechenwegTabelle schritte={schritte} />

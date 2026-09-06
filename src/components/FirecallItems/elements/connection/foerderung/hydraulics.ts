@@ -95,14 +95,29 @@ export interface FoerderungResult {
   enddruck: number;
   darstellbar: boolean;
   /**
-   * Ob die Standorte gleichmäßig verteilt wurden oder es beim Ergebnis des
-   * Vorwärtslaufs geblieben ist.
+   * Die Zahlen der gleichmäßigen Verteilung — **nur**, wenn tatsächlich
+   * verteilt wurde.
    *
-   * Für den Rechenweg: Der beschreibt sonst eine Verteilung mit Kapazität und
-   * Auslastung, die in diesem Fall gar nicht stattgefunden hat — eine Rechnung
-   * vorzuführen, die das Ergebnis nicht erzeugt hat, ist schlimmer als keine.
+   * Für den Rechenweg, und deshalb hier und nicht dort gerechnet: Er beschriebe
+   * sonst eine Verteilung mit Kapazität und Auslastung, die er selbst
+   * nachgerechnet hat. Weicht die Verteilung später ab, führte er eine Rechnung
+   * vor, die das Ergebnis nicht erzeugt hat — schlimmer als keine.
+   *
+   * `undefined` heißt: Es blieb beim Ergebnis des Vorwärtslaufs. Das ist auch
+   * der Fall, wenn es gar nichts zu verteilen gab, weil die Leitung ohne
+   * Verstärkerpumpe auskommt.
    */
-  gleichmaessigVerteilt: boolean;
+  verteilung?: FoerderungVerteilung;
+}
+
+/** Kapazität, Auslastung und Abnahme je Zwischenabschnitt der Verteilung. */
+export interface FoerderungVerteilung {
+  /** Summe der Kapazitäten aller Abschnitte in bar. */
+  kapazitaet: number;
+  /** Anteil der Kapazität, den die Strecke braucht — 0 bis 1. */
+  auslastung: number;
+  /** Druckabnahme je Zwischenabschnitt in bar. */
+  abnahmeJeAbschnitt: number;
 }
 
 /** Druckverlust zwischen zwei Abtastpunkten: Reibung plus Höhe. */
@@ -200,6 +215,37 @@ function dropAt(
 }
 
 /**
+ * Die **größte** kumulierte Abnahme im Stück zwischen zwei Streckenmetern.
+ *
+ * Zwischen Anfang und Ende eines Abschnitts kann mehr Druck verloren gehen als
+ * am Ende übrig bleibt: Eine Kuppe kostet den Aufstieg, und das Gefälle danach
+ * gibt ihn zurück. Wer nur die Enden vergleicht, sieht davon nichts und hält
+ * eine Leitung für darstellbar, in der oben auf der Kuppe rechnerisch ein
+ * negativer Druck steht — dort fließt kein Wasser mehr, egal was am Verteiler
+ * ankäme.
+ *
+ * Zwischen zwei Abtastpunkten verläuft die Abnahme linear, das Maximum liegt
+ * also auf einem Abtastpunkt oder auf einer der beiden Grenzen.
+ */
+function maxDropBetween(
+  profile: FoerderungProfilePoint[],
+  drop: number[],
+  fromDistance: number,
+  toDistance: number
+): number {
+  let max = Math.max(
+    dropAt(profile, drop, fromDistance),
+    dropAt(profile, drop, toDistance)
+  );
+  for (let i = 0; i < profile.length; i += 1) {
+    if (profile[i].distance <= fromDistance) continue;
+    if (profile[i].distance >= toDistance) break;
+    if (drop[i] > max) max = drop[i];
+  }
+  return max;
+}
+
+/**
  * Pumpen, Abschnitte und Enddruck zu einer gegebenen Folge von Standorten.
  *
  * Getrennt von der Suche, weil die Standorte zweimal entstehen: einmal aus dem
@@ -290,7 +336,7 @@ function balancedDistances(
   ausgangsdruck: number,
   eingangsdruck: number,
   zieldruck: number
-): number[] | undefined {
+): { distances: number[]; verteilung: FoerderungVerteilung } | undefined {
   const zwischenKapazitaet = ausgangsdruck - eingangsdruck;
   const letzteKapazitaet = ausgangsdruck - zieldruck;
   const kapazitaet = (sections - 1) * zwischenKapazitaet + letzteKapazitaet;
@@ -309,18 +355,32 @@ function balancedDistances(
     distances.push(distance);
     previous = distance;
   }
-  return distances;
+  return {
+    distances,
+    verteilung: {
+      kapazitaet,
+      auslastung,
+      abnahmeJeAbschnitt: zwischenKapazitaet * auslastung,
+    },
+  };
 }
 
 /**
- * Ob eine Standortfolge die Drücke einhält: jeder Zwischenabschnitt bis
- * höchstens auf den Mindest-Eingangsdruck, der letzte bis höchstens auf den
- * Zieldruck.
+ * Ob eine Standortfolge die Drücke einhält.
  *
- * Die verteilten Standorte sind rechnerisch immer zulässig; geprüft wird
- * trotzdem, weil `distanceAtDrop` auf Abschnitten ohne Abnahme den Anfang
- * zurückgibt und die Standorte damit von den Sollwerten abweichen können. Eine
- * Verteilung, die die Förderung nicht mehr trägt, ist keine Verbesserung.
+ * Zwei Bedingungen je Abschnitt, und beide werden gebraucht:
+ *
+ * - **Nirgends** im Abschnitt darf der Druck unter den Mindest-Eingangsdruck
+ *   fallen — gemessen an der größten Abnahme im Stück, nicht an der am Ende.
+ *   Eine Kuppe kostet den Aufstieg und gibt ihn im Gefälle zurück; wer nur die
+ *   Enden vergleicht, hält eine Leitung für darstellbar, in der oben kein
+ *   Wasser mehr ankommt.
+ * - Am Verteiler steht der Zieldruck.
+ *
+ * Geprüft wird auch, was `balancedDistances` liefert: `distanceAtDrop` gibt auf
+ * Abschnitten ohne Abnahme den Anfang zurück, die Standorte können also von den
+ * Sollwerten abweichen. Eine Verteilung, die die Förderung nicht mehr trägt,
+ * ist keine Verbesserung.
  */
 function isFeasible(
   profile: FoerderungProfilePoint[],
@@ -339,11 +399,21 @@ function isFeasible(
       return false;
     }
     const nextDrop = dropAt(profile, drop, distance);
-    if (nextDrop - currentDrop > ausgangsdruck - eingangsdruck + EPS) {
+    const worst = maxDropBetween(profile, drop, currentDistance, distance);
+    if (worst - currentDrop > ausgangsdruck - eingangsdruck + EPS) {
       return false;
     }
     currentDistance = distance;
     currentDrop = nextDrop;
+  }
+  const worstLast = maxDropBetween(
+    profile,
+    drop,
+    currentDistance,
+    totalDistance
+  );
+  if (worstLast - currentDrop > ausgangsdruck - eingangsdruck + EPS) {
+    return false;
   }
   return totalDrop - currentDrop <= ausgangsdruck - zieldruck + EPS;
 }
@@ -377,17 +447,39 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
       exceeded = true;
       break;
     }
-    // Reicht der Ausgangsdruck bis zum Ende, ist die Leitung fertig.
-    if (totalDrop - currentDrop <= ausgangsdruck - zieldruck + EPS) {
+    // Die größte Abnahme im Rest der Strecke — sie und nicht die am Verteiler
+    // entscheidet, ob das Reststück ohne weitere Pumpe trägt. Bei einer Kuppe
+    // liegt sie oben und nicht am Ende.
+    const restMaxDrop = maxDropBetween(
+      profile,
+      drop,
+      currentDistance,
+      totalDistance
+    );
+
+    // Reicht der Ausgangsdruck bis zum Ende, ist die Leitung fertig — wenn
+    // unterwegs nirgends der Mindestdruck unterschritten wird.
+    if (
+      totalDrop - currentDrop <= ausgangsdruck - zieldruck + EPS &&
+      restMaxDrop - currentDrop <= ausgangsdruck - eingangsdruck + EPS
+    ) {
       break;
     }
 
-    // Der weiteste erreichbare Punkt, und der erste, von dem aus das Ende noch
-    // mit dem Zieldruck erreichbar ist. Der frühere von beiden gewinnt: Auf
-    // 2000 m flach wäre der weiteste 1950 m — 50 m vor dem Verteiler, ein
-    // unsinniger Standort. Die Pumpenzahl ist dieselbe, die Reserve größer.
+    // Der weiteste erreichbare Punkt, und der erste, von dem aus der Rest noch
+    // trägt. Der frühere von beiden gewinnt: Auf 2000 m flach wäre der weiteste
+    // 1950 m — 50 m vor dem Verteiler, ein unsinniger Standort. Die Pumpenzahl
+    // ist dieselbe, die Reserve größer.
+    //
+    // „Der Rest trägt" heißt beides: der Zieldruck am Verteiler **und** der
+    // Mindestdruck an der höchsten Stelle dazwischen. Ohne die zweite Bedingung
+    // rückte die Pumpe hinter eine Kuppe, über die sie das Wasser erst bringen
+    // muss.
     const reachDrop = currentDrop + (ausgangsdruck - eingangsdruck);
-    const endReachableDrop = totalDrop - (ausgangsdruck - zieldruck);
+    const endReachableDrop = Math.max(
+      totalDrop - (ausgangsdruck - zieldruck),
+      restMaxDrop - (ausgangsdruck - eingangsdruck)
+    );
     const targetDrop = Math.min(reachDrop, endReachableDrop);
 
     const nextDistance = distanceAtDrop(
@@ -412,6 +504,7 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
   // einer Leitung, die so nicht zu legen ist, wäre eine schönere Verteilung
   // eine Aussage über etwas, das es nicht gibt.
   let placed = distances;
+  let verteilung: FoerderungVerteilung | undefined;
   if (darstellbar && !exceeded && distances.length > 0) {
     const balanced = balancedDistances(
       profile,
@@ -427,7 +520,7 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
       isFeasible(
         profile,
         drop,
-        balanced,
+        balanced.distances,
         totalDistance,
         totalDrop,
         ausgangsdruck,
@@ -435,7 +528,8 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
         zieldruck
       )
     ) {
-      placed = balanced;
+      placed = balanced.distances;
+      verteilung = balanced.verteilung;
     }
   }
 
@@ -458,7 +552,7 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
   return {
     pumps: built.pumps,
     verstaerkerpumpen: built.pumps.length - 1,
-    gleichmaessigVerteilt: placed !== distances,
+    ...(verteilung ? { verteilung } : {}),
     abschnitte,
     reibungsverlustBar:
       (profile[last].distance - profile[0].distance) * frictionBarPerMeter,

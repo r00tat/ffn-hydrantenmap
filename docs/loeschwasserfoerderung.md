@@ -264,12 +264,23 @@ Karte mit fünf Leitungen sind das fünf Beschriftungen, die verdecken, was sie
 beschriften. Beim Ziehen eines Punktes steht es trotzdem da — wer verschiebt,
 will die neue Länge sehen, ohne vorher einen Schalter zu suchen.
 
+**Nicht im reinen Pendelverkehr.** Dort ist die Linie eine Fahrstrecke und keine
+Schlauchleitung; Kupplungsmarken alle 20 m entlang der Straße behaupten eine
+Verlegung, die es nicht gibt. Aus demselben Grund weichen dort schon die
+Pumpenmarker (`mode !== 'pendel'`). Wer die Fahrstrecke messen will, schaltet
+Länge und Schläuche ein — angefordert erscheint beides auch dort.
+
 Zwei Schranken, weil zweierlei gefragt ist:
 
 | | Mindestabstand | warum |
 | --- | --- | --- |
 | eingeschaltet oder beim Ziehen | 6 px | Wer sie anfordert, nimmt auch enge Striche in Kauf |
 | ungefragt | **12 px** | Viermal die Strichstärke: eine Reihe einzelner Kupplungen, kein schraffiertes Band. Ein 20-m-B-Schlauch erreicht das ab etwa Zoom 16 |
+
+Welche der beiden gilt, folgt aus dem Etikett und ist **kein** zweiter Schalter:
+Zwei Regler für eine Entscheidung ließen sich gegeneinander stellen, und enge
+Striche ohne Etikett wären genau das Band, gegen das die strengere Schranke
+eingeführt wurde.
 
 Gezeichnet wird außerdem nur, was im **Ausschnitt** liegt (mit großzügigem Rand,
 neu gerechnet bei `moveend`). Eine 10-km-Leitung hat bei Zoom 17 fünfhundert
@@ -412,6 +423,22 @@ nicht gibt. Und die verteilten Standorte werden gegengeprüft (`isFeasible`) —
 Standorte können also von den Sollwerten abweichen. Hält eine Verteilung die
 Drücke nicht ein, bleibt es beim Ergebnis des Vorwärtslaufs.
 
+### Gemessen wird die höchste Stelle im Abschnitt, nicht sein Ende
+
+Ein Abschnitt ist nicht dadurch zulässig, dass an seinem Ende noch Druck steht:
+Eine Kuppe dazwischen kostet den Aufstieg, und das Gefälle danach gibt ihn
+zurück. Wer nur Anfang und Ende vergleicht, hält eine Leitung für darstellbar,
+in der oben auf der Kuppe rechnerisch ein negativer Druck steht — dort fließt
+kein Wasser mehr, egal was am Verteiler ankäme.
+
+Deshalb prüfen sowohl der Vorwärtslauf als auch `isFeasible` die **größte**
+kumulierte Abnahme im Abschnitt (`maxDropBetween`) gegen den
+Mindest-Eingangsdruck, und der letzte Abschnitt zusätzlich sein Ende gegen den
+Zieldruck. Beispiel: 500 m eben, dann 200 m hinauf, dann wieder hinunter. Netto
+verliert die Strecke wenig, die Kuppe kostet 20 bar — ohne diese Prüfung meldete
+der Rechner zwei Verstärkerpumpen und „darstellbar", während an der Kuppe −9 bar
+stünden.
+
 ### Die Standorte werden auf der Strecke gelöst, nicht aufs Raster gerundet
 
 Gerechnet wird über die kumulierte Druckabnahme, und der Standort einer Pumpe ist
@@ -442,8 +469,11 @@ Antwort „nicht mit diesen Mitteln", und dieselbe Schranke schützt die Schleif
 gegen eine Lage ohne Fortschritt.
 
 **Prüfstein:** 800 l/min flach in B 75 mit 8 bar Ausgangs- und 1,5 bar
-Eingangsdruck ergibt (8 − 1,5) / 0,01 = **650 m** Pumpenabstand. Veröffentlicht
-ist „etwa alle 600 m eine Verstärkerpumpe". Das steht als Testzusicherung in
+Eingangsdruck ergibt (8 − 1,5) / 0,01 = **650 m** als weitesten Standort.
+Gesetzt wird die Pumpe näher, weil die Standorte danach auf gleiche Auslastung
+verteilt werden: auf 2000 m sind es **605 m**. Veröffentlicht ist „etwa alle
+600 m eine Verstärkerpumpe" — die verteilten Standorte liegen also näher an der
+Faustregel als die ausgeschöpften. Beide Zahlen stehen als Testzusicherung in
 `hydraulics.test.ts`.
 
 **Die Pumpe an der Entnahmestelle zählt nicht als Verstärkerpumpe.** Sie steht
@@ -688,10 +718,16 @@ Abschnittstabelle im Panel. Der Rechenweg nennt stattdessen die Größen, aus
 denen die Zahl der Abschnitte folgt, und die Verteilung, die sie danach auf die
 Strecke setzt — Kapazität, Auslastung, Abnahme je Abschnitt.
 
-Diese drei Zeilen erscheinen nur, wenn tatsächlich verteilt wurde
-(`gleichmaessigVerteilt`). Ist es beim Ergebnis des Vorwärtslaufs geblieben,
-sagt die Zeile das: Eine Rechnung vorzuführen, die das Ergebnis nicht erzeugt
-hat, ist schlimmer als keine.
+Diese drei Zeilen erscheinen nur, wenn tatsächlich verteilt wurde — und sie
+nennen die Zahlen, die `computeFoerderung` dabei benutzt hat (`verteilung` am
+Ergebnis), nicht nachgerechnete. Ein Rechenweg, der seine eigenen Zwischenwerte
+bildet, führt eine Rechnung vor, die das Ergebnis nicht erzeugt hat, sobald die
+Verteilung sich ändert; das ist schlimmer als keine.
+
+Ist es beim Ergebnis des Vorwärtslaufs geblieben, sagt die Zeile das — aber nur,
+wenn es überhaupt einen Zwischenabschnitt gibt. Eine Leitung ohne
+Verstärkerpumpe hat keinen, der „bis zum Mindest-Eingangsdruck ausgeschöpft"
+sein könnte, und dann entfällt die Zeile ganz.
 
 ### Aufbau
 

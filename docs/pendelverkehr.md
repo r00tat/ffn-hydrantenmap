@@ -134,6 +134,11 @@ hergibt — und genau der Regler ist der Zweck des Panels.
   fünf einstellte, sah dieselben zwei Sätze wieder. Statt der Zahl steht jetzt
   „mit keiner Zahl erreichbar", und die Meldung nennt die Ergiebigkeit der
   Entnahmestelle und die einzige Abhilfe: eine zweite.
+
+  Welcher der beiden Sätze gilt, sagt `fuellstelleUnterSollmenge` am Ergebnis
+  und nicht die fehlende Zahl: Ohne geforderte Menge fehlt sie ebenfalls, und
+  ein Satz über eine Ergiebigkeit, die gar nicht im Weg steht, wäre dort falsch.
+  Dann steht ein Gedankenstrich.
 - **Kipppunkt** — die einfache Fahrstrecke, ab der die Menge nicht mehr getragen
   wird. Geschlossen gelöst, nicht gesucht: Aus `n·V / t_umlauf = Q_soll` folgt
   die zulässige Umlaufzeit `n·V/Q_soll`; was davon nach Füllen und Entleeren
@@ -172,7 +177,10 @@ der Entleerzeit die Leistung, die sie bedeutet. Beides hält die Zahlen
 nachprüfbar, ohne sie zweimal eingeben zu lassen.
 
 Die Füllzeit steht dabei **aufgeteilt** da: „2,3 min = 1,3 min füllen + 1,0 min
-rangieren". Ohne die Aufteilung ist sie nicht nachzurechnen — „2,3 min für 2000 l
+rangieren". Die Summe wird aus den *gerundeten* Summanden gebildet und nicht
+getrennt gerundet — sonst stünde „2,5 = 1,3 + 1,1" da, und eine Anzeige, die
+sich selbst widerspricht, ist genau der Vorwurf, der die Aufteilung nötig
+gemacht hat. Ohne die Aufteilung ist sie nicht nachzurechnen — „2,3 min für 2000 l
 an einem Hydranten mit 1500 l/min" liest sich als Rechenfehler, weil 2000/1500 =
 1,3 ist und die Rangierzeit im Wort „Füllzeit" nicht vorkommt. Die Zahl war
 richtig, die Anzeige nicht prüfbar, und eine Zahl, die man nicht nachrechnen

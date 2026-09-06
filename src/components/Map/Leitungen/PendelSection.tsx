@@ -22,7 +22,7 @@ import type {
 } from '../../FirecallItems/elements/connection/pendel/pendelverkehr';
 import type { HydrantOhneLeistung } from '../../FirecallItems/elements/connection/pendel/fuellstelle';
 import { pendelRechenweg } from '../../FirecallItems/elements/connection/pendel/rechenweg';
-import { parseNumber } from '../panelNumbers';
+import { parseNumber, round } from '../panelNumbers';
 import RechenwegTabelle from './RechenwegTabelle';
 import usePanelNumber from './usePanelNumber';
 
@@ -200,16 +200,18 @@ export default function PendelSection({
               })}
             {/* Ohne erreichbare Fahrzeugzahl **keine** Zahl: Die
                 Entnahmestelle ist dann die Grenze, und „nötig wären 5" neben
-                einem eingestellten 5 ist ein Widerspruch, kein Auftrag. */}
+                einem eingestellten 5 ist ein Widerspruch, kein Auftrag. Welcher
+                der beiden Sätze gilt, sagt das Ergebnis und nicht die fehlende
+                Zahl. */}
             {warning === 'sollMengeNotReached' &&
-              (result?.fahrzeugeFuerSollmenge !== undefined
-                ? t('warningRequiredFlowMissed', {
+              (result?.fuellstelleUnterSollmenge
+                ? t('warningRequiredFlowImpossible', {
                     required: num(view.sollMenge, 0),
-                    vehicles: result.fahrzeugeFuerSollmenge,
+                    value: num(result.fuellstellenLeistung, 0),
                   })
-                : t('warningRequiredFlowImpossible', {
+                : t('warningRequiredFlowMissed', {
                     required: num(view.sollMenge, 0),
-                    value: num(result?.fuellstellenLeistung ?? 0, 0),
+                    vehicles: result?.fahrzeugeFuerSollmenge ?? 0,
                   }))}
             {warning === 'notComputable' && t('warningShuttleNotComputable')}
           </Alert>
@@ -258,9 +260,15 @@ export default function PendelSection({
               <Typography variant="caption" color="text.secondary">
                 {t('vehiclesForRequiredFlow')}
               </Typography>
+              {/* Der Satz „mit keiner Zahl erreichbar" gehört zur deckelnden
+                  Entnahmestelle. Fehlt die Zahl, weil gar keine Menge
+                  gefordert ist, steht ein Gedankenstrich — eine Begründung
+                  über die Ergiebigkeit wäre dort falsch. */}
               <Typography variant="body2">
                 {result.fahrzeugeFuerSollmenge ??
-                  t('vehiclesForRequiredFlowNone')}
+                  (result.fuellstelleUnterSollmenge
+                    ? t('vehiclesForRequiredFlowNone')
+                    : '—')}
               </Typography>
             </Grid>
             <Grid size={{ xs: 6 }}>
@@ -345,7 +353,14 @@ export default function PendelSection({
                 helperText={
                   result
                     ? t('fillTimeHint', {
-                        value: num(result.fuellzeit),
+                        // Die Summe aus den **gerundeten** Summanden: Sonst
+                        // steht „2,5 = 1,3 + 1,1" da, und eine Anzeige, die
+                        // sich selbst widerspricht, ist genau der Vorwurf
+                        // gewesen, der die Aufteilung nötig gemacht hat.
+                        value: num(
+                          round(result.nettoFuellzeit) +
+                            round(params.rangierzeit)
+                        ),
                         filling: num(result.nettoFuellzeit),
                         shunting: num(params.rangierzeit),
                       })
@@ -394,7 +409,7 @@ export default function PendelSection({
         slotProps={{ transition: { unmountOnExit: true } }}
       >
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="subtitle2">{t('rechenweg')}</Typography>
+          <Typography variant="subtitle2">{t('calculationSteps')}</Typography>
         </AccordionSummary>
         <AccordionDetails sx={{ px: 0 }}>
           <RechenwegTabelle schritte={schritte} />

@@ -40,9 +40,7 @@ import LoeschwasserfoerderungPanel from '../../../Map/Leitungen/Loeschwasserfoer
 // Aus demselben Grund statisch importiert wie das Panel darüber.
 import DammbauPanel from '../../../Map/Damm/DammbauPanel';
 import { foerderungView } from './foerderung/foerderung';
-import HoseLengthOverlay, {
-  AUTO_MIN_TICK_SPACING_PX,
-} from './HoseLengthOverlay';
+import HoseLengthOverlay from './HoseLengthOverlay';
 import { versorgungsart } from './pendel/pendelRoute';
 import { nearestInsertIndex } from './pointGeometry';
 import {
@@ -181,6 +179,41 @@ export default function ConnectionMarker({
   // Leitung, mit dem Routing-Profil `drive` über alle Punkte. Siehe
   // docs/pendelverkehr.md.
 
+  /**
+   * Der Knopf, der den Rechner zu diesem Element öffnet.
+   *
+   * Einmal gebaut und in beide Popups gestellt — in das der Linie und in das
+   * jedes Punktes. Sobald ein Punktpopup offen war, bleiben die Punktmarker
+   * sichtbar, und ein Tippen trifft den Punkt statt der Leitung; ohne den Knopf
+   * dort ist der Rechner von der Karte aus nicht mehr zu erreichen. Zwei Kopien
+   * derselben Zuordnung „Typ → Rechner" liefen auseinander, sobald ein dritter
+   * Rechner dazukommt.
+   */
+  const rechnerKnopf =
+    record.type === 'connection' ? (
+      <Tooltip title={tf('openCalculator')}>
+        <IconButton
+          sx={{ marginLeft: 'auto', float: 'right' }}
+          aria-label={tf('openCalculator')}
+          onClick={() => setFoerderungOpen(true)}
+        >
+          <WaterDropIcon />
+        </IconButton>
+      </Tooltip>
+    ) : record.type === 'line' ? (
+      // Der Sandsackrechner hängt an der Linie und nicht an der Leitung: Eine
+      // Dammlinie führt kein Wasser. Siehe docs/dammbau-sandsaecke.md.
+      <Tooltip title={td('openCalculator')}>
+        <IconButton
+          sx={{ marginLeft: 'auto', float: 'right' }}
+          aria-label={td('openCalculator')}
+          onClick={() => setDammbauOpen(true)}
+        >
+          <FoundationIcon />
+        </IconButton>
+      </Tooltip>
+    ) : undefined;
+
   return (
     <>
       {positions
@@ -250,32 +283,7 @@ export default function ConnectionMarker({
                     </strong>
                   </div>
                   <PopupNavigateButton lat={p[0]} lng={p[1]} />
-                  {/* Derselbe Rechner-Knopf wie im Popup der Linie: Sobald die
-                      Punktmarker sichtbar sind, trifft ein Tippen den Punkt und
-                      nicht die Leitung, und dann war der Rechner von der Karte
-                      aus gar nicht mehr zu erreichen. */}
-                  {record.type === 'connection' && (
-                    <Tooltip title={tf('openCalculator')}>
-                      <IconButton
-                        sx={{ marginLeft: 'auto', float: 'right' }}
-                        aria-label={tf('openCalculator')}
-                        onClick={() => setFoerderungOpen(true)}
-                      >
-                        <WaterDropIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  {record.type === 'line' && (
-                    <Tooltip title={td('openCalculator')}>
-                      <IconButton
-                        sx={{ marginLeft: 'auto', float: 'right' }}
-                        aria-label={td('openCalculator')}
-                        onClick={() => setDammbauOpen(true)}
-                      >
-                        <FoundationIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
+                  {rechnerKnopf}
                   {editable && (
                     <>
                       <Tooltip title={t('editLine')}>
@@ -374,20 +382,11 @@ export default function ConnectionMarker({
               <EditIcon />
             </IconButton>
           )}
-          {/* Der Sandsackrechner hängt an der Linie und nicht an der Leitung:
-              Eine Dammlinie führt kein Wasser. Siehe
-              docs/dammbau-sandsaecke.md. */}
-          {record.type === 'line' && (
-            <Tooltip title={td('openCalculator')}>
-              <IconButton
-                sx={{ marginLeft: 'auto', float: 'right' }}
-                aria-label={td('openCalculator')}
-                onClick={() => setDammbauOpen(true)}
-              >
-                <FoundationIcon />
-              </IconButton>
-            </Tooltip>
-          )}
+          {/* Zweimal derselbe Knopf, aber an zwei Stellen: Der Sandsackrechner
+              steht vor dem Schalter für Länge und Schläuche, der
+              Löschwasserrechner dahinter. Es greift immer genau eine der
+              beiden Bedingungen. */}
+          {record.type === 'line' && rechnerKnopf}
           {/* Der Schalter sitzt im Popup und nicht im Rechner-Panel: Er gilt
               auch für Linien, und dort gibt es kein Panel. */}
           {editable && (
@@ -413,17 +412,7 @@ export default function ConnectionMarker({
               </IconButton>
             </Tooltip>
           )}
-          {record.type === 'connection' && (
-            <Tooltip title={tf('openCalculator')}>
-              <IconButton
-                sx={{ marginLeft: 'auto', float: 'right' }}
-                aria-label={tf('openCalculator')}
-                onClick={() => setFoerderungOpen(true)}
-              >
-                <WaterDropIcon />
-              </IconButton>
-            </Tooltip>
-          )}
+          {record.type === 'connection' && rechnerKnopf}
           {record.popupFn()}
         </Popup>
       </Polyline>
@@ -435,12 +424,19 @@ export default function ConnectionMarker({
           Maßstab sie trägt (`AUTO_MIN_TICK_SPACING_PX`); zu dicht wären die
           Striche ein schraffiertes Band und keine Auskunft.
 
+          **Nicht** im reinen Pendelverkehr: Dort ist die Linie eine
+          Fahrstrecke und keine Schlauchleitung, und Kupplungsmarken alle 20 m
+          entlang der Straße behaupten eine Verlegung, die es nicht gibt. Aus
+          demselben Grund weichen dort schon die Pumpenmarker. Angefordert wird
+          die Länge auch dort noch angezeigt — die Fahrstrecke zu messen ist
+          eine sinnvolle Frage.
+
           Das **Etikett** bleibt am Schalter: Fünf Leitungen auf einer Karte
           sind fünf dauerhafte Beschriftungen, und die verdecken, was sie
           beschriften. Beim Ziehen steht es trotzdem da — wer einen Punkt
           verschiebt, will die neue Länge sehen, ohne vorher einen Schalter zu
           suchen. */}
-      {(showLabel || record.type === 'connection') && (
+      {(showLabel || (record.type === 'connection' && mode !== 'pendel')) && (
         <HoseLengthOverlay
           positions={dragPositions ?? linePositions}
           dimension={
@@ -452,7 +448,6 @@ export default function ConnectionMarker({
           color={record.color}
           fromEnd={foerderungUmgekehrt === 'true'}
           label={showLabel}
-          minTickSpacingPx={showLabel ? undefined : AUTO_MIN_TICK_SPACING_PX}
           {...(pane ? { pane } : {})}
         />
       )}

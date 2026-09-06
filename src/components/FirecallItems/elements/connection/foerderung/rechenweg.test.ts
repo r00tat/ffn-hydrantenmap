@@ -22,6 +22,8 @@ const fmt = (value: number, digits = 1) => value.toFixed(digits);
 const entnahme: LatLngPosition = [47.9482, 16.8482];
 /** Rund 2000 m nach Norden. */
 const verteiler: LatLngPosition = [47.9482 + 2000 / 111_320, 16.8482];
+/** Rund 100 m nach Norden — zu kurz für eine Verstärkerpumpe. */
+const nahesZiel: LatLngPosition = [47.9482 + 100 / 111_320, 16.8482];
 
 const connection = (overrides: Partial<Connection> = {}): Connection =>
   ({
@@ -162,6 +164,48 @@ describe('foerderungRechenweg', () => {
     expect(find(schritte, 'stepDimension').wert).toBe('Gartenschlauch');
     expect(schritte.some((s) => s.label === 'stepTotalDrop')).toBe(false);
     expect(schritte.some((s) => s.label === 'stepBoosterPumps')).toBe(false);
+  });
+
+  it('nennt ohne Höhenprofil und ohne Eingabe die Annahme „eben"', () => {
+    // Ohne beides steht dort die 0 aus der Vorbelegung. Sie als „Eingabe" zu
+    // führen behauptete eine Auskunft, die niemand gegeben hat — und die
+    // Spalte gibt es genau dafür, das sichtbar zu machen.
+    const ohne = find(
+      schritteVon(connection()),
+      'stepElevationDifference'
+    );
+    expect(ohne.wert).toBe('0.0');
+    expect(ohne.herkunft).toBe('vorgabe');
+    expect(ohne.hinweis).toBe('hintAssumedFlat');
+  });
+
+  it('zeigt ohne Verstärkerpumpe keine Verteilung und keinen Greedy-Hinweis', () => {
+    // 100 m tragen ohne zweite Pumpe. Es gibt dann keinen Zwischenabschnitt,
+    // der „bis zum Mindest-Eingangsdruck ausgeschöpft" sein könnte, und die
+    // Zeile „Abnahme je Zwischenabschnitt 6,5 bar" beschriebe eine Rechnung,
+    // die nie stattgefunden hat.
+    const kurz = connection({
+      destLat: nahesZiel[0],
+      destLng: nahesZiel[1],
+      positions: JSON.stringify([entnahme, nahesZiel]),
+    });
+    const schritte = schritteVon(kurz);
+
+    expect(Number(find(schritte, 'stepBoosterPumps').wert)).toBe(0);
+    expect(schritte.some((s) => s.label === 'stepDropPerSection')).toBe(false);
+    expect(schritte.some((s) => s.label === 'stepCapacity')).toBe(false);
+    expect(schritte.some((s) => s.hinweis === 'hintGreedyPlacement')).toBe(
+      false
+    );
+  });
+
+  it('zählt so viele Abschnitte, wie die Abschnittstabelle zeigt', () => {
+    const view = foerderungView(flach());
+    if (!view?.result) throw new Error('kein Ergebnis');
+    const schritte = foerderungRechenweg(view, fmt);
+    expect(Number(find(schritte, 'stepSections').wert)).toBe(
+      view.result.abschnitte.length
+    );
   });
 
   it('nennt jede Größe nur einmal', () => {

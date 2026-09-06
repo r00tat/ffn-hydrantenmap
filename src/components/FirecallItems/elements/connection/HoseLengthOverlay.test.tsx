@@ -14,10 +14,10 @@ const map = vi.hoisted(() => ({
   /** Meter je 100 px — über die Karte gerechnet, hier gestellt. */
   metresPer100px: 1000,
   /**
-   * Der sichtbare Ausschnitt. `undefined` heißt „alles sichtbar" — so verhält
-   * sich auch eine Karte, deren `getBounds` es nicht gibt.
+   * Die Südgrenze des sichtbaren Ausschnitts. `-90` heißt „alles sichtbar".
+   * Eine echte Leaflet-Karte hat immer einen Ausschnitt, der Mock deshalb auch.
    */
-  visibleNorthOf: undefined as number | undefined,
+  visibleNorthOf: -90,
 }));
 
 vi.mock('react-leaflet', () => ({
@@ -36,22 +36,16 @@ vi.mock('react-leaflet', () => ({
       lng: 16.8 + x,
     }),
     distance: () => map.metresPer100px,
-    getBounds: () =>
-      map.visibleNorthOf === undefined
-        ? undefined
-        : {
-            pad: () => ({
-              contains: ([lat]: [number, number]) =>
-                lat >= (map.visibleNorthOf as number),
-            }),
-          },
+    getBounds: () => ({
+      pad: () => ({
+        contains: ([lat]: [number, number]) => lat >= map.visibleNorthOf,
+      }),
+    }),
   }),
   useMapEvent: () => undefined,
 }));
 
-const { default: HoseLengthOverlay, AUTO_MIN_TICK_SPACING_PX } = await import(
-  './HoseLengthOverlay'
-);
+const { default: HoseLengthOverlay } = await import('./HoseLengthOverlay');
 
 /** Rund 400 m nach Norden — 20 Schlauchlängen zu 20 m. */
 const gerade: LatLngPosition[] = [
@@ -65,7 +59,7 @@ describe('HoseLengthOverlay', () => {
     // 10 m je Pixel: Ein 20-m-Schlauch ist damit 2 px — bewusst grob, damit
     // jeder Test seinen Maßstab selbst setzt.
     map.metresPer100px = 1000;
-    map.visibleNorthOf = undefined;
+    map.visibleNorthOf = -90;
   });
 
   it('beschriftet Länge und Schlauchzahl', () => {
@@ -167,7 +161,6 @@ describe('HoseLengthOverlay', () => {
         dimension="B"
         hoseLengthM={20}
         label={false}
-        minTickSpacingPx={AUTO_MIN_TICK_SPACING_PX}
       />
     );
     expect(polylines.props).toHaveLength(0);

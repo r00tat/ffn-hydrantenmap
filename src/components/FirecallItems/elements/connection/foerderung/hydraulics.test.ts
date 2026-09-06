@@ -91,6 +91,67 @@ describe('computeFoerderung', () => {
     }
   });
 
+  it('setzt eine Pumpe vor eine Kuppe im letzten Abschnitt', () => {
+    // 500 m flach, dann auf 200 m hinauf und wieder herunter. Netto verliert
+    // die Strecke wenig — die Kuppe dazwischen kostet aber 20 bar. Wer nur
+    // Anfang und Ende eines Abschnitts vergleicht, sieht sie nicht und meldet
+    // die Lage als darstellbar, während an der Kuppe rechnerisch −9 bar
+    // stünden. Wasser fließt dort keines mehr.
+    const points: FoerderungProfilePoint[] = [];
+    for (let distance = 0; distance <= 1500; distance += 10) {
+      points.push({
+        distance,
+        elevation:
+          distance <= 500
+            ? 0
+            : distance <= 1000
+              ? (200 * (distance - 500)) / 500
+              : 200 - (200 * (distance - 1000)) / 500,
+      });
+    }
+    const result = computeFoerderung(input(points));
+
+    // Der Druck an der Kuppe, gerechnet ab der letzten Pumpe davor.
+    const letztePumpeVorDerKuppe = result.pumps
+      .filter((pump) => pump.distance <= 1000)
+      .pop();
+    const dropAt = (distance: number) => {
+      const elevation =
+        distance <= 500
+          ? 0
+          : distance <= 1000
+            ? (200 * (distance - 500)) / 500
+            : 200 - (200 * (distance - 1000)) / 500;
+      return distance * 0.01 + elevation * 0.1;
+    };
+    const druckAnDerKuppe =
+      8 - (dropAt(1000) - dropAt(letztePumpeVorDerKuppe?.distance ?? 0));
+
+    expect(druckAnDerKuppe).toBeGreaterThanOrEqual(1.5 - 1e-9);
+    expect(result.enddruck).toBeGreaterThanOrEqual(6 - 1e-9);
+  });
+
+  it('weist die Verteilung nur aus, wenn tatsächlich verteilt wurde', () => {
+    // Ohne Verstärkerpumpe gibt es keinen Zwischenabschnitt, den man verteilen
+    // könnte. Ein Rechenweg, der hier „Abnahme je Zwischenabschnitt 6,5 bar"
+    // zeigt, beschreibt eine Rechnung, die nie stattgefunden hat.
+    expect(computeFoerderung(input(profile(150))).verteilung).toBeUndefined();
+    expect(computeFoerderung(input(profile(2000))).verteilung).toBeDefined();
+  });
+
+  it('nennt in der Verteilung die Zahlen, die die Standorte erzeugt haben', () => {
+    // 20 bar auf 3 · 6,5 + 2 = 21,5 bar Kapazität sind 93,0 % Auslastung und
+    // 6,047 bar je Zwischenabschnitt — genau der Abstand der ersten Pumpe.
+    const result = computeFoerderung(input(profile(2000)));
+    expect(result.verteilung?.kapazitaet).toBeCloseTo(21.5, 6);
+    expect(result.verteilung?.auslastung).toBeCloseTo(20 / 21.5, 6);
+    expect(result.verteilung?.abnahmeJeAbschnitt).toBeCloseTo(6.047, 3);
+    expect(result.abschnitte[0].druckverlust).toBeCloseTo(
+      result.verteilung?.abnahmeJeAbschnitt ?? 0,
+      6
+    );
+  });
+
   it('setzt die letzte Pumpe nicht unmittelbar vor den Verteiler', () => {
     // Der weiteste erreichbare Punkt wäre 1950 m — 50 m vor dem Ende. Mit der
     // gleichmäßigen Verteilung sind es 3 · 6,047 bar = 1814 m.

@@ -86,7 +86,7 @@ export default function RechenwegTabelle({ schritte }: RechenwegTabelleProps) {
         component="p"
         sx={{ px: 2, pb: 1 }}
       >
-        {t('rechenwegHint')}
+        {t('calculationStepsHint')}
       </Typography>
       <Box sx={{ overflowX: 'auto' }}>
         <Table size="small">

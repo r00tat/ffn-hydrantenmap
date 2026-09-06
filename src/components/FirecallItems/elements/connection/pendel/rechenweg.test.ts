@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { RechenSchritt } from '../rechenweg';
 import { pendelRechenweg } from './rechenweg';
 import type { PendelView } from './pendelverkehr';
+import { FOERDERUNG_DEFAULTS } from '../foerderung/defaults';
 import { computeShuttle } from './shuttle';
 
 /**
@@ -48,6 +49,71 @@ const find = (schritte: RechenSchritt[], label: RechenSchritt['label']) => {
 };
 
 describe('pendelRechenweg', () => {
+  it('weist die geforderte Menge als Planungswert aus, solange sie es ist', () => {
+    // 1000 l/min ist die Vorbelegung beider Rechner. Sie als „Eingabe" zu
+    // führen verwischt genau den Unterschied, für den es die Spalte gibt.
+    const vorbelegt = pendelRechenweg(
+      { ...view(), sollMenge: FOERDERUNG_DEFAULTS.foerderMenge },
+      fmt
+    );
+    expect(find(vorbelegt, 'stepRequiredFlow').herkunft).toBe('vorgabe');
+    // Und die 400 l/min des Prüfsteins hat jemand eingetragen.
+    expect(find(pendelRechenweg(view(), fmt), 'stepRequiredFlow').herkunft).toBe(
+      'eingabe'
+    );
+  });
+
+  it('begründet die fehlende Fahrzeugzahl mit dem, was tatsächlich fehlt', () => {
+    // Ohne geforderte Menge fehlen Fahrzeugzahl und Kipppunkt ebenfalls — aber
+    // nicht, weil die Entnahmestelle deckelt. Der Grund kommt aus dem Ergebnis
+    // und wird nicht aus der fehlenden Zahl erraten.
+    const ohneAnforderung = pendelRechenweg(
+      {
+        ...view(),
+        sollMenge: 0,
+        result: computeShuttle({
+          strecke: 2000,
+          sollMenge: 0,
+          fahrzeuge: 3,
+          tankinhalt: 2000,
+          geschwindigkeit: 40,
+          fuellleistung: 800,
+          rangierzeit: 1,
+          entleerzeit: 3,
+        }),
+      },
+      fmt
+    );
+    expect(find(ohneAnforderung, 'stepVehiclesForRequiredFlow').hinweis).toBe(
+      'hintNoValueNoRequirement'
+    );
+    expect(find(ohneAnforderung, 'stepTippingPoint').hinweis).toBe(
+      'hintNoValueNoRequirement'
+    );
+
+    // Deckelt die Entnahmestelle dagegen wirklich, steht ihr Satz da.
+    const gedeckelt = pendelRechenweg(
+      {
+        ...view(),
+        sollMenge: 1000,
+        result: computeShuttle({
+          strecke: 2000,
+          sollMenge: 1000,
+          fahrzeuge: 3,
+          tankinhalt: 2000,
+          geschwindigkeit: 40,
+          fuellleistung: 800,
+          rangierzeit: 1,
+          entleerzeit: 3,
+        }),
+      },
+      fmt
+    );
+    expect(find(gedeckelt, 'stepVehiclesForRequiredFlow').hinweis).toBe(
+      'hintNoValueFillStation'
+    );
+  });
+
   it('setzt in jede Rechnung die Zahlen ein, mit denen gerechnet wurde', () => {
     const schritte = pendelRechenweg(view(), fmt);
 

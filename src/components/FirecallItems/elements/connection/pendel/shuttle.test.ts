@@ -89,6 +89,17 @@ describe('computeShuttle', () => {
     expect(result.traegtSollmenge).toBe(false);
   });
 
+  it('nennt den Grund, aus dem keine Fahrzeugzahl dasteht', () => {
+    // Ohne den Grund liest die Oberfläche „keine Zahl" als „die Entnahmestelle
+    // deckelt". Bei einer Sollmenge von 0 stimmt das nicht: Dann gibt es nur
+    // nichts zu erreichen, und ein Satz über die Ergiebigkeit wäre falsch.
+    expect(run({ sollMenge: 1000 }).fuellstelleUnterSollmenge).toBe(true);
+
+    const ohneAnforderung = run({ sollMenge: 0 });
+    expect(ohneAnforderung.fahrzeugeFuerSollmenge).toBeUndefined();
+    expect(ohneAnforderung.fuellstelleUnterSollmenge).toBe(false);
+  });
+
   it('nennt die Fahrzeuge, die die Sollmenge tragen', () => {
     // 500 l/min · 12,5 min / 2000 l = 3,125 → 4 Fahrzeuge, und die Füllstelle
     // trägt mit 571 l/min die geforderten 500.

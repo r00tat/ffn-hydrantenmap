@@ -16,14 +16,14 @@
  * Begründung des Modells: docs/loeschwasserfoerderung.md.
  */
 
-import type { RechenSchritt, RechenwegFormat } from '../rechenweg';
+import {
+  herkunftVonVorgabe as herkunft,
+  type RechenSchritt,
+  type RechenwegFormat,
+} from '../rechenweg';
 import { FOERDERUNG_DEFAULTS } from './defaults';
 import type { FoerderungView } from './foerderung';
 import { BAR_PER_METER_ELEVATION } from './hydraulics';
-
-/** Ob eine Zahl noch die Vorbelegung ist — wie im Pendelverkehr. */
-const herkunft = (value: number, vorgabe: number) =>
-  value === vorgabe ? ('vorgabe' as const) : ('eingabe' as const);
 
 export function foerderungRechenweg(
   view: FoerderungView,
@@ -138,14 +138,28 @@ export function foerderungRechenweg(
     herkunft: 'gerechnet',
   });
 
+  // Ohne Höhenprofil **und** ohne eingetragenen Wert steht hier die Annahme
+  // „eben" und keine Eingabe. Sie als Eingabe auszuweisen behauptete eine
+  // Auskunft, die niemand gegeben hat — genau das soll die Spalte verhindern.
+  const hoeheAngenommen =
+    view.elevationSource !== 'profile' && view.hoehenunterschied === 0;
   schritte.push({
     label: 'stepElevationDifference',
     wert: fmt(view.hoehenunterschied, 1),
     einheit: 'm',
-    herkunft: view.elevationSource === 'profile' ? 'gemessen' : 'eingabe',
+    herkunft:
+      view.elevationSource === 'profile'
+        ? 'gemessen'
+        : hoeheAngenommen
+          ? 'vorgabe'
+          : 'eingabe',
     ...(view.elevationSource === 'profile'
       ? {}
-      : { hinweis: 'hintManualElevation' as const }),
+      : {
+          hinweis: hoeheAngenommen
+            ? ('hintAssumedFlat' as const)
+            : ('hintManualElevation' as const),
+        }),
   });
 
   schritte.push({
@@ -225,7 +239,10 @@ export function foerderungRechenweg(
     herkunft: 'gerechnet',
   });
 
-  const abschnitte = result.pumps.length;
+  // Die Zahl der Abschnitte, die auch in der Abschnittstabelle steht: Über
+  // `MAX_PUMPS` wird der letzte Abschnitt verworfen, weil die Leitung dort kein
+  // Ende erreicht hat. `pumps.length` zählte ihn mit.
+  const abschnitte = result.abschnitte.length;
   schritte.push({
     label: 'stepSections',
     wert: fmt(abschnitte, 0),
@@ -236,36 +253,41 @@ export function foerderungRechenweg(
   // Kapazität, Auslastung und Abnahme je Abschnitt beschreiben die
   // gleichmäßige Verteilung. Ohne sie stünde hier eine Rechnung, die das
   // Ergebnis nicht erzeugt hat.
-  if (result.gleichmaessigVerteilt) {
-    const kapazitaet = (abschnitte - 1) * zwischen + letzter;
+  const verteilung = result.verteilung;
+  if (verteilung) {
     schritte.push({
       label: 'stepCapacity',
       rechnung: `${fmt(abschnitte - 1, 0)} · ${fmt(zwischen, 1)} bar + ${fmt(
         letzter,
         1
       )} bar`,
-      wert: fmt(kapazitaet, 1),
+      wert: fmt(verteilung.kapazitaet, 1),
       einheit: 'bar',
       herkunft: 'gerechnet',
     });
 
-    const auslastung = Math.min(1, totalDrop / kapazitaet);
     schritte.push({
       label: 'stepUtilisation',
-      rechnung: `${fmt(totalDrop, 1)} bar / ${fmt(kapazitaet, 1)} bar`,
-      wert: fmt(auslastung * 100, 1),
+      rechnung: `${fmt(totalDrop, 1)} bar / ${fmt(verteilung.kapazitaet, 1)} bar`,
+      wert: fmt(verteilung.auslastung * 100, 1),
       einheit: '%',
       herkunft: 'gerechnet',
     });
 
     schritte.push({
       label: 'stepDropPerSection',
-      rechnung: `${fmt(zwischen, 1)} bar · ${fmt(auslastung * 100, 1)} %`,
-      wert: fmt(zwischen * auslastung, 2),
+      rechnung: `${fmt(zwischen, 1)} bar · ${fmt(
+        verteilung.auslastung * 100,
+        1
+      )} %`,
+      wert: fmt(verteilung.abnahmeJeAbschnitt, 2),
       einheit: 'bar',
       herkunft: 'gerechnet',
     });
-  } else {
+  } else if (abschnitte > 1) {
+    // Nur mit Zwischenabschnitten: Ohne Verstärkerpumpe gibt es keinen, der
+    // „bis zum Mindest-Eingangsdruck ausgeschöpft" sein könnte, und der Satz
+    // wäre schlicht falsch.
     schritte.push({
       label: 'stepDropPerSection',
       wert: fmt(zwischen, 1),

@@ -10,23 +10,11 @@
  * Begründung des Modells: docs/pendelverkehr.md. Formel: `shuttle.ts`.
  */
 
-import type {
-  RechenSchritt,
-  RechenwegFormat,
-} from '../rechenweg';
+import { herkunftVonVorgabe as herkunft, type RechenSchritt, type RechenwegFormat } from '../rechenweg';
+import { FOERDERUNG_DEFAULTS } from '../foerderung/defaults';
 import { PENDEL_DEFAULTS } from './defaults';
 import type { PendelView } from './pendelverkehr';
-
-/**
- * Ob eine Zahl noch die Vorbelegung ist.
- *
- * Ein Planungswert, den jemand ausdrücklich bestätigt hat, ist immer noch ein
- * Planungswert — verglichen wird deshalb der Wert und nicht, ob das Feld
- * angefasst wurde. Die Verwechslungsgefahr ist gering und die Alternative wäre
- * ein zweites Feld je Größe, nur um „von Hand gesetzt" zu vermerken.
- */
-const herkunft = (value: number, vorgabe: number) =>
-  value === vorgabe ? ('vorgabe' as const) : ('eingabe' as const);
+import { metrePerMinute } from './shuttle';
 
 export function pendelRechenweg(
   view: PendelView,
@@ -53,7 +41,7 @@ export function pendelRechenweg(
   // Die Umrechnung als eigener Schritt: Die Fahrzeit teilt Meter durch
   // Meter je Minute, und ohne diese Zeile steht in der nächsten eine Zahl, die
   // nirgends eingegeben wurde.
-  const mPerMin = (params.geschwindigkeit * 1000) / 60;
+  const mPerMin = metrePerMinute(params.geschwindigkeit);
   schritte.push({
     label: 'stepSpeedPerMinute',
     rechnung: `${fmt(params.geschwindigkeit, 0)} · 1000 / 60`,
@@ -189,7 +177,10 @@ export function pendelRechenweg(
     label: 'stepRequiredFlow',
     wert: fmt(view.sollMenge, 0),
     einheit: 'l/min',
-    herkunft: 'eingabe',
+    // Dieselbe Vorbelegung wie in der Förderung — die geforderte Menge ist
+    // dieselbe Größe, egal welcher der beiden Rechner sie verbraucht. Steht
+    // sie noch auf dem Planungswert, ist sie einer.
+    herkunft: herkunft(view.sollMenge, FOERDERUNG_DEFAULTS.foerderMenge),
   });
 
   schritte.push({
@@ -202,7 +193,9 @@ export function pendelRechenweg(
           )} min / ${fmt(params.tankinhalt, 0)} l⌉`,
           wert: fmt(result.fahrzeugeFuerSollmenge, 0),
         }
-      : { hinweis: 'hintNoValueFillStation' as const }),
+      : result.fuellstelleUnterSollmenge
+        ? { hinweis: 'hintNoValueFillStation' as const }
+        : { hinweis: 'hintNoValueNoRequirement' as const }),
     herkunft: 'gerechnet',
   });
 
@@ -224,9 +217,15 @@ export function pendelRechenweg(
           einheit: 'm',
         }
       : {
-          hinweis: result.fuellstellenLeistung < view.sollMenge
+          // Der Grund kommt aus dem Ergebnis und wird nicht aus der fehlenden
+          // Zahl erraten: Ohne Anforderung fehlt der Kipppunkt ebenfalls, und
+          // dann trifft weder „die Entnahmestelle deckelt" noch „es fehlt an
+          // Fahrzeugen" zu.
+          hinweis: result.fuellstelleUnterSollmenge
             ? ('hintNoValueFillStation' as const)
-            : ('hintNoValueNoVehicles' as const),
+            : view.sollMenge > 0
+              ? ('hintNoValueNoVehicles' as const)
+              : ('hintNoValueNoRequirement' as const),
         }),
     herkunft: 'gerechnet',
   });

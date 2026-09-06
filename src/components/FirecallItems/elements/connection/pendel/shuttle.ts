@@ -83,6 +83,16 @@ export interface ShuttleResult {
    * Grenze ist, ist die Antwort nicht „mehr davon".
    */
   fahrzeugeFuerSollmenge?: number;
+  /**
+   * Ob die Entnahmestelle **unter** der Sollmenge deckelt.
+   *
+   * Der Grund, aus dem `fahrzeugeFuerSollmenge` und `kipppunkt` fehlen können —
+   * und zwar getrennt von der Zahl selbst, weil beide auch ohne Anforderung
+   * fehlen (`sollMenge` 0). „Keine Zahl" ist keine Begründung: Wer daraus auf
+   * die Entnahmestelle schließt, schreibt bei einer Sollmenge von 0 einen Satz
+   * über eine Ergiebigkeit, die gar nicht im Weg steht.
+   */
+  fuellstelleUnterSollmenge: boolean;
   /** Ob die Lage die Sollmenge dauerhaft trägt. */
   traegtSollmenge: boolean;
   /**
@@ -100,8 +110,14 @@ export interface ShuttleResult {
   eingeschwungenNach: number;
 }
 
-/** km/h in m/min — die Zeiten sind Minuten, die Strecken Meter. */
-const metrePerMinute = (kmh: number): number => (kmh * 1000) / 60;
+/**
+ * km/h in m/min — die Zeiten sind Minuten, die Strecken Meter.
+ *
+ * Exportiert, damit der Rechenweg dieselbe Umrechnung zeigt, mit der gerechnet
+ * wurde. Eine zweite, gleich aussehende Formel dort wäre genau der Fehler, den
+ * ein Rechenweg aufdecken soll.
+ */
+export const metrePerMinute = (kmh: number): number => (kmh * 1000) / 60;
 
 /**
  * Das Ergebnis, oder `undefined`, wenn eine Eingabe nicht rechenbar ist.
@@ -177,6 +193,7 @@ export function computeShuttle(input: ShuttleInput): ShuttleResult | undefined {
           // nicht an der letzten Binärstelle um eines nach oben rutscht.
           Math.max(1, Math.ceil((sollMenge * umlaufzeit) / tankinhalt - EPS))
         : undefined,
+    fuellstelleUnterSollmenge: sollMenge > 0 && !fuellstelleTraegtSollmenge,
     traegtSollmenge: menge + EPS >= sollMenge,
     kipppunkt: tippingDistance(input),
     faltbehaelter: fahrzeuge < fahrzeugeOhnePuffer,
