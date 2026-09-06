@@ -15,12 +15,15 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import { useMemo } from 'react';
 import type {
   PendelParams,
   PendelView,
 } from '../../FirecallItems/elements/connection/pendel/pendelverkehr';
 import type { HydrantOhneLeistung } from '../../FirecallItems/elements/connection/pendel/fuellstelle';
+import { pendelRechenweg } from '../../FirecallItems/elements/connection/pendel/rechenweg';
 import { parseNumber } from '../panelNumbers';
+import RechenwegTabelle from './RechenwegTabelle';
 import usePanelNumber from './usePanelNumber';
 
 /**
@@ -67,6 +70,7 @@ export default function PendelSection({
   const t = useTranslations('loeschwasserfoerderung');
   const num = usePanelNumber();
   const result = view.result;
+  const schritte = useMemo(() => pendelRechenweg(view, num), [view, num]);
 
   return (
     <>
@@ -374,6 +378,26 @@ export default function PendelSection({
               />
             </Grid>
           </Grid>
+        </AccordionDetails>
+      </Accordion>
+
+      {/* Der Rechenweg steht ganz unten und zugeklappt: Er ist die Kontrolle
+          des Ergebnisses, nicht der Weg dorthin. Wer ihn aufklappt, will
+          nachrechnen — und dann ist die Reihenfolge die der Formel und nicht
+          die des Panels.
+
+          `unmountOnExit`: zwanzig Zeilen, die bei jedem Ruck am Regler neu
+          entstünden, ohne dass sie jemand sieht. */}
+      <Accordion
+        disableGutters
+        elevation={0}
+        slotProps={{ transition: { unmountOnExit: true } }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2">{t('rechenweg')}</Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ px: 0 }}>
+          <RechenwegTabelle schritte={schritte} />
         </AccordionDetails>
       </Accordion>
     </>

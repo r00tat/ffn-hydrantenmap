@@ -631,6 +631,91 @@ zu erreichen — man musste erst danebentippen, um das Popup der Leitung zu beko
 Dasselbe gilt für den Sandsackrechner an der Linie: gleicher Aufbau, gleiche
 Ursache.
 
+## Der Rechenweg
+
+Beide Rechner geben am Ende wenige große Zahlen aus: „5 Verstärkerpumpen",
+„530 l/min dauerhaft". Wer damit eine Entscheidung trifft, muss sie nachrechnen
+können. Die Herleitung stand bisher nur hier und im Quelltext — an der
+Einsatzstelle hat niemand beides.
+
+Der Aufklapper **„Rechenweg"** am Ende jeder Sektion führt sie als Tabelle vor:
+Größe, Rechnung, Wert, Herkunft.
+
+### Die Rechnung mit eingesetzten Zahlen, nicht die Formel
+
+`2 · 2000 m / 666,7 m/min` ist nachzurechnen, `2·s/v` nicht. Eine Formel, deren
+Symbole man erst auflösen muss, ist keine Kontrolle, sondern eine zweite
+Aufgabe. Deshalb steht in der Spalte auch keine allgemeine Schreibweise, sondern
+genau die Zahlen dieses Falls — dieselben, die im Ergebnis stecken.
+
+Zwischenschritte, die im Panel sonst nirgends stehen, bekommen eine eigene
+Zeile: die Geschwindigkeit in m/min, das reine Füllen ohne Rangieren, die Menge
+vor der Schranke der Entnahmestelle. Ohne sie stünde in der nächsten Zeile eine
+Zahl, die nirgends herkommt.
+
+### Die Herkunft ist der eigentliche Punkt
+
+Eine Kette von Rechnungen sagt für sich nur, dass richtig gerechnet wurde.
+Belastbar ist ein Ergebnis aber nur so weit wie seine **schwächste
+Eingangsgröße** — und im Ergebnis sieht ein Planungswert genauso aus wie ein
+Tabellenwert.
+
+| Herkunft | Bedeutung |
+| --- | --- |
+| gemessen | Karte, Höhenmodell, GIS-Bestand |
+| Eingabe | von Hand eingetragen |
+| **Planungswert** | geschätzt, **durch nichts belegt** — hervorgehoben |
+| Tabelle | aus der Ausbildungsunterlage |
+| abgeleitet | aus einem Tabellenwert umgerechnet (d⁵-Skalierung), nicht selbst tabelliert |
+| gerechnet | aus den Zeilen darüber |
+
+Planungswert und Eingabe unterscheiden sich am **Wert** und nicht daran, ob das
+Feld angefasst wurde: Ein Vorgabewert, den jemand ausdrücklich bestätigt hat,
+ist immer noch ein Vorgabewert. Die Alternative wäre ein zweites Feld je Größe,
+nur um „von Hand gesetzt" zu vermerken.
+
+### Wo keine Zahl steht, steht warum
+
+Fehlt ein Wert — keine Fahrzeugzahl trägt die Menge, kein Kipppunkt existiert —,
+steht ein Gedankenstrich und darunter der Grund. Eine leere Zelle ließe offen,
+ob nicht gerechnet wurde oder nichts herauskam.
+
+### Was der Rechenweg nicht zeigt
+
+Die **Standortsuche** der Förderung. Sie ist eine Schleife über das Höhenprofil
+und keine Kette von Zwischenergebnissen; ihre Ausgabe steht schon als
+Abschnittstabelle im Panel. Der Rechenweg nennt stattdessen die Größen, aus
+denen die Zahl der Abschnitte folgt, und die Verteilung, die sie danach auf die
+Strecke setzt — Kapazität, Auslastung, Abnahme je Abschnitt.
+
+Diese drei Zeilen erscheinen nur, wenn tatsächlich verteilt wurde
+(`gleichmaessigVerteilt`). Ist es beim Ergebnis des Vorwärtslaufs geblieben,
+sagt die Zeile das: Eine Rechnung vorzuführen, die das Ergebnis nicht erzeugt
+hat, ist schlimmer als keine.
+
+### Aufbau
+
+| Datei | Inhalt |
+| --- | --- |
+| `connection/rechenweg.ts` | Schritt, Herkunft, geprüfte Beschriftungsschlüssel |
+| `foerderung/rechenweg.ts` | die Schritte der Förderung |
+| `pendel/rechenweg.ts` | die Schritte des Pendelverkehrs |
+| `Map/Leitungen/RechenwegTabelle.tsx` | die Anzeige, für beide dieselbe |
+
+Die Bauer sind **Reinmodule**: kein React, kein Firestore, formatiert wird über
+eine übergebene Funktion. Ein Test reicht `toFixed` herein und prüft damit die
+Rechnung, ohne dass eine Sprache im Spiel ist — und kann widerlegen, dass der
+vorgeführte Weg derselbe ist wie der gegangene.
+
+Die Beschriftungen sind eine **Aufzählung von Nachrichtenschlüsseln** und kein
+zusammengesetzter `t(`step_${name}`)`: next-intl prüft die Schlüssel statisch,
+ein zusammengesetzter wäre zu `string` verbreitert und ungeprüft. So scheitert
+stattdessen der Typecheck, wenn ein Schritt eine Beschriftung nennt, die im
+Katalog fehlt.
+
+Der Aufklapper trägt `unmountOnExit`: fünfundzwanzig Zeilen, die bei jedem Ruck
+am Regler neu entstünden, ohne dass sie jemand sieht.
+
 ## Ein Panel über der Karte, kein Dialog
 
 Der Rechner ist ein **nicht modales** Panel, das über der Karte schwebt und über

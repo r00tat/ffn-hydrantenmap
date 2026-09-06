@@ -94,6 +94,15 @@ export interface FoerderungResult {
   hoehenverlustBar: number;
   enddruck: number;
   darstellbar: boolean;
+  /**
+   * Ob die Standorte gleichmäßig verteilt wurden oder es beim Ergebnis des
+   * Vorwärtslaufs geblieben ist.
+   *
+   * Für den Rechenweg: Der beschreibt sonst eine Verteilung mit Kapazität und
+   * Auslastung, die in diesem Fall gar nicht stattgefunden hat — eine Rechnung
+   * vorzuführen, die das Ergebnis nicht erzeugt hat, ist schlimmer als keine.
+   */
+  gleichmaessigVerteilt: boolean;
 }
 
 /** Druckverlust zwischen zwei Abtastpunkten: Reibung plus Höhe. */
@@ -449,6 +458,7 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
   return {
     pumps: built.pumps,
     verstaerkerpumpen: built.pumps.length - 1,
+    gleichmaessigVerteilt: placed !== distances,
     abschnitte,
     reibungsverlustBar:
       (profile[last].distance - profile[0].distance) * frictionBarPerMeter,

@@ -791,6 +791,35 @@ describe('LoeschwasserfoerderungPanel', () => {
         onClose={() => {}}
       />
     );
+    // Auch nicht im aufgeklappten Rechenweg — der nennt die Herkunft je Zeile
+    // als Wort, aber keine Fundstelle. Solange er zu ist, steht ohnehin nichts
+    // davon im Baum.
     expect(screen.queryByText(/Ausbildungsunterlage/)).not.toBeInTheDocument();
+  });
+
+  it('führt den Rechenweg erst vor, wenn er aufgeklappt wird', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile()}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    // Zugeklappt ist er nicht im Baum: zwanzig Zeilen, die bei jedem Ruck am
+    // Regler neu entstünden, ohne dass sie jemand sieht — und die
+    // Ergebniszahlen des Panels stünden zweimal da.
+    expect(screen.queryByText('Gesamte Druckabnahme')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('Rechenweg'));
+
+    // Die Rechnung mit eingesetzten Zahlen, nicht die Formel mit Symbolen.
+    expect(screen.getByText('Gesamte Druckabnahme')).toBeInTheDocument();
+    // `usePanelNumber` erzwingt keine Nachkommastelle: 8 bar stehen als „8".
+    expect(screen.getByText('8 − 1,5')).toBeInTheDocument();
+    // Und die Herkunft, an der hängt, wie belastbar das Ergebnis ist.
+    expect(screen.getAllByText('Tabelle').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Planungswert').length).toBeGreaterThan(0);
   });
 });

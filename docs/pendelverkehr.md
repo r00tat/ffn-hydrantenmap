@@ -292,6 +292,7 @@ des Panels gesetzt.
 | `pendel/pendelverkehr.ts` | die Fassade: Felder lesen, Vorgabewerte auffüllen |
 | `pendel/versorgungVergleich.ts` | Gegenüberstellung, Empfehlung, Aufbauzeit |
 | `connection/versorgungSummary.ts` | die Zeile für Popup und Elementliste, je Modus |
+| `pendel/rechenweg.ts` | die Schritte für den Aufklapper „Rechenweg" (s. [docs/loeschwasserfoerderung.md](loeschwasserfoerderung.md)) |
 
 Formel und Fassade liegen getrennt, Fassade und Vergleich auch. Die Trennung ist
 dieselbe wie bei `hydraulics.ts`/`foerderung.ts`, aus demselben Grund: Ein Test
