@@ -99,7 +99,8 @@ export function parseBesatzung(besatzung?: string): number {
   if (!besatzung) return 0;
   const parts = besatzung.split(/[:/]/);
   // Bei „1/8/9" ist die Gesamtsumme angeschrieben — die Mannschaft steht davor.
-  const raw = parts.length > 2 ? parts[parts.length - 2] : parts[parts.length - 1];
+  const raw =
+    (parts.length > 2 ? parts[parts.length - 2] : parts[parts.length - 1]) ?? '';
   const value = Number.parseInt(raw.trim(), 10);
   return Number.isFinite(value) && value > 0 ? value : 0;
 }

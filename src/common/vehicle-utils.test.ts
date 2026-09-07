@@ -119,6 +119,9 @@ describe('parseBesatzung', () => {
     expect(parseBesatzung('')).toBe(0);
     expect(parseBesatzung('viele')).toBe(0);
     expect(parseBesatzung('-3')).toBe(0);
+    // Angefangen und nicht fertig getippt.
+    expect(parseBesatzung('1:')).toBe(0);
+    expect(parseBesatzung(':')).toBe(0);
   });
 });
 
