@@ -34,6 +34,8 @@ import {
 } from '../../common/time-format';
 import {
   countCrewByVehicle,
+  einsatzmittelKategorie,
+  formatBesatzung,
   getEffectiveAts,
   getEffectiveBesatzung,
 } from '../../common/vehicle-utils';
@@ -93,11 +95,13 @@ export function useDiaries(sortAscending: boolean = false) {
       countCrewByVehicle(crewAssignments);
 
     const getBesatzungText = (item: Fzg) => {
+      const kategorie = einsatzmittelKategorie(item);
       const bes = getEffectiveBesatzung(
         item.besatzung,
-        crewCountMap.get(item.id || '') ?? 0
+        crewCountMap.get(item.id || '') ?? 0,
+        kategorie
       );
-      return bes > 0 ? '1:' + bes : '';
+      return bes > 0 ? formatBesatzung(bes, kategorie) : '';
     };
 
     const fmtBesatzung = (item: Fzg) => {

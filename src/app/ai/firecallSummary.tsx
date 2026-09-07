@@ -1,5 +1,12 @@
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import { formatTimestamp } from '../../common/time-format';
+import {
+  countCrewByVehicle,
+  einsatzmittelKategorie,
+  EINSATZMITTEL_KATEGORIE_LABELS,
+  formatBesatzung,
+  getEffectiveBesatzung,
+} from '../../common/vehicle-utils';
 import {
   Diary,
   FirecallItem,
@@ -7,20 +14,43 @@ import {
   GeschaeftsbuchEintrag,
 } from '../../components/firebase/firestore';
 import { useFirecallItems } from '../../components/firebase/firestoreHooks';
-import useFirecall from '../../hooks/useFirecall';
+import useFirecall, { FirecallContext } from '../../hooks/useFirecall';
+
+/**
+ * Die Besatzung für die Zusammenfassung — dieselbe Ableitung wie auf der Karte.
+ *
+ * Bewusst nicht der Rohwert des Feldes mit einem festen „1:" davor: Ohne
+ * gepflegte Besatzung zählen die zugeordneten Personen, und am Aufbau steht
+ * keine Führungskraft an.
+ */
+function besatzungText(v: Fzg, crewCountMap: Map<string, number>): string {
+  const kategorie = einsatzmittelKategorie(v);
+  const bes = getEffectiveBesatzung(
+    v.besatzung,
+    crewCountMap.get(v.id || '') ?? 0,
+    kategorie
+  );
+  if (bes <= 0) return '';
+  return `Besatzung ${formatBesatzung(bes, kategorie)}`;
+}
 
 const firecallItemTextFormatters: {
-  [key: string]: <T extends FirecallItem>(item: T) => string;
+  [key: string]: <T extends FirecallItem>(
+    item: T,
+    crewCountMap: Map<string, number>
+  ) => string;
 } = {
   default: (item: FirecallItem) =>
     `${item.name} ${item.beschreibung || ''} ${formatTimestamp(
       item.datum
     )} Position: ${item.lat},${item.lng}`,
-  vehicle: (item: FirecallItem) => {
+  vehicle: (item: FirecallItem, crewCountMap: Map<string, number>) => {
     const v = item as Fzg;
-    return `Fahrzeug ${v.name} ${v.fw || ''} ${
+    return `${EINSATZMITTEL_KATEGORIE_LABELS[einsatzmittelKategorie(v)]} ${
+      v.name
+    } ${v.fw || ''} ${
       v.beschreibung ? v.beschreibung?.replace('\n', ' ') : ''
-    } ${v.besatzung ? 'Besatzung 1:' + v.besatzung : ''} ${
+    } ${besatzungText(v, crewCountMap)} ${
       v.ats ? 'Atemschutzträger ' + v.ats : ''
     }  ${
       v.alarmierung ? 'alarmierung ' + formatTimestamp(v.alarmierung) : ''
@@ -53,6 +83,11 @@ const firecallItemTextFormatters: {
 export default function useFirecallSummary() {
   const firecall = useFirecall();
   const firecallItems = useFirecallItems();
+  const { crewAssignments } = useContext(FirecallContext);
+  const { crewCount: crewCountMap } = useMemo(
+    () => countCrewByVehicle(crewAssignments),
+    [crewAssignments]
+  );
 
   const summary = useMemo(() => {
     const sum = `Einsatz ${firecall.name} am ${formatTimestamp(
@@ -67,12 +102,12 @@ export default function useFirecallSummary() {
         const formatter =
           firecallItemTextFormatters[i.type] ||
           firecallItemTextFormatters.default;
-        return formatter(i);
+        return formatter(i, crewCountMap);
       })
       .join('\n')}
     `;
     return sum;
-  }, [firecall, firecallItems]);
+  }, [firecall, firecallItems, crewCountMap]);
 
   return summary;
 }

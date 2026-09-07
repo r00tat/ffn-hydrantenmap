@@ -4,6 +4,7 @@
  *
  */
 
+import type { EinsatzmittelKategorie } from '../../common/vehicle-utils';
 import type { Hydrant } from '../../common/gis-objects';
 import type { SampleRateSpec } from '../../hooks/radiacode/types';
 
@@ -160,6 +161,16 @@ export interface FcMarker extends FirecallItem {
 
 export interface Fzg extends FirecallItem {
   fw?: string;
+  /**
+   * Art des Einsatzmittels. Fehlt bei allen gewachsenen Einträgen — wo keine
+   * gepflegt ist, leitet `einsatzmittelKategorie()` sie aus dem Namen ab.
+   */
+  kategorie?: EinsatzmittelKategorie;
+  /**
+   * Die Mannschaft **ohne** Führung, also die Zahl hinter dem Doppelpunkt der
+   * Schreibweise „1:8". Die Gesamtstärke rechnet `einsatzmittelStaerke()` —
+   * siehe docs/einsatzmittel-staerke.md.
+   */
   besatzung?: string;
   ats?: number;
   alarmierung?: string;

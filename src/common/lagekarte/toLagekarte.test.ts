@@ -229,7 +229,7 @@ describe('buildFahrzeugeGroup', () => {
           type: 'vehicle',
           name: 'KDO Neusiedl',
           fw: 'FF Neusiedl',
-          besatzung: '1:5',
+          besatzung: '5',
           lat: 47.9,
           lng: 16.8,
           beschreibung: 'Erstangriff',

@@ -98,6 +98,51 @@ describe('CrewVehicleColumn', () => {
     expect(screen.getByText('0')).toBeInTheDocument();
   });
 
+  describe('Aufbau oder Anhänger', () => {
+    it('weist die leere Spalte als ohne Personenzuordnung aus', () => {
+      render(
+        <CrewVehicleColumn
+          {...defaultProps}
+          vehicleName="WLA Bergung"
+          assignments={[]}
+          noCrew
+        />,
+      );
+      expect(screen.getByText('Keine Personenzuordnung')).toBeInTheDocument();
+    });
+
+    it('zeigt bereits zugeordnete Personen weiter an', () => {
+      render(
+        <CrewVehicleColumn
+          {...defaultProps}
+          vehicleName="WLA Bergung"
+          noCrew
+        />,
+      );
+      expect(screen.getByText('Max Mustermann')).toBeInTheDocument();
+      expect(
+        screen.queryByText('Keine Personenzuordnung'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('bleibt entfernbar', () => {
+      const onRemoveVehicle = vi.fn();
+      render(
+        <CrewVehicleColumn
+          {...defaultProps}
+          vehicleName="WLA Bergung"
+          assignments={[]}
+          noCrew
+          onRemoveVehicle={onRemoveVehicle}
+        />,
+      );
+      fireEvent.click(
+        screen.getByLabelText('WLA Bergung aus dem Einsatz entfernen'),
+      );
+      expect(onRemoveVehicle).toHaveBeenCalledWith('v1');
+    });
+  });
+
   describe('vehicle removal', () => {
     it('renders no remove button without onRemoveVehicle', () => {
       render(<CrewVehicleColumn {...defaultProps} />);

@@ -54,6 +54,7 @@ import { useFirecall } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import useVehicles from '../../hooks/useVehicles';
+import { nimmtBesatzung } from '../../common/vehicle-utils';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import {
   CrewAssignment,
@@ -75,11 +76,16 @@ export interface CrewAssignmentBoardProps {
 function DroppableTableBody({
   droppableId,
   children,
+  disabled = false,
 }: {
   droppableId: string;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
-  const { isOver, setNodeRef } = useDroppable({ id: droppableId });
+  const { isOver, setNodeRef } = useDroppable({
+    id: droppableId,
+    disabled,
+  });
   return (
     <TableBody
       ref={setNodeRef}
@@ -499,6 +505,13 @@ export default function CrewAssignmentBoard({
     [validAssignments, activePersons],
   );
 
+  // Aufbauten und Anhänger nehmen keine Personen auf: Sie stehen weiter als
+  // Spalte da, tauchen aber in keinem Auswahlfeld auf (#795).
+  const crewVehicles = useMemo(
+    () => vehicles.filter((v) => nimmtBesatzung(v)),
+    [vehicles],
+  );
+
   const unassigned = displayAssignments.filter((a) => a.vehicleId === null);
   const assignedToVehicle = useCallback(
     (vehicleId: string) =>
@@ -514,11 +527,16 @@ export default function CrewAssignmentBoard({
       const assignmentId = active.id as string;
       const targetVehicleId =
         over.id === 'unassigned' ? null : (over.id as string);
-      const targetVehicleName = targetVehicleId
-        ? vehicles.find((v) => v.id === targetVehicleId)?.name || ''
-        : '';
+      const targetVehicle = targetVehicleId
+        ? vehicles.find((v) => v.id === targetVehicleId)
+        : undefined;
+      // Das Ablageziel ist gesperrt, der Riegel bleibt trotzdem hier: Eine
+      // Zuordnung an einen Aufbau wäre fachlich falsch, egal woher sie kommt.
+      if (targetVehicleId && (!targetVehicle || !nimmtBesatzung(targetVehicle))) {
+        return;
+      }
 
-      assignVehicle(assignmentId, targetVehicleId, targetVehicleName);
+      assignVehicle(assignmentId, targetVehicleId, targetVehicle?.name || '');
     },
     [assignVehicle, vehicles],
   );
@@ -546,7 +564,7 @@ export default function CrewAssignmentBoard({
       <CrewRow
         key={a.id || a.recipientId}
         assignment={a}
-        vehicles={vehicles}
+        vehicles={crewVehicles}
         onFunktionChange={(funktion) =>
           handleFunktionChange(a.id || a.recipientId, funktion)
         }
@@ -651,7 +669,11 @@ export default function CrewAssignmentBoard({
               {vehicles.map((v) => {
                 const assigned = assignedToVehicle(v.id!);
                 return (
-                  <DroppableTableBody key={v.id} droppableId={v.id!}>
+                  <DroppableTableBody
+                    key={v.id}
+                    droppableId={v.id!}
+                    disabled={!nimmtBesatzung(v)}
+                  >
                     <TableRow>
                       <TableCell
                         colSpan={4}
@@ -666,6 +688,7 @@ export default function CrewAssignmentBoard({
                         >
                           <Typography variant="subtitle2">
                             {v.name} ({assigned.length})
+                            {!nimmtBesatzung(v) && ` — ${t('noCrewVehicle')}`}
                           </Typography>
                           {canWrite && v.id && (
                             <IconButton
@@ -697,7 +720,7 @@ export default function CrewAssignmentBoard({
               vehicleId={null}
               vehicleName={t('available')}
               assignments={unassigned}
-              vehicles={vehicles}
+              vehicles={crewVehicles}
               onFunktionChange={handleFunktionChange}
               onVehicleChange={handleVehicleChange}
               onRemove={removeAssignment}
@@ -709,7 +732,8 @@ export default function CrewAssignmentBoard({
                 vehicleId={v.id!}
                 vehicleName={v.name}
                 assignments={assignedToVehicle(v.id!)}
-                vehicles={vehicles}
+                vehicles={crewVehicles}
+                noCrew={!nimmtBesatzung(v)}
                 onFunktionChange={handleFunktionChange}
                 onVehicleChange={handleVehicleChange}
                 onRemove={removeAssignment}

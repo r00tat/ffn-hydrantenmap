@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { renderWithIntl as render } from '../../test-utils/intlRender';
 import { CrewAssignment, Fzg } from '../firebase/firestore';
@@ -445,6 +445,42 @@ describe('CrewAssignmentBoard', () => {
     expect(screen.getAllByText('Max Mustermann').length).toBeGreaterThanOrEqual(
       1,
     );
+  });
+
+  describe('Aufbauten und Anhänger', () => {
+    beforeEach(() => {
+      mockVehicles.push({
+        id: 'v3',
+        name: 'WLA Bergung',
+        type: 'vehicle',
+      } as Fzg);
+    });
+
+    afterEach(() => {
+      mockVehicles.pop();
+    });
+
+    it('nimmt am Aufbau keine Personen auf', () => {
+      render(<CrewAssignmentBoard />);
+      expect(screen.getByText('WLA Bergung')).toBeInTheDocument();
+      expect(screen.getByText('Keine Personenzuordnung')).toBeInTheDocument();
+    });
+
+    it('bietet den Aufbau in keinem Auswahlfeld an', async () => {
+      // Das Fahrzeug-Auswahlfeld steht in der Tabelle; auf dem Desktop tragen
+      // die Karten nur die Funktion.
+      mockUseMediaQuery.mockReturnValue(true);
+      render(<CrewAssignmentBoard />);
+      // Reihenfolge der Auswahlfelder: erst die Personensuche, dann je Zeile
+      // Funktion und Fahrzeug.
+      fireEvent.mouseDown(screen.getAllByRole('combobox')[2]);
+      expect(
+        await screen.findByRole('option', { name: 'TLFA 4000' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('option', { name: 'WLA Bergung' }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   describe('removing a vehicle', () => {

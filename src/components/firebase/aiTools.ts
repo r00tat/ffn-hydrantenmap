@@ -56,7 +56,18 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
       properties: {
         name: { type: SchemaType.STRING, description: 'Vehicle name (e.g., TLFA 4000)' },
         fw: { type: SchemaType.STRING, description: 'Fire department name' },
-        besatzung: { type: SchemaType.STRING, description: 'Crew count' },
+        besatzung: {
+          type: SchemaType.STRING,
+          description:
+            'Crew without the commander — the number behind the colon of the ' +
+            'Austrian notation "1:8", so "8"',
+        },
+        kategorie: {
+          type: SchemaType.STRING,
+          description:
+            'Kind of resource: fahrzeug, boot, anhaenger or aufbau. Derived ' +
+            'from the name when omitted',
+        },
         ats: { type: SchemaType.NUMBER, description: 'Number of breathing apparatus' },
         alarmierung: { type: SchemaType.STRING, description: 'Alert time' },
         eintreffen: { type: SchemaType.STRING, description: 'Arrival time' },

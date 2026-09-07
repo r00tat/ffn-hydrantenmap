@@ -13,6 +13,9 @@ import React from 'react';
 import { FirecallContext } from '../../hooks/useFirecall';
 import {
   countCrewByVehicle,
+  einsatzmittelKategorie,
+  einsatzmittelStaerke,
+  formatBesatzung,
   getEffectiveAts,
   getEffectiveBesatzung,
 } from '../../common/vehicle-utils';
@@ -51,10 +54,17 @@ export default function FahrzeugePrint() {
   );
 
   const totalCrew = vehicles
-    .map(
-      (v) =>
-        getEffectiveBesatzung(v.besatzung, crewCountMap.get(v.id || '') ?? 0) + 1
-    )
+    .map((v) => {
+      const kategorie = einsatzmittelKategorie(v);
+      return einsatzmittelStaerke(
+        getEffectiveBesatzung(
+          v.besatzung,
+          crewCountMap.get(v.id || '') ?? 0,
+          kategorie
+        ),
+        kategorie
+      );
+    })
     .reduce((p, c) => p + c, 0);
 
   return (
@@ -102,15 +112,17 @@ export default function FahrzeugePrint() {
                     <td>{fzg.name}</td>
                     <td>
                       {(() => {
+                        const kategorie = einsatzmittelKategorie(fzg);
                         const bes = getEffectiveBesatzung(
                           fzg.besatzung,
-                          crewCountMap.get(fzg.id || '') ?? 0
+                          crewCountMap.get(fzg.id || '') ?? 0,
+                          kategorie
                         );
                         const ats = getEffectiveAts(
                           fzg.ats,
                           atsCountMap.get(fzg.id || '') ?? 0
                         );
-                        return `1:${bes} (${ats})`;
+                        return `${formatBesatzung(bes, kategorie)} (${ats})`;
                       })()}
                     </td>
                     <td>{fzg.beschreibung}</td>

@@ -7,6 +7,9 @@ import {
 } from '../firebase/firestore';
 import {
   countCrewByVehicle,
+  einsatzmittelKategorie,
+  einsatzmittelStaerke,
+  EINSATZMITTEL_KATEGORIE_LABELS,
   getEffectiveAts,
   getEffectiveBesatzung,
 } from '../../common/vehicle-utils';
@@ -41,12 +44,16 @@ export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAs
     if (item.type === 'vehicle') {
       const v = item as Fzg;
       const crewCount = crewCountMap.get(v.id || '') ?? 0;
-      const besatzung = getEffectiveBesatzung(v.besatzung, crewCount);
+      // Ein Aufbau oder ein Anhänger fährt nicht selbst: Dort keine
+      // Führungskraft dazuzählen, sonst steht jeder Aufbau mit 1 in der
+      // Stärke und die Gesamtstärke ist zu hoch (#795).
+      const kategorie = einsatzmittelKategorie(v);
+      const besatzung = getEffectiveBesatzung(v.besatzung, crewCount, kategorie);
       rows.push({
         name: v.name,
         fw: v.fw,
-        typ: 'Fahrzeug',
-        mann: besatzung + 1,
+        typ: EINSATZMITTEL_KATEGORIE_LABELS[kategorie],
+        mann: einsatzmittelStaerke(besatzung, kategorie),
         ats: getEffectiveAts(v.ats, atsCountMap.get(v.id || '') ?? 0),
         alarmierung: v.alarmierung,
         eintreffen: v.eintreffen,
