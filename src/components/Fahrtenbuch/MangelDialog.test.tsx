@@ -36,6 +36,7 @@ import {
   MANGEL_MAX_IMAGE_BYTES,
   type Mangel,
 } from '../../common/mangel';
+import { flushEffects } from '../../test-utils/actHelpers';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import MangelDialog from './MangelDialog';
 
@@ -505,7 +506,7 @@ describe('MangelDialog — bearbeiten', () => {
     ]);
   });
 
-  it('zeigt den Verlauf mit Autor, Zeit und Statuswechsel', () => {
+  it('zeigt den Verlauf mit Autor, Zeit und Statuswechsel', async () => {
     renderWithIntl(
       <MangelDialog
         open
@@ -525,13 +526,14 @@ describe('MangelDialog — bearbeiten', () => {
         onClose={vi.fn()}
       />,
     );
+    await flushEffects();
 
     expect(screen.getByText(/Anna Muster/)).toBeInTheDocument();
     expect(screen.getByText('Werkstatttermin am 12.8.')).toBeInTheDocument();
     expect(screen.getByText('Status: In Arbeit')).toBeInTheDocument();
   });
 
-  it('meldet einen leeren Verlauf, statt nichts zu zeigen', () => {
+  it('meldet einen leeren Verlauf, statt nichts zu zeigen', async () => {
     renderWithIntl(
       <MangelDialog
         open
@@ -541,12 +543,13 @@ describe('MangelDialog — bearbeiten', () => {
         onClose={vi.fn()}
       />,
     );
+    await flushEffects();
     expect(
       screen.getByText('Noch keine Einträge im Verlauf.'),
     ).toBeInTheDocument();
   });
 
-  it('lässt das Fahrzeug beim Bearbeiten unverändert', () => {
+  it('lässt das Fahrzeug beim Bearbeiten unverändert', async () => {
     // Ein Mangel wandert nicht von einem Fahrzeug zum anderen — dafür gibt es
     // Löschen und neu melden.
     renderWithIntl(
@@ -558,6 +561,7 @@ describe('MangelDialog — bearbeiten', () => {
         onClose={vi.fn()}
       />,
     );
+    await flushEffects();
     expect(screen.queryByRole('combobox', { name: 'Fahrzeug' })).toBeNull();
     expect(screen.getByText('RLFA 2000')).toBeInTheDocument();
   });

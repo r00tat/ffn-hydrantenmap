@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../../test-utils/intlRender';
@@ -43,8 +43,15 @@ const fakeMap = {
   },
 };
 
+/**
+ * Die Handler laufen in `act`, weil sie im Layer `setState` auslösen: Ein
+ * Aufruf von Hand ist für React ein Update von außen, das es sonst als „not
+ * wrapped in act(...)" meldet und erst beim nächsten Rendern einspielt.
+ */
 const fire = (name: string, event: unknown) => {
-  for (const fn of handlers.get(name) ?? []) fn(event);
+  act(() => {
+    for (const fn of handlers.get(name) ?? []) fn(event);
+  });
 };
 
 vi.mock('react-leaflet', () => ({

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { renderHook } from '@testing-library/react';
+import { actAsync } from '../../test-utils/actHelpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../components/firebase/firebase', () => ({
@@ -85,7 +86,7 @@ describe('useSaveHistory', () => {
     // Ohne die Striche sichert der Snapshot eine leere Zeichnung.
     const { result } = renderHook(() => useSaveHistory());
 
-    await result.current.saveHistory('Test');
+    await actAsync(() => result.current.saveHistory('Test'));
 
     const stroke = writtenOperations().find(
       (op) => op.data.color === '#ff0000'
@@ -99,7 +100,7 @@ describe('useSaveHistory', () => {
   it('copies items and layers into the snapshot', async () => {
     const { result } = renderHook(() => useSaveHistory());
 
-    await result.current.saveHistory('Test');
+    await actAsync(() => result.current.saveHistory('Test'));
 
     const paths = writtenOperations().map((op) => op.ref.path);
     expect(paths).toContain('call/fc1/history/h1/item/draw1');
@@ -110,7 +111,7 @@ describe('useSaveHistory', () => {
   it('does not look for strokes on items that are not drawings', async () => {
     const { result } = renderHook(() => useSaveHistory());
 
-    await result.current.saveHistory('Test');
+    await actAsync(() => result.current.saveHistory('Test'));
 
     const strokeQueries = vi
       .mocked(getDocs)

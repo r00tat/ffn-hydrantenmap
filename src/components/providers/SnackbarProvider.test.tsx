@@ -138,8 +138,12 @@ describe('SnackbarProvider', () => {
 
     fireEvent.click(screen.getByText('show-sticky'));
     // Ein kurzes Warten und nicht `waitFor`: Geprüft wird eine Nicht-Änderung,
-    // und dafür gibt es keine Bedingung, auf die man warten könnte.
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // und dafür gibt es keine Bedingung, auf die man warten könnte. Das
+    // Warten steht in `act`, weil die Einblende-Transition des Snackbars in
+    // dieser Zeit noch `setState` aufruft.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
     expect(screen.getByText('Bleibt!')).toBeInTheDocument();
   });
 });

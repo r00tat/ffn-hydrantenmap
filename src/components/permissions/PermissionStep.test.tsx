@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../lib/permissions', () => ({
@@ -41,6 +41,9 @@ describe('PermissionStep', () => {
       />
     );
     fireEvent.click(screen.getByText('Erlauben'));
-    await vi.waitFor(() => expect(onResult).toHaveBeenCalledWith('granted'));
+    // `waitFor` der Testing Library statt `vi.waitFor`: nur jenes wartet
+    // innerhalb von `act` und spielt das `setState` ein, das aus dem
+    // aufgelösten `requestPermission` folgt.
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith('granted'));
   });
 });

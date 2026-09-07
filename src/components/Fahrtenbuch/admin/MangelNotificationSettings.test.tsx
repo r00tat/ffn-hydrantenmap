@@ -2,6 +2,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushEffects } from '../../../test-utils/actHelpers';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
 // `stammdatenActions` ist eine 'use server'/'server-only'-Datei und lässt sich
@@ -134,8 +135,12 @@ describe('MangelNotificationSettings', () => {
     ).toBeDisabled();
   });
 
-  it('sperrt das Speichern, solange geladen wird', () => {
+  it('sperrt das Speichern, solange geladen wird', async () => {
     renderWithIntl(<MangelNotificationSettings groupId="ffnd" />);
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    // Der Ladezustand ist hier der Prüfgegenstand, deshalb steht der Flush
+    // bewusst *nach* der Zusicherung: Er lässt das Laden nur noch auslaufen,
+    // damit das `setState` danach nicht außerhalb von `act` landet.
+    await flushEffects();
   });
 });

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import { actAsync } from '../test-utils/actHelpers';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/server', () => ({}));
@@ -90,7 +91,9 @@ describe('useAiAssistant loop exhaustion', () => {
     });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    const answer = await result.current.processText('wo ist der nächste hydrant');
+    const answer = await actAsync(() =>
+      result.current.processText('wo ist der nächste hydrant'),
+    );
 
     expect(answer.success).toBe(true);
     expect(answer.message).toContain('ÖH 12');
@@ -120,8 +123,8 @@ describe('useAiAssistant Gedächtnis', () => {
     const { geminiModel } = await import('../components/firebase/vertexai');
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processText('erster Befehl');
-    await result.current.processText('und jetzt noch einmal');
+    await actAsync(() => result.current.processText('erster Befehl'));
+    await actAsync(() => result.current.processText('und jetzt noch einmal'));
 
     const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
     // Erster Benutzerbeitrag, Antwort des Modells, neuer Benutzerbeitrag
@@ -138,18 +141,18 @@ describe('useAiAssistant Gedächtnis', () => {
     const nowSpy = vi.spyOn(Date, 'now');
 
     nowSpy.mockReturnValue(1_000_000);
-    await result.current.processText('erster Befehl');
+    await actAsync(() => result.current.processText('erster Befehl'));
 
     // Knapp innerhalb des Fensters: die Historie steht noch
     nowSpy.mockReturnValue(1_000_000 + MEMORY_TIMEOUT_MS - 1000);
-    await result.current.processText('kurz danach');
+    await actAsync(() => result.current.processText('kurz danach'));
     expect(
       JSON.stringify((geminiModel.generateContent as any).mock.calls[1][0].contents)
     ).toContain('erster Befehl');
 
     // Deutlich danach: die Historie ist weg
     nowSpy.mockReturnValue(1_000_000 + 5 * MEMORY_TIMEOUT_MS);
-    await result.current.processText('viel später');
+    await actAsync(() => result.current.processText('viel später'));
     const thirdRequest = (geminiModel.generateContent as any).mock.calls[2][0];
     expect(JSON.stringify(thirdRequest.contents)).not.toContain('erster Befehl');
 
@@ -177,11 +180,11 @@ describe('useAiAssistant Gedächtnis', () => {
     });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processText('erster Befehl');
+    await actAsync(() => result.current.processText('erster Befehl'));
 
     // Der Benutzer spricht zehn Sekunden nach der Antwort weiter
     nowSpy.mockReturnValue((Date.now() as number) + 10_000);
-    await result.current.processText('und weiter');
+    await actAsync(() => result.current.processText('und weiter'));
 
     const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
     expect(JSON.stringify(secondRequest.contents)).toContain('erster Befehl');
@@ -193,7 +196,7 @@ describe('useAiAssistant Gedächtnis', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processText('erster Befehl überhaupt');
+    await actAsync(() => result.current.processText('erster Befehl überhaupt'));
 
     expect(
       info.mock.calls.some((args) => String(args[0]).includes('Memory timeout'))
@@ -215,7 +218,7 @@ describe('useAiAssistant Denkaufwand', () => {
     });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processText('Fahrzeug eintragen');
+    await actAsync(() => result.current.processText('Fahrzeug eintragen'));
 
     const request = (geminiModel.generateContent as any).mock.calls[0][0];
     expect(request.generationConfig?.thinkingConfig?.thinkingLevel).toBe('LOW');
@@ -238,7 +241,7 @@ describe('useAiAssistant Sprachbefehl', () => {
     });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processAudio(AUDIO_BASE64);
+    await actAsync(() => result.current.processAudio(AUDIO_BASE64));
 
     expect((geminiModel.generateContent as any)).toHaveBeenCalledTimes(1);
     // contents wird im Verlauf der Schleife weitergeschrieben, der
@@ -273,7 +276,7 @@ describe('useAiAssistant Sprachbefehl', () => {
       });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processAudio(AUDIO_BASE64);
+    await actAsync(() => result.current.processAudio(AUDIO_BASE64));
 
     // Der zweite Aufruf trägt nur noch den Platzhalter — das Audio ein zweites
     // Mal hochzuladen kostete in der Messung zu #740 gut zwei Sekunden.
@@ -294,8 +297,8 @@ describe('useAiAssistant Sprachbefehl', () => {
     });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processAudio(AUDIO_BASE64);
-    await result.current.processText('und noch eine Frage');
+    await actAsync(() => result.current.processAudio(AUDIO_BASE64));
+    await actAsync(() => result.current.processText('und noch eine Frage'));
 
     const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
     expect(JSON.stringify(secondRequest.contents)).not.toContain(AUDIO_BASE64);
@@ -319,7 +322,7 @@ describe('useAiAssistant Kontextgröße', () => {
   it('schickt den Kartenkontext kompakt, ohne Einrückung', async () => {
     const { geminiModel } = await import('../components/firebase/vertexai');
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processText('Fahrzeug eintragen');
+    await actAsync(() => result.current.processText('Fahrzeug eintragen'));
 
     const parts = (geminiModel.generateContent as any).mock.calls[0][0].contents[0].parts;
     const contextPart = parts.at(-1).text as string;
@@ -330,8 +333,8 @@ describe('useAiAssistant Kontextgröße', () => {
   it('spiegelt den Kartenkontext nicht in die Historie', async () => {
     const { geminiModel } = await import('../components/firebase/vertexai');
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processText('erster Befehl');
-    await result.current.processText('zweiter Befehl');
+    await actAsync(() => result.current.processText('erster Befehl'));
+    await actAsync(() => result.current.processText('zweiter Befehl'));
 
     const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
     const kontextTeile = JSON.stringify(secondRequest.contents).split('mapCenter').length - 1;
@@ -348,7 +351,9 @@ describe('useAiAssistant kurze Aufnahme', () => {
 
     const { result } = renderHook(() => useAiAssistant([]));
     // Ein WebM-Kopf ohne Ton — Gemini antwortet darauf mit HTTP 400.
-    const answer = await result.current.processAudio('A'.repeat(600));
+    const answer = await actAsync(() =>
+      result.current.processAudio('A'.repeat(600)),
+    );
 
     expect((geminiModel.generateContent as any)).not.toHaveBeenCalled();
     expect(answer.success).toBe(false);

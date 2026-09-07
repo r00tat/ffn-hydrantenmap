@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 
@@ -79,9 +79,13 @@ describe('FirebaseUiLogin: gescheiterte Anmeldung', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
     const config = await renderLogin();
 
-    config.callbacks.signInFailure({
-      code: 'auth/credential-already-in-use',
-      message: 'Bereits vergeben',
+    // Der Callback kommt sonst von firebaseui, hier von Hand — er setzt im
+    // Login den Fehlerzustand und gehört deshalb in `act`.
+    act(() => {
+      config.callbacks.signInFailure({
+        code: 'auth/credential-already-in-use',
+        message: 'Bereits vergeben',
+      });
     });
 
     await waitFor(() => {
