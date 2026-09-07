@@ -56,7 +56,7 @@ geplant und appliziert werden.
 
 ### dev und prod im selben GCP-Projekt
 
-Heute liegen beide Environments im Projekt `ffn-utils`; unterschieden werden sie durch die
+Heute liegen beide Environments im selben GCP-Projekt; unterschieden werden sie durch die
 Firestore-Datenbank (`ffndev` vs. `(default)`), den Dienstnamen und ein paar Suffixe. Es gibt
 deshalb genau einen Projekt-Root, auf den beide Environments zeigen.
 

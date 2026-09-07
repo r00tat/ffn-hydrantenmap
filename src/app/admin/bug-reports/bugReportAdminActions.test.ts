@@ -31,7 +31,7 @@ vi.mock('../../../server/firebase/admin', () => ({
 }));
 
 vi.mock('../../../server/firebase/project', () => ({
-  getGcpProjectId: () => Promise.resolve('ffn-utils'),
+  getGcpProjectId: () => Promise.resolve('demo-project'),
 }));
 
 vi.mock('firebase-admin/firestore', () => ({

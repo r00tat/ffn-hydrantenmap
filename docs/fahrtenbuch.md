@@ -61,7 +61,7 @@ Infrastruktur im Terraform-Modul
 **pausiert**, damit nicht zwei Umgebungen dieselbe Verteilerliste bemailen.
 
 Job und Invoker-Service-Account legt terraform an; nach dem `apply` ist nur noch
-der Job in Prod zu entpausieren. Dev und Prod teilen das Projekt `ffn-utils`,
+der Job in Prod zu entpausieren. Dev und Prod teilen dasselbe GCP-Projekt,
 deshalb tragen die Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, Dev
 `"-dev"`) — ohne das legten beide Roots denselben Service Account und denselben
 Job an und der zweite `apply` scheiterte mit 409.
@@ -631,7 +631,7 @@ Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{nam
   — in `firebase.json` steht die Datei deshalb bewusst nicht. Die Regeln gelten für den
   Default-Bucket `<projekt>.appspot.com`, den es je Projekt einmal gibt; sie liegen deshalb
   im Projekt-Root und werden bei jedem Push auf main vor dem Deploy appliziert. **Dev und
-  prod teilen sich diesen Bucket** — beide Dienste tragen `ffn-utils.appspot.com` in ihrer
+  prod teilen sich diesen Bucket** — beide Dienste tragen `<projekt-id>.appspot.com` in ihrer
   Firebase-Konfiguration.
 - Die Liste zeigt nur die **Anzahl** der Bilder, der Dialog die Vorschaubilder: Jedes Bild
   braucht eine eigene Signatur, für eine ganze Tabelle wären das dutzende Aufrufe.

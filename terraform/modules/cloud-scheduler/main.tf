@@ -83,7 +83,7 @@ resource "google_cloud_scheduler_job" "fahrtenbuch_weekly_report" {
 # müsste ihn übergeben oder duplizieren.
 #
 # Sie liegt aber **nicht** in der Region des Dienstes: Hat ein Projekt eine
-# App-Engine-Anwendung, kennt Cloud Tasks nur deren Region — für ffn-utils
+# App-Engine-Anwendung, kennt Cloud Tasks nur deren Region — für dieses
 # europe-west1. `location = europe-west4` scheitert dort mit „Location
 # 'europe-west4' is not a valid location". Das schadet nichts, weil das Ziel
 # einer Aufgabe eine beliebige HTTPS-URL sein darf; einzig der Pfad in

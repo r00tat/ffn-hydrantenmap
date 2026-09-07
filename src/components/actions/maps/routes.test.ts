@@ -14,7 +14,7 @@ vi.mock('google-auth-library', () => ({
 }));
 
 vi.mock('../../../server/firebase/project', () => ({
-  getGcpProjectId: vi.fn().mockResolvedValue('ffn-utils'),
+  getGcpProjectId: vi.fn().mockResolvedValue('demo-project'),
 }));
 
 import {
@@ -62,7 +62,7 @@ describe('computeRouteDistanceMeters', () => {
     expect(url).toBe('https://routes.googleapis.com/directions/v2:computeRoutes');
     const headers = (init as RequestInit).headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer test-token');
-    expect(headers['X-Goog-User-Project']).toBe('ffn-utils');
+    expect(headers['X-Goog-User-Project']).toBe('demo-project');
     expect(headers['X-Goog-FieldMask']).toBe('routes.distanceMeters');
 
     const body = JSON.parse((init as RequestInit).body as string);

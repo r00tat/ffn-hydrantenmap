@@ -665,7 +665,7 @@ Was daran zu wissen ist:
 - **Nichts weiter als einen Tag im Voraus.** `abmarschZeit` kommt aus einem
   Formularfeld; ein vertipptes Datum ergäbe eine Aufgabe, die in Wochen anläuft.
 - **Die Queue liegt in `europe-west1`, der Dienst in `europe-west4`.** Nicht aus
-  Nachlässigkeit: Hat ein Projekt eine App-Engine-Anwendung — `ffn-utils` hat
+  Nachlässigkeit: Hat ein Projekt eine App-Engine-Anwendung — dieses hat
   eine in `europe-west1` —, kennt Cloud Tasks ausschließlich deren Region und
   lehnt jede andere mit „Location 'europe-west4' is not a valid location" ab.
   Das Ziel der Aufgabe ist eine HTTPS-URL und von der Region unabhängig; einzig

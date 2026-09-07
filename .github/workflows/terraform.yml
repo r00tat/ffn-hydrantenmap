@@ -43,7 +43,7 @@ env:
   TOFU_VERSION: 1.12.5
 
   # Zuordnung Environment -> Projekt-Root. Die Projekt-Basis gibt es einmal je
-  # GCP-Projekt, nicht je Environment; dev und prod teilen sich ffn-utils,
+  # GCP-Projekt, nicht je Environment; dev und prod teilen sich eines,
   # deshalb stehen links und rechts derzeit dieselben Pfade. Bekommt dev ein
   # eigenes Projekt, wird der rechte Zweig auf dessen Root umgestellt.
   BASE_ROOT: ${{ github.event.inputs.environment == 'prod' && 'terraform/projects/ffn-utils' || 'terraform/projects/ffn-utils' }}

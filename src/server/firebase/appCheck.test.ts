@@ -17,10 +17,10 @@ vi.mock('./admin', () => ({
 
 import { createAppCheckToken, resolveAppCheckAppId } from './appCheck';
 
-const WEB_APP_ID = '1:429163084278:web:e25aeca80df74c5f292fd7';
+const WEB_APP_ID = '1:123456789012:web:abcdef1234567890abcdef';
 const FIREBASE_CONFIG = JSON.stringify({
   apiKey: 'test-key',
-  projectId: 'ffn-utils',
+  projectId: 'demo-project',
   appId: WEB_APP_ID,
 });
 

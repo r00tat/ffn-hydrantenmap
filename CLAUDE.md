@@ -308,7 +308,7 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 
 In-App-Bug-Reports und Feature-Requests landen in der Firestore-Collection `bugReport`
 ([src/components/bugReport/](src/components/bugReport/)), verwaltet unter `/admin/bug-reports`.
-**Produktive Reports liegen in der Default-Datenbank `(default)` von `ffn-utils`**, nicht in
+**Produktive Reports liegen in der Default-Datenbank `(default)` des Prod-Projekts**, nicht in
 `ffndev`. Abfrage über den Firebase MCP, Bearbeitung, Verlauf und Screenshot-Aufnahme:
 [docs/bug-reports.md](docs/bug-reports.md).
 

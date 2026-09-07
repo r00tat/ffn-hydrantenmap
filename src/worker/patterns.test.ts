@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const APP_ORIGIN = 'https://einsatz.ffnd.at';
 
-const BUCKET = 'ffn-utils.appspot.com';
+const BUCKET = 'demo-project.appspot.com';
 const storageUrl = (path: string) =>
   `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(
     path,
