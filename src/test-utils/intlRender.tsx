@@ -33,10 +33,26 @@ export const testTheme = createTheme({
   },
 });
 
+/**
+ * Dieselbe Zeitzone, die `src/i18n/request.ts` der App gibt.
+ *
+ * Ohne sie fällt next-intl auf die Zeitzone der Umgebung zurück und meldet das
+ * je Formatierung als `IntlError: ENVIRONMENT_FALLBACK` — über die Suite rund
+ * 1150 Zeilen, die im CI-Log alles Übrige zudecken. Wichtiger als der Lärm ist
+ * die Bestimmtheit: Der CI-Runner läuft auf UTC, Entwicklermaschinen hier auf
+ * Europe/Vienna. Jede Zusicherung auf eine über next-intl formatierte Uhrzeit
+ * käme sonst je Maschine anders heraus — im Sommer zwei Stunden daneben.
+ */
+const TEST_TIME_ZONE = 'Europe/Vienna';
+
 export function IntlWrapper({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider theme={testTheme}>
-      <NextIntlClientProvider locale="de" messages={deMessages}>
+      <NextIntlClientProvider
+        locale="de"
+        messages={deMessages}
+        timeZone={TEST_TIME_ZONE}
+      >
         {children}
       </NextIntlClientProvider>
     </ThemeProvider>
