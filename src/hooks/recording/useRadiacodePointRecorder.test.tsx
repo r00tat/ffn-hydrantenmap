@@ -388,8 +388,14 @@ describe('useRadiacodePointRecorder', () => {
       creatorEmail: 'u@x',
       firestoreDb: '',
     });
-    await vi.waitFor(() => {
-      expect(onStart).toHaveBeenCalledTimes(1);
+    // `vi.waitFor` bleibt — `waitFor` der Testing Library pollt mit echten
+    // Timern und läuft unter den Fake-Timers dieser Datei in die
+    // Zeitüberschreitung. Das `act` darum fängt das `setState` ein, das der
+    // RadiacodeProvider nach dem aufgelösten `onStart` auslöst.
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(onStart).toHaveBeenCalledTimes(1);
+      });
     });
     expect(onStop).not.toHaveBeenCalled();
     rerender({
@@ -406,8 +412,10 @@ describe('useRadiacodePointRecorder', () => {
       creatorEmail: 'u@x',
       firestoreDb: '',
     });
-    await vi.waitFor(() => {
-      expect(onStop).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(onStop).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

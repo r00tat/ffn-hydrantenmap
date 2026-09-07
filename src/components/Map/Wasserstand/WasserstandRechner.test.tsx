@@ -5,6 +5,7 @@ import {
   WASSERSTAND_DEFAULTS,
   wasserstandSignature,
 } from '../../../common/terrain/wasserstand';
+import { flushEffects } from '../../../test-utils/actHelpers';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 import type { Wasserstand } from '../../firebase/firestore';
 import WasserstandRechner from './WasserstandRechner';
@@ -47,8 +48,9 @@ describe('WasserstandRechner', () => {
     expect(screen.getByRole('button', { name: /Berechnen/ })).toBeEnabled();
   });
 
-  it('nennt die Einheit am Umkreis und am Zuschlag', () => {
+  it('nennt die Einheit am Umkreis und am Zuschlag', async () => {
     renderWithIntl(<WasserstandRechner item={szenario()} />);
+    await flushEffects();
     const umkreis = screen.getByLabelText(
       'Umkreis der Berechnung in m'
     ) as HTMLInputElement;
@@ -58,24 +60,26 @@ describe('WasserstandRechner', () => {
     expect(screen.getAllByText('m').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('ohne Basishöhe wird nicht gerechnet', () => {
+  it('ohne Basishöhe wird nicht gerechnet', async () => {
     renderWithIntl(
       <WasserstandRechner item={szenario({ wasserBasisHoehe: undefined })} />
     );
+    await flushEffects();
     expect(screen.getByText(/keine Geländehöhe vor/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Berechnen/ })).toBeDisabled();
   });
 
-  it('bietet die Basishöhe neu zu bestimmen, wenn sie aus der Übersicht kommt', () => {
+  it('bietet die Basishöhe neu zu bestimmen, wenn sie aus der Übersicht kommt', async () => {
     renderWithIntl(
       <WasserstandRechner item={szenario({ wasserBasisStufe: 'overview' })} />
     );
+    await flushEffects();
     expect(
       screen.getByRole('button', { name: /Basishöhe neu bestimmen/ })
     ).toBeInTheDocument();
   });
 
-  it('weist ein veraltetes Ergebnis aus', () => {
+  it('weist ein veraltetes Ergebnis aus', async () => {
     renderWithIntl(
       <WasserstandRechner
         item={szenario({
@@ -87,11 +91,12 @@ describe('WasserstandRechner', () => {
         })}
       />
     );
+    await flushEffects();
     // Zweimal: als Warnung im Rechner und als Kurzhinweis in der Legende.
     expect(screen.getAllByText(/Ergebnis veraltet/).length).toBeGreaterThan(0);
   });
 
-  it('zeigt den Knopf zur Feinrechnung erst über der Schwelle', () => {
+  it('zeigt den Knopf zur Feinrechnung erst über der Schwelle', async () => {
     const grob = szenario({
       wasserBaender: '{"baender":[]}',
       wasserStufe: 'overview',
@@ -106,12 +111,13 @@ describe('WasserstandRechner', () => {
         }}
       />
     );
+    await flushEffects();
     expect(
       screen.getByRole('button', { name: /Fein rechnen/ })
     ).toBeInTheDocument();
   });
 
-  it('nennt Fläche, Tiefe und Rasterweite im Ergebnis', () => {
+  it('nennt Fläche, Tiefe und Rasterweite im Ergebnis', async () => {
     const fertig = szenario({
       wasserBaender: '{"baender":[]}',
       wasserStufe: 'detail',
@@ -128,6 +134,7 @@ describe('WasserstandRechner', () => {
         }}
       />
     );
+    await flushEffects();
     // Fläche steht in der Ergebniszeile **und** in der Legende.
     expect(screen.getAllByText(/25\.0 ha/).length).toBeGreaterThan(0);
     expect(screen.getByText(/1\.24 m/)).toBeInTheDocument();

@@ -49,17 +49,32 @@ function StackedHarness() {
   );
 }
 
+/**
+ * `closeTopmostModal` schließt das Overlay über dessen `onClose`, was im
+ * Harness ein `setState` auslöst. Der Aufruf gehört daher in `act`, sonst
+ * meldet React „not wrapped in act(...)" und das Overlay ist erst beim
+ * nächsten Rendern verschwunden. Der Rückgabewert wird durchgereicht, damit
+ * die Zusicherung eine Zeile bleibt.
+ */
+const closeInAct = () => {
+  let closed = false;
+  act(() => {
+    closed = closeTopmostModal();
+  });
+  return closed;
+};
+
 describe('closeTopmostModal', () => {
   it('reports nothing to close when no overlay is open', () => {
     render(<div>nur Seiteninhalt</div>);
-    expect(closeTopmostModal()).toBe(false);
+    expect(closeInAct()).toBe(false);
   });
 
   it('closes an open dialog', async () => {
     render(<DialogHarness />);
     expect(screen.getByText('Dialog-Inhalt')).toBeInTheDocument();
 
-    expect(closeTopmostModal()).toBe(true);
+    expect(closeInAct()).toBe(true);
 
     await waitFor(() =>
       expect(screen.queryByText('Dialog-Inhalt')).not.toBeInTheDocument(),
@@ -70,7 +85,7 @@ describe('closeTopmostModal', () => {
     render(<DrawerHarness />);
     expect(screen.getByText('Drawer-Inhalt')).toBeInTheDocument();
 
-    expect(closeTopmostModal()).toBe(true);
+    expect(closeInAct()).toBe(true);
 
     await waitFor(() =>
       expect(screen.queryByText('Drawer-Inhalt')).not.toBeInTheDocument(),
@@ -80,7 +95,7 @@ describe('closeTopmostModal', () => {
   it('closes only the topmost overlay when several are stacked', async () => {
     render(<StackedHarness />);
 
-    expect(closeTopmostModal()).toBe(true);
+    expect(closeInAct()).toBe(true);
 
     await waitFor(() =>
       expect(screen.queryByText('Dialog-Inhalt')).not.toBeInTheDocument(),
@@ -96,7 +111,7 @@ describe('closeTopmostModal', () => {
     // Der Dialog verweigert das Schließen bewusst (z.B. ungespeicherte
     // Eingaben). Trotzdem gilt der Druck als behandelt, sonst würde er
     // durchfallen und die App beenden.
-    expect(closeTopmostModal()).toBe(true);
+    expect(closeInAct()).toBe(true);
 
     await act(async () => {});
     expect(screen.getByText('Dialog-Inhalt')).toBeInTheDocument();
