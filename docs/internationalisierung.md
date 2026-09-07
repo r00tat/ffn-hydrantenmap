@@ -44,7 +44,7 @@ Statische Texte unter `/docs/<slug>` liegen in `content/docs/{de,en}/<slug>.md` 
 
 1. Beide Locale-Dateien gleichzeitig erweitern (Schlüssel in beiden, Wert übersetzt).
 2. Komponente auf `useTranslations`/`getTranslations` umstellen — keine hartkodierten deutschen Strings im JSX.
-3. Komponenten-Tests müssen mit `renderWithIntl` aus [src/test-utils/intlRender.tsx](../src/test-utils/intlRender.tsx) gerendert werden — das wrappt den Tree in einen `NextIntlClientProvider` mit der `messages/de.json` als Katalog.
+3. Komponenten-Tests müssen mit `renderWithIntl` aus [src/test-utils/intlRender.tsx](../src/test-utils/intlRender.tsx) gerendert werden — das wrappt den Tree in einen `NextIntlClientProvider` mit der `messages/de.json` als Katalog und mit `Europe/Vienna` als Zeitzone, derselben, die `src/i18n/request.ts` der App gibt. Die Zeitzone gehört dazu: ohne sie nimmt next-intl die der Umgebung, und da der CI-Runner auf UTC läuft, käme jede formatierte Uhrzeit dort anders heraus als lokal.
 
 Meldet `npm run typecheck` einen eben ergänzten Schlüssel als `not assignable to
 parameter of type NamespacedMessageKeys`, ist es der inkrementelle Cache von TS 7:
