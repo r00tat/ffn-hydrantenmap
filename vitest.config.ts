@@ -8,6 +8,24 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Worker_threads statt Kindprozesse: Die Threads teilen sich den Prozess
+    // und sparen dessen Aufbau je Testdatei. Sichtbar wird das am Overhead —
+    // `import` fällt von rund 39s auf 35s, `transform` von 7,3s auf 6,2s.
+    //
+    // Auf die Wanduhr der Suite schlägt das gemeinsam mit dem animationsfreien
+    // Test-Theme (src/test-utils/intlRender.tsx) mit rund 4% durch: 57,2s gegen
+    // 59,4s im Median aus je drei abwechselnd gefahrenen Läufen (volle Suite,
+    // vier Worker, mit Coverage). Wer die beiden Maßnahmen einzeln messen will,
+    // braucht eine unbelastete Maschine — ihre Anteile liegen unter dem
+    // Rauschen einer Entwicklermaschine.
+    //
+    // Möglich ist der Thread-Pool nur, weil keiner der Tests prozessweite
+    // Zustände braucht (`process.chdir`, native Addons); alle 478 Dateien
+    // laufen unverändert durch. Die Isolation je Testdatei bleibt bestehen:
+    // Ohne sie (`isolate: false`) lief die Suite gar nicht mehr durch — vier
+    // Worker drehten über elf Minuten bei 100% CPU, der Zustand leckt zwischen
+    // den Dateien.
+    pool: 'threads',
     // Über der Vorgabe von 5s. Die Dialog-Tests fahren mit `userEvent` ganze
     // MUI-Formulare durch und liegen unter Volllast schon ohne Coverage bei gut
     // 2s; die Instrumentierung von coverage-v8 legt rund 40% drauf und der
