@@ -1,5 +1,3 @@
-import type { AuthenticatorTransportFuture } from '@simplewebauthn/server';
-
 export const PASSKEY_COLLECTION_ID = 'passkey';
 
 export const MAX_PASSKEY_LABEL_LENGTH = 100;
@@ -16,7 +14,16 @@ export interface Passkey {
   /** COSE Public Key, base64url-kodiert. */
   publicKey: string;
   counter: number;
-  transports: AuthenticatorTransportFuture[];
+  /**
+   * Wie der Authenticator erreichbar ist (`internal`, `hybrid`, `usb`, …).
+   * Bewusst `string[]` und nicht die Union `AuthenticatorTransport` aus
+   * `@simplewebauthn/server`: Der Browser darf laut WebAuthn-Spec auch
+   * Transporte melden, die die Union noch nicht kennt (bis v13 hieß sie
+   * deshalb `AuthenticatorTransportFuture`). Die Werte werden nur
+   * gespeichert und unverändert an `excludeCredentials` bzw.
+   * `verifyAuthenticationResponse` zurückgegeben — beide nehmen `string[]`.
+   */
+  transports: string[];
   deviceType: 'singleDevice' | 'multiDevice';
   backedUp: boolean;
   /** Domain-Bindung, z.B. `einsatz.ffnd.at`. */
