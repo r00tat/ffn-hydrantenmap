@@ -20,6 +20,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/releases.md](docs/releases.md) | Ein Release erstellen |
 | [docs/service-worker-pwa.md](docs/service-worker-pwa.md) | Änderungen unter `src/worker/`, Push, Precaching |
 | [docs/auth-und-origins.md](docs/auth-und-origins.md) | Basis-URL, WebAuthn-Origins, Cron-Aufrufer |
+| [docs/api-keys.md](docs/api-keys.md) | API-Keys des Firebase-Projekts: warum der Browser-Key öffentlich ist und Referrer nicht schützen, die begründete Freigabeliste je Key, die drei Android-SHA-1 und ihre Verteilwege, App-Check-Erzwingung für Gemini unter `firebaseml` statt `firebasevertexai`, Debug-Token lokal, Drift-Prüfung |
 | [docs/berechtigungen.md](docs/berechtigungen.md) | Rollen: globaler Admin, Gruppen-Admin, Gerätemeister, Gruppenmitglied, Einsatz-Gast; wer was vergibt, warum kein Custom Claim, die Guards |
 | [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Screenshot-Aufnahme |
 | [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle (Rollen allgemein: docs/berechtigungen.md), Fahrzeugkategorie und Anzeigereihenfolge |
@@ -307,7 +308,7 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 
 In-App-Bug-Reports und Feature-Requests landen in der Firestore-Collection `bugReport`
 ([src/components/bugReport/](src/components/bugReport/)), verwaltet unter `/admin/bug-reports`.
-**Produktive Reports liegen in der Default-Datenbank `(default)` von `ffn-utils`**, nicht in
+**Produktive Reports liegen in der Default-Datenbank `(default)` des Prod-Projekts**, nicht in
 `ffndev`. Abfrage über den Firebase MCP, Bearbeitung, Verlauf und Screenshot-Aufnahme:
 [docs/bug-reports.md](docs/bug-reports.md).
 

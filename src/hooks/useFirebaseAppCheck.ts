@@ -12,12 +12,24 @@ declare global {
 }
 
 /**
+ * Whether App Check was already set up for `firebaseApp`.
+ *
+ * React invokes effects twice in StrictMode and again on every fast refresh,
+ * and `initializeAppCheck` rejects a second call for the same app. Module
+ * scope is the right lifetime for this: it matches the Firebase app instance,
+ * which is also created once per module graph.
+ */
+let appCheckInitialized = false;
+
+/**
  * Initialize Firebase App Check.
  *
- * App Check is required for Firebase AI Logic (Gemini via `firebase/ai`) —
- * Firebase enforces it for all AI Logic requests from 2026-11-02 on, and
- * enforcement cannot be turned off for AI Logic. Requests without a valid
- * App Check token are rejected.
+ * App Check is what stands between the public browser API key and the billable
+ * Gemini calls of Firebase AI Logic (`firebase/ai`). The key itself is shipped
+ * in the JS bundle and its HTTP-referrer restriction is trivially spoofed, so
+ * enforcement on `firebasevertexai.googleapis.com` is the only real gate — see
+ * docs/api-keys.md. Firebase additionally enforces App Check for all AI Logic
+ * requests from 2026-11-02 on, with no opt-out.
  *
  * Production uses the reCAPTCHA Enterprise provider with the site key from
  * `NEXT_PUBLIC_RECAPTCHA_KEY`. That site key is only allowed for the deployed
@@ -37,6 +49,10 @@ declare global {
  */
 export default function useFirebaseAppCheck() {
   useEffect(() => {
+    if (appCheckInitialized) {
+      return;
+    }
+
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_KEY;
     const debugToken = process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN;
 
@@ -53,10 +69,20 @@ export default function useFirebaseAppCheck() {
       );
     }
 
-    const appCheck = initializeAppCheck(firebaseApp, {
-      provider: new ReCaptchaEnterpriseProvider(siteKey || ''),
-      isTokenAutoRefreshEnabled: true, // Set to true to allow auto-refresh.
-    });
-    console.info('app check initialized.', appCheck);
+    // Failures are contained on purpose. `AppProviders` wraps every page, so an
+    // exception escaping here would blank the screen during an operation. What
+    // breaks instead is narrow and visible: Gemini calls get rejected once
+    // enforcement is on, while Firestore rules and the server-side auth guards
+    // keep gating everything else.
+    try {
+      initializeAppCheck(firebaseApp, {
+        provider: new ReCaptchaEnterpriseProvider(siteKey || ''),
+        isTokenAutoRefreshEnabled: true,
+      });
+      appCheckInitialized = true;
+      console.info('app check initialized.');
+    } catch (err) {
+      console.warn('app check initialization failed', err);
+    }
   }, []);
 }

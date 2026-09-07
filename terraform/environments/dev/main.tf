@@ -174,7 +174,7 @@ module "cloud_scheduler" {
   tasks_region                 = var.tasks_region
   caller_service_account_email = "${var.run_sa}@${var.project}.iam.gserviceaccount.com"
 
-  # Dev und Prod teilen das Projekt ffn-utils. Ohne eigenes Suffix legten beide
+  # Dev und Prod teilen dasselbe Projekt. Ohne eigenes Suffix legten beide
   # Roots denselben Service Account und denselben Job an, und der zweite apply
   # scheiterte mit 409. Muss zu den Suffixen in `local.cron_invoker_emails`
   # passen, sonst steht dieser Invoker nicht auf der Allowlist — der

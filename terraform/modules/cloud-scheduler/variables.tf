@@ -13,7 +13,7 @@ variable "service_name" {
   type        = string
 }
 
-# Dev und Prod laufen im selben GCP-Projekt (ffn-utils). Service-Account-Namen
+# Dev und Prod laufen im selben GCP-Projekt. Service-Account-Namen
 # sind projektweit eindeutig, Scheduler-Job-Namen je Projekt und Region — ohne
 # Unterscheidung legen beide Roots dieselben Ressourcen an und der zweite `apply`
 # scheitert mit 409.
@@ -79,7 +79,7 @@ variable "ueberwachung_paused" {
 }
 
 # Cloud Tasks hängt in einem Projekt mit App-Engine-Anwendung an deren Region:
-# ffn-utils hat eine in europe-west1, der Dienst läuft in europe-west4, und ein
+# Das Projekt hat eine in europe-west1, der Dienst läuft in europe-west4, und ein
 # `location = europe-west4` scheitert deshalb mit „Location 'europe-west4' is
 # not a valid location". Die Region der Queue ist frei wählbar gegenüber dem
 # Ziel des Aufrufs — Cloud Tasks ruft eine beliebige HTTPS-URL auf.

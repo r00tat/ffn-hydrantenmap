@@ -129,7 +129,7 @@ Set up the Chrome Extension project structure with Vite, CRXJS, and all configur
     "128": "icons/icon128.png"
   },
   "oauth2": {
-    "client_id": "429163084278-q0ft241066jqadh3tv9cv0djcs1e7534.apps.googleusercontent.com",
+    "client_id": "<projektnummer>-<client>.apps.googleusercontent.com",
     "scopes": [
       "openid",
       "email",
@@ -287,11 +287,11 @@ The Firebase config for the extension. Hardcoded since Chrome Extensions can't u
 ```typescript
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyD1VlCe-OzX8Yt44AK7as0PU-71G9hFkN4',
-  authDomain: 'ffn-utils.firebaseapp.com',
-  projectId: 'ffn-utils',
-  storageBucket: 'ffn-utils.appspot.com',
-  messagingSenderId: '429163084278',
-  appId: '1:429163084278:web:...',  // fill from .env.local
+  authDomain: '<projekt-id>.firebaseapp.com',
+  projectId: '<projekt-id>',
+  storageBucket: '<projekt-id>.appspot.com',
+  messagingSenderId: '<projektnummer>',
+  appId: '1:<projektnummer>:web:...',  // fill from .env.local
   measurementId: 'G-0JVBEYMY02',
 };
 
@@ -547,7 +547,7 @@ export default function App() {
 
 For `chrome.identity.getAuthToken` to work:
 1. Go to Google Cloud Console → APIs & Services → Credentials
-2. The OAuth 2.0 client `429163084278-...` must have the extension's origin added
+2. The OAuth 2.0 client `<projektnummer>-...` must have the extension's origin added
 3. Alternatively, create a new Chrome App OAuth client for the extension's ID
 
 This is a manual step — document it in the README.

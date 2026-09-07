@@ -25,7 +25,7 @@ A responsive web application to replace the existing spreadsheet for calculating
 | Email | SendGrid |
 | Hosting | Cloud Run (container) |
 | Infrastructure | Terraform |
-| GCP Project | `ffn-utils` (existing) |
+| GCP Project | das bestehende Projekt |
 
 ## Data Model
 
@@ -406,7 +406,7 @@ service cloud.firestore {
 
 ## Initial Setup Tasks
 
-1. Create Firebase app in `ffn-utils` project
+1. Create Firebase app in the existing GCP project
 2. Enable Authentication with Google provider
 3. Configure authorized domain restriction
 4. Run Terraform to create infrastructure

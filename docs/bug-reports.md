@@ -8,7 +8,7 @@ In-App-Bug-Reports und Feature-Requests werden über den Bug-Report-Dialog
 `context` mit `url`/`buildId`/`database`/`platform`/`firecallId`, `logs`, `screenshots`).
 
 **Wichtig:** Produktive Bug-Reports liegen in der **Default-Datenbank `(default)`** des
-Projekts `ffn-utils` — NICHT in `ffndev`. Das Feld `context.database` zeigt, aus welcher
+Prod-Projekts — NICHT in `ffndev`. Das Feld `context.database` zeigt, aus welcher
 Umgebung der Report stammt (`""` = prod, `ffndev` = dev).
 
 **Reports abrufen (Firebase MCP, neueste zuerst):**

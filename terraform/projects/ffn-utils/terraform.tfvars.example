@@ -4,5 +4,5 @@
 # Service-Account-IDs und der State-Bucket haben Vorgabewerte in variables.tf.
 # In der Pipeline kommen sie als TF_VAR_project und TF_VAR_github_org herein,
 # eine terraform.tfvars gibt es dort nicht.
-project    = "ffn-utils"
+project    = "<projekt-id>"
 github_org = "r00tat"

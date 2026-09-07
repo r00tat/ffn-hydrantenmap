@@ -8,8 +8,8 @@ afterEach(() => {
 describe('parseFirebaseConfig', () => {
   it('returns the parsed configuration', () => {
     expect(
-      parseFirebaseConfig('{"apiKey":"abc","projectId":"ffn-utils"}'),
-    ).toEqual({ apiKey: 'abc', projectId: 'ffn-utils' });
+      parseFirebaseConfig('{"apiKey":"abc","projectId":"demo-project"}'),
+    ).toEqual({ apiKey: 'abc', projectId: 'demo-project' });
   });
 
   it.each([
@@ -22,7 +22,7 @@ describe('parseFirebaseConfig', () => {
   });
 
   it('returns undefined for a configuration without an apiKey', () => {
-    expect(parseFirebaseConfig('{"projectId":"ffn-utils"}')).toBeUndefined();
+    expect(parseFirebaseConfig('{"projectId":"demo-project"}')).toBeUndefined();
   });
 
   it('returns undefined instead of throwing on invalid JSON', () => {

@@ -277,7 +277,7 @@ Der Upload braucht zwei Umgebungsvariablen. Das Skript ist einfaches Node und li
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS=config/service_account.json
-export GOOGLE_CLOUD_PROJECT=ffn-utils
+export GOOGLE_CLOUD_PROJECT=<projekt-id>
 
 npm run terrainImport -- --cache .terrain-cache --level overview
 npm run terrainImport -- --cache .terrain-cache --level detail
