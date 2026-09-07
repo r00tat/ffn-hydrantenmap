@@ -2,16 +2,26 @@ name: "Cloud Run"
 
 # Vier Wege hier hinein, und nur drei davon rollen aus:
 #
-#   Push auf main      -> Build, Projekt-Basis, Apply auf dev
-#   Release-Tag v*     -> Build, Projekt-Basis, Apply auf prod
+#   Push auf main      -> Lint, Tests, Build, Projekt-Basis, Apply auf dev
+#   Release-Tag v*     -> dasselbe, Apply auf prod
 #   Run workflow       -> dasselbe für den gewählten Branch; auf einem Branch
 #                         geht es nach dev, auf einem Tag nach prod. Das ist
 #                         der Weg, einen Feature-Branch auf dev auszuprobieren.
-#   Pull Request       -> nur Build, Lint und Tests. Kein Apply (ungeprüfter
+#   Pull Request       -> nur Lint, Tests und Build. Kein Apply (ungeprüfter
 #                         Terraform-Code aus einem PR-Branch gegen die geteilte
 #                         Dev-Umgebung) und deshalb auch KEIN Push in die
 #                         Registry: ein Image, das nie eine Revision wird,
 #                         gehört dort nicht hin.
+#
+# Lint, Tests und Image-Build sind drei eigene Jobs und laufen gleichzeitig.
+# Vorher hingen sie in einem Job hintereinander: Der Image-Build begann erst
+# nach knapp sechs Minuten Lint und Tests, obwohl er von beiden nichts braucht.
+# Die Wanduhr des Laufs ist damit das Maximum der drei statt ihrer Summe. Was
+# die Jobs zusätzlich kosten, sind ihre Fixkosten — Checkout, Node, `npm ci`,
+# je etwa 35 s.
+#
+# Dass ein Deploy Lint und Tests weiterhin abwartet, hängt jetzt an `needs` im
+# deploy-Job (siehe dort) und nicht mehr daran, dass alles in einem Job liegt.
 on:
   push:
     branches:
@@ -45,6 +55,80 @@ env:
   BASE_ROOT: ${{ github.ref_type == 'tag' && 'terraform/projects/ffn-utils' || 'terraform/projects/ffn-utils' }}
 
 jobs:
+  lint:
+    name: "Lint"
+    # Wie beim Build: Ein Rollback prüft keinen Code, er zeigt auf eine
+    # Revision, die es schon gibt.
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.serving_revision == '' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: cloud-run-lint-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+  test:
+    name: "Tests"
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.serving_revision == '' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: cloud-run-test-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # Ohne `.env.local`: Die Suite stubbt die `NEXT_PUBLIC_*`-Werte, wo sie
+      # sie braucht (`vi.stubEnv`), und liest sonst keine. Das Schreiben der
+      # Datei gehört damit allein zum Image-Build.
+      - name: Run tests
+        run: npm run test:coverage
+
+      # Nur die beiden JSON-Dateien: den HTML-Report und lcov.info braucht der
+      # Auswertungs-Job nicht, und ein Artifact über das ganze coverage/ wäre
+      # ein Vielfaches an Upload.
+      - name: Coverage-Report sichern
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-report
+          path: |
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          retention-days: 7
+
   build:
     name: "Build"
     # Ein Rollback baut nichts: Es zeigt auf eine Revision, die es schon gibt.
@@ -167,33 +251,10 @@ jobs:
           NEXTAUTH_URL_INTERNAL=http://localhost:8080
           EOF
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Run tests
-        run: npm run test:coverage
-
-      # Nur die beiden JSON-Dateien: den HTML-Report und lcov.info braucht der
-      # Auswertungs-Job nicht, und ein Artifact über das ganze coverage/ wäre
-      # ein Vielfaches an Upload.
-      - name: Coverage-Report sichern
-        uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
-        with:
-          name: coverage-report
-          path: |
-            coverage/coverage-summary.json
-            coverage/coverage-final.json
-          retention-days: 7
+      # Hier fehlen Node und `npm ci` mit Absicht: Die Abhängigkeiten
+      # installiert der Docker-Build selbst, und das einzige Skript in diesem
+      # Job (`scripts/cloud-run-tfvars.sh` im Setup-env-Step) ist Bash. Nötig
+      # waren sie nur für Lint und Tests, und die haben jetzt eigene Jobs.
 
       - name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@v3"
@@ -208,7 +269,7 @@ jobs:
 
       - name: Configure Docker for Artifact Registry
         if: ${{ env.workload_identity_provider != '' }}
-        run: gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker "${RUN_REGION}-docker.pkg.dev" --quiet
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -266,26 +327,18 @@ jobs:
           fi
           echo "IMAGE_REF=${IMAGE}@${DIGEST}" | tee -a "$GITHUB_OUTPUT"
 
-  # Die Projekt-Basis läuft vor jedem Environment-Apply, nicht als Handgriff bei
-  # Gelegenheit. Sie enthält, was ein Environment-Apply bereits vorfinden muss —
-  # Rechte des Pipeline-SA, aktivierte APIs, Secret-Hüllen. Solange sie am
-  # prod-Root hing, wurde eine neue Rolle erst beim nächsten Release wirksam und
-  # dev scheiterte bis dahin mit 403.
-  #
-  # Ohne `needs`, damit sie parallel zum Build läuft: Sie hängt vom Image nicht
-  # ab, und der Deploy wartet ohnehin auf beide.
   # Die Auswertung ist bewusst ein eigener Job: Sie braucht Schreibrechte auf
-  # Repository und Pull Request, und die will der Build-Job nicht haben — der
-  # baut Images und redet mit Google Cloud. Rechte gelten je Job, deshalb bleibt
-  # der Build bei contents: read.
+  # Repository und Pull Request, und die will der Test-Job nicht haben — der
+  # führt fremden Code aus. Rechte gelten je Job, deshalb bleibt der Test-Job
+  # bei contents: read.
   coverage:
     name: "Coverage"
-    needs: build
-    # Auch wenn der Build rot ist: Genau dann sind die Zahlen interessant, und
+    needs: test
+    # Auch wenn die Tests rot sind: Genau dann sind die Zahlen interessant, und
     # `reportOnFailure` in vitest.config.ts sorgt dafür, dass es sie gibt. Fehlt
     # das Artifact — der Lauf ist vor den Tests gescheitert —, überspringen die
     # folgenden Steps sich selbst, statt den Job ein zweites Mal rot zu färben.
-    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    if: ${{ !cancelled() && needs.test.result != 'skipped' }}
     runs-on: ubuntu-latest
     permissions:
       # Für den Badge-Push auf den Branch `badges` (nur auf main).
@@ -344,11 +397,19 @@ jobs:
       - name: Badge veröffentlichen
         # Nur von einem grünen main-Lauf: ein Badge, das die Abdeckung eines
         # gescheiterten Laufs zeigt, wäre schlechter als keines.
-        if: ${{ hashFiles('coverage/coverage-summary.json') != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success' }}
+        if: ${{ hashFiles('coverage/coverage-summary.json') != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/publish-coverage-badge.sh
 
+  # Die Projekt-Basis läuft vor jedem Environment-Apply, nicht als Handgriff bei
+  # Gelegenheit. Sie enthält, was ein Environment-Apply bereits vorfinden muss —
+  # Rechte des Pipeline-SA, aktivierte APIs, Secret-Hüllen. Solange sie am
+  # prod-Root hing, wurde eine neue Rolle erst beim nächsten Release wirksam und
+  # dev scheiterte bis dahin mit 403.
+  #
+  # Ohne `needs`, damit sie parallel zu Lint, Tests und Build läuft: Sie hängt
+  # vom Image nicht ab, und der Deploy wartet ohnehin auf alle.
   base:
     name: "Projekt-Basis"
     if: ${{ github.event_name != 'pull_request' }}
@@ -399,20 +460,28 @@ jobs:
 
   deploy:
     name: "Deploy ${{ github.ref_type == 'tag' && 'prod' || 'dev' }}"
-    needs: [build, base]
+    # `lint` und `test` stehen hier, weil sie eigene Jobs sind: Solange sie im
+    # Build-Job lagen, konnte ohne grüne Tests gar kein Image entstehen. Ohne
+    # diese beiden `needs` würde ein Push auf main auch mit roten Tests
+    # ausrollen.
+    needs: [lint, test, build, base]
     # Kein Deploy aus einem Pull Request. Der Deploy ist jetzt ein `tofu apply`,
     # und ein apply mit ungeprüftem Terraform-Code aus einem PR-Branch gegen die
     # gemeinsame Dev-Umgebung wäre nicht zu verantworten. Einen Branch auf dev
     # ausprobieren geht über workflow_dispatch auf diesem Branch.
     #
-    # `always()`, weil der Build beim Rollback übersprungen wird — die Zeilen
-    # darunter schließen aus, dass ein gescheiterter Build trotzdem deployt.
-    # Die Projekt-Basis muss dagegen gelaufen sein: Ohne sie fehlen dem
+    # `always()`, weil Lint, Tests und Build beim Rollback übersprungen werden —
+    # die Zeilen darunter schließen aus, dass ein gescheiterter Lauf trotzdem
+    # deployt. Die Projekt-Basis muss dagegen gelaufen sein: Ohne sie fehlen dem
     # Environment-Apply womöglich Rechte oder Secret-Hüllen.
     if: >-
       always() &&
       github.event_name != 'pull_request' &&
       needs.base.result == 'success' &&
+      needs.lint.result != 'failure' &&
+      needs.lint.result != 'cancelled' &&
+      needs.test.result != 'failure' &&
+      needs.test.result != 'cancelled' &&
       needs.build.result != 'failure' &&
       needs.build.result != 'cancelled' &&
       (needs.build.result == 'skipped' || needs.build.outputs.pushed == 'true')
