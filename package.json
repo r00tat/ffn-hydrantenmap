@@ -66,7 +66,7 @@
     "@react-pdf/renderer": "^4.6.1",
     "@serwist/turbopack": "^9.5.12",
     "@simplewebauthn/browser": "^13.3.0",
-    "@simplewebauthn/server": "^13.3.2",
+    "@simplewebauthn/server": "^14.0.0",
     "@turf/bbox-polygon": "^7.4.0",
     "@turf/boolean-within": "^7.4.0",
     "@turf/center": "^7.4.0",
