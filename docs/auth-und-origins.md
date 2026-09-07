@@ -56,7 +56,7 @@ offener Endpoint, der Mails an gepflegte Verteilerlisten verschickt, wäre ein
 Mail-Relay. In Cloud Run setzt terraform den Wert als Env-Var des Dienstes
 (`local.cron_invoker_emails` im jeweiligen Root), abgeleitet aus dem Projekt
 und den Namen der Invoker-Service-Accounts. Die Liste enthält die Invoker
-**beider** Umgebungen, weil Dev und Prod das Projekt `ffn-utils` teilen; deren
+**beider** Umgebungen, weil Dev und Prod dasselbe GCP-Projekt teilen; deren
 Namen unterscheidet `name_suffix` des Moduls `cloud-scheduler`. Ein
 `check`-Block im Root prüft, dass der tatsächliche Invoker auf der Liste steht.
 
@@ -67,7 +67,7 @@ braucht es IAM-Rechte auf den Service Account.
 ## Der Firebase-Auth-Handler unter der eigenen Domain
 
 `authDomain` zeigt in der Firebase-Konfiguration auf
-`ffn-utils.firebaseapp.com`. Damit läuft jeder Google-Login über eine **fremde
+`<projekt-id>.firebaseapp.com`. Damit läuft jeder Google-Login über eine **fremde
 Origin**, und daran scheitert er in WebKit-Browsern:
 
 - `signInWithPopup` gibt sein Ergebnis per `postMessage` an `window.opener`
@@ -173,13 +173,13 @@ E-Mail-Link ist für solche Konten also kein Ausweichweg.
 Redirect-URI eingetragen sein** — `https://<origin>/__/auth/handler`. Fehlt
 sie, antwortet Google mit `redirect_uri_mismatch`, und zwar erst mitten im
 Login. Betroffen ist der Client „Web client (auto created by Google Service)"
-im Projekt `ffn-utils`; einzutragen sind
+im GCP-Projekt; einzutragen sind
 
 - `https://einsatz.ffnd.at/__/auth/handler`,
 - `https://einsatz-dev.ffnd.at/__/auth/handler`,
 - `http://localhost:3000/__/auth/handler` für die lokale Entwicklung.
 
-Der bestehende Eintrag `https://ffn-utils.firebaseapp.com/__/auth/handler`
+Der bestehende Eintrag `https://<projekt-id>.firebaseapp.com/__/auth/handler`
 bleibt stehen — ohne ihn bricht der Login für alle, die den Schalter nicht
 gesetzt haben. Ein zusätzlicher Eintrag ändert für den alten Weg nichts, das
 Eintragen ist also gefahrlos und muss **vor** dem ersten Test passieren.

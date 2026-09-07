@@ -162,8 +162,8 @@ Erforderliche Umgebungsvariablen (in `.env.local`):
 
 ```bash
 IMAGE_TAG=$(date +%Y%m%d-%H%M%S)
-gcloud builds submit . -t eu.gcr.io/ffn-utils/hydrantenmap:$IMAGE_TAG
-gcloud run deploy hydrantenmap --allow-unauthenticated --image eu.gcr.io/ffn-utils/hydrantenmap:$IMAGE_TAG --max-instances=2 --region europe-west4
+gcloud builds submit . -t eu.gcr.io/$PROJECT/hydrantenmap:$IMAGE_TAG
+gcloud run deploy hydrantenmap --allow-unauthenticated --image eu.gcr.io/$PROJECT/hydrantenmap:$IMAGE_TAG --max-instances=2 --region europe-west4
 ```
 
 Für Dateianhänge auf Firebase Storage muss der Standard-Bucket konfiguriert und die [CORS Policy](https://firebase.google.com/docs/storage/web/download-files?hl=en#download_data_directly_from_the_sdk) gesetzt werden:

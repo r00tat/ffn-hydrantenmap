@@ -42,7 +42,7 @@ function trupp(over: Partial<AtemschutzTrupp> = {}): AtemschutzTrupp {
   };
 }
 
-const QUEUE = 'projects/ffn-utils/locations/europe-west1/queues/asue-dev';
+const QUEUE = 'projects/demo-project/locations/europe-west1/queues/asue-dev';
 
 describe('ueberwachungTaskId', () => {
   it('bildet den Namen aus Trupp, Warnung und Terminminute', () => {
@@ -69,7 +69,7 @@ describe('ueberwachungTaskId', () => {
 describe('planeUeberwachungTask', () => {
   beforeEach(() => {
     process.env.ATEMSCHUTZ_TASKS_QUEUE = QUEUE;
-    process.env.ATEMSCHUTZ_TASKS_INVOKER = 'invoker@ffn-utils.iam.gserviceaccount.com';
+    process.env.ATEMSCHUTZ_TASKS_INVOKER = 'invoker@demo-project.iam.gserviceaccount.com';
     getAccessToken.mockResolvedValue('test-token');
     vi.stubGlobal('fetch', vi.fn());
   });
@@ -105,7 +105,7 @@ describe('planeUeberwachungTask', () => {
     // OIDC und nicht ein geteiltes Geheimnis: `cronRequired` prüft Token und
     // Audience.
     expect(body.task.httpRequest.oidcToken).toEqual({
-      serviceAccountEmail: 'invoker@ffn-utils.iam.gserviceaccount.com',
+      serviceAccountEmail: 'invoker@demo-project.iam.gserviceaccount.com',
       audience: 'https://einsatz-dev.ffnd.at',
     });
     expect(

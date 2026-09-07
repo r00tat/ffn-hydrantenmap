@@ -4,7 +4,10 @@ import { renderHook } from '@testing-library/react';
 
 const initializeAppCheckMock = vi.hoisted(() => vi.fn());
 const reCaptchaEnterpriseProviderMock = vi.hoisted(() =>
-  vi.fn(function ReCaptchaEnterpriseProvider(this: { siteKey: string }, siteKey: string) {
+  vi.fn(function ReCaptchaEnterpriseProvider(
+    this: { siteKey: string },
+    siteKey: string
+  ) {
     this.siteKey = siteKey;
   })
 );
@@ -18,8 +21,6 @@ vi.mock('../components/firebase/firebase', () => ({
   firebaseApp: { name: 'test-app' },
 }));
 
-import useFirebaseAppCheck from './useFirebaseAppCheck';
-
 /**
  * The debug flag has to be set on `window` *before* `initializeAppCheck` runs,
  * otherwise the SDK already decided to talk to reCAPTCHA. The mock records the
@@ -27,8 +28,15 @@ import useFirebaseAppCheck from './useFirebaseAppCheck';
  */
 let debugTokenAtInit: boolean | string | undefined;
 
+/**
+ * The hook remembers across re-mounts that it already initialized App Check,
+ * so every test needs a fresh copy of the module — hence the dynamic import
+ * after `vi.resetModules()` instead of a static one at the top of the file.
+ */
+let useFirebaseAppCheck: () => void;
+
 describe('useFirebaseAppCheck', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     initializeAppCheckMock.mockReset();
     initializeAppCheckMock.mockImplementation(() => {
       debugTokenAtInit = window.FIREBASE_APPCHECK_DEBUG_TOKEN;
@@ -39,10 +47,14 @@ describe('useFirebaseAppCheck', () => {
     delete window.FIREBASE_APPCHECK_DEBUG_TOKEN;
     vi.stubEnv('NEXT_PUBLIC_RECAPTCHA_KEY', '');
     vi.stubEnv('NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN', '');
+
+    vi.resetModules();
+    useFirebaseAppCheck = (await import('./useFirebaseAppCheck')).default;
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('does not initialize App Check without a reCAPTCHA site key', () => {
@@ -56,7 +68,9 @@ describe('useFirebaseAppCheck', () => {
 
     renderHook(() => useFirebaseAppCheck());
 
-    expect(reCaptchaEnterpriseProviderMock).toHaveBeenCalledWith('site-key-123');
+    expect(reCaptchaEnterpriseProviderMock).toHaveBeenCalledWith(
+      'site-key-123'
+    );
     expect(initializeAppCheckMock).toHaveBeenCalledTimes(1);
     expect(initializeAppCheckMock.mock.calls[0][1]).toMatchObject({
       isTokenAutoRefreshEnabled: true,
@@ -101,5 +115,35 @@ describe('useFirebaseAppCheck', () => {
     expect(debugTokenAtInit).toBe(true);
     expect(initializeAppCheckMock).toHaveBeenCalledTimes(1);
     expect(reCaptchaEnterpriseProviderMock).toHaveBeenCalledWith('');
+  });
+
+  /**
+   * App Check is load-bearing once enforcement is on, but a failure to
+   * initialize it must not take the whole app down: `AppProviders` wraps every
+   * page, so an exception escaping this hook would blank the screen mid
+   * operation. Firestore rules and server-side auth still gate every request.
+   */
+  it('survives an initialization failure instead of tearing down the app', () => {
+    vi.stubEnv('NEXT_PUBLIC_RECAPTCHA_KEY', 'site-key-123');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initializeAppCheckMock.mockImplementation(() => {
+      throw new Error('recaptcha script blocked');
+    });
+
+    expect(() => renderHook(() => useFirebaseAppCheck())).not.toThrow();
+  });
+
+  /**
+   * React runs effects twice in StrictMode and again on every fast refresh.
+   * `initializeAppCheck` rejects a second call with different options for the
+   * same app, so the hook has to remember that it already ran.
+   */
+  it('initializes App Check only once across re-mounts', () => {
+    vi.stubEnv('NEXT_PUBLIC_RECAPTCHA_KEY', 'site-key-123');
+
+    renderHook(() => useFirebaseAppCheck()).unmount();
+    renderHook(() => useFirebaseAppCheck());
+
+    expect(initializeAppCheckMock).toHaveBeenCalledTimes(1);
   });
 });

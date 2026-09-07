@@ -1,8 +1,8 @@
 # Kopieren nach terraform.tfvars (gitignored) und Werte einsetzen. In der
 # Pipeline kommen dieselben Werte als TF_VAR_* aus Repository-Variablen und
 # -Secrets, dort gibt es keine terraform.tfvars.
-project               = "ffn-utils"
-build_service_account = "cloudbuild@ffn-utils.iam.gserviceaccount.com"
+project               = "<projekt-id>"
+build_service_account = "cloudbuild@<projekt-id>.iam.gserviceaccount.com"
 github_org            = "r00tat"
 cloudbuild_disabled   = true
 
@@ -12,7 +12,7 @@ cloudbuild_disabled   = true
 # EINSATZMAPPE_IMPERSONATION_ACCOUNT) und in den Repository-Variablen.
 # Die inneren Anfuehrungszeichen der Firebase-Konfiguration muessen escaped
 # werden — HCL kennt keine einfachen Anfuehrungszeichen.
-firebase_config                    = "{\"apiKey\":\"…\",\"projectId\":\"ffn-utils\",…}"
+firebase_config                    = "{\"apiKey\":\"…\",\"projectId\":\"<projekt-id>\",…}"
 recaptcha_key                      = "…"
 einsatzmappe_impersonation_account = "ffn@ff-neusiedlamsee.at"
 
@@ -20,6 +20,6 @@ einsatzmappe_impersonation_account = "ffn@ff-neusiedlamsee.at"
 # scripts/cloud-run-tfvars.sh als cloudrun.auto.tfvars.json aus dem laufenden
 # Dienst. Ohne diesen Lauf fragt tofu beim plan nach dem Image.
 #
-#   scripts/cloud-run-tfvars.sh --service hydrantenmap --project ffn-utils \
+#   scripts/cloud-run-tfvars.sh --service hydrantenmap --project <projekt-id> \
 #     --region europe-west4 --keep 20 \
 #     --out terraform/environments/prod/cloudrun.auto.tfvars.json

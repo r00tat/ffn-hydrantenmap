@@ -78,22 +78,22 @@ describe('isAuthProxyEnabled', () => {
 describe('resolveAuthDomain', () => {
   it('laesst die konfigurierte Domain stehen, solange der Proxy aus ist', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', '');
-    expect(resolveAuthDomain('ffn-utils.firebaseapp.com', fakeWindow())).toBe(
-      'ffn-utils.firebaseapp.com',
+    expect(resolveAuthDomain('demo-project.firebaseapp.com', fakeWindow())).toBe(
+      'demo-project.firebaseapp.com',
     );
   });
 
   it('nimmt bei aktivem Proxy den eigenen Host', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
-    expect(resolveAuthDomain('ffn-utils.firebaseapp.com', fakeWindow())).toBe(
+    expect(resolveAuthDomain('demo-project.firebaseapp.com', fakeWindow())).toBe(
       'einsatz-dev.ffnd.at',
     );
   });
 
   it('bleibt beim konfigurierten Wert, wenn es kein Fenster gibt', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
-    expect(resolveAuthDomain('ffn-utils.firebaseapp.com', undefined)).toBe(
-      'ffn-utils.firebaseapp.com',
+    expect(resolveAuthDomain('demo-project.firebaseapp.com', undefined)).toBe(
+      'demo-project.firebaseapp.com',
     );
   });
 });
@@ -106,8 +106,8 @@ describe('resolveAuthDomain: nur unter https', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
     const win = fakeWindow();
     win.location.protocol = 'http:';
-    expect(resolveAuthDomain('ffn-utils.firebaseapp.com', win)).toBe(
-      'ffn-utils.firebaseapp.com',
+    expect(resolveAuthDomain('demo-project.firebaseapp.com', win)).toBe(
+      'demo-project.firebaseapp.com',
     );
   });
 
@@ -115,7 +115,7 @@ describe('resolveAuthDomain: nur unter https', () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_PROXY', 'true');
     const win = fakeWindow();
     win.location.protocol = 'https:';
-    expect(resolveAuthDomain('ffn-utils.firebaseapp.com', win)).toBe(
+    expect(resolveAuthDomain('demo-project.firebaseapp.com', win)).toBe(
       'einsatz-dev.ffnd.at',
     );
   });

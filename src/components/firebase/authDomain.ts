@@ -1,7 +1,7 @@
 /**
  * Wo der Firebase-Auth-Handler liegt.
  *
- * Standardmaessig zeigt `authDomain` auf `ffn-utils.firebaseapp.com`. Damit
+ * Standardmaessig zeigt `authDomain` auf `<projekt>.firebaseapp.com`. Damit
  * laeuft jeder Google-Login ueber eine **fremde Origin**, und genau daran
  * scheitert er in WebKit-Browsern:
  *
