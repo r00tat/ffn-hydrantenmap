@@ -853,7 +853,8 @@
     "removeVehicleTitle": "{name} entfernen",
     "removeVehicleConfirm": "{name} wirklich aus dem Einsatz entfernen?",
     "removeVehicleConfirmWithCrew": "{name} wirklich aus dem Einsatz entfernen? {count, plural, one {Die zugeordnete Person wird} other {Die # zugeordneten Personen werden}} wieder auf \"Verfügbar\" gesetzt.",
-    "available": "Verfügbar"
+    "available": "Verfügbar",
+    "noCrewVehicle": "Keine Personenzuordnung"
   },
   "einsatzorte": {
     "placeholderNew": "Neue Adresse...",

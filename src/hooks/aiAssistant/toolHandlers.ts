@@ -5,6 +5,10 @@ import { searchPlace } from '../../components/actions/maps/places';
 import { GeoPosition, GeoPositionObject } from '../../common/geo';
 import { GeohashCluster } from '../../common/gis-objects';
 import {
+  EinsatzmittelKategorie,
+  parseBesatzung,
+} from '../../common/vehicle-utils';
+import {
   buildHoseLineDraft,
   collectWaterSupplyCandidates,
   describeHoseLineDraft,
@@ -156,7 +160,12 @@ export async function executeToolCall(
         type: 'vehicle',
         name: (args.name as string) || 'Fahrzeug',
         fw: args.fw as string,
-        besatzung: args.besatzung as string,
+        // Ein unbekannter Wert bleibt liegen: `einsatzmittelKategorie()`
+        // verwirft ihn und leitet die Art aus dem Namen ab.
+        kategorie: args.kategorie as EinsatzmittelKategorie | undefined,
+        besatzung: parseBesatzung(args.besatzung as string)
+          ? String(parseBesatzung(args.besatzung as string))
+          : undefined,
         ats: args.ats as number,
         alarmierung: args.alarmierung as string,
         eintreffen: args.eintreffen as string,

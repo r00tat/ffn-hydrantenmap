@@ -208,7 +208,20 @@ export function registerWriteTools(
         art: z.string().optional().describe('Rohrart B/C/Wasserwerfer (nur rohr)'),
         durchfluss: z.number().optional().describe('Durchfluss in l/min (nur rohr)'),
         fw: z.string().optional().describe('Feuerwehr (vehicle, tacticalUnit)'),
-        besatzung: z.string().optional().describe('Besatzung, z.B. "1:8" (nur vehicle)'),
+        besatzung: z
+          .string()
+          .optional()
+          .describe(
+            'Mannschaft ohne Kommandant — die Zahl hinter dem Doppelpunkt der ' +
+              'Schreibweise „1:8", hier also "8" (nur vehicle)',
+          ),
+        kategorie: z
+          .string()
+          .optional()
+          .describe(
+            'Art des Einsatzmittels: "fahrzeug", "boot", "anhaenger" oder ' +
+              '"aufbau". Ohne Angabe aus dem Namen abgeleitet (nur vehicle)',
+          ),
         ats: z.number().optional().describe('Atemschutzträger'),
         alarmierung: z.string().optional(),
         eintreffen: z.string().optional(),

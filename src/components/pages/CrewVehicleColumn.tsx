@@ -27,6 +27,12 @@ export interface CrewVehicleColumnProps {
   onRemoveVehicle?: (vehicleId: string) => void;
   /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
   readOnly?: boolean;
+  /**
+   * Aufbau oder Anhänger: Die Spalte bleibt sichtbar — das Einsatzmittel ist
+   * im Einsatz und soll auch hier entfernt werden können —, nimmt aber keine
+   * Personen auf (#795).
+   */
+  noCrew?: boolean;
 }
 
 export default function CrewVehicleColumn({
@@ -39,11 +45,12 @@ export default function CrewVehicleColumn({
   onRemove,
   onRemoveVehicle,
   readOnly = false,
+  noCrew = false,
 }: CrewVehicleColumnProps) {
   const t = useTranslations('crew');
   const { isOver, setNodeRef } = useDroppable({
     id: vehicleId || 'unassigned',
-    disabled: readOnly,
+    disabled: readOnly || noCrew,
   });
   // Die Spalte „Verfügbar" (vehicleId null) ist kein Fahrzeug und bleibt.
   const canRemoveVehicle = !readOnly && !!vehicleId && !!onRemoveVehicle;
@@ -93,6 +100,11 @@ export default function CrewVehicleColumn({
           )}
         </Box>
       </Box>
+      {noCrew && assignments.length === 0 && (
+        <Typography variant="body2" color="text.secondary">
+          {t('noCrewVehicle')}
+        </Typography>
+      )}
       {assignments.map((assignment) => (
         <CrewPersonCard
           key={assignment.id || assignment.recipientId}

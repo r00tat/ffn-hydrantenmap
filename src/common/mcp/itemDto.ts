@@ -21,6 +21,7 @@ export interface FirecallItemDto {
   lat?: number;
   lng?: number;
   fw?: string;
+  kategorie?: string;
   besatzung?: string;
   ats?: number;
   alarmierung?: string;
@@ -67,6 +68,7 @@ export function projectFirecallItem(
     case 'vehicle': {
       const v = item as Record<string, any>;
       if (v.fw) base.fw = v.fw;
+      if (v.kategorie) base.kategorie = v.kategorie;
       if (v.besatzung) base.besatzung = v.besatzung;
       if (v.ats) base.ats = v.ats;
       if (v.alarmierung) base.alarmierung = v.alarmierung;

@@ -190,3 +190,65 @@ describe('calculateStrength', () => {
     });
   });
 });
+
+describe('calculateStrength mit Kategorien', () => {
+  it('zählt an einem Aufbau keinen Fahrer dazu', () => {
+    const items: FirecallItem[] = [
+      { name: 'WLA Bergung', type: 'vehicle' } as any,
+    ];
+    const result = calculateStrength(items);
+    expect(result.totalMann).toBe(0);
+    expect(result.rows[0].typ).toBe('Aufbau');
+  });
+
+  it('zählt an einem Anhänger keinen Fahrer dazu', () => {
+    const items: FirecallItem[] = [
+      { name: 'Ölwehranhänger', type: 'vehicle' } as any,
+    ];
+    const result = calculateStrength(items);
+    expect(result.totalMann).toBe(0);
+    expect(result.rows[0].typ).toBe('Anhänger');
+  });
+
+  it('folgt der gepflegten Kategorie gegen den Namen', () => {
+    const items: FirecallItem[] = [
+      {
+        name: 'WLA Bergung',
+        type: 'vehicle',
+        kategorie: 'fahrzeug',
+        besatzung: '2',
+      } as any,
+    ];
+    const result = calculateStrength(items);
+    expect(result.totalMann).toBe(3);
+    expect(result.rows[0].typ).toBe('Fahrzeug');
+  });
+
+  it('zählt am Boot den Bootsführer dazu', () => {
+    const items: FirecallItem[] = [
+      { name: 'MZB', type: 'vehicle', besatzung: '2' } as any,
+    ];
+    const result = calculateStrength(items);
+    expect(result.totalMann).toBe(3);
+    expect(result.rows[0].typ).toBe('Boot');
+  });
+
+  it('zählt die Personen eines Aufbaus vollständig, wenn welche zugeordnet sind', () => {
+    const items: FirecallItem[] = [
+      { id: 'v1', name: 'WLA Bergung', type: 'vehicle' } as any,
+    ];
+    const crew: CrewAssignment[] = [
+      { id: 'a1', recipientId: 'r1', name: 'A', vehicleId: 'v1' } as any,
+      { id: 'a2', recipientId: 'r2', name: 'B', vehicleId: 'v1' } as any,
+    ];
+    const result = calculateStrength(items, crew);
+    expect(result.totalMann).toBe(2);
+  });
+
+  it('liest die Schreibweise „1:8" im Besatzungsfeld', () => {
+    const items: FirecallItem[] = [
+      { name: 'TLFA 4000', type: 'vehicle', besatzung: '1:8' } as any,
+    ];
+    expect(calculateStrength(items).totalMann).toBe(9);
+  });
+});

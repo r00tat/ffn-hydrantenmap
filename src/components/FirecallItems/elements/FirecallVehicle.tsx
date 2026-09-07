@@ -3,15 +3,21 @@ import { ReactNode } from 'react';
 import { vehicleIconDataUrl } from '../../../common/markerSvg';
 import { formatTimestamp } from '../../../common/time-format';
 import {
+  einsatzmittelKategorie,
+  EinsatzmittelKategorie,
+  EINSATZMITTEL_KATEGORIE_LABELS,
+  formatBesatzung,
   getEffectiveAts,
   getEffectiveBesatzung,
 } from '../../../common/vehicle-utils';
+import { SimpleMap } from '../../../common/types';
 import { Fzg } from '../../firebase/firestore';
 import VehicleCrewPopup from '../VehicleCrewPopup';
-import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
 
 export class FirecallVehicle extends FirecallItemBase {
   fw?: string;
+  kategorie?: EinsatzmittelKategorie;
   besatzung?: string;
   ats?: number;
   alarmierung?: string;
@@ -28,6 +34,7 @@ export class FirecallVehicle extends FirecallItemBase {
     if (firecallItem) {
       ({
         fw: this.fw,
+        kategorie: this.kategorie,
         besatzung: this.besatzung,
         ats: this.ats,
         alarmierung: this.alarmierung,
@@ -53,7 +60,8 @@ export class FirecallVehicle extends FirecallItemBase {
     return {
       name: 'Bezeichnung',
       fw: 'Feuerwehr',
-      besatzung: 'Besatzung 1:?',
+      kategorie: 'Art',
+      besatzung: 'Besatzung 1:? (ohne Kommandant)',
       ats: 'ATS Träger',
       beschreibung: 'Beschreibung',
       alarmierung: 'Alarmierung',
@@ -66,8 +74,20 @@ export class FirecallVehicle extends FirecallItemBase {
   public fieldTypes(): { [fieldName: string]: string } {
     return {
       ...super.fieldTypes(),
+      kategorie: 'select',
       rotation: 'number',
       ats: 'number',
+    };
+  }
+
+  public selectValues(): SimpleMap<SelectOptions> {
+    return {
+      // Der leere Wert bleibt wählbar: Ohne gepflegte Art entscheidet der
+      // Name, und genau das ist für die gewachsenen Einträge der Normalfall.
+      kategorie: {
+        '': 'aus dem Namen',
+        ...EINSATZMITTEL_KATEGORIE_LABELS,
+      } as unknown as SelectOptions,
     };
   }
 
@@ -75,6 +95,7 @@ export class FirecallVehicle extends FirecallItemBase {
     return {
       ...super.data(),
       fw: this.fw,
+      kategorie: this.kategorie,
       besatzung: this.besatzung,
       ats: this.ats,
       alarmierung: this.alarmierung,
@@ -87,10 +108,25 @@ export class FirecallVehicle extends FirecallItemBase {
     return `${this.name} ${this.fw || ''}`.trim();
   }
 
+  /** Die Art des Einsatzmittels: gepflegt, sonst aus dem Namen abgeleitet. */
+  public einsatzmittelKategorie(): EinsatzmittelKategorie {
+    return einsatzmittelKategorie({
+      name: this.name || '',
+      kategorie: this.kategorie,
+    });
+  }
+
+  public besatzung1x(): string {
+    const kategorie = this.einsatzmittelKategorie();
+    return formatBesatzung(
+      getEffectiveBesatzung(this.besatzung, this.crewCount ?? 0, kategorie),
+      kategorie
+    );
+  }
+
   public info(): string {
-    const bes = getEffectiveBesatzung(this.besatzung, this.crewCount ?? 0);
     const ats = getEffectiveAts(this.ats, this.atsCount ?? 0);
-    return `1:${bes} ATS: ${ats}`;
+    return `${this.besatzung1x()} ATS: ${ats}`.trim();
   }
 
   public body(): ReactNode {
@@ -154,19 +190,26 @@ export class FirecallVehicle extends FirecallItemBase {
           {this.name} {this.fw || ''}
         </b>
         {(() => {
-          const bes = getEffectiveBesatzung(this.besatzung, this.crewCount ?? 0);
+          const kategorie = this.einsatzmittelKategorie();
+          const bes = this.besatzung1x();
           const ats = getEffectiveAts(this.ats, this.atsCount ?? 0);
           return (
             <>
-              {bes > 0 && (
+              {kategorie !== 'fahrzeug' && (
                 <>
                   <br />
-                  Besatzung: 1:{bes}
+                  {EINSATZMITTEL_KATEGORIE_LABELS[kategorie]}
+                </>
+              )}
+              {bes && (
+                <>
+                  <br />
+                  Besatzung: {bes}
                 </>
               )}
               {ats > 0 && (
                 <>
-                  {!(bes > 0) && <br />} ({ats} ATS)
+                  {!bes && <br />} ({ats} ATS)
                 </>
               )}
             </>

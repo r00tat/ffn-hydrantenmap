@@ -853,7 +853,8 @@
     "removeVehicleTitle": "Remove {name}",
     "removeVehicleConfirm": "Really remove {name} from the operation?",
     "removeVehicleConfirmWithCrew": "Really remove {name} from the operation? {count, plural, one {The assigned person will be} other {The # assigned persons will be}} moved back to \"Available\".",
-    "available": "Available"
+    "available": "Available",
+    "noCrewVehicle": "No crew assignment"
   },
   "einsatzorte": {
     "placeholderNew": "New address...",

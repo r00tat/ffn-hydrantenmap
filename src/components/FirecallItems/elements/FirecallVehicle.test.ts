@@ -73,3 +73,50 @@ describe('FirecallVehicle.isRotatable', () => {
     expect(new FirecallVehicle().isRotatable()).toBe(true);
   });
 });
+
+describe('FirecallVehicle Kategorie', () => {
+  it('schreibt am Aufbau keine Führungskraft an', () => {
+    const wla = new FirecallVehicle({
+      name: 'WLA Bergung',
+      type: 'vehicle',
+    } as any);
+    expect(wla.info()).toBe('ATS: 0');
+  });
+
+  it('nennt die zugeordneten Personen am Aufbau ohne Doppelpunkt', () => {
+    const wla = new FirecallVehicle({
+      name: 'WLA Bergung',
+      type: 'vehicle',
+    } as any);
+    wla.crewCount = 2;
+    expect(wla.info()).toBe('2 ATS: 0');
+  });
+
+  it('folgt der gepflegten Kategorie gegen den Namen', () => {
+    const wla = new FirecallVehicle({
+      name: 'WLA Bergung',
+      type: 'vehicle',
+      kategorie: 'fahrzeug',
+      besatzung: '2',
+    } as any);
+    expect(wla.info()).toBe('1:2 ATS: 0');
+  });
+
+  it('liest die Schreibweise „1:8" im Besatzungsfeld', () => {
+    const tlf = new FirecallVehicle({
+      name: 'TLFA 4000',
+      type: 'vehicle',
+      besatzung: '1:8',
+    } as any);
+    expect(tlf.info()).toBe('1:8 ATS: 0');
+  });
+
+  it('führt die Kategorie im Datensatz mit', () => {
+    const wla = new FirecallVehicle({
+      name: 'WLA Bergung',
+      type: 'vehicle',
+      kategorie: 'aufbau',
+    } as any);
+    expect(wla.data().kategorie).toBe('aufbau');
+  });
+});

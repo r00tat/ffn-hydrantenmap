@@ -7,6 +7,11 @@ import type { GeoJsonFeatureColleaction } from '../../server/geojson';
 import { defaultLatLngPosition, LatLngPosition } from '../geo';
 import { parseWasserBaender } from '../terrain/wasserstand';
 import {
+  einsatzmittelKategorie,
+  formatBesatzung,
+  parseBesatzung,
+} from '../vehicle-utils';
+import {
   buildCouplingCollection,
   hoseOffsetFor,
   lineTypeFor,
@@ -330,9 +335,23 @@ function markerFeature(
         bezeichnung: item.name,
         ...(item.type === 'vehicle' ? { label: item.name } : {}),
         ...(informationen ? { informationen } : {}),
-        ...(typeof rec.besatzung === 'string' && rec.besatzung
-          ? { mannschaftAnz: rec.besatzung, mannschaft: [] }
-          : {}),
+        // lagekarte.info trägt die Stärke als Text — deshalb die Schreibweise
+        // „1:8" und nicht die nackte Zahl, die das Feld speichert. Am Aufbau
+        // steht keine Führungskraft an (docs/einsatzmittel-staerke.md).
+        ...(() => {
+          const besatzung = parseBesatzung(
+            typeof rec.besatzung === 'string' ? rec.besatzung : undefined,
+          );
+          if (!besatzung) return {};
+          const text = formatBesatzung(
+            besatzung,
+            einsatzmittelKategorie({
+              name: item.name,
+              kategorie: rec.kategorie as never,
+            }),
+          );
+          return text ? { mannschaftAnz: text, mannschaft: [] } : {};
+        })(),
       },
       ffnd: { v: 1, item },
     },
