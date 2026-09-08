@@ -505,12 +505,35 @@ export default function CrewAssignmentBoard({
     [validAssignments, activePersons],
   );
 
-  // Aufbauten und Anhänger nehmen keine Personen auf: Sie stehen weiter als
-  // Spalte da, tauchen aber in keinem Auswahlfeld auf (#795).
+  // Aufbauten und Anhänger nehmen keine Personen auf und tauchen deshalb in
+  // keinem Auswahlfeld auf (#795).
   const crewVehicles = useMemo(
     () => vehicles.filter((v) => nimmtBesatzung(v)),
     [vehicles],
   );
+
+  /**
+   * Die Einsatzmittel, die im Board eine Spalte bzw. einen Abschnitt bekommen.
+   *
+   * Ein Aufbau oder Anhänger, in dem nie jemand sitzen kann, ist hier nur
+   * Platzhalter: Auf dem Desktop verdrängt jede solche Spalte 220 px weit die
+   * Fahrzeuge, um die es geht (#801). Entfernt wird das Einsatzmittel aus dem
+   * Einsatz weiterhin über die Fahrzeug-Chips oberhalb des Boards.
+   *
+   * Ausnahme sind Zuordnungen aus der Zeit vor #795: Hängen an einem Aufbau
+   * noch Personen, bleibt er sichtbar — sonst wären sie unsichtbar zugeordnet
+   * und ließen sich nicht mehr auf ein Fahrzeug umhängen.
+   */
+  const boardVehicles = useMemo(() => {
+    const besetzt = new Set(
+      displayAssignments
+        .map((a) => a.vehicleId)
+        .filter((id): id is string => !!id),
+    );
+    return vehicles.filter(
+      (v) => nimmtBesatzung(v) || (v.id ? besetzt.has(v.id) : false),
+    );
+  }, [displayAssignments, vehicles]);
 
   const unassigned = displayAssignments.filter((a) => a.vehicleId === null);
   const assignedToVehicle = useCallback(
@@ -666,7 +689,7 @@ export default function CrewAssignmentBoard({
                 </TableRow>
                 {renderRows(unassigned)}
               </DroppableTableBody>
-              {vehicles.map((v) => {
+              {boardVehicles.map((v) => {
                 const assigned = assignedToVehicle(v.id!);
                 return (
                   <DroppableTableBody
@@ -726,7 +749,7 @@ export default function CrewAssignmentBoard({
               onRemove={removeAssignment}
               readOnly={!canWrite}
             />
-            {vehicles.map((v) => (
+            {boardVehicles.map((v) => (
               <CrewVehicleColumn
                 key={v.id}
                 vehicleId={v.id!}

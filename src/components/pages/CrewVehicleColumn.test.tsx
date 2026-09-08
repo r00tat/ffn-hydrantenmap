@@ -112,6 +112,8 @@ describe('CrewVehicleColumn', () => {
     });
 
     it('zeigt bereits zugeordnete Personen weiter an', () => {
+      // Seit #801 steht die Spalte überhaupt nur noch für diesen Fall da: Der
+      // Hinweis sagt, warum hier niemand dazukommen kann.
       render(
         <CrewVehicleColumn
           {...defaultProps}
@@ -120,9 +122,7 @@ describe('CrewVehicleColumn', () => {
         />,
       );
       expect(screen.getByText('Max Mustermann')).toBeInTheDocument();
-      expect(
-        screen.queryByText('Keine Personenzuordnung'),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText('Keine Personenzuordnung')).toBeInTheDocument();
     });
 
     it('bleibt entfernbar', () => {

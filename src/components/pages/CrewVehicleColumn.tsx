@@ -28,9 +28,9 @@ export interface CrewVehicleColumnProps {
   /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
   readOnly?: boolean;
   /**
-   * Aufbau oder Anhänger: Die Spalte bleibt sichtbar — das Einsatzmittel ist
-   * im Einsatz und soll auch hier entfernt werden können —, nimmt aber keine
-   * Personen auf (#795).
+   * Aufbau oder Anhänger: Die Spalte nimmt keine Personen auf (#795). Gezeigt
+   * wird sie nur noch, wenn dort aus Altbeständen jemand hängt — wer die
+   * Spalten setzt, entscheidet das Board (#801).
    */
   noCrew?: boolean;
 }
@@ -100,7 +100,7 @@ export default function CrewVehicleColumn({
           )}
         </Box>
       </Box>
-      {noCrew && assignments.length === 0 && (
+      {noCrew && (
         <Typography variant="body2" color="text.secondary">
           {t('noCrewVehicle')}
         </Typography>
