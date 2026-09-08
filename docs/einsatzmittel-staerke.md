@@ -64,9 +64,18 @@ Der Grund ist derselbe für beide Spalten: Ein Aufbau fährt nicht selbst, er wi
 gebracht. Seine Mannschaft ist die des Zugfahrzeugs und dort schon gezählt. Stünde
 jeder Aufbau mit `1` in der Stärketabelle, wäre die Gesamtstärke des Einsatzes um
 jeden Aufbau und jeden Anhänger zu hoch — der Ausgangspunkt von #795. Und wo niemand
-sitzt, ist auch die Personenzuordnung im Personal-Board fachlich falsch: Die Spalte
-bleibt sichtbar und entfernbar, nimmt aber nichts auf und taucht in keinem
-Fahrzeug-Auswahlfeld auf. Am Aufbau steht deshalb auch kein `1:0` an, sondern nichts.
+sitzt, ist auch die Personenzuordnung im Personal-Board fachlich falsch: Der Aufbau
+taucht in keinem Fahrzeug-Auswahlfeld auf. Am Aufbau steht deshalb auch kein `1:0` an,
+sondern nichts.
+
+Im Personal-Board bekommt er seit #801 auch keine eigene Spalte mehr. Eine Spalte, in
+der nie jemand stehen kann, ist nur Platzhalter — auf dem Desktop schob jede von ihnen
+220 px weit die Fahrzeuge aus dem Bild, um die es geht; in einem Einsatz mit
+WLA-Bergung, Mulden und Anhängern war das die halbe Breite. Aus dem Einsatz entfernt
+werden die Einsatzmittel über die Fahrzeug-Chips oberhalb des Boards, dafür braucht es
+die Spalte nicht. Ausgenommen sind Zuordnungen aus der Zeit vor #795: Hängen an einem
+Aufbau noch Personen, bleibt er mitsamt Hinweis stehen — sonst wären sie unsichtbar
+zugeordnet und ließen sich nicht mehr auf ein Fahrzeug umhängen.
 
 Die ersten drei Werte sind die Kategorien der Fahrtenbuch-Stammdaten
 (`FahrtenbuchVehicleKategorie`), damit `kategorieAusName()` weiterverwendet werden

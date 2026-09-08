@@ -460,10 +460,42 @@ describe('CrewAssignmentBoard', () => {
       mockVehicles.pop();
     });
 
-    it('nimmt am Aufbau keine Personen auf', () => {
+    it('bekommt auf dem Desktop keine eigene Spalte', () => {
+      // Eine Spalte, in der nie jemand stehen kann, verdrängt auf dem Desktop
+      // die besetzbaren Fahrzeuge aus dem Bild (#801).
       render(<CrewAssignmentBoard />);
-      expect(screen.getByText('WLA Bergung')).toBeInTheDocument();
-      expect(screen.getByText('Keine Personenzuordnung')).toBeInTheDocument();
+      // „TLFA 4000" steht auch auf einem Chip der Schnellauswahl, die Spalte
+      // ist der zweite Treffer.
+      expect(screen.getAllByText('TLFA 4000').length).toBeGreaterThan(1);
+      expect(screen.queryByText('WLA Bergung')).not.toBeInTheDocument();
+    });
+
+    it('bekommt auch mobil keinen eigenen Abschnitt', () => {
+      mockUseMediaQuery.mockReturnValue(true);
+      render(<CrewAssignmentBoard />);
+      expect(screen.queryByText(/WLA Bergung/)).not.toBeInTheDocument();
+    });
+
+    it('bleibt sichtbar, solange noch Personen zugeordnet sind', () => {
+      // Zuordnungen aus der Zeit vor #795 dürfen nicht unsichtbar werden —
+      // sonst hängen sie am Aufbau fest und niemand kann sie auflösen.
+      mockAssignments.push({
+        id: 'a5',
+        recipientId: 'r5',
+        name: 'Alt Zuordnung',
+        vehicleId: 'v3',
+        vehicleName: 'WLA Bergung',
+        funktion: 'Feuerwehrmann',
+        source: 'manual',
+      });
+      try {
+        render(<CrewAssignmentBoard />);
+        expect(screen.getByText('WLA Bergung')).toBeInTheDocument();
+        expect(screen.getByText('Alt Zuordnung')).toBeInTheDocument();
+        expect(screen.getByText('Keine Personenzuordnung')).toBeInTheDocument();
+      } finally {
+        mockAssignments.pop();
+      }
     });
 
     it('bietet den Aufbau in keinem Auswahlfeld an', async () => {
