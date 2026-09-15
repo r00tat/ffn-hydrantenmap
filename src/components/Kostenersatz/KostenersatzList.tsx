@@ -28,10 +28,13 @@ import { downloadBlob } from '../firebase/download';
 
 export interface KostenersatzListProps {
   firecallId: string;
+  /** Überschrift weglassen, wenn der Aufrufer schon eine hat. */
+  hideTitle?: boolean;
 }
 
 export default function KostenersatzList({
   firecallId,
+  hideTitle = false,
 }: KostenersatzListProps) {
   const t = useTranslations('kostenersatz');
   const tCommon = useTranslations('common');
@@ -178,7 +181,11 @@ export default function KostenersatzList({
           mb: 2,
         }}
       >
-        <Typography variant="h6">{t('calculations')}</Typography>
+        {hideTitle ? (
+          <Box />
+        ) : (
+          <Typography variant="h6">{t('calculations')}</Typography>
+        )}
         <Button
           variant="contained"
           startIcon={<AddIcon />}

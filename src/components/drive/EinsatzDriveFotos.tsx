@@ -41,8 +41,11 @@ async function loadDriveState(firecallId: string): Promise<DriveStateResult> {
 
 export default function EinsatzDriveFotos({
   firecallId,
+  hideTitle = false,
 }: {
   firecallId: string;
+  /** Überschrift weglassen, wenn der Aufrufer schon eine hat. */
+  hideTitle?: boolean;
 }) {
   const t = useTranslations('einsatzDrive');
   const { isAdmin } = useFirebaseLogin();
@@ -84,9 +87,11 @@ export default function EinsatzDriveFotos({
 
   return (
     <Box sx={{ mt: 3 }}>
-      <Typography variant="h5" gutterBottom>
-        {t('title')}
-      </Typography>
+      {!hideTitle && (
+        <Typography variant="h5" gutterBottom>
+          {t('title')}
+        </Typography>
+      )}
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {t('explanation', { folder: state.folderName })}
       </Typography>

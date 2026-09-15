@@ -835,6 +835,14 @@
       "abruecken": "Departed at",
       "description": "Description",
       "einsatzmittel": "Resources"
+    },
+    "sections": {
+      "overview": "Overview",
+      "fotos": "Photos in Google Drive",
+      "einsatzorte": "Operation sites",
+      "besatzung": "Crew",
+      "tagebuch": "Operation log",
+      "kostenersatz": "Cost recovery"
     }
   },
   "crew": {

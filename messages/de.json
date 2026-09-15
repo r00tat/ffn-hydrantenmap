@@ -835,6 +835,14 @@
       "abruecken": "Abrücken",
       "description": "Beschreibung",
       "einsatzmittel": "Einsatzmittel"
+    },
+    "sections": {
+      "overview": "Übersicht",
+      "fotos": "Fotos im Google Drive",
+      "einsatzorte": "Einsatzorte",
+      "besatzung": "Besatzung",
+      "tagebuch": "Einsatztagebuch",
+      "kostenersatz": "Kostenersatz"
     }
   },
   "crew": {

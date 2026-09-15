@@ -1,9 +1,11 @@
 'use client';
 
 import { FunctionComponent, useEffect, useState } from 'react';
+import type { EinsatzorteProps } from './Einsatzorte';
 
-const EinsatzorteWrapper: FunctionComponent = () => {
-  const [EinsatzortePage, setEinsatzortePage] = useState<FunctionComponent>();
+const EinsatzorteWrapper: FunctionComponent<EinsatzorteProps> = (props) => {
+  const [EinsatzortePage, setEinsatzortePage] =
+    useState<FunctionComponent<EinsatzorteProps>>();
 
   useEffect(() => {
     (async () => {
@@ -18,7 +20,7 @@ const EinsatzorteWrapper: FunctionComponent = () => {
     return null;
   }
 
-  return EinsatzortePage ? <EinsatzortePage /> : null;
+  return EinsatzortePage ? <EinsatzortePage {...props} /> : null;
 };
 
 export default EinsatzorteWrapper;

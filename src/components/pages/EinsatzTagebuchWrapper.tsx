@@ -1,8 +1,12 @@
 'use client';
 import { FunctionComponent, useEffect, useState } from 'react';
+import type { EinsatzTagebuchOptions } from './EinsatzTagebuch';
 
-const EinsatzTagebuchWrapper: FunctionComponent = () => {
-  const [LayersPage, setLayersPage] = useState<FunctionComponent>();
+const EinsatzTagebuchWrapper: FunctionComponent<EinsatzTagebuchOptions> = (
+  props,
+) => {
+  const [LayersPage, setLayersPage] =
+    useState<FunctionComponent<EinsatzTagebuchOptions>>();
 
   useEffect(() => {
     (async () => {
@@ -17,7 +21,7 @@ const EinsatzTagebuchWrapper: FunctionComponent = () => {
     return null;
   }
 
-  return LayersPage ? <LayersPage /> : null;
+  return LayersPage ? <LayersPage {...props} /> : null;
 };
 
 export default EinsatzTagebuchWrapper;

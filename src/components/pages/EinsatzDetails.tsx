@@ -54,9 +54,16 @@ import {
 import AlarmCard from '../../app/blaulicht-sms/AlarmCard';
 import EinsatzFahrtenbuch from '../Fahrtenbuch/EinsatzFahrtenbuch';
 import CrewAssignmentBoard from './CrewAssignmentBoard';
+import EinsatzDetailSection from './EinsatzDetailSection';
 import EinsatzorteWrapper from './EinsatzorteWrapper';
 import EinsatzTagebuchWrapper from './EinsatzTagebuchWrapper';
 import StrengthTable from './StrengthTable';
+
+/**
+ * Anker des Kostenersatz-Abschnitts. Unverändert aus der Zeit vor den
+ * aufklappbaren Abschnitten, damit bestehende Links weiter dorthin führen.
+ */
+const KOSTENERSATZ_SECTION_ID = 'kostenersatz-section';
 
 export default function EinsatzDetails() {
   const t = useTranslations('einsatzDetails');
@@ -75,6 +82,15 @@ export default function EinsatzDetails() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const canWrite = useFirecallWriteAccess();
+  /**
+   * Offene Abschnitte. Alle starten zu — die Übersicht oben reicht für den
+   * ersten Blick, alles Weitere holt man sich mit einem Klick. Mehrere
+   * Abschnitte dürfen gleichzeitig offen sein; im Einsatz braucht man
+   * Tagebuch und Besatzung durchaus nebeneinander.
+   */
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    {}
+  );
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[] | undefined>(
     undefined,
   );
@@ -208,6 +224,21 @@ export default function EinsatzDetails() {
     [firecallId]
   );
 
+  const toggleSection = (sectionId: string, expanded: boolean) =>
+    setOpenSections((prev) => ({ ...prev, [sectionId]: expanded }));
+
+  /**
+   * Der Abschnitt kann zu sein; erst aufklappen, dann hinspringen. Gescrollt
+   * wird auf den Kopf des Abschnitts, der im DOM steht, auch solange er zu
+   * ist — deshalb braucht es kein Warten auf das Aufklappen.
+   */
+  const jumpToKostenersatz = () => {
+    setOpenSections((prev) => ({ ...prev, [KOSTENERSATZ_SECTION_ID]: true }));
+    document
+      .getElementById(KOSTENERSATZ_SECTION_ID)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   if (loading) return <CircularProgress sx={{ m: 4 }} />;
   if (!firecall) return <Typography sx={{ m: 2 }}>{t('notFound')}</Typography>;
 
@@ -276,7 +307,7 @@ export default function EinsatzDetails() {
         <Tooltip title={t('jumpToKostenersatz')}>
           <IconButton
             size="small"
-            onClick={() => document.getElementById('kostenersatz-section')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={jumpToKostenersatz}
             color="primary"
           >
             <ReceiptLongIcon />
@@ -284,7 +315,10 @@ export default function EinsatzDetails() {
         </Tooltip>
       </Box>
 
-      {/* Einsatz info */}
+      {/* Übersicht — der einzige Abschnitt, der immer offen steht. */}
+      <Typography variant="h6" component="h2" gutterBottom>
+        {t('sections.overview')}
+      </Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {firecall.group && (
           <Grid size={{ xs: 12, sm: 6 }}>
@@ -338,12 +372,18 @@ export default function EinsatzDetails() {
         )}
       </Grid>
 
-      {/* BlaulichtSMS Details */}
+      {/* Ab hier alles aufklappbar und beim Öffnen der Seite zugeklappt:
+          Die Übersicht oben soll ohne Scrollen lesbar sein. Die Abschnitte
+          hängen fast alle an eigenen Firestore-Abfragen — zugeklappt fragt
+          keiner davon etwas ab (`unmountOnExit` in EinsatzDetailSection). */}
       {alarmIds.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" gutterBottom>
-            {t('blaulichtSmsTitle')}
-          </Typography>
+        <EinsatzDetailSection
+          sectionId="alarm-sms"
+          title={t('blaulichtSmsTitle')}
+          subtitle={alarms?.length ? `${alarms.length}` : undefined}
+          expanded={openSections['alarm-sms'] === true}
+          onToggle={toggleSection}
+        >
           {alarms === undefined ? (
             <CircularProgress size={24} />
           ) : alarms.length > 0 ? (
@@ -363,101 +403,141 @@ export default function EinsatzDetails() {
               })}
             </Typography>
           )}
-        </Box>
+        </EinsatzDetailSection>
       )}
 
-      {/* Attachments */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Typography variant="h5" gutterBottom>
-          {t('attachments')}
-        </Typography>
-        {firecall.attachments && firecall.attachments.length > 0 && (
-          <DownloadAllButton urls={firecall.attachments} />
-        )}
-      </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {t('attachmentsExplanation')}
-      </Typography>
-      {canWrite && (
-        <FileUploader onFileUploadComplete={handleFileUploadComplete} />
-      )}
-      {firecall.attachments && firecall.attachments.length > 0 ? (
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: '1fr',
-              sm: 'repeat(2, 1fr)',
-              md: 'repeat(3, 1fr)',
-              lg: 'repeat(4, 1fr)',
-            },
-            gap: 2,
-            mt: 2,
-          }}
-        >
-          {firecall.attachments.map((url) => (
-            <Box key={url} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FileDisplay
-                url={url}
-                edit={canWrite}
-                onDeleteCallback={handleDeleteAttachment}
-                imageSize={200}
-              />
-            </Box>
-          ))}
+      <EinsatzDetailSection
+        sectionId="anhaenge"
+        title={t('attachments')}
+        subtitle={
+          firecall.attachments?.length
+            ? `${firecall.attachments.length}`
+            : undefined
+        }
+        expanded={openSections['anhaenge'] === true}
+        onToggle={toggleSection}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            {t('attachmentsExplanation')}
+          </Typography>
+          {firecall.attachments && firecall.attachments.length > 0 && (
+            <DownloadAllButton urls={firecall.attachments} />
+          )}
         </Box>
-      ) : (
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
-          {t('noAttachments')}
-        </Typography>
-      )}
+        {canWrite && (
+          <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+        )}
+        {firecall.attachments && firecall.attachments.length > 0 ? (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(2, 1fr)',
+                md: 'repeat(3, 1fr)',
+                lg: 'repeat(4, 1fr)',
+              },
+              gap: 2,
+              mt: 2,
+            }}
+          >
+            {firecall.attachments.map((url) => (
+              <Box
+                key={url}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+              >
+                <FileDisplay
+                  url={url}
+                  edit={canWrite}
+                  onDeleteCallback={handleDeleteAttachment}
+                  imageSize={200}
+                />
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          <Typography color="text.secondary" sx={{ mt: 1 }}>
+            {t('noAttachments')}
+          </Typography>
+        )}
+      </EinsatzDetailSection>
 
       {/* Fotos im Drive — zweiter Ablageort neben den Anhängen. Bewusst direkt
           darunter, damit der Unterschied beim Hochladen sichtbar ist. */}
-      {firecall.id && <EinsatzDriveFotos firecallId={firecall.id} />}
-
-      {/* Einsatzorte */}
-      <Box sx={{ mt: 3 }}>
-        <EinsatzorteWrapper />
-      </Box>
-
-      {/* Einsatzmittel */}
-      {displayItems.length > 0 && (
-        <>
-          <Typography variant="h5" gutterBottom sx={{ mt: 3 }}>
-            {t('labels.einsatzmittel')}
-          </Typography>
-          <StrengthTable items={displayItems} />
-        </>
+      {firecall.id && (
+        <EinsatzDetailSection
+          sectionId="fotos"
+          title={t('sections.fotos')}
+          expanded={openSections['fotos'] === true}
+          onToggle={toggleSection}
+        >
+          <EinsatzDriveFotos firecallId={firecall.id} hideTitle />
+        </EinsatzDetailSection>
       )}
 
-      {/* Besatzung */}
-      <Box sx={{ mt: 3 }}>
-        <CrewAssignmentBoard alarms={alarms} />
-      </Box>
+      <EinsatzDetailSection
+        sectionId="einsatzorte"
+        title={t('sections.einsatzorte')}
+        expanded={openSections['einsatzorte'] === true}
+        onToggle={toggleSection}
+      >
+        <EinsatzorteWrapper hideTitle />
+      </EinsatzDetailSection>
+
+      {displayItems.length > 0 && (
+        <EinsatzDetailSection
+          sectionId="einsatzmittel"
+          title={t('labels.einsatzmittel')}
+          subtitle={`${displayItems.length}`}
+          expanded={openSections['einsatzmittel'] === true}
+          onToggle={toggleSection}
+        >
+          <StrengthTable items={displayItems} />
+        </EinsatzDetailSection>
+      )}
+
+      <EinsatzDetailSection
+        sectionId="besatzung"
+        title={t('sections.besatzung')}
+        expanded={openSections['besatzung'] === true}
+        onToggle={toggleSection}
+      >
+        <CrewAssignmentBoard alarms={alarms} hideTitle />
+      </EinsatzDetailSection>
 
       {/* Fahrtenbuch — Sammelerfassung direkt nach der Mannschaftszuordnung.
           Ohne Gruppe gibt es kein Fahrtenbuch, zu dem der Einsatz gehören
           könnte; dann bleibt der Abschnitt ganz weg. */}
       {firecall.id && firecall.group && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h5" gutterBottom>
-            {tFahrtenbuch('einsatz.title')}
-          </Typography>
+        <EinsatzDetailSection
+          sectionId="fahrtenbuch"
+          title={tFahrtenbuch('einsatz.title')}
+          expanded={openSections['fahrtenbuch'] === true}
+          onToggle={toggleSection}
+        >
           <EinsatzFahrtenbuch firecallId={firecall.id} firecall={firecall} />
-        </Box>
+        </EinsatzDetailSection>
       )}
 
-      {/* Einsatztagebuch */}
-      <Box sx={{ mt: 3 }}>
-        <EinsatzTagebuchWrapper />
-      </Box>
+      <EinsatzDetailSection
+        sectionId="tagebuch"
+        title={t('sections.tagebuch')}
+        expanded={openSections['tagebuch'] === true}
+        onToggle={toggleSection}
+      >
+        <EinsatzTagebuchWrapper hideTitle />
+      </EinsatzDetailSection>
 
-      {/* Kostenersatz */}
       {firecall.id && (
-        <Box id="kostenersatz-section" sx={{ mt: 3 }}>
-          <KostenersatzList firecallId={firecall.id} />
-        </Box>
+        <EinsatzDetailSection
+          sectionId={KOSTENERSATZ_SECTION_ID}
+          title={t('sections.kostenersatz')}
+          expanded={openSections[KOSTENERSATZ_SECTION_ID] === true}
+          onToggle={toggleSection}
+        >
+          <KostenersatzList firecallId={firecall.id} hideTitle />
+        </EinsatzDetailSection>
       )}
 
       {/* Dialogs */}

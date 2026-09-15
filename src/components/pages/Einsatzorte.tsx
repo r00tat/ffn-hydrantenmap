@@ -43,7 +43,12 @@ function getLocationDisplayName(location: Partial<FirecallLocation>): string {
   );
 }
 
-export default function Einsatzorte() {
+export interface EinsatzorteProps {
+  /** Überschrift weglassen, wenn der Aufrufer schon eine hat. */
+  hideTitle?: boolean;
+}
+
+export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
   const t = useTranslations('einsatzorte');
   const firecall = useFirecall();
   const { locations, addLocation, updateLocation, deleteLocation } =
@@ -468,7 +473,13 @@ export default function Einsatzorte() {
           mb: 2,
         }}
       >
-        <Typography variant="h5">{t('title', { name: firecall.name })}</Typography>
+        {hideTitle ? (
+          <Box />
+        ) : (
+          <Typography variant="h5">
+            {t('title', { name: firecall.name })}
+          </Typography>
+        )}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {isGroupFfn && lastResult && lastResult.added > 0 && (
             <Chip
