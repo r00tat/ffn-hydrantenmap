@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
@@ -223,27 +224,45 @@ export default function FirecallItemFields({
           {/* Attachment fields */}
           {item.fieldTypes()[key] === 'attachment' && (
             <>
-              <FileUploader
-                onFileUploadComplete={(ref) => fileUploadComplete(key, ref)}
-              />
-              {(item as any)[key] && ((item as any)[key] as string[]).length > 0 && (
-                <DownloadAllButton urls={(item as any)[key] as string[]} />
-              )}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  flexWrap: 'wrap',
+                  mb: 1,
+                }}
+              >
+                <FileUploader
+                  onFileUploadComplete={(ref) => fileUploadComplete(key, ref)}
+                />
+                {(item as any)[key] &&
+                  ((item as any)[key] as string[]).length > 0 && (
+                    <Box sx={{ ml: 'auto' }}>
+                      <DownloadAllButton
+                        urls={(item as any)[key] as string[]}
+                      />
+                    </Box>
+                  )}
+              </Box>
+              {/* Eine Datei je Zeile: Name, Download und Löschen sind sonst
+                  nicht der richtigen Datei zuzuordnen. */}
               {(item as any)[key] &&
                 ((item as any)[key] as string[]).map((url) => (
-                  <FileDisplay
-                    key={url}
-                    url={url}
-                    edit
-                    onDeleteCallback={() => {
-                      setItemField(
-                        key,
-                        ((item as any)[key] as string[]).filter(
-                          (u) => u !== url
-                        )
-                      );
-                    }}
-                  />
+                  <Box key={url}>
+                    <FileDisplay
+                      url={url}
+                      edit
+                      onDeleteCallback={() => {
+                        setItemField(
+                          key,
+                          ((item as any)[key] as string[]).filter(
+                            (u) => u !== url
+                          )
+                        );
+                      }}
+                    />
+                  </Box>
                 ))}
             </>
           )}

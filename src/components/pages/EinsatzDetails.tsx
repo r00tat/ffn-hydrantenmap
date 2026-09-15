@@ -421,12 +421,20 @@ export default function EinsatzDetails() {
         expanded={openSections['dateien'] === true}
         onToggle={toggleSection}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="h6" gutterBottom>
-            {t('attachments')}
-          </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            flexWrap: 'wrap',
+            mb: 0.5,
+          }}
+        >
+          <Typography variant="h6">{t('attachments')}</Typography>
           {firecall.attachments && firecall.attachments.length > 0 && (
-            <DownloadAllButton urls={firecall.attachments} />
+            <Box sx={{ ml: 'auto' }}>
+              <DownloadAllButton urls={firecall.attachments} />
+            </Box>
           )}
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

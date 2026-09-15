@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
 import React, { ReactNode } from 'react';
@@ -89,6 +90,34 @@ export class FirecallItemMarker extends FirecallItemBase {
       showLabel: 'boolean',
     };
   }
+  /**
+   * Anhänge als Liste: eine Datei je Zeile, darüber der Sammel-Download.
+   *
+   * FileDisplay rendert lauter Inline-Elemente (Name, Bild, Download,
+   * Löschen). Ohne die Zeilen je Datei fließen mehrere Anhänge ineinander
+   * und es ist nicht mehr zu sehen, welches Symbol zu welcher Datei gehört.
+   */
+  private attachmentList(): ReactNode {
+    const urls = (this.attachments || []).filter(
+      (a): a is string => typeof a === 'string',
+    );
+    if (urls.length === 0) {
+      return null;
+    }
+    return (
+      <Box sx={{ mt: 1 }}>
+        <Box sx={{ mb: 0.5 }}>
+          <DownloadAllButton urls={urls} />
+        </Box>
+        {urls.map((url) => (
+          <Box key={url}>
+            <FileDisplay url={url} showTitleIfImage={false} />
+          </Box>
+        ))}
+      </Box>
+    );
+  }
+
   public popupFn(): ReactNode {
     return (
       <>
@@ -105,20 +134,7 @@ export class FirecallItemMarker extends FirecallItemBase {
               <br />
             </React.Fragment>
           )) || ''}
-        {this.attachments && this.attachments.filter((a) => typeof a === 'string').length > 0 && (
-          <>
-            <DownloadAllButton urls={this.attachments.filter((a): a is string => typeof a === 'string')} />
-            {this.attachments
-              .filter((a) => typeof a === 'string')
-              .map((a) => (
-                <FileDisplay
-                  key={a as string}
-                  url={a as string}
-                  showTitleIfImage={false}
-                />
-              ))}
-          </>
-        )}
+        {this.attachmentList()}
         <br />
         Position: {Number.parseFloat('' + this.lat).toFixed(6)},
         {Number.parseFloat('' + this.lng).toFixed(6)}
@@ -168,20 +184,7 @@ export class FirecallItemMarker extends FirecallItemBase {
     return (
       <>
         {super.body()}
-        {this.attachments && this.attachments.filter((a) => typeof a === 'string').length > 0 && (
-          <>
-            <DownloadAllButton urls={this.attachments.filter((a): a is string => typeof a === 'string')} />
-            {this.attachments
-              .filter((a) => typeof a === 'string')
-              .map((a) => (
-                <FileDisplay
-                  key={a as string}
-                  url={a as string}
-                  showTitleIfImage={false}
-                />
-              ))}
-          </>
-        )}
+        {this.attachmentList()}
       </>
     );
   }
