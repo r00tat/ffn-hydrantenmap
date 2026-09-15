@@ -406,25 +406,32 @@ export default function EinsatzDetails() {
         </EinsatzDetailSection>
       )}
 
+      {/* Anhänge und Drive-Fotos in einem Abschnitt: Es sind zwei Ablageorte
+          für dieselbe Sache. Nebeneinander ist der Unterschied — nur in der
+          App gegen volle Auflösung im Drive der Feuerwehr — beim Hochladen
+          zu sehen, statt zwei Abschnitte weit auseinander. */}
       <EinsatzDetailSection
-        sectionId="anhaenge"
-        title={t('attachments')}
+        sectionId="dateien"
+        title={t('sections.files')}
         subtitle={
           firecall.attachments?.length
             ? `${firecall.attachments.length}`
             : undefined
         }
-        expanded={openSections['anhaenge'] === true}
+        expanded={openSections['dateien'] === true}
         onToggle={toggleSection}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            {t('attachmentsExplanation')}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h6" gutterBottom>
+            {t('attachments')}
           </Typography>
           {firecall.attachments && firecall.attachments.length > 0 && (
             <DownloadAllButton urls={firecall.attachments} />
           )}
         </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {t('attachmentsExplanation')}
+        </Typography>
         {canWrite && (
           <FileUploader onFileUploadComplete={handleFileUploadComplete} />
         )}
@@ -461,20 +468,12 @@ export default function EinsatzDetails() {
             {t('noAttachments')}
           </Typography>
         )}
-      </EinsatzDetailSection>
 
-      {/* Fotos im Drive — zweiter Ablageort neben den Anhängen. Bewusst direkt
-          darunter, damit der Unterschied beim Hochladen sichtbar ist. */}
-      {firecall.id && (
-        <EinsatzDetailSection
-          sectionId="fotos"
-          title={t('sections.fotos')}
-          expanded={openSections['fotos'] === true}
-          onToggle={toggleSection}
-        >
-          <EinsatzDriveFotos firecallId={firecall.id} hideTitle />
-        </EinsatzDetailSection>
-      )}
+        {/* Zweiter Ablageort: volle Auflösung im Google Drive der Feuerwehr.
+            Bringt seine eigene Zwischenüberschrift samt Trennlinie mit und
+            verschwindet ganz, wenn kein Drive eingerichtet ist. */}
+        {firecall.id && <EinsatzDriveFotos firecallId={firecall.id} />}
+      </EinsatzDetailSection>
 
       <EinsatzDetailSection
         sectionId="einsatzorte"

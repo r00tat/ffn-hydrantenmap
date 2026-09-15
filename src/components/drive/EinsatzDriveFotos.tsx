@@ -41,11 +41,8 @@ async function loadDriveState(firecallId: string): Promise<DriveStateResult> {
 
 export default function EinsatzDriveFotos({
   firecallId,
-  hideTitle = false,
 }: {
   firecallId: string;
-  /** Überschrift weglassen, wenn der Aufrufer schon eine hat. */
-  hideTitle?: boolean;
 }) {
   const t = useTranslations('einsatzDrive');
   const { isAdmin } = useFirebaseLogin();
@@ -86,12 +83,13 @@ export default function EinsatzDriveFotos({
   }
 
   return (
-    <Box sx={{ mt: 3 }}>
-      {!hideTitle && (
-        <Typography variant="h5" gutterBottom>
-          {t('title')}
-        </Typography>
-      )}
+    // Zweiter Block im Abschnitt „Anhänge und Fotos": die Trennlinie gehört
+    // hierher und nicht zum Aufrufer, sonst bliebe sie stehen, wenn das Drive
+    // nicht eingerichtet und der Betrachter kein Admin ist (return null oben).
+    <Box sx={{ mt: 3, pt: 3, borderTop: 1, borderColor: 'divider' }}>
+      <Typography variant="h6" gutterBottom>
+        {t('title')}
+      </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {t('explanation', { folder: state.folderName })}
       </Typography>
