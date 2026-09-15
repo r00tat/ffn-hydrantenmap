@@ -968,7 +968,8 @@
   },
   "fileDisplay": {
     "download": "Download",
-    "deleteAttachment": "Delete attachment"
+    "deleteAttachment": "Delete attachment",
+    "downloadAll": "Download all ({count})"
   },
   "userDialog": {
     "title": "Edit user {name}",
