@@ -1,4 +1,5 @@
 import DownloadIcon from '@mui/icons-material/Download';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTranslations } from 'next-intl';
@@ -24,22 +25,25 @@ export default function DownloadAllButton({ urls }: DownloadAllButtonProps) {
   if (urls.length === 0) return null;
 
   return (
-    <Button
-      size="small"
-      startIcon={
-        loading ? <CircularProgress size={16} /> : <DownloadIcon />
-      }
-      disabled={loading}
-      onClick={async () => {
-        setLoading(true);
-        try {
-          await Promise.all(urls.map((url) => downloadStorageFile(url)));
-        } finally {
-          setLoading(false);
-        }
-      }}
-    >
-      {t('downloadAll', { count: urls.length })}
-    </Button>
+    // Eigene Zeile: Die Anhänge darunter sind eine Folge von Inline-Elementen
+    // (Name, Bild, Download, Löschen je Datei). Ohne den Block klebte der
+    // Knopf an der ersten Datei und las sich wie deren Beschriftung.
+    <Box sx={{ display: 'block', mt: 1, mb: 0.5 }}>
+      <Button
+        size="small"
+        startIcon={loading ? <CircularProgress size={16} /> : <DownloadIcon />}
+        disabled={loading}
+        onClick={async () => {
+          setLoading(true);
+          try {
+            await Promise.all(urls.map((url) => downloadStorageFile(url)));
+          } finally {
+            setLoading(false);
+          }
+        }}
+      >
+        {t('downloadAll', { count: urls.length })}
+      </Button>
+    </Box>
   );
 }
