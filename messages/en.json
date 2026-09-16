@@ -835,6 +835,14 @@
       "abruecken": "Departed at",
       "description": "Description",
       "einsatzmittel": "Resources"
+    },
+    "sections": {
+      "overview": "Overview",
+      "files": "Attachments and photos",
+      "einsatzorte": "Operation sites",
+      "besatzung": "Crew",
+      "tagebuch": "Operation log",
+      "kostenersatz": "Cost recovery"
     }
   },
   "crew": {
@@ -960,7 +968,11 @@
   },
   "fileDisplay": {
     "download": "Download",
-    "deleteAttachment": "Delete attachment"
+    "deleteAttachment": "Delete attachment",
+    "downloadAll": "Download all ({count})",
+    "previousImage": "Previous image",
+    "nextImage": "Next image",
+    "deleteAttachmentConfirm": "Delete attachment {name}?"
   },
   "userDialog": {
     "title": "Edit user {name}",

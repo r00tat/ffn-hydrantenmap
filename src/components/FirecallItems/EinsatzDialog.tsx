@@ -33,7 +33,7 @@ import { firestore } from '../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import MyDateTimePicker from '../inputs/DateTimePicker';
-import FileDisplay from '../inputs/FileDisplay';
+import AttachmentGallery from '../inputs/AttachmentGallery';
 import FileUploader from '../inputs/FileUploader';
 import {
   getBlaulichtSmsAlarms,
@@ -488,30 +488,27 @@ export default function EinsatzDialog({
               {t('firecall.fields.attachments')}
             </Typography>
             <FileUploader onFileUploadComplete={handleFileUploadComplete} />
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-              {einsatz.attachments?.map((url) => (
-                <Box key={url} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <FileDisplay
-                    url={url}
-                    edit
-                    onDeleteCallback={async (deletedUrl) => {
-                      setEinsatz((prev) => ({
-                        ...prev,
-                        attachments: prev.attachments?.filter(
-                          (u) => u !== deletedUrl
-                        ),
-                      }));
-                      if (einsatz.id) {
-                        await setDoc(
-                          doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
-                          { attachments: arrayRemove(deletedUrl) },
-                          { merge: true }
-                        );
-                      }
-                    }}
-                  />
-                </Box>
-              ))}
+            <Box sx={{ mt: 1 }}>
+              <AttachmentGallery
+                urls={einsatz.attachments ?? []}
+                edit
+                tileSize={96}
+                onDelete={async (deletedUrl) => {
+                  setEinsatz((prev) => ({
+                    ...prev,
+                    attachments: prev.attachments?.filter(
+                      (u) => u !== deletedUrl
+                    ),
+                  }));
+                  if (einsatz.id) {
+                    await setDoc(
+                      doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
+                      { attachments: arrayRemove(deletedUrl) },
+                      { merge: true }
+                    );
+                  }
+                }}
+              />
             </Box>
           </>
         )}

@@ -37,7 +37,7 @@ import useZOrderActions from '../../hooks/useZOrderActions';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { firestore } from '../firebase/firebase';
 import FileUploader from '../inputs/FileUploader';
-import FileDisplay from '../inputs/FileDisplay';
+import AttachmentGallery from '../inputs/AttachmentGallery';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import {
   DataSchemaField,
@@ -313,9 +313,10 @@ export default function FirecallItemDialog({
               <FileUploader onFileUploadComplete={handleFileUploadComplete} />
               {uploadedRefs.length > 0 && (
                 <Box sx={{ mt: 2 }}>
-                  {uploadedRefs.map((r) => (
-                    <FileDisplay key={r.toString()} url={r.toString()} />
-                  ))}
+                  <AttachmentGallery
+                    urls={uploadedRefs.map((r) => r.toString())}
+                    tileSize={96}
+                  />
                 </Box>
               )}
               {countdown !== null && (

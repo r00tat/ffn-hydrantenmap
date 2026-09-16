@@ -62,7 +62,7 @@ vi.mock('../../hooks/useFirecall', () => ({
 }));
 
 vi.mock('../inputs/FileUploader', () => ({ default: () => null }));
-vi.mock('../inputs/FileDisplay', () => ({ default: () => null }));
+vi.mock('../inputs/AttachmentGallery', () => ({ default: () => null }));
 vi.mock('../inputs/AutoSnapshotIntervalSelect', () => ({ default: () => null }));
 
 import EinsatzDialog from './EinsatzDialog';

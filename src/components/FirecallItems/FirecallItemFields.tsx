@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
@@ -17,7 +18,7 @@ import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import DownloadAllButton from '../inputs/DownloadAllButton';
-import FileDisplay from '../inputs/FileDisplay';
+import AttachmentGallery from '../inputs/AttachmentGallery';
 import FileUploader from '../inputs/FileUploader';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
@@ -223,28 +224,42 @@ export default function FirecallItemFields({
           {/* Attachment fields */}
           {item.fieldTypes()[key] === 'attachment' && (
             <>
-              <FileUploader
-                onFileUploadComplete={(ref) => fileUploadComplete(key, ref)}
-              />
-              {(item as any)[key] && ((item as any)[key] as string[]).length > 0 && (
-                <DownloadAllButton urls={(item as any)[key] as string[]} />
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  flexWrap: 'wrap',
+                  mb: 1,
+                }}
+              >
+                <FileUploader
+                  onFileUploadComplete={(ref) => fileUploadComplete(key, ref)}
+                />
+                {(item as any)[key] &&
+                  ((item as any)[key] as string[]).length > 0 && (
+                    <Box sx={{ ml: 'auto' }}>
+                      <DownloadAllButton
+                        urls={(item as any)[key] as string[]}
+                      />
+                    </Box>
+                  )}
+              </Box>
+              {(item as any)[key] && (
+                <AttachmentGallery
+                  urls={(item as any)[key] as string[]}
+                  edit
+                  tileSize={96}
+                  onDelete={(deletedUrl) => {
+                    setItemField(
+                      key,
+                      ((item as any)[key] as string[]).filter(
+                        (u) => u !== deletedUrl
+                      )
+                    );
+                  }}
+                />
               )}
-              {(item as any)[key] &&
-                ((item as any)[key] as string[]).map((url) => (
-                  <FileDisplay
-                    key={url}
-                    url={url}
-                    edit
-                    onDeleteCallback={() => {
-                      setItemField(
-                        key,
-                        ((item as any)[key] as string[]).filter(
-                          (u) => u !== url
-                        )
-                      );
-                    }}
-                  />
-                ))}
             </>
           )}
 

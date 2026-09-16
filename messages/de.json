@@ -835,6 +835,14 @@
       "abruecken": "Abrücken",
       "description": "Beschreibung",
       "einsatzmittel": "Einsatzmittel"
+    },
+    "sections": {
+      "overview": "Übersicht",
+      "files": "Anhänge und Fotos",
+      "einsatzorte": "Einsatzorte",
+      "besatzung": "Besatzung",
+      "tagebuch": "Einsatztagebuch",
+      "kostenersatz": "Kostenersatz"
     }
   },
   "crew": {
@@ -960,7 +968,11 @@
   },
   "fileDisplay": {
     "download": "Herunterladen",
-    "deleteAttachment": "Anhang löschen"
+    "deleteAttachment": "Anhang löschen",
+    "downloadAll": "Alle herunterladen ({count})",
+    "previousImage": "Vorheriges Bild",
+    "nextImage": "Nächstes Bild",
+    "deleteAttachmentConfirm": "Anhang {name} löschen?"
   },
   "userDialog": {
     "title": "Benutzer {name} bearbeiten",

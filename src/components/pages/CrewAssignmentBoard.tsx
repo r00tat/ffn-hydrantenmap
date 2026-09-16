@@ -69,6 +69,11 @@ import CrewVehicleColumn from './CrewVehicleColumn';
 
 export interface CrewAssignmentBoardProps {
   alarms?: BlaulichtSmsAlarm[] | null;
+  /**
+   * Überschrift weglassen: Auf der Detailseite steht der Name des Abschnitts
+   * bereits in der Kopfzeile zum Aufklappen.
+   */
+  hideTitle?: boolean;
 }
 
 /* ─── Mobile: compact table components ─── */
@@ -237,6 +242,7 @@ const isManualEntry = (a: CrewAssignment) =>
 
 export default function CrewAssignmentBoard({
   alarms,
+  hideTitle = false,
 }: CrewAssignmentBoardProps) {
   const t = useTranslations('crew');
   const {
@@ -606,7 +612,7 @@ export default function CrewAssignmentBoard({
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <Typography variant="h5">{t('title')}</Typography>
+        {!hideTitle && <Typography variant="h5">{t('title')}</Typography>}
         {canWrite && (
         <Autocomplete
           freeSolo

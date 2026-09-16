@@ -369,6 +369,8 @@ export function DiaryButtons({ diary }: { diary: Diary }) {
 export interface EinsatzTagebuchOptions {
   showEditButton?: boolean;
   sortAscending?: boolean;
+  /** Überschrift weglassen, wenn der Aufrufer schon eine hat. */
+  hideTitle?: boolean;
 }
 type DiarySortField = 'nummer' | 'datum' | 'art' | 'name' | 'beschreibung';
 
@@ -441,6 +443,7 @@ function compareDiaryField(
 export function EinsatzTagebuch({
   showEditButton = true,
   sortAscending = false,
+  hideTitle = false,
 }: EinsatzTagebuchOptions) {
   const t = useTranslations('tagebuch');
   const firecall = useFirecall();
@@ -554,7 +557,11 @@ export function EinsatzTagebuch({
             mb: 2,
           }}
         >
-          <Typography variant="h4">{t('title')}</Typography>
+          {hideTitle ? (
+            <Box />
+          ) : (
+            <Typography variant="h4">{t('title')}</Typography>
+          )}
           {showEditButton && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <DownloadButton
@@ -819,6 +826,7 @@ export function EinsatzTagebuch({
 export default function Tagebuch({
   showEditButton = true,
   sortAscending = false,
+  hideTitle = false,
 }: EinsatzTagebuchOptions) {
   const firecallId = useFirecallId();
   const canEdit = useMapEditorCanEdit();
@@ -836,6 +844,7 @@ export default function Tagebuch({
     <EinsatzTagebuch
       showEditButton={showEditButton && canEdit}
       sortAscending={sortAscending}
+      hideTitle={hideTitle}
     />
   );
 }

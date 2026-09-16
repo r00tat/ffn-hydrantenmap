@@ -83,8 +83,11 @@ export default function EinsatzDriveFotos({
   }
 
   return (
-    <Box sx={{ mt: 3 }}>
-      <Typography variant="h5" gutterBottom>
+    // Zweiter Block im Abschnitt „Anhänge und Fotos": die Trennlinie gehört
+    // hierher und nicht zum Aufrufer, sonst bliebe sie stehen, wenn das Drive
+    // nicht eingerichtet und der Betrachter kein Admin ist (return null oben).
+    <Box sx={{ mt: 3, pt: 3, borderTop: 1, borderColor: 'divider' }}>
+      <Typography variant="h6" gutterBottom>
         {t('title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
