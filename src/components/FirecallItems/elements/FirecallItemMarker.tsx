@@ -9,8 +9,8 @@ import {
   FcMarker,
   FirecallItem,
 } from '../../firebase/firestore';
+import AttachmentGallery from '../../inputs/AttachmentGallery';
 import DownloadAllButton from '../../inputs/DownloadAllButton';
-import FileDisplay from '../../inputs/FileDisplay';
 import { FirecallItemBase } from './FirecallItemBase';
 import { iconKeys } from './icons';
 import {
@@ -91,11 +91,9 @@ export class FirecallItemMarker extends FirecallItemBase {
     };
   }
   /**
-   * Anhänge als Liste: eine Datei je Zeile, darüber der Sammel-Download.
-   *
-   * FileDisplay rendert lauter Inline-Elemente (Name, Bild, Download,
-   * Löschen). Ohne die Zeilen je Datei fließen mehrere Anhänge ineinander
-   * und es ist nicht mehr zu sehen, welches Symbol zu welcher Datei gehört.
+   * Anhänge als Kachelraster. Kleinere Kacheln als sonst: Das Popup ist
+   * schmal, und drei Vorschaubilder nebeneinander sind dort mehr wert als
+   * eines in voller Größe.
    */
   private attachmentList(): ReactNode {
     const urls = (this.attachments || []).filter(
@@ -109,11 +107,7 @@ export class FirecallItemMarker extends FirecallItemBase {
         <Box sx={{ mb: 0.5 }}>
           <DownloadAllButton urls={urls} />
         </Box>
-        {urls.map((url) => (
-          <Box key={url}>
-            <FileDisplay url={url} showTitleIfImage={false} />
-          </Box>
-        ))}
+        <AttachmentGallery urls={urls} tileSize={72} />
       </Box>
     );
   }

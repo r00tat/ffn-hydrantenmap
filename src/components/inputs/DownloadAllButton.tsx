@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { downloadStorageFile } from './FileDisplay';
+import { downloadStorageFile } from './storageFile';
 
 export interface DownloadAllButtonProps {
   urls: string[];

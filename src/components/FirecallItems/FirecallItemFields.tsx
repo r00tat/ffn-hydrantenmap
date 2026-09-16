@@ -18,7 +18,7 @@ import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import DownloadAllButton from '../inputs/DownloadAllButton';
-import FileDisplay from '../inputs/FileDisplay';
+import AttachmentGallery from '../inputs/AttachmentGallery';
 import FileUploader from '../inputs/FileUploader';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
@@ -245,25 +245,21 @@ export default function FirecallItemFields({
                     </Box>
                   )}
               </Box>
-              {/* Eine Datei je Zeile: Name, Download und Löschen sind sonst
-                  nicht der richtigen Datei zuzuordnen. */}
-              {(item as any)[key] &&
-                ((item as any)[key] as string[]).map((url) => (
-                  <Box key={url}>
-                    <FileDisplay
-                      url={url}
-                      edit
-                      onDeleteCallback={() => {
-                        setItemField(
-                          key,
-                          ((item as any)[key] as string[]).filter(
-                            (u) => u !== url
-                          )
-                        );
-                      }}
-                    />
-                  </Box>
-                ))}
+              {(item as any)[key] && (
+                <AttachmentGallery
+                  urls={(item as any)[key] as string[]}
+                  edit
+                  tileSize={96}
+                  onDelete={(deletedUrl) => {
+                    setItemField(
+                      key,
+                      ((item as any)[key] as string[]).filter(
+                        (u) => u !== deletedUrl
+                      )
+                    );
+                  }}
+                />
+              )}
             </>
           )}
 

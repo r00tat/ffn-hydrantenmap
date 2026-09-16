@@ -969,7 +969,10 @@
   "fileDisplay": {
     "download": "Herunterladen",
     "deleteAttachment": "Anhang löschen",
-    "downloadAll": "Alle herunterladen ({count})"
+    "downloadAll": "Alle herunterladen ({count})",
+    "previousImage": "Vorheriges Bild",
+    "nextImage": "Nächstes Bild",
+    "deleteAttachmentConfirm": "Anhang {name} löschen?"
   },
   "userDialog": {
     "title": "Benutzer {name} bearbeiten",

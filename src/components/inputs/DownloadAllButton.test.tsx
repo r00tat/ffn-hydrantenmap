@@ -5,7 +5,7 @@ import '@testing-library/jest-dom/vitest';
 import { renderWithIntl as render } from '../../test-utils/intlRender';
 import DownloadAllButton from './DownloadAllButton';
 
-vi.mock('./FileDisplay', () => ({
+vi.mock('./storageFile', () => ({
   downloadStorageFile: vi.fn(),
 }));
 

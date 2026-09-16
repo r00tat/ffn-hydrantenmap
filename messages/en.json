@@ -969,7 +969,10 @@
   "fileDisplay": {
     "download": "Download",
     "deleteAttachment": "Delete attachment",
-    "downloadAll": "Download all ({count})"
+    "downloadAll": "Download all ({count})",
+    "previousImage": "Previous image",
+    "nextImage": "Next image",
+    "deleteAttachmentConfirm": "Delete attachment {name}?"
   },
   "userDialog": {
     "title": "Edit user {name}",

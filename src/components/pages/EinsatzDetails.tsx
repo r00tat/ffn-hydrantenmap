@@ -42,7 +42,7 @@ import {
   firecallAlarmIds,
 } from '../firebase/firestore';
 import DownloadAllButton from '../inputs/DownloadAllButton';
-import FileDisplay from '../inputs/FileDisplay';
+import AttachmentGallery from '../inputs/AttachmentGallery';
 import EinsatzDriveFotos from '../drive/EinsatzDriveFotos';
 import FileUploader from '../inputs/FileUploader';
 import { useSnackbar } from '../providers/SnackbarProvider';
@@ -444,32 +444,13 @@ export default function EinsatzDetails() {
           <FileUploader onFileUploadComplete={handleFileUploadComplete} />
         )}
         {firecall.attachments && firecall.attachments.length > 0 ? (
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: '1fr',
-                sm: 'repeat(2, 1fr)',
-                md: 'repeat(3, 1fr)',
-                lg: 'repeat(4, 1fr)',
-              },
-              gap: 2,
-              mt: 2,
-            }}
-          >
-            {firecall.attachments.map((url) => (
-              <Box
-                key={url}
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <FileDisplay
-                  url={url}
-                  edit={canWrite}
-                  onDeleteCallback={handleDeleteAttachment}
-                  imageSize={200}
-                />
-              </Box>
-            ))}
+          <Box sx={{ mt: 2 }}>
+            <AttachmentGallery
+              urls={firecall.attachments}
+              edit={canWrite}
+              onDelete={handleDeleteAttachment}
+              tileSize={140}
+            />
           </Box>
         ) : (
           <Typography color="text.secondary" sx={{ mt: 1 }}>
