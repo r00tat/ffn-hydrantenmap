@@ -45,7 +45,7 @@ beidem greift, darf nicht in der Freigabeliste stehen.
 
 ## Freigabeliste Browser-Key
 
-Elf Dienste, je einer mit Grund:
+Zwölf Dienste, je einer mit Grund:
 
 | Dienst | Warum |
 | --- | --- |
@@ -58,6 +58,7 @@ Elf Dienste, je einer mit Grund:
 | `fcm.googleapis.com`, `fcmregistrations.googleapis.com` | Push |
 | `firebasevertexai.googleapis.com` | Gemini über Firebase AI Logic — durch App Check erzwungen, s. unten |
 | `firebaseml.googleapis.com` | Altname derselben AI Logic. Bleibt drin, weil unklar ist, ob die Key-Prüfung den aufgerufenen (`firebasevertexai`) oder den kanonischen Namen ansetzt — App Check zählt unter dem Altnamen. Kostet nichts: der Dienst ist im Projekt nicht aktiviert und zusätzlich erzwungen |
+| `generativelanguage.googleapis.com` | Live-Sitzung des Sprach-Assistenten. Läuft über dieselbe AI Logic, aber über das Backend der Gemini Developer API — für Gemini 3 gibt es die Live-API nur dort. App Check greift auch hier, s. [docs/ai-sprachassistent.md](ai-sprachassistent.md) |
 | `firebase.googleapis.com` | Konfigurations-Lookup des SDK; nur mit OAuth für mehr zu gebrauchen |
 
 Bewusst **entfernt** wurden `places` und `texttospeech` — beide
