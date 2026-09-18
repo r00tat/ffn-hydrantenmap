@@ -1,25 +1,14 @@
-import { useCallback, useContext, useRef, useState } from 'react';
-import { LeafletContext } from '@react-leaflet/core';
+import { useCallback, useRef, useState } from 'react';
 import { GenerateContentRequest, Content, GenerationConfig, ThinkingLevel } from 'firebase/ai';
 import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
 import { FirecallItem } from '../../components/firebase/firestore';
-import { usePositionContext } from '../../components/providers/PositionProvider';
-import { queryClusters } from '../../components/firebase/clusterQuery';
-import { HoseLineDraft, WaterSupplyCandidate } from '../../common/waterSupply';
-import { defaultPosition } from '../constants';
-import { PositionSpec, resolveOriginFrom } from './resolveOrigin';
-import { ResolvedOrigin } from './types';
-import { useFirecall } from '../useFirecall';
-import { useHoseLineDraft } from '../useHoseLineDraft';
-import useFirecallItemAdd from '../useFirecallItemAdd';
-import useFirecallItemUpdate from '../useFirecallItemUpdate';
-import { AiAssistantResult, AiInteraction, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types';
-import { executeToolCall } from './toolHandlers';
-import { buildAiContext } from './contextBuilder';
-import { MAP_CONTEXT_PREFIX, stripInlineDataParts, stripMapContextParts } from './chatHistory';
+import { HoseLineDraft } from '../../common/waterSupply';
+import { AiAssistantResult, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types';
+import { stripInlineDataParts, stripMapContextParts } from './chatHistory';
 import { isUsableAudio } from './audioInput';
 import { LatencyRun, startLatencyRun, tokenDetail } from './latency';
+import useAiToolRunner from './useAiToolRunner';
 
 // Ohne eigenen Transkriptionsschritt gibt es keinen Zustand „transcribing" mehr:
 // Der gesprochene Befehl geht direkt in die Analyse (Issue #740).
@@ -41,21 +30,12 @@ const AI_GENERATION_CONFIG: GenerationConfig = {
 };
 
 export default function useAiAssistant(existingItems: FirecallItem[]) {
-  const leafletContext = useContext(LeafletContext);
-  const map = leafletContext?.map ?? null;
-  const [position, isPositionSet] = usePositionContext();
-  const addFirecallItem = useFirecallItemAdd();
-  const updateFirecallItem = useFirecallItemUpdate();
-  const firecall = useFirecall();
-  const { proposeDrafts } = useHoseLineDraft();
+  const { executeTool, buildContextText, contextStats, interactionsRef, lastCreatedItem, undoLastAction } =
+    useAiToolRunner(existingItems);
 
-  const interactionsRef = useRef<AiInteraction[]>([]);
-  /** Treffer der letzten Umkreissuche, siehe `ToolHandlerDeps` */
-  const waterSupplyResultsRef = useRef<WaterSupplyCandidate[]>([]);
   const chatHistoryRef = useRef<Content[]>([]);
   const lastActivityRef = useRef<number>(0);
-  
-  const [lastCreatedItem, setLastCreatedItem] = useState<{ id: string; type: string } | null>(null);
+
   const [processingStatus, setProcessingStatus] = useState<AiProcessingStatus>('idle');
 
   const cleanupHistory = useCallback(() => {
@@ -76,7 +56,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     if (chatHistoryRef.current.length > MAX_INTERACTIONS * 2) {
       chatHistoryRef.current = chatHistoryRef.current.slice(-MAX_INTERACTIONS * 2);
     }
-  }, []);
+  }, [interactionsRef]);
 
   /**
    * Ende einer Interaktion festhalten. Erst ab hier zählt das Zeitfenster des
@@ -87,55 +67,6 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     lastActivityRef.current = Date.now();
   }, []);
 
-  /**
-   * Positionsangabe auflösen — die Regeln stehen in `resolveOriginFrom` und
-   * gelten für den Browser-Assistenten und den MCP-Server gleichermaßen.
-   * Hier kommt nur der Kontext dazu, den es ausschließlich im Browser gibt:
-   * Kartenmitte und eigener Standort.
-   */
-  const resolveOrigin = useCallback(
-    async (positionSpec: PositionSpec | undefined): Promise<ResolvedOrigin> => {
-      const center = map ? map.getCenter() : defaultPosition;
-      return resolveOriginFrom(positionSpec, {
-        fallback: {
-          lat: center.lat,
-          lng: center.lng,
-          type: 'mapCenter',
-          label: 'der Kartenmitte',
-        },
-        userPosition: isPositionSet
-          ? {
-              lat: position.lat,
-              lng: position.lng,
-              type: 'userPosition',
-              label: 'deinem Standort',
-            }
-          : undefined,
-        einsatzort:
-          firecall.lat && firecall.lng
-            ? {
-                lat: firecall.lat,
-                lng: firecall.lng,
-                type: 'einsatzort',
-                label: 'dem Einsatzort',
-              }
-            : undefined,
-        existingItems,
-      });
-    },
-    [existingItems, firecall.lat, firecall.lng, isPositionSet, map, position]
-  );
-
-  const resolvePosition = useCallback(
-    async (
-      positionSpec: PositionSpec | undefined
-    ): Promise<{ lat: number; lng: number }> => {
-      const { lat, lng } = await resolveOrigin(positionSpec);
-      return { lat, lng };
-    },
-    [resolveOrigin]
-  );
-
   const sendToGemini = useCallback(
     async (
       userParts: GenerateContentRequest['contents'][0]['parts'],
@@ -143,23 +74,11 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     ): Promise<AiAssistantResult> => {
       cleanupHistory();
 
-      const contextText = run.sync('kontext bauen', () => {
-        const context = buildAiContext({
-          map,
-          defaultPosition,
-          existingItems,
-          isPositionSet,
-          position,
-          interactions: interactionsRef.current,
-        });
-        // Kompakt statt eingerückt: Die Einrückung ist rund ein Drittel der
-        // Zeichen und trägt für das Modell nichts bei (#740).
-        return `${MAP_CONTEXT_PREFIX}\n${JSON.stringify(context)}`;
-      });
+      const contextText = run.sync('kontext bauen', () => buildContextText());
 
       run.note({
         kontextZeichen: contextText.length,
-        items: existingItems.filter((i) => !i.deleted).length,
+        ...contextStats(),
         historieEintraege: chatHistoryRef.current.length,
       });
 
@@ -176,7 +95,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       console.info('[AI] User input:', userParts.map((p) => 'text' in p ? p.text : '[Data]'));
 
       setProcessingStatus('analyzing');
-      
+
       let iterations = 0;
       const MAX_LOOP_ITERATIONS = 5;
       let lastResult: AiAssistantResult | null = null;
@@ -188,7 +107,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       try {
         while (iterations < MAX_LOOP_ITERATIONS) {
           iterations++;
-          
+
           const request: GenerateContentRequest = {
             systemInstruction: AI_SYSTEM_PROMPT,
             contents: currentContents,
@@ -209,7 +128,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
           const candidate = response.candidates[0];
           const modelContent = candidate.content;
-          
+
           if (!modelContent) {
             throw new Error('Candidate content is missing');
           }
@@ -238,17 +157,17 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           if (!functionCalls || functionCalls.length === 0) {
             // No more function calls, we are done
             const text = responseText;
-            
+
             // SAVE current session back to persistent history ref — die
             // Audio-Blobs sind oben bereits ersetzt, der Kartenkontext geht
             // hier heraus: Er käme sonst bei jeder Folgefrage veraltet noch
             // einmal mit.
             chatHistoryRef.current = stripMapContextParts(currentContents);
-            
+
             setProcessingStatus('idle');
             console.info('[AI] Interaction complete. Final message:', text || 'Aktion ausgeführt');
-            return { 
-              success: true, 
+            return {
+              success: true,
               message: text || lastResult?.message || 'Aktion ausgeführt',
               isAnswer: !!text,
               createdItemId: lastResult?.createdItemId,
@@ -256,40 +175,15 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             };
           }
 
-          // Execute function calls
-          const toolDeps = {
-            resolvePosition,
-            addFirecallItem,
-            updateFirecallItem,
-            existingItems,
-            lastCreatedItem,
-            setLastCreatedItem,
-            map,
-            defaultPosition,
-            resolveOrigin,
-            findWaterSupply: queryClusters,
-            waterSupplyResults: waterSupplyResultsRef,
-            proposeHoseLineDrafts: proposeDrafts,
-          };
-
           setProcessingStatus('executing');
           const functionResponseParts = [];
 
           for (const fc of functionCalls) {
             console.info(`[AI] Executing tool: ${fc.name}`, fc.args);
             const execResult = await run.phase(`werkzeug ${fc.name}`, () =>
-              executeToolCall(fc, toolDeps)
+              executeTool(fc)
             );
             console.info(`[AI] Tool result (${fc.name}):`, { success: execResult.success, message: execResult.message });
-            
-            if (execResult.success) {
-              interactionsRef.current.push({
-                timestamp: Date.now(),
-                action: fc.name,
-                createdItemId: execResult.createdItemId,
-                createdItemType: fc.name.replace('create', '').toLowerCase(),
-              });
-            }
 
             functionResponseParts.push({
               functionResponse: {
@@ -325,7 +219,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         markInteractionDone();
       }
     },
-    [cleanupHistory, markInteractionDone, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDrafts, resolveOrigin]
+    [buildContextText, cleanupHistory, contextStats, executeTool, markInteractionDone]
   );
 
   const processAudio = useCallback(
@@ -381,18 +275,6 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     },
     [sendToGemini]
   );
-
-  const undoLastAction = useCallback(async (): Promise<boolean> => {
-    if (!lastCreatedItem) return false;
-
-    const item = existingItems.find((i) => i.id === lastCreatedItem.id);
-    if (!item) return false;
-
-    console.info('[AI] Undoing last action:', lastCreatedItem);
-    await updateFirecallItem({ ...item, deleted: true });
-    setLastCreatedItem(null);
-    return true;
-  }, [existingItems, lastCreatedItem, updateFirecallItem]);
 
   return {
     processAudio,

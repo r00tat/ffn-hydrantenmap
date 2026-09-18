@@ -60,6 +60,16 @@ Elf Dienste, je einer mit Grund:
 | `firebaseml.googleapis.com` | Altname derselben AI Logic. Bleibt drin, weil unklar ist, ob die Key-Prüfung den aufgerufenen (`firebasevertexai`) oder den kanonischen Namen ansetzt — App Check zählt unter dem Altnamen. Kostet nichts: der Dienst ist im Projekt nicht aktiviert und zusätzlich erzwungen |
 | `firebase.googleapis.com` | Konfigurations-Lookup des SDK; nur mit OAuth für mehr zu gebrauchen |
 
+**Nicht** in die Liste gehört `generativelanguage.googleapis.com`, obwohl der
+Sprach-Assistent seit der Live-Sitzung das Backend der Gemini Developer API
+verwendet. Der Browser ruft diesen Dienst nie auf: Das SDK spricht für **beide**
+Backends ausschließlich `firebasevertexai.googleapis.com` an — per HTTPS und
+per WebSocket —, die AI Logic ruft die Developer API erst dahinter auf. Im
+Projekt muss der Dienst aktiviert sein, am Key hätte er nur eine Wirkung: Die
+Generative Language API nimmt einen blanken Key entgegen und steht **nicht**
+hinter App Check. Wer den Key aus dem JS-Bundle liest, könnte damit auf Rechnung
+des Projekts Modelle aufrufen — genau die Lücke, gegen die die Liste da ist.
+
 Bewusst **entfernt** wurden `places` und `texttospeech` — beide
 kostenpflichtig, beide client-seitig ungenutzt: die Adresssuche läuft über
 Nominatim, Text-to-Speech serverseitig in `src/app/api/tts/route.ts` mit

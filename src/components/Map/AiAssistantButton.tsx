@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 import useAiAssistant from '../../hooks/useAiAssistant';
+import useAiLiveAssistant from '../../hooks/aiAssistant/useAiLiveAssistant';
 import { useHoseLineDraft } from '../../hooks/useHoseLineDraft';
 import { FirecallItem } from '../firebase/firestore';
 import type { AiAssistantResult } from '../../hooks/aiAssistant/types';
@@ -60,6 +61,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const t = useTranslations('ai');
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
   const { processAudio, processText, undoLastAction, processingStatus } = useAiAssistant(firecallItems);
+  const live = useAiLiveAssistant(firecallItems);
   const { confirmAllDrafts, discardAllDrafts } = useHoseLineDraft();
 
   const [toast, setToast] = useState<AiToastState>({
@@ -70,6 +72,15 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const [isAiProcessing, setIsAiProcessing] = useState(false);
 
   const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  /** Läuft der aktuelle Befehl über die Live-Sitzung? */
+  const liveTurnRef = useRef(false);
+  /**
+   * Einmal gescheitert, bleibt es beim Einzelaufruf: Ist die Live-API im
+   * Projekt nicht freigeschaltet oder der Browser zu alt, scheitert jeder
+   * weitere Versuch genauso — und zwar erst beim Sprechen, wenn es am meisten
+   * stört.
+   */
+  const liveUnavailableRef = useRef(false);
 
   const showResult = useCallback(async (result: AiAssistantResult, run?: LatencyRun) => {
     setToast({
@@ -81,8 +92,9 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
       draftCount: result.drafts?.length ?? 0,
     });
     run?.mark('antwort angezeigt');
-    // Speak answers from the AI
-    if (result.isAnswer && result.message) {
+    // Speak answers from the AI — in der Live-Sitzung hat das Modell den Satz
+    // bereits selbst gesprochen.
+    if (result.isAnswer && result.message && !result.spokenByModel) {
       // Bis zur Sprachausgabe wartet der Benutzer weiter — deshalb gehört
       // auch dieser Schritt in die Messung (Issue #740).
       await (run
@@ -106,63 +118,90 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
     }
   }, [recorderError]);
 
+  /**
+   * Aufnahme beenden und den Befehl verarbeiten — über die Live-Sitzung, wenn
+   * sie beim Drücken zustande kam, sonst über den Einzelaufruf.
+   */
+  const stopAndProcess = useCallback(async (label: string) => {
+    if (maxRecordingTimerRef.current) {
+      clearTimeout(maxRecordingTimerRef.current);
+      maxRecordingTimerRef.current = null;
+    }
+
+    // Der Lauf beginnt hier, weil ab hier gewartet wird — alles davor ist
+    // Aufnahmezeit und zählt nicht zur Latenz (Issue #740).
+    const run = startLatencyRun(label);
+    playStopBeep();
+
+    if (liveTurnRef.current) {
+      liveTurnRef.current = false;
+      setIsAiProcessing(true);
+      try {
+        await showResult(await live.finishTurn(run), run);
+      } finally {
+        setIsAiProcessing(false);
+      }
+      return;
+    }
+
+    const audio = await run.phase('aufnahme abschließen', () => stopRecording());
+    if (!audio) {
+      run.finish();
+      return;
+    }
+
+    setIsAiProcessing(true);
+    try {
+      await showResult(await processAudio(audio, run), run);
+    } finally {
+      setIsAiProcessing(false);
+    }
+  }, [live, processAudio, showResult, stopRecording]);
+
+  const startListening = useCallback(async () => {
+    playStartBeep();
+
+    if (live.isSupported && !liveUnavailableRef.current) {
+      try {
+        await live.startTurn();
+        liveTurnRef.current = true;
+      } catch (error) {
+        // Der Benutzer spricht bereits — hier ist kein Platz für eine
+        // Fehlermeldung, nur für den Weg, der funktioniert.
+        console.warn('[AI] Live-Sitzung nicht verfügbar, weiter im Einzelaufruf:', error);
+        liveUnavailableRef.current = true;
+        await live.abortTurn();
+        await startRecording();
+      }
+    } else {
+      await startRecording();
+    }
+
+    // Auto-stop after max recording time
+    maxRecordingTimerRef.current = setTimeout(() => {
+      void stopAndProcess('sprachbefehl (zeitlimit)');
+    }, MAX_RECORDING_TIME_MS);
+  }, [live, startRecording, stopAndProcess]);
+
   const handleClick = useCallback(async (event: React.MouseEvent) => {
     event.stopPropagation();
     event.preventDefault();
 
-    if (recorderState === 'recording') {
-      // Stop recording
-      if (maxRecordingTimerRef.current) {
-        clearTimeout(maxRecordingTimerRef.current);
-        maxRecordingTimerRef.current = null;
-      }
-
-      // Der Lauf beginnt hier, weil ab hier gewartet wird — alles davor ist
-      // Aufnahmezeit und zählt nicht zur Latenz (Issue #740).
-      const run = startLatencyRun('sprachbefehl');
-      playStopBeep();
-      const audio = await run.phase('aufnahme abschließen', () => stopRecording());
-      if (!audio) {
-        run.finish();
-        return;
-      }
-
-      setIsAiProcessing(true);
-      try {
-        await showResult(await processAudio(audio, run), run);
-      } finally {
-        setIsAiProcessing(false);
-      }
+    if (recorderState === 'recording' || liveTurnRef.current) {
+      await stopAndProcess('sprachbefehl');
     } else {
-      // Start recording
-      playStartBeep();
-      await startRecording();
-
-      // Auto-stop after max recording time
-      maxRecordingTimerRef.current = setTimeout(async () => {
-        const run = startLatencyRun('sprachbefehl (zeitlimit)');
-        playStopBeep();
-        const audio = await run.phase('aufnahme abschließen', () => stopRecording());
-        if (!audio) {
-          run.finish();
-          return;
-        }
-        setIsAiProcessing(true);
-        try {
-          await showResult(await processAudio(audio, run), run);
-        } finally {
-          setIsAiProcessing(false);
-        }
-      }, MAX_RECORDING_TIME_MS);
+      await startListening();
     }
-  }, [processAudio, recorderState, showResult, startRecording, stopRecording]);
+  }, [recorderState, startListening, stopAndProcess]);
 
   const handleToastClose = useCallback(() => {
     setToast((prev) => ({ ...prev, open: false }));
   }, []);
 
   const handleUndo = useCallback(async () => {
-    const success = await undoLastAction();
+    // Welcher Weg das Element angelegt hat, weiß nur der jeweilige Hook — der
+    // andere meldet dann schlicht, dass er nichts zurückzunehmen hat.
+    const success = (await live.undoLastAction()) || (await undoLastAction());
     if (success) {
       setToast({
         open: true,
@@ -170,7 +209,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         severity: 'success',
       });
     }
-  }, [undoLastAction]);
+  }, [live, undoLastAction]);
 
   const handleClarificationSelect = useCallback(async (option: string) => {
     const run = startLatencyRun('rückfrage beantwortet');
@@ -202,17 +241,21 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
     discardAllDrafts();
   }, [discardAllDrafts]);
 
-  const isRecording = recorderState === 'recording';
+  const isRecording = recorderState === 'recording' || live.status === 'listening';
   const isProcessing = recorderState === 'processing' || isAiProcessing;
 
   const statusLabels: Record<string, string> = {
     analyzing: 'Analysiere...',
     executing: 'Führe aus...',
   };
+  // Beide Wege melden denselben Fortschritt, aktiv ist immer nur einer.
+  const activeStatus = live.status !== 'idle' && live.status !== 'listening'
+    ? live.status
+    : processingStatus;
   const statusText = isRecording
     ? 'Aufnahme...'
-    : processingStatus !== 'idle'
-      ? statusLabels[processingStatus]
+    : activeStatus !== 'idle'
+      ? statusLabels[activeStatus]
       : isProcessing
         ? 'Verarbeitung...'
         : null;
