@@ -45,7 +45,7 @@ beidem greift, darf nicht in der Freigabeliste stehen.
 
 ## Freigabeliste Browser-Key
 
-Zwölf Dienste, je einer mit Grund:
+Elf Dienste, je einer mit Grund:
 
 | Dienst | Warum |
 | --- | --- |
@@ -58,8 +58,17 @@ Zwölf Dienste, je einer mit Grund:
 | `fcm.googleapis.com`, `fcmregistrations.googleapis.com` | Push |
 | `firebasevertexai.googleapis.com` | Gemini über Firebase AI Logic — durch App Check erzwungen, s. unten |
 | `firebaseml.googleapis.com` | Altname derselben AI Logic. Bleibt drin, weil unklar ist, ob die Key-Prüfung den aufgerufenen (`firebasevertexai`) oder den kanonischen Namen ansetzt — App Check zählt unter dem Altnamen. Kostet nichts: der Dienst ist im Projekt nicht aktiviert und zusätzlich erzwungen |
-| `generativelanguage.googleapis.com` | Live-Sitzung des Sprach-Assistenten. Läuft über dieselbe AI Logic, aber über das Backend der Gemini Developer API — für Gemini 3 gibt es die Live-API nur dort. App Check greift auch hier, s. [docs/ai-sprachassistent.md](ai-sprachassistent.md) |
 | `firebase.googleapis.com` | Konfigurations-Lookup des SDK; nur mit OAuth für mehr zu gebrauchen |
+
+**Nicht** in die Liste gehört `generativelanguage.googleapis.com`, obwohl der
+Sprach-Assistent seit der Live-Sitzung das Backend der Gemini Developer API
+verwendet. Der Browser ruft diesen Dienst nie auf: Das SDK spricht für **beide**
+Backends ausschließlich `firebasevertexai.googleapis.com` an — per HTTPS und
+per WebSocket —, die AI Logic ruft die Developer API erst dahinter auf. Im
+Projekt muss der Dienst aktiviert sein, am Key hätte er nur eine Wirkung: Die
+Generative Language API nimmt einen blanken Key entgegen und steht **nicht**
+hinter App Check. Wer den Key aus dem JS-Bundle liest, könnte damit auf Rechnung
+des Projekts Modelle aufrufen — genau die Lücke, gegen die die Liste da ist.
 
 Bewusst **entfernt** wurden `places` und `texttospeech` — beide
 kostenpflichtig, beide client-seitig ungenutzt: die Adresssuche läuft über

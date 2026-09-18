@@ -69,9 +69,38 @@ Backend, beide dürfen also nebeneinander bestehen —
 Live-Sitzung hängt an [liveAi.ts](../src/components/firebase/liveAi.ts).
 
 Zu tun ist das im Firebase-Projekt einmal: **`generativelanguage.googleapis.com`
-aktivieren und in die Freigabeliste des Browser-Keys aufnehmen**
-(siehe [api-keys.md](api-keys.md)). App Check greift auch für dieses Backend.
-Solange das fehlt, scheitert `connect()` — was kein Ausfall ist, siehe unten.
+aktivieren** — im Projekt, **nicht** am Browser-Key. Der Browser ruft den Dienst
+nie auf, die AI Logic tut es hinter ihrem Proxy; am Key wäre der Eintrag nur
+eine offene Flanke (Begründung in [api-keys.md](api-keys.md)). Solange die
+Freischaltung fehlt, scheitert `connect()` — was kein Ausfall ist, siehe unten.
+
+## App Check deckt die Live-Verbindung nicht ab
+
+Das ist der offene Punkt dieser Bauweise, und er ist im SDK nachzulesen
+(`@firebase/ai` 12.19.0):
+
+- Der **Einzelaufruf** geht per `fetch` hinaus. `getHeaders()` setzt
+  `x-goog-api-key`, **`X-Firebase-AppCheck`** und `Authorization: Firebase <ID-Token>`.
+  Hier greift App Check samt Replay-Schutz (`useLimitedUseAppCheckTokens`).
+- Die **Live-Sitzung** ist ein WebSocket. `WebSocketUrl.toString()` hängt
+  ausschließlich `?key=<Browser-Key>` an, und die `setup`-Nachricht trägt weder
+  App-Check- noch Auth-Token. Browser können auf einem WebSocket-Handshake keine
+  eigenen Header setzen — das ist keine Nachlässigkeit des SDK, sondern eine
+  Grenze der Plattform.
+
+Daraus folgt zweierlei, und was davon zutrifft, muss **vor dem Ausrollen in dev
+gemessen werden**: Entweder die erzwungene App-Check-Prüfung weist den Handshake
+ab — dann läuft der Assistent dauerhaft im Rückfall und die Live-Sitzung bringt
+nichts. Oder der WebSocket-Endpunkt ist von der Erzwingung ausgenommen — dann
+hängt er allein am Browser-Key, und wer den aus dem Bundle liest, kann auf
+Rechnung des Projekts Sitzungen öffnen.
+
+Bis das geklärt ist, gilt für die Live-Sitzung der Grundsatz aus
+[api-keys.md](api-keys.md) nicht, dass hinter jedem Dienst am Key entweder
+Firestore-Regeln oder App Check stehen. Gegenmittel, unabhängig vom Ausgang:
+ein Kontingent (Quota) auf `firebasevertexai.googleapis.com` im Cloud-Projekt
+und ein Budget-Alarm, damit der Schaden im Missbrauchsfall begrenzt und sichtbar
+ist.
 
 ## Der Rückfall ist kein Notnagel
 
