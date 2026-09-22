@@ -42,9 +42,9 @@ interface UiConfig {
   }[];
 }
 
-async function renderLogin() {
+async function renderLogin(props: { showGoogleProvider?: boolean } = {}) {
   const { default: FirebaseUiLogin } = await import('./firebase-ui-login');
-  renderWithIntl(<FirebaseUiLogin />);
+  renderWithIntl(<FirebaseUiLogin {...props} />);
   return startMock.mock.calls.at(-1)?.[1] as UiConfig;
 }
 
@@ -105,5 +105,28 @@ describe('FirebaseUiLogin: Kontenauswahl', () => {
       (o) => o.provider === 'google.com',
     );
     expect(google?.customParameters).toEqual({ prompt: 'select_account' });
+  });
+});
+
+describe('FirebaseUiLogin: Anbieterauswahl', () => {
+  it('bietet ohne Angabe alle Anbieter an', async () => {
+    const config = await renderLogin();
+    expect(config.signInOptions.map((o) => o.provider)).toEqual([
+      'google.com',
+      'password',
+      'password',
+    ]);
+  });
+
+  it('laesst Google weg, wenn es der native Login schon abdeckt', async () => {
+    // In der Android-App meldet `NativeLoginPanel` ueber Google an. Der
+    // Web-Weg von FirebaseUI kaeme in der WebView ohnehin nicht durch — zwei
+    // Google-Knoepfe, von denen einer nicht funktioniert, waeren schlechter
+    // als einer.
+    const config = await renderLogin({ showGoogleProvider: false });
+    expect(config.signInOptions.map((o) => o.provider)).toEqual([
+      'password',
+      'password',
+    ]);
   });
 });

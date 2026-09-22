@@ -21,7 +21,20 @@ import {
 import { shouldUseRedirectSignIn } from './signInStrategy';
 import { claimWidgetContainer } from './widgetGuard';
 
-export default function FirebaseUiLogin() {
+/**
+ * `showGoogleProvider=false` blendet Google aus.
+ *
+ * In der Android-App meldet `NativeLoginPanel` ueber den nativen Google-Weg
+ * an. FirebaseUI steht dort daneben, damit E-Mail und E-Mail-Link erreichbar
+ * bleiben — aber sein eigener Google-Knopf waere ein zweiter, der nicht
+ * funktioniert: Popup wie Redirect laufen in der WebView gegen eine Origin,
+ * die Firebase nicht als autorisierte Domain kennt.
+ */
+export default function FirebaseUiLogin({
+  showGoogleProvider = true,
+}: {
+  showGoogleProvider?: boolean;
+}) {
   const t = useTranslations('login');
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -147,17 +160,22 @@ export default function FirebaseUiLogin() {
       signInFlow: shouldUseRedirectSignIn() ? 'redirect' : 'popup',
       // signInSuccessUrl: 'https://www.anyurl.com', // This is where should redirect if the sign in is successful.
       signInOptions: [
-        {
-          provider: GoogleAuthProvider.PROVIDER_ID,
-          // scopes: ['https://www.googleapis.com/auth/contacts.readonly'],
-          clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID,
-          // Ohne `prompt` entscheidet Google selbst und nimmt bei einer
-          // aktiven Sitzung stillschweigend ein Konto — in der Antwort steht
-          // dann `prompt=none`. Wer dienstlich und privat getrennte Konten
-          // hat, kommt so nie an das zweite und muesste sich erst im Browser
-          // abmelden. `select_account` erzwingt die Auswahl.
-          customParameters: { prompt: 'select_account' },
-        },
+        ...(showGoogleProvider
+          ? [
+              {
+                provider: GoogleAuthProvider.PROVIDER_ID,
+                // scopes: ['https://www.googleapis.com/auth/contacts.readonly'],
+                clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID,
+                // Ohne `prompt` entscheidet Google selbst und nimmt bei einer
+                // aktiven Sitzung stillschweigend ein Konto — in der Antwort
+                // steht dann `prompt=none`. Wer dienstlich und privat
+                // getrennte Konten hat, kommt so nie an das zweite und
+                // muesste sich erst im Browser abmelden. `select_account`
+                // erzwingt die Auswahl.
+                customParameters: { prompt: 'select_account' },
+              },
+            ]
+          : []),
         {
           provider: EmailAuthProvider.PROVIDER_ID,
           providerName: 'Email',
@@ -186,7 +204,10 @@ export default function FirebaseUiLogin() {
       // currently broken
       // credentialHelper: firebaseui.auth.CredentialHelper.GOOGLE_YOLO,
     });
-  }, []);
+    // `showGoogleProvider` steht ab dem ersten Rendern fest — LoginUi rendert
+    // erst, wenn die Plattform bekannt ist. Ein zweiter Lauf waere ohnehin ein
+    // No-op, darum siehe `claimWidgetContainer`.
+  }, [showGoogleProvider]);
 
   return (
     <>

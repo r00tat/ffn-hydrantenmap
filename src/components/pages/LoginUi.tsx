@@ -4,6 +4,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -135,10 +136,24 @@ export default function LoginUi() {
         <>
           <Paper sx={{ p: 2, m: 2 }}>
             <Typography>{t('intro')}</Typography>
-            {nativeDebug?.isCapacitorNative ? (
-              <NativeLoginPanel />
-            ) : (
-              <FirebaseUiLogin />
+            {/* Erst rendern, wenn die Plattform feststeht. FirebaseUI startet
+                sein Widget beim Einhängen und entscheidet dabei ein für alle
+                Mal über die Anbieter — ein Rendern „auf Verdacht" würde in der
+                App den Google-Knopf mitnehmen, den der native Login abdeckt. */}
+            {nativeDebug && (
+              <>
+                {/* Der native Login ist eine Ergänzung, kein Ersatz: E-Mail,
+                    E-Mail-Link und Passkey bleiben auch in der App erreichbar. */}
+                {nativeDebug.isCapacitorNative && (
+                  <>
+                    <NativeLoginPanel />
+                    <Divider sx={{ my: 2 }}>{t('orOtherMethods')}</Divider>
+                  </>
+                )}
+                <FirebaseUiLogin
+                  showGoogleProvider={!nativeDebug.isCapacitorNative}
+                />
+              </>
             )}
             {/* Passkey-Login gilt für beide Varianten und liegt deshalb hier
                 statt in den beiden Panels — firebaseui rendert seinen eigenen

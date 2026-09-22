@@ -1681,6 +1681,7 @@
     "loadingCachedAuth": "Gespeicherte Anmeldung wird geladen...",
     "signInInProgress": "Anmeldung läuft...",
     "intro": "Für die Nutzung der Einsatzkarte ist eine Anmeldung und manuelle Freischaltung erforderlich. Bitte melde dich an.",
+    "orOtherMethods": "oder mit anderen Methoden",
     "capacitorDebug": "Capacitor Debug",
     "alreadySignedIn": "Du bist bereits angemeldet.",
     "goToProfile": "Zum Profil",

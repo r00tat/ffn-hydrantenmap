@@ -1681,6 +1681,7 @@
     "loadingCachedAuth": "Loading saved sign-in...",
     "signInInProgress": "Signing in...",
     "intro": "Using the operations map requires a sign-in and manual account activation. Please sign in.",
+    "orOtherMethods": "or use another method",
     "capacitorDebug": "Capacitor debug",
     "alreadySignedIn": "You are already signed in.",
     "goToProfile": "Go to profile",
