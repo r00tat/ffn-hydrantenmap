@@ -74,6 +74,35 @@ function tagMessage(message: Record<string, unknown>): LiveMessage | undefined {
   return undefined;
 }
 
+/**
+ * Kurzfassung einer Servernachricht fürs Protokoll.
+ *
+ * Roh ausgeben geht nicht: Ein einziger Tonblock des Modells sind einige
+ * Kilobyte base64 und kämen alle 20 ms. Hier steht deshalb nur, *was* kam.
+ */
+function describeMessage(message: Record<string, unknown>): unknown {
+  const content = message.serverContent as Record<string, unknown> | undefined;
+  if (!content) {
+    return Object.keys(message);
+  }
+  const parts = (content.modelTurn as { parts?: unknown[] } | undefined)?.parts ?? [];
+  const audio = parts.filter(
+    (part) => (part as { inlineData?: { mimeType?: string } }).inlineData?.mimeType?.startsWith('audio/'),
+  ).length;
+  return {
+    ...(audio ? { tonbloecke: audio } : {}),
+    ...(content.inputTranscription
+      ? { gehoert: (content.inputTranscription as { text?: string }).text }
+      : {}),
+    ...(content.outputTranscription
+      ? { gesagt: (content.outputTranscription as { text?: string }).text }
+      : {}),
+    ...(content.generationComplete ? { generationComplete: true } : {}),
+    ...(content.turnComplete ? { turnComplete: true } : {}),
+    ...(content.interrupted ? { interrupted: true } : {}),
+  };
+}
+
 async function payloadText(data: unknown): Promise<string | undefined> {
   if (typeof data === 'string') {
     return data;
@@ -137,6 +166,8 @@ export async function connectLiveSession(
         return;
       }
 
+      console.debug('[AI-Live] <<', describeMessage(message));
+
       const tagged = tagMessage(message);
       if (tagged) {
         queue.push(tagged);
@@ -173,6 +204,10 @@ export async function connectLiveSession(
     );
   });
 
+  /** Nur fürs Protokoll: wie viel Ton in diesem Beitrag hinausgegangen ist. */
+  let audioChunks = 0;
+  let audioBytes = 0;
+
   const sendRaw = (message: unknown) => {
     if (finished) {
       throw new Error('Live-Sitzung: die Verbindung ist bereits geschlossen');
@@ -186,16 +221,39 @@ export async function connectLiveSession(
     },
 
     async send(parts, turnComplete) {
+      // Hier und nicht je Block: Ein Block kommt alle paar Millisekunden, die
+      // Summe ist die Zahl, die zählt — steht sie auf null, hat das Mikrofon
+      // nichts geliefert.
+      console.info('[AI-Live] >> Ton gesendet:', {
+        bloecke: audioChunks,
+        bytes: audioBytes,
+        sekunden: Math.round((audioBytes / 32000) * 10) / 10,
+      });
+      console.info('[AI-Live] >> Beitrag abgeschlossen:', {
+        teile: parts.length,
+        zeichen: parts.reduce(
+          (sum, part) => sum + ('text' in part && part.text ? part.text.length : 0),
+          0,
+        ),
+        turnComplete,
+      });
       sendRaw({
         clientContent: { turns: [{ role: 'user', parts }], turnComplete },
       });
     },
 
     async sendAudioRealtime(blob) {
+      audioChunks += 1;
+      // base64 → rohe Bytes, für die Sekundenangabe oben.
+      audioBytes += Math.round((blob.data.length * 3) / 4);
       sendRaw({ realtimeInput: { audio: blob } });
     },
 
     async sendFunctionResponses(functionResponses) {
+      console.info(
+        '[AI-Live] >> Werkzeugantworten:',
+        functionResponses.map((response) => response.name),
+      );
       sendRaw({ toolResponse: { functionResponses } });
     },
 

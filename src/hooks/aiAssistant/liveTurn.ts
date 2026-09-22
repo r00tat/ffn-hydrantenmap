@@ -62,6 +62,13 @@ export async function runLiveTurn({
   // Die Abschrift kommt in Bruchstücken („Das TLFA " / "ist eingetragen.") und
   // wird erst am Ende ein Satz.
   let transcript = '';
+  /**
+   * Was das Modell aus dem Ton verstanden hat. Wird nicht zurückgegeben, aber
+   * protokolliert: Es ist die einzige Stelle, an der sich ein Fehlgriff bei der
+   * Werkzeugwahl von einem Hörfehler unterscheiden lässt. Ist sie leer, hat das
+   * Modell den gesprochenen Satz gar nicht bekommen.
+   */
+  let heard = '';
   let lastToolResult: AiAssistantResult | null = null;
   let drafts: AiAssistantResult['drafts'];
   let spoken = false;
@@ -107,6 +114,10 @@ export async function runLiveTurn({
         }
       }
 
+      if (content.inputTranscription?.text) {
+        heard += content.inputTranscription.text;
+      }
+
       if (content.outputTranscription?.text) {
         transcript += content.outputTranscription.text;
       }
@@ -115,9 +126,11 @@ export async function runLiveTurn({
         openTurns -= 1;
         if (openTurns <= 0) {
           run?.mark('turn abgeschlossen');
+          console.info('[AI-Live] Turn beendet');
           return buildResult();
         }
         run?.mark('werkzeug-turn beendet');
+        console.info('[AI-Live] Werkzeug-Turn beendet, warte auf die Antwort');
       }
       continue;
     }
@@ -126,11 +139,20 @@ export async function runLiveTurn({
       const { functionCalls } = message as LiveServerToolCall;
       onStatus?.('executing');
 
+      console.info(
+        '[AI-Live] Werkzeugaufrufe:',
+        functionCalls.map((call) => ({ name: call.name, args: call.args })),
+      );
+
       const responses: FunctionResponse[] = [];
       for (const call of functionCalls) {
         const result = await (run
           ? run.phase(`werkzeug ${call.name}`, () => executeTool(call))
           : executeTool(call));
+        console.info(`[AI-Live] Werkzeugergebnis (${call.name}):`, {
+          success: result.success,
+          message: result.message,
+        });
         lastToolResult = result;
         if (result.drafts) {
           drafts = result.drafts;
@@ -161,6 +183,10 @@ export async function runLiveTurn({
 
   function buildResult(): AiAssistantResult {
     const message = transcript.trim();
+    // Die eine Zeile, die den Fall erklärt: Steht hinter „verstanden" nichts,
+    // ist der Ton nicht angekommen — dann ist jede Werkzeugwahl geraten.
+    console.info('[AI-Live] verstanden:', JSON.stringify(heard.trim()));
+    console.info('[AI-Live] Antwort:', JSON.stringify(message), { gesprochen: spoken });
     if (!message && !lastToolResult) {
       return { success: false, message: 'Sprachbefehl konnte nicht verarbeitet werden' };
     }
