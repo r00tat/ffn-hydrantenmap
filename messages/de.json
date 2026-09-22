@@ -741,7 +741,8 @@
       "gps": "GPS Position",
       "coordinates": "Koordinaten",
       "plainName": "Name"
-    }
+    },
+    "mapImageAlt": "Einsatzkarte"
   },
   "passkey": {
     "or": "oder",
@@ -1337,6 +1338,7 @@
       "kmPreview": "{start} → {end} km (+{diff})",
       "kmPreviewEstimated": "{start} → ca. {end} km (ca. +{diff})",
       "kmPreviewNoStart": "kein Startstand — wird ohne Kilometer gespeichert",
+      "kmEnd": "km-Endstand",
       "savedKmEstimated": "{km} km je Fahrzeug (geschätzt, keine Route verfügbar)",
       "failed": "{count, plural, one {# Fahrzeug konnte nicht gespeichert werden — die Fahrt fehlt und muss von Hand nachgetragen werden} other {# Fahrzeuge konnten nicht gespeichert werden — die Fahrten fehlen und müssen von Hand nachgetragen werden}}"
     },
@@ -1806,7 +1808,20 @@
     },
     "quickAddVehiclesTitle": "Fahrzeuge Neusiedl am See",
     "quickAddAlreadyAdded": "{name} bereits im Einsatz",
-    "quickAddRemove": "{name} aus dem Einsatz entfernen"
+    "quickAddRemove": "{name} aus dem Einsatz entfernen",
+    "coordinates": {
+      "title": "Koordinaten",
+      "decimal": "Dezimalgrad",
+      "edit": "Koordinaten bearbeiten",
+      "done": "Bearbeitung beenden",
+      "none": "keine Position",
+      "dms": "Grad/Minuten/Sekunden",
+      "ddm": "Grad/Dezimalminuten",
+      "utm": "UTM",
+      "bmn": "Bundesmeldenetz (Gauß-Krüger)",
+      "hint": "In jedes Feld lässt sich ein ganzes Koordinatenpaar einfügen — auch ein Kartenlink oder ein geo:-Link.",
+      "invalid": "Keine gültige Koordinate"
+    }
   },
   "heatmap": {
     "enable": "Heatmap-Färbung aktivieren",
@@ -2793,10 +2808,17 @@
       "description": "Beschreibung",
       "alarmierung": "Alarmierung",
       "eintreffen": "Eintreffen",
-      "abruecken": "Abrücken"
+      "abruecken": "Abrücken",
+      "force": "Kräfte"
     },
     "total": "Gesamt",
-    "totalFw": "{count} FW"
+    "totalFw": "{count} FW",
+    "ownForces": "Eigene Kräfte",
+    "foreignForces": "Fremdkräfte",
+    "ownForcesTotal": "Summe eigene Kräfte",
+    "foreignForcesTotal": "Summe Fremdkräfte",
+    "forceOwn": "eigen",
+    "forceForeign": "fremd"
   },
   "einsaetze": {
     "title": "Einsätze",

@@ -239,7 +239,6 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
               <FirecallItemFields
                 item={editedItem}
                 setItemField={setItemField}
-                showLatLng={false}
                 autoFocus
               />
               <Typography
@@ -344,7 +343,7 @@ export default function MapSidebar() {
   const canEdit = useMapEditorCanEdit();
 
   return (
-    <SidebarBox isEditable={editable}>
+    <SidebarBox className="map-sidebar" isEditable={editable}>
       <Paper elevation={0} sx={{ px: 1.5, py: 1, height: '100%' }}>
         {!editable && !selectedFirecallItem && (
           <Box>

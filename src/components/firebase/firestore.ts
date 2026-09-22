@@ -176,6 +176,20 @@ export interface Fzg extends FirecallItem {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
+  /**
+   * Fahrzeug einer fremden Organisation — Rettung, Polizei, Nachbarwehr.
+   *
+   * Als Zeichenkette `'true'`/`'false'` wie jedes andere Schaltfeld eines
+   * Elements. Der Schalter färbt nur vor und kennzeichnet: An Besatzung,
+   * Personal-Board und Auswertungen ändert er nichts, denn ein Fremdfahrzeug
+   * ist auf der Lagekarte ein Einsatzmittel wie jedes andere.
+   */
+  fremd?: string;
+  /**
+   * Die Farbe des Balkens. Ohne Angabe Rot, bei `fremd` Blau — siehe
+   * `vehicleMarkerColor()`.
+   */
+  color?: string;
   type: 'vehicle';
 }
 

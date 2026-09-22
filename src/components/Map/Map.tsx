@@ -81,6 +81,9 @@ export default function Map() {
 
   return (
     <Box
+      // Der PDF-Export der Print-Seite ersetzt diesen Block als Ganzes durch
+      // eine Aufnahme der Karte — s. printMapSnapshot.ts.
+      className="map-area"
       sx={{
         display: 'flex',
         overflow: 'hidden',

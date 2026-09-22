@@ -30,7 +30,12 @@ export interface CounterFieldsProps {
   autoFill?: EinsatzAutoFill;
 }
 
-function parseNumber(value: string): number | undefined {
+/**
+ * Liest einen Zählerstand aus einem Eingabefeld. Exportiert, weil die
+ * Sammelerfassung denselben Endstand auch direkt in der Zeile anbietet und
+ * dort nicht anders runden oder das Komma anders lesen darf.
+ */
+export function parseCounterInput(value: string): number | undefined {
   if (value.trim() === '') return undefined;
   const parsed = Number(value.replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -58,7 +63,7 @@ export default function CounterFields({
   const update = (id: string, field: 'start' | 'end', value: string) => {
     onChange({
       ...counters,
-      [id]: { ...counters[id], [field]: parseNumber(value) },
+      [id]: { ...counters[id], [field]: parseCounterInput(value) },
     });
   };
 

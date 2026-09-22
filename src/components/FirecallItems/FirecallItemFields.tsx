@@ -20,6 +20,7 @@ import MyDateTimePicker from '../inputs/DateTimePicker';
 import DownloadAllButton from '../inputs/DownloadAllButton';
 import AttachmentGallery from '../inputs/AttachmentGallery';
 import FileUploader from '../inputs/FileUploader';
+import CoordinateFields from '../inputs/CoordinateFields';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
 
@@ -81,6 +82,17 @@ export default function FirecallItemFields({
       setItemField(field, event.target.value);
     };
 
+  // Zwei Aufrufe und kein gemeinsamer: `setItemField` setzt ein Feld, und
+  // beide Aufrufer rechnen aus dem vorigen Stand weiter — die zweite Änderung
+  // verliert die erste also nicht.
+  const setPosition = useCallback(
+    (lat: number, lng: number) => {
+      setItemField('lat', lat);
+      setItemField('lng', lng);
+    },
+    [setItemField]
+  );
+
   const fileUploadComplete = useCallback(
     (key: string, refs: StorageReference[]) => {
       console.info(`file upload complete for ${key}: ${refs.toString()}`);
@@ -92,28 +104,16 @@ export default function FirecallItemFields({
 
   return (
     <>
-      {/* Lat/Lng fields for existing displayable items */}
-      {showLatLng && NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && item.id && (
-        <>
-          <TextField
-            margin="dense"
-            id="lat"
-            label={t('firecall.fields.latitude')}
-            variant="standard"
-            onChange={onChange('lat')}
-            value={item.lat || ''}
-            fullWidth
-          />
-          <TextField
-            margin="dense"
-            id="lng"
-            label={t('firecall.fields.longitude')}
-            variant="standard"
-            onChange={onChange('lng')}
-            value={item.lng || ''}
-            fullWidth
-          />
-        </>
+      {/* Die Position, in drei Schreibweisen und in jeder beschreibbar. Auch
+          am **neuen** Element: Wer Koordinaten von der Polizei bekommt, will
+          die Markierung gleich dort anlegen und nicht erst irgendwo setzen,
+          speichern und dann verschieben. */}
+      {showLatLng && NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && (
+        <CoordinateFields
+          lat={item.lat}
+          lng={item.lng}
+          onChange={setPosition}
+        />
       )}
 
       {/* Dynamic fields from item.fields() */}

@@ -13,17 +13,77 @@ import { useContext, useMemo } from 'react';
 import { FirecallItem } from '../firebase/firestore';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallContext } from '../../hooks/useFirecall';
-import { calculateStrength } from './fahrzeuge-utils';
+import { StrengthGroup, StrengthRow, calculateStrength } from './fahrzeuge-utils';
+
+const COLUMNS = 8;
+
+function StrengthRows({ rows }: { rows: StrengthRow[] }) {
+  return (
+    <>
+      {rows.map((row, i) => (
+        <TableRow key={i}>
+          <TableCell>{row.name}</TableCell>
+          <TableCell>{row.fw || ''}</TableCell>
+          <TableCell>{row.typ}</TableCell>
+          <TableCell align="right">{row.mann}</TableCell>
+          <TableCell align="right">{row.ats}</TableCell>
+          <TableCell>{row.alarmierung ? formatTimestamp(row.alarmierung) : ''}</TableCell>
+          <TableCell>{row.eintreffen ? formatTimestamp(row.eintreffen) : ''}</TableCell>
+          <TableCell>{row.abruecken ? formatTimestamp(row.abruecken) : ''}</TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
+function TotalRow({ label, group }: { label: string; group: StrengthGroup }) {
+  const t = useTranslations('einsatzmittel');
+  return (
+    <TableRow sx={{ '& td': { fontWeight: 'bold' } }}>
+      <TableCell>{label}</TableCell>
+      <TableCell>{t('totalFw', { count: group.totalFw })}</TableCell>
+      <TableCell>
+        {Object.entries(group.typCounts).map(([typ, count]) => (
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }} key={typ}>
+            {count} {typ}
+          </Typography>
+        ))}
+      </TableCell>
+      <TableCell align="right">{group.totalMann}</TableCell>
+      <TableCell align="right">{group.totalAts}</TableCell>
+      <TableCell colSpan={3} />
+    </TableRow>
+  );
+}
+
+function SectionRow({ label }: { label: string }) {
+  return (
+    <TableRow>
+      <TableCell
+        colSpan={COLUMNS}
+        sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}
+      >
+        {label}
+      </TableCell>
+    </TableRow>
+  );
+}
 
 export default function StrengthTable({ items }: { items: FirecallItem[] }) {
   const t = useTranslations('einsatzmittel');
   const { crewAssignments } = useContext(FirecallContext);
-  const { rows, totalMann, totalAts, totalFw, typCounts } = useMemo(
+  const summary = useMemo(
     () => calculateStrength(items, crewAssignments),
     [items, crewAssignments]
   );
+  const { rows, eigene, fremde } = summary;
 
   if (rows.length === 0) return null;
+
+  // Ohne Fremdkräfte bleibt die Tabelle, wie sie war: eine Liste, eine
+  // Gesamtzeile. Ein leerer Abschnitt „Fremdkräfte" an jedem Einsatz, an dem
+  // nur die eigene Wehr ausgerückt ist, wäre Ballast.
+  const split = fremde.rows.length > 0;
 
   return (
     <TableContainer component={Paper} sx={{ mb: 3 }}>
@@ -41,32 +101,22 @@ export default function StrengthTable({ items }: { items: FirecallItem[] }) {
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row, i) => (
-            <TableRow key={i}>
-              <TableCell>{row.name}</TableCell>
-              <TableCell>{row.fw || ''}</TableCell>
-              <TableCell>{row.typ}</TableCell>
-              <TableCell align="right">{row.mann}</TableCell>
-              <TableCell align="right">{row.ats}</TableCell>
-              <TableCell>{row.alarmierung ? formatTimestamp(row.alarmierung) : ''}</TableCell>
-              <TableCell>{row.eintreffen ? formatTimestamp(row.eintreffen) : ''}</TableCell>
-              <TableCell>{row.abruecken ? formatTimestamp(row.abruecken) : ''}</TableCell>
-            </TableRow>
-          ))}
-          <TableRow sx={{ '& td': { fontWeight: 'bold' } }}>
-            <TableCell>{t('total')}</TableCell>
-            <TableCell>{t('totalFw', { count: totalFw })}</TableCell>
-            <TableCell>
-              {Object.entries(typCounts).map(([typ, count]) => (
-                <Typography variant="body2" sx={{ fontWeight: "bold" }} key={typ}>
-                  {count} {typ}
-                </Typography>
-              ))}
-            </TableCell>
-            <TableCell align="right">{totalMann}</TableCell>
-            <TableCell align="right">{totalAts}</TableCell>
-            <TableCell colSpan={3} />
-          </TableRow>
+          {split ? (
+            <>
+              {/* Zuerst die eigenen Kräfte: Die Einsatzleitung führt sie, und
+                  die Frage „wie viele habe ich" steht vor der Frage „wer ist
+                  sonst noch da". */}
+              <SectionRow label={t('ownForces')} />
+              <StrengthRows rows={eigene.rows} />
+              <TotalRow label={t('ownForcesTotal')} group={eigene} />
+              <SectionRow label={t('foreignForces')} />
+              <StrengthRows rows={fremde.rows} />
+              <TotalRow label={t('foreignForcesTotal')} group={fremde} />
+            </>
+          ) : (
+            <StrengthRows rows={rows} />
+          )}
+          <TotalRow label={t('total')} group={summary} />
         </TableBody>
       </Table>
     </TableContainer>

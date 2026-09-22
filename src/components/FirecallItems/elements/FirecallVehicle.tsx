@@ -9,6 +9,8 @@ import {
   formatBesatzung,
   getEffectiveAts,
   getEffectiveBesatzung,
+  isFremdesFahrzeug,
+  vehicleMarkerColor,
 } from '../../../common/vehicle-utils';
 import { SimpleMap } from '../../../common/types';
 import { Fzg } from '../../firebase/firestore';
@@ -23,6 +25,10 @@ export class FirecallVehicle extends FirecallItemBase {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
+  /** Fahrzeug einer fremden Organisation — `'true'`/`'false'` wie jedes Schaltfeld. */
+  fremd?: string;
+  /** Farbe des Balkens; ohne Angabe gilt die Vorgabe nach Zugehörigkeit. */
+  color?: string;
   /** Anzahl der zugeordneten Personen (nicht persistiert) */
   crewCount?: number;
   /** Anzahl der zugeordneten Atemschutzträger (nicht persistiert) */
@@ -40,6 +46,8 @@ export class FirecallVehicle extends FirecallItemBase {
         alarmierung: this.alarmierung,
         eintreffen: this.eintreffen,
         abruecken: this.abruecken,
+        fremd: this.fremd,
+        color: this.color,
       } = firecallItem);
     }
   }
@@ -68,6 +76,8 @@ export class FirecallVehicle extends FirecallItemBase {
       eintreffen: 'Eintreffen',
       abruecken: 'Abrücken',
       rotation: 'Drehung in Grad',
+      fremd: 'Fremdorganisation',
+      color: 'Farbe (HTML bzw. Englisch)',
     };
   }
 
@@ -77,6 +87,8 @@ export class FirecallVehicle extends FirecallItemBase {
       kategorie: 'select',
       rotation: 'number',
       ats: 'number',
+      fremd: 'boolean',
+      color: 'color',
     };
   }
 
@@ -101,11 +113,18 @@ export class FirecallVehicle extends FirecallItemBase {
       alarmierung: this.alarmierung,
       eintreffen: this.eintreffen,
       abruecken: this.abruecken,
+      fremd: this.fremd,
+      color: this.color,
     } as Fzg;
   }
 
   public title(): string {
     return `${this.name} ${this.fw || ''}`.trim();
+  }
+
+  /** Gehört das Fahrzeug einer fremden Organisation? */
+  public isFremd(): boolean {
+    return isFremdesFahrzeug(this);
   }
 
   /** Die Art des Einsatzmittels: gepflegt, sonst aus dem Namen abgeleitet. */
@@ -134,6 +153,12 @@ export class FirecallVehicle extends FirecallItemBase {
       <>
         {super.body()}
 
+        {this.isFremd() && (
+          <>
+            Fremdorganisation
+            <br />
+          </>
+        )}
         {this.alarmierung && (
           <>
             Alarmierung: {formatTimestamp(this.alarmierung)}
@@ -172,6 +197,7 @@ export class FirecallVehicle extends FirecallItemBase {
       iconUrl: vehicleIconDataUrl({
         name: this.name || '',
         fw: this.fw || '',
+        color: vehicleMarkerColor(this),
       }),
       iconSize: [45, 20],
       iconAnchor: [20, 0],
@@ -189,6 +215,12 @@ export class FirecallVehicle extends FirecallItemBase {
         <b>
           {this.name} {this.fw || ''}
         </b>
+        {this.isFremd() && (
+          <>
+            <br />
+            Fremdorganisation
+          </>
+        )}
         {(() => {
           const kategorie = this.einsatzmittelKategorie();
           const bes = this.besatzung1x();

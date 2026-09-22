@@ -334,10 +334,12 @@ export default function FirecallItemDialog({
                   onToggle={handleQuickAddToggle}
                 />
               )}
+              {/* Auch am neuen Element: Wer eine Koordinate von der Polizei
+                  bekommt, will die Markierung gleich dort anlegen und nicht
+                  erst irgendwo setzen, speichern und dann verschieben. */}
               <FirecallItemFields
                 item={item}
                 setItemField={setItemField}
-                showLatLng={!!item.id}
                 autoFocusField={autoFocusField}
               />
               {isExistingItem && (

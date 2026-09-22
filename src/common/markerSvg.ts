@@ -12,20 +12,31 @@ export function markerIconDataUrl(color: string): string {
   return toDataUrl(svg);
 }
 
+/** Die Farbe eines Einsatzmittels der eigenen Feuerwehr. */
+export const VEHICLE_DEFAULT_COLOR = '#ff0000';
+
 export interface VehicleIconParams {
   name: string;
   fw: string;
   rotate?: number;
+  /**
+   * Die Farbe des Balkens. Ohne Angabe Rot — auf einer Lage mit Rettung,
+   * Polizei und Nachbarwehren ist die Farbe das, was die Organisationen auf
+   * einen Blick auseinanderhält.
+   */
+  color?: string;
 }
 
 export function vehicleIconDataUrl({
   name,
   fw,
   rotate = 0,
+  color,
 }: VehicleIconParams): string {
   const safeName = escapeXml(name);
   const safeFw = escapeXml(fw);
+  const fill = sanitizeHexColor(color || '', VEHICLE_DEFAULT_COLOR);
   const r = Number.isFinite(rotate) ? Math.trunc(rotate) % 360 : 0;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="45" height="20" viewBox="0 0 45 20" fill="#ff0000"><rect width="45" height="20" x="0" y="0" style="fill:#ff0000" transform="rotate(${r})"/><circle cx="4" cy="6" r="1.5" fill="blue"/><circle cx="4" cy="14" r="1.5" fill="blue"/><line x1="8" y1="0" x2="8" y2="20" style="stroke:rgb(255,255,255);stroke-width:2" transform="rotate(${r})"/><text x="12" y="9" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="8">${safeName}<tspan x="12" y="17">${safeFw}</tspan></text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="45" height="20" viewBox="0 0 45 20" fill="${fill}"><rect width="45" height="20" x="0" y="0" style="fill:${fill}" transform="rotate(${r})"/><circle cx="4" cy="6" r="1.5" fill="blue"/><circle cx="4" cy="14" r="1.5" fill="blue"/><line x1="8" y1="0" x2="8" y2="20" style="stroke:rgb(255,255,255);stroke-width:2" transform="rotate(${r})"/><text x="12" y="9" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="8">${safeName}<tspan x="12" y="17">${safeFw}</tspan></text></svg>`;
   return toDataUrl(svg);
 }

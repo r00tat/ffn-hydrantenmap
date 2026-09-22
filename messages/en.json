@@ -741,7 +741,8 @@
       "gps": "GPS position",
       "coordinates": "Coordinates",
       "plainName": "Name"
-    }
+    },
+    "mapImageAlt": "Operations map"
   },
   "passkey": {
     "or": "or",
@@ -1337,6 +1338,7 @@
       "kmPreview": "{start} → {end} km (+{diff})",
       "kmPreviewEstimated": "{start} → approx. {end} km (approx. +{diff})",
       "kmPreviewNoStart": "no starting reading — will be saved without kilometres",
+      "kmEnd": "Odometer end",
       "savedKmEstimated": "{km} km per vehicle (estimated, no route available)",
       "failed": "{count, plural, one {# vehicle could not be saved — the trip is missing and has to be added manually} other {# vehicles could not be saved — the trips are missing and have to be added manually}}"
     },
@@ -1806,7 +1808,20 @@
     },
     "quickAddVehiclesTitle": "Vehicles Neusiedl am See",
     "quickAddAlreadyAdded": "{name} already in the operation",
-    "quickAddRemove": "Remove {name} from the operation"
+    "quickAddRemove": "Remove {name} from the operation",
+    "coordinates": {
+      "title": "Coordinates",
+      "decimal": "Decimal degrees",
+      "edit": "Edit coordinates",
+      "done": "Finish editing",
+      "none": "no position",
+      "dms": "Degrees/minutes/seconds",
+      "ddm": "Degrees/decimal minutes",
+      "utm": "UTM",
+      "bmn": "Austrian grid (Gauss-Krüger)",
+      "hint": "A full coordinate pair can be pasted into any of these fields — a map link or a geo: link works too.",
+      "invalid": "Not a valid coordinate"
+    }
   },
   "heatmap": {
     "enable": "Enable heatmap colouring",
@@ -2793,10 +2808,17 @@
       "description": "Description",
       "alarmierung": "Alerted at",
       "eintreffen": "Arrived at",
-      "abruecken": "Departed at"
+      "abruecken": "Departed at",
+      "force": "Forces"
     },
     "total": "Total",
-    "totalFw": "{count} FDs"
+    "totalFw": "{count} FDs",
+    "ownForces": "Own forces",
+    "foreignForces": "Other organisations",
+    "ownForcesTotal": "Own forces total",
+    "foreignForcesTotal": "Other organisations total",
+    "forceOwn": "own",
+    "forceForeign": "other"
   },
   "einsaetze": {
     "title": "Operations",

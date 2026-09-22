@@ -162,12 +162,14 @@ function HoseLengthOverlay({
           key={`tick-${index}`}
           positions={tick}
           {...(pane ? { pane } : {})}
+          // Nicht anklickbar: Die Striche sind Beschriftung, und ein Treffer
+          // auf ihnen fügte beim Zeichnen statt eines Punktes nichts hinzu.
+          // Als Eigenschaft und nicht in `pathOptions` — Leaflet liest es beim
+          // Anlegen des Pfades, `setStyle` kommt dafür zu spät.
+          interactive={false}
           pathOptions={{
             color: stroke,
             weight: 3,
-            // Nicht anklickbar: Die Striche sind Beschriftung, und ein Treffer
-            // auf ihnen fügte sonst statt eines Punktes nichts hinzu.
-            interactive: false,
           }}
         />
       ))}
@@ -178,7 +180,8 @@ function HoseLengthOverlay({
           center={longestSegmentMidpoint(clean)}
           radius={1}
           {...(pane ? { pane } : {})}
-          pathOptions={{ opacity: 0, fillOpacity: 0, interactive: false }}
+          interactive={false}
+          pathOptions={{ opacity: 0, fillOpacity: 0 }}
         >
           <Tooltip permanent direction="center" offset={[0, 0]}>
             {hoseLabel(distance, dimension, hoseLengthM)}

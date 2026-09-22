@@ -120,3 +120,75 @@ describe('FirecallVehicle Kategorie', () => {
     expect(wla.data().kategorie).toBe('aufbau');
   });
 });
+
+/**
+ * Fahrzeuge fremder Organisationen (#Bug-Report „Fahrzeuge Fremdorganisation").
+ *
+ * Auf einer Karte mit Rettung, Polizei und Nachbarwehren sind zwanzig rote
+ * Balken keine Lage, sondern ein Haufen. Die Farbe ist deshalb frei; der
+ * Schalter „Fremdfahrzeug" setzt nur eine andere Vorgabe und kennzeichnet.
+ */
+function decodeIcon(vehicle: FirecallVehicle): string {
+  const url = vehicle.icon().options.iconUrl as string;
+  return decodeURIComponent(url.slice('data:image/svg+xml;utf8,'.length));
+}
+
+describe('FirecallVehicle: Fremdfahrzeug und Farbe', () => {
+  it('zeichnet ein eigenes Fahrzeug rot', () => {
+    const vehicle = new FirecallVehicle({ name: 'TLF', type: 'vehicle' } as any);
+    expect(decodeIcon(vehicle)).toContain('fill:#ff0000');
+  });
+
+  it('zeichnet ein Fremdfahrzeug ohne eigene Farbe blau', () => {
+    const vehicle = new FirecallVehicle({
+      name: 'RTW',
+      fw: 'Rotes Kreuz',
+      type: 'vehicle',
+      fremd: 'true',
+    } as any);
+    expect(decodeIcon(vehicle)).toContain('fill:#1976d2');
+  });
+
+  it('nimmt die gewählte Farbe vor jeder Vorgabe', () => {
+    const vehicle = new FirecallVehicle({
+      name: 'Streife',
+      fw: 'Polizei',
+      type: 'vehicle',
+      fremd: 'true',
+      color: '#2e7d32',
+    } as any);
+    expect(decodeIcon(vehicle)).toContain('fill:#2e7d32');
+  });
+
+  it('führt Schalter und Farbe als Felder', () => {
+    const vehicle = new FirecallVehicle();
+    expect(Object.keys(vehicle.fields())).toContain('fremd');
+    expect(vehicle.fieldTypes().fremd).toBe('boolean');
+    expect(vehicle.fieldTypes().color).toBe('color');
+  });
+
+  it('speichert beides', () => {
+    const vehicle = new FirecallVehicle({
+      name: 'RTW',
+      type: 'vehicle',
+      fremd: 'true',
+      color: '#1976d2',
+    } as any);
+    expect(vehicle.data()).toMatchObject({ fremd: 'true', color: '#1976d2' });
+    // Und übersteht eine Kopie — der Dialog arbeitet auf Kopien.
+    expect(vehicle.copy().data()).toMatchObject({ fremd: 'true' });
+  });
+
+  it('weist das Fahrzeug im Popup als fremd aus', () => {
+    const vehicle = new FirecallVehicle({
+      name: 'RTW',
+      fw: 'Rotes Kreuz',
+      type: 'vehicle',
+      fremd: 'true',
+    } as any);
+    expect(vehicle.isFremd()).toBe(true);
+    expect(new FirecallVehicle({ name: 'TLF', type: 'vehicle' } as any).isFremd()).toBe(
+      false
+    );
+  });
+});

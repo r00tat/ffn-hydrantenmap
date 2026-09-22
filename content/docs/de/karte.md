@@ -76,6 +76,28 @@ Im Bearbeitungsmodus kannst du Elemente zum aktiven Einsatz auf der Karte hinzuf
 Aktiviere den Bearbeitungsmodus nur, wenn du Änderungen vornehmen möchtest. Im Ansichtsmodus kannst du die Karte schneller bedienen.
 :::
 
+### Koordinaten eingeben
+
+Kommen die Koordinaten von außen — etwa von Polizei oder Landessicherheitszentrale —, lässt sich ein Element direkt dort anlegen, statt es auf der Karte zu suchen.
+
+1. Element wie gewohnt hinzufügen oder ein bestehendes zum Bearbeiten öffnen
+2. Unter **Koordinaten** steht die Position; der Stift daneben klappt die Eingabefelder auf
+3. Dort steht dieselbe Position in fünf Schreibweisen: Dezimalgrad, Grad/Minuten/Sekunden, Grad/Dezimalminuten, UTM und Bundesmeldenetz
+4. In **jedes** dieser Felder lässt sich ein ganzes Koordinatenpaar einfügen — die übrigen Felder rechnen mit
+5. Speichern; das Element sitzt auf der eingetragenen Position
+
+:::info
+Dieselbe Stelle, fünfmal geschrieben: `47.94829, 16.84822` — `47°56'53.8"N 16°50'53.6"E` — `N 47°56.897' E 16°50.893'` — `33T 638004 5312206` — `M34 788550 312316`. Steht die Himmelsrichtung dabei, ist die Reihenfolge von Breite und Länge belanglos.
+:::
+
+:::tip
+Auch ein **Kartenlink** lässt sich einfügen: der geteilte Standort aus WhatsApp, ein Link von Google Maps, Apple Karten oder OpenStreetMap, oder eine `geo:`-Adresse. Nur Kurzlinks (`maps.app.goo.gl/…`) tragen die Position nicht in sich — die zuerst im Browser öffnen und dann den langen Link kopieren.
+:::
+
+:::info
+**UTM** braucht die Zone (`33T …`); ohne sie gilt die Zone, die im Feld schon stand. Beim **Bundesmeldenetz** genügt der Rechtswert: An ihm erkennt die App den Meridianstreifen M28, M31 oder M34 von selbst. Werte aus dem Burgenland-GIS beginnen dagegen bei 0 statt bei 750000 — dort fehlt der Streifenversatz, sie gehören nicht unverändert in dieses Feld.
+:::
+
 ### Zeichenwerkzeuge
 
 Im Bearbeitungsmodus stehen dir verschiedene Zeichenwerkzeuge zur Verfügung, mit denen du Linien, Flächen und Markierungen direkt auf der Karte einzeichnen kannst.

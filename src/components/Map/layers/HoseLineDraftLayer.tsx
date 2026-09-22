@@ -33,11 +33,11 @@ function DraftLine({ draft, primary, onConfirm, onDiscard }: DraftLineProps) {
           und bestehenden Leitungen ab, ohne die Karte zu verdecken. */}
       <Polyline
         positions={draft.positions}
+        interactive={false}
         pathOptions={{
           color: DRAFT_COLOR,
           weight: primary ? 12 : 8,
           opacity: primary ? 0.2 : 0.12,
-          interactive: false,
         }}
       />
       <Polyline
@@ -80,7 +80,8 @@ function DraftLine({ draft, primary, onConfirm, onDiscard }: DraftLineProps) {
         <CircleMarker
           center={hoseLineDraftMidpoint(draft)}
           radius={1}
-          pathOptions={{ opacity: 0, fillOpacity: 0, interactive: false }}
+          interactive={false}
+          pathOptions={{ opacity: 0, fillOpacity: 0 }}
         >
           <Tooltip permanent direction="center" offset={[0, 0]}>
             {hoseLineDraftLabel(draft)}
