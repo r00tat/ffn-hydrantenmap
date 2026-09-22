@@ -2801,10 +2801,17 @@
       "description": "Beschreibung",
       "alarmierung": "Alarmierung",
       "eintreffen": "Eintreffen",
-      "abruecken": "Abrücken"
+      "abruecken": "Abrücken",
+      "force": "Kräfte"
     },
     "total": "Gesamt",
-    "totalFw": "{count} FW"
+    "totalFw": "{count} FW",
+    "ownForces": "Eigene Kräfte",
+    "foreignForces": "Fremdkräfte",
+    "ownForcesTotal": "Summe eigene Kräfte",
+    "foreignForcesTotal": "Summe Fremdkräfte",
+    "forceOwn": "eigen",
+    "forceForeign": "fremd"
   },
   "einsaetze": {
     "title": "Einsätze",

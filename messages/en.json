@@ -2801,10 +2801,17 @@
       "description": "Description",
       "alarmierung": "Alerted at",
       "eintreffen": "Arrived at",
-      "abruecken": "Departed at"
+      "abruecken": "Departed at",
+      "force": "Forces"
     },
     "total": "Total",
-    "totalFw": "{count} FDs"
+    "totalFw": "{count} FDs",
+    "ownForces": "Own forces",
+    "foreignForces": "Other organisations",
+    "ownForcesTotal": "Own forces total",
+    "foreignForcesTotal": "Other organisations total",
+    "forceOwn": "own",
+    "forceForeign": "other"
   },
   "einsaetze": {
     "title": "Operations",

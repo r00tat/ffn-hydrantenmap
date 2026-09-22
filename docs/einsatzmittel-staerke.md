@@ -97,13 +97,24 @@ wie überall) und `color`. Der Balken auf der Karte wird damit eingefärbt —
 `vehicleMarkerColor()` nimmt die gewählte Farbe, sonst Blau bei `fremd` und
 sonst Rot.
 
-**Der Schalter ändert an der Stärke nichts.** Er färbt vor und kennzeichnet im
-Popup, mehr nicht: Besatzung, ATS-Träger, Stärketabelle und Personal-Board
-behandeln ein Fremdfahrzeug wie jedes andere Einsatzmittel. Das ist eine
-Entscheidung und kein Versäumnis — auf der Lagekarte steht, wer da ist, und ein
-RTW mit zwei Mann ist für die Lage genauso gezählt wie ein eigenes TLF. Wer die
-eigene Mannschaftsstärke braucht, liest sie an der eigenen Feuerwehr (`fw`) ab
-und nicht an diesem Schalter.
+Der Schalter rechnet nichts anders — er **sortiert**. Besatzung und ATS-Träger
+eines Fremdfahrzeugs werden wie an jedem anderen Einsatzmittel gezählt; sie
+zählen nur nicht zu den eigenen Kräften. Deshalb liefert `calculateStrength()`
+neben der Gesamtsumme zwei Gruppen (`eigene`, `fremde`) derselben Bauart, und
+die Stärketabelle zeigt bei gemischter Lage zwei Abschnitte mit je einer
+Zwischensumme und darunter die Gesamtsumme. Sind keine Fremdkräfte da, bleibt
+die Tabelle wie zuvor eine Liste mit einer Gesamtzeile — ein leerer Abschnitt an
+jedem Einsatz der eigenen Wehr wäre Ballast.
+
+Warum überhaupt getrennt: „Wie viele eigene Leute habe ich" und „wer ist sonst
+noch da" sind zwei Fragen, und eine Zahl, die beides vermengt, beantwortet
+keine von beiden. Die eigene Feuerwehr (`fw`) taugt dafür nicht als Merkmal —
+eine Nachbarwehr trägt dort ebenfalls einen Feuerwehrnamen und ist trotzdem
+nicht die eigene Mannschaft.
+
+Der Schalter hängt am **Fahrzeug**. Eine taktische Einheit (`tacticalUnit`)
+kennt ihn nicht und zählt daher zu den eigenen Kräften; wer fremde Einheiten
+ohne Fahrzeug führen will, braucht das Feld dort ebenfalls.
 
 Die Farbe setzt der Schalter **nicht**, er ändert nur die Vorgabe. Sonst
 verlöre, wer einmal eine eigene Farbe gewählt hat, sie beim nächsten Umschalten.

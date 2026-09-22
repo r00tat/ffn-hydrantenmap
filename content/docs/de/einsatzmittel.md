@@ -60,8 +60,12 @@ Auf einer Lage mit Rettung, Polizei und Nachbarwehren sind lauter rote Balken sc
 2. Schalter **Fremdorganisation** einschalten — der Balken auf der Karte wird blau statt rot, und das Popup weist das Fahrzeug als fremd aus
 3. Über **Farbe** lässt sich stattdessen jede andere Farbe wählen, etwa je Organisation eine eigene
 
+In der Stärketabelle stehen fremde Einsatzmittel nicht bei den eigenen Kräften: Sobald ein Fahrzeug als fremd gekennzeichnet ist, teilt sich die Tabelle in **Eigene Kräfte** und **Fremdkräfte**, jeder Abschnitt bekommt eine eigene Zwischensumme und darunter steht die Gesamtsumme. Der CSV-Export führt dafür die Spalte **Kräfte** mit `eigen` bzw. `fremd`.
+
 :::info
-Der Schalter ändert nur Farbe und Kennzeichnung. Besatzung, ATS-Träger und Stärketabelle rechnen ein Fremdfahrzeug wie jedes andere Einsatzmittel.
+Ohne Fremdfahrzeuge bleibt die Stärketabelle unverändert: eine Liste mit einer Gesamtzeile.
+
+Der Schalter sitzt am Fahrzeug. Eine taktische Einheit ohne Fahrzeug zählt daher zu den eigenen Kräften.
 :::
 
 ### Als CSV exportieren

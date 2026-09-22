@@ -60,8 +60,12 @@ On a situation map with ambulances, police and neighbouring brigades, a row of r
 2. Turn on the **Fremdorganisation** switch — the bar on the map turns blue instead of red and the popup marks the vehicle as belonging to another organisation
 3. Under **Farbe** any other colour can be picked instead, for example one per organisation
 
+In the strength table such resources are kept apart from your own: as soon as one vehicle is marked as belonging to another organisation, the table splits into **Eigene Kräfte** (own forces) and **Fremdkräfte** (other organisations), each section gets its own subtotal and the grand total is shown below. The CSV export carries a **Kräfte** column with `eigen` or `fremd`.
+
 :::info
-The switch only changes colour and labelling. Crew, breathing apparatus wearers and the strength table count such a vehicle like any other resource.
+Without such vehicles the strength table stays as it was: one list with one total row.
+
+The switch sits on the vehicle. A tactical unit without a vehicle therefore counts towards your own forces.
 :::
 
 ### Export as CSV
