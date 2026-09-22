@@ -60,15 +60,47 @@ Elf Dienste, je einer mit Grund:
 | `firebaseml.googleapis.com` | Altname derselben AI Logic. Bleibt drin, weil unklar ist, ob die Key-Prüfung den aufgerufenen (`firebasevertexai`) oder den kanonischen Namen ansetzt — App Check zählt unter dem Altnamen. Kostet nichts: der Dienst ist im Projekt nicht aktiviert und zusätzlich erzwungen |
 | `firebase.googleapis.com` | Konfigurations-Lookup des SDK; nur mit OAuth für mehr zu gebrauchen |
 
-**Nicht** in die Liste gehört `generativelanguage.googleapis.com`, obwohl der
-Sprach-Assistent seit der Live-Sitzung das Backend der Gemini Developer API
-verwendet. Der Browser ruft diesen Dienst nie auf: Das SDK spricht für **beide**
-Backends ausschließlich `firebasevertexai.googleapis.com` an — per HTTPS und
-per WebSocket —, die AI Logic ruft die Developer API erst dahinter auf. Im
-Projekt muss der Dienst aktiviert sein, am Key hätte er nur eine Wirkung: Die
-Generative Language API nimmt einen blanken Key entgegen und steht **nicht**
-hinter App Check. Wer den Key aus dem JS-Bundle liest, könnte damit auf Rechnung
-des Projekts Modelle aufrufen — genau die Lücke, gegen die die Liste da ist.
+**Nicht** in die Liste gehört `generativelanguage.googleapis.com`, obwohl die
+Live-Sitzung des Sprach-Assistenten genau diesen Dienst anspricht. Der Grund ist
+derselbe, aus dem die Liste überhaupt existiert: Die Generative Language API
+nimmt einen blanken Key entgegen und steht **nicht** hinter App Check — für sie
+gibt es dort gar keine Erzwingung, weil sie kein Firebase-Dienst ist. Wer den
+öffentlichen Key aus dem JS-Bundle liest, könnte damit auf Rechnung des Projekts
+Modelle aufrufen, und keine zweite Schicht hielte ihn auf.
+
+Die Live-Sitzung kommt deshalb ohne Key im Browser aus. Sie braucht drei Dinge
+im Projekt:
+
+1. **Den Dienst aktivieren**: `generativelanguage.googleapis.com`.
+2. **Einen eigenen Key anlegen** — API-Restriction genau auf diesen einen
+   Dienst, keine Application-Restriction (der Server schickt keinen Referrer).
+   Wert in den Secret Manager unter `GEMINI_LIVE_API_KEY`, von dort als
+   Umgebungsvariable in den Cloud-Run-Dienst (Terraform, siehe
+   `terraform/modules/project-base/variables.tf`).
+3. **Ihn nirgends veröffentlichen.** Er prägt nur kurzlebige Tokens
+   (`uses: 1`, 60 Sekunden), und nur die gehen an den Browser. Ablauf:
+   [ai-sprachassistent.md](ai-sprachassistent.md).
+
+### Die Drift-Prüfung muss zwei Dinge sehen
+
+Nach dem Aktivieren trägt Firebase erfahrungsgemäß neue Dienste von selbst in
+die Freigabelisten ein. Zwei Fragen, die die Zählung am Ende dieser Datei
+**nicht** beantwortet:
+
+```bash
+# 1. Steht generativelanguage in einem Key? Muss leer bleiben.
+gcloud services api-keys list --project="$PROJECT" --format=json \
+  | jq -r '.[] | select([.restrictions.apiTargets[]?.service]
+      | index("generativelanguage.googleapis.com")) | .displayName'
+
+# 2. Hat ein Key gar keine Restriction mehr? Muss ebenfalls leer bleiben.
+gcloud services api-keys list --project="$PROJECT" --format=json \
+  | jq -r '.[] | select((.restrictions.apiTargets // []) | length == 0) | .displayName'
+```
+
+Die zweite Prüfung fängt den Fall, den eine reine Zählung durchlässt: Ein Key
+ohne jede Einschränkung meldet **null** Ziele — eine kleinere Zahl als vorher,
+und damit unauffällig, obwohl es der schlechteste aller Zustände ist.
 
 Bewusst **entfernt** wurden `places` und `texttospeech` — beide
 kostenpflichtig, beide client-seitig ungenutzt: die Adresssuche läuft über

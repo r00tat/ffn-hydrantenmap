@@ -23,7 +23,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/api-keys.md](docs/api-keys.md) | API-Keys des Firebase-Projekts: warum der Browser-Key öffentlich ist und Referrer nicht schützen, die begründete Freigabeliste je Key, die drei Android-SHA-1 und ihre Verteilwege, App-Check-Erzwingung für Gemini unter `firebaseml` statt `firebasevertexai`, Debug-Token lokal, Drift-Prüfung |
 | [docs/berechtigungen.md](docs/berechtigungen.md) | Rollen: globaler Admin, Gruppen-Admin, Gerätemeister, Gruppenmitglied, Einsatz-Gast; wer was vergibt, warum kein Custom Claim, die Guards |
 | [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Screenshot-Aufnahme |
-| [docs/ai-sprachassistent.md](docs/ai-sprachassistent.md) | Sprach-Assistent auf der Karte: Live-Sitzung je Sprachbefehl gegen Einzelaufruf, warum die Sitzung nur einen Befehl lang lebt, warum nicht `startAudioConversation`, die zwei Backends und die zusätzlich nötige API, Rückfall, Abschrift |
+| [docs/ai-sprachassistent.md](docs/ai-sprachassistent.md) | Sprach-Assistent auf der Karte: Live-Sitzung je Sprachbefehl gegen Einzelaufruf, warum die Sitzung nur einen Befehl lang lebt, warum nicht `startAudioConversation`, warum die Verbindung ohne Firebase-SDK gebaut ist, kurzlebige Tokens und was darin festgenagelt ist, Tageskontingent, Rückfall, Abschrift |
 | [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle (Rollen allgemein: docs/berechtigungen.md), Fahrzeugkategorie und Anzeigereihenfolge |
 | [docs/einsatz-drive-fotos.md](docs/einsatz-drive-fotos.md) | Einsatz-Fotos im Google Shared Drive |
 | [docs/einsatz-backup.md](docs/einsatz-backup.md) | Einsatz sichern und zurückspielen: Umfang, was bewusst fehlt, Gruppenwahl beim Import, Dateinamen von Anhängen |
@@ -357,6 +357,14 @@ Required environment variables (see `.env.local`):
   Umgebungsvariable. Siehe [docs/mcp-server.md](docs/mcp-server.md).
 - `MCP_WRITE_ENABLED` — schaltet die schreibenden MCP-Tools frei. In dev an,
   in prod zunächst aus.
+- `GEMINI_LIVE_API_KEY` (optional) — API-Key der Gemini Developer API, aus dem
+  die Server Action die kurzlebigen Tokens der Live-Sitzung prägt. **Nicht** der
+  öffentliche Browser-Key, sondern ein eigener, ausschließlich auf
+  `generativelanguage.googleapis.com` eingeschränkter Key aus dem Secret
+  Manager. Ohne ihn fällt der Sprach-Assistent auf den Einzelaufruf zurück —
+  lokal der Normalfall. Siehe
+  [docs/ai-sprachassistent.md](docs/ai-sprachassistent.md) und
+  [docs/api-keys.md](docs/api-keys.md).
 - `NEXT_PUBLIC_FIREBASE_AUTH_PROXY` (optional) — `true` lässt den
   Firebase-Auth-Handler unter der eigenen Domain laufen statt auf
   `firebaseapp.com`; nötig für den Google-Login in WebKit-Browsern. Je Gerät

@@ -124,5 +124,10 @@ variable "secrets" {
     "SUMUP_AFFILIATE_KEY_DEV",
     "SUMUP_MERCHANT_CODE",
     "SUMUP_MERCHANT_CODE_DEV",
+    # Eigener API-Key fuer die Live-API der Gemini Developer API. Bewusst
+    # getrennt vom oeffentlichen Browser-Key des Firebase-Projekts: Er darf
+    # ausschliesslich generativelanguage.googleapis.com aufrufen und verlaesst
+    # den Server nie. Siehe docs/api-keys.md.
+    "GEMINI_LIVE_API_KEY",
   ]
 }

@@ -7,7 +7,8 @@ darin, wie Ton und Antwort übertragen werden.
 | | Live-Sitzung | Einzelaufruf |
 | --- | --- | --- |
 | Datei | [useAiLiveAssistant.ts](../src/hooks/aiAssistant/useAiLiveAssistant.ts) | [useAiAssistant.ts](../src/hooks/aiAssistant/useAiAssistant.ts) |
-| Backend | Gemini Developer API (`GoogleAIBackend`) | Agent Platform (`VertexAIBackend`, `global`) |
+| Dienst | Gemini Developer API, direkt | Agent Platform über Firebase AI Logic |
+| Zugangsmittel | kurzlebiges Token je Befehl | öffentlicher Browser-Key + App Check |
 | Modell | `GEMINI_LIVE_MODEL` | `GEMINI_MODEL` |
 | Ton hinein | PCM-Strom während des Sprechens | WebM am Stück nach dem Sprechen |
 | Ton heraus | vom Modell gesprochen | `/api/tts`, sonst Browser-Sprachsynthese |
@@ -59,60 +60,115 @@ Deshalb sind Aufnahme und Wiedergabe in [liveAudio.ts](../src/hooks/aiAssistant/
 zwei getrennte Einheiten mit **eigenem `AudioContext`**: Das Mikrofon endet beim
 Loslassen, die Wiedergabe läuft weiter, bis sie leer ist.
 
-## Warum zwei Backends nebeneinander
+## Warum die Live-Sitzung ohne Firebase-SDK auskommt
 
 Für Gemini 3 gibt es die Live-API ausschließlich über die Gemini Developer API.
-Das Agent-Platform-Backend, über das der übrige Assistent und die Auswertungen
-laufen, führt nur die 2.5er-Live-Modelle. `getAI` schlüsselt seine Instanz je
-Backend, beide dürfen also nebeneinander bestehen —
-[vertexai.ts](../src/components/firebase/vertexai.ts) bleibt unverändert, die
-Live-Sitzung hängt an [liveAi.ts](../src/components/firebase/liveAi.ts).
+Der naheliegende Weg dorthin wäre ein zweites Firebase-AI-Logic-Backend
+(`GoogleAIBackend`) — er ist gebaut worden und hat nicht getragen:
 
-Zu tun ist das im Firebase-Projekt einmal: **`generativelanguage.googleapis.com`
-aktivieren** — im Projekt, **nicht** am Browser-Key. Der Browser ruft den Dienst
-nie auf, die AI Logic tut es hinter ihrem Proxy; am Key wäre der Eintrag nur
-eine offene Flanke (Begründung in [api-keys.md](api-keys.md)). Solange die
-Freischaltung fehlt, scheitert `connect()` — was kein Ausfall ist, siehe unten.
+```text
+WebSocket connection closed by server.
+Reason: 'Requests from referer <empty> are blocked.'
+```
 
-## App Check deckt die Live-Verbindung nicht ab
+Der Grund ist die Referrer-Bindung des öffentlichen Browser-Keys. Ein Browser
+schickt auf einem WebSocket-Upgrade **keinen `Referer`**, der Key-Prüfer sieht
+`<empty>` und weist ab. Der Einzelaufruf ist nicht betroffen, weil er ein
+gewöhnliches HTTPS-Request ist und den Header mitschickt. Die Sperre ließe sich
+nur lösen, indem man einen Key ohne Application-Restriction erlaubt — also genau
+das, was [api-keys.md](api-keys.md) verbietet.
 
-Das ist der offene Punkt dieser Bauweise, und er ist im SDK nachzulesen
-(`@firebase/ai` 12.19.0):
+Der Ausweg ist, **gar keinen Key in den Browser zu geben**:
 
-- Der **Einzelaufruf** geht per `fetch` hinaus. `getHeaders()` setzt
-  `x-goog-api-key`, **`X-Firebase-AppCheck`** und `Authorization: Firebase <ID-Token>`.
-  Hier greift App Check samt Replay-Schutz (`useLimitedUseAppCheckTokens`).
-- Die **Live-Sitzung** ist ein WebSocket. `WebSocketUrl.toString()` hängt
-  ausschließlich `?key=<Browser-Key>` an, und die `setup`-Nachricht trägt weder
-  App-Check- noch Auth-Token. Browser können auf einem WebSocket-Handshake keine
-  eigenen Header setzen — das ist keine Nachlässigkeit des SDK, sondern eine
-  Grenze der Plattform.
+1. [aiLiveToken.ts](../src/app/actions/aiLiveToken.ts) (Server Action) prüft mit
+   `actionUserRequired()` die Sitzung, zählt das Tageskontingent und prägt mit
+   dem geheimen `GEMINI_LIVE_API_KEY` ein kurzlebiges Token
+   (`POST /v1beta/auth_tokens`).
+2. Der Browser bekommt nur dieses Token und verbindet damit auf
+   `…GenerativeService.BidiGenerateContentConstrained?access_token=…`
+   ([liveConnection.ts](../src/hooks/aiAssistant/liveConnection.ts)).
 
-Daraus folgt zweierlei, und was davon zutrifft, muss **vor dem Ausrollen in dev
-gemessen werden**: Entweder die erzwungene App-Check-Prüfung weist den Handshake
-ab — dann läuft der Assistent dauerhaft im Rückfall und die Live-Sitzung bringt
-nichts. Oder der WebSocket-Endpunkt ist von der Erzwingung ausgenommen — dann
-hängt er allein am Browser-Key, und wer den aus dem Bundle liest, kann auf
-Rechnung des Projekts Sitzungen öffnen.
+Weil in der Anfrage kein API-Key mehr steckt, gibt es auch keine
+Referrer-Regel, die greifen könnte. Das Problem ist nicht umgangen, sondern
+entfallen.
 
-Bis das geklärt ist, gilt für die Live-Sitzung der Grundsatz aus
-[api-keys.md](api-keys.md) nicht, dass hinter jedem Dienst am Key entweder
-Firestore-Regeln oder App Check stehen. Gegenmittel, unabhängig vom Ausgang:
-ein Kontingent (Quota) auf `firebasevertexai.googleapis.com` im Cloud-Projekt
-und ein Budget-Alarm, damit der Schaden im Missbrauchsfall begrenzt und sichtbar
-ist.
+### Was im Token festgenagelt ist
+
+[aiLiveToken.ts](../src/common/aiLiveToken.ts) baut den Token-Rumpf **ohne
+`fieldMask`**. Das ist die entscheidende Auslassung: Liegt ein
+`bidiGenerateContentSetup` vor und keine Maske, gilt das Setup des Tokens
+vollständig und das Setup, das der Browser beim Verbinden schickt, wird
+verworfen. Modell, Systemanweisung, Werkzeuge und Ausgabeform stehen damit
+serverseitig fest — ein veränderter Client kann weder die Systemanweisung
+austauschen noch ein teureres Modell wählen.
+
+Dazu `uses: 1` und 60 Sekunden Frist zum Verbinden: Ein abgefangenes Token
+taugt für nichts mehr, wenn die Sitzung schon offen ist.
+
+Zwei Kleinigkeiten, die den direkten Weg vom SDK-Weg unterscheiden und beide im
+Code kommentiert sind: Die Schema-Typen der Werkzeuge müssen groß geschrieben
+werden (`'object'` → `'OBJECT'`), weil der Firebase-Proxy diese Umschrift bisher
+übernommen hat; und die beiden Abschriften gehören in das `setup`, nicht in die
+`generationConfig`.
+
+### Warum die Verbindung von Hand gebaut ist
+
+`@firebase/ai` hängt an die WebSocket-Adresse fest `?key=<apiKey>` und kennt nur
+den Firebase-Proxy-Pfad — `WebSocketUrl` liest nicht einmal `baseUrl` aus den
+`singleRequestOptions`. Es gibt also keine Stelle, an der sich ein Token
+unterschieben ließe. [liveConnection.ts](../src/hooks/aiAssistant/liveConnection.ts)
+baut die Verbindung deshalb selbst nach und reicht die Nachrichten in **genau
+der Form** weiter, die das SDK geliefert hat (`{type: 'serverContent', …}`).
+Dadurch bleibt [liveTurn.ts](../src/hooks/aiAssistant/liveTurn.ts) unverändert.
+
+Die API-Fassung ist `v1alpha`, nicht `v1beta`: So steht es im Live-Modul des
+offiziellen `js-genai`, das bei jeder anderen Fassung warnt. Die
+Übersichtsseite der Doku nennt `v1beta` — im Zweifel gilt der Code.
+
+## App Check gilt hier nicht — und das ist kein Loch mehr
+
+App Check erzwingt je Firebase-Dienst, bei diesem Projekt unter dem Altnamen
+`firebaseml.googleapis.com`. `generativelanguage.googleapis.com` ist kein
+Firebase-Dienst; dort gibt es nichts zu erzwingen, und der Browser schickt auf
+dem WebSocket ohnehin keine eigenen Header.
+
+Der Schutz wandert damit von der Plattform zur Anwendung, und er wird dabei
+schärfer statt schwächer:
+
+| | Einzelaufruf | Live-Sitzung |
+| --- | --- | --- |
+| Prüft | App Check: „eine echte Instanz der App" | Server Action: „dieser angemeldete, freigeschaltete Benutzer" |
+| Kostendeckel | keiner | `uses: 1`, 60 s, Modell im Token festgenagelt |
+| Missbrauch skaliert | über den öffentlichen Key | nur über ein Benutzerkonto, begrenzt durch das Tageskontingent |
+
+Das Tageskontingent steht in
+[liveTokenQuota.ts](../src/server/ai/liveTokenQuota.ts): ein Firestore-Dokument
+je Benutzer und Tag (`aiLiveQuota/{uid}_{JJJJ-MM-TT}`), geschrieben ausschließlich
+vom Admin-SDK — deshalb braucht es dafür keine Firestore-Regel. Fällt Firestore
+aus, wird durchgelassen: Ein Sprachbefehl im Einsatz darf nicht an der
+Buchhaltung scheitern.
+
+Im Cloud-Projekt bleibt zu tun: **`generativelanguage.googleapis.com`
+aktivieren**, einen **eigenen** API-Key dafür anlegen (API-Restriction genau auf
+diesen einen Dienst, keine Application-Restriction, Wert im Secret Manager unter
+`GEMINI_LIVE_API_KEY`) und ihn **nicht** in den Browser-Key eintragen. Warum
+gerade dieser Dienst dort nichts zu suchen hat, steht in
+[api-keys.md](api-keys.md).
 
 ## Der Rückfall ist kein Notnagel
 
-Scheitert der Verbindungsaufbau, nimmt der Knopf still den Einzelaufruf und
+Scheitert das Prägen des Tokens oder der Verbindungsaufbau, nimmt der Knopf
+still den Einzelaufruf und
 merkt sich das für den Rest der Sitzung
 ([AiAssistantButton.tsx](../src/components/Map/AiAssistantButton.tsx)). Der
 Benutzer spricht zu diesem Zeitpunkt bereits — eine Fehlermeldung hülfe ihm
 nicht, ein funktionierender Weg schon.
 
-Dass es diesen Weg weiterhin gibt, ist Absicht: Die Live-API des Web-SDK ist
-als `@beta` gekennzeichnet, das Live-Modell ist ein Preview-Modell, und beides
-steht ohne Zusagen zu Verfügbarkeit und Abkündigung. Der Einzelaufruf ist
+Dass es diesen Weg weiterhin gibt, ist Absicht: Die kurzlebigen Tokens sind
+als Preview gekennzeichnet, das Live-Modell ebenfalls, und beides steht ohne
+Zusagen zu Verfügbarkeit und Abkündigung. Ohne gesetztes `GEMINI_LIVE_API_KEY`
+— lokal der Normalfall — gibt die Server Action `unconfigured` zurück und der
+Assistent arbeitet unverändert weiter. Der Einzelaufruf ist
 dagegen ein einzelner HTTPS-Request, der sich wiederholen lässt — im Funkloch
 an der Einsatzstelle das robustere Verfahren.
 

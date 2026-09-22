@@ -157,6 +157,7 @@ module "cloud_run" {
     SUMUP_API_KEY            = "SUMUP_API_KEY"
     SUMUP_AFFILIATE_KEY      = "SUMUP_AFFILIATE_KEY"
     SUMUP_MERCHANT_CODE      = "SUMUP_MERCHANT_CODE"
+    GEMINI_LIVE_API_KEY      = "GEMINI_LIVE_API_KEY"
   }
 
 }

@@ -1,6 +1,5 @@
-import { LiveSession } from 'firebase/ai';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getAiLiveModel } from '../../components/firebase/liveAi';
+import { createLiveToken } from '../../app/actions/aiLiveToken';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { LatencyRun } from './latency';
 import {
@@ -9,6 +8,7 @@ import {
   MicrophoneCapture,
   startMicrophoneCapture,
 } from './liveAudio';
+import { connectLiveSession, LiveConnection } from './liveConnection';
 import { runLiveTurn } from './liveTurn';
 import { AiAssistantResult } from './types';
 import useAiToolRunner from './useAiToolRunner';
@@ -39,7 +39,7 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
   const { executeTool, buildContextText, contextStats, lastCreatedItem, undoLastAction } =
     useAiToolRunner(existingItems);
 
-  const sessionRef = useRef<LiveSession | null>(null);
+  const sessionRef = useRef<LiveConnection | null>(null);
   const captureRef = useRef<MicrophoneCapture | null>(null);
   const playbackRef = useRef<LivePlayback | null>(null);
   const [status, setStatus] = useState<AiLiveStatus>('idle');
@@ -74,10 +74,14 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
     async (run?: LatencyRun): Promise<void> => {
       await cleanup();
 
-      const model = getAiLiveModel();
-      const session = await (run
-        ? run.phase('sitzung öffnen', () => model.connect())
-        : model.connect());
+      const open = async () => {
+        const { token, model, error, detail } = await createLiveToken();
+        if (!token || !model) {
+          throw new Error(`Live-Token nicht verfügbar (${error}${detail ? `: ${detail}` : ''})`);
+        }
+        return connectLiveSession(token, model);
+      };
+      const session = await (run ? run.phase('sitzung öffnen', open) : open());
       sessionRef.current = session;
 
       try {

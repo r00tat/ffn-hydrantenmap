@@ -57,9 +57,21 @@ const session = {
   receive: vi.fn(),
 };
 
-const connect = vi.fn(async () => session);
-vi.mock('../../components/firebase/liveAi', () => ({
-  getAiLiveModel: () => ({ connect }),
+const connect = vi.fn(async (token: string, model: string) => {
+  void token;
+  void model;
+  return session;
+});
+vi.mock('./liveConnection', () => ({
+  connectLiveSession: (token: string, model: string) => connect(token, model),
+}));
+
+const createLiveToken = vi.fn(async () => ({
+  token: 'auth_tokens/abc',
+  model: 'gemini-live',
+}));
+vi.mock('../../app/actions/aiLiveToken', () => ({
+  createLiveToken: () => createLiveToken(),
 }));
 
 import useAiLiveAssistant from './useAiLiveAssistant';
@@ -75,6 +87,7 @@ describe('useAiLiveAssistant', () => {
     vi.clearAllMocks();
     session.isClosed = false;
     connect.mockResolvedValue(session);
+    createLiveToken.mockResolvedValue({ token: 'auth_tokens/abc', model: 'gemini-live' });
     answerWith('Erledigt.');
   });
 
@@ -132,6 +145,23 @@ describe('useAiLiveAssistant', () => {
 
     await expect(actAsync(() => result.current.startTurn())).rejects.toThrow('api not enabled');
     expect(result.current.status).toBe('idle');
+  });
+
+  it('holt das Token vom Server und verbindet erst damit', async () => {
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await actAsync(() => result.current.startTurn());
+
+    expect(createLiveToken).toHaveBeenCalled();
+    expect(connect).toHaveBeenCalledWith('auth_tokens/abc', 'gemini-live');
+  });
+
+  it('verbindet gar nicht erst, wenn der Server kein Token ausgibt', async () => {
+    createLiveToken.mockResolvedValueOnce({ error: 'quota' } as never);
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await expect(actAsync(() => result.current.startTurn())).rejects.toThrow('quota');
+    expect(connect).not.toHaveBeenCalled();
   });
 
   it('räumt die Sitzung auf, wenn das Mikrofon nicht startet', async () => {
