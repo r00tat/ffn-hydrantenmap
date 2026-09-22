@@ -1,5 +1,5 @@
 /**
- * Maße und Aufbau der Kartenaufnahme im PDF-Export der Print-Seite.
+ * Maße des Druck-Satzspiegels und Aufbau der Kartenaufnahme der Print-Seite.
  *
  * Warum das nicht am Kartenelement selbst hängt: html2pdf rendert nicht den
  * Bildschirm, sondern legt einen Klon des Dokuments in einem Container neu um,
@@ -33,6 +33,35 @@ export const PRINT_CONTENT_HEIGHT_MM = A4_HEIGHT_MM - 2 * PRINT_PDF_MARGIN_MM;
  * wieder über zwei Seiten zerreißen.
  */
 export const PRINT_MAP_MAX_HEIGHT_MM = 240;
+
+/**
+ * CSS-Pixel je Millimeter. Im Druck ist das CSS-Pixel über 1in = 96px
+ * festgelegt, unabhängig von der Auflösung des Druckers — nur deshalb lässt
+ * sich eine Papierbreite überhaupt in Pixeln treffen.
+ */
+export const PX_PER_MM = 96 / 25.4;
+
+/**
+ * Satzspiegelbreite in CSS-Pixeln (718px).
+ *
+ * Die Print-Seite bekommt genau diese Breite — und zwar auf dem Bildschirm
+ * wie auf dem Papier. Das ist der Kern gegen den abgeschnittenen
+ * Kartenausschnitt beim Drucken über das System: Leaflet setzt die Kachelebene
+ * einmal für die gemessene Containergröße und rechnet sie nie nach. Ändert
+ * sich der Container erst im Druck (`@media print`), bleibt die Kachelebene
+ * stehen und der kleinere Ausschnitt zeigt ihre linke obere Ecke. Bleibt die
+ * Breite gleich, gibt es kein Umbrechen und damit auch keinen Versatz.
+ */
+export const PRINT_CONTENT_WIDTH_PX = Math.round(
+  PRINT_CONTENT_WIDTH_MM * PX_PER_MM
+);
+
+/**
+ * Höhe der Karte auf der Print-Seite in CSS-Pixeln. Zusammen mit der Breite
+ * ergibt das 190mm x 132mm — die Karte bleibt damit deutlich unter der
+ * Satzspiegelhöhe und passt mit der Einsatz-Kopfzeile auf die erste Seite.
+ */
+export const PRINT_MAP_HEIGHT_PX = 500;
 
 /** Klasse der Aufnahme; html2pdf bekommt sie als `pagebreak.avoid`-Selektor. */
 export const PRINT_MAP_SNAPSHOT_CLASS = 'print-map-snapshot';

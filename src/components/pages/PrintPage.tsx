@@ -23,6 +23,8 @@ import {
 import { displayFileName } from '../../common/attachmentName';
 import {
   createMapSnapshotImage,
+  PRINT_CONTENT_WIDTH_PX,
+  PRINT_MAP_HEIGHT_PX,
   PRINT_MAP_SNAPSHOT_CLASS,
   PRINT_PDF_MARGIN_MM,
 } from './printMapSnapshot';
@@ -48,6 +50,45 @@ const SpectrumChart = dynamic(() => import('./SpectrumChart'), {
   loading: () => null,
 });
 import StrengthTable from './StrengthTable';
+
+/**
+ * Die Print-Seite ist exakt so breit wie der Satzspiegel von A4 — auf dem
+ * Bildschirm genauso wie auf dem Papier. Nur so bleibt die Karte beim Drucken
+ * über das System stehen, wo sie steht: Leaflet setzt die Kachelebene einmal
+ * für die gemessene Containergröße und rechnet sie nie nach, ein erst im Druck
+ * umbrechender Container zeigt deshalb nur deren linke obere Ecke.
+ *
+ * Aus demselben Grund bekommt die Karte feste Pixelmaße statt der 80%-Breite
+ * aus Map.tsx, und die Seitenleiste entfällt: Sie ist Bedienoberfläche und
+ * würde der Karte nur Breite nehmen.
+ */
+const printPageSx = {
+  width: PRINT_CONTENT_WIDTH_PX,
+  mx: 'auto',
+  '& .map-area': {
+    width: PRINT_CONTENT_WIDTH_PX,
+    height: PRINT_MAP_HEIGHT_PX,
+    flex: 'none',
+    breakInside: 'avoid',
+  },
+  '& .map-area .leaflet-container': {
+    width: '100%',
+    height: '100%',
+  },
+  '& .map-sidebar': {
+    display: 'none',
+  },
+  // Die allgemeinen Druckregeln in globals.css stellen jede Leaflet-Karte auf
+  // 100% x 400px um. Für andere Seiten ist das der einzige Weg zu einer Höhe
+  // überhaupt; hier würde es genau den Versatz erzeugen, den die festen Maße
+  // vermeiden.
+  '@media print': {
+    '& .map-area, & .map-area .leaflet-container': {
+      width: `${PRINT_CONTENT_WIDTH_PX}px !important`,
+      height: `${PRINT_MAP_HEIGHT_PX}px !important`,
+    },
+  },
+};
 
 export default function PrintPage() {
   const t = useTranslations('print');
@@ -223,7 +264,7 @@ export default function PrintPage() {
   }, [displayItems, layers, t]);
 
   return (
-    <>
+    <Box className="print-page" sx={printPageSx}>
       {/* Aktionsleiste */}
       <Box sx={{ p: 2, display: 'flex', gap: 2 }} className="no-print">
         <Button
@@ -476,7 +517,7 @@ export default function PrintPage() {
           ))}
         </Box>
       )}
-    </>
+    </Box>
   );
 }
 

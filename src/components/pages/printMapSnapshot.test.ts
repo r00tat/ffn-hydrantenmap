@@ -4,8 +4,11 @@ import {
   createMapSnapshotImage,
   fitMapSnapshot,
   PRINT_CONTENT_WIDTH_MM,
+  PRINT_CONTENT_WIDTH_PX,
+  PRINT_MAP_HEIGHT_PX,
   PRINT_MAP_MAX_HEIGHT_MM,
   PRINT_MAP_SNAPSHOT_CLASS,
+  PX_PER_MM,
 } from './printMapSnapshot';
 
 const mmValue = (value: string) => Number.parseFloat(value.replace('mm', ''));
@@ -74,5 +77,28 @@ describe('createMapSnapshotImage', () => {
     expect(img.style.display).toBe('block');
     expect(img.style.flexShrink).toBe('0');
     expect(img.src).toBe('data:image/jpeg;base64,xxx');
+  });
+});
+
+describe('Satzspiegel in CSS-Pixeln', () => {
+  it('rechnet mit 96 CSS-Pixeln je Zoll', () => {
+    // Im Druck ist das CSS-Pixel über 1in = 96px definiert — nur deshalb
+    // lässt sich die Seitenbreite überhaupt in Pixeln treffen.
+    expect(PX_PER_MM * 25.4).toBeCloseTo(96, 10);
+  });
+
+  it('entspricht der Satzspiegelbreite von A4', () => {
+    expect(PRINT_CONTENT_WIDTH_PX).toBe(
+      Math.round(PRINT_CONTENT_WIDTH_MM * PX_PER_MM)
+    );
+    // 210mm Papier minus 2x10mm Rand
+    expect(PRINT_CONTENT_WIDTH_PX).toBe(718);
+  });
+
+  it('lässt die Karte auf eine Seite passen', () => {
+    // Satzspiegelhöhe A4 bei 15mm Rand oben und unten
+    const contentHeightPx = (297 - 2 * 15) * PX_PER_MM;
+
+    expect(PRINT_MAP_HEIGHT_PX).toBeLessThan(contentHeightPx);
   });
 });
