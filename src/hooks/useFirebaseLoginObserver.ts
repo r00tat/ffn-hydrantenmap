@@ -23,6 +23,7 @@ import {
   saveAuthToSessionStorage,
 } from './auth/sessionStorage';
 import { ensureFreshAuth } from './auth/ensureFreshAuth';
+import { suppressSessionRecovery } from './useFirebaseSessionRecovery';
 
 // Re-export types for backward compatibility
 export type { LoginData, LoginStatus, LoginStep } from './auth/types';
@@ -297,6 +298,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }, []);
 
   const fbSignOut = useCallback(async () => {
+    // Vor dem Abmelden: Sonst haelt die Sitzungs-Wiederherstellung das
+    // Zeitfenster, in dem der Firebase-Benutzer schon weg und das Cookie noch
+    // da ist, fuer einen Ausfall und meldet den Benutzer wieder an.
+    suppressSessionRecovery();
     clearAuthFromSessionStorage();
     // redirect: false — NextAuth server otherwise falls back to NEXTAUTH_URL
     // when the callbackUrl origin doesn't match (Capacitor WebView, dev

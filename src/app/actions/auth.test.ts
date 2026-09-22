@@ -14,6 +14,12 @@ vi.mock('./jwt', () => ({
   verifyJwt: verifyJwtMock,
 }));
 
+// `actionUserRequired` zieht NextAuth mit in den Modulgraphen, das im
+// Testlauf nicht aufloest. Der Share-Link-Weg benutzt den Waechter nicht.
+vi.mock('../auth', () => ({
+  actionUserRequired: vi.fn(async () => ({ user: { id: 'uid-1' } })),
+}));
+
 vi.mock('../../server/firebase/admin', () => ({
   firebaseAuth: {
     createCustomToken: createCustomTokenMock,

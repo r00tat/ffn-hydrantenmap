@@ -1,13 +1,9 @@
 'use server';
 import 'server-only';
 
-import { firebaseAuth, firestore } from '../../server/firebase/admin';
-import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
-import { CustomClaims } from '../api/users/[uid]/updateUser';
+import { mintFirebaseCustomToken } from '../../server/auth/mintCustomToken';
+import { actionUserRequired } from '../auth';
 import { verifyJwt } from './jwt';
-import { FirebaseUserInfo } from '../../common/users';
-import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
-import { shareLinkStatus } from '../../common/firecallShareLink';
 
 /**
  * Tauscht das JWT aus einem Share-Link gegen ein Firebase Custom Token.
@@ -27,69 +23,21 @@ export async function exchangeCustomJwtForFirebaseToken(customToken: string) {
 
     const uid = payload.sub;
 
-    const userDoc = await firestore
-      .collection(USER_COLLECTION_ID)
-      .doc(uid)
-      .get();
-    if (!userDoc.exists) {
-      throw new Error(`no user document for ${uid}`);
-    }
-    const userData = userDoc.data() as FirebaseUserInfo;
-    if (!userData.authorized) {
-      throw new Error(`user ${uid} is not authorized`);
-    }
-
-    // Ablauf und Entzug wirken über das Benutzerdokument, nicht über das JWT.
-    // Ein Gast ohne Ablaufdatum stammt aus der Zeit vor der Link-Verwaltung und
-    // gilt damit als abgelaufen.
-    if (
-      isFirecallGuest(userData) &&
-      shareLinkStatus(
-        {
-          expiresAt: userData.firecallExpiresAt,
-          disabled: !userData.authorized,
-        },
-        Date.now(),
-      ) !== 'active'
-    ) {
-      console.info(`share link for ${uid} is no longer valid`);
-      return { error: 'Token expired' };
+    // Claims und Ablaufpruefung liegen in `mintFirebaseCustomToken`, damit
+    // dieser Weg und die Wiederanmeldung aus der Session dieselben Rechte
+    // praegen. Ein anderer Fehler als der Ablauf bleibt nach aussen
+    // "Invalid token" — der Aufrufer soll nicht erfahren, ob es den Benutzer
+    // gibt und woran es lag.
+    const minted = await mintFirebaseCustomToken(uid);
+    if (!minted.token) {
+      if (minted.error === 'Token expired') {
+        console.info(`share link for ${uid} is no longer valid`);
+        return { error: 'Token expired' };
+      }
+      throw new Error(minted.error);
     }
 
-    const claims: CustomClaims = {
-      groups: userData.groups || ['allUsers'],
-      isAdmin: !!userData.isAdmin,
-      authorized: true,
-      firecall: userData.firecall,
-      firecallWrite: guestCanWrite(userData),
-    };
-
-    console.info(
-      `payload: ${JSON.stringify({
-        sub: payload.sub,
-        firecall: claims.firecall,
-        firecallWrite: claims.firecallWrite,
-      })}`,
-    );
-
-    // `undefined` ist als Developer Claim nicht erlaubt — der firecall-Claim
-    // entfällt daher komplett, wenn der Benutzer kein Einsatz-Gast (mehr) ist.
-    const firebaseToken = await firebaseAuth.createCustomToken(uid, {
-      groups: claims.groups,
-      isAdmin: claims.isAdmin,
-      authorized: claims.authorized,
-      ...(claims.firecall
-        ? {
-            firecall: claims.firecall,
-            firecallWrite: claims.firecallWrite,
-            // Die Firestore-Rules prüfen den Ablauf gegen `request.time`.
-            ...(userData.firecallExpiresAt
-              ? { firecallExpires: userData.firecallExpiresAt }
-              : {}),
-          }
-        : {}),
-    });
-    return { token: firebaseToken };
+    return { token: minted.token };
   } catch (error: any) {
     console.error('Error exchanging custom token:', error);
     if (error.code === 'ERR_JWT_EXPIRED') {
@@ -97,4 +45,35 @@ export async function exchangeCustomJwtForFirebaseToken(customToken: string) {
     }
     return { error: 'Invalid token', details: error.message };
   }
+}
+
+/**
+ * Stellt die Firebase-Anmeldung aus einer bestehenden NextAuth-Session wieder
+ * her.
+ *
+ * Die App fuehrt zwei Sitzungen: das NextAuth-Cookie und den Firebase-Client.
+ * Faellt nur der Firebase-Client aus — abgebrochener Login, verlorener
+ * Browserspeicher, geschlossene WebView — bleibt das Cookie gueltig, und die
+ * App zeigt sich angemeldet, waehrend jeder Firestore-Zugriff ohne
+ * `request.auth` laeuft und leer bleibt. Aus diesem Zustand gab es bisher
+ * keinen Rueckweg: Der einzige Custom-Token-Login hing am `?token=` eines
+ * Share-Links.
+ *
+ * Neue Rechte entstehen hier nicht. Das Cookie ist selbst aus einem
+ * verifizierten Firebase-ID-Token entstanden, und die Claims kommen wie
+ * ueberall aus dem Benutzerdokument.
+ */
+export async function createFirebaseTokenForSession() {
+  const session = await actionUserRequired();
+  const uid = session.user?.id;
+  if (!uid) {
+    return { error: 'no user id in session' };
+  }
+  const minted = await mintFirebaseCustomToken(uid);
+  if (!minted.token) {
+    console.warn(`session re-login for ${uid} refused: ${minted.error}`);
+    return { error: minted.error ?? 'no token' };
+  }
+  console.info(`minted session re-login token for ${uid}`);
+  return { token: minted.token };
 }
