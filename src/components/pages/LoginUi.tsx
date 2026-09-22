@@ -25,6 +25,7 @@ import PasskeyLoginButton from '../auth/PasskeyLoginButton';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import ProfileUi from './ProfileUi';
+import { isSessionRecoverySuppressed } from '../../hooks/auth/recoverySuppression';
 
 const FirebaseUiLogin = dynamic(() => import('../firebase/firebase-ui-login'), {
   ssr: false,
@@ -56,8 +57,22 @@ export default function LoginUi() {
     setNativeDebug(info);
   }, []);
 
+  // Nach dem Abmelden laedt `fbSignOut` die Seite neu, und `isAuthLoading`
+  // steht wieder auf true, bis Firebase seinen leeren Zustand meldet — rund
+  // eine Sekunde, in der die Seite eine automatische Anmeldung ankuendigte,
+  // die gesperrt ist und gar nicht kommt. Die Sperre erst im Effekt lesen:
+  // `localStorage` gibt es beim Prerender nicht.
+  const [recoverySuppressed, setRecoverySuppressed] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRecoverySuppressed(isSessionRecoverySuppressed());
+  }, []);
+
   const isAutoLoginInProgress =
-    !isSignedIn && (isAuthLoading || isRefreshing) && !autoLoginTimedOut;
+    !isSignedIn &&
+    (isAuthLoading || isRefreshing) &&
+    !autoLoginTimedOut &&
+    !recoverySuppressed;
 
   const loginSteps: { key: LoginStep; labelKey: string }[] = [
     { key: 'authenticating', labelKey: 'stepAuthenticating' },

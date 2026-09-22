@@ -26,7 +26,7 @@ import { ensureFreshAuth } from './auth/ensureFreshAuth';
 import {
   clearSessionRecoverySuppression,
   suppressSessionRecovery,
-} from './useFirebaseSessionRecovery';
+} from './auth/recoverySuppression';
 
 // Re-export types for backward compatibility
 export type { LoginData, LoginStatus, LoginStep } from './auth/types';
