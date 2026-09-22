@@ -13,6 +13,7 @@ import Collapse from '@mui/material/Collapse';
 import FormHelperText from '@mui/material/FormHelperText';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -26,7 +27,10 @@ import {
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
-import { estimatedDistance } from '../../common/fahrtenbuchAutoFill';
+import {
+  estimatedDistance,
+  isKmCounter,
+} from '../../common/fahrtenbuchAutoFill';
 import useFahrtenbuchEntries from '../../hooks/useFahrtenbuchEntries';
 import useFahrtenbuchGroupStandort from '../../hooks/useFahrtenbuchGroupStandort';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
@@ -41,7 +45,7 @@ import {
   type Firecall,
   type Fzg,
 } from '../firebase/firestore';
-import CounterFields from './CounterFields';
+import CounterFields, { parseCounterInput } from './CounterFields';
 import {
   buildEinsatzRows,
   einsatzTimes,
@@ -167,6 +171,66 @@ function KmPreviewText({
             diff,
           })}
     </Typography>
+  );
+}
+
+/**
+ * Der Kilometer-Endstand direkt in der Zeile. „Einzutragen sind nur die
+ * Endstände" — das ist die eine Zahl, die der Fahrer an seiner Zeile wirklich
+ * zu korrigieren hat, und sie soll ihn keinen Klick in die Details kosten. Die
+ * Schätzung steht nur als Platzhalter darin: Eingetragen sähe sie aus wie eine
+ * Ablesung, und genau das darf im Nachweisdokument nicht passieren.
+ *
+ * Ohne Kilometerzähler — ein Boot, ein Anhänger — gibt es das Feld nicht; seine
+ * Zähler stehen in den Details.
+ */
+function KmEndField({
+  vehicle,
+  row,
+  autoFill,
+  onChangeRow,
+}: {
+  vehicle?: FahrtenbuchVehicle;
+  row: EinsatzRow;
+  autoFill?: EinsatzAutoFill;
+  onChangeRow: (key: string, patch: Partial<EinsatzRow>) => void;
+}) {
+  const t = useTranslations('fahrtenbuch');
+  const def = (vehicle?.counters ?? []).find(isKmCounter);
+  if (!def) return null;
+
+  const reading = row.counters[def.id] ?? {};
+  const estimate =
+    autoFill?.distance && reading.start !== undefined
+      ? reading.start + autoFill.distance.roundTripKm
+      : undefined;
+
+  return (
+    <TextField
+      size="small"
+      type="number"
+      label={t('einsatz.kmEnd')}
+      value={reading.end ?? ''}
+      placeholder={estimate !== undefined ? `${estimate}` : undefined}
+      sx={{ width: 150, flexShrink: 0 }}
+      onChange={(e) =>
+        onChangeRow(row.key, {
+          counters: {
+            ...row.counters,
+            [def.id]: { ...reading, end: parseCounterInput(e.target.value) },
+          },
+        })
+      }
+      slotProps={{
+        input: {
+          endAdornment: (
+            <InputAdornment position="end">{def.unit}</InputAdornment>
+          ),
+        },
+        // Ohne das verdeckt das Label den Platzhalter mit der Schätzung.
+        inputLabel: { shrink: true },
+      }}
+    />
   );
 }
 
@@ -372,35 +436,16 @@ export function EinsatzFahrtenbuchView({
                             <TextField {...params} label={t('driver')} />
                           )}
                         />
-                        {/* Nichts vorbelegt: Die gemeldete Mannschaft eines
-                            Fahrzeugs ist nicht seine Fahrerliste. */}
-                        <Autocomplete
-                          multiple
-                          freeSolo
-                          size="small"
-                          options={persons.map((p) => p.name)}
-                          value={(row.coDrivers ?? []).map((ref) => ref.name)}
-                          sx={{ flexGrow: 1, minWidth: 200 }}
-                          onChange={(_, values) =>
-                            onChangeRow(row.key, {
-                              coDrivers: values.map((name) => {
-                                const person = persons.find(
-                                  (p) => p.name === name,
-                                );
-                                return person?.id
-                                  ? { id: person.id, name: person.name }
-                                  : { name };
-                              }),
-                            })
-                          }
-                          renderInput={(params) => (
-                            <TextField {...params} label={t('coDrivers')} />
-                          )}
-                        />
                       </>
                     ) : (
                       <Box sx={{ flexGrow: 1 }} />
                     )}
+                    <KmEndField
+                      vehicle={vehicle}
+                      row={row}
+                      autoFill={autoFill}
+                      onChangeRow={onChangeRow}
+                    />
                     <KmPreviewText
                       vehicle={vehicle}
                       row={row}
@@ -453,6 +498,38 @@ export function EinsatzFahrtenbuchView({
 
               <Collapse in={isOpen && !recorded} unmountOnExit>
                 <Box sx={{ mt: 2 }}>
+                  {/* Nichts vorbelegt: Die gemeldete Mannschaft eines Fahrzeugs
+                      ist nicht seine Fahrerliste. Der Zusatzfahrer ist der
+                      Ausnahmefall und steht deshalb hier und nicht in der
+                      Zeile — dort nahm er den Platz des Kilometerfeldes ein,
+                      das jede Fahrt braucht. */}
+                  {needsDriver && (
+                    <Autocomplete
+                      multiple
+                      freeSolo
+                      size="small"
+                      options={persons.map((p) => p.name)}
+                      value={(row.coDrivers ?? []).map((ref) => ref.name)}
+                      sx={{ mb: 2 }}
+                      onChange={(_, values) =>
+                        onChangeRow(row.key, {
+                          coDrivers: values.map((name) => {
+                            const person = persons.find((p) => p.name === name);
+                            return person?.id
+                              ? { id: person.id, name: person.name }
+                              : { name };
+                          }),
+                        })
+                      }
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label={t('coDrivers')}
+                          helperText={t('coDriversHint')}
+                        />
+                      )}
+                    />
+                  )}
                   <Grid container spacing={2} sx={{ mb: 1 }}>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField

@@ -1338,6 +1338,7 @@
       "kmPreview": "{start} → {end} km (+{diff})",
       "kmPreviewEstimated": "{start} → ca. {end} km (ca. +{diff})",
       "kmPreviewNoStart": "kein Startstand — wird ohne Kilometer gespeichert",
+      "kmEnd": "km-Endstand",
       "savedKmEstimated": "{km} km je Fahrzeug (geschätzt, keine Route verfügbar)",
       "failed": "{count, plural, one {# Fahrzeug konnte nicht gespeichert werden — die Fahrt fehlt und muss von Hand nachgetragen werden} other {# Fahrzeuge konnten nicht gespeichert werden — die Fahrten fehlen und müssen von Hand nachgetragen werden}}"
     },

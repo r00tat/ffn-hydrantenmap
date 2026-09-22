@@ -1338,6 +1338,7 @@
       "kmPreview": "{start} → {end} km (+{diff})",
       "kmPreviewEstimated": "{start} → approx. {end} km (approx. +{diff})",
       "kmPreviewNoStart": "no starting reading — will be saved without kilometres",
+      "kmEnd": "Odometer end",
       "savedKmEstimated": "{km} km per vehicle (estimated, no route available)",
       "failed": "{count, plural, one {# vehicle could not be saved — the trip is missing and has to be added manually} other {# vehicles could not be saved — the trips are missing and have to be added manually}}"
     },
