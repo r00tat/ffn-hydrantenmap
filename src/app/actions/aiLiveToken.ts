@@ -35,6 +35,20 @@ export interface LiveTokenResult {
   detail?: string;
 }
 
+/**
+ * Holt die Klartextbegründung aus einer Fehlerantwort der API. Sie steht unter
+ * `error.message`; ist die Antwort kein JSON, taugt der Rumpf selbst.
+ */
+function apiReason(body: string): string {
+  try {
+    const { error } = JSON.parse(body) as { error?: { message?: string } };
+    if (error?.message) return error.message.slice(0, 300);
+  } catch {
+    // kein JSON — dann eben der Rumpf
+  }
+  return body.slice(0, 300) || 'ohne Begründung';
+}
+
 export async function createLiveToken(): Promise<LiveTokenResult> {
   const session = await actionUserRequired();
 
@@ -67,11 +81,16 @@ export async function createLiveToken(): Promise<LiveTokenResult> {
     });
 
     if (!response.ok) {
-      const detail = await response.text().catch(() => '');
+      const body = await response.text().catch(() => '');
       console.error(
-        `[AI] Live-Token nicht erhalten (${response.status}): ${detail.slice(0, 500)}`,
+        `[AI] Live-Token nicht erhalten (${response.status}): ${body.slice(0, 500)}`,
       );
-      return { error: 'failed', detail: `HTTP ${response.status}` };
+      // Der Grund gehört an den Aufrufer, nicht nur ins Serverlog. Er landet
+      // in der Browser-Konsole, und von dort kommen die Fehlermeldungen, die
+      // gemeldet werden — ein blankes „HTTP 400" ist dort nicht zu deuten.
+      // Meist steckt ein Werkzeugschema dahinter, das die API nicht annimmt;
+      // das Token trägt sie alle (siehe `buildLiveTokenRequest`).
+      return { error: 'failed', detail: `HTTP ${response.status}: ${apiReason(body)}` };
     }
 
     const { name } = (await response.json()) as { name?: string };

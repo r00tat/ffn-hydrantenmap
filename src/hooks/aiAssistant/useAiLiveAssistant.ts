@@ -15,6 +15,13 @@ import useAiToolRunner from './useAiToolRunner';
 
 export type AiLiveStatus = 'idle' | LiveConversationStatus;
 
+/**
+ * Wie viel Ton höchstens auf die Sitzung wartet — 100-ms-Blöcke, also rund
+ * 30 Sekunden. So lange darf der Verbindungsaufbau nicht dauern; die Grenze
+ * ist ein Riegel gegen unbegrenzten Speicherverbrauch, keine erwartete Länge.
+ */
+const MAX_PENDING_CHUNKS = 300;
+
 export interface AiLiveCallbacks {
   /** Ein abgeschlossener Beitrag des Modells. */
   onTurn?: (result: AiAssistantResult) => void;
@@ -105,8 +112,20 @@ export default function useAiLiveAssistant(
   );
 
   /**
-   * Gespräch eröffnen: Verbindung, Kontext, Gesprächsregeln, Mikrofon — in
-   * dieser Reihenfolge. Ab dem letzten Schritt hört das Modell mit.
+   * Gespräch eröffnen: Mikrofon, Verbindung, Kontext, Gesprächsregeln — in
+   * dieser Reihenfolge.
+   *
+   * **Das Mikrofon zuerst.** Vorher stand es am Ende, hinter dem Holen des
+   * Tokens und dem WebSocket-Handshake — zusammen mehrere hundert Millisekunden
+   * bis über eine Sekunde. Wer tippt und sofort losredet, verlor genau diese
+   * Zeit vom Satzanfang: Aus „wie kannst du mich im Strahlenschutzeinsatz
+   * unterstützen" wurde „Satz unterstützen". Der Rumpf sieht dann aus wie eine
+   * Meldung, und das Modell legt einen Tagebucheintrag an, statt zu antworten.
+   *
+   * Was in der Zwischenzeit aufgenommen wird, wird gesammelt und nachgereicht,
+   * sobald die Sitzung steht. Die Reihenfolge bleibt dabei erhalten, und der
+   * Kartenkontext geht weiterhin vor dem ersten Ton hinaus — darauf beruht die
+   * Werkzeugwahl (siehe unten).
    */
   const startConversation = useCallback(async (): Promise<void> => {
     // Vor allem anderen und ohne `await` davor: Der Aufruf muss in der
@@ -118,26 +137,49 @@ export default function useAiLiveAssistant(
     await cleanup();
     playbackRef.current = playback;
 
-    const { token, model, error, detail } = await createLiveToken();
-    if (!token || !model) {
-      throw new Error(`Live-Token nicht verfügbar (${error}${detail ? `: ${detail}` : ''})`);
-    }
-    const session = await connectLiveSession(token, model);
-    sessionRef.current = session;
+    // Der Zwischenspeicher für die Zeit vor der Sitzung. Begrenzt, damit eine
+    // hängende Verbindung nicht unbegrenzt Ton anhäuft; die *ältesten* Blöcke
+    // bleiben, denn der Satzanfang ist das, was gerettet werden soll.
+    const pending: string[] = [];
+    let sendChunk = (chunk: string): void => {
+      if (pending.length < MAX_PENDING_CHUNKS) pending.push(chunk);
+    };
 
     try {
-      await sendContext(session);
-      await session.send([{ text: CONVERSATION_PROMPT }], false);
-
-      captureRef.current = await startMicrophoneCapture((chunk) => {
-        void session.sendAudioRealtime({ mimeType: 'audio/pcm', data: chunk });
-      });
+      captureRef.current = await startMicrophoneCapture((chunk) => sendChunk(chunk));
     } catch (error) {
       await cleanup();
       throw error;
     }
-
     setStatus('listening');
+
+    let session: LiveConnection;
+    try {
+      const { token, model, error, detail } = await createLiveToken();
+      if (!token || !model) {
+        throw new Error(`Live-Token nicht verfügbar (${error}${detail ? `: ${detail}` : ''})`);
+      }
+      session = await connectLiveSession(token, model);
+      sessionRef.current = session;
+
+      await sendContext(session);
+      await session.send([{ text: CONVERSATION_PROMPT }], false);
+
+      // Erst leeren, dann umschalten — beides ohne `await` dazwischen, damit
+      // kein Block zwischen die beiden Wege fällt und die Reihenfolge hält.
+      const open = session;
+      for (const chunk of pending) {
+        void open.sendAudioRealtime({ mimeType: 'audio/pcm', data: chunk });
+      }
+      pending.length = 0;
+      sendChunk = (chunk) => {
+        void open.sendAudioRealtime({ mimeType: 'audio/pcm', data: chunk });
+      };
+    } catch (error) {
+      await cleanup();
+      setStatus('idle');
+      throw error;
+    }
 
     // Läuft für sich weiter, bis die Sitzung endet — deshalb kein `await`.
     void runLiveConversation({

@@ -41,9 +41,18 @@ const playback = {
   close: vi.fn().mockResolvedValue(undefined),
 };
 
+/** Ton, der schon anfällt, während die Sitzung noch aufgebaut wird. */
+let startupChunks: string[] = [];
+/** Der Rückruf des Mikrofons, um im Test weitere Blöcke nachzuschieben. */
+let micChunk: ((chunk: string) => void) | undefined;
+
 vi.mock('./liveAudio', () => ({
   isLiveAudioSupported: () => true,
-  startMicrophoneCapture: vi.fn(async () => capture),
+  startMicrophoneCapture: vi.fn(async (onChunk: (chunk: string) => void) => {
+    micChunk = onChunk;
+    startupChunks.forEach((chunk) => onChunk(chunk));
+    return capture;
+  }),
   LivePlayback: vi.fn(function LivePlaybackMock() {
     return playback;
   }),
@@ -97,22 +106,15 @@ describe('useAiLiveAssistant', () => {
     session.isClosed = false;
     connect.mockResolvedValue(session);
     createLiveToken.mockResolvedValue({ token: 'auth_tokens/abc', model: 'gemini-live' });
+    startupChunks = [];
+    micChunk = undefined;
     neverEnding();
   });
 
-  it('schickt den Kartenkontext, bevor das Mikrofon aufgeht', async () => {
+  it('eröffnet mit Kartenkontext und Gesprächsregeln', async () => {
     const { result } = renderHook(() => useAiLiveAssistant([]));
 
     await actAsync(() => result.current.startConversation());
-
-    // Der Kern der Umstellung: Der Kontext muss da sein, bevor das erste Wort
-    // fällt. Ging er wie früher erst mit dem Abschluss des Beitrags hinaus,
-    // hatte der Server längst selbst geantwortet.
-    const { startMicrophoneCapture } = await import('./liveAudio');
-    expect(session.send.mock.invocationCallOrder[0]).toBeLessThan(
-      (startMicrophoneCapture as unknown as ReturnType<typeof vi.fn>).mock
-        .invocationCallOrder[0],
-    );
 
     const [contextParts, contextComplete] = session.send.mock.calls[0];
     expect(contextParts[0].text).toContain('mapCenter');
@@ -122,6 +124,39 @@ describe('useAiLiveAssistant', () => {
 
     const [promptParts] = session.send.mock.calls[1];
     expect(promptParts[0].text).toContain('Beantworte eine Frage');
+  });
+
+  it('hebt den Ton vom Satzanfang auf, bis die Sitzung steht', async () => {
+    startupChunks = ['erstes-wort'];
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await actAsync(() => result.current.startConversation());
+
+    // Das Mikrofon geht auf, bevor irgendetwas über das Netz läuft — sonst
+    // fehlt dem ersten Satz der Anfang.
+    const { startMicrophoneCapture } = await import('./liveAudio');
+    expect(
+      (startMicrophoneCapture as unknown as ReturnType<typeof vi.fn>).mock
+        .invocationCallOrder[0],
+    ).toBeLessThan(createLiveToken.mock.invocationCallOrder[0]);
+
+    // Was in der Zwischenzeit gesprochen wurde, geht nach ...
+    expect(session.sendAudioRealtime).toHaveBeenCalledWith({
+      mimeType: 'audio/pcm',
+      data: 'erstes-wort',
+    });
+    // ... aber erst hinter Kartenkontext und Gesprächsregeln: Das Modell
+    // wählt sein Werkzeug sonst ohne zu wissen, was auf der Karte steht.
+    expect(session.send.mock.invocationCallOrder[1]).toBeLessThan(
+      session.sendAudioRealtime.mock.invocationCallOrder[0],
+    );
+
+    // Ab jetzt ohne Umweg.
+    micChunk?.('zweites-wort');
+    expect(session.sendAudioRealtime).toHaveBeenLastCalledWith({
+      mimeType: 'audio/pcm',
+      data: 'zweites-wort',
+    });
   });
 
   it('meldet jeden Beitrag über den Rückruf, nicht als Rückgabewert', async () => {
@@ -213,7 +248,7 @@ describe('useAiLiveAssistant', () => {
     expect(result.current.status).toBe('idle');
   });
 
-  it('räumt die Sitzung auf, wenn das Mikrofon nicht startet', async () => {
+  it('verbindet gar nicht, wenn das Mikrofon nicht startet', async () => {
     const { startMicrophoneCapture } = await import('./liveAudio');
     (startMicrophoneCapture as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error('NotAllowedError'),
@@ -223,6 +258,21 @@ describe('useAiLiveAssistant', () => {
     await expect(actAsync(() => result.current.startConversation())).rejects.toThrow(
       'NotAllowedError',
     );
-    expect(session.close).toHaveBeenCalled();
+    // Ohne Mikrofon ist das Gespräch sinnlos — dann gar nicht erst ein Token
+    // holen und eine Sitzung öffnen, die niemand nutzt.
+    expect(createLiveToken).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+    expect(playback.close).toHaveBeenCalled();
+  });
+
+  it('fällt nach einem gescheiterten Aufbau nicht im Zuhören stehen', async () => {
+    connect.mockRejectedValueOnce(new Error('api not enabled'));
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await expect(actAsync(() => result.current.startConversation())).rejects.toThrow();
+    // Das Mikrofon lief schon, der Status stand auf „listening" — beides muss
+    // zurück, sonst zeigt die Karte ein Gespräch an, das es nicht gibt.
+    expect(capture.stop).toHaveBeenCalled();
+    expect(result.current.status).toBe('idle');
   });
 });

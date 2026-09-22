@@ -68,6 +68,14 @@ export const VOICE_TURN_PROMPT =
  * ausdrückliche Ansage landet „Wie ist die aktuelle Lage?" als
  * Tagebucheintrag.
  *
+ * Die Bitte um Nachfrage bei Bruchstücken hat denselben Ursprung von der
+ * anderen Seite: Bis das Mikrofon offen ist, vergeht Zeit, und was dann noch
+ * ankommt, ist ein Satzrumpf. „wie kannst du mich im Strahlenschutzeinsatz
+ * unterstützen" wurde zu „Satz unterstützen" — keine Frage mehr, sondern etwas,
+ * das wie eine Meldung aussieht. Der Satzanfang ist inzwischen gerettet (siehe
+ * `startConversation`); die Regel bleibt, weil kein Mikrofon jedes Wort trifft
+ * und ein halb verstandener Satz im Einsatztagebuch ein falscher Nachweis ist.
+ *
  * Die Bitte um kurze Antworten ist keine Kosmetik: Gesprochen wird jede Antwort
  * in voller Länge, und am Einsatzort hört niemand einem Absatz zu.
  */
@@ -76,6 +84,8 @@ export const CONVERSATION_PROMPT =
   'Jeder Beitrag ist entweder eine Anweisung oder eine Frage. ' +
   'Führe eine Anweisung aus. Beantworte eine Frage und lege sie nicht als ' +
   'Tagebucheintrag ab. ' +
+  'Verstehst du einen Beitrag nur bruchstückhaft, frage nach, statt ihn ' +
+  'abzulegen — ein halb verstandener Satz wird nie zum Tagebucheintrag. ' +
   'Antworte kurz, in einem oder zwei Sätzen, und in ganzen Worten ohne ' +
   'Aufzählungszeichen — deine Antwort wird vorgelesen. ' +
   'Der Kartenkontext liegt dir vor und wird nach jeder Änderung aufgefrischt.';
