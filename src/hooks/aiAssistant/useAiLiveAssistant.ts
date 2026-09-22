@@ -42,6 +42,8 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
   const sessionRef = useRef<LiveConnection | null>(null);
   const captureRef = useRef<MicrophoneCapture | null>(null);
   const playbackRef = useRef<LivePlayback | null>(null);
+  /** Nur zur Anzeige in der Messung — welches Modell das Token benannt hat. */
+  const modelRef = useRef<string | null>(null);
   const [status, setStatus] = useState<AiLiveStatus>('idle');
 
   const cleanup = useCallback(async () => {
@@ -72,13 +74,21 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
    */
   const startTurn = useCallback(
     async (run?: LatencyRun): Promise<void> => {
+      // Vor allem anderen und ohne `await` davor: Der Aufruf muss in der
+      // Benutzeraktion liegen, sonst bleibt die Wiedergabe stumm. Begründung
+      // an `LivePlayback.prime()`.
+      const playback = new LivePlayback();
+      playback.prime();
+
       await cleanup();
+      playbackRef.current = playback;
 
       const open = async () => {
         const { token, model, error, detail } = await createLiveToken();
         if (!token || !model) {
           throw new Error(`Live-Token nicht verfügbar (${error}${detail ? `: ${detail}` : ''})`);
         }
+        modelRef.current = model;
         return connectLiveSession(token, model);
       };
       const session = await (run ? run.phase('sitzung öffnen', open) : open());
@@ -110,13 +120,20 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
         return { success: false, message: 'Keine Live-Sitzung aktiv' };
       }
 
-      const playback = new LivePlayback();
+      // In der Regel die beim Drücken geweckte Wiedergabe. Der Rückfall greift
+      // nur, wenn `startTurn` gar nicht gelaufen ist — dann ist Stummheit das
+      // kleinere Übel gegenüber einem Absturz.
+      const playback = playbackRef.current ?? new LivePlayback();
       playbackRef.current = playback;
 
       try {
         await captureRef.current?.stop();
         captureRef.current = null;
         run?.mark('mikrofon aus');
+
+        // Damit in der Konsole steht, welcher Weg gelaufen ist und mit
+        // welchem Modell — die beiden Wege sind sonst nicht zu unterscheiden.
+        run?.note({ weg: 'live', modell: modelRef.current ?? 'unbekannt' });
 
         const contextText = run
           ? run.sync('kontext bauen', () => buildContextText())

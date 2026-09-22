@@ -4,6 +4,7 @@ import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { HoseLineDraft } from '../../common/waterSupply';
+import { GEMINI_MODEL } from '../../common/ai';
 import { AiAssistantResult, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types';
 import { stripInlineDataParts, stripMapContextParts } from './chatHistory';
 import { isUsableAudio } from './audioInput';
@@ -77,6 +78,11 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       const contextText = run.sync('kontext bauen', () => buildContextText());
 
       run.note({
+        // Gegenstück zur Angabe in `useAiLiveAssistant`: In der Konsole ist
+        // sonst nicht zu sehen, ob die Live-Sitzung oder der Einzelaufruf
+        // gelaufen ist.
+        weg: 'einzelaufruf',
+        modell: GEMINI_MODEL,
         kontextZeichen: contextText.length,
         ...contextStats(),
         historieEintraege: chatHistoryRef.current.length,

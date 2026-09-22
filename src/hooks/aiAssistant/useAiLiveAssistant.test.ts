@@ -34,6 +34,7 @@ vi.mock('./toolHandlers', () => ({ executeToolCall: vi.fn() }));
 
 const capture = { stop: vi.fn().mockResolvedValue(undefined) };
 const playback = {
+  prime: vi.fn(),
   enqueue: vi.fn(),
   interrupt: vi.fn(),
   whenDrained: vi.fn().mockResolvedValue(undefined),
@@ -145,6 +146,34 @@ describe('useAiLiveAssistant', () => {
 
     await expect(actAsync(() => result.current.startTurn())).rejects.toThrow('api not enabled');
     expect(result.current.status).toBe('idle');
+  });
+
+  it('weckt die Wiedergabe beim Drücken, nicht erst beim ersten Ton', async () => {
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await actAsync(() => result.current.startTurn());
+
+    // Der Kontext muss in der Benutzeraktion entstehen, sonst bleibt er
+    // nach den Autoplay-Regeln stumm — und zwar lautlos, weil angekommener
+    // Ton die Sprachausgabe des Browsers unterdrückt.
+    expect(playback.prime).toHaveBeenCalled();
+    expect(playback.prime.mock.invocationCallOrder[0]).toBeLessThan(
+      createLiveToken.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('nutzt beim Abschluss dieselbe Wiedergabe wie beim Drücken', async () => {
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await actAsync(() => result.current.startTurn());
+    await actAsync(() => result.current.finishTurn());
+
+    // Genau eine Instanz: Eine zweite, beim Abschluss angelegte läge wieder
+    // außerhalb der Benutzeraktion und wäre damit stumm.
+    const { LivePlayback } = await import('./liveAudio');
+    expect(LivePlayback).toHaveBeenCalledTimes(1);
+    expect(playback.prime).toHaveBeenCalledTimes(1);
+    expect(playback.whenDrained).toHaveBeenCalled();
   });
 
   it('holt das Token vom Server und verbindet erst damit', async () => {

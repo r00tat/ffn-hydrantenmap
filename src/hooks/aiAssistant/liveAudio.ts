@@ -150,6 +150,25 @@ export class LivePlayback {
   private nextStartTime = 0;
   private sources = new Set<AudioBufferSourceNode>();
 
+  /**
+   * Legt den `AudioContext` an und weckt ihn — **aus der Benutzeraktion
+   * heraus**, also beim Drücken der Sprechtaste.
+   *
+   * Warum das nicht warten kann, bis der erste Ton da ist: Der erste Ton
+   * kommt Sekunden nach dem Tastendruck, und ein dann angelegter Kontext
+   * startet nach den Autoplay-Regeln `suspended`. Seine Uhr steht dann bei
+   * 0 und läuft nicht, `start()` reiht zwar ein, aber es erklingt nichts.
+   * Die Aufnahme kennt diese Regel längst (siehe `startMicrophoneCapture`);
+   * die Wiedergabe kannte sie nicht.
+   *
+   * Der Fehler war besonders unangenehm, weil er still war: Ton **kam** an,
+   * also galt die Antwort als gesprochen (`spokenByModel`), und damit
+   * unterblieb auch die Sprachausgabe des Browsers als zweiter Weg.
+   */
+  prime(): void {
+    void this.ensureContext();
+  }
+
   enqueue(base64Pcm: string): void {
     const context = this.ensureContext();
     const bytes = Uint8Array.from(atob(base64Pcm), (character) => character.charCodeAt(0));
@@ -206,6 +225,13 @@ export class LivePlayback {
     if (!this.audioContext || this.audioContext.state === 'closed') {
       this.audioContext = new AudioContext();
       this.nextStartTime = 0;
+    }
+    // Auch außerhalb von `prime()`: Ein Kontext kann zwischendurch wieder
+    // einschlafen, etwa wenn der Bildschirm sperrt. Das Ergebnis wird nicht
+    // abgewartet — `enqueue` plant ohnehin in die Zukunft, und ein Warten
+    // hier würde die Reihenfolge der Blöcke gefährden.
+    if (this.audioContext.state === 'suspended') {
+      void this.audioContext.resume().catch(() => undefined);
     }
     return this.audioContext;
   }
