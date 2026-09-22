@@ -104,6 +104,12 @@ variable "project_services" {
     "texttospeech.googleapis.com",
     "picker.googleapis.com",
     "firebasevertexai.googleapis.com",
+    # Live-Sitzung des Sprach-Assistenten. Sie spricht die Developer API
+    # direkt an, nicht über Firebase AI Logic — mit einem kurzlebigen Token,
+    # das der Server prägt. Der Dienst gehört deshalb hierher, aber NICHT in
+    # die Freigabeliste des öffentlichen Browser-Keys: Er nimmt einen blanken
+    # Key entgegen und steht nicht hinter App Check. Siehe docs/api-keys.md.
+    "generativelanguage.googleapis.com",
     "androidpublisher.googleapis.com",
     "chromewebstore.googleapis.com",
   ]

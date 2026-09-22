@@ -71,13 +71,19 @@ Modelle aufrufen, und keine zweite Schicht hielte ihn auf.
 Die Live-Sitzung kommt deshalb ohne Key im Browser aus. Sie braucht drei Dinge
 im Projekt:
 
-1. **Den Dienst aktivieren**: `generativelanguage.googleapis.com`.
+1. **Den Dienst aktivieren** — erledigt Terraform: `generativelanguage.googleapis.com`
+   steht in `project_services`
+   ([terraform/modules/project-base/variables.tf](../terraform/modules/project-base/variables.tf)).
+   Von Hand ist hier nichts zu tun, und `gcloud services enable` wäre Drift.
 2. **Einen eigenen Key anlegen** — API-Restriction genau auf diesen einen
    Dienst, keine Application-Restriction (der Server schickt keinen Referrer).
-   Wert in den Secret Manager unter `GEMINI_LIVE_API_KEY`, von dort als
-   Umgebungsvariable in den Cloud-Run-Dienst (Terraform, siehe
-   `terraform/modules/project-base/variables.tf`).
-3. **Ihn nirgends veröffentlichen.** Er prägt nur kurzlebige Tokens
+   Das ist der eine Schritt von Hand, aus demselben Grund, aus dem die
+   bestehenden Keys nicht in Terraform stehen (siehe „Drift" unten).
+3. **Den Wert in den Secret Manager** unter `GEMINI_LIVE_API_KEY` legen. Hülle
+   und die Bindung als Umgebungsvariable des Cloud-Run-Dienstes stehen in
+   Terraform; nur der Wert wird von Hand gesetzt, wie bei allen anderen
+   Secrets auch.
+4. **Ihn nirgends veröffentlichen.** Er prägt nur kurzlebige Tokens
    (`uses: 1`, 60 Sekunden), und nur die gehen an den Browser. Ablauf:
    [ai-sprachassistent.md](ai-sprachassistent.md).
 
