@@ -15,6 +15,19 @@ Releases folgen **Semantic Versioning** mit Tag-Format `v<major>.<minor>.<patch>
 3. Kategorien aus `.github/release.yml` verwenden (🏕 Features, 🛠️ Enhancements, 🪲 Bugfixes, 👒 Dependencies)
 4. Titel: `v<version> <Kurzbeschreibung auf Deutsch>`
 
+Der Abschnitt **Zusammenfassung** ist nicht nur Zierde: Aus ihm baut
+[android-release.yml](../.github/workflows/android-release.yml) den Text, den der
+Play Store unter „Was ist neu" anzeigt. Play nimmt dort 500 Zeichen je Sprache —
+längere Zusammenfassungen werden am letzten vollständigen Satz abgeschnitten und
+mit „…" beendet. Die ersten Sätze sollten also für sich stehen und ohne
+Vorwissen verständlich sein. Markdown wird entfernt, die Änderungsliste unter
+„What's Changed" landet nicht im Store.
+
+Builds ohne Release (Push auf `main`, manueller Alpha-Build) bekommen stattdessen
+die Commit-Betreffs seit dem letzten Tag als Stichpunkte; `chore`, `ci`, `docs`,
+`test`, `style`, `build` und `refactor` bleiben weg. Gebaut wird der Text von
+[`buildPlayReleaseNotes`](../src/server/play/releaseNotes.ts).
+
 ```bash
 gh release create v<version> --title "v<version> <Kurzbeschreibung>" --notes "$(cat <<'EOF'
 ## Zusammenfassung
