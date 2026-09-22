@@ -751,6 +751,7 @@
     "description": "Melde dich ohne Passwort mit Fingerabdruck, Gesichtserkennung oder Geräte-PIN an.",
     "add": "Passkey hinzufügen",
     "addFailed": "Passkey konnte nicht angelegt werden.",
+    "addExists": "Auf diesem Gerät ist bereits ein Passkey für dieses Konto hinterlegt. Melden Sie sich damit über „Mit Passkey anmelden\" an.",
     "none": "Noch keine Passkeys angelegt.",
     "created": "Angelegt am {date}",
     "lastUsed": "Zuletzt verwendet am {date}",

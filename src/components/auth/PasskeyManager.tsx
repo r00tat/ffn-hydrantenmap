@@ -95,11 +95,23 @@ export default function PasskeyManager() {
       await finishPasskeyRegistration(challengeToken, response, suggestLabel());
       await reload();
     } catch (err) {
+      const name = (err as Error)?.name;
       // Abbruch im Systemdialog ist kein Fehler, der gemeldet werden muss.
-      if ((err as Error)?.name !== 'NotAllowedError') {
-        console.error('passkey registration failed', err);
-        setError(t('addFailed'));
+      if (name === 'NotAllowedError') {
+        return;
       }
+      // `InvalidStateError` heisst: Einer der Schluessel aus
+      // `excludeCredentials` liegt schon auf diesem Geraet — der Passkey ist
+      // also bereits da, nur eben ueber ein anderes Geraet angelegt und
+      // hierher synchronisiert. Ein "konnte nicht angelegt werden" schickt
+      // den Benutzer dann in die falsche Richtung: Anlegen ist gar nicht
+      // noetig, anmelden schon.
+      if (name === 'InvalidStateError') {
+        setError(t('addExists'));
+        return;
+      }
+      console.error('passkey registration failed', err);
+      setError(t('addFailed'));
     } finally {
       setBusy(false);
     }

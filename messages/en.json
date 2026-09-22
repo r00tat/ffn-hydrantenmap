@@ -751,6 +751,7 @@
     "description": "Sign in without a password using fingerprint, face recognition or your device PIN.",
     "add": "Add passkey",
     "addFailed": "Could not create the passkey.",
+    "addExists": "This device already holds a passkey for this account. Use \"Sign in with passkey\" to sign in with it.",
     "none": "No passkeys yet.",
     "created": "Created on {date}",
     "lastUsed": "Last used on {date}",
