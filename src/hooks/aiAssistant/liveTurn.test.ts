@@ -18,6 +18,13 @@ function toolCall(...functionCalls: FunctionCall[]): LiveMessage {
   return { type: 'toolCall', functionCalls } as LiveMessage;
 }
 
+function audio(data: string): LiveMessage {
+  return {
+    type: 'serverContent',
+    modelTurn: { role: 'model', parts: [{ inlineData: { mimeType: 'audio/pcm', data } }] },
+  } as LiveMessage;
+}
+
 const ok: AiAssistantResult = { success: true, message: 'Fahrzeug angelegt' };
 
 describe('runLiveTurn', () => {
@@ -42,6 +49,52 @@ describe('runLiveTurn', () => {
     expect(result.success).toBe(true);
     expect(result.message).toBe('Das TLFA 4000 ist eingetragen.');
     expect(result.createdItemId).toBe('item-1');
+  });
+
+  it('wirft die Antwort nach einem Werkzeugaufruf nicht weg', async () => {
+    // Die gemessene Reihenfolge einer echten Sitzung: Der Werkzeugaufruf
+    // beendet den Sprecherwechsel, und erst im nächsten spricht das Modell.
+    //
+    //   1203ms  toolCall
+    //   1205ms  turnComplete        <- nur das Ende des Werkzeug-Turns
+    //   1905ms  audio + Abschrift
+    //   5617ms  turnComplete        <- das echte Ende
+    //
+    // Wer beim ersten aussteigt, verliert jedes Mal die gesprochene Antwort.
+    const onAudio = vi.fn();
+
+    const result = await runLiveTurn({
+      messages: stream(
+        toolCall({ name: 'answerQuestion', args: { frage: 'Wie ist die Lage?' } }),
+        { type: 'serverContent', turnComplete: true } as LiveMessage,
+        audio('AAAA'),
+        transcript('Drei Fahrzeuge im Einsatz.', true),
+      ),
+      executeTool: vi.fn().mockResolvedValue(ok),
+      sendFunctionResponses: vi.fn().mockResolvedValue(undefined),
+      onAudio,
+    });
+
+    expect(result.message).toBe('Drei Fahrzeuge im Einsatz.');
+    expect(result.isAnswer).toBe(true);
+    expect(result.spokenByModel).toBe(true);
+    expect(onAudio).toHaveBeenCalledWith('AAAA');
+  });
+
+  it('beendet den Sprecherwechsel auch über zwei Werkzeugrunden hinweg', async () => {
+    const result = await runLiveTurn({
+      messages: stream(
+        toolCall({ name: 'searchWaterSupply', args: {} }),
+        { type: 'serverContent', turnComplete: true } as LiveMessage,
+        toolCall({ name: 'proposeHoseLine', args: {} }),
+        { type: 'serverContent', turnComplete: true } as LiveMessage,
+        transcript('Leitung vorgeschlagen.', true),
+      ),
+      executeTool: vi.fn().mockResolvedValue(ok),
+      sendFunctionResponses: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(result.message).toBe('Leitung vorgeschlagen.');
   });
 
   it('beantwortet eine reine Frage ohne Werkzeugaufruf', async () => {

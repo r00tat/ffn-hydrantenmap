@@ -101,7 +101,7 @@ describe('useAiLiveAssistant', () => {
     expect(answer.message).toBe('Erledigt.');
     const [parts, turnComplete] = session.send.mock.calls[0];
     expect(parts[0].text).toContain('mapCenter');
-    expect(parts[1].text).toContain('Befehl des Benutzers');
+    expect(parts[1].text).toContain('Beantworte eine Frage');
     expect(turnComplete).toBe(true);
   });
 

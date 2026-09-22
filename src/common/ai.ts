@@ -33,3 +33,21 @@ export const GEMINI_MODEL = 'gemini-3.8-flash';
  * Siehe [docs/ai-sprachassistent.md](../../docs/ai-sprachassistent.md).
  */
 export const GEMINI_LIVE_MODEL = 'gemini-3.8-live';
+
+/**
+ * Der Satz, der den gesprochenen Beitrag abschließt — in beiden Wegen
+ * derselbe, deshalb steht er hier und nicht zweimal in den Hooks.
+ *
+ * Er hieß einmal „Das Gesagte ist der Befehl des Benutzers. Führe ihn aus."
+ * und hat damit jede Frage zum Befehl erklärt. Das Werkzeug `answerQuestion`
+ * ist aber beschrieben mit „use this when the user asks a question **rather
+ * than giving a command**" — der Abschlusssatz hat es also gerade dann
+ * ausgeschlossen, wenn es gebraucht wurde. Übrig blieb `createDiary`, das
+ * sich selbst als „DEFAULT action … does not match any other tool" anbietet.
+ * „Wie ist die aktuelle Lage?" landete so als Tagebucheintrag statt als
+ * Antwort.
+ */
+export const VOICE_TURN_PROMPT =
+  'Das Gesagte ist die Eingabe des Benutzers — eine Anweisung oder eine Frage. ' +
+  'Führe eine Anweisung aus. Beantworte eine Frage und lege sie nicht als ' +
+  'Tagebucheintrag ab.';

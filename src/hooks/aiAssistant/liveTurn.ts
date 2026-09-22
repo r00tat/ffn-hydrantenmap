@@ -67,6 +67,26 @@ export async function runLiveTurn({
   let spoken = false;
   let firstChunk = true;
 
+  /**
+   * Offene Sprecherwechsel. Beginnt bei eins — dem Turn, den der Browser mit
+   * seinem Beitrag eröffnet hat.
+   *
+   * Warum das zählen muss: Ein Werkzeugaufruf **beendet** den laufenden Turn.
+   * Das Modell spricht erst im nächsten, den unsere Werkzeugantwort eröffnet.
+   * An einer echten Sitzung gemessen:
+   *
+   *   1203 ms  toolCall
+   *   1205 ms  turnComplete        ← nur das Ende des Werkzeug-Turns
+   *   1905 ms  erster Ton samt Abschrift
+   *   5617 ms  turnComplete        ← das echte Ende
+   *
+   * Wer beim ersten `turnComplete` aussteigt, liefert jedes Mal, wenn ein
+   * Werkzeug lief, eine stumme Antwort ohne Abschrift — und weil ohne
+   * Abschrift `isAnswer` falsch ist, spricht auch die Sprachsynthese des
+   * Browsers nicht ein.
+   */
+  let openTurns = 1;
+
   for await (const message of messages) {
     if (message.type === 'serverContent') {
       const content = message as LiveServerContent;
@@ -92,8 +112,12 @@ export async function runLiveTurn({
       }
 
       if (content.turnComplete) {
-        run?.mark('turn abgeschlossen');
-        return buildResult();
+        openTurns -= 1;
+        if (openTurns <= 0) {
+          run?.mark('turn abgeschlossen');
+          return buildResult();
+        }
+        run?.mark('werkzeug-turn beendet');
       }
       continue;
     }
@@ -115,6 +139,10 @@ export async function runLiveTurn({
       }
 
       await sendFunctionResponses(responses);
+      // Die Werkzeugantwort eröffnet den Sprecherwechsel, in dem das Modell
+      // seine Antwort spricht. Bis dahin steht noch ein `turnComplete` aus,
+      // das nur den Werkzeug-Turn schließt.
+      openTurns += 1;
       onStatus?.('analyzing');
       continue;
     }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { VOICE_TURN_PROMPT } from '../../common/ai';
 import { createLiveToken } from '../../app/actions/aiLiveToken';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { LatencyRun } from './latency';
@@ -15,14 +16,6 @@ import useAiToolRunner from './useAiToolRunner';
 
 export type AiLiveStatus = 'idle' | 'listening' | 'analyzing' | 'executing';
 
-/**
- * Derselbe Satz wie beim Einzelaufruf: Er schließt den Sprecherwechsel ab und
- * sagt dem Modell, was mit dem Gehörten zu tun ist. Ohne ihn müsste die
- * Sprecherkennung des Servers das Ende der Rede selbst erkennen — bei einem
- * abrupt abgeschalteten Mikrofon hört sie aber keine Stille, sondern nichts
- * mehr.
- */
-const LIVE_TURN_PROMPT = 'Das Gesagte ist der Befehl des Benutzers. Führe ihn aus.';
 
 /**
  * Sprachbefehl über eine Live-Sitzung — ein Sprecherwechsel je Tastendruck.
@@ -141,7 +134,7 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
         run?.note({ kontextZeichen: contextText.length, ...contextStats() });
 
         setStatus('analyzing');
-        await session.send([{ text: contextText }, { text: LIVE_TURN_PROMPT }], true);
+        await session.send([{ text: contextText }, { text: VOICE_TURN_PROMPT }], true);
 
         const result = await runLiveTurn({
           messages: session.receive(),

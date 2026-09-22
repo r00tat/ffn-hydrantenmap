@@ -4,7 +4,7 @@ import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { HoseLineDraft } from '../../common/waterSupply';
-import { GEMINI_MODEL } from '../../common/ai';
+import { GEMINI_MODEL, VOICE_TURN_PROMPT } from '../../common/ai';
 import { AiAssistantResult, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types';
 import { stripInlineDataParts, stripMapContextParts } from './chatHistory';
 import { isUsableAudio } from './audioInput';
@@ -255,7 +255,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         return await sendToGemini(
           [
             { inlineData: { mimeType: AUDIO_MIME_TYPE, data: audioBase64 } },
-            { text: 'Das Gesagte ist der Befehl des Benutzers. Führe ihn aus.' },
+            { text: VOICE_TURN_PROMPT },
           ],
           run
         );
