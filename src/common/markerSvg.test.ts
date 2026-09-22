@@ -27,6 +27,27 @@ describe('markerIconDataUrl', () => {
 });
 
 describe('vehicleIconDataUrl', () => {
+  it('paints the vehicle red by default', () => {
+    const svg = decode(vehicleIconDataUrl({ name: 'TLF-A', fw: 'FFN' }));
+    expect(svg).toContain('fill:#ff0000');
+  });
+
+  it('paints the vehicle in the requested color', () => {
+    const svg = decode(
+      vehicleIconDataUrl({ name: 'RTW', fw: 'RK', color: '#1976d2' })
+    );
+    expect(svg).toContain('fill:#1976d2');
+    expect(svg).not.toContain('#ff0000');
+  });
+
+  it('falls back to red for an invalid color', () => {
+    const svg = decode(
+      vehicleIconDataUrl({ name: 'RTW', fw: 'RK', color: 'javascript:alert(1)' })
+    );
+    expect(svg).toContain('fill:#ff0000');
+    expect(svg).not.toContain('javascript');
+  });
+
   it('embeds the vehicle name and FW', () => {
     const svg = decode(vehicleIconDataUrl({ name: 'TLF-A', fw: 'FFN' }));
     expect(svg).toContain('TLF-A');

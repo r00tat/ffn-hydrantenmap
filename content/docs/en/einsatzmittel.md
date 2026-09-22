@@ -52,6 +52,18 @@ vehicles of other fire brigades without a crew assignment.
 2. Click the edit button
 3. Change details and save
 
+### Mark a vehicle of another organisation
+
+On a situation map with ambulances, police and neighbouring brigades, a row of red bars is hard to tell apart. A vehicle can therefore be coloured.
+
+1. Open the vehicle for editing
+2. Turn on the **Fremdorganisation** switch — the bar on the map turns blue instead of red and the popup marks the vehicle as belonging to another organisation
+3. Under **Farbe** any other colour can be picked instead, for example one per organisation
+
+:::info
+The switch only changes colour and labelling. Crew, breathing apparatus wearers and the strength table count such a vehicle like any other resource.
+:::
+
 ### Export as CSV
 
 1. Click the download button in the top right

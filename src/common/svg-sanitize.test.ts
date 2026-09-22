@@ -45,8 +45,19 @@ describe('sanitizeHexColor', () => {
     expect(sanitizeHexColor('ff0000', '#000')).toBe('#000');
   });
 
-  it('rejects overly long hex strings', () => {
-    expect(sanitizeHexColor('#ff00ff00', '#000')).toBe('#000');
+  it('accepts hex colors with an alpha channel', () => {
+    // Der Farbwähler des Elementdialogs (`MuiColorInput`, `format="hex8"`)
+    // liefert acht Stellen. Ohne sie fiele jede dort gewählte Farbe auf den
+    // Vorgabewert zurück.
+    expect(sanitizeHexColor('#ff00ff80', '#000')).toBe('#ff00ff80');
+    expect(sanitizeHexColor('#f00a', '#000')).toBe('#f00a');
+  });
+
+  it('rejects hex strings of an invalid length', () => {
+    // Gültig sind 3, 4, 6 und 8 Stellen — alles dazwischen ist keine Farbe.
+    expect(sanitizeHexColor('#ff00f', '#000')).toBe('#000');
+    expect(sanitizeHexColor('#ff00ff0', '#000')).toBe('#000');
+    expect(sanitizeHexColor('#ff00ff001', '#000')).toBe('#000');
   });
 });
 

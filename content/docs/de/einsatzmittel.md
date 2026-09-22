@@ -52,6 +52,18 @@ praktisch für Fahrzeuge anderer Feuerwehren ohne Besatzungszuordnung.
 2. Bearbeiten-Button klicken
 3. Details ändern und speichern
 
+### Fahrzeug einer fremden Organisation kennzeichnen
+
+Auf einer Lage mit Rettung, Polizei und Nachbarwehren sind lauter rote Balken schwer auseinanderzuhalten. Ein Fahrzeug lässt sich deshalb einfärben.
+
+1. Fahrzeug zum Bearbeiten öffnen
+2. Schalter **Fremdorganisation** einschalten — der Balken auf der Karte wird blau statt rot, und das Popup weist das Fahrzeug als fremd aus
+3. Über **Farbe** lässt sich stattdessen jede andere Farbe wählen, etwa je Organisation eine eigene
+
+:::info
+Der Schalter ändert nur Farbe und Kennzeichnung. Besatzung, ATS-Träger und Stärketabelle rechnen ein Fremdfahrzeug wie jedes andere Einsatzmittel.
+:::
+
 ### Als CSV exportieren
 
 1. Download-Button oben rechts klicken

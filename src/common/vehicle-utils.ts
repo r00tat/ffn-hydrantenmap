@@ -1,4 +1,36 @@
 import { kategorieAusName, normalizeName } from './fahrtenbuch';
+import { VEHICLE_DEFAULT_COLOR } from './markerSvg';
+
+/**
+ * Die Vorgabefarbe eines Fahrzeugs einer fremden Organisation.
+ *
+ * Blau und nicht irgendeine Farbe: Es ist das Blau, das die App ohnehin führt
+ * (Leitungsentwürfe, Dreh-Griff), und es steht im größten Abstand zum Rot der
+ * eigenen Einsatzmittel.
+ */
+export const FREMD_VEHICLE_COLOR = '#1976d2';
+
+/**
+ * Die Farbe des Fahrzeugbalkens auf der Karte.
+ *
+ * Reihenfolge: die gewählte Farbe, sonst die Vorgabe nach Zugehörigkeit. Der
+ * Schalter setzt also keine Farbe, er ändert nur, welche gilt, solange keine
+ * gewählt ist — wer später doch eine wählt, verliert sie beim Umschalten nicht.
+ */
+export function vehicleMarkerColor(vehicle: {
+  color?: string;
+  fremd?: string | boolean;
+}): string {
+  if (vehicle.color) return vehicle.color;
+  return isFremdesFahrzeug(vehicle) ? FREMD_VEHICLE_COLOR : VEHICLE_DEFAULT_COLOR;
+}
+
+/** Der Schalter, tolerant gelesen — im Dokument steht eine Zeichenkette. */
+export function isFremdesFahrzeug(vehicle: {
+  fremd?: string | boolean;
+}): boolean {
+  return vehicle.fremd === true || vehicle.fremd === 'true';
+}
 
 /** Funktion, die eine Person als Atemschutzträger ausweist. */
 export const ATS_FUNKTION = 'Atemschutzträger';

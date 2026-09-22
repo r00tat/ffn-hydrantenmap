@@ -90,6 +90,24 @@ bestehender Einsatz nach dem Reload richtig, ohne dass Daten nachgezogen werden
 müssen. Ein gepflegter Wert hat Vorrang: Wer ein Einsatzmittel ausdrücklich
 einordnet, will nicht, dass ein Wort im Namen die Einordnung wieder umwirft.
 
+## Fremdorganisation und Farbe
+
+Ein Einsatzmittel trägt zwei weitere Felder: `fremd` (Schaltfeld, `'true'`/`'false'`
+wie überall) und `color`. Der Balken auf der Karte wird damit eingefärbt —
+`vehicleMarkerColor()` nimmt die gewählte Farbe, sonst Blau bei `fremd` und
+sonst Rot.
+
+**Der Schalter ändert an der Stärke nichts.** Er färbt vor und kennzeichnet im
+Popup, mehr nicht: Besatzung, ATS-Träger, Stärketabelle und Personal-Board
+behandeln ein Fremdfahrzeug wie jedes andere Einsatzmittel. Das ist eine
+Entscheidung und kein Versäumnis — auf der Lagekarte steht, wer da ist, und ein
+RTW mit zwei Mann ist für die Lage genauso gezählt wie ein eigenes TLF. Wer die
+eigene Mannschaftsstärke braucht, liest sie an der eigenen Feuerwehr (`fw`) ab
+und nicht an diesem Schalter.
+
+Die Farbe setzt der Schalter **nicht**, er ändert nur die Vorgabe. Sonst
+verlöre, wer einmal eine eigene Farbe gewählt hat, sie beim nächsten Umschalten.
+
 ## Anzeige und Austausch
 
 `formatBesatzung()` ist die einzige Stelle, die das `1:` schreibt — Marker-Popup,
