@@ -122,6 +122,28 @@ jobs:
           cache: npm
           cache-dependency-path: capacitor/package-lock.json
 
+      - name: Determine Play release notes
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          set -euo pipefail
+
+          # Der Text, den der Play Store unter „Was ist neu" zeigt, kommt aus
+          # den Release-Informationen: bei einem Release aus dem Abschnitt
+          # „Zusammenfassung" der Beschreibung (docs/releases.md), sonst aus
+          # den Commit-Betreffs seit dem letzten Tag. Ohne Release-Notes
+          # bliebe der Abschnitt im Store leer.
+          if [[ "${GITHUB_EVENT_NAME}" != "release" ]]; then
+            LATEST_TAG=$(git describe --tags --abbrev=0 --match='v*')
+            COMMIT_SUBJECTS=$(git log --no-merges --format=%s "${LATEST_TAG}..HEAD")
+            export COMMIT_SUBJECTS
+          fi
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
+            scripts/playReleaseNotes.mts > play-release-notes.txt
+          echo "==> Release notes ($(wc -m < play-release-notes.txt) Zeichen):"
+          cat play-release-notes.txt
+          echo
+
       - name: Install Capacitor dependencies
         working-directory: capacitor
         run: npm ci --ignore-scripts
@@ -206,10 +228,35 @@ jobs:
             "${UPLOAD_API}/edits/${EDIT_ID}/bundles?uploadType=media" | jq -r '.versionCode')
           echo "Uploaded versionCode: ${UPLOADED_VC} (expected ${VERSION_CODE})"
 
-          TRACK_BODY=$(jq -nc \
+          # Release-Notes nimmt Play nur für Sprachen an, die es im
+          # Store-Eintrag auch gibt — eine unbekannte Sprache lässt den
+          # gesamten Commit scheitern. Die App ist deutsch, daher die
+          # deutschen Einträge; gibt es keine, alle vorhandenen, damit der
+          # Text nicht ganz entfällt.
+          echo "==> Reading store listing languages"
+          LISTING_LANGUAGES=$(gcall -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            "${API}/edits/${EDIT_ID}/listings" | jq -c '[.listings[]?.language]')
+          NOTE_LANGUAGES=$(jq -cn --argjson all "${LISTING_LANGUAGES}" '
+            ($all | map(select(startswith("de")))) as $de
+            | if ($de | length) > 0 then $de
+              elif ($all | length) > 0 then $all
+              else ["de-DE"] end')
+          echo "Store listing languages: ${LISTING_LANGUAGES}, release notes for: ${NOTE_LANGUAGES}"
+
+          RELEASE=$(jq -nc \
             --arg name "${VERSION_NAME}" \
             --arg vc "${UPLOADED_VC}" \
-            '{releases: [{name: $name, versionCodes: [$vc], status: "completed"}]}')
+            '{name: $name, versionCodes: [$vc], status: "completed"}')
+          if [[ -s play-release-notes.txt ]]; then
+            RELEASE=$(jq -c \
+              --rawfile notes play-release-notes.txt \
+              --argjson langs "${NOTE_LANGUAGES}" \
+              '.releaseNotes = ($langs | map({language: ., text: ($notes | rtrimstr("\n"))}))' \
+              <<<"${RELEASE}")
+          else
+            echo "::warning::Keine Release-Notes ermittelt — „Was ist neu" bleibt leer."
+          fi
+          TRACK_BODY=$(jq -nc --argjson release "${RELEASE}" '{releases: [$release]}')
           for TRACK in ${TRACKS}; do
             echo "==> Assigning to track ${TRACK}"
             gcall -X PATCH \

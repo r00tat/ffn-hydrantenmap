@@ -200,3 +200,6 @@ certificates
 # Cache des Höhenmodell-Imports: Quellverzeichnisse, rohe Blöcke und die
 # fertigen Kacheln. Gigabytes, und jederzeit neu erzeugbar.
 /.terrain-cache/
+
+# Im Android-Release-Workflow erzeugter „Was ist neu"-Text für den Play Store.
+/play-release-notes.txt
