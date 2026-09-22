@@ -68,24 +68,34 @@ gibt es dort gar keine Erzwingung, weil sie kein Firebase-Dienst ist. Wer den
 öffentlichen Key aus dem JS-Bundle liest, könnte damit auf Rechnung des Projekts
 Modelle aufrufen, und keine zweite Schicht hielte ihn auf.
 
-Die Live-Sitzung kommt deshalb ohne Key im Browser aus. Sie braucht drei Dinge
-im Projekt:
+Die Live-Sitzung kommt deshalb ohne Key im Browser aus. Nötig sind drei Dinge
+im Projekt, und **alle drei macht Terraform** — von Hand ist hier nichts zu
+tun, jeder `gcloud`-Aufruf wäre Drift:
 
-1. **Den Dienst aktivieren** — erledigt Terraform: `generativelanguage.googleapis.com`
-   steht in `project_services`
+1. **Die Dienste aktivieren** — `generativelanguage.googleapis.com` und
+   `apikeys.googleapis.com` stehen in `project_services`
    ([terraform/modules/project-base/variables.tf](../terraform/modules/project-base/variables.tf)).
-   Von Hand ist hier nichts zu tun, und `gcloud services enable` wäre Drift.
-2. **Einen eigenen Key anlegen** — API-Restriction genau auf diesen einen
-   Dienst, keine Application-Restriction (der Server schickt keinen Referrer).
-   Das ist der eine Schritt von Hand, aus demselben Grund, aus dem die
-   bestehenden Keys nicht in Terraform stehen (siehe „Drift" unten).
-3. **Den Wert in den Secret Manager** unter `GEMINI_LIVE_API_KEY` legen. Hülle
-   und die Bindung als Umgebungsvariable des Cloud-Run-Dienstes stehen in
-   Terraform; nur der Wert wird von Hand gesetzt, wie bei allen anderen
-   Secrets auch.
-4. **Ihn nirgends veröffentlichen.** Er prägt nur kurzlebige Tokens
-   (`uses: 1`, 60 Sekunden), und nur die gehen an den Browser. Ablauf:
-   [ai-sprachassistent.md](ai-sprachassistent.md).
+   Den zweiten braucht Terraform, um überhaupt einen Key anlegen zu dürfen.
+2. **Einen eigenen Key anlegen** — `google_apikeys_key.gemini_live` in
+   [secrets.tf](../terraform/modules/project-base/secrets.tf): API-Restriction
+   genau auf diesen einen Dienst, keine Application-Restriction (der Server
+   schickt keinen Referrer).
+3. **Den Wert in den Secret Manager** unter `GEMINI_LIVE_API_KEY` — der
+   `key_string` wandert direkt in die Secret-Version, ohne dass ihn jemand zu
+   Gesicht bekommt. Dieses Secret steht deshalb **nicht** in `var.secrets`:
+   dort stehen nur Werte von außen.
+
+Und, als Regel statt als Schritt: **Er wird nirgends veröffentlicht.** Er prägt
+nur kurzlebige Tokens (`uses: 1`, 60 Sekunden), und nur die gehen an den
+Browser. Ablauf: [ai-sprachassistent.md](ai-sprachassistent.md).
+
+Warum dieser Key in Terraform steht und die beiden Firebase-Keys nicht: Das
+Argument unter „Drift" ist der Key-**String**, der bei einem `destroy`/`create`
+neu vergeben wird und in jedem ausgelieferten Bundle und jeder
+`google-services.json` steckt. Dieser Key steckt in keinem Artefakt, sondern
+ausschließlich im Secret Manager — ein neuer String kostet ein Redeploy, keinen
+Ausfall. Der Preis ist, dass der String im Terraform-State liegt; wer den lesen
+kann, ist ohnehin Projekt-Administrator.
 
 ### Die Drift-Prüfung muss zwei Dinge sehen
 
@@ -203,10 +213,10 @@ eine Dienst erzwungen. Firebase erzwingt App Check für AI Logic ab dem
 
 ## Drift
 
-Die Keys sind **nicht** in Terraform abgebildet. Das ist eine bewusste
-Abwägung: ein `tofu destroy`/`create` auf einem API-Key vergibt einen neuen
-Key-String und legt damit die App still, und der Key-String steckt in
-GitHub-Variablen, im `.env.local` und in `google-services.json`. Der Preis
+Die beiden **Firebase-Keys** sind **nicht** in Terraform abgebildet. Das ist
+eine bewusste Abwägung: ein `tofu destroy`/`create` auf einem API-Key vergibt
+einen neuen Key-String und legt damit die App still, und der Key-String steckt
+in GitHub-Variablen, im `.env.local` und in `google-services.json`. Der Preis
 dafür ist, dass Firebase die Freigabelisten wieder auffüllt, sobald ein neues
 Produkt aktiviert wird. Prüfstand:
 
@@ -217,3 +227,8 @@ gcloud services api-keys list --project="$PROJECT" --format=json \
 
 Wächst eine Zahl gegenüber den 11 bzw. 23 Zielen oben, ist etwas dazugekommen,
 das hier nicht begründet ist.
+
+Der dritte Key, `gemini-live`, ist der Gegenentwurf: Er steht in Terraform und
+hat genau ein Ziel. Steht dort je etwas anderes als
+`generativelanguage.googleapis.com`, ist das kein Drift, sondern ein `apply`,
+der nicht gelaufen ist — dann gehört er zurückgesetzt, nicht nachgezogen.

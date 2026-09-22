@@ -148,13 +148,14 @@ vom Admin-SDK — deshalb braucht es dafür keine Firestore-Regel. Fällt Firest
 aus, wird durchgelassen: Ein Sprachbefehl im Einsatz darf nicht an der
 Buchhaltung scheitern.
 
-Im Cloud-Projekt ist `generativelanguage.googleapis.com` über Terraform
-aktiviert (`project_services` in
-[project-base/variables.tf](../terraform/modules/project-base/variables.tf)).
-Von Hand bleibt einer: einen **eigenen** API-Key dafür anlegen — API-Restriction
-genau auf diesen einen Dienst, keine Application-Restriction — und seinen Wert
-im Secret Manager unter `GEMINI_LIVE_API_KEY` ablegen. Er gehört **nicht** in
-den Browser-Key; warum gerade dieser Dienst dort nichts zu suchen hat, steht in
+Im Cloud-Projekt richtet Terraform alles ein: den Dienst
+`generativelanguage.googleapis.com`, einen **eigenen** API-Key dafür
+(`google_apikeys_key.gemini_live` in
+[project-base/secrets.tf](../terraform/modules/project-base/secrets.tf), mit
+API-Restriction genau auf diesen einen Dienst und ohne
+Application-Restriction), und den Key-String als Secret-Version unter
+`GEMINI_LIVE_API_KEY`. Von Hand ist nichts zu tun. Dieser Dienst gehört
+**nicht** in den öffentlichen Browser-Key; warum, steht in
 [api-keys.md](api-keys.md).
 
 ## Der Rückfall ist kein Notnagel

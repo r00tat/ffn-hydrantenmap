@@ -360,9 +360,9 @@ Required environment variables (see `.env.local`):
 - `GEMINI_LIVE_API_KEY` (optional) — API-Key der Gemini Developer API, aus dem
   die Server Action die kurzlebigen Tokens der Live-Sitzung prägt. **Nicht** der
   öffentliche Browser-Key, sondern ein eigener, ausschließlich auf
-  `generativelanguage.googleapis.com` eingeschränkter Key aus dem Secret
-  Manager. Ohne ihn fällt der Sprach-Assistent auf den Einzelaufruf zurück —
-  lokal der Normalfall. Siehe
+  `generativelanguage.googleapis.com` eingeschränkter Key, den Terraform
+  anlegt und selbst in den Secret Manager schreibt. Ohne ihn fällt der
+  Sprach-Assistent auf den Einzelaufruf zurück — lokal der Normalfall. Siehe
   [docs/ai-sprachassistent.md](docs/ai-sprachassistent.md) und
   [docs/api-keys.md](docs/api-keys.md).
 - `NEXT_PUBLIC_FIREBASE_AUTH_PROXY` (optional) — `true` lässt den

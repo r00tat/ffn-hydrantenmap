@@ -110,6 +110,9 @@ variable "project_services" {
     # die Freigabeliste des öffentlichen Browser-Keys: Er nimmt einen blanken
     # Key entgegen und steht nicht hinter App Check. Siehe docs/api-keys.md.
     "generativelanguage.googleapis.com",
+    # Voraussetzung dafür, dass terraform den Live-Key selbst anlegen darf
+    # (google_apikeys_key in secrets.tf).
+    "apikeys.googleapis.com",
     "androidpublisher.googleapis.com",
     "chromewebstore.googleapis.com",
   ]
@@ -130,10 +133,13 @@ variable "secrets" {
     "SUMUP_AFFILIATE_KEY_DEV",
     "SUMUP_MERCHANT_CODE",
     "SUMUP_MERCHANT_CODE_DEV",
-    # Eigener API-Key fuer die Live-API der Gemini Developer API. Bewusst
-    # getrennt vom oeffentlichen Browser-Key des Firebase-Projekts: Er darf
-    # ausschliesslich generativelanguage.googleapis.com aufrufen und verlaesst
-    # den Server nie. Siehe docs/api-keys.md.
-    "GEMINI_LIVE_API_KEY",
   ]
+  # Achtung: Dieser Default ist tot. Der einzige Root, der das Modul einsetzt
+  # (terraform/projects/ffn-utils), übergibt `secrets` ausdrücklich — eine
+  # Ergänzung nur hier bleibt wirkungslos. Die Liste dort ist die gültige.
+  #
+  # GEMINI_LIVE_API_KEY steht deshalb gar nicht mehr in einer der beiden
+  # Listen: Diesen Key legt terraform selbst an und schreibt ihn selbst in den
+  # Secret Manager, er hat eine eigene Hülle in secrets.tf. Hier stehen nur
+  # Werte von außen.
 }
