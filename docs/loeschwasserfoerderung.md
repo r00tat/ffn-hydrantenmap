@@ -340,6 +340,21 @@ Die Schlauchzahl steht dabei **nur** bei `type === 'connection'`: Dieselbe
 Zeichenmaschine bedient Linien und Flächen, und „12 Schläuche" an einer
 Dammlinie wäre Unsinn.
 
+Beschriftung und Vorschau liegen in derselben Zeichenebene (`drawingPane`) wie
+die gesetzten Punkte und dürfen deshalb **keine Klickfläche** haben. Zweierlei
+hängt daran, und beides ist eine Falle:
+
+* `interactive` gehört an die Komponente, **nicht** in `pathOptions`. Leaflet
+  liest die Angabe einmalig in `_initPath`, wenn der Pfad entsteht; was in
+  `pathOptions` steht, reicht react-leaflet erst danach über `setStyle` nach —
+  die Klasse `leaflet-interactive` ist dann längst gesetzt und wird nie wieder
+  entfernt. Ein `interactive: false` in `pathOptions` sieht richtig aus und
+  wirkt nicht.
+* Der Klickfänger lässt nur Treffer auf einem **gesetzten Punkt** durch
+  (`.leaflet-marker-icon`), nicht alles aus der Zeichenebene. Der Träger der
+  laufenden Summe klebt am Zeiger; wer die ganze Ebene durchließ, verlor jeden
+  zweiten Klick genau dort, wo gezeichnet wird.
+
 Beim **Verschieben** eines Punktes hält ein `drag`-Handler die gezogene Position
 in lokalem Zustand; geschrieben wird weiterhin erst bei `dragend`. Solange
 gezogen wird, zeichnet die Polylinie aus diesem Zustand — ein Etikett mit 240 m

@@ -50,9 +50,18 @@ const LeitungenDraw = () => {
     container.style.cursor = 'crosshair';
 
     const handleClick = (e: MouseEvent) => {
-      // Let clicks on drawing point markers through (they're in the drawingPane)
+      // Durchgelassen wird nur der Klick auf einen **gesetzten Punkt** — der
+      // beendet die Linie. Die Zeichenebene allein taugt nicht als Merkmal:
+      // In ihr liegen auch Vorschaulinie, Kupplungsstriche und der Träger der
+      // laufenden Summe, und der klebt am Zeiger. Wer die ganze Ebene
+      // durchließ, verlor genau dort jeden Klick, wo gezeichnet wird.
       const drawingPane = map.getPane(DRAWING_PANE);
-      if (drawingPane && drawingPane.contains(e.target as Node)) {
+      const target = e.target as Element | null;
+      if (
+        drawingPane &&
+        target?.closest?.('.leaflet-marker-icon') &&
+        drawingPane.contains(target)
+      ) {
         return;
       }
 
@@ -177,10 +186,14 @@ const LeitungenDraw = () => {
         <>
           <Polyline
             positions={preview}
+            // `interactive` gehört an die Komponente und **nicht** in
+            // `pathOptions`: Leaflet liest es einmalig beim Anlegen des
+            // Pfades, `setStyle` — und damit `pathOptions` — kommt zu spät und
+            // nimmt die Klickfläche nicht mehr weg.
+            interactive={false}
             pathOptions={{
               color: '#00ff00',
               dashArray: '8 8',
-              interactive: false,
             }}
             pane={DRAWING_PANE}
           />
@@ -188,7 +201,8 @@ const LeitungenDraw = () => {
             center={preview[1]}
             radius={1}
             pane={DRAWING_PANE}
-            pathOptions={{ opacity: 0, fillOpacity: 0, interactive: false }}
+            interactive={false}
+            pathOptions={{ opacity: 0, fillOpacity: 0 }}
           >
             <Tooltip permanent direction="right" offset={[8, 0]}>
               {hoseLabel(
