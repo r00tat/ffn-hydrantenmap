@@ -21,6 +21,11 @@ import {
   useState,
 } from 'react';
 import { displayFileName } from '../../common/attachmentName';
+import {
+  createMapSnapshotImage,
+  PRINT_MAP_SNAPSHOT_CLASS,
+  PRINT_PDF_MARGIN_MM,
+} from './printMapSnapshot';
 import { formatTimestamp } from '../../common/time-format';
 import { countCrewByVehicle } from '../../common/vehicle-utils';
 import useFirecall, { FirecallContext } from '../../hooks/useFirecall';
@@ -78,40 +83,75 @@ export default function PrintPage() {
       const filename = `${t('pdfFilenamePrefix')}_${firecall.name || t('pdfFilenameFallback')}.pdf`
         .replace(/[^a-zA-Z0-9äöüÄÖÜß._-]/g, '_');
 
-      // Capture the Leaflet map as a static image before PDF generation
-      // html2canvas cannot render CSS 3D transforms used by Leaflet tiles
-      const mapContainer = document.querySelector('.leaflet-container') as HTMLElement | null;
+      // Die Leaflet-Karte vor der PDF-Erzeugung als Standbild aufnehmen:
+      // html2canvas kann die CSS-3D-Transforms der Kacheln nicht rendern.
+      //
+      // Ersetzt wird der ganze Kartenbereich, nicht nur das Leaflet-Element.
+      // Dessen Flex-Zeile hat `overflow: hidden`, eine Prozentbreite und eine
+      // Seitenleiste als Geschwister — html2pdf löst das im 190mm breiten
+      // Klon-Container neu auf und beschnitt die Aufnahme dabei. Als eigener
+      // Block daneben hängt sie an keiner dieser Vorgaben mehr.
+      const mapContainer = document.querySelector(
+        '.leaflet-container'
+      ) as HTMLElement | null;
+      const mapArea =
+        (mapContainer?.closest('.map-area') as HTMLElement | null) ??
+        mapContainer;
       let mapImage: HTMLImageElement | null = null;
-      if (mapContainer) {
-        const canvas = await html2canvas(mapContainer, {
-          useCORS: true,
-          allowTaint: true,
-          scale: 2,
-        });
-        mapImage = document.createElement('img');
-        mapImage.src = canvas.toDataURL('image/jpeg', 0.95);
-        mapImage.style.width = '100%';
-        mapImage.style.height = mapContainer.offsetHeight + 'px';
-        mapContainer.style.display = 'none';
-        mapContainer.parentElement?.insertBefore(mapImage, mapContainer);
-      }
+      const mapAreaDisplay = mapArea?.style.display ?? '';
 
-      const element = document.body;
-      await html2pdf()
-        .set({
-          margin: [10, 10, 10, 10],
+      try {
+        if (mapContainer && mapArea) {
+          const canvas = await html2canvas(mapContainer, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 2,
+          });
+          mapImage = createMapSnapshotImage(
+            document,
+            canvas.toDataURL('image/jpeg', 0.95),
+            { width: canvas.width, height: canvas.height },
+            t('mapImageAlt')
+          );
+          mapArea.style.display = 'none';
+          mapArea.parentElement?.insertBefore(mapImage, mapArea);
+        }
+
+        // `pagebreak` gehört zu einem fest eingebauten Plugin von html2pdf.js,
+        // taucht aber in dessen mitgelieferten Typen nicht auf. Als Variable
+        // statt als Objektliteral übergeben greift die Prüfung auf
+        // überzählige Eigenschaften nicht — die Option kommt an, ohne dass wir
+        // die Typen des Pakets umbiegen müssen.
+        const pdfOptions = {
+          margin: [
+            PRINT_PDF_MARGIN_MM,
+            PRINT_PDF_MARGIN_MM,
+            PRINT_PDF_MARGIN_MM,
+            PRINT_PDF_MARGIN_MM,
+          ] as [number, number, number, number],
           filename,
-          image: { type: 'jpeg', quality: 0.95 },
+          image: { type: 'jpeg' as const, quality: 0.95 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        })
-        .from(element)
-        .save();
+          jsPDF: {
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait' as const,
+          },
+          pagebreak: {
+            mode: ['css', 'legacy'],
+            avoid: [`.${PRINT_MAP_SNAPSHOT_CLASS}`],
+          },
+        };
 
-      // Restore the live map
-      if (mapContainer && mapImage) {
-        mapImage.remove();
-        mapContainer.style.display = '';
+        const element = document.body;
+        await html2pdf().set(pdfOptions).from(element).save();
+      } finally {
+        // Auch wenn die PDF-Erzeugung scheitert: die Karte muss zurück,
+        // sonst bleibt die Seite ohne sichtbare Karte stehen.
+        mapImage?.remove();
+        if (mapArea) {
+          mapArea.style.display = mapAreaDisplay;
+        }
       }
     } finally {
       setPdfLoading(false);

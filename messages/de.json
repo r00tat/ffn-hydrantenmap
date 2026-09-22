@@ -741,7 +741,8 @@
       "gps": "GPS Position",
       "coordinates": "Koordinaten",
       "plainName": "Name"
-    }
+    },
+    "mapImageAlt": "Einsatzkarte"
   },
   "passkey": {
     "or": "oder",
