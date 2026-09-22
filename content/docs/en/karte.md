@@ -76,6 +76,28 @@ In editing mode you can add, move and edit items belonging to the active operati
 Only enable editing mode when you want to make changes. In view mode the map responds more quickly.
 :::
 
+### Enter coordinates
+
+When coordinates come from elsewhere — from the police or the state control centre, say — an element can be placed on them directly instead of being hunted for on the map.
+
+1. Add an element as usual, or open an existing one for editing
+2. Under **Coordinates** the position is shown; the pencil next to it opens the input fields
+3. There the same position is given five ways: decimal degrees, degrees/minutes/seconds, degrees/decimal minutes, UTM and the Austrian grid (BMN)
+4. A full coordinate pair can be pasted into **any** of these fields — the other fields follow
+5. Save; the element sits on the entered position
+
+:::info
+The same spot written five ways: `47.94829, 16.84822` — `47°56'53.8"N 16°50'53.6"E` — `N 47°56.897' E 16°50.893'` — `33T 638004 5312206` — `M34 788550 312316`. When the hemisphere is given, the order of latitude and longitude does not matter.
+:::
+
+:::tip
+A **map link** works too: a location shared from WhatsApp, a link from Google Maps, Apple Maps or OpenStreetMap, or a `geo:` address. Only short links (`maps.app.goo.gl/…`) do not carry the position — open those in a browser first and copy the long link.
+:::
+
+:::info
+**UTM** needs its zone (`33T …`); without one the zone already in the field applies. For the **Austrian grid** the easting is enough: the app recognises the meridian strip M28, M31 or M34 from it. Values from the Burgenland GIS start at 0 rather than at 750000 — they lack the strip offset and do not belong in this field unchanged.
+:::
+
 ### Drawing tools
 
 In editing mode various drawing tools are available so you can draw lines, areas and markings directly on the map.

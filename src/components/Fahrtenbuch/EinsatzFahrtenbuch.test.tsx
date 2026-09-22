@@ -183,6 +183,58 @@ describe('EinsatzFahrtenbuchView', () => {
     expect(screen.getByText('1000 → ca. 1024 km (ca. +24)')).toBeInTheDocument();
   });
 
+  it('bietet den Kilometer-Endstand zur Korrektur in der Zeile an', () => {
+    // Genau dieses Feld braucht der Fahrer: Die geschätzte Zahl durch die
+    // abgelesene ersetzen, ohne erst die Details aufzuklappen.
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        rows={[row()]}
+        autoFill={{ distance: { roundTripKm: 24, source: 'estimate' } }}
+      />,
+    );
+    const field = screen.getByLabelText('km-Endstand');
+    expect(field).toHaveValue(null);
+    // Die Schätzung steht als Platzhalter da — eingetragen wird sie nicht,
+    // sonst sähe sie wie eine Ablesung aus.
+    expect(field).toHaveAttribute('placeholder', '1024');
+  });
+
+  it('meldet den in der Zeile eingetragenen Endstand über onChangeRow', async () => {
+    const user = userEvent.setup();
+    const onChangeRow = vi.fn();
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        onChangeRow={onChangeRow}
+        rows={[row()]}
+      />,
+    );
+    await user.type(screen.getByLabelText('km-Endstand'), '5');
+    expect(onChangeRow).toHaveBeenCalledWith('i1', {
+      counters: { km: { start: 1000, end: 5 } },
+    });
+  });
+
+  it('zeigt bei einer Einheit ohne Kilometerzähler kein Kilometerfeld in der Zeile', () => {
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        vehicles={[vehicle, boot]}
+        rows={[
+          row({
+            key: 'i2',
+            vehicleId: 'gv2',
+            vehicleName: 'MZB',
+            sourceName: 'MZB',
+            counters: { betriebsstundenBb: { start: 20 } },
+          }),
+        ]}
+      />,
+    );
+    expect(screen.queryByLabelText('km-Endstand')).not.toBeInTheDocument();
+  });
+
   it('meldet eine Zeile ohne Startstand, statt eine Zahl zu erfinden', () => {
     renderWithIntl(
       <EinsatzFahrtenbuchView
@@ -549,10 +601,16 @@ describe('EinsatzFahrtenbuch — Sammelerfassung ohne Endstand', () => {
 describe('EinsatzFahrtenbuchView — Zusatzfahrer', () => {
   const persons = [{ id: 'p2', name: 'Anna Bauer' }];
 
-  it('zeigt ein Zusatzfahrer-Feld für ein Fahrzeug mit Fahrer', () => {
+  it('zeigt das Zusatzfahrer-Feld erst in den Details', async () => {
+    // Der Ausnahmefall gehört nicht in die Zeile: Dort steht der Platz dem
+    // Kilometer-Endstand zu, den jede Fahrt braucht.
+    const user = userEvent.setup();
     renderWithIntl(
       <EinsatzFahrtenbuchView {...baseProps} persons={persons} rows={[row()]} />,
     );
+    expect(screen.queryByLabelText('Zusatzfahrer')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Details bearbeiten' }));
     expect(screen.getByLabelText('Zusatzfahrer')).toBeInTheDocument();
   });
 
@@ -568,6 +626,7 @@ describe('EinsatzFahrtenbuchView — Zusatzfahrer', () => {
       />,
     );
 
+    await user.click(screen.getByRole('button', { name: 'Details bearbeiten' }));
     await user.click(screen.getByLabelText('Zusatzfahrer'));
     await user.click(await screen.findByRole('option', { name: 'Anna Bauer' }));
 
@@ -646,7 +705,8 @@ describe('EinsatzFahrtenbuchView — Zusatzfahrer', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('zeigt bei einer Einheit ohne Zähler kein Zusatzfahrer-Feld', () => {
+  it('zeigt bei einer Einheit ohne Zähler kein Zusatzfahrer-Feld', async () => {
+    const user = userEvent.setup();
     const trailer: FahrtenbuchVehicle = {
       ...vehicle,
       id: 'gv9',
@@ -661,6 +721,7 @@ describe('EinsatzFahrtenbuchView — Zusatzfahrer', () => {
         rows={[row({ vehicleId: 'gv9', vehicleName: 'Anhänger' })]}
       />,
     );
+    await user.click(screen.getByRole('button', { name: 'Details bearbeiten' }));
     expect(screen.queryByLabelText('Zusatzfahrer')).not.toBeInTheDocument();
   });
 });

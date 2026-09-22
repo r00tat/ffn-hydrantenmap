@@ -190,11 +190,25 @@ describe('HoseLengthOverlay', () => {
         color="#ff0000"
       />
     );
-    expect(polylines.props[0].pathOptions).toMatchObject({
-      color: '#ff0000',
-      // Die Striche sind Beschriftung: Ein Treffer auf ihnen darf nicht als
-      // Klick auf die Leitung gelten.
-      interactive: false,
-    });
+    expect(polylines.props[0].pathOptions).toMatchObject({ color: '#ff0000' });
+  });
+
+  it('macht die Striche nicht anklickbar', () => {
+    // Die Striche sind Beschriftung: Ein Treffer auf ihnen darf nicht als
+    // Klick auf die Leitung gelten — und beim Zeichnen nicht den Klick
+    // verschlucken, mit dem der nächste Punkt gesetzt wird.
+    //
+    // Geprüft wird die **Eigenschaft**, nicht `pathOptions`: Leaflet liest
+    // `interactive` beim Anlegen des Pfades, `pathOptions` landen erst danach
+    // über `setStyle` dort — die Klickfläche bliebe bestehen.
+    map.metresPer100px = 100;
+    render(
+      <HoseLengthOverlay positions={gerade} dimension="B" hoseLengthM={100} />
+    );
+    expect(polylines.props.length).toBeGreaterThan(0);
+    for (const props of polylines.props) {
+      expect(props.interactive).toBe(false);
+      expect(props.pathOptions).not.toHaveProperty('interactive');
+    }
   });
 });

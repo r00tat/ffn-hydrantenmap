@@ -334,6 +334,15 @@ benutzt.
   Maschinist war vorbelegt, aber wer ihn korrigieren musste, tippte den Namen
   neu und verlor die Verknüpfung zur Person — und damit ihren Anteil in der
   Fahrerstatistik. Name und `driverId` werden immer gemeinsam gesetzt.
+- **In der Zeile stehen Fahrer und Kilometer-Endstand, der Zusatzfahrer in den
+  Details.** Der Endstand ist die eine Zahl, die an einer Zeile wirklich zu
+  korrigieren ist („Einzutragen sind nur die Endstände"); ein Zusatzfahrer ist
+  der Ausnahmefall und kostete in der Zeile den Platz dafür. Die geschätzte
+  Strecke steht im Feld nur als Platzhalter: eingetragen sähe sie im
+  Nachweisdokument aus wie eine Ablesung. Ohne Kilometerzähler — Boot,
+  Anhänger — gibt es das Feld nicht, dessen Zähler stehen in den Details. Die
+  Zählerfelder der Details schreiben in denselben Zustand, beide Wege bleiben
+  also synchron.
 - **Jede Zeile hat einen eigenen Speichern-Knopf.** Er ruft dasselbe `save()`
   wie „Alle speichern", nur mit einer Auswahl — ein zweiter Pfad würde bei der
   Duplikatserkennung oder der Kilometerlogik auseinanderlaufen. `saving` sperrt

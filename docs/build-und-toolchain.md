@@ -73,3 +73,33 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
 ```
 
 Bei Aufrufen aus Tools (z.B. Capacitor Sync, Android Studio) muss `JAVA_HOME` ebenfalls auf JDK 21 zeigen. Wenn AGP/Gradle/Kotlin später aktualisiert werden, ist die JDK-Pinning-Anforderung in einem separaten Branch zu prüfen.
+
+## jsdom auf 30.0.1 festgenagelt
+
+`package.json` pinnt `jsdom` **exakt** auf `30.0.1` — ohne Caret — und
+`.github/dependabot.yml` ignoriert alles ab `30.1.0`. Grund ist keine Eigenheit
+dieses Projekts, sondern ein Bruch zwischen vitest und jsdom:
+
+Vitests jsdom-Umgebung reicht jsdom-`Blob`s an Nodes `fetch` weiter und holt
+sich die Bytes dafür über ein privates Feld der jsdom-Implementierung. Gefunden
+wird dieses Feld mit einem Scan über `Object.getOwnPropertySymbols` der
+Blob-Instanz (`makeCompatBlob` in `packages/vitest/src/integrations/env/jsdom.ts`).
+Ab **jsdom 30.1** liegt die Implementierung hinter einem privaten Klassenfeld
+(`#impl`), der Scan liefert nichts mehr, und jeder Aufruf von
+`URL.createObjectURL(blob)` — oder ein `Request` mit `FormData`, die einen Blob
+enthält — stirbt mit:
+
+```text
+TypeError: Cannot read properties of undefined (reading '_buffer')
+```
+
+Im Testlauf trifft das `BugReportDialog`, der die Screenshot-Vorschauen über
+`URL.createObjectURL` baut. Der Fehler fliegt außerhalb des Tests als
+*unhandled error*, reißt aber den ganzen File-Lauf mit.
+
+Verfolgt wird das upstream in
+[vitest-dev/vitest#11294](https://github.com/vitest-dev/vitest/issues/11294);
+der Fix steht in
+[PR #11300](https://github.com/vitest-dev/vitest/pull/11300) und ist in
+vitest 5.0.1 **noch nicht** enthalten. Sobald eine vitest-Version mit dem Fix
+erscheint: Pin und Ignore-Regel wieder entfernen.

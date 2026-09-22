@@ -43,6 +43,9 @@ function downloadEinsatzmittel(
       [
         t('cols.name'),
         t('cols.fw'),
+        // Eigen oder fremd steht neben der Feuerwehr: Die Spalte beantwortet
+        // dieselbe Frage — wer ist das —, und die Tabelle trennt danach.
+        t('cols.force'),
         t('cols.type'),
         t('cols.strength'),
         t('cols.ats'),
@@ -56,6 +59,7 @@ function downloadEinsatzmittel(
         return [
           r.name,
           r.fw,
+          r.fremd ? t('forceForeign') : t('forceOwn'),
           r.typ,
           r.mann,
           r.ats,

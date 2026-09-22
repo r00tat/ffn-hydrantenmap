@@ -177,6 +177,7 @@ describe('calculateStrength', () => {
       alarmierung: undefined,
       eintreffen: undefined,
       abruecken: undefined,
+      fremd: false,
     });
     expect(result.rows[1]).toEqual({
       name: '1. Gruppe',
@@ -187,6 +188,7 @@ describe('calculateStrength', () => {
       alarmierung: undefined,
       eintreffen: undefined,
       abruecken: undefined,
+      fremd: false,
     });
   });
 });
@@ -250,5 +252,76 @@ describe('calculateStrength mit Kategorien', () => {
       { name: 'TLFA 4000', type: 'vehicle', besatzung: '1:8' } as any,
     ];
     expect(calculateStrength(items).totalMann).toBe(9);
+  });
+});
+
+/**
+ * Fremdkräfte werden getrennt gezählt.
+ *
+ * Für die Einsatzleitung sind das zwei verschiedene Fragen: „wie viele eigene
+ * Leute habe ich" und „wer ist sonst noch da". Eine Zahl, die beides vermengt,
+ * beantwortet keine von beiden.
+ */
+describe('calculateStrength: eigene Kräfte und Fremdkräfte', () => {
+  const items: FirecallItem[] = [
+    { name: 'TLF', fw: 'FF Neusiedl', type: 'vehicle', besatzung: '5', ats: 2 } as any,
+    {
+      name: 'RTW',
+      fw: 'Rotes Kreuz',
+      type: 'vehicle',
+      besatzung: '1',
+      ats: 0,
+      fremd: 'true',
+    } as any,
+  ];
+
+  it('trennt die Zeilen nach Zugehörigkeit', () => {
+    const result = calculateStrength(items);
+    expect(result.eigene.rows.map((r) => r.name)).toEqual(['TLF']);
+    expect(result.fremde.rows.map((r) => r.name)).toEqual(['RTW']);
+  });
+
+  it('zählt je Gruppe getrennt', () => {
+    const result = calculateStrength(items);
+    expect(result.eigene.totalMann).toBe(6);
+    expect(result.eigene.totalAts).toBe(2);
+    expect(result.fremde.totalMann).toBe(2);
+    expect(result.fremde.totalAts).toBe(0);
+  });
+
+  it('behält die Gesamtsumme über beide Gruppen', () => {
+    // Die Trennung nimmt nichts weg: Wer wissen will, wie viele Kräfte
+    // insgesamt vor Ort sind, liest die Gesamtzeile.
+    const result = calculateStrength(items);
+    expect(result.totalMann).toBe(8);
+    expect(result.totalUnits).toBe(2);
+  });
+
+  it('merkt sich die Zugehörigkeit an der Zeile', () => {
+    const result = calculateStrength(items);
+    expect(result.rows.find((r) => r.name === 'RTW')?.fremd).toBe(true);
+    expect(result.rows.find((r) => r.name === 'TLF')?.fremd).toBe(false);
+  });
+
+  it('zählt die Feuerwehren je Gruppe', () => {
+    const result = calculateStrength(items);
+    expect(result.eigene.totalFw).toBe(1);
+    expect(result.fremde.totalFw).toBe(1);
+  });
+
+  it('lässt die Fremdgruppe leer, wenn keine fremden Kräfte da sind', () => {
+    const result = calculateStrength([items[0]]);
+    expect(result.fremde.rows).toHaveLength(0);
+    expect(result.fremde.totalMann).toBe(0);
+    expect(result.eigene.totalMann).toBe(6);
+  });
+
+  it('zählt eine taktische Einheit weiterhin zu den eigenen Kräften', () => {
+    // Der Schalter hängt am Fahrzeug; eine Einheit kennt ihn nicht.
+    const result = calculateStrength([
+      { name: '1. Gruppe', type: 'tacticalUnit', mann: 8 } as any,
+    ]);
+    expect(result.eigene.totalMann).toBe(8);
+    expect(result.fremde.rows).toHaveLength(0);
   });
 });
