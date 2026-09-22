@@ -70,7 +70,7 @@ export function normalizeSchemaTypes<T>(value: T): T {
   return value;
 }
 
-/** Aus `gemini-3.1-flash-live-preview` wird `models/gemini-3.1-flash-live-preview`. */
+/** Aus `gemini-3.8-live` wird `models/gemini-3.8-live`. */
 export function liveModelPath(model: string): string {
   return model.startsWith('models/') ? model : `models/${model}`;
 }

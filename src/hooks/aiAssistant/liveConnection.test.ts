@@ -68,7 +68,7 @@ class FakeWebSocket {
 }
 
 /** Oeffnet eine Sitzung und beantwortet den Handshake. */
-async function openSession(model = 'gemini-3.1-flash-live-preview') {
+async function openSession(model = 'gemini-3.8-live') {
   const pending = connectLiveSession('auth_tokens/abc', model);
   const socket = FakeWebSocket.instances.at(-1)!;
   socket.accept();
@@ -108,7 +108,7 @@ describe('connectLiveSession', () => {
 
     expect(session.isClosed).toBe(false);
     expect(sentMessages(socket)[0]).toEqual({
-      setup: { model: 'models/gemini-3.1-flash-live-preview' },
+      setup: { model: 'models/gemini-3.8-live' },
     });
   });
 

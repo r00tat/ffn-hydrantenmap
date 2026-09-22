@@ -44,14 +44,14 @@ const toolDeclarations: TestDeclaration[] = [
 
 describe('liveModelPath', () => {
   it('stellt den Sammelnamen voran', () => {
-    expect(liveModelPath('gemini-3.1-flash-live-preview')).toBe(
-      'models/gemini-3.1-flash-live-preview',
+    expect(liveModelPath('gemini-3.8-live')).toBe(
+      'models/gemini-3.8-live',
     );
   });
 
   it('laesst einen bereits vollstaendigen Pfad unveraendert', () => {
-    expect(liveModelPath('models/gemini-3.1-flash-live-preview')).toBe(
-      'models/gemini-3.1-flash-live-preview',
+    expect(liveModelPath('models/gemini-3.8-live')).toBe(
+      'models/gemini-3.8-live',
     );
   });
 });
@@ -81,7 +81,7 @@ describe('normalizeSchemaTypes', () => {
 
 describe('buildLiveTokenRequest', () => {
   const request = buildLiveTokenRequest({
-    model: 'gemini-3.1-flash-live-preview',
+    model: 'gemini-3.8-live',
     systemInstruction: 'Du bist ein Einsatz-Assistent.',
     toolDeclarations,
     now: NOW,
@@ -102,7 +102,7 @@ describe('buildLiveTokenRequest', () => {
 
   it('nagelt Modell, Systemanweisung und Werkzeuge im Token fest', () => {
     const setup = request.bidiGenerateContentSetup;
-    expect(setup.model).toBe('models/gemini-3.1-flash-live-preview');
+    expect(setup.model).toBe('models/gemini-3.8-live');
     expect(setup.systemInstruction).toEqual({
       role: 'system',
       parts: [{ text: 'Du bist ein Einsatz-Assistent.' }],
