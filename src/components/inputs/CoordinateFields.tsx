@@ -12,10 +12,18 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import {
   formatDdm,
+  formatDecimal,
   formatDms,
   parseCoordinatePair,
   parseCoordinateValue,
 } from '../../common/coordinates';
+import {
+  formatBmn,
+  formatUtm,
+  parseBmn,
+  parseUtm,
+  utmZone,
+} from '../../common/coordinates-grid';
 
 export interface CoordinateFieldsProps {
   lat?: number;
@@ -23,16 +31,17 @@ export interface CoordinateFieldsProps {
   onChange: (lat: number, lng: number) => void;
 }
 
-/** Die vier Felder, jedes eine eigene Sicht auf dieselbe Position. */
-type FieldKey = 'lat' | 'lng' | 'dms' | 'ddm';
+/** Die sechs Felder, jedes eine eigene Sicht auf dieselbe Position. */
+type FieldKey = 'lat' | 'lng' | 'dms' | 'ddm' | 'utm' | 'bmn';
 
 /**
  * Die Position: angezeigt, und auf Klick in drei Schreibweisen beschreibbar.
  *
  * Der Anlass sind Koordinaten von außen — von Polizei oder LSZ kommt, was dort
- * im Einsatzleitsystem steht, und das ist mal Dezimalgrad und mal
- * Grad/Minuten/Sekunden. Umrechnen soll das niemand im Kopf, also nimmt jedes
- * Feld jede Schreibweise an; angezeigt wird in jedem Feld die seine.
+ * im Einsatzleitsystem steht, und das ist mal Dezimalgrad, mal
+ * Grad/Minuten/Sekunden, mal UTM von der ÖK und mal ein geteilter Standort aus
+ * einer App. Umrechnen soll das niemand im Kopf, also nimmt jedes Feld jede
+ * Schreibweise an; angezeigt wird in jedem Feld die seine.
  *
  * Voreingestellt ist aber die reine Anzeige. Eine Position kommt fast immer
  * von der Karte, und wer ein Element umbenennt, will nicht vier Zahlenfelder
@@ -61,6 +70,8 @@ export default function CoordinateFields({
     lng: Number.isFinite(lng) ? String(lng) : '',
     dms: hasPosition ? formatDms(lat as number, lng as number) : '',
     ddm: hasPosition ? formatDdm(lat as number, lng as number) : '',
+    utm: hasPosition ? formatUtm(lat as number, lng as number) : '',
+    bmn: hasPosition ? formatBmn(lat as number, lng as number) : '',
   };
 
   const valueOf = (key: FieldKey) =>
@@ -77,7 +88,23 @@ export default function CoordinateFields({
         return;
       }
 
-      // Zuerst das ganze Paar: Wer aus einer Meldung kopiert, trifft nicht das
+      // Ein Gitterfeld liest zuerst sein eigenes Gitter: `638004 5312206` ist
+      // dort eine Position und nicht zwei Winkel. Die Zone bleibt die, die im
+      // Feld schon stand — wer nur die Zahlen tauscht, wechselt nicht den
+      // Meridianstreifen.
+      const grid =
+        key === 'utm'
+          ? parseUtm(value, Number.isFinite(lng) ? utmZone(lng as number) : undefined)
+          : key === 'bmn'
+            ? parseBmn(value)
+            : undefined;
+      if (grid) {
+        setInvalid(false);
+        onChange(grid.lat, grid.lng);
+        return;
+      }
+
+      // Dann das ganze Paar: Wer aus einer Meldung kopiert, trifft nicht das
       // Feld der einzelnen Achse, und „47.9, 16.8" im Breitenfeld ist als Paar
       // gemeint und nicht als Breite.
       const pair = parseCoordinatePair(value);
@@ -154,7 +181,7 @@ export default function CoordinateFields({
 
       {!editing && (
         <Typography variant="body2">
-          {hasPosition ? `${lat}, ${lng}` : t('none')}
+          {hasPosition ? formatDecimal(lat as number, lng as number) : t('none')}
         </Typography>
       )}
 
@@ -166,6 +193,8 @@ export default function CoordinateFields({
           </Box>
           <TextField id="coordinates-dms" label={t('dms')} {...common('dms')} />
           <TextField id="coordinates-ddm" label={t('ddm')} {...common('ddm')} />
+          <TextField id="coordinates-utm" label={t('utm')} {...common('utm')} />
+          <TextField id="coordinates-bmn" label={t('bmn')} {...common('bmn')} />
           <FormHelperText error={invalid}>
             {invalid ? t('invalid') : t('hint')}
           </FormHelperText>

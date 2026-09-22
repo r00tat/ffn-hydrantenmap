@@ -14,8 +14,13 @@
  *
  * Gelesen wird großzügig — jede der drei Schreibweisen, mit oder ohne
  * Gradzeichen, mit vorangestellter oder nachgestellter Himmelsrichtung, mit
- * Punkt oder deutschem Komma. Geschrieben wird eng: je Schreibweise genau eine
- * Form.
+ * Punkt oder deutschem Komma. Dazu Kartenlinks und `geo:`-Adressen, denn so
+ * kommt eine Position heute meistens an. Geschrieben wird eng: je Schreibweise
+ * genau eine Form.
+ *
+ * Die ebenen Gitter — UTM und das Bundesmeldenetz — stehen nebenan in
+ * [coordinates-grid.ts](./coordinates-grid.ts); die brauchen proj4, dieses
+ * Modul rechnet mit nichts als Text.
  */
 
 export interface CoordinatePair {
@@ -131,6 +136,59 @@ function inRange(value: number, axis: CoordinateAxis): boolean {
   return Math.abs(value) <= MAX[axis];
 }
 
+/** Die Abfrageparameter, in denen die üblichen Kartendienste ein Paar führen. */
+const URI_PARAMETERS = ['q', 'query', 'll', 'center', 'daddr', 'saddr', 'sll'];
+
+/** `/@47.94829,16.84822,17z` — so hängt Google die Mitte an den Pfad. */
+const AT_PAIR = /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+
+/** `#map=17/47.94829/16.84822` — der Ausschnitt von OpenStreetMap. */
+const OSM_FRAGMENT = /map=[\d.]+\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/;
+
+/**
+ * Die Stellen einer Adresse, an denen eine Position stehen kann.
+ *
+ * So kommt eine Position heute meistens an: als geteilter Standort, als
+ * Kartenlink in einer Mail, als `geo:` aus einer App. Gesucht wird der Reihe
+ * nach, und die erste lesbare Fundstelle gewinnt — `geo:0,0?q=…` führt die
+ * Position im Parameter, und der Pfad davor ist nur Beiwerk.
+ *
+ * Ein Kurzlink (`maps.app.goo.gl/…`) trägt nichts davon; dort steht die
+ * Position erst hinter der Weiterleitung, und die gibt es offline nicht.
+ */
+function uriCandidates(input: string): string[] {
+  let url: URL;
+  try {
+    url = new URL(input.trim());
+  } catch {
+    return [];
+  }
+
+  // `geo:0,0?q=47.9,16.8(Einsatzort)` — die Beschriftung hängt am Wert und
+  // gehört nicht zur Zahl.
+  const found: string[] = [];
+  const push = (value: string) => found.push(value.replace(/\(.*\)$/, '').trim());
+
+  for (const key of URI_PARAMETERS) {
+    const value = url.searchParams.get(key);
+    if (value) push(value);
+  }
+
+  const mlat = url.searchParams.get('mlat');
+  const mlon = url.searchParams.get('mlon');
+  if (mlat && mlon) push(`${mlat},${mlon}`);
+
+  if (url.protocol === 'geo:') push(url.pathname);
+
+  const at = AT_PAIR.exec(url.pathname);
+  if (at) push(`${at[1]},${at[2]}`);
+
+  const osm = OSM_FRAGMENT.exec(url.hash);
+  if (osm) push(`${osm[1]},${osm[2]}`);
+
+  return found;
+}
+
 /**
  * Ein Koordinatenpaar lesen.
  *
@@ -142,6 +200,14 @@ export function parseCoordinatePair(
   input: string
 ): CoordinatePair | undefined {
   if (!input?.trim()) return undefined;
+
+  // Eine Adresse wird nicht zerlegt wie ein Zahlenpaar; aus ihr wird erst die
+  // Fundstelle geholt, und die geht dann denselben Weg wie getippter Text.
+  for (const candidate of uriCandidates(input)) {
+    const pair = parseCoordinatePair(candidate);
+    if (pair) return pair;
+  }
+
   let normalized = normalize(input);
 
   const german = GERMAN_DECIMAL_PAIR.exec(normalized);

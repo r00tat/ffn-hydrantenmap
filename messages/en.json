@@ -1817,7 +1817,9 @@
       "none": "no position",
       "dms": "Degrees/minutes/seconds",
       "ddm": "Degrees/decimal minutes",
-      "hint": "A full coordinate pair can be pasted into any of these fields.",
+      "utm": "UTM",
+      "bmn": "Austrian grid (Gauss-Krüger)",
+      "hint": "A full coordinate pair can be pasted into any of these fields — a map link or a geo: link works too.",
       "invalid": "Not a valid coordinate"
     }
   },

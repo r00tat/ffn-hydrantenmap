@@ -51,6 +51,53 @@ describe('CoordinateFields', () => {
     expect(screen.getByLabelText(/Grad\/Dezimalminuten/)).toHaveValue(
       "N 47°56.897' E 16°50.893'"
     );
+    expect(screen.getByLabelText(/UTM/)).toHaveValue('33T 638004 5312206');
+    expect(screen.getByLabelText(/Bundesmeldenetz/)).toHaveValue(
+      'M34 788550 312316'
+    );
+  });
+
+  it('übernimmt eine eingefügte UTM-Angabe', async () => {
+    const user = userEvent.setup();
+    const { onChange } = setup();
+    await edit(user);
+    const field = screen.getByLabelText(/UTM/);
+    await user.clear(field);
+    await user.paste('33U 602065 5340387'); // Stephansdom
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.closeTo(48.2085, 3),
+      expect.closeTo(16.3738, 3)
+    );
+  });
+
+  it('übernimmt eine eingefügte BMN-Angabe aus dem Burgenland-GIS', async () => {
+    const user = userEvent.setup();
+    const { onChange } = setup();
+    await edit(user);
+    const field = screen.getByLabelText(/Bundesmeldenetz/);
+    await user.clear(field);
+    await user.paste('787648 310270');
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.closeTo(47.92995, 3),
+      expect.closeTo(16.83597, 3)
+    );
+  });
+
+  it('nimmt einen Kartenlink in jedem Feld an', async () => {
+    // Der geteilte Standort aus WhatsApp landet dort, wo der Finger hintrifft.
+    const user = userEvent.setup();
+    const { onChange } = setup();
+    await edit(user);
+    const field = screen.getByLabelText(/Grad\/Minuten\/Sekunden/);
+    await user.clear(field);
+    await user.paste('https://maps.google.com/?q=48.2083,16.3708');
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.closeTo(48.2083, 4),
+      expect.closeTo(16.3708, 4)
+    );
   });
 
   it('klappt die Felder wieder zu', async () => {
@@ -143,5 +190,6 @@ describe('CoordinateFields', () => {
     await edit(user);
     expect(screen.getByLabelText(/Latitude/)).toHaveValue('');
     expect(screen.getByLabelText(/Grad\/Minuten\/Sekunden/)).toHaveValue('');
+    expect(screen.getByLabelText(/UTM/)).toHaveValue('');
   });
 });

@@ -16,6 +16,13 @@ export const EPSG_DEFINITIONS: Record<string, string> = {
     '+proj=tmerc +lat_0=0 +lon_0=16.33333333333333 +k=1 +x_0=0 +y_0=-5000000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.4232 +units=m +no_defs',
   'EPSG:31259':
     '+proj=tmerc +lat_0=0 +lon_0=16.33333333333333 +k=1 +x_0=750000 +y_0=-5000000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.4232 +units=m +no_defs',
+  // Die beiden westlichen Streifen des Bundesmeldenetzes. Dieselbe Abbildung
+  // wie M34, nur um je drei Grad versetzt — und mit je einem eigenen falschen
+  // Rechtswert, an dem sich der Streifen an der Zahl allein erkennen laesst.
+  'EPSG:31257':
+    '+proj=tmerc +lat_0=0 +lon_0=10.33333333333333 +k=1 +x_0=150000 +y_0=-5000000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.4232 +units=m +no_defs',
+  'EPSG:31258':
+    '+proj=tmerc +lat_0=0 +lon_0=13.33333333333333 +k=1 +x_0=450000 +y_0=-5000000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.4232 +units=m +no_defs',
   // MGI geographisch (Bessel 1841). Das amtliche BEV-Hoehen-Grid, das
   // EVRF2000-Hoehen in Gebrauchshoehen (Adria) ueberfuehrt, fuehrt seine
   // Koordinaten in diesem System.

@@ -1817,7 +1817,9 @@
       "none": "keine Position",
       "dms": "Grad/Minuten/Sekunden",
       "ddm": "Grad/Dezimalminuten",
-      "hint": "In jedes Feld lässt sich auch ein ganzes Koordinatenpaar einfügen.",
+      "utm": "UTM",
+      "bmn": "Bundesmeldenetz (Gauß-Krüger)",
+      "hint": "In jedes Feld lässt sich ein ganzes Koordinatenpaar einfügen — auch ein Kartenlink oder ein geo:-Link.",
       "invalid": "Keine gültige Koordinate"
     }
   },

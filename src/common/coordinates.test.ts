@@ -116,3 +116,42 @@ describe('Formatierung', () => {
     }
   });
 });
+
+describe('parseCoordinatePair mit Links', () => {
+  // So kommt eine Position heute meistens an: als geteilter Standort aus
+  // WhatsApp, als Kartenlink aus einer Mail, als `geo:` aus einer App.
+  const cases: [string, string][] = [
+    ['geo-URI', 'geo:47.94829,16.84822'],
+    ['geo-URI mit Zoom', 'geo:47.94829,16.84822?z=17'],
+    ['geo-URI mit Suchbegriff', 'geo:0,0?q=47.94829,16.84822(Einsatzort)'],
+    ['Google-Maps-Link', 'https://maps.google.com/?q=47.94829,16.84822'],
+    [
+      'Google-Maps-Ort',
+      'https://www.google.com/maps/place/Neusiedl+am+See/@47.94829,16.84822,17z/data=!3m1',
+    ],
+    ['Apple-Maps-Link', 'https://maps.apple.com/?ll=47.94829,16.84822&q=Einsatzort'],
+    [
+      'OpenStreetMap-Marker',
+      'https://www.openstreetmap.org/?mlat=47.94829&mlon=16.84822#map=17/47.94829/16.84822',
+    ],
+    ['OpenStreetMap-Ausschnitt', 'https://www.openstreetmap.org/#map=17/47.94829/16.84822'],
+  ];
+
+  it.each(cases)('liest die Position aus einem %s', (_name, link) => {
+    const pair = parseCoordinatePair(link);
+    expect(pair?.lat).toBeCloseTo(NEUSIEDL.lat, 4);
+    expect(pair?.lng).toBeCloseTo(NEUSIEDL.lng, 4);
+  });
+
+  it('gibt einen Kurzlink auf, statt zu raten', () => {
+    // `maps.app.goo.gl` trägt die Position nicht, sie steht erst hinter der
+    // Weiterleitung. Offline ist daraus nichts zu holen.
+    expect(parseCoordinatePair('https://maps.app.goo.gl/abc123')).toBeUndefined();
+  });
+
+  it('nimmt keinen Link ohne Position', () => {
+    expect(
+      parseCoordinatePair('https://www.google.com/maps/search/Feuerwehr')
+    ).toBeUndefined();
+  });
+});
