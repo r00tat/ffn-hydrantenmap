@@ -387,6 +387,70 @@ benutzt.
   `ankunftBeforeAbfahrt` ab und gilt damit auch serverseitig; `timeOrderInvalid`
   markiert das Feld sofort, statt die Meldung erst beim Speichern zu bringen.
 
+## Eine Fahrt diktieren
+
+„Lege einen Fahrtenbucheintrag für das RLFA an, Kilometerstand 1723, gefahren
+bin ich." Der Sprach-Assistent auf der Einsatzkarte kann das seit
+`createFahrtenbuchEntry`; die Auflösung der gesprochenen Namen steht in
+[assistantEntry.ts](../src/components/Fahrtenbuch/assistantEntry.ts), geschrieben
+wird über `createFahrtenbuchEntryFromAssistant`
+([fahrtenbuchActions.ts](../src/components/Fahrtenbuch/fahrtenbuchActions.ts)).
+
+**Warum überhaupt am Einsatz und nicht auf der Fahrtenbuchseite.** Wer aus dem
+Einsatz zurückkommt, steht neben dem Fahrzeug und liest den Tacho ab. Genau
+dann ist der Stand bekannt, und genau dann hat niemand eine Hand für ein
+Formular frei. Die Fahrt später nachzutragen heißt, den Kilometerstand aus dem
+Gedächtnis zu holen — und ein geratener Stand verschiebt über den
+[Fahrzeug-Cache](#fahrzeug-cache-im-fahrtenbuch) alle folgenden Fahrten.
+
+**Was der Server auflöst und warum nicht der Browser.** Das Werkzeug nimmt einen
+*Namen* entgegen, keine `vehicleId`, und der Browser bekommt die Stammdaten der
+Gruppe nie zu sehen. Zwei Gründe:
+
+- Der Kartenschirm hat die Fahrzeug- und Personenlisten der Gruppe nicht
+  geladen. Sie für einen Befehl zu abonnieren, den die meisten Einsätze nie
+  auslösen, wäre ein dauerhafter Listener für einen seltenen Fall.
+- Die Gruppe wird **aus dem Einsatz** abgeleitet, nicht vom Client behauptet.
+  `actionGroupMemberRequired` prüft nur die Mitgliedschaft in der genannten
+  Gruppe, nicht deren Bezug zum Einsatz — ein manipulierter Aufruf könnte sonst
+  eine Fahrt in das Fahrtenbuch einer fremden Gruppe schreiben.
+
+**Geraten wird nichts, und jede Absage nennt die Alternativen.** Ein Name, der
+auf zwei Fahrzeuge passt, ist eine Rückfrage und kein Grund, das erste zu
+nehmen. Umgekehrt bekommt das Modell mit jeder Absage die vorhandenen
+Fahrzeug- bzw. Zählernamen zurück; ohne sie rät es beim nächsten Versuch
+denselben Namen. Der Abgleich läuft in Stufen — genaue Übereinstimmung,
+Namensanfang, enthaltener Text, und zuletzt der umgekehrte Fall, dass der
+Sprecher mehr sagt als in den Stammdaten steht („RLFA Neusiedl" gegen „RLFA").
+Auf jeder Stufe gilt: genau einer gewinnt, mehrere fragen zurück, keiner geht
+eine Stufe weiter.
+
+**Gesprochen wird der abgelesene Stand, nicht die Strecke.** Der Startwert kommt
+aus dem Fahrzeug-Cache, also aus der letzten erfassten Fahrt. Fehlt er dort —
+ein Fahrzeug ohne Vorfahrt —, wird er erfragt und nicht erfunden; das ist der
+einzige Fall, in dem `startStand` mitgesprochen werden muss. Ein Fahrzeug mit
+mehreren Zählern (das Boot) verlangt den Zählernamen dazu.
+
+**„Gefahren bin ich" geht ausschließlich über `person.userIds`** — dieselbe
+gepflegte Zuordnung, auf die sich auch das Änderungsrecht stützt (siehe
+[Personen den Benutzerkonten zuordnen](#personen-den-benutzerkonten-zuordnen)).
+Ist sie nicht gepflegt, steht der Anzeigename als Freitext da. Über den Namen
+zu raten verbietet sich aus demselben Grund wie dort: Der Anzeigename gehört
+dem Benutzer selbst und ist jederzeit änderbar.
+
+**Geprüft und geschrieben wird auf dem gewohnten Weg.** `planAssistantEntry`
+baut nur die Eingabe; gültig macht sie dieselbe `validateEntryInput`, die
+Dialog und Sammelerfassung verwenden, und gespeichert wird über
+`createFahrtenbuchEntry` — mitsamt Duplikatsprüfung, Zähler-Cache und
+Mangel-Meldung. Die Prüffehler werden nur übersetzt: aus `counterMissing:km`
+wird ein Satz, den das Modell vorlesen und beantworten kann. Ein
+[Duplikat](#doppelte-fahrten-zu-einem-einsatz) verlangt auch hier eine
+ausdrückliche Bestätigung, gesprochen als „trotzdem eintragen".
+
+**Was bewusst fehlt:** der Defekt. Ein angehakter Mangel verschickt eine Mail
+an die Fahrzeugverantwortlichen, und ein verhörtes Wort wäre eine Meldung, die
+niemand zurückholt. Den Mangel trägt man im Dialog ein.
+
 ## Wer eine Fahrt korrigieren darf
 
 Entscheidend ist `canModifyEntry` in

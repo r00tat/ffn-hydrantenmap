@@ -104,6 +104,15 @@ export function createServerToolDeps({
       // Zustandslos: Es gibt keinen nächsten Aufruf, der sich daran erinnern
       // könnte.
     },
+    // Das Fahrtenbuch liegt an der Gruppe, nicht am Einsatz, und der
+    // MCP-Zugang ist auf einen Einsatz ausgestellt (`authorizeFirecall`) —
+    // seine Berechtigung sagt nichts über die Mitgliedschaft in der Gruppe
+    // aus, die `actionGroupMemberRequired` verlangt. Deshalb kein Weg dorthin;
+    // das MCP-Werkzeugset bietet die Fahrt auch gar nicht erst an.
+    createFahrtenbuchEntry: async () => ({
+      success: false,
+      message: 'Das Fahrtenbuch ist über den MCP-Zugang nicht erreichbar.',
+    }),
     resolveOrigin,
     resolvePosition: async (positionSpec) => {
       const { lat, lng } = await resolveOrigin(positionSpec);

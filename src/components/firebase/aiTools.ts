@@ -190,6 +190,91 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'createFahrtenbuchEntry',
+    description:
+      'Record a trip in the Fahrtenbuch (the fire department\'s driver log). ' +
+      'This is NOT a map element — use it for "Fahrtenbucheintrag", "Fahrt ' +
+      'eintragen", "Kilometerstand eintragen". The vehicle is named as it is ' +
+      'kept in the Fahrtenbuch master data; when the name does not match, the ' +
+      'result lists the vehicles that exist. Without a stated purpose the trip ' +
+      'is booked on the current Einsatz.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        fahrzeug: {
+          type: SchemaType.STRING,
+          description: 'Vehicle name as spoken, e.g. "RLFA" or "MZB"',
+        },
+        zaehlerstaende: {
+          type: SchemaType.ARRAY,
+          description:
+            'Counter readings taken on return. Pass what the user said, ' +
+            'never a guessed or computed value',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              zaehler: {
+                type: SchemaType.STRING,
+                description:
+                  'Which counter, e.g. "Kilometerstand" or "Lenzpumpe ' +
+                  'Steuerbord". Omit for a vehicle with a single counter',
+              },
+              stand: {
+                type: SchemaType.NUMBER,
+                description: 'The reading on return, as spoken',
+              },
+              startStand: {
+                type: SchemaType.NUMBER,
+                description:
+                  'The reading at departure. Only needed when the vehicle has ' +
+                  'no earlier trip — otherwise it is taken from the last one',
+              },
+            },
+            required: ['stand'],
+          },
+        },
+        fahrer: {
+          type: SchemaType.STRING,
+          description:
+            'Driver. "ich" or omitted = the logged in user',
+        },
+        mitfahrer: {
+          type: SchemaType.ARRAY,
+          description: 'Further crew members on this trip',
+          items: { type: SchemaType.STRING },
+        },
+        zweck: {
+          type: SchemaType.STRING,
+          enum: ['einsatz', 'uebung', 'versorgung', 'sonstiges'],
+          description:
+            'Purpose of the trip. Defaults to einsatz, which links the trip to ' +
+            'the current Einsatz. Any other purpose needs a ziel',
+        },
+        ziel: {
+          type: SchemaType.STRING,
+          description: 'Where the trip went. Required unless zweck is einsatz',
+        },
+        abfahrt: {
+          type: SchemaType.STRING,
+          description:
+            'Departure time. Defaults to the alert time of the Einsatz',
+        },
+        ankunft: {
+          type: SchemaType.STRING,
+          description: 'Arrival time back at the station',
+        },
+        hinweise: { type: SchemaType.STRING, description: 'Remarks' },
+        trotzdemEintragen: {
+          type: SchemaType.BOOLEAN,
+          description:
+            'Record although a trip of this vehicle is already on file for ' +
+            'this Einsatz. Only after the user confirmed the second trip',
+        },
+      },
+      required: ['fahrzeug'],
+    },
+  },
+  {
     name: 'updateItem',
     description: 'Update an existing item on the map',
     parameters: {
@@ -456,6 +541,9 @@ Aktionen:
 - searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
 - searchWaterSupply: Hydranten, Saugstellen und Löschteiche im Umkreis suchen
 - proposeHoseLine: Löschleitung als Entwurf vorschlagen
+- createFahrtenbuchEntry: Fahrt ins Fahrtenbuch eintragen ("Fahrtenbucheintrag",
+  "Kilometerstand"). NICHT createVehicle - das legt ein Fahrzeug auf der Karte an.
+  Gib die Zählerstände so weiter, wie sie gesagt wurden; rechne nichts um.
 - updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position)
 - deleteItem: Bestehendes Element löschen
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")

@@ -257,6 +257,33 @@ zusammengesetzt. Die Ausgabe-Abschrift geht dabei **schon während des
 Sprechens** als `onPartialAnswer` hinaus: Die Meldung soll mit der Stimme
 erscheinen und nicht, wenn der Satz zu Ende gesprochen ist.
 
+## Das einzige Werkzeug, das die Karte verlässt
+
+`createFahrtenbuchEntry` trägt eine Fahrt ins Fahrtenbuch ein — „Lege einen
+Fahrtenbucheintrag für das RLFA an, Kilometerstand 1723, gefahren bin ich."
+Alle übrigen Werkzeuge schreiben Elemente des laufenden Einsatzes oder rechnen;
+dieses schreibt in die Stammdaten einer Gruppe. Drei Dinge fallen dadurch
+anders aus:
+
+- **Es läuft über eine Server Action**, nicht über Firestore im Browser. Die
+  Fahrzeug- und Personenlisten der Gruppe sind auf der Karte nicht geladen, und
+  die Gruppe wird aus dem Einsatz abgeleitet statt vom Client entgegengenommen.
+  Warum, steht in [fahrtenbuch.md](fahrtenbuch.md#eine-fahrt-diktieren).
+- **Es kennt kein „Rückgängig".** Der Knopf nimmt Kartenelemente über
+  `lastCreatedItem` zurück; eine Fahrt ist keins, und `createdItemId` bleibt
+  deshalb leer. Eine falsch diktierte Fahrt wird im Fahrtenbuch gelöscht — dort
+  gilt ohnehin ein eigenes Änderungsrecht.
+- **Seine Fehlschläge sind Rückfragen.** „Kein Fahrzeug „Drehleiter" im
+  Fahrtenbuch. Vorhanden sind: …" geht als Werkzeugergebnis zurück ins
+  Gespräch. Im Gespräch ist das der billigste Weg: Das Modell liest den Satz
+  vor, die Einsatzkraft antwortet, und der zweite Versuch trifft. Ein
+  `askClarification` wäre ein zusätzlicher Sprecherwechsel für dieselbe Frage.
+
+Über den MCP-Zugang gibt es die Fahrt nicht: Dessen Token ist auf **einen
+Einsatz** ausgestellt und sagt nichts über die Mitgliedschaft in der Gruppe aus,
+die das Fahrtenbuch verlangt. `createServerToolDeps` weist den Weg deshalb
+ausdrücklich ab, statt ihn offen zu lassen.
+
 ## Was gemeinsam bleibt
 
 [useAiToolRunner.ts](../src/hooks/aiAssistant/useAiToolRunner.ts) hält

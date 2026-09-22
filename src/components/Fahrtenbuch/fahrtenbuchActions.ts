@@ -7,6 +7,7 @@ import {
   FAHRTENBUCH_PERSON_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
   type FahrtenbuchEntry,
+  type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
 import {
@@ -24,6 +25,11 @@ import { resolveFahrtenbuchShareLink } from '../../server/auth/resolveFahrtenbuc
 import { computeRouteLegsMeters } from '../actions/maps/routes';
 import { FIRECALL_COLLECTION_ID, GROUP_COLLECTION_ID, type Firecall } from '../firebase/firestore';
 import { actionErrorKey } from './actionErrorKey';
+import {
+  describeAssistantEntry,
+  planAssistantEntry,
+  type AssistantEntryCommand,
+} from './assistantEntry';
 import { actionGroupMemberRequired } from './authGuards';
 import {
   buildEntryDocument,
@@ -503,6 +509,136 @@ export async function createFahrtenbuchEntry(
   } catch (err) {
     console.error('createFahrtenbuchEntry failed', err);
     return { success: false, error: actionErrorKey(err) };
+  }
+}
+
+/** Die Fahrzeuge der Gruppe, die noch im Dienst stehen. */
+async function loadActiveVehicles(
+  groupId: string,
+): Promise<FahrtenbuchVehicle[]> {
+  const snapshot = await firestore
+    .collection(GROUP_COLLECTION_ID)
+    .doc(groupId)
+    .collection(FAHRTENBUCH_VEHICLE_COLLECTION_ID)
+    .get();
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as FahrtenbuchVehicle)
+    .filter((vehicle) => vehicle.active !== false);
+}
+
+async function loadPersons(groupId: string): Promise<FahrtenbuchPerson[]> {
+  const snapshot = await firestore
+    .collection(GROUP_COLLECTION_ID)
+    .doc(groupId)
+    .collection(FAHRTENBUCH_PERSON_COLLECTION_ID)
+    .get();
+  return snapshot.docs.map(
+    (doc) => ({ id: doc.id, ...doc.data() }) as FahrtenbuchPerson,
+  );
+}
+
+export interface AssistantEntryActionResult {
+  success: boolean;
+  id?: string;
+  /**
+   * Ein deutscher Satz — Bestätigung oder Rückfrage. Er wird vorgelesen und
+   * ist zugleich das, was das Modell als Werkzeugergebnis zu sehen bekommt;
+   * deshalb nennt eine Absage immer, was stattdessen möglich gewesen wäre.
+   */
+  message: string;
+  error?: string;
+}
+
+/**
+ * Eine gesprochene Fahrt ins Fahrtenbuch — der Weg des Sprach-Assistenten.
+ *
+ * Die Gruppe wird **aus dem Einsatz** abgeleitet und nicht vom Client
+ * behauptet: Sonst könnte ein manipulierter Aufruf eine Fahrt in das
+ * Fahrtenbuch einer fremden Gruppe schreiben, und `actionGroupMemberRequired`
+ * prüft nur die Mitgliedschaft in der genannten Gruppe, nicht deren Bezug zum
+ * Einsatz. Aus demselben Grund nimmt diese Action keine `vehicleId` entgegen,
+ * sondern einen Namen: Was daraus wird, entscheidet die Fahrzeugliste der
+ * Gruppe.
+ *
+ * Geschrieben wird über `createFahrtenbuchEntry` und damit über denselben
+ * Pfad wie der Dialog — mitsamt Duplikatsprüfung, Zähler-Cache und
+ * Mangel-Meldung. Hier kommt nur die Auflösung der gesprochenen Namen dazu
+ * (`planAssistantEntry`).
+ *
+ * Hintergrund: [docs/ai-sprachassistent.md](../../../docs/ai-sprachassistent.md)
+ */
+export async function createFahrtenbuchEntryFromAssistant(
+  firecallId: string,
+  command: AssistantEntryCommand,
+  options: EntryWriteOptions = {},
+): Promise<AssistantEntryActionResult> {
+  try {
+    const firecallDoc = await firestore
+      .collection(FIRECALL_COLLECTION_ID)
+      .doc(firecallId)
+      .get();
+    const firecall = firecallDoc.data() as Firecall | undefined;
+    const groupId = firecall?.group;
+    if (!firecallDoc.exists || !groupId) {
+      return {
+        success: false,
+        error: 'firecallWithoutGroup',
+        message:
+          'Dieser Einsatz gehört zu keiner Gruppe — ohne sie gibt es kein ' +
+          'Fahrtenbuch, in das die Fahrt gehört.',
+      };
+    }
+
+    const session = await actionGroupMemberRequired(groupId);
+    const [vehicles, persons] = await Promise.all([
+      loadActiveVehicles(groupId),
+      loadPersons(groupId),
+    ]);
+
+    const plan = planAssistantEntry(command, {
+      vehicles,
+      persons,
+      self: {
+        userId: session.user.id,
+        name: session.user.name ?? session.user.email ?? '',
+      },
+      firecall: {
+        id: firecallId,
+        name: firecall.name,
+        date: firecall.date,
+        abruecken: firecall.abruecken,
+      },
+      now: new Date().toISOString(),
+    });
+    if (!plan.ok) {
+      return { success: false, error: plan.error, message: plan.message };
+    }
+
+    const result = await createFahrtenbuchEntry(groupId, plan.input, options);
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+        message:
+          result.error === 'duplicateFirecallEntry'
+            ? `Für das ${plan.vehicle.name} ist bei diesem Einsatz schon eine ` +
+              'Fahrt erfasst. Sag „trotzdem eintragen", wenn es eine zweite war.'
+            : 'Die Fahrt konnte nicht gespeichert werden.',
+      };
+    }
+
+    return {
+      success: true,
+      id: result.id,
+      message: describeAssistantEntry(plan.vehicle, plan.input),
+    };
+  } catch (err) {
+    console.error('createFahrtenbuchEntryFromAssistant failed', err);
+    return {
+      success: false,
+      error: actionErrorKey(err),
+      message: 'Die Fahrt konnte nicht gespeichert werden.',
+    };
   }
 }
 

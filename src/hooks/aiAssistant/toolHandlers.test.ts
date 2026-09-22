@@ -46,6 +46,10 @@ function makeDeps(overrides: Partial<ToolHandlerDeps> = {}): ToolHandlerDeps {
     ),
     waterSupplyResults: { current: [] as WaterSupplyCandidate[] },
     proposeHoseLineDrafts: vi.fn(),
+    createFahrtenbuchEntry: vi.fn(async () => ({
+      success: true,
+      message: 'Fahrt eingetragen',
+    })),
     ...overrides,
   } as ToolHandlerDeps;
 }
@@ -440,5 +444,78 @@ describe('proposeHoseLine', () => {
     );
 
     expect(deps.resolveOrigin).toHaveBeenCalledWith({ type: 'auto' });
+  });
+});
+
+describe('createFahrtenbuchEntry', () => {
+  it('reicht das Gesprochene unverändert weiter', async () => {
+    // Was „RLFA" ist und welcher Zähler gemeint war, entscheidet die
+    // Gegenseite anhand der Stammdaten der Gruppe. Würde hier schon etwas
+    // umgedeutet, stünde die Auflösung an zwei Stellen.
+    const createFahrtenbuchEntry = vi.fn(async () => ({
+      success: true,
+      message: 'Fahrt des RLFA-A eingetragen: Kilometerstand 1723',
+    }));
+    const deps = makeDeps({ createFahrtenbuchEntry });
+
+    const result = await executeToolCall(
+      call('createFahrtenbuchEntry', {
+        fahrzeug: 'RLFA',
+        zaehlerstaende: [{ stand: 1723 }],
+        fahrer: 'ich',
+      }),
+      deps
+    );
+
+    expect(createFahrtenbuchEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fahrzeug: 'RLFA',
+        zaehlerstaende: [{ stand: 1723 }],
+        fahrer: 'ich',
+      }),
+      { confirmDuplicate: false }
+    );
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('1723');
+    // Eine Fahrt ist kein Kartenelement — „rückgängig" fände sie nie wieder.
+    expect(result.createdItemId).toBeUndefined();
+  });
+
+  it('bestätigt ein Duplikat nur auf ausdrückliche Ansage', async () => {
+    const createFahrtenbuchEntry = vi.fn(async () => ({
+      success: true,
+      message: 'Fahrt eingetragen',
+    }));
+    const deps = makeDeps({ createFahrtenbuchEntry });
+
+    await executeToolCall(
+      call('createFahrtenbuchEntry', {
+        fahrzeug: 'RLFA',
+        trotzdemEintragen: true,
+      }),
+      deps
+    );
+
+    expect(createFahrtenbuchEntry).toHaveBeenCalledWith(expect.anything(), {
+      confirmDuplicate: true,
+    });
+  });
+
+  it('gibt eine Rückfrage als Misserfolg zurück', async () => {
+    // Der Satz ist die Rückfrage — das Modell liest ihn vor und fragt nach.
+    const deps = makeDeps({
+      createFahrtenbuchEntry: vi.fn(async () => ({
+        success: false,
+        message: 'Kein Fahrzeug „Drehleiter" im Fahrtenbuch. Vorhanden sind: KLF.',
+      })),
+    });
+
+    const result = await executeToolCall(
+      call('createFahrtenbuchEntry', { fahrzeug: 'Drehleiter' }),
+      deps
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('KLF');
   });
 });

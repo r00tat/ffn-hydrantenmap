@@ -1,6 +1,7 @@
 import { LeafletContext } from '@react-leaflet/core';
 import { FunctionCall } from 'firebase/ai';
 import { useCallback, useContext, useRef, useState } from 'react';
+import { createFahrtenbuchEntryFromAssistant } from '../../components/Fahrtenbuch/fahrtenbuchActions';
 import { queryClusters } from '../../components/firebase/clusterQuery';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { usePositionContext } from '../../components/providers/PositionProvider';
@@ -10,6 +11,7 @@ import useFirecallItemAdd from '../useFirecallItemAdd';
 import useFirecallItemUpdate from '../useFirecallItemUpdate';
 import { useFirecall } from '../useFirecall';
 import { useHoseLineDraft } from '../useHoseLineDraft';
+import type { AssistantEntryCommand } from '../../components/Fahrtenbuch/assistantEntry';
 import { buildAiContext } from './contextBuilder';
 import { MAP_CONTEXT_PREFIX } from './chatHistory';
 import { PositionSpec, resolveOriginFrom } from './resolveOrigin';
@@ -99,6 +101,31 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
     [resolveOrigin]
   );
 
+  /**
+   * Eine Fahrt ins Fahrtenbuch — der Einsatz bestimmt, in wessen Fahrtenbuch.
+   *
+   * Nur die Einsatz-ID geht hinaus; die Gruppe leitet der Server daraus ab.
+   * Der Browser kennt die Fahrzeug- und Personenstammdaten der Gruppe nicht
+   * und soll sie für diesen einen Befehl auch nicht abonnieren müssen.
+   */
+  const createFahrtenbuchEntry = useCallback(
+    async (
+      command: AssistantEntryCommand,
+      options: { confirmDuplicate?: boolean },
+    ) => {
+      if (!firecall.id) {
+        return {
+          success: false,
+          message:
+            'Ohne laufenden Einsatz weiß ich nicht, in welches Fahrtenbuch die ' +
+            'Fahrt gehört.',
+        };
+      }
+      return createFahrtenbuchEntryFromAssistant(firecall.id, command, options);
+    },
+    [firecall.id],
+  );
+
   const executeTool = useCallback(
     async (call: FunctionCall): Promise<AiAssistantResult> => {
       const result = await executeToolCall(call, {
@@ -114,6 +141,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
         findWaterSupply: queryClusters,
         waterSupplyResults: waterSupplyResultsRef,
         proposeHoseLineDrafts: proposeDrafts,
+        createFahrtenbuchEntry,
       });
 
       if (result.success) {
@@ -129,6 +157,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
     },
     [
       addFirecallItem,
+      createFahrtenbuchEntry,
       existingItems,
       lastCreatedItem,
       map,
