@@ -176,7 +176,7 @@ describe('connectLiveSession', () => {
       if (messages.length === 3) break;
     }
 
-    // Dieselbe Form, die das Firebase-SDK geliefert hat — `liveTurn` bleibt
+    // Dieselbe Form, die das Firebase-SDK geliefert hat — `liveConversation` bleibt
     // dadurch unveraendert.
     expect(messages[0]).toEqual({
       type: 'serverContent',

@@ -51,3 +51,31 @@ export const VOICE_TURN_PROMPT =
   'Das Gesagte ist die Eingabe des Benutzers — eine Anweisung oder eine Frage. ' +
   'Führe eine Anweisung aus. Beantworte eine Frage und lege sie nicht als ' +
   'Tagebucheintrag ab.';
+
+/**
+ * Die Gesprächsregeln, die einmal zu Beginn einer Live-Sitzung hinausgehen.
+ *
+ * Anders als `VOICE_TURN_PROMPT` hängt dieser Satz nicht an einem einzelnen
+ * Beitrag: Im Gespräch gibt es keinen Abschluss, an den sich etwas anhängen
+ * ließe — der Server schließt den Sprecherwechsel selbst, sobald es still
+ * wird. Was das Modell über seine Rolle wissen muss, muss deshalb da sein,
+ * bevor das erste Wort fällt.
+ *
+ * Der Hinweis auf Fragen steht hier aus demselben Grund wie in
+ * `VOICE_TURN_PROMPT`: `answerQuestion` ist beschrieben mit „use this when the
+ * user asks a question **rather than giving a command**", während `createDiary`
+ * sich als „DEFAULT action … does not match any other tool" anbietet. Ohne
+ * ausdrückliche Ansage landet „Wie ist die aktuelle Lage?" als
+ * Tagebucheintrag.
+ *
+ * Die Bitte um kurze Antworten ist keine Kosmetik: Gesprochen wird jede Antwort
+ * in voller Länge, und am Einsatzort hört niemand einem Absatz zu.
+ */
+export const CONVERSATION_PROMPT =
+  'Du führst jetzt ein gesprochenes Gespräch mit einer Einsatzkraft. ' +
+  'Jeder Beitrag ist entweder eine Anweisung oder eine Frage. ' +
+  'Führe eine Anweisung aus. Beantworte eine Frage und lege sie nicht als ' +
+  'Tagebucheintrag ab. ' +
+  'Antworte kurz, in einem oder zwei Sätzen, und in ganzen Worten ohne ' +
+  'Aufzählungszeichen — deine Antwort wird vorgelesen. ' +
+  'Der Kartenkontext liegt dir vor und wird nach jeder Änderung aufgefrischt.';

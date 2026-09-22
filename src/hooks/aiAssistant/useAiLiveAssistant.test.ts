@@ -53,6 +53,7 @@ const session = {
   isClosed: false,
   send: vi.fn().mockResolvedValue(undefined),
   sendAudioRealtime: vi.fn().mockResolvedValue(undefined),
+  sendAudioStreamEnd: vi.fn().mockResolvedValue(undefined),
   sendFunctionResponses: vi.fn().mockResolvedValue(undefined),
   close: vi.fn().mockResolvedValue(undefined),
   receive: vi.fn(),
@@ -77,7 +78,14 @@ vi.mock('../../app/actions/aiLiveToken', () => ({
 
 import useAiLiveAssistant from './useAiLiveAssistant';
 
-function answerWith(text: string) {
+/** Ein Strom, der offen bleibt — wie eine laufende Sitzung. */
+function neverEnding() {
+  session.receive.mockImplementation(async function* () {
+    await new Promise(() => undefined);
+  });
+}
+
+function answersOnce(text: string) {
   session.receive.mockImplementation(async function* () {
     yield { type: 'serverContent', outputTranscription: { text }, turnComplete: true };
   });
@@ -89,69 +97,83 @@ describe('useAiLiveAssistant', () => {
     session.isClosed = false;
     connect.mockResolvedValue(session);
     createLiveToken.mockResolvedValue({ token: 'auth_tokens/abc', model: 'gemini-live' });
-    answerWith('Erledigt.');
+    neverEnding();
   });
 
-  it('schickt den Kartenkontext frisch mit dem Abschluss des Befehls', async () => {
+  it('schickt den Kartenkontext, bevor das Mikrofon aufgeht', async () => {
     const { result } = renderHook(() => useAiLiveAssistant([]));
 
-    await actAsync(() => result.current.startTurn());
-    const answer = await actAsync(() => result.current.finishTurn());
+    await actAsync(() => result.current.startConversation());
 
-    expect(answer.message).toBe('Erledigt.');
-    const [parts, turnComplete] = session.send.mock.calls[0];
-    expect(parts[0].text).toContain('mapCenter');
-    expect(parts[1].text).toContain('Beantworte eine Frage');
-    expect(turnComplete).toBe(true);
+    // Der Kern der Umstellung: Der Kontext muss da sein, bevor das erste Wort
+    // fällt. Ging er wie früher erst mit dem Abschluss des Beitrags hinaus,
+    // hatte der Server längst selbst geantwortet.
+    const { startMicrophoneCapture } = await import('./liveAudio');
+    expect(session.send.mock.invocationCallOrder[0]).toBeLessThan(
+      (startMicrophoneCapture as unknown as ReturnType<typeof vi.fn>).mock
+        .invocationCallOrder[0],
+    );
+
+    const [contextParts, contextComplete] = session.send.mock.calls[0];
+    expect(contextParts[0].text).toContain('mapCenter');
+    // Ohne `turnComplete`: Der Kontext liegt dem Gespräch bei, löst aber keine
+    // Antwort aus.
+    expect(contextComplete).toBe(false);
+
+    const [promptParts] = session.send.mock.calls[1];
+    expect(promptParts[0].text).toContain('Beantworte eine Frage');
   });
 
-  it('schaltet das Mikrofon vor dem Abschluss ab, die Wiedergabe erst danach', async () => {
+  it('meldet jeden Beitrag über den Rückruf, nicht als Rückgabewert', async () => {
+    answersOnce('Zwei Fahrzeuge sind vor Ort.');
+    const onTurn = vi.fn();
+    const { result } = renderHook(() => useAiLiveAssistant([], { onTurn }));
+
+    await actAsync(() => result.current.startConversation());
+
+    expect(onTurn).toHaveBeenCalledTimes(1);
+    expect(onTurn.mock.calls[0][0].message).toBe('Zwei Fahrzeuge sind vor Ort.');
+  });
+
+  it('bleibt nach einer Antwort offen', async () => {
+    answersOnce('Erledigt.');
     const { result } = renderHook(() => useAiLiveAssistant([]));
 
-    await actAsync(() => result.current.startTurn());
-    await actAsync(() => result.current.finishTurn());
+    await actAsync(() => result.current.startConversation());
+
+    // Nur der Nachrichtenstrom ist zu Ende, nicht das Gespräch: Geschlossen
+    // wird ausschließlich auf Wunsch des Benutzers.
+    expect(session.close).not.toHaveBeenCalled();
+  });
+
+  it('schließt Mikrofon und Sitzung erst beim Beenden', async () => {
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await actAsync(() => result.current.startConversation());
+    expect(capture.stop).not.toHaveBeenCalled();
+
+    await actAsync(() => result.current.endConversation());
 
     expect(capture.stop).toHaveBeenCalled();
-    expect(capture.stop.mock.invocationCallOrder[0]).toBeLessThan(
-      session.send.mock.invocationCallOrder[0],
-    );
-    expect(playback.whenDrained).toHaveBeenCalled();
-    expect(playback.whenDrained.mock.invocationCallOrder[0]).toBeLessThan(
-      playback.close.mock.invocationCallOrder[0],
-    );
-  });
-
-  it('schließt die Sitzung nach dem Befehl wieder', async () => {
-    const { result } = renderHook(() => useAiLiveAssistant([]));
-
-    await actAsync(() => result.current.startTurn());
-    await actAsync(() => result.current.finishTurn());
-
     expect(session.close).toHaveBeenCalled();
     expect(result.current.status).toBe('idle');
   });
 
-  it('meldet einen Fehler, wenn ohne Sitzung abgeschlossen wird', async () => {
+  it('schickt „fertig" ohne die Sitzung zu schließen', async () => {
     const { result } = renderHook(() => useAiLiveAssistant([]));
 
-    const answer = await actAsync(() => result.current.finishTurn());
+    await actAsync(() => result.current.startConversation());
+    await actAsync(() => result.current.finishSpeaking());
 
-    expect(answer.success).toBe(false);
-    expect(session.send).not.toHaveBeenCalled();
-  });
-
-  it('gibt einen gescheiterten Verbindungsaufbau nach außen weiter', async () => {
-    connect.mockRejectedValueOnce(new Error('api not enabled'));
-    const { result } = renderHook(() => useAiLiveAssistant([]));
-
-    await expect(actAsync(() => result.current.startTurn())).rejects.toThrow('api not enabled');
-    expect(result.current.status).toBe('idle');
+    expect(session.sendAudioStreamEnd).toHaveBeenCalledTimes(1);
+    expect(session.close).not.toHaveBeenCalled();
+    expect(result.current.isActive).toBe(true);
   });
 
   it('weckt die Wiedergabe beim Drücken, nicht erst beim ersten Ton', async () => {
     const { result } = renderHook(() => useAiLiveAssistant([]));
 
-    await actAsync(() => result.current.startTurn());
+    await actAsync(() => result.current.startConversation());
 
     // Der Kontext muss in der Benutzeraktion entstehen, sonst bleibt er
     // nach den Autoplay-Regeln stumm — und zwar lautlos, weil angekommener
@@ -160,26 +182,14 @@ describe('useAiLiveAssistant', () => {
     expect(playback.prime.mock.invocationCallOrder[0]).toBeLessThan(
       createLiveToken.mock.invocationCallOrder[0],
     );
-  });
-
-  it('nutzt beim Abschluss dieselbe Wiedergabe wie beim Drücken', async () => {
-    const { result } = renderHook(() => useAiLiveAssistant([]));
-
-    await actAsync(() => result.current.startTurn());
-    await actAsync(() => result.current.finishTurn());
-
-    // Genau eine Instanz: Eine zweite, beim Abschluss angelegte läge wieder
-    // außerhalb der Benutzeraktion und wäre damit stumm.
     const { LivePlayback } = await import('./liveAudio');
     expect(LivePlayback).toHaveBeenCalledTimes(1);
-    expect(playback.prime).toHaveBeenCalledTimes(1);
-    expect(playback.whenDrained).toHaveBeenCalled();
   });
 
   it('holt das Token vom Server und verbindet erst damit', async () => {
     const { result } = renderHook(() => useAiLiveAssistant([]));
 
-    await actAsync(() => result.current.startTurn());
+    await actAsync(() => result.current.startConversation());
 
     expect(createLiveToken).toHaveBeenCalled();
     expect(connect).toHaveBeenCalledWith('auth_tokens/abc', 'gemini-live');
@@ -189,8 +199,18 @@ describe('useAiLiveAssistant', () => {
     createLiveToken.mockResolvedValueOnce({ error: 'quota' } as never);
     const { result } = renderHook(() => useAiLiveAssistant([]));
 
-    await expect(actAsync(() => result.current.startTurn())).rejects.toThrow('quota');
+    await expect(actAsync(() => result.current.startConversation())).rejects.toThrow('quota');
     expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('gibt einen gescheiterten Verbindungsaufbau nach außen weiter', async () => {
+    connect.mockRejectedValueOnce(new Error('api not enabled'));
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await expect(actAsync(() => result.current.startConversation())).rejects.toThrow(
+      'api not enabled',
+    );
+    expect(result.current.status).toBe('idle');
   });
 
   it('räumt die Sitzung auf, wenn das Mikrofon nicht startet', async () => {
@@ -200,7 +220,9 @@ describe('useAiLiveAssistant', () => {
     );
     const { result } = renderHook(() => useAiLiveAssistant([]));
 
-    await expect(actAsync(() => result.current.startTurn())).rejects.toThrow('NotAllowedError');
+    await expect(actAsync(() => result.current.startConversation())).rejects.toThrow(
+      'NotAllowedError',
+    );
     expect(session.close).toHaveBeenCalled();
   });
 });

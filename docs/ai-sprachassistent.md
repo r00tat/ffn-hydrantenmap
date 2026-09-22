@@ -1,4 +1,4 @@
-# Sprach-Assistent: Live-Sitzung je Sprachbefehl
+# Sprach-Assistent: Live-Gespräch auf der Karte
 
 Der Assistent auf der Karte hat zwei Wege zum Modell. Beide führen über
 dieselben Werkzeuge und denselben Kartenkontext — sie unterscheiden sich nur
@@ -8,7 +8,7 @@ darin, wie Ton und Antwort übertragen werden.
 | --- | --- | --- |
 | Datei | [useAiLiveAssistant.ts](../src/hooks/aiAssistant/useAiLiveAssistant.ts) | [useAiAssistant.ts](../src/hooks/aiAssistant/useAiAssistant.ts) |
 | Dienst | Gemini Developer API, direkt | Agent Platform über Firebase AI Logic |
-| Zugangsmittel | kurzlebiges Token je Befehl | öffentlicher Browser-Key + App Check |
+| Zugangsmittel | kurzlebiges Token je Gespräch | öffentlicher Browser-Key + App Check |
 | Modell | `GEMINI_LIVE_MODEL` | `GEMINI_MODEL` |
 | Ton hinein | PCM-Strom während des Sprechens | WebM am Stück nach dem Sprechen |
 | Ton heraus | vom Modell gesprochen | `/api/tts`, sonst Browser-Sprachsynthese |
@@ -16,49 +16,100 @@ darin, wie Ton und Antwort übertragen werden.
 Der Live-Weg ist der Normalfall, der Einzelaufruf der Rückfall. Beide bleiben
 im Code, und zwar dauerhaft — die Gründe stehen unten.
 
-## Warum die Sitzung nur einen Befehl lang lebt
+## Warum der Kartenkontext zu Beginn hinausgeht und nicht am Ende
 
-Die Live-API ist für ein laufendes Gespräch gebaut: Verbindung auf, Mikrofon
-offen, Modell und Mensch reden abwechselnd, bis jemand auflegt. Genau das
-macht der Assistent **nicht**. Er öffnet die Sitzung beim Druck auf den
-Knopf und schließt sie, wenn die Antwort zu Ende gesprochen ist.
+Die erste Fassung öffnete die Sitzung beim Druck auf den Knopf, schickte den
+Kartenkontext mit dem **abschließenden** Beitrag hinaus und schloss die Sitzung,
+sobald die Antwort gesprochen war — ein Befehl je Tastendruck. Das hat nicht
+getragen, und der Grund steckt im Protokoll:
 
-Das ist keine halbe Umsetzung, sondern die Entscheidung, an der alles Weitere
-hängt:
+Die Live-API erkennt die Sprechpause selbst. Sie wartet nicht darauf, dass der
+Browser den Sprecherwechsel schließt, sondern schließt ihn, sobald es still
+wird, und antwortet sofort. In einer gemessenen Sitzung sah das so aus:
 
-- **Der Kartenkontext kann nicht veralten.** Er geht wie beim Einzelaufruf mit
-  dem abschließenden Beitrag frisch hinaus. In einer stehenden Sitzung stünde
-  der Stand vom Verbindungsaufbau im Kontext, und nach zehn Minuten Einsatz
-  wäre er falsch — mit einem Werkzeug „aktuellen Kartenstand holen" wäre das zu
-  lösen, aber es wäre ein Werkzeug mehr unter 32 und ein Modellaufruf mehr je
-  ortsbezogenem Befehl.
-- **Zeitgrenze und Wiederaufnahme spielen keine Rolle.** Eine Audio-Sitzung
-  endet nach rund 15 Minuten und fasst 128k Token; ein Einsatz dauert Stunden.
-  Ohne stehende Sitzung braucht es weder `resumeSession` noch die Behandlung
-  von `goingAwayNotice`.
-- **Das Mikrofon ist zu, solange niemand drückt.** An der Einsatzstelle stehen
-  Pumpe, Funk und Zurufe im Raum, und die Spracherkennung der Live-API lässt
-  sich derzeit nicht konfigurieren. Ein Fehlauslöser würde hier nicht nur
-  antworten, sondern ein Element auf der Karte anlegen.
+```text
+<< {gehoert: 'Lage im Einsatz'}
+<< {tonbloecke: 1, gesagt: 'Es liegen derzeit keine '}   <- Antwort läuft schon
+<< {turnComplete: true}                                  <- Turn bereits zu
+>> Ton gesendet: {bloecke: 3752, sekunden: 10.2}         <- jetzt erst loslassen
+>> Beitrag abgeschlossen: {teile: 2, zeichen: 3499}      <- Kontext kommt zu spät
+```
+
+Die Folgen reihum:
+
+- Das Modell wählte sein Werkzeug **ohne Kartenkontext** und ohne den Hinweis,
+  dass eine Frage zu beantworten und nicht abzulegen ist. „Wie ist die aktuelle
+  Lage?" landete als Tagebucheintrag.
+- Die Tonblöcke lagen beim Loslassen längst in der Warteschlange und erreichten
+  die Wiedergabe erst dann — die Antwort war zu hören, nachdem der Benutzer
+  fertig war, nicht während.
+- Die Antwort auf den nachgereichten Kontext kam als **zweiter**
+  Sprecherwechsel und fiel unter den Tisch, weil die Sitzung da schon zu war.
+
+Deshalb jetzt umgekehrt: Der Kontext geht **einmal zu Beginn** hinaus, als
+Beitrag ohne `turnComplete` — er liegt dem Gespräch bei, ohne eine Antwort
+auszulösen. Danach folgt `CONVERSATION_PROMPT`, und erst dann geht das Mikrofon
+auf. Wenn das Modell sein Werkzeug wählt, weiß es, was auf der Karte steht.
+
+## Warum die Sitzung ein ganzes Gespräch lang lebt
+
+Die Sitzung lebt vom „Gespräch starten" bis zum „Gespräch beenden" und trägt
+beliebig viele Sprecherwechsel. Das Mikrofon bleibt offen, der Server erkennt
+die Pause, das Modell antwortet, und wer ihm ins Wort fällt, unterbricht es.
+
+Der Knopf mit dem Haken ist **nicht** mehr die Sprechtaste, sondern nur noch
+das ausdrückliche „ich bin fertig": Er schickt `audioStreamEnd` und schließt
+den Beitrag sofort, statt die Sprechpause abzuwarten. Ohne ihn geht es auch.
+
+Was diese Entscheidung kostet, und wie es aufgefangen ist:
+
+- **Der Kartenkontext veraltet.** Deshalb wird er nach jedem abgeschlossenen
+  Beitrag nachgereicht — aber nur, wenn er sich geändert hat (`sentContextRef`).
+  Ein Werkzeug „aktuellen Kartenstand holen" bliebe die Alternative; es wäre ein
+  Werkzeug mehr unter 32 und ein Modellaufruf mehr je ortsbezogenem Befehl.
+- **Zeitgrenze und Wiederaufnahme.** Eine Audio-Sitzung endet nach rund
+  15 Minuten und fasst 128k Token; ein Einsatz dauert Stunden. Ein Gespräch ist
+  keine Einsatzdauer — es dauert Minuten, und danach wird neu gestartet.
+  `goingAwayNotice` und `sessionResumptionUpdate` werden deshalb weiterhin
+  entgegengenommen und verworfen.
+- **Das Mikrofon ist offen, solange das Gespräch läuft.** An der Einsatzstelle
+  stehen Pumpe, Funk und Zurufe im Raum, und die Spracherkennung der Live-API
+  lässt sich derzeit nicht konfigurieren. Ein Fehlauslöser antwortet hier nicht
+  nur, sondern legt ein Element auf der Karte an. Deshalb ist das Gespräch
+  ausdrücklich zu starten und ausdrücklich zu beenden, und der Knopf pulst
+  rot, solange es läuft.
+
+## Warum die Blöcke des Mikrofons gesammelt werden
+
+Ein `process()`-Aufruf des AudioWorklet liefert 128 Bilder — bei 48 kHz sind
+das 2,7 ms, nach der Umrechnung auf 16 kHz rund 85 Byte. Jeder Block einzeln
+verschickt ergab in der oben zitierten Messung **3752 WebSocket-Nachrichten für
+zehn Sekunden**: 375 pro Sekunde, jede mit JSON- und base64-Aufschlag um ein
+Vielfaches größer als ihre Nutzlast. Beim Einzelbefehl blieb das unbemerkt, im
+Dauergespräch läuft es durchgehend. `CHUNK_MS` in
+[liveAudio.ts](../src/hooks/aiAssistant/liveAudio.ts) sammelt deshalb im
+Audio-Thread auf 100 ms — die Blockgröße, mit der die Live-API in ihren eigenen
+Beispielen gefüttert wird, und weit unter allem, was als Verzögerung auffällt.
 
 ## Warum nicht `startAudioConversation`
 
 Das Firebase-SDK bringt mit `startAudioConversation` genau die Klammer mit, die
 man hier vermuten würde: Mikrofon, Nachrichtenschleife und Wiedergabe in einem
 Aufruf, samt `functionCallingHandler` für die Werkzeuge. Zwei Eigenschaften
-machen es für den Sprechtasten-Betrieb unbrauchbar:
+machen es hier unbrauchbar:
 
 1. Sein `stop()` räumt beim Beenden **auch die geplante Wiedergabe** ab
-   (`cleanup()` ruft `interruptPlayback()`). Beim Loslassen der Taste wäre
-   damit genau die Antwort weg, auf die der Benutzer wartet.
+   (`cleanup()` ruft `interruptPlayback()`). Damit wäre jedes Beenden ein
+   Abbruch mitten im Satz.
 2. Es verbraucht den Nachrichtenstrom selbst. Werkzeugergebnisse, Abschrift und
    das Ende des Sprecherwechsels sind von außen nicht mehr zu sehen — der Toast
    bekäme keinen Text, und niemand wüsste, wann die Sitzung geschlossen werden
    darf.
 
 Deshalb sind Aufnahme und Wiedergabe in [liveAudio.ts](../src/hooks/aiAssistant/liveAudio.ts)
-zwei getrennte Einheiten mit **eigenem `AudioContext`**: Das Mikrofon endet beim
-Loslassen, die Wiedergabe läuft weiter, bis sie leer ist.
+zwei getrennte Einheiten mit **eigenem `AudioContext`**, und die
+Nachrichtenschleife liegt offen in
+[liveConversation.ts](../src/hooks/aiAssistant/liveConversation.ts).
 
 ## Warum die Live-Sitzung ohne Firebase-SDK auskommt
 
@@ -119,7 +170,8 @@ den Firebase-Proxy-Pfad — `WebSocketUrl` liest nicht einmal `baseUrl` aus den
 unterschieben ließe. [liveConnection.ts](../src/hooks/aiAssistant/liveConnection.ts)
 baut die Verbindung deshalb selbst nach und reicht die Nachrichten in **genau
 der Form** weiter, die das SDK geliefert hat (`{type: 'serverContent', …}`).
-Dadurch bleibt [liveTurn.ts](../src/hooks/aiAssistant/liveTurn.ts) unverändert.
+Dadurch bleibt [liveConversation.ts](../src/hooks/aiAssistant/liveConversation.ts)
+vom Verbindungsaufbau unberührt.
 
 Die API-Fassung ist `v1alpha`, nicht `v1beta`: So steht es im Live-Modul des
 offiziellen `js-genai`, das bei jeder anderen Fassung warnt. Die
@@ -177,11 +229,12 @@ an der Einsatzstelle das robustere Verfahren.
 
 ## Was der Einzelaufruf kann und die Live-Sitzung nicht
 
-- **Gedächtnis über mehrere Befehle.** Der Einzelaufruf hält eine Historie über
-  15 Minuten (`MEMORY_TIMEOUT_MS`), damit „und wie weit ist das?" noch dieselbe
-  Sache meint. Die Live-Sitzung endet mit dem Befehl; eine Folgefrage beginnt
-  von vorn. Die Rückfrage-Optionen des Toasts laufen deshalb weiterhin über den
-  Einzelaufruf (`processText`).
+- **Gedächtnis über die Sitzung hinaus.** Der Einzelaufruf hält eine Historie
+  über 15 Minuten (`MEMORY_TIMEOUT_MS`), damit „und wie weit ist das?" auch nach
+  einer Pause noch dieselbe Sache meint. Das Live-Gespräch erinnert sich
+  innerhalb der Sitzung an alles, aber mit dem Beenden ist es vergessen. Die
+  Rückfrage-Optionen des Toasts laufen deshalb weiterhin über den Einzelaufruf
+  (`processText`).
 - **Denkaufwand steuern.** `ThinkingLevel.LOW` gibt es nur beim Einzelaufruf;
   die Live-API nimmt derzeit keine Konfiguration dafür entgegen.
 
@@ -193,11 +246,16 @@ und `outputAudioTranscription` — ist deshalb eingeschaltet:
 - Die **Ausgabe-Abschrift** ist die Antwort im Toast und alles, was
   protokolliert werden kann.
 - Die **Eingabe-Abschrift** ist die einzige Kontrolle darüber, ob der
-  Sprachbefehl richtig angekommen ist. Beim Einzelaufruf steht das in den
-  Werkzeugargumenten, hier sonst nirgends.
+  gesprochene Beitrag richtig angekommen ist. Beim Einzelaufruf steht das in den
+  Werkzeugargumenten, hier sonst nirgends. In der Konsole steht sie als
+  `[AI-Live] verstanden:` — ist sie leer, hat das Modell den Satz nie bekommen,
+  und jede Werkzeugwahl danach ist geraten.
 
-Die Abschrift kommt in Bruchstücken („Das TLFA " / „ist eingetragen.") und
-wird in [liveTurn.ts](../src/hooks/aiAssistant/liveTurn.ts) zusammengesetzt.
+Die Abschrift kommt in Bruchstücken („Das TLFA " / „ist eingetragen.") und wird
+in [liveConversation.ts](../src/hooks/aiAssistant/liveConversation.ts)
+zusammengesetzt. Die Ausgabe-Abschrift geht dabei **schon während des
+Sprechens** als `onPartialAnswer` hinaus: Die Meldung soll mit der Stimme
+erscheinen und nicht, wenn der Satz zu Ende gesprochen ist.
 
 ## Was gemeinsam bleibt
 

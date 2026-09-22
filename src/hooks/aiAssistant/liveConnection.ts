@@ -1,6 +1,6 @@
 import { FunctionResponse, Part } from 'firebase/ai';
 import { liveModelPath } from '../../common/aiLiveToken';
-import { LiveMessage } from './liveTurn';
+import { LiveMessage } from './liveConversation';
 
 /**
  * Die Live-Verbindung des Browsers — ohne Firebase-SDK.
@@ -10,7 +10,7 @@ import { LiveMessage } from './liveTurn';
  * verlangt beides anders — `?access_token=` und den Endpunkt
  * `BidiGenerateContentConstrained` —, und das SDK bietet keine Stelle, an der
  * sich das ändern ließe. Die Verbindung ist deshalb hier nachgebaut; das
- * Protokoll darüber (`liveTurn.ts`) bleibt unverändert, weil die Nachrichten
+ * Protokoll darüber (`liveConversation.ts`) bleibt unverändert, weil die Nachrichten
  * genau so weitergereicht werden, wie das SDK sie geliefert hat.
  *
  * Hintergrund: [docs/ai-sprachassistent.md](../../../docs/ai-sprachassistent.md)
@@ -38,6 +38,12 @@ export interface LiveConnection {
   send(parts: Part[], turnComplete: boolean): Promise<void>;
   /** 16-bit-PCM, 16 kHz, base64 — laufend während der Aufnahme. */
   sendAudioRealtime(blob: { mimeType: string; data: string }): Promise<void>;
+  /**
+   * „Ich bin fertig" von Hand. Die Sprechpausenerkennung des Servers schließt
+   * den Beitrag sonst selbst, sobald es still wird; das hier schließt ihn
+   * sofort, ohne auf die Pause zu warten.
+   */
+  sendAudioStreamEnd(): Promise<void>;
   sendFunctionResponses(responses: FunctionResponse[]): Promise<void>;
   receive(): AsyncGenerator<LiveMessage>;
   close(): Promise<void>;
@@ -221,15 +227,7 @@ export async function connectLiveSession(
     },
 
     async send(parts, turnComplete) {
-      // Hier und nicht je Block: Ein Block kommt alle paar Millisekunden, die
-      // Summe ist die Zahl, die zählt — steht sie auf null, hat das Mikrofon
-      // nichts geliefert.
-      console.info('[AI-Live] >> Ton gesendet:', {
-        bloecke: audioChunks,
-        bytes: audioBytes,
-        sekunden: Math.round((audioBytes / 32000) * 10) / 10,
-      });
-      console.info('[AI-Live] >> Beitrag abgeschlossen:', {
+      console.info('[AI-Live] >> Text gesendet:', {
         teile: parts.length,
         zeichen: parts.reduce(
           (sum, part) => sum + ('text' in part && part.text ? part.text.length : 0),
@@ -247,6 +245,20 @@ export async function connectLiveSession(
       // base64 → rohe Bytes, für die Sekundenangabe oben.
       audioBytes += Math.round((blob.data.length * 3) / 4);
       sendRaw({ realtimeInput: { audio: blob } });
+    },
+
+    async sendAudioStreamEnd() {
+      // Hier und nicht je Block: Ein Block kommt alle paar Millisekunden, die
+      // Summe ist die Zahl, die zählt — steht sie auf null, hat das Mikrofon
+      // nichts geliefert.
+      console.info('[AI-Live] >> Ton gesendet:', {
+        bloecke: audioChunks,
+        bytes: audioBytes,
+        sekunden: Math.round((audioBytes / 32000) * 10) / 10,
+      });
+      audioChunks = 0;
+      audioBytes = 0;
+      sendRaw({ realtimeInput: { audioStreamEnd: true } });
     },
 
     async sendFunctionResponses(functionResponses) {

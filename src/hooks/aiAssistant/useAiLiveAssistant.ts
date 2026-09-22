@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { VOICE_TURN_PROMPT } from '../../common/ai';
+import { CONVERSATION_PROMPT } from '../../common/ai';
 import { createLiveToken } from '../../app/actions/aiLiveToken';
 import { FirecallItem } from '../../components/firebase/firestore';
-import { LatencyRun } from './latency';
 import {
   isLiveAudioSupported,
   LivePlayback,
@@ -10,34 +9,62 @@ import {
   startMicrophoneCapture,
 } from './liveAudio';
 import { connectLiveSession, LiveConnection } from './liveConnection';
-import { runLiveTurn } from './liveTurn';
+import { LiveConversationStatus, runLiveConversation } from './liveConversation';
 import { AiAssistantResult } from './types';
 import useAiToolRunner from './useAiToolRunner';
 
-export type AiLiveStatus = 'idle' | 'listening' | 'analyzing' | 'executing';
+export type AiLiveStatus = 'idle' | LiveConversationStatus;
 
+export interface AiLiveCallbacks {
+  /** Ein abgeschlossener Beitrag des Modells. */
+  onTurn?: (result: AiAssistantResult) => void;
+  /** Die Antwort, während sie gesprochen wird — für die Anzeige. */
+  onPartialAnswer?: (text: string) => void;
+  /** Was der Benutzer gerade sagt. */
+  onHeard?: (text: string) => void;
+}
 
 /**
- * Sprachbefehl über eine Live-Sitzung — ein Sprecherwechsel je Tastendruck.
+ * Sprach-Gespräch über eine Live-Sitzung.
  *
- * Die Sitzung lebt nur für diesen einen Befehl. Das ist die Eigenschaft, an
- * der alles Weitere hängt: Der Kartenkontext geht wie beim Einzelaufruf frisch
- * mit dem abschließenden Beitrag hinaus und kann nicht veralten, das
- * Zeitlimit einer Audio-Sitzung und die Wiederaufnahme nach einem Abriss
- * spielen keine Rolle, und das Mikrofon ist außerhalb des Tastendrucks zu.
+ * Die Sitzung lebt vom „Gespräch starten" bis zum „Gespräch beenden" und trägt
+ * viele Sprecherwechsel. Das Mikrofon bleibt offen, der Server erkennt die
+ * Sprechpause selbst und antwortet; wer dem Modell ins Wort fällt,
+ * unterbricht es.
+ *
+ * Der entscheidende Unterschied zum früheren Einzelbefehl ist, **wann** der
+ * Kartenkontext hinausgeht: einmal zu Beginn, vor dem ersten Wort. Vorher ging
+ * er mit dem Abschluss des Beitrags hinaus — und kam damit regelmäßig zu spät,
+ * weil der Server den Sprecherwechsel längst selbst geschlossen und geantwortet
+ * hatte. Das Modell wählte sein Werkzeug ohne Kartenkontext und legte Fragen
+ * als Tagebucheintrag ab.
+ *
+ * Preis dieser Umstellung: Der Kontext ist so alt wie das Gespräch. Deshalb
+ * wird er nach jedem Beitrag nachgereicht, aber nur, wenn er sich geändert hat.
  *
  * Hintergrund: [docs/ai-sprachassistent.md](../../../docs/ai-sprachassistent.md)
  */
-export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
-  const { executeTool, buildContextText, contextStats, lastCreatedItem, undoLastAction } =
+export default function useAiLiveAssistant(
+  existingItems: FirecallItem[],
+  callbacks: AiLiveCallbacks = {},
+) {
+  const { executeTool, buildContextText, lastCreatedItem, undoLastAction } =
     useAiToolRunner(existingItems);
 
   const sessionRef = useRef<LiveConnection | null>(null);
   const captureRef = useRef<MicrophoneCapture | null>(null);
   const playbackRef = useRef<LivePlayback | null>(null);
-  /** Nur zur Anzeige in der Messung — welches Modell das Token benannt hat. */
-  const modelRef = useRef<string | null>(null);
+  /** Zuletzt gesendeter Kartenkontext — verhindert unnötige Wiederholungen. */
+  const sentContextRef = useRef<string | null>(null);
   const [status, setStatus] = useState<AiLiveStatus>('idle');
+
+  // Die Rückrufe wandern in ein Ref, damit die laufende Schleife immer die
+  // aktuellen erwischt: Sie startet einmal und läuft das ganze Gespräch lang,
+  // während die Komponente darüber beliebig oft neu rendert.
+  const callbacksRef = useRef(callbacks);
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  }, [callbacks]);
 
   const cleanup = useCallback(async () => {
     const capture = captureRef.current;
@@ -46,6 +73,7 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
     captureRef.current = null;
     playbackRef.current = null;
     sessionRef.current = null;
+    sentContextRef.current = null;
 
     await capture?.stop().catch(() => undefined);
     await playback?.close().catch(() => undefined);
@@ -61,108 +89,99 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
   }, [cleanup]);
 
   /**
-   * Verbindung öffnen und aufnehmen. Beides läuft an, während der Benutzer
-   * schon spricht — der Verbindungsaufbau fällt damit nicht in die Wartezeit
-   * nach dem Loslassen.
+   * Schickt den Kartenkontext als offenen Beitrag — ohne `turnComplete`, damit
+   * er dem Gespräch beiliegt, ohne eine Antwort auszulösen.
    */
-  const startTurn = useCallback(
-    async (run?: LatencyRun): Promise<void> => {
-      // Vor allem anderen und ohne `await` davor: Der Aufruf muss in der
-      // Benutzeraktion liegen, sonst bleibt die Wiedergabe stumm. Begründung
-      // an `LivePlayback.prime()`.
-      const playback = new LivePlayback();
-      playback.prime();
-
-      await cleanup();
-      playbackRef.current = playback;
-
-      const open = async () => {
-        const { token, model, error, detail } = await createLiveToken();
-        if (!token || !model) {
-          throw new Error(`Live-Token nicht verfügbar (${error}${detail ? `: ${detail}` : ''})`);
-        }
-        modelRef.current = model;
-        return connectLiveSession(token, model);
-      };
-      const session = await (run ? run.phase('sitzung öffnen', open) : open());
-      sessionRef.current = session;
-
-      try {
-        captureRef.current = await startMicrophoneCapture((chunk) => {
-          void session.sendAudioRealtime({ mimeType: 'audio/pcm', data: chunk });
-        });
-      } catch (error) {
-        await cleanup();
-        throw error;
+  const sendContext = useCallback(
+    async (session: LiveConnection) => {
+      const contextText = buildContextText();
+      if (contextText === sentContextRef.current) {
+        return;
       }
-
-      setStatus('listening');
+      sentContextRef.current = contextText;
+      await session.send([{ text: contextText }], false);
     },
-    [cleanup]
+    [buildContextText],
   );
 
   /**
-   * Mikrofon zu, Befehl abschließen und die Antwort abwarten. Die Wiedergabe
-   * läuft bis zum letzten Ton weiter — deshalb wird die Sitzung erst danach
-   * geschlossen.
+   * Gespräch eröffnen: Verbindung, Kontext, Gesprächsregeln, Mikrofon — in
+   * dieser Reihenfolge. Ab dem letzten Schritt hört das Modell mit.
    */
-  const finishTurn = useCallback(
-    async (run?: LatencyRun): Promise<AiAssistantResult> => {
-      const session = sessionRef.current;
-      if (!session) {
-        return { success: false, message: 'Keine Live-Sitzung aktiv' };
-      }
+  const startConversation = useCallback(async (): Promise<void> => {
+    // Vor allem anderen und ohne `await` davor: Der Aufruf muss in der
+    // Benutzeraktion liegen, sonst bleibt die Wiedergabe stumm. Begründung
+    // an `LivePlayback.prime()`.
+    const playback = new LivePlayback();
+    playback.prime();
 
-      // In der Regel die beim Drücken geweckte Wiedergabe. Der Rückfall greift
-      // nur, wenn `startTurn` gar nicht gelaufen ist — dann ist Stummheit das
-      // kleinere Übel gegenüber einem Absturz.
-      const playback = playbackRef.current ?? new LivePlayback();
-      playbackRef.current = playback;
+    await cleanup();
+    playbackRef.current = playback;
 
-      try {
-        await captureRef.current?.stop();
-        captureRef.current = null;
-        run?.mark('mikrofon aus');
+    const { token, model, error, detail } = await createLiveToken();
+    if (!token || !model) {
+      throw new Error(`Live-Token nicht verfügbar (${error}${detail ? `: ${detail}` : ''})`);
+    }
+    const session = await connectLiveSession(token, model);
+    sessionRef.current = session;
 
-        // Damit in der Konsole steht, welcher Weg gelaufen ist und mit
-        // welchem Modell — die beiden Wege sind sonst nicht zu unterscheiden.
-        run?.note({ weg: 'live', modell: modelRef.current ?? 'unbekannt' });
+    try {
+      await sendContext(session);
+      await session.send([{ text: CONVERSATION_PROMPT }], false);
 
-        const contextText = run
-          ? run.sync('kontext bauen', () => buildContextText())
-          : buildContextText();
-        run?.note({ kontextZeichen: contextText.length, ...contextStats() });
+      captureRef.current = await startMicrophoneCapture((chunk) => {
+        void session.sendAudioRealtime({ mimeType: 'audio/pcm', data: chunk });
+      });
+    } catch (error) {
+      await cleanup();
+      throw error;
+    }
 
-        setStatus('analyzing');
-        await session.send([{ text: contextText }, { text: VOICE_TURN_PROMPT }], true);
+    setStatus('listening');
 
-        const result = await runLiveTurn({
-          messages: session.receive(),
-          executeTool,
-          sendFunctionResponses: (responses) => session.sendFunctionResponses(responses),
-          onAudio: (base64Pcm) => playback.enqueue(base64Pcm),
-          onInterrupt: () => playback.interrupt(),
-          onStatus: setStatus,
-          run,
-        });
+    // Läuft für sich weiter, bis die Sitzung endet — deshalb kein `await`.
+    void runLiveConversation({
+      messages: session.receive(),
+      executeTool,
+      sendFunctionResponses: (responses) => session.sendFunctionResponses(responses),
+      onAudio: (base64Pcm) => playback.enqueue(base64Pcm),
+      onInterrupt: () => playback.interrupt(),
+      onStatus: setStatus,
+      onHeard: (text) => callbacksRef.current.onHeard?.(text),
+      onPartialAnswer: (text) => callbacksRef.current.onPartialAnswer?.(text),
+      onTurn: (result) => {
+        callbacksRef.current.onTurn?.(result);
+        // Ein Werkzeug hat womöglich die Karte verändert; der nächste Beitrag
+        // soll den neuen Stand sehen.
+        if (sessionRef.current === session && !session.isClosed) {
+          void sendContext(session).catch(() => undefined);
+        }
+      },
+      onEnd: () => setStatus('idle'),
+    }).catch((error) => {
+      console.error('[AI] Live-Gespräch abgebrochen:', error);
+      setStatus('idle');
+    });
+  }, [cleanup, executeTool, sendContext]);
 
-        // Erst wenn der letzte Block gespielt ist, darf die Wiedergabe
-        // abgebaut werden — sonst bricht die Antwort mitten im Satz ab.
-        await playback.whenDrained();
-        return result;
-      } catch (error) {
-        console.error('[AI] Live-Sitzung fehlgeschlagen:', error);
-        return { success: false, message: 'Sprachbefehl konnte nicht verarbeitet werden' };
-      } finally {
-        await cleanup();
-        setStatus('idle');
-      }
-    },
-    [buildContextText, cleanup, contextStats, executeTool]
-  );
+  /**
+   * „Ich bin fertig" — schließt den gesprochenen Beitrag sofort, statt auf die
+   * Sprechpause zu warten. Das Gespräch läuft weiter.
+   */
+  const finishSpeaking = useCallback(async (): Promise<void> => {
+    const session = sessionRef.current;
+    if (!session || session.isClosed) {
+      return;
+    }
+    await session.sendAudioStreamEnd().catch(() => undefined);
+  }, []);
 
-  /** Abbruch ohne Antwort, etwa wenn die Aufnahme gar nicht erst zustande kam. */
-  const abortTurn = useCallback(async () => {
+  const endConversation = useCallback(async () => {
+    // Das Mikrofon zuerst: Was jetzt noch gesagt wird, gehört nicht mehr dazu.
+    await captureRef.current?.stop().catch(() => undefined);
+    captureRef.current = null;
+    // Auf das Ende der Wiedergabe wird nicht gewartet — wer beendet, will
+    // Ruhe, nicht den Rest des Satzes.
     await cleanup();
     setStatus('idle');
   }, [cleanup]);
@@ -171,9 +190,10 @@ export default function useAiLiveAssistant(existingItems: FirecallItem[]) {
     /** Ob die Umgebung Live-Audio überhaupt unterstützt (Web Audio, AudioWorklet). */
     isSupported: isLiveAudioSupported(),
     status,
-    startTurn,
-    finishTurn,
-    abortTurn,
+    isActive: status !== 'idle',
+    startConversation,
+    finishSpeaking,
+    endConversation,
     undoLastAction,
     lastCreatedItem,
   };

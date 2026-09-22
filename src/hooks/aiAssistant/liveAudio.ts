@@ -19,9 +19,22 @@ const OUTPUT_SAMPLE_RATE = 24000;
 const PROCESSOR_NAME = 'ffnd-live-audio-processor';
 
 /**
- * Wandelt die Blöcke des Mikrofons in 16-bit-PCM der Zielrate. Läuft im
- * Audio-Thread, weil der Hauptthread beim Rendern der Karte ins Stocken gerät
- * und Aussetzer im Ton hörbar wären.
+ * Wie viel Ton in einer Nachricht zusammengefasst wird.
+ *
+ * Ein `process()`-Aufruf liefert 128 Bilder; bei 48 kHz sind das 2,7 ms und
+ * nach der Umrechnung auf 16 kHz rund 85 Byte. Jeder Block einzeln verschickt
+ * ergab in einer gemessenen Sitzung **3752 WebSocket-Nachrichten für zehn
+ * Sekunden** — 375 pro Sekunde, jede mit JSON- und base64-Aufschlag um ein
+ * Vielfaches größer als ihre Nutzlast. Im Gespräch läuft das durchgehend.
+ * 100 ms ist die Blockgröße, mit der die Live-API in ihren eigenen Beispielen
+ * gefüttert wird, und liegt weit unter allem, was man als Verzögerung merkt.
+ */
+const CHUNK_MS = 100;
+
+/**
+ * Wandelt die Blöcke des Mikrofons in 16-bit-PCM der Zielrate und sammelt sie
+ * zu Paketen von `CHUNK_MS`. Läuft im Audio-Thread, weil der Hauptthread beim
+ * Rendern der Karte ins Stocken gerät und Aussetzer im Ton hörbar wären.
  */
 const workletSource = `
   class LiveAudioProcessor extends AudioWorkletProcessor {
@@ -29,6 +42,10 @@ const workletSource = `
       super();
       this.targetSampleRate = options.processorOptions.targetSampleRate;
       this.inputSampleRate = sampleRate;
+      this.buffer = new Int16Array(
+        Math.round((this.targetSampleRate * options.processorOptions.chunkMs) / 1000)
+      );
+      this.filled = 0;
     }
 
     process(inputs) {
@@ -37,12 +54,15 @@ const workletSource = `
         const samples = input[0];
         const length = Math.round((samples.length * this.targetSampleRate) / this.inputSampleRate);
         const ratio = samples.length / length;
-        const pcm16 = new Int16Array(length);
         for (let i = 0; i < length; i++) {
           const sample = Math.max(-1, Math.min(1, samples[Math.floor(i * ratio)]));
-          pcm16[i] = sample < 0 ? sample * 32768 : sample * 32767;
+          this.buffer[this.filled++] = sample < 0 ? sample * 32768 : sample * 32767;
+          if (this.filled === this.buffer.length) {
+            // Eine Kopie, weil der Puffer sofort weiterbeschrieben wird.
+            this.port.postMessage(this.buffer.slice());
+            this.filled = 0;
+          }
         }
-        this.port.postMessage(pcm16);
       }
       return true;
     }
@@ -105,7 +125,7 @@ export async function startMicrophoneCapture(
 
     const sourceNode = audioContext.createMediaStreamSource(mediaStream);
     const workletNode = new AudioWorkletNode(audioContext, PROCESSOR_NAME, {
-      processorOptions: { targetSampleRate: INPUT_SAMPLE_RATE },
+      processorOptions: { targetSampleRate: INPUT_SAMPLE_RATE, chunkMs: CHUNK_MS },
     });
     sourceNode.connect(workletNode);
 
