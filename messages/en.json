@@ -1806,7 +1806,15 @@
     },
     "quickAddVehiclesTitle": "Vehicles Neusiedl am See",
     "quickAddAlreadyAdded": "{name} already in the operation",
-    "quickAddRemove": "Remove {name} from the operation"
+    "quickAddRemove": "Remove {name} from the operation",
+    "coordinates": {
+      "title": "Coordinates",
+      "decimal": "Decimal degrees",
+      "dms": "Degrees/minutes/seconds",
+      "ddm": "Degrees/decimal minutes",
+      "hint": "A full coordinate pair can be pasted into any of these fields.",
+      "invalid": "Not a valid coordinate"
+    }
   },
   "heatmap": {
     "enable": "Enable heatmap colouring",

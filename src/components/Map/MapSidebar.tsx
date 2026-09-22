@@ -239,7 +239,6 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
               <FirecallItemFields
                 item={editedItem}
                 setItemField={setItemField}
-                showLatLng={false}
                 autoFocus
               />
               <Typography

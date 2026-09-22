@@ -1806,7 +1806,15 @@
     },
     "quickAddVehiclesTitle": "Fahrzeuge Neusiedl am See",
     "quickAddAlreadyAdded": "{name} bereits im Einsatz",
-    "quickAddRemove": "{name} aus dem Einsatz entfernen"
+    "quickAddRemove": "{name} aus dem Einsatz entfernen",
+    "coordinates": {
+      "title": "Koordinaten",
+      "decimal": "Dezimalgrad",
+      "dms": "Grad/Minuten/Sekunden",
+      "ddm": "Grad/Dezimalminuten",
+      "hint": "In jedes Feld lässt sich auch ein ganzes Koordinatenpaar einfügen.",
+      "invalid": "Keine gültige Koordinate"
+    }
   },
   "heatmap": {
     "enable": "Heatmap-Färbung aktivieren",

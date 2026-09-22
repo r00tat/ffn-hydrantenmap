@@ -76,6 +76,19 @@ Im Bearbeitungsmodus kannst du Elemente zum aktiven Einsatz auf der Karte hinzuf
 Aktiviere den Bearbeitungsmodus nur, wenn du Änderungen vornehmen möchtest. Im Ansichtsmodus kannst du die Karte schneller bedienen.
 :::
 
+### Koordinaten eingeben
+
+Kommen die Koordinaten von außen — etwa von Polizei oder Landessicherheitszentrale —, lässt sich ein Element direkt dort anlegen, statt es auf der Karte zu suchen.
+
+1. Element wie gewohnt hinzufügen oder ein bestehendes zum Bearbeiten öffnen
+2. Unter **Koordinaten** stehen dieselbe Position in Dezimalgrad, in Grad/Minuten/Sekunden und in Grad/Dezimalminuten
+3. In **jedes** dieser Felder lässt sich ein ganzes Koordinatenpaar einfügen, in jeder der drei Schreibweisen — die übrigen Felder rechnen mit
+4. Speichern; das Element sitzt auf der eingetragenen Position
+
+:::info
+Beispiele für dieselbe Stelle: `47.94829, 16.84822` — `47°56'53.8"N 16°50'53.6"E` — `N 47°56.897' E 16°50.893'`. Steht die Himmelsrichtung dabei, ist die Reihenfolge von Breite und Länge belanglos.
+:::
+
 ### Zeichenwerkzeuge
 
 Im Bearbeitungsmodus stehen dir verschiedene Zeichenwerkzeuge zur Verfügung, mit denen du Linien, Flächen und Markierungen direkt auf der Karte einzeichnen kannst.
