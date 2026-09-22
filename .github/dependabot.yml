@@ -21,3 +21,11 @@ updates:
           - 'patch'
         patterns:
           - '*'
+    ignore:
+      # jsdom ab 30.1 versteckt die Blob-Implementierung hinter einem privaten
+      # Feld; vitests makeCompatBlob sucht sie weiter über getOwnPropertySymbols
+      # und scheitert mit „Cannot read properties of undefined (reading
+      # '_buffer')". Pin auflösen, sobald vitest den Fix released hat:
+      # https://github.com/vitest-dev/vitest/pull/11300
+      - dependency-name: 'jsdom'
+        versions: ['>=30.1.0']
