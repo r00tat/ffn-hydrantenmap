@@ -5,23 +5,93 @@ import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { signInWithCustomToken } from 'firebase/auth';
 import { useSession } from 'next-auth/react';
 import { useEffect, useRef, useState } from 'react';
-import { createFirebaseTokenForSession } from '../app/actions/auth';
+import {
+  createFirebaseTokenForSession,
+  exchangeNativeIdTokenForFirebaseToken,
+} from '../app/actions/auth';
 import { auth } from '../components/firebase/firebase';
 
+/** Woher das Custom Token kam — entscheidet, was danach noch zu tun ist. */
+type TokenSource = 'native' | 'session';
+
+interface RecoveredToken {
+  token: string;
+  source: TokenSource;
+}
+
 /**
- * Holt den Firebase-Client zurueck, wenn nur noch die NextAuth-Session steht.
+ * Holt ein Token aus der **nativen** Firebase-Sitzung.
+ *
+ * Unter Android laufen zwei Firebase-Clients nebeneinander, und nur das
+ * native SDK haelt seine Anmeldung zuverlaessig: ein logcat des betroffenen
+ * Geraets zeigt den Benutzer 270 ms nach jedem Prozessstart wieder, offline
+ * aus der lokalen Persistenz, waehrend die WebView ohne Benutzer hochkommt.
+ * Dieser Weg traegt deshalb auch dann noch, wenn das NextAuth-Cookie laengst
+ * abgelaufen ist — der Fall, in dem der Benutzer sich bisher von Hand neu
+ * anmelden musste, obwohl eine gueltige Anmeldung danebenlag.
+ */
+async function tokenFromNativeSession(): Promise<string | undefined> {
+  if (!Capacitor.isNativePlatform()) {
+    return undefined;
+  }
+  try {
+    const { user } = await FirebaseAuthentication.getCurrentUser();
+    if (!user) {
+      return undefined;
+    }
+    const { token: idToken } = await FirebaseAuthentication.getIdToken();
+    const { token, error } =
+      await exchangeNativeIdTokenForFirebaseToken(idToken);
+    if (!token) {
+      // Kein Abbruch: Das Cookie kann trotzdem noch tragen, etwa wenn das
+      // native Token abgelaufen oder widerrufen ist.
+      console.warn(`native session was refused: ${error}`);
+      return undefined;
+    }
+    return token;
+  } catch (err) {
+    console.warn('could not use the native firebase session', err);
+    return undefined;
+  }
+}
+
+/** Erst die native Sitzung, dann das NextAuth-Cookie. */
+async function recoveryToken(
+  hasSession: boolean,
+): Promise<RecoveredToken | undefined> {
+  const nativeToken = await tokenFromNativeSession();
+  if (nativeToken) {
+    return { token: nativeToken, source: 'native' };
+  }
+  if (!hasSession) {
+    return undefined;
+  }
+  const { token, error } = await createFirebaseTokenForSession();
+  if (!token) {
+    console.warn(`session recovery was refused: ${error}`);
+    return undefined;
+  }
+  return { token, source: 'session' };
+}
+
+/**
+ * Holt den Firebase-Client zurueck, wenn seine Anmeldung weg ist.
  *
  * Die App fuehrt zwei Sitzungen nebeneinander: `isAuthorized` kommt aus dem
  * NextAuth-Cookie und schaltet die ganze Oberflaeche frei, waehrend jeder
  * Datenzugriff `hasFirebaseUser` voraussetzt. Bricht der Firebase-Login ab
- * oder geht der Browserspeicher verloren, bleibt genau der Zustand
- * `isSignedIn: N` / `isAuthorized: Y` zurueck: angemeldete App, keine Daten,
- * und kein Login-Bildschirm, weil `isAuthorized` ja stimmt.
+ * oder geht der Browserspeicher der WebView verloren, bleibt genau der
+ * Zustand `isSignedIn: N` / `isAuthorized: Y` zurueck: angemeldete App,
+ * keine Daten, und kein Login-Bildschirm, weil `isAuthorized` ja stimmt.
  *
  * Ohne diesen Hook gibt es daraus keinen Rueckweg — der einzige
- * Custom-Token-Login haengt am `?token=` eines Share-Links. Hier wird
- * stattdessen aus der bestehenden Session ein Token geholt und der Client
- * damit neu angemeldet.
+ * Custom-Token-Login haengt am `?token=` eines Share-Links, und
+ * `serverLogin()` braucht zum Auffrischen des Cookies seinerseits einen
+ * Firebase-Benutzer.
+ *
+ * Das NextAuth-Cookie ist dabei nur der zweite Weg. Es laeuft nach einer
+ * Stunde ab und kann ohne Firebase-Benutzer nicht aufgefrischt werden; die
+ * native Sitzung dagegen ueberlebt jeden App-Neustart. Deshalb zuerst nativ.
  *
  * Bewusst genau **ein** Versuch je Seitenaufbau: Schlaegt er fehl, ist der
  * Login von Hand faellig, und eine Schleife aus Server-Aufrufen waere das
@@ -34,7 +104,9 @@ export function useFirebaseSessionRecovery() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (status !== 'authenticated' || attemptedRef.current) return;
+    // `loading` heisst nur "NextAuth weiss es noch nicht". Abwarten, sonst
+    // verschenken wir den zweiten Weg, bevor er ueberhaupt bereitsteht.
+    if (status === 'loading' || attemptedRef.current) return;
 
     let cancelled = false;
 
@@ -50,24 +122,23 @@ export function useFirebaseSessionRecovery() {
       attemptedRef.current = true;
       setIsRecovering(true);
       console.info(
-        'NextAuth session without firebase user, recovering firebase login',
+        'no firebase user in the webview, recovering the firebase login',
       );
       try {
-        const { token, error: tokenError } =
-          await createFirebaseTokenForSession();
-        if (!token) {
-          throw new Error(tokenError ?? 'no token returned');
+        const recovered = await recoveryToken(status === 'authenticated');
+        if (!recovered) {
+          throw new Error('no token available to recover the login');
         }
-        await signInWithCustomToken(auth, token);
-        console.info('firebase login recovered from session');
+        await signInWithCustomToken(auth, recovered.token);
+        console.info(`firebase login recovered from the ${recovered.source}`);
 
         // Wie beim Share-Link-Login: Die nativen Dienste (Live-Standort,
         // Radiacode-Tracking) schreiben mit der nativen Firebase-Sitzung,
-        // nicht mit der des JS-SDK.
-        if (Capacitor.isNativePlatform()) {
+        // nicht mit der des JS-SDK. Kam das Token von dort, steht sie schon.
+        if (recovered.source !== 'native' && Capacitor.isNativePlatform()) {
           try {
             await FirebaseAuthentication.signInWithCustomToken({
-              token,
+              token: recovered.token,
               skipNativeAuth: false,
             });
           } catch (nativeErr) {
@@ -96,7 +167,8 @@ export function useFirebaseSessionRecovery() {
 /**
  * Beim Abmelden faellt der Firebase-Benutzer weg, bevor `useSession` den
  * Wegfall des Cookies meldet. Ohne diese Sperre haelt der Hook genau dieses
- * Zeitfenster fuer einen Ausfall und meldet den Benutzer wieder an.
+ * Zeitfenster fuer einen Ausfall und meldet den Benutzer wieder an — und die
+ * native Sitzung ueberlebt das Abmelden in der WebView ohnehin.
  */
 let recoverySuppressed = false;
 

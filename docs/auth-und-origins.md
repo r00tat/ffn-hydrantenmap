@@ -187,3 +187,49 @@ Eintragen ist also gefahrlos und muss **vor** dem ersten Test passieren.
 Die Domains selbst stehen bereits unter „Authorized domains" in der
 Firebase-Konsole; das ist Voraussetzung dafür, dass die App dort überhaupt
 anmelden darf, und gilt schon für den Popup-Weg.
+
+## Zwei Sitzungen, und wie die Anmeldung zurückkommt
+
+Die App führt zwei voneinander unabhängige Sitzungen:
+
+- das **NextAuth-Cookie**, aus dem `isAuthorized` kommt. Es schaltet in
+  `AppProviders` die gesamte Oberfläche frei und läuft nach einer Stunde ab.
+- den **Firebase-Client**, aus dem `hasFirebaseUser` kommt. Ohne ihn liefert
+  `useFirebaseCollection` für jede Sammlung `null`, weil die Firestore-Regeln
+  `request.auth` verlangen.
+
+Fällt nur der Firebase-Client aus, entsteht ein Zustand ohne Ausweg:
+`isSignedIn: N` / `isAuthorized: Y` — angemeldete App, leere Listen, und kein
+Login-Bildschirm, weil `isAuthorized` ja stimmt. Das Cookie lässt sich aus
+diesem Zustand auch nicht auffrischen, denn `serverLogin()` braucht dafür ein
+ID-Token von `auth.currentUser`. Nach spätestens einer Stunde läuft das Cookie
+ab und alles beginnt von vorn.
+
+`useFirebaseSessionRecovery` holt den Client zurück, in dieser Reihenfolge:
+
+1. **Native Firebase-Sitzung.** Unter Android meldet `googleAuthAdapter` mit
+   `skipNativeAuth: false` auch das native SDK an, und **nur dieses** hält
+   seine Anmeldung zuverlässig: ein logcat eines betroffenen Geräts zeigt den
+   Benutzer 270 ms nach jedem Prozessstart wieder, offline aus der lokalen
+   Persistenz, während die WebView ohne Benutzer hochkommt. Der Hook holt sich
+   von dort ein ID-Token und tauscht es über
+   `exchangeNativeIdTokenForFirebaseToken` gegen ein Custom Token.
+2. **NextAuth-Cookie**, über `createFirebaseTokenForSession`.
+
+Nativ zuerst, weil dieser Weg das Ablaufen des Cookies überlebt — er ist der
+einzige, der die Frage „warum muss ich mich nach jedem App-Start neu anmelden"
+beantwortet. Kam das Token aus der Session, meldet der Hook zusätzlich das
+native SDK an: Live-Standort und Radiacode-Tracking schreiben mit der nativen
+Sitzung, nicht mit der des JS-SDK.
+
+Die Claims kommen in beiden Fällen aus dem Benutzerdokument
+(`mintFirebaseCustomToken`), nie aus dem vorgelegten Token. Wer ein Token
+vorlegt, belegt damit nur seine Identität, nicht seine Rechte — ein Entzug in
+Firestore wirkt deshalb sofort, unabhängig vom Anmeldeweg.
+
+Genau **ein** Versuch je Seitenaufbau. Schlägt er fehl, ist die Anmeldung von
+Hand fällig; eine Schleife aus Server-Aufrufen wäre das Letzte, was ein Gerät
+mit schlechter Verbindung braucht. Beim Abmelden sperrt `fbSignOut` den Hook
+über `suppressSessionRecovery()`, denn der Firebase-Benutzer fällt weg, bevor
+`useSession` den Wegfall des Cookies meldet — ohne die Sperre hielte der Hook
+dieses Zeitfenster für einen Ausfall und meldete den Benutzer wieder an.

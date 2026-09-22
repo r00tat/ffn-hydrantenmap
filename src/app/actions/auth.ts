@@ -1,6 +1,7 @@
 'use server';
 import 'server-only';
 
+import { firebaseAuth } from '../../server/firebase/admin';
 import { mintFirebaseCustomToken } from '../../server/auth/mintCustomToken';
 import { actionUserRequired } from '../auth';
 import { verifyJwt } from './jwt';
@@ -76,4 +77,48 @@ export async function createFirebaseTokenForSession() {
   }
   console.info(`minted session re-login token for ${uid}`);
   return { token: minted.token };
+}
+
+/**
+ * Tauscht das ID-Token der **nativen** Firebase-Sitzung gegen ein Custom
+ * Token fuer den Client in der WebView.
+ *
+ * Unter Android laufen zwei Firebase-Clients nebeneinander: das native SDK,
+ * das `googleAuthAdapter` mit `skipNativeAuth: false` anmeldet, und das
+ * JS-SDK in der WebView mit eigener Persistenz. Nur das native SDK haelt
+ * seine Anmeldung zuverlaessig — ein logcat des betroffenen Geraets zeigt
+ * den Benutzer 270 ms nach jedem Prozessstart wieder, offline aus der
+ * lokalen Persistenz, waehrend die WebView ohne Benutzer hochkommt. Bisher
+ * hat niemand nach dieser Sitzung gefragt, und der Benutzer musste sich
+ * neu anmelden, obwohl eine gueltige Anmeldung zwei Zentimeter daneben lag.
+ *
+ * Bewusst **ohne** Waechter aus `src/app/auth.ts`: Das ID-Token ist hier das
+ * Anmeldemittel, nicht das Ergebnis einer bestehenden Anmeldung — derselbe
+ * Weg, den auch der NextAuth-Credentials-Provider geht. `verifyIdToken`
+ * prueft Signatur, Projekt und Ablauf, und `checkRevoked` sorgt dafuer, dass
+ * ein abgemeldetes oder gesperrtes Konto seine alte native Sitzung nicht
+ * weitertraegt. Rechte entstehen dabei keine: die Claims kommen wie ueberall
+ * aus dem Benutzerdokument.
+ */
+export async function exchangeNativeIdTokenForFirebaseToken(idToken: string) {
+  if (!idToken) {
+    return { error: 'Invalid token' };
+  }
+  try {
+    const decoded = await firebaseAuth.verifyIdToken(idToken, true);
+    const minted = await mintFirebaseCustomToken(decoded.uid);
+    if (!minted.token) {
+      console.warn(
+        `native re-login for ${decoded.uid} refused: ${minted.error}`,
+      );
+      return { error: minted.error ?? 'no token' };
+    }
+    console.info(`minted native re-login token for ${decoded.uid}`);
+    return { token: minted.token };
+  } catch (error: any) {
+    // Nach aussen bleibt es bei "Invalid token" — der Aufrufer soll nicht
+    // erfahren, ob es den Benutzer gibt und woran es lag.
+    console.error('native id token exchange failed:', error);
+    return { error: 'Invalid token', details: error.message };
+  }
 }
