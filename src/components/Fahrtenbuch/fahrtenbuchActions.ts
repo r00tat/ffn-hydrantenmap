@@ -28,6 +28,7 @@ import { actionErrorKey } from './actionErrorKey';
 import {
   describeAssistantEntry,
   planAssistantEntry,
+  queryAssistantVehicles,
   type AssistantEntryCommand,
 } from './assistantEntry';
 import { actionGroupMemberRequired } from './authGuards';
@@ -537,6 +538,74 @@ async function loadPersons(groupId: string): Promise<FahrtenbuchPerson[]> {
   );
 }
 
+/**
+ * Die Gruppe, in deren Fahrtenbuch eine Fahrt dieses Einsatzes gehört.
+ *
+ * Aus dem Einsatz abgeleitet und nicht vom Client entgegengenommen:
+ * `actionGroupMemberRequired` prüft nur die Mitgliedschaft in der genannten
+ * Gruppe, nicht deren Bezug zum Einsatz. Ohne diesen Schritt könnte ein
+ * manipulierter Aufruf im Fahrtenbuch einer fremden Gruppe lesen und
+ * schreiben.
+ */
+async function firecallGroup(
+  firecallId: string,
+): Promise<{ groupId: string; firecall: Firecall } | undefined> {
+  const doc = await firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId)
+    .get();
+  const firecall = doc.data() as Firecall | undefined;
+  if (!doc.exists || !firecall?.group) return undefined;
+  return { groupId: firecall.group, firecall };
+}
+
+const NO_GROUP_MESSAGE =
+  'Dieser Einsatz gehört zu keiner Gruppe — ohne sie gibt es kein ' +
+  'Fahrtenbuch, in das die Fahrt gehört.';
+
+export interface AssistantVehicleQueryResult {
+  success: boolean;
+  /** Der Stand als vorlesbarer Satz, oder die Absage. */
+  message: string;
+  error?: string;
+}
+
+/**
+ * Die zuletzt erfassten Zählerstände — die Antwort auf „wie ist der
+ * Kilometerstand vom RLFA?".
+ *
+ * Gelesen wird der Zähler-Cache am Fahrzeug, nicht die Fahrtenliste: Er wird
+ * nach jedem Anlegen, Ändern und Löschen serverseitig nachgezogen
+ * (`refreshVehicleCounters`) und ist damit genau die Zahl, auf der die nächste
+ * Fahrt aufsetzt. Ohne Fahrzeugangabe kommen alle Fahrzeuge zurück — die Frage
+ * „welche Stände haben wir?" ist dieselbe Frage.
+ */
+export async function getFahrtenbuchCountersForAssistant(
+  firecallId: string,
+  fahrzeug?: string,
+): Promise<AssistantVehicleQueryResult> {
+  try {
+    const group = await firecallGroup(firecallId);
+    if (!group) {
+      return { success: false, error: 'firecallWithoutGroup', message: NO_GROUP_MESSAGE };
+    }
+    await actionGroupMemberRequired(group.groupId);
+
+    const vehicles = await loadActiveVehicles(group.groupId);
+    const query = queryAssistantVehicles(fahrzeug, vehicles);
+    return query.ok
+      ? { success: true, message: query.message }
+      : { success: false, error: query.error, message: query.message };
+  } catch (err) {
+    console.error('getFahrtenbuchCountersForAssistant failed', err);
+    return {
+      success: false,
+      error: actionErrorKey(err),
+      message: 'Die Zählerstände konnten nicht gelesen werden.',
+    };
+  }
+}
+
 export interface AssistantEntryActionResult {
   success: boolean;
   id?: string;
@@ -573,21 +642,15 @@ export async function createFahrtenbuchEntryFromAssistant(
   options: EntryWriteOptions = {},
 ): Promise<AssistantEntryActionResult> {
   try {
-    const firecallDoc = await firestore
-      .collection(FIRECALL_COLLECTION_ID)
-      .doc(firecallId)
-      .get();
-    const firecall = firecallDoc.data() as Firecall | undefined;
-    const groupId = firecall?.group;
-    if (!firecallDoc.exists || !groupId) {
+    const group = await firecallGroup(firecallId);
+    if (!group) {
       return {
         success: false,
         error: 'firecallWithoutGroup',
-        message:
-          'Dieser Einsatz gehört zu keiner Gruppe — ohne sie gibt es kein ' +
-          'Fahrtenbuch, in das die Fahrt gehört.',
+        message: NO_GROUP_MESSAGE,
       };
     }
+    const { groupId, firecall } = group;
 
     const session = await actionGroupMemberRequired(groupId);
     const [vehicles, persons] = await Promise.all([

@@ -50,6 +50,10 @@ function makeDeps(overrides: Partial<ToolHandlerDeps> = {}): ToolHandlerDeps {
       success: true,
       message: 'Fahrt eingetragen',
     })),
+    getFahrtenbuchCounters: vi.fn(async () => ({
+      success: true,
+      message: 'RLFA-A: Kilometerstand 1700 km.',
+    })),
     ...overrides,
   } as ToolHandlerDeps;
 }
@@ -517,5 +521,28 @@ describe('createFahrtenbuchEntry', () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toContain('KLF');
+  });
+});
+
+describe('getFahrtenbuchCounters', () => {
+  it('gibt den Stand als Antwort zurück, nicht als Änderung', () => {
+    // Auskunft, keine Aktion: Der Toast zeigt sie als Antwort, und
+    // „Rückgängig" hat nichts zurückzunehmen.
+    const deps = makeDeps();
+    return executeToolCall(
+      call('getFahrtenbuchCounters', { fahrzeug: 'RLFA' }),
+      deps
+    ).then((result) => {
+      expect(deps.getFahrtenbuchCounters).toHaveBeenCalledWith('RLFA');
+      expect(result.isAnswer).toBe(true);
+      expect(result.message).toContain('1700');
+      expect(result.createdItemId).toBeUndefined();
+    });
+  });
+
+  it('fragt ohne Fahrzeugangabe alle Fahrzeuge ab', async () => {
+    const deps = makeDeps();
+    await executeToolCall(call('getFahrtenbuchCounters'), deps);
+    expect(deps.getFahrtenbuchCounters).toHaveBeenCalledWith(undefined);
   });
 });

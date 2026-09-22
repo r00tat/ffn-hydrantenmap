@@ -113,6 +113,10 @@ export function createServerToolDeps({
       success: false,
       message: 'Das Fahrtenbuch ist über den MCP-Zugang nicht erreichbar.',
     }),
+    getFahrtenbuchCounters: async () => ({
+      success: false,
+      message: 'Das Fahrtenbuch ist über den MCP-Zugang nicht erreichbar.',
+    }),
     resolveOrigin,
     resolvePosition: async (positionSpec) => {
       const { lat, lng } = await resolveOrigin(positionSpec);

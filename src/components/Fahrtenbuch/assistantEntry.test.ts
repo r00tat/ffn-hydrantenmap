@@ -7,6 +7,7 @@ import {
 import {
   describeAssistantEntry,
   planAssistantEntry,
+  queryAssistantVehicles,
   type AssistantEntryContext,
 } from './assistantEntry';
 import { buildEntryDocument } from './entryLogic';
@@ -43,7 +44,13 @@ function person(
   };
 }
 
-const rlfa = vehicle({ id: 'v-rlfa', name: 'RLFA-A', lastCounters: { km: 1700 } });
+const rlfa = vehicle({
+  id: 'v-rlfa',
+  name: 'RLFA-A',
+  lastCounters: { km: 1700 },
+  lastEntryAt: '2026-09-20T18:30:00.000Z',
+  lastDriverName: 'Erika Musterfrau',
+});
 const klf = vehicle({ id: 'v-klf', name: 'KLF', lastCounters: { km: 800 } });
 const mzb = vehicle({
   id: 'v-mzb',
@@ -367,6 +374,103 @@ describe('planAssistantEntry', () => {
     expect(plan.input.firecallId).toBeUndefined();
   });
 
+  it('nimmt eine getankte Menge entgegen', () => {
+    const plan = planAssistantEntry(
+      {
+        fahrzeug: 'RLFA',
+        zaehlerstaende: [{ stand: 1723 }],
+        betriebsmittel: [{ art: 'Diesel', menge: 45 }],
+      },
+      context(),
+    );
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.input.betriebsmittel).toEqual({ diesel: 45 });
+  });
+
+  it('kennt die gesprochenen Namen der Betriebsmittel', () => {
+    // „Öl" heißt in den Daten `oel`, und „Super" ist Benzin. Gesprochen wird
+    // keins von beiden so, wie es gespeichert ist.
+    const tank = vehicle({
+      id: 'v-tank',
+      name: 'TLFA',
+      fuelTypes: ['diesel', 'adblue', 'oel'],
+      lastCounters: { km: 400 },
+    });
+    const plan = planAssistantEntry(
+      {
+        fahrzeug: 'TLFA',
+        zaehlerstaende: [{ stand: 430 }],
+        betriebsmittel: [
+          { art: 'AdBlue', menge: 10 },
+          { art: 'Motoröl', menge: 1.5 },
+        ],
+      },
+      context({ vehicles: [tank] }),
+    );
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.input.betriebsmittel).toEqual({ adblue: 10, oel: 1.5 });
+  });
+
+  it('ordnet eine Menge ohne Art dem einzigen Kraftstoff zu', () => {
+    const plan = planAssistantEntry(
+      {
+        fahrzeug: 'RLFA',
+        zaehlerstaende: [{ stand: 1723 }],
+        betriebsmittel: [{ menge: 45 }],
+      },
+      context(),
+    );
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.input.betriebsmittel).toEqual({ diesel: 45 });
+  });
+
+  it('verlangt die Art, wenn das Fahrzeug mehrere führt', () => {
+    const tank = vehicle({
+      id: 'v-tank',
+      name: 'TLFA',
+      fuelTypes: ['diesel', 'adblue'],
+      lastCounters: { km: 400 },
+    });
+    const plan = planAssistantEntry(
+      {
+        fahrzeug: 'TLFA',
+        zaehlerstaende: [{ stand: 430 }],
+        betriebsmittel: [{ menge: 45 }],
+      },
+      context({ vehicles: [tank] }),
+    );
+
+    expect(plan.ok).toBe(false);
+    if (plan.ok) return;
+    expect(plan.error).toBe('fuelAmbiguous');
+    expect(plan.message).toContain('AdBlue');
+  });
+
+  it('lehnt ein Betriebsmittel ab, das das Fahrzeug nicht führt', () => {
+    // Dieselbe Schranke wie im Dialog: Der bietet nur die Felder an, die am
+    // Fahrzeug gepflegt sind. Ein Benzinkanister am Dieselfahrzeug ist eher
+    // ein Hörfehler als eine Tankung.
+    const plan = planAssistantEntry(
+      {
+        fahrzeug: 'RLFA',
+        zaehlerstaende: [{ stand: 1723 }],
+        betriebsmittel: [{ art: 'Benzin', menge: 20 }],
+      },
+      context(),
+    );
+
+    expect(plan.ok).toBe(false);
+    if (plan.ok) return;
+    expect(plan.error).toBe('fuelUnknown');
+    expect(plan.message).toContain('Diesel');
+  });
+
   it('kommt ohne laufenden Einsatz aus', () => {
     const plan = planAssistantEntry(
       {
@@ -387,7 +491,12 @@ describe('planAssistantEntry', () => {
 describe('describeAssistantEntry', () => {
   it('fasst die Fahrt so zusammen, wie sie vorgelesen wird', () => {
     const plan = planAssistantEntry(
-      { fahrzeug: 'RLFA', zaehlerstaende: [{ stand: 1723 }], fahrer: 'ich' },
+      {
+        fahrzeug: 'RLFA',
+        zaehlerstaende: [{ stand: 1723 }],
+        fahrer: 'ich',
+        betriebsmittel: [{ art: 'Diesel', menge: 45 }],
+      },
       context(),
     );
     expect(plan.ok).toBe(true);
@@ -398,7 +507,73 @@ describe('describeAssistantEntry', () => {
     expect(summary).toContain('RLFA-A');
     expect(summary).toContain('1723');
     expect(summary).toContain('Max Mustermann');
+    expect(summary).toContain('45');
+    expect(summary).toContain('Diesel');
     // Vorgelesen wird der Satz — kein Markdown, keine Aufzählung.
     expect(summary).not.toMatch(/[*#|]/);
+  });
+});
+
+describe('queryAssistantVehicles', () => {
+  it('nennt den letzten Kilometerstand eines Fahrzeugs', () => {
+    const query = queryAssistantVehicles('RLFA', [rlfa, klf, mzb]);
+
+    expect(query.ok).toBe(true);
+    if (!query.ok) return;
+    expect(query.vehicles).toEqual([rlfa]);
+    expect(query.message).toContain('RLFA-A');
+    expect(query.message).toContain('1700');
+    // Der Stand allein sagt nicht, wie alt er ist — und ein Stand von vor
+    // drei Fahrten ist kein Stand.
+    expect(query.message).toContain('20.09.2026');
+    expect(query.message).toContain('Erika Musterfrau');
+  });
+
+  it('nennt ohne Fahrzeugangabe alle Stände', () => {
+    const query = queryAssistantVehicles(undefined, [rlfa, klf]);
+
+    expect(query.ok).toBe(true);
+    if (!query.ok) return;
+    expect(query.vehicles).toHaveLength(2);
+    expect(query.message).toContain('RLFA-A');
+    expect(query.message).toContain('KLF');
+  });
+
+  it('nennt alle Zähler eines Fahrzeugs, das mehrere hat', () => {
+    const query = queryAssistantVehicles('MZB', [mzb]);
+
+    expect(query.ok).toBe(true);
+    if (!query.ok) return;
+    expect(query.message).toContain('Betriebsstunden Backbordmotor');
+    expect(query.message).toContain('Lenzpumpe Steuerbord');
+  });
+
+  it('sagt es, wenn noch keine Fahrt erfasst ist', () => {
+    const neu = vehicle({ id: 'v-neu', name: 'VF' });
+    const query = queryAssistantVehicles('VF', [neu]);
+
+    expect(query.ok).toBe(true);
+    if (!query.ok) return;
+    expect(query.message).toContain('keine');
+  });
+
+  it('antwortet auf einen mehrdeutigen Namen mit allen Treffern', () => {
+    // Anders als beim Eintragen ist Mehrdeutigkeit hier kein Hindernis: Zwei
+    // Stände zu nennen beantwortet die Frage, zwei Fahrten anzulegen nicht.
+    const rlfaB = vehicle({ id: 'v-rlfa-b', name: 'RLFA-B', lastCounters: { km: 900 } });
+    const query = queryAssistantVehicles('RLFA', [rlfa, rlfaB]);
+
+    expect(query.ok).toBe(true);
+    if (!query.ok) return;
+    expect(query.vehicles).toHaveLength(2);
+  });
+
+  it('nennt die vorhandenen Fahrzeuge, wenn keines passt', () => {
+    const query = queryAssistantVehicles('Drehleiter', [rlfa, klf]);
+
+    expect(query.ok).toBe(false);
+    if (query.ok) return;
+    expect(query.error).toBe('vehicleUnknown');
+    expect(query.message).toContain('KLF');
   });
 });

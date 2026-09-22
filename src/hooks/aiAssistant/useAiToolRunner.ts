@@ -1,7 +1,10 @@
 import { LeafletContext } from '@react-leaflet/core';
 import { FunctionCall } from 'firebase/ai';
 import { useCallback, useContext, useRef, useState } from 'react';
-import { createFahrtenbuchEntryFromAssistant } from '../../components/Fahrtenbuch/fahrtenbuchActions';
+import {
+  createFahrtenbuchEntryFromAssistant,
+  getFahrtenbuchCountersForAssistant,
+} from '../../components/Fahrtenbuch/fahrtenbuchActions';
 import { queryClusters } from '../../components/firebase/clusterQuery';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { usePositionContext } from '../../components/providers/PositionProvider';
@@ -17,6 +20,13 @@ import { MAP_CONTEXT_PREFIX } from './chatHistory';
 import { PositionSpec, resolveOriginFrom } from './resolveOrigin';
 import { executeToolCall } from './toolHandlers';
 import { AiAssistantResult, AiInteraction, ResolvedOrigin } from './types';
+
+/**
+ * Ohne Einsatz keine Gruppe: Das Fahrtenbuch hängt an der Feuerwehr, und
+ * welche das ist, sagt allein der laufende Einsatz.
+ */
+const NO_FIRECALL_MESSAGE =
+  'Ohne laufenden Einsatz weiß ich nicht, um wessen Fahrtenbuch es geht.';
 
 export interface AiToolRunner {
   /** Führt einen Werkzeugaufruf aus und schreibt ihn in die Interaktionsliste. */
@@ -114,14 +124,19 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
       options: { confirmDuplicate?: boolean },
     ) => {
       if (!firecall.id) {
-        return {
-          success: false,
-          message:
-            'Ohne laufenden Einsatz weiß ich nicht, in welches Fahrtenbuch die ' +
-            'Fahrt gehört.',
-        };
+        return { success: false, message: NO_FIRECALL_MESSAGE };
       }
       return createFahrtenbuchEntryFromAssistant(firecall.id, command, options);
+    },
+    [firecall.id],
+  );
+
+  const getFahrtenbuchCounters = useCallback(
+    async (fahrzeug?: string) => {
+      if (!firecall.id) {
+        return { success: false, message: NO_FIRECALL_MESSAGE };
+      }
+      return getFahrtenbuchCountersForAssistant(firecall.id, fahrzeug);
     },
     [firecall.id],
   );
@@ -142,6 +157,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
         waterSupplyResults: waterSupplyResultsRef,
         proposeHoseLineDrafts: proposeDrafts,
         createFahrtenbuchEntry,
+        getFahrtenbuchCounters,
       });
 
       if (result.success) {
@@ -159,6 +175,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
       addFirecallItem,
       createFahrtenbuchEntry,
       existingItems,
+      getFahrtenbuchCounters,
       lastCreatedItem,
       map,
       proposeDrafts,

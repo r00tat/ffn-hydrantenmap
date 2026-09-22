@@ -447,6 +447,22 @@ wird ein Satz, den das Modell vorlesen und beantworten kann. Ein
 [Duplikat](#doppelte-fahrten-zu-einem-einsatz) verlangt auch hier eine
 ausdrückliche Bestätigung, gesprochen als „trotzdem eintragen".
 
+**Betriebsmittel gehören zum Diktat, weil sie zur Fahrt gehören.** Wer den
+Kilometerstand nennt, nennt meist im selben Atemzug, dass getankt wurde. Die
+Sorte wird gegen `vehicle.fuelTypes` geprüft — dieselbe Liste, die auch der
+Dialog anbietet; ist sie am Fahrzeug nicht gepflegt, gelten alle vier. Nennt der
+Sprecher keine Sorte und führt das Fahrzeug genau eine, ist sie eindeutig;
+führt es mehrere, wird gefragt. Die Menge ist immer in Litern, auch beim Öl.
+
+**Den letzten Stand fragt man ab, statt ihn zu erraten.**
+`getFahrtenbuchCounters` liest die Werte aus dem Fahrzeug-Cache und nennt dazu,
+wann und von wem die letzte Fahrt war. Es ist bewusst nachsichtiger als das
+Eintragen: Ein mehrdeutiger Name ist hier **kein** Fehler, sondern wird mit
+beiden Ständen beantwortet — zwei Zahlen vorzulesen beantwortet die Frage, zwei
+Fahrten anzulegen beantwortet nichts. Ohne Fahrzeugnamen kommen alle Fahrzeuge
+der Gruppe. Das Werkzeug ist auch die Absicherung dagegen, dass das Modell einen
+Kilometerstand aus dem Gespräch weiterrechnet und als abgelesen ausgibt.
+
 **Was bewusst fehlt:** der Defekt. Ein angehakter Mangel verschickt eine Mail
 an die Fahrzeugverantwortlichen, und ein verhörtes Wort wäre eine Meldung, die
 niemand zurückholt. Den Mangel trägt man im Dialog ein.

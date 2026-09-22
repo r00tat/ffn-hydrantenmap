@@ -88,6 +88,10 @@ export interface ToolHandlerDeps {
     command: AssistantEntryCommand,
     options: { confirmDuplicate?: boolean },
   ) => Promise<{ success: boolean; message: string }>;
+  /** Die zuletzt erfassten Zählerstände nachsehen — derselbe Weg, andere Richtung. */
+  getFahrtenbuchCounters: (
+    fahrzeug?: string,
+  ) => Promise<{ success: boolean; message: string }>;
 }
 
 /**
@@ -155,6 +159,7 @@ export async function executeToolCall(
     waterSupplyResults,
     proposeHoseLineDrafts,
     createFahrtenbuchEntry,
+    getFahrtenbuchCounters,
   } = deps;
 
   switch (call.name) {
@@ -334,6 +339,7 @@ export async function executeToolCall(
         {
           fahrzeug: args.fahrzeug as string,
           zaehlerstaende: args.zaehlerstaende as AssistantEntryCommand['zaehlerstaende'],
+          betriebsmittel: args.betriebsmittel as AssistantEntryCommand['betriebsmittel'],
           fahrer: args.fahrer as string | undefined,
           mitfahrer: args.mitfahrer as string[] | undefined,
           zweck: args.zweck as string | undefined,
@@ -345,6 +351,17 @@ export async function executeToolCall(
         { confirmDuplicate: args.trotzdemEintragen === true },
       );
       return { success: result.success, message: result.message };
+    }
+
+    case 'getFahrtenbuchCounters': {
+      const result = await getFahrtenbuchCounters(args.fahrzeug as string | undefined);
+      // `isAnswer`, weil es eine Auskunft ist und keine Änderung: Der Toast
+      // zeigt sie als Antwort, und „Rückgängig" hat nichts zurückzunehmen.
+      return {
+        success: result.success,
+        message: result.message,
+        isAnswer: result.success,
+      };
     }
 
     case 'askClarification':

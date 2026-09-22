@@ -28,6 +28,7 @@ import {
   arrivalFromTimeOnly,
   arrivalOnDepartureDay,
   FAHRT_ZWECKE,
+  FUEL_TYPES,
   isTimeOnlyTimestamp,
   matchVehicleByName,
   normalizeName,
@@ -40,8 +41,10 @@ import {
   type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
   type FahrtZweck,
+  type FuelType,
 } from '../../common/fahrtenbuch';
-import { parseTimestamp } from '../../common/time-format';
+import { dateFormat, parseTimestamp } from '../../common/time-format';
+import moment from 'moment';
 import { einsatzTimes, type EinsatzFirecall } from './einsatzRows';
 import type { FahrtenbuchEntryInput } from './entryLogic';
 
@@ -61,10 +64,22 @@ export interface AssistantCounterReading {
   startStand?: number;
 }
 
+/** Eine getankte oder nachgefüllte Menge, so wie sie gesprochen wird. */
+export interface AssistantFuelAmount {
+  /**
+   * Diesel, Benzin, AdBlue oder Öl — in der gesprochenen Schreibweise.
+   * Überflüssig, wenn am Fahrzeug nur ein Betriebsmittel gepflegt ist.
+   */
+  art?: string;
+  /** Menge in Litern. */
+  menge: number;
+}
+
 /** Der Befehl, wie ihn das Werkzeug entgegennimmt. */
 export interface AssistantEntryCommand {
   fahrzeug: string;
   zaehlerstaende?: AssistantCounterReading[];
+  betriebsmittel?: AssistantFuelAmount[];
   /** Leer oder „ich" heißt: der angemeldete Benutzer. */
   fahrer?: string;
   mitfahrer?: string[];
@@ -96,6 +111,8 @@ export type AssistantEntryError =
   | 'vehicleAmbiguous'
   | 'counterUnknown'
   | 'counterAmbiguous'
+  | 'fuelUnknown'
+  | 'fuelAmbiguous'
   | 'invalid';
 
 /** Wortlaute, mit denen der Sprecher sich selbst meint. */
@@ -253,6 +270,81 @@ function resolveCounters(
   }
 
   return { ok: true, counters };
+}
+
+/**
+ * Wie die Betriebsmittel gesprochen werden.
+ *
+ * Eine eigene Tabelle und nicht die Katalogtexte aus `messages/de.json`: Dieses
+ * Modul soll ohne Übersetzungsapparat laufen, und es geht hier ohnehin nicht um
+ * Beschriftungen, sondern um Wörter, die jemand *sagt* — „Super" und „Sprit"
+ * stehen in keinem Katalog, und der gespeicherte Schlüssel `oel` wird nie so
+ * ausgesprochen.
+ */
+const FUEL_WORDS: Record<FuelType, string[]> = {
+  diesel: ['diesel'],
+  benzin: ['benzin', 'super', 'eurosuper', 'ottokraftstoff', 'sprit'],
+  adblue: ['adblue', 'ad blue', 'harnstoff'],
+  oel: ['oel', 'öl', 'motoroel', 'motoröl', 'motorenöl', 'motorenoel'],
+};
+
+const FUEL_LABELS: Record<FuelType, string> = {
+  diesel: 'Diesel',
+  benzin: 'Benzin',
+  adblue: 'AdBlue',
+  oel: 'Öl',
+};
+
+/**
+ * Die getankten Mengen.
+ *
+ * Geprüft wird gegen die am Fahrzeug gepflegten Betriebsmittel — dieselbe
+ * Schranke, die der Dialog zieht, indem er nur diese Felder anbietet. Ein
+ * Benzinkanister am Dieselfahrzeug ist eher ein Hörfehler als eine Tankung.
+ * Ist am Fahrzeug nichts gepflegt, gibt es nichts zu prüfen und jedes bekannte
+ * Betriebsmittel gilt.
+ */
+function resolveFuels(
+  vehicle: FahrtenbuchVehicle,
+  amounts: AssistantFuelAmount[],
+):
+  | { ok: true; betriebsmittel: Partial<Record<FuelType, number>> }
+  | { ok: false; error: AssistantEntryError; message: string } {
+  const allowed = vehicle.fuelTypes?.length ? vehicle.fuelTypes : FUEL_TYPES;
+  const known = listNames(allowed.map((fuel) => FUEL_LABELS[fuel]));
+  const betriebsmittel: Partial<Record<FuelType, number>> = {};
+
+  for (const amount of amounts) {
+    if (typeof amount?.menge !== 'number' || !Number.isFinite(amount.menge)) {
+      continue;
+    }
+
+    let fuel: FuelType | undefined;
+    if (amount.art?.trim()) {
+      const spoken = normalizeName(amount.art);
+      fuel = FUEL_TYPES.find((candidate) =>
+        FUEL_WORDS[candidate].includes(spoken),
+      );
+      if (!fuel || !allowed.includes(fuel)) {
+        return fail(
+          'fuelUnknown',
+          `Das ${vehicle.name} nimmt kein „${amount.art}". Gepflegt ist: ${known}.`,
+        );
+      }
+    } else if (allowed.length === 1) {
+      fuel = allowed[0];
+    } else {
+      return fail(
+        'fuelAmbiguous',
+        `Beim ${vehicle.name} gibt es mehrere Betriebsmittel: ${known}. ` +
+          'Sag dazu, was getankt wurde.',
+      );
+    }
+
+    betriebsmittel[fuel] = amount.menge;
+  }
+
+  return { ok: true, betriebsmittel };
 }
 
 /** Eine Person aus den Stammdaten, sonst der Name als Freitext. */
@@ -424,6 +516,12 @@ export function describeAssistantEntry(
     );
   }
 
+  for (const fuel of FUEL_TYPES) {
+    const amount = input.betriebsmittel?.[fuel];
+    if (typeof amount !== 'number' || amount <= 0) continue;
+    parts.push(`${amount} Liter ${FUEL_LABELS[fuel]} getankt`);
+  }
+
   if (input.driverName) parts.push(`gefahren von ${input.driverName}`);
 
   const ziel = input.firecallName || input.ziel;
@@ -464,6 +562,9 @@ export function planAssistantEntry(
   const counters = resolveCounters(vehicle, command.zaehlerstaende ?? []);
   if (!counters.ok) return counters;
 
+  const fuels = resolveFuels(vehicle, command.betriebsmittel ?? []);
+  if (!fuels.ok) return fuels;
+
   const zweck = (
     command.zweck?.trim() || (context.firecall ? 'einsatz' : 'sonstiges')
   ) as FahrtZweck;
@@ -480,6 +581,9 @@ export function planAssistantEntry(
     counters: counters.counters,
   };
   if (driver.id) input.driverId = driver.id;
+  if (Object.keys(fuels.betriebsmittel).length > 0) {
+    input.betriebsmittel = fuels.betriebsmittel;
+  }
   if (command.hinweise?.trim()) input.hinweise = command.hinweise.trim();
   // Der Einsatzbezug gilt nur beim Zweck „einsatz" — `buildEntryDocument`
   // verwirft ihn sonst, und die Fahrt stünde ohne Zielangabe da. Deshalb wird
@@ -509,4 +613,81 @@ export function planAssistantEntry(
   }
 
   return { ok: true, vehicle, input };
+}
+
+
+export type AssistantVehicleQuery =
+  | { ok: true; vehicles: FahrtenbuchVehicle[]; message: string }
+  | { ok: false; error: AssistantEntryError; message: string };
+
+/**
+ * Der Stand eines Fahrzeugs als vorlesbarer Satz.
+ *
+ * Mit Datum und Fahrer der letzten Fahrt, nicht nur mit der Zahl: Ein Stand
+ * sagt nichts, solange offen ist, wie alt er ist. Wer vor dem Fahrzeug steht
+ * und „1700" hört, obwohl der Tacho 1723 zeigt, muss erkennen können, dass
+ * zwischendurch jemand gefahren ist, ohne es einzutragen.
+ */
+export function describeVehicleCounters(vehicle: FahrtenbuchVehicle): string {
+  const definitions = vehicle.counters ?? [];
+  const parts = definitions
+    .map((definition) => {
+      const stand = vehicle.lastCounters?.[definition.id];
+      return stand === undefined
+        ? undefined
+        : `${counterLabel(definition)} ${stand} ${definition.unit}`;
+    })
+    .filter((part): part is string => !!part);
+
+  if (parts.length === 0) {
+    return `Für das ${vehicle.name} ist keine Fahrt erfasst.`;
+  }
+
+  const seit: string[] = [];
+  if (vehicle.lastEntryAt) {
+    seit.push(`am ${moment(vehicle.lastEntryAt).locale('de').format(dateFormat)}`);
+  }
+  if (vehicle.lastDriverName) seit.push(`gefahren von ${vehicle.lastDriverName}`);
+
+  return (
+    `${vehicle.name}: ${listNames(parts)}` +
+    (seit.length > 0 ? ` (letzte Fahrt ${seit.join(', ')})` : '') +
+    '.'
+  );
+}
+
+/**
+ * Die Stände eines Fahrzeugs oder aller — die Antwort auf „wie ist der
+ * Kilometerstand vom RLFA?".
+ *
+ * Anders als beim Eintragen ist ein mehrdeutiger Name hier kein Hindernis:
+ * Zwei Stände zu nennen beantwortet die Frage, zwei Fahrten anzulegen nicht.
+ * Deshalb kommen hier alle Treffer zurück statt einer Rückfrage.
+ */
+export function queryAssistantVehicles(
+  fahrzeug: string | undefined,
+  vehicles: FahrtenbuchVehicle[],
+): AssistantVehicleQuery {
+  if (!fahrzeug?.trim()) {
+    return {
+      ok: true,
+      vehicles,
+      message: vehicles.map(describeVehicleCounters).join(' '),
+    };
+  }
+
+  const matches = matchAssistantVehicle(vehicles, fahrzeug);
+  if (matches.length === 0) {
+    return fail(
+      'vehicleUnknown',
+      `Kein Fahrzeug „${fahrzeug}" im Fahrtenbuch. Vorhanden sind: ` +
+        `${listNames(vehicles.map((v) => v.name))}.`,
+    );
+  }
+
+  return {
+    ok: true,
+    vehicles: matches,
+    message: matches.map(describeVehicleCounters).join(' '),
+  };
 }
