@@ -23,6 +23,10 @@ import {
   saveAuthToSessionStorage,
 } from './auth/sessionStorage';
 import { ensureFreshAuth } from './auth/ensureFreshAuth';
+import {
+  clearSessionRecoverySuppression,
+  suppressSessionRecovery,
+} from './auth/recoverySuppression';
 
 // Re-export types for backward compatibility
 export type { LoginData, LoginStatus, LoginStep } from './auth/types';
@@ -170,6 +174,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         setUid(u?.uid);
 
         if (user) {
+          // Eine Anmeldung hebt die Sperre auf, die das Abmelden gesetzt hat —
+          // sie kennt keinen Zeitablauf, nur diesen einen Weg zurueck.
+          clearSessionRecoverySuppression();
           setLoginStatus((prev) => ({ ...prev, loginStep: 'authenticating' }));
           const token = await user.getIdToken();
           if (token) {
@@ -297,6 +304,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }, []);
 
   const fbSignOut = useCallback(async () => {
+    // Vor dem Abmelden: Sonst haelt die Sitzungs-Wiederherstellung das
+    // Zeitfenster, in dem der Firebase-Benutzer schon weg und das Cookie noch
+    // da ist, fuer einen Ausfall und meldet den Benutzer wieder an.
+    suppressSessionRecovery();
     clearAuthFromSessionStorage();
     // redirect: false — NextAuth server otherwise falls back to NEXTAUTH_URL
     // when the callbackUrl origin doesn't match (Capacitor WebView, dev
@@ -304,10 +315,23 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     await signOutJsClient({ redirect: false });
     await auth.signOut();
     if (Capacitor.isNativePlatform()) {
+      // Keine blosse Warnung mehr: bleibt die native Sitzung stehen, ist der
+      // Benutzer nicht abgemeldet — sie ueberlebt Reload und App-Neustart, und
+      // `useFirebaseSessionRecovery` koennte den Firebase-Login daraus
+      // zurueckholen. Genau davor schuetzt die dauerhafte Sperre oben; hier
+      // muss der Fehlschlag wenigstens sichtbar werden.
       try {
         await FirebaseAuthentication.signOut();
-      } catch (err) {
-        console.warn('native firebase signOut failed', err);
+      } catch (firstErr) {
+        console.warn('native firebase signOut failed, retrying', firstErr);
+        try {
+          await FirebaseAuthentication.signOut();
+        } catch (err) {
+          console.error(
+            'logout incomplete: the native firebase session is still signed in',
+            err
+          );
+        }
       }
     }
     console.info(`logout completed`);

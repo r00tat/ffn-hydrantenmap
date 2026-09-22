@@ -20,6 +20,10 @@ case "$BUILD_TYPE" in
     GRADLE_TASK="assembleDebug"
     ARTIFACT_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
     ARTIFACT_LABEL="APK"
+    # WebView-Konsole nach logcat und `chrome://inspect` — nur hier. In einem
+    # ausgelieferten Build waere beides ein offener Weg zur Sitzung des
+    # Benutzers, siehe capacitor.config.ts.
+    CAP_DIAGNOSTICS=1
     ;;
   release)
     GRADLE_TASK="assembleRelease"
@@ -37,7 +41,9 @@ case "$BUILD_TYPE" in
     ;;
 esac
 
-echo "==> Syncing Capacitor → Android"
+export CAP_DIAGNOSTICS="${CAP_DIAGNOSTICS:-0}"
+
+echo "==> Syncing Capacitor → Android (CAP_DIAGNOSTICS=$CAP_DIAGNOSTICS)"
 npx cap sync android
 
 echo "==> Running Gradle: $GRADLE_TASK"

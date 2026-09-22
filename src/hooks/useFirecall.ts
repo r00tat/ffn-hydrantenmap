@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  collection,
-  doc,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-} from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import {
   createContext,
   Dispatch,
@@ -52,12 +44,7 @@ export const FirecallContext = createContext<FirecallContextType>({
 
 export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>(defaultFirecall);
-  const {
-    isAuthorized,
-    hasFirebaseUser,
-    groups,
-    firecall: firecallClaim,
-  } = useFirebaseLogin();
+  const { isAuthorized, hasFirebaseUser, groups, firecall: firecallClaim } = useFirebaseLogin();
 
   useEffect(() => {
     // `hasFirebaseUser` zusätzlich zu `isAuthorized`: letzteres ist beim ersten
@@ -70,7 +57,7 @@ export function useLastFirecall() {
           where('deleted', '==', false),
           where('group', 'in', groups),
           orderBy('date', 'desc'),
-          limit(1)
+          limit(1),
         );
         const unsub = onSnapshot(q, async (querySnapshot) => {
           if (!querySnapshot.empty) {
@@ -92,26 +79,18 @@ export function useLastFirecall() {
       } else {
         // we can only query the one and only firecall
 
-        const unsub = onSnapshot(
-          doc(firestore, FIRECALL_COLLECTION_ID, firecallClaim),
-          (doc) => {
-            if (doc.exists()) {
-              const fc: Firecall = {
-                id: doc.id,
-                ...doc.data(),
-              } as Firecall;
-              setFirecall(fc);
-              console.log(
-                `Current firecall ${fc.id} ${fc.name} ${fc.date}`,
-                fc
-              );
-            } else {
-              console.warn(
-                `firecall from claim with id ${firecallClaim} not found!`
-              );
-            }
+        const unsub = onSnapshot(doc(firestore, FIRECALL_COLLECTION_ID, firecallClaim), (doc) => {
+          if (doc.exists()) {
+            const fc: Firecall = {
+              id: doc.id,
+              ...doc.data(),
+            } as Firecall;
+            setFirecall(fc);
+            console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`, fc);
+          } else {
+            console.warn(`firecall from claim with id ${firecallClaim} not found!`);
           }
-        );
+        });
         return () => {
           unsub();
         };
@@ -127,9 +106,13 @@ export function useLastFirecall() {
 export function useFirecallSwitcher(): Pick<FirecallContextType, 'firecall' | 'setFirecallId'> {
   const [firecallId, setFirecallId] = useState<string>();
   const [firecall, setFirecall] = useState<Firecall>();
+  // Wie in `useLastFirecall`: die gewaehlte Einsatz-ID kommt aus URL oder
+  // Speicher und steht oft schon, bevor der Firebase-Client seinen Benutzer
+  // hat. `request.auth` ist dann null und die Regel lehnt ab.
+  const { hasFirebaseUser } = useFirebaseLogin();
 
   useEffect(() => {
-    if (!firecallId) {
+    if (!firecallId || !hasFirebaseUser) {
       const unsetFirecall = async () => {
         setFirecall(undefined);
       };
@@ -144,21 +127,22 @@ export function useFirecallSwitcher(): Pick<FirecallContextType, 'firecall' | 's
               ...docSnapshot.data(),
             } as Firecall;
             setFirecall(fc);
-            console.log(
-              `selected firecall ${fc.id} ${fc.name} ${
-                fc.date
-              }: ${JSON.stringify(fc)}`
-            );
+            console.log(`selected firecall ${fc.id} ${fc.name} ${fc.date}: ${JSON.stringify(fc)}`);
           } else {
             console.warn(`firecall with id ${firecallId} not found!`);
           }
-        }
+        },
+        // Ohne diesen Zweig wirft `onSnapshot` die Ablehnung als unbehandelte
+        // Promise-Ablehnung — sie landet dann im globalen Reporter statt hier.
+        (err) => {
+          console.warn(`could not watch firecall ${firecallId}`, err);
+        },
       );
       return () => {
         unsubscribe();
       };
     }
-  }, [firecallId]);
+  }, [firecallId, hasFirebaseUser]);
 
   return {
     firecall,
@@ -166,16 +150,17 @@ export function useFirecallSwitcher(): Pick<FirecallContextType, 'firecall' | 's
   };
 }
 
-export function useLastOrSelectedFirecall(): Pick<FirecallContextType, 'firecall' | 'setFirecallId'> {
+export function useLastOrSelectedFirecall(): Pick<
+  FirecallContextType,
+  'firecall' | 'setFirecallId'
+> {
   const lastFirecall = useLastFirecall();
   const { firecall, setFirecallId } = useFirecallSwitcher();
 
   return { firecall: firecall || lastFirecall, setFirecallId };
 }
 
-export const useFirecallSelect = ():
-  | Dispatch<SetStateAction<string | undefined>>
-  | undefined => {
+export const useFirecallSelect = (): Dispatch<SetStateAction<string | undefined>> | undefined => {
   const { setFirecallId } = useContext(FirecallContext);
   return setFirecallId;
 };
@@ -201,15 +186,15 @@ export const useCrewForVehicle = (vehicleId: string): CrewAssignment[] => {
           const lastB = b.name.split(' ').pop() || '';
           return lastA.localeCompare(lastB, 'de');
         }),
-    [crewAssignments, vehicleId]
+    [crewAssignments, vehicleId],
   );
 };
 
 export const useCrewCountForVehicle = (vehicleId: string | undefined): number => {
   const { crewAssignments } = useContext(FirecallContext);
   return useMemo(
-    () => vehicleId ? crewAssignments.filter((c) => c.vehicleId === vehicleId).length : 0,
-    [crewAssignments, vehicleId]
+    () => (vehicleId ? crewAssignments.filter((c) => c.vehicleId === vehicleId).length : 0),
+    [crewAssignments, vehicleId],
   );
 };
 
@@ -219,11 +204,10 @@ export const useAtsCountForVehicle = (vehicleId: string | undefined): number => 
   return useMemo(
     () =>
       vehicleId
-        ? crewAssignments.filter(
-            (c) => c.vehicleId === vehicleId && c.funktion === ATS_FUNKTION
-          ).length
+        ? crewAssignments.filter((c) => c.vehicleId === vehicleId && c.funktion === ATS_FUNKTION)
+            .length
         : 0,
-    [crewAssignments, vehicleId]
+    [crewAssignments, vehicleId],
   );
 };
 

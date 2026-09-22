@@ -8,6 +8,7 @@ import useFirebaseLoginObserver, {
   LoginStatus,
 } from '../../hooks/useFirebaseLoginObserver';
 import { useFirebaseCustomTokenLogin } from '../../hooks/useFirebaseCustomTokenLogin';
+import { useFirebaseSessionRecovery } from '../../hooks/useFirebaseSessionRecovery';
 
 export const FirebaseLoginContext = createContext<LoginStatus>({
   isSignedIn: false,
@@ -29,6 +30,7 @@ export default function FirebaseUserProvider({
   children: React.ReactNode;
 }) {
   useFirebaseCustomTokenLogin();
+  useFirebaseSessionRecovery();
   const authInfo = useFirebaseLoginObserver();
   useCrashlyticsUserSync(authInfo.uid);
   return (
