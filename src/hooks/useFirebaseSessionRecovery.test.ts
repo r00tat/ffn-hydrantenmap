@@ -63,6 +63,7 @@ async function loadHook() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
   authMock.currentUser = null;
   isNativePlatformMock.mockReturnValue(true);
   useSessionMock.mockReturnValue({ status: 'authenticated' });
@@ -193,5 +194,81 @@ describe('useFirebaseSessionRecovery', () => {
     await Promise.resolve();
     expect(getCurrentUserMock).not.toHaveBeenCalled();
     expect(signInWithCustomTokenMock).not.toHaveBeenCalled();
+  });
+
+  it('bleibt gesperrt ueber den Reload, den das Abmelden ausloest', async () => {
+    // `fbSignOut` schliesst mit `window.location.assign('/login')` ab. Damit
+    // faellt das Modul samt seiner Sperre weg — und der Hook lief auf der
+    // neuen Seite sofort wieder an. Steht eine native Sitzung, holt er den
+    // gerade Abgemeldeten daraus zurueck.
+    const { suppressSessionRecovery } = await loadHook();
+    suppressSessionRecovery();
+
+    const { useFirebaseSessionRecovery } = await loadHook();
+    renderHook(() => useFirebaseSessionRecovery());
+
+    await Promise.resolve();
+    expect(getCurrentUserMock).not.toHaveBeenCalled();
+    expect(signInWithCustomTokenMock).not.toHaveBeenCalled();
+  });
+
+  it('bleibt auch ueber einen App-Neustart hinweg gesperrt', async () => {
+    // Der Fall, den der Reload allein nicht abdeckt: scheitert der native
+    // `signOut`, ueberlebt die Firebase-Sitzung im nativen SDK das Abmelden.
+    // Ohne dauerhafte Sperre brauchte es dann nur einen Neustart, und die
+    // Bruecke meldet den Benutzer wieder an.
+    const { suppressSessionRecovery } = await loadHook();
+    suppressSessionRecovery();
+
+    // Ein Neustart nimmt die Sitzungsablage mit, den dauerhaften Speicher
+    // nicht.
+    window.sessionStorage.clear();
+
+    const { useFirebaseSessionRecovery } = await loadHook();
+    renderHook(() => useFirebaseSessionRecovery());
+
+    await Promise.resolve();
+    expect(getCurrentUserMock).not.toHaveBeenCalled();
+  });
+
+  it('hebt die Sperre beim naechsten erfolgreichen Login wieder auf', async () => {
+    const first = await loadHook();
+    first.suppressSessionRecovery();
+    first.clearSessionRecoverySuppression();
+
+    const { useFirebaseSessionRecovery } = await loadHook();
+    renderHook(() => useFirebaseSessionRecovery());
+
+    await waitFor(() =>
+      expect(signInWithCustomTokenMock).toHaveBeenCalledWith(
+        authMock,
+        'custom-from-native'
+      )
+    );
+  });
+
+  it('arbeitet weiter, wenn der Browserspeicher jeden Zugriff verweigert', async () => {
+    // Privater Modus, geloeschte Site-Daten: `localStorage` wirft dann schon
+    // beim Lesen. Die Sperre ist dann nur so gut wie das Modul-Flag, aber die
+    // Wiederherstellung darf daran nicht scheitern.
+    const setItem = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('storage disabled');
+      });
+    const getItem = vi
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(() => {
+        throw new Error('storage disabled');
+      });
+    try {
+      const { useFirebaseSessionRecovery } = await loadHook();
+      renderHook(() => useFirebaseSessionRecovery());
+
+      await waitFor(() => expect(signInWithCustomTokenMock).toHaveBeenCalled());
+    } finally {
+      setItem.mockRestore();
+      getItem.mockRestore();
+    }
   });
 });

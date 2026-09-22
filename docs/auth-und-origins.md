@@ -229,7 +229,37 @@ Firestore wirkt deshalb sofort, unabhängig vom Anmeldeweg.
 
 Genau **ein** Versuch je Seitenaufbau. Schlägt er fehl, ist die Anmeldung von
 Hand fällig; eine Schleife aus Server-Aufrufen wäre das Letzte, was ein Gerät
-mit schlechter Verbindung braucht. Beim Abmelden sperrt `fbSignOut` den Hook
-über `suppressSessionRecovery()`, denn der Firebase-Benutzer fällt weg, bevor
-`useSession` den Wegfall des Cookies meldet — ohne die Sperre hielte der Hook
-dieses Zeitfenster für einen Ausfall und meldete den Benutzer wieder an.
+mit schlechter Verbindung braucht.
+
+### Warum die Sperre beim Abmelden dauerhaft ist
+
+Beim Abmelden sperrt `fbSignOut` den Hook über `suppressSessionRecovery()`,
+denn der Firebase-Benutzer fällt weg, bevor `useSession` den Wegfall des
+Cookies meldet — ohne die Sperre hielte der Hook dieses Zeitfenster für einen
+Ausfall und meldete den Benutzer wieder an.
+
+Diese Sperre lag zunächst in einer Modulvariablen, und damit deckte sie zu
+wenig ab. `fbSignOut` schließt mit `window.location.assign('/login')` ab, und
+ein harter Reload wirft das Modul weg: im logcat eines Android-Geräts vom
+2026-09-22 läuft der Hook 640 ms nach `logout completed` prompt wieder an.
+Dort blieb es folgenlos, weil weder native Sitzung noch Cookie übrig waren —
+mit einer nativen Sitzung hätte die Brücke den gerade Abgemeldeten daraus
+zurückgeholt.
+
+Die Sperre liegt deshalb in `localStorage` und nicht in `sessionStorage`:
+scheitert der native `signOut`, überlebt die Firebase-Sitzung im nativen SDK
+auch den App-Neustart, und die Sperre muss so weit reichen wie das, wogegen sie
+schützt. Aufgehoben wird sie nicht durch Zeitablauf, sondern von
+`useFirebaseLoginObserver`, sobald `onAuthStateChanged` wieder einen Benutzer
+meldet — also bei der nächsten erfolgreichen Anmeldung, gleich auf welchem Weg.
+
+Jeder Speicherzugriff ist gekapselt. Im privaten Modus und bei gelöschten
+Site-Daten wirft schon das Lesen; dann trägt nur noch das Modul-Flag, und das
+ist der Stand vor dieser Sperre, kein Grund die Wiederherstellung abzubrechen.
+
+Der native `signOut` selbst wird nicht mehr als Warnung abgetan: `fbSignOut`
+versucht ihn ein zweites Mal und meldet danach `logout incomplete` als Fehler.
+Eine Anzeige in der Oberfläche gibt es dafür bewusst nicht — der Logout
+navigiert unmittelbar danach auf `/login` und verwirft dabei jeden Zustand, der
+sie tragen könnte. Die Absicherung ist die dauerhafte Sperre, die Meldung ist
+für die Fehlersuche.
