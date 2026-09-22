@@ -1812,6 +1812,9 @@
     "coordinates": {
       "title": "Koordinaten",
       "decimal": "Dezimalgrad",
+      "edit": "Koordinaten bearbeiten",
+      "done": "Bearbeitung beenden",
+      "none": "keine Position",
       "dms": "Grad/Minuten/Sekunden",
       "ddm": "Grad/Dezimalminuten",
       "hint": "In jedes Feld lässt sich auch ein ganzes Koordinatenpaar einfügen.",

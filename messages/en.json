@@ -1812,6 +1812,9 @@
     "coordinates": {
       "title": "Coordinates",
       "decimal": "Decimal degrees",
+      "edit": "Edit coordinates",
+      "done": "Finish editing",
+      "none": "no position",
       "dms": "Degrees/minutes/seconds",
       "ddm": "Degrees/decimal minutes",
       "hint": "A full coordinate pair can be pasted into any of these fields.",

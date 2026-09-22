@@ -7,7 +7,9 @@ import CoordinateFields from './CoordinateFields';
 
 const NEUSIEDL = { lat: 47.94829, lng: 16.84822 };
 
-function setup(props: Partial<React.ComponentProps<typeof CoordinateFields>> = {}) {
+function setup(
+  props: Partial<React.ComponentProps<typeof CoordinateFields>> = {}
+) {
   const onChange = vi.fn();
   renderWithIntl(
     <CoordinateFields
@@ -20,9 +22,27 @@ function setup(props: Partial<React.ComponentProps<typeof CoordinateFields>> = {
   return { onChange };
 }
 
+/** Die Felder liegen hinter dem Stift — erst aufklappen, dann tippen. */
+async function edit(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Koordinaten bearbeiten' }));
+}
+
 describe('CoordinateFields', () => {
-  it('zeigt dieselbe Position in allen drei Schreibweisen', () => {
+  it('zeigt die Position und kein einziges Eingabefeld', () => {
+    // Die Position gehört zu einem Element wie sein Name: meistens will man
+    // sie lesen. Vier Felder, in die man versehentlich tippt, sind für den
+    // Regelfall die falsche Voreinstellung.
     setup();
+    expect(screen.getByText('47.94829, 16.84822')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Latitude/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Grad\/Minuten\/Sekunden/)).not.toBeInTheDocument();
+  });
+
+  it('zeigt nach dem Klick auf Bearbeiten dieselbe Position in allen drei Schreibweisen', async () => {
+    const user = userEvent.setup();
+    setup();
+    await edit(user);
+
     expect(screen.getByLabelText(/Latitude/)).toHaveValue('47.94829');
     expect(screen.getByLabelText(/Longitude/)).toHaveValue('16.84822');
     expect(screen.getByLabelText(/Grad\/Minuten\/Sekunden/)).toHaveValue(
@@ -33,9 +53,22 @@ describe('CoordinateFields', () => {
     );
   });
 
+  it('klappt die Felder wieder zu', async () => {
+    const user = userEvent.setup();
+    setup();
+    await edit(user);
+    await user.click(
+      screen.getByRole('button', { name: 'Bearbeitung beenden' })
+    );
+
+    expect(screen.queryByLabelText(/Latitude/)).not.toBeInTheDocument();
+    expect(screen.getByText('47.94829, 16.84822')).toBeInTheDocument();
+  });
+
   it('übernimmt eine eingefügte DMS-Angabe', async () => {
     const user = userEvent.setup();
     const { onChange } = setup();
+    await edit(user);
     const field = screen.getByLabelText(/Grad\/Minuten\/Sekunden/);
     await user.clear(field);
     await user.paste('48°12\'30.0"N 16°22\'15.0"E');
@@ -51,6 +84,7 @@ describe('CoordinateFields', () => {
     // Feld — jedes nimmt das ganze Paar.
     const user = userEvent.setup();
     const { onChange } = setup();
+    await edit(user);
     const field = screen.getByLabelText(/Latitude/);
     await user.clear(field);
     await user.paste('48.2083, 16.3708');
@@ -64,6 +98,7 @@ describe('CoordinateFields', () => {
   it('ändert nur die eine Achse, wenn nur ein Wert eingetragen wird', async () => {
     const user = userEvent.setup();
     const { onChange } = setup();
+    await edit(user);
     const field = screen.getByLabelText(/Latitude/);
     await user.clear(field);
     await user.paste('48.2083');
@@ -77,6 +112,7 @@ describe('CoordinateFields', () => {
   it('meldet Unlesbares, ohne die Position zu ändern', async () => {
     const user = userEvent.setup();
     const { onChange } = setup();
+    await edit(user);
     const field = screen.getByLabelText(/Grad\/Dezimalminuten/);
     await user.clear(field);
     await user.paste('keine Koordinate');
@@ -88,6 +124,7 @@ describe('CoordinateFields', () => {
   it('zeigt nach dem Verlassen wieder die gespeicherte Position', async () => {
     const user = userEvent.setup();
     setup();
+    await edit(user);
     const field = screen.getByLabelText(/Grad\/Minuten\/Sekunden/);
     await user.clear(field);
     await user.paste('Unsinn');
@@ -96,8 +133,14 @@ describe('CoordinateFields', () => {
     expect(field).toHaveValue('47°56\'53.8"N 16°50\'53.6"E');
   });
 
-  it('bleibt ohne Position leer', () => {
+  it('lässt sich auch ohne Position bearbeiten', async () => {
+    // Der Anlass des ganzen Feldes: Von der Polizei kommt eine Koordinate für
+    // eine Markierung, die es noch nirgends gibt.
+    const user = userEvent.setup();
     setup({ lat: undefined, lng: undefined });
+    expect(screen.getByText('keine Position')).toBeInTheDocument();
+
+    await edit(user);
     expect(screen.getByLabelText(/Latitude/)).toHaveValue('');
     expect(screen.getByLabelText(/Grad\/Minuten\/Sekunden/)).toHaveValue('');
   });

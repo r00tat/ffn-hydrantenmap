@@ -1,8 +1,12 @@
 'use client';
 
+import CheckIcon from '@mui/icons-material/Check';
+import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
 import FormHelperText from '@mui/material/FormHelperText';
+import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
@@ -23,17 +27,22 @@ export interface CoordinateFieldsProps {
 type FieldKey = 'lat' | 'lng' | 'dms' | 'ddm';
 
 /**
- * Die Position in drei Schreibweisen, jede davon beschreibbar.
+ * Die Position: angezeigt, und auf Klick in drei Schreibweisen beschreibbar.
  *
  * Der Anlass sind Koordinaten von außen — von Polizei oder LSZ kommt, was dort
  * im Einsatzleitsystem steht, und das ist mal Dezimalgrad und mal
  * Grad/Minuten/Sekunden. Umrechnen soll das niemand im Kopf, also nimmt jedes
  * Feld jede Schreibweise an; angezeigt wird in jedem Feld die seine.
  *
- * Gehalten wird immer nur **ein** Entwurf: das Feld, in dem gerade getippt
- * wird. Alle übrigen zeigen die gespeicherte Position. Damit gibt es keinen
- * Gleichlauf zwischen vier Zuständen zu pflegen — und nichts, was beim Tippen
- * unter den Fingern umformatiert wird.
+ * Voreingestellt ist aber die reine Anzeige. Eine Position kommt fast immer
+ * von der Karte, und wer ein Element umbenennt, will nicht vier Zahlenfelder
+ * vor sich haben, in die er versehentlich tippt. Erst der Stift klappt sie
+ * auf — dann liegen alle Schreibweisen nebeneinander.
+ *
+ * Gehalten wird dabei immer nur **ein** Entwurf: das Feld, in dem gerade
+ * getippt wird. Alle übrigen zeigen die gespeicherte Position. Damit gibt es
+ * keinen Gleichlauf zwischen vier Zuständen zu pflegen — und nichts, was beim
+ * Tippen unter den Fingern umformatiert wird.
  */
 export default function CoordinateFields({
   lat,
@@ -42,6 +51,7 @@ export default function CoordinateFields({
 }: CoordinateFieldsProps) {
   const t = useTranslations('firecallItem.coordinates');
   const tField = useTranslations('firecall.fields');
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<{ key: FieldKey; value: string }>();
   const [invalid, setInvalid] = useState(false);
 
@@ -101,6 +111,12 @@ export default function CoordinateFields({
     setInvalid(false);
   }, []);
 
+  const closeEditor = useCallback(() => {
+    setEditing(false);
+    setDraft(undefined);
+    setInvalid(false);
+  }, []);
+
   const common = (key: FieldKey) => ({
     value: valueOf(key),
     onChange: handleChange(key),
@@ -113,18 +129,48 @@ export default function CoordinateFields({
 
   return (
     <Box sx={{ mt: 1 }}>
-      <Typography variant="caption" color="text.secondary">
-        {t('title')}
-      </Typography>
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        <TextField id="lat" label={tField('latitude')} {...common('lat')} />
-        <TextField id="lng" label={tField('longitude')} {...common('lng')} />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ flexGrow: 1 }}
+        >
+          {t('title')}
+        </Typography>
+        <Tooltip title={editing ? t('done') : t('edit')}>
+          <IconButton
+            size="small"
+            aria-label={editing ? t('done') : t('edit')}
+            onClick={editing ? closeEditor : () => setEditing(true)}
+          >
+            {editing ? (
+              <CheckIcon fontSize="small" />
+            ) : (
+              <EditIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
       </Box>
-      <TextField id="coordinates-dms" label={t('dms')} {...common('dms')} />
-      <TextField id="coordinates-ddm" label={t('ddm')} {...common('ddm')} />
-      <FormHelperText error={invalid}>
-        {invalid ? t('invalid') : t('hint')}
-      </FormHelperText>
+
+      {!editing && (
+        <Typography variant="body2">
+          {hasPosition ? `${lat}, ${lng}` : t('none')}
+        </Typography>
+      )}
+
+      {editing && (
+        <>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField id="lat" label={tField('latitude')} {...common('lat')} />
+            <TextField id="lng" label={tField('longitude')} {...common('lng')} />
+          </Box>
+          <TextField id="coordinates-dms" label={t('dms')} {...common('dms')} />
+          <TextField id="coordinates-ddm" label={t('ddm')} {...common('ddm')} />
+          <FormHelperText error={invalid}>
+            {invalid ? t('invalid') : t('hint')}
+          </FormHelperText>
+        </>
+      )}
     </Box>
   );
 }

@@ -81,9 +81,10 @@ Only enable editing mode when you want to make changes. In view mode the map res
 When coordinates come from elsewhere — from the police or the state control centre, say — an element can be placed on them directly instead of being hunted for on the map.
 
 1. Add an element as usual, or open an existing one for editing
-2. Under **Coordinates** the same position is shown in decimal degrees, in degrees/minutes/seconds and in degrees/decimal minutes
-3. A full coordinate pair can be pasted into **any** of these fields, in any of the three notations — the other fields follow
-4. Save; the element sits on the entered position
+2. Under **Coordinates** the position is shown; the pencil next to it opens the input fields
+3. There the same position is given in decimal degrees, in degrees/minutes/seconds and in degrees/decimal minutes
+4. A full coordinate pair can be pasted into **any** of these fields, in any of the three notations — the other fields follow
+5. Save; the element sits on the entered position
 
 :::info
 The same spot in each notation: `47.94829, 16.84822` — `47°56'53.8"N 16°50'53.6"E` — `N 47°56.897' E 16°50.893'`. When the hemisphere is given, the order of latitude and longitude does not matter.
