@@ -250,3 +250,24 @@ describe('zusammengelegte Werkzeuge', () => {
     }
   });
 });
+
+describe('Seite bei nearItem', () => {
+  it('bietet an der Position eine Richtung an', () => {
+    const position = (
+      AI_TOOL_DECLARATIONS.find((d) => d.name === 'updateItem')
+        ?.parameters as unknown as LooseSchema
+    ).properties?.updates?.properties?.position;
+    expect(position?.properties?.direction?.enum).toEqual([
+      'left',
+      'right',
+      'above',
+      'below',
+    ]);
+    expect(position?.properties?.distance?.type).toBeDefined();
+  });
+
+  it('verlangt im Systemprompt die Richtung und einen neuen Aufruf bei Korrektur', () => {
+    expect(AI_SYSTEM_PROMPT).toMatch(/direction left\/right\/above\/below/);
+    expect(AI_SYSTEM_PROMPT).toMatch(/Korrektur wie "nein, links" ist ein neuer Werkzeugaufruf/);
+  });
+});

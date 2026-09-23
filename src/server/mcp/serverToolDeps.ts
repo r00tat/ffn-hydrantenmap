@@ -3,7 +3,10 @@ import 'server-only';
 import type { FirecallItem } from '../../components/firebase/firestore';
 import type { HoseLineDraft, WaterSupplyCandidate } from '../../common/waterSupply';
 import type { ToolHandlerDeps } from '../../hooks/aiAssistant/toolHandlers';
-import { resolveOriginFrom } from '../../hooks/aiAssistant/resolveOrigin';
+import {
+  type PositionSpec,
+  resolveOriginFrom,
+} from '../../hooks/aiAssistant/resolveOrigin';
 import type { ResolvedOrigin } from '../../hooks/aiAssistant/types';
 import { defaultPosition } from '../../hooks/constants';
 import { queryClustersAdmin } from './clusterQuery';
@@ -68,11 +71,7 @@ export function createServerToolDeps({
         label: 'der Ortsmitte (kein Einsatzort gesetzt)',
       };
 
-  const resolveOrigin = (
-    positionSpec:
-      | { type: string; itemName?: string; address?: string; lat?: number; lng?: number }
-      | undefined,
-  ) =>
+  const resolveOrigin = (positionSpec: PositionSpec | undefined) =>
     resolveOriginFrom(positionSpec, {
       fallback,
       einsatzort: einsatzort

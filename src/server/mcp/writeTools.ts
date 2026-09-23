@@ -55,6 +55,15 @@ const positionSchema = z
     lng: z.number().optional(),
     address: z.string().optional(),
     itemName: z.string().optional(),
+    direction: z
+      .enum(['left', 'right', 'above', 'below'])
+      .optional()
+      .describe('Seite des Elements bei "nearItem", auf der genordeten Karte'),
+    distance: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Abstand zum Element in Metern bei "nearItem", Standard 20'),
   })
   .optional();
 

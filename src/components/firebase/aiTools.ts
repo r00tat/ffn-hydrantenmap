@@ -24,6 +24,18 @@ const positionSchema = {
       type: SchemaType.STRING,
       description: 'Name of item to place near (for nearItem type)',
     },
+    direction: {
+      type: SchemaType.STRING,
+      enum: ['left', 'right', 'above', 'below'],
+      description:
+        'Side of the item for nearItem, as seen on the north-up map: ' +
+        '"links" = left (west), "rechts" = right (east), "oberhalb"/"nördlich" ' +
+        '= above, "unterhalb"/"südlich" = below. Set it whenever a side is named.',
+    },
+    distance: {
+      type: SchemaType.NUMBER,
+      description: 'Distance from the item in meters for nearItem, default 20',
+    },
     address: {
       type: SchemaType.STRING,
       description: 'Address to geocode (for address type)',
@@ -695,6 +707,12 @@ Regeln:
 - "Einsatzstelle" / "Einsatzort" / "zum Einsatz" = einsatzort als position.type
 - "von <Element>" / "beim TLFA" als Bezugspunkt einer Messung = atItem mit itemName
 - Referenzen wie "daneben", "neben dem X" zum PLATZIEREN = nearItem mit itemName
+- "links/rechts neben dem X", "oberhalb/unterhalb von X" = nearItem mit itemName und
+  direction left/right/above/below; ein genannter Abstand ("10 Meter links") = distance.
+  Gilt auch beim Verschieben mit updateItem.
+- Eine Korrektur wie "nein, links" ist ein neuer Werkzeugaufruf. Sage nie, ein
+  Element sei verschoben oder geändert, ohne dass das Werkzeug in diesem Zug
+  aufgerufen wurde und Erfolg meldet. Gib wieder, was die Rückmeldung sagt.
 - Ohne jede Ortsangabe bei einer Messung oder Suche: auto als position.type
 - Für Adresssuche: verwende searchAddress (erstellt Marker und schwenkt Karte dorthin)
 

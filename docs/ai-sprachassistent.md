@@ -296,6 +296,24 @@ Der MCP-Zugang behält `el` und `assp` als eigene Typen von `create_item`
 [calcTools.ts](../src/server/mcp/calcTools.ts) sind ein eigenes Tool-Set und
 bleiben getrennt.
 
+## „Links neben dem TLFA": Richtung statt fester Versatz
+
+`nearItem` setzte früher immer rund 20 m schräg rechts oben ab. „Links" und
+„rechts" ließen sich nicht ausdrücken, jeder Aufruf landete auf demselben
+Punkt, und das Modell meldete trotzdem „steht jetzt links". Die Position
+trägt deshalb `direction` (`left`, `right`, `above`, `below`) und `distance`
+in Metern ([resolveOrigin.ts](../src/hooks/aiAssistant/resolveOrigin.ts)).
+Links heißt Westen: Die Karte ist genordet und nicht drehbar, der Benutzer
+meint die Seite, die er auf dem Bildschirm sieht. Der Ost-West-Versatz ist
+mit dem Kosinus der Breite gerechnet, damit 20 m auch 20 m sind.
+
+Beim Verschieben fällt das verschobene Element aus der Suche nach dem
+Bezug — sonst findet „neben das TLF" beim Verschieben eines TLF das Fahrzeug
+selbst. `updateItem` meldet zurück, wohin das Element kam („links neben
+"TLFA 4000"") und ob der Bezug fehlte. Aus dieser Rückmeldung baut das Modell
+seine Antwort; eine Verschiebung ohne Aufruf zu behaupten, verbietet der
+Systemprompt ausdrücklich.
+
 ## Werkzeuge, die die Karte verlassen
 
 Die meisten Werkzeuge schreiben Elemente des laufenden Einsatzes oder rechnen.

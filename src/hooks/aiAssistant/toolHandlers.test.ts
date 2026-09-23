@@ -778,3 +778,92 @@ describe('createVehicle', () => {
     expect(result.message).toBe('Fahrzeug "KLF" ohne Feuerwehr erstellt');
   });
 });
+
+describe('executeToolCall — updateItem', () => {
+  const fahrzeug = {
+    id: 'tlf',
+    type: 'vehicle',
+    name: 'TLF',
+    fw: 'Parndorf',
+    lat: 47.9,
+    lng: 16.8,
+  };
+
+  it('nennt in der Rückmeldung, wohin das Element kam', async () => {
+    const resolveOrigin = vi.fn(async () => ({
+      lat: 47.95,
+      lng: 16.84,
+      type: 'nearItem',
+      label: '"TLFA 4000"',
+    }));
+    const updateFirecallItem = vi.fn(async () => {});
+    const result = await executeToolCall(
+      call('updateItem', {
+        itemName: 'TLF',
+        updates: {
+          position: { type: 'nearItem', itemName: 'TLFA', direction: 'left' },
+        },
+      }),
+      makeDeps({
+        existingItems: [fahrzeug] as never,
+        resolveOrigin,
+        updateFirecallItem,
+      }),
+    );
+
+    expect(result).toEqual({
+      success: true,
+      message: '"TLF" links neben "TLFA 4000" gesetzt',
+    });
+    expect(resolveOrigin).toHaveBeenCalledWith({
+      type: 'nearItem',
+      itemName: 'TLFA',
+      direction: 'left',
+      excludeItemId: 'tlf',
+    });
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'tlf', lat: 47.95, lng: 16.84 }),
+    );
+  });
+
+  it('sagt, wenn das Bezugselement fehlte', async () => {
+    const result = await executeToolCall(
+      call('updateItem', {
+        itemName: 'TLF',
+        updates: {
+          position: { type: 'nearItem', itemName: 'RLFA', direction: 'right' },
+        },
+      }),
+      makeDeps({
+        existingItems: [fahrzeug] as never,
+        resolveOrigin: vi.fn(async () => ({
+          lat: 1,
+          lng: 2,
+          type: 'mapCenter',
+          label: 'der Kartenmitte',
+        })),
+      }),
+    );
+    expect(result.message).toBe(
+      '"TLF" an der Kartenmitte (Element "RLFA" nicht gefunden) gesetzt',
+    );
+  });
+
+  it('lässt die Position ohne Angabe unverändert', async () => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const resolveOrigin = vi.fn();
+    const result = await executeToolCall(
+      call('updateItem', { itemName: 'TLF', updates: { beschreibung: 'Pumpe' } }),
+      makeDeps({
+        existingItems: [fahrzeug] as never,
+        resolveOrigin,
+        updateFirecallItem,
+      }),
+    );
+    expect(result.message).toBe('"TLF" aktualisiert');
+    expect(resolveOrigin).not.toHaveBeenCalled();
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ lat: 47.9, lng: 16.8, beschreibung: 'Pumpe' }),
+    );
+  });
+});

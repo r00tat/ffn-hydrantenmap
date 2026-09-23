@@ -22,6 +22,7 @@ import type { AssistantEntryCommand } from '../../components/Fahrtenbuch/assista
 import type { TruppCommand } from '../../components/Atemschutz/truppAssistant';
 import { TRUPP_STATUSES, type TruppStatus } from '../../common/atemschutz';
 import { findFirecallItemByName } from './itemLookup';
+import { DIRECTION_LABELS, type PositionSpec } from './resolveOrigin';
 import { AiAssistantResult, ResolvedOrigin } from './types';
 import {
   calculateInverseSquareLaw,
@@ -33,7 +34,7 @@ import {
 } from '../../common/strahlenschutz';
 
 type ResolvePositionFn = (
-  positionSpec: { type: string; itemName?: string; address?: string; lat?: number; lng?: number } | undefined
+  positionSpec: PositionSpec | undefined
 ) => Promise<{ lat: number; lng: number }>;
 
 type AddFirecallItemFn = (item: FirecallItem) => Promise<{ id: string }>;
@@ -46,11 +47,7 @@ export interface ToolHandlerDeps {
    * tatsächlich hinauslief — inklusive Rückfall. Die Wasserversorgungssuche
    * braucht das, weil eine Messung ohne genannten Bezugspunkt wertlos ist.
    */
-  resolveOrigin: (
-    positionSpec:
-      | { type: string; itemName?: string; address?: string; lat?: number; lng?: number }
-      | undefined
-  ) => Promise<ResolvedOrigin>;
+  resolveOrigin: (positionSpec: PositionSpec | undefined) => Promise<ResolvedOrigin>;
   addFirecallItem: AddFirecallItemFn;
   updateFirecallItem: UpdateFirecallItemFn;
   existingItems: FirecallItem[];
@@ -180,6 +177,23 @@ const MARKER_KINDS: Record<string, { fallbackName: string; label: string }> = {
 function feuerwehrHinweis(fw: unknown): string {
   const name = typeof fw === 'string' ? fw.trim() : '';
   return name ? `(${name})` : 'ohne Feuerwehr';
+}
+
+/**
+ * Wohin ein verschobenes Element kam, für die Rückmeldung. Fand sich das
+ * Bezugselement nicht, steht das darin — sonst meldet das Modell „links
+ * neben dem TLFA", obwohl es in der Kartenmitte gelandet ist.
+ */
+function positionHinweis(spec: PositionSpec, origin: ResolvedOrigin): string {
+  if (origin.type === 'nearItem') {
+    const seite = (spec.direction && DIRECTION_LABELS[spec.direction]) || 'neben';
+    return `${seite} ${origin.label}`;
+  }
+  if (origin.type === 'atItem') return `auf ${origin.label}`;
+  if ((spec.type === 'nearItem' || spec.type === 'atItem') && spec.itemName) {
+    return `an ${origin.label} (Element "${spec.itemName}" nicht gefunden)`;
+  }
+  return `an ${origin.label}`;
 }
 
 export async function executeToolCall(
@@ -345,16 +359,28 @@ export async function executeToolCall(
         return { success: false, message: 'Element nicht gefunden' };
       }
 
-      const pos = updates.position ? await resolvePosition(updates.position as any) : {};
-      const updatedItem: FirecallItem = {
-        ...targetItem,
-        ...pos,
-      };
+      const positionSpec = updates.position as PositionSpec | undefined;
+      // Über `resolveOrigin`, damit die Antwort sagt, wohin das Element kam.
+      // Ohne das hat das Modell eine verfehlte Verschiebung als gelungen
+      // gemeldet.
+      const origin = positionSpec
+        ? await resolveOrigin({ ...positionSpec, excludeItemId: targetItem.id })
+        : undefined;
+      const updatedItem: FirecallItem = { ...targetItem };
+      if (origin) {
+        updatedItem.lat = origin.lat;
+        updatedItem.lng = origin.lng;
+      }
       if (updates.name) updatedItem.name = updates.name as string;
       if (updates.color) (updatedItem as any).color = updates.color as string;
       if (updates.beschreibung) updatedItem.beschreibung = updates.beschreibung as string;
       await updateFirecallItem(updatedItem);
-      return { success: true, message: `"${targetItem.name}" aktualisiert` };
+      return {
+        success: true,
+        message: origin
+          ? `"${targetItem.name}" ${positionHinweis(positionSpec!, origin)} gesetzt`
+          : `"${targetItem.name}" aktualisiert`,
+      };
     }
 
     case 'deleteItem': {
