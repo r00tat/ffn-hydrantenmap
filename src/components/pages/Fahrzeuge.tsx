@@ -167,7 +167,9 @@ function CompactItemCard({
               <Typography color="text.secondary" variant="body2">
                 {instance.info()}
               </Typography>
-              <Typography variant="body2">{instance.body()}</Typography>
+              <Typography variant="body2" component="div">
+                {instance.body()}
+              </Typography>
             </Box>
           </Collapse>
         </CardContent>

@@ -53,6 +53,12 @@ export interface AiAssistantResult {
   isAnswer?: boolean;
   data?: any; // Structured data for the AI to process
   /**
+   * Das Modell hat die Antwort bereits selbst gesprochen (Live-Sitzung). Die
+   * Sprachsynthese des Browsers bzw. `/api/tts` bleibt dann außen vor, sonst
+   * käme derselbe Satz ein zweites Mal.
+   */
+  spokenByModel?: boolean;
+  /**
    * Leitungsvorschläge, die noch bestätigt werden müssen. Solange gesetzt,
    * zeigt der Toast „Übernehmen"/„Verwerfen" statt automatisch zu verschwinden.
    */

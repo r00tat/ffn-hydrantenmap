@@ -240,7 +240,9 @@ export default function FirecallItemCard({
               <Typography sx={{ mb: 1.5 }} color="text.secondary">
                 {item.info()}
               </Typography>
-              <Typography variant="body2">{item.body()}</Typography>
+              <Typography variant="body2" component="div">
+                {item.body()}
+              </Typography>
             </>
           )}
 

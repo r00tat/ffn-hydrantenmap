@@ -18,6 +18,7 @@ import {
   WaterSupplyKind,
   WATER_SUPPLY_LABELS,
 } from '../../common/waterSupply';
+import type { AssistantEntryCommand } from '../../components/Fahrtenbuch/assistantEntry';
 import { findFirecallItemByName } from './itemLookup';
 import { AiAssistantResult, ResolvedOrigin } from './types';
 import {
@@ -71,6 +72,26 @@ export interface ToolHandlerDeps {
    * vorherige Runde wird dabei ersetzt.
    */
   proposeHoseLineDrafts: (drafts: HoseLineDraft[]) => void;
+  /**
+   * Eine Fahrt ins Fahrtenbuch eintragen.
+   *
+   * Als Abhängigkeit und nicht als direkter Aufruf der Server Action, weil der
+   * Einsatzbezug und damit die Gruppe erst im Hook feststehen — und weil diese
+   * Datei sonst eine Server Action in ihr Bündel zöge, obwohl die übrigen
+   * Werkzeuge rein im Browser laufen.
+   *
+   * Die Rückmeldung ist ein fertiger deutscher Satz: Was hier schiefgehen
+   * kann, sind Namen, die nicht aufgehen, und die Rückfrage danach kennt nur
+   * die Gegenseite (siehe `planAssistantEntry`).
+   */
+  createFahrtenbuchEntry: (
+    command: AssistantEntryCommand,
+    options: { confirmDuplicate?: boolean },
+  ) => Promise<{ success: boolean; message: string }>;
+  /** Die zuletzt erfassten Zählerstände nachsehen — derselbe Weg, andere Richtung. */
+  getFahrtenbuchCounters: (
+    fahrzeug?: string,
+  ) => Promise<{ success: boolean; message: string }>;
 }
 
 /**
@@ -137,6 +158,8 @@ export async function executeToolCall(
     findWaterSupply,
     waterSupplyResults,
     proposeHoseLineDrafts,
+    createFahrtenbuchEntry,
+    getFahrtenbuchCounters,
   } = deps;
 
   switch (call.name) {
@@ -304,6 +327,41 @@ export async function executeToolCall(
         setLastCreatedItem(null);
       }
       return { success: true, message: `"${targetItem.name}" gelöscht` };
+    }
+
+    case 'createFahrtenbuchEntry': {
+      // Durchgereicht statt umgedeutet: Welcher Zähler, welches Fahrzeug und
+      // wer gefahren ist, entscheidet die Gegenseite anhand der Stammdaten der
+      // Gruppe — der Browser kennt sie nicht. `createdItemId` bleibt bewusst
+      // leer: Die Fahrt ist kein Kartenelement und lässt sich mit „rückgängig"
+      // nicht zurücknehmen.
+      const result = await createFahrtenbuchEntry(
+        {
+          fahrzeug: args.fahrzeug as string,
+          zaehlerstaende: args.zaehlerstaende as AssistantEntryCommand['zaehlerstaende'],
+          betriebsmittel: args.betriebsmittel as AssistantEntryCommand['betriebsmittel'],
+          fahrer: args.fahrer as string | undefined,
+          mitfahrer: args.mitfahrer as string[] | undefined,
+          zweck: args.zweck as string | undefined,
+          ziel: args.ziel as string | undefined,
+          abfahrt: args.abfahrt as string | undefined,
+          ankunft: args.ankunft as string | undefined,
+          hinweise: args.hinweise as string | undefined,
+        },
+        { confirmDuplicate: args.trotzdemEintragen === true },
+      );
+      return { success: result.success, message: result.message };
+    }
+
+    case 'getFahrtenbuchCounters': {
+      const result = await getFahrtenbuchCounters(args.fahrzeug as string | undefined);
+      // `isAnswer`, weil es eine Auskunft ist und keine Änderung: Der Toast
+      // zeigt sie als Antwort, und „Rückgängig" hat nichts zurückzunehmen.
+      return {
+        success: result.success,
+        message: result.message,
+        isAnswer: result.success,
+      };
     }
 
     case 'askClarification':

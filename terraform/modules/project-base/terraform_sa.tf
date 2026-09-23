@@ -38,6 +38,9 @@ resource "google_project_iam_member" "terraform_iam" {
     "roles/cloudscheduler.admin",            # Scheduler-Jobs (modules/cloud-scheduler)
     "roles/cloudtasks.admin",                # Task-Queue + deren IAM (modules/cloud-scheduler)
     "roles/run.admin",                       # Cloud-Run-Dienst (modules/cloud-run)
+    # API-Keys anlegen UND den Key-String auslesen (apikeys.keys.getKeyString);
+    # ohne das Auslesen käme der Wert nicht in den Secret Manager.
+    "roles/serviceusage.apiKeysAdmin", # google_apikeys_key (secrets.tf)
   ])
   member  = google_service_account.terraform_sa.member
   role    = each.value

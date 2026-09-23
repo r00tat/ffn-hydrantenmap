@@ -102,3 +102,68 @@ resource "google_secret_manager_secret_iam_member" "mcp_oauth_signing_key_access
   role      = "roles/secretmanager.secretAccessor"
   member    = google_service_account.run_sa.member
 }
+
+# ============================================================================
+# Gemini Live API Key
+#
+# Eigener API-Key für die Live-API der Gemini Developer API, streng getrennt
+# vom öffentlichen Browser-Key des Firebase-Projekts. Er prägt serverseitig die
+# kurzlebigen Tokens der Sprach-Sitzung und verlässt den Server nie — im
+# Browser liegt nur das Token. Siehe docs/api-keys.md.
+#
+# Warum dieser Key — anders als die beiden Firebase-Keys — in terraform steht:
+# Das Killer-Argument dort ist, dass ein destroy/create einen neuen Key-String
+# vergibt und damit jedes ausgelieferte Bundle und jede google-services.json
+# entwertet. Dieser Key steckt in keinem Artefakt, sondern ausschließlich im
+# Secret Manager; ein neuer String kostet hier ein Redeploy, keinen Ausfall.
+#
+# Der Key-String landet damit im terraform-State (var.state_bucket). Das ist
+# die bewusst in Kauf genommene Seite der Abwägung: Wer den State lesen kann,
+# ist ohnehin Projekt-Administrator.
+#
+# Die `restrictions`: ausschließlich eine API-Restriction auf den einen Dienst,
+# **keine** Application-Restriction. Ein Referrer würde hier nichts schützen —
+# der Aufruf kommt vom Server und schickt keinen.
+# ============================================================================
+
+resource "google_apikeys_key" "gemini_live" {
+  name         = "gemini-live"
+  display_name = "Gemini Live (server only)"
+  project      = var.project
+
+  restrictions {
+    api_targets {
+      service = "generativelanguage.googleapis.com"
+    }
+  }
+
+  # Ohne aktivierte API-Keys-API scheitert das erste apply mit 403. terraform
+  # leitet die Abhängigkeit nicht selbst ab, weil die Ressource den Dienst
+  # nicht referenziert.
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret" "gemini_live_api_key" {
+  secret_id = "GEMINI_LIVE_API_KEY"
+  project   = var.project
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "gemini_live_api_key" {
+  secret = google_secret_manager_secret.gemini_live_api_key.id
+  # Hier bewusst **kein** `ignore_changes` wie bei den beiden Schlüsseln
+  # darüber: Deren Wert erzeugt terraform aus dem Nichts, eine Rotation ist
+  # eine Entscheidung. Dieser Wert gehört einer echten Ressource — wird der
+  # Key neu vergeben, muss das Secret nachziehen, sonst zeigt der Dienst auf
+  # einen Key, den es nicht mehr gibt.
+  secret_data = google_apikeys_key.gemini_live.key_string
+}
+
+resource "google_secret_manager_secret_iam_member" "gemini_live_api_key_access" {
+  secret_id = google_secret_manager_secret.gemini_live_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = google_service_account.run_sa.member
+}

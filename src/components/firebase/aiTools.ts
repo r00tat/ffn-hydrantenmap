@@ -96,7 +96,15 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: 'createDiary',
-    description: 'Add an entry to the Einsatztagebuch (operational diary). This is the DEFAULT action when the user input is a report/message that does not match any other tool.',
+    description:
+      'Add an entry to the Einsatztagebuch (operational diary). Use for a REPORT: ' +
+      'something the user states has happened, addressed to the record. This is the ' +
+      'default action for a report that matches no other tool. NEVER for a question ' +
+      'asked of you - a question is answered with answerQuestion, even when it is ' +
+      'about your own abilities. NEVER for a fragment: if the transcript does not ' +
+      'form a sensible report on its own, ask with askClarification instead of ' +
+      'filing it. Speech recognition loses the beginning of a sentence, and a half ' +
+      'understood sentence in the diary is a false entry in the legal record.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -187,6 +195,126 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
         position: positionSchema,
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'createFahrtenbuchEntry',
+    description:
+      'Record a trip in the Fahrtenbuch (the fire department\'s driver log). ' +
+      'This is NOT a map element — use it for "Fahrtenbucheintrag", "Fahrt ' +
+      'eintragen", "Kilometerstand eintragen". The vehicle is named as it is ' +
+      'kept in the Fahrtenbuch master data; when the name does not match, the ' +
+      'result lists the vehicles that exist. Without a stated purpose the trip ' +
+      'is booked on the current Einsatz.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        fahrzeug: {
+          type: SchemaType.STRING,
+          description: 'Vehicle name as spoken, e.g. "RLFA" or "MZB"',
+        },
+        zaehlerstaende: {
+          type: SchemaType.ARRAY,
+          description:
+            'Counter readings taken on return. Pass what the user said, ' +
+            'never a guessed or computed value',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              zaehler: {
+                type: SchemaType.STRING,
+                description:
+                  'Which counter, e.g. "Kilometerstand" or "Lenzpumpe ' +
+                  'Steuerbord". Omit for a vehicle with a single counter',
+              },
+              stand: {
+                type: SchemaType.NUMBER,
+                description: 'The reading on return, as spoken',
+              },
+              startStand: {
+                type: SchemaType.NUMBER,
+                description:
+                  'The reading at departure. Only needed when the vehicle has ' +
+                  'no earlier trip — otherwise it is taken from the last one',
+              },
+            },
+            required: ['stand'],
+          },
+        },
+        betriebsmittel: {
+          type: SchemaType.ARRAY,
+          description:
+            'Fuel and fluids taken on this trip, in litres — Diesel, Benzin, ' +
+            'AdBlue, Öl',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              art: {
+                type: SchemaType.STRING,
+                description:
+                  'What was filled up. Omit for a vehicle that only takes one',
+              },
+              menge: { type: SchemaType.NUMBER, description: 'Litres' },
+            },
+            required: ['menge'],
+          },
+        },
+        fahrer: {
+          type: SchemaType.STRING,
+          description:
+            'Driver. "ich" or omitted = the logged in user',
+        },
+        mitfahrer: {
+          type: SchemaType.ARRAY,
+          description: 'Further crew members on this trip',
+          items: { type: SchemaType.STRING },
+        },
+        zweck: {
+          type: SchemaType.STRING,
+          enum: ['einsatz', 'uebung', 'versorgung', 'sonstiges'],
+          description:
+            'Purpose of the trip. Defaults to einsatz, which links the trip to ' +
+            'the current Einsatz. Any other purpose needs a ziel',
+        },
+        ziel: {
+          type: SchemaType.STRING,
+          description: 'Where the trip went. Required unless zweck is einsatz',
+        },
+        abfahrt: {
+          type: SchemaType.STRING,
+          description:
+            'Departure time. Defaults to the alert time of the Einsatz',
+        },
+        ankunft: {
+          type: SchemaType.STRING,
+          description: 'Arrival time back at the station',
+        },
+        hinweise: { type: SchemaType.STRING, description: 'Remarks' },
+        trotzdemEintragen: {
+          type: SchemaType.BOOLEAN,
+          description:
+            'Record although a trip of this vehicle is already on file for ' +
+            'this Einsatz. Only after the user confirmed the second trip',
+        },
+      },
+      required: ['fahrzeug'],
+    },
+  },
+  {
+    name: 'getFahrtenbuchCounters',
+    description:
+      'Look up the counter readings of the last recorded trip — the answer to ' +
+      '"Wie ist der Kilometerstand vom RLFA?". Also the way to check a reading ' +
+      'before recording a trip. Without a vehicle it reports every vehicle.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        fahrzeug: {
+          type: SchemaType.STRING,
+          description:
+            'Vehicle name as spoken. Omit to get every vehicle of the group',
+        },
+      },
     },
   },
   {
@@ -396,7 +524,10 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: 'answerQuestion',
-    description: 'Answer a question about the firecall data. Use this when the user asks a question rather than giving a command.',
+    description:
+      'Answer a question. Use this whenever the user asks something rather than giving ' +
+      'a command - about the firecall data, about the map, or about what you can do ' +
+      'for them. Never file a question as a diary entry.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -456,6 +587,13 @@ Aktionen:
 - searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
 - searchWaterSupply: Hydranten, Saugstellen und Löschteiche im Umkreis suchen
 - proposeHoseLine: Löschleitung als Entwurf vorschlagen
+- createFahrtenbuchEntry: Fahrt ins Fahrtenbuch eintragen ("Fahrtenbucheintrag",
+  "Kilometerstand", "getankt"). NICHT createVehicle - das legt ein Fahrzeug auf
+  der Karte an. Gib Zählerstände und Tankmengen so weiter, wie sie gesagt
+  wurden; rechne nichts um.
+- getFahrtenbuchCounters: Letzten Kilometer- bzw. Zählerstand eines Fahrzeugs
+  nachsehen. Fragen nach einem Kilometerstand NIEMALS mit answerQuestion
+  beantworten - die Zahl steht nur im Fahrtenbuch.
 - updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position)
 - deleteItem: Bestehendes Element löschen
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
@@ -534,7 +672,14 @@ mit exakt denselben Argumenten - ein Aufruf mit geändertem limit, Radius, Ort o
 Filter ist dagegen ausdrücklich erlaubt.
 
 WICHTIG - Standardverhalten bei Meldungen:
-Wenn der Benutzer keine bestimmte Funktion aufruft und keine Frage zum Einsatz stellt, handelt es sich wahrscheinlich um eine Meldung.
+Wenn der Benutzer keine bestimmte Funktion aufruft und keine Frage stellt, handelt es sich wahrscheinlich um eine Meldung.
 Erstelle in diesem Fall automatisch einen Tagebucheintrag (createDiary) mit art="M".
+Zwei Ausnahmen, die dem vorgehen:
+- Eine Frage wird beantwortet (answerQuestion), niemals abgelegt. Das gilt auch
+  für Fragen danach, was du kannst - auch die sind keine Meldung.
+- Ein Bruchstück wird nicht abgelegt. Ergibt das Gehörte für sich genommen keine
+  sinnvolle Meldung, frage mit askClarification nach. Bei gesprochener Eingabe
+  fehlt regelmäßig der Satzanfang; was übrig bleibt, sieht aus wie eine Meldung
+  und wäre als Eintrag im Nachweis schlicht falsch.
 - Bei kurzen Texten: verwende name für den Inhalt
 - Bei langen Texten (mehr als ein kurzer Satz): erstelle einen kurzen Titel in name und setze den vollständigen Text in beschreibung`;

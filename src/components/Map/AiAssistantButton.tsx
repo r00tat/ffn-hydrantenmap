@@ -1,6 +1,8 @@
 'use client';
 
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckIcon from '@mui/icons-material/Check';
+import StopIcon from '@mui/icons-material/Stop';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
@@ -11,6 +13,7 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 import useAiAssistant from '../../hooks/useAiAssistant';
+import useAiLiveAssistant from '../../hooks/aiAssistant/useAiLiveAssistant';
 import { useHoseLineDraft } from '../../hooks/useHoseLineDraft';
 import { FirecallItem } from '../firebase/firestore';
 import type { AiAssistantResult } from '../../hooks/aiAssistant/types';
@@ -70,6 +73,13 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const [isAiProcessing, setIsAiProcessing] = useState(false);
 
   const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  /**
+   * Einmal gescheitert, bleibt es beim Einzelaufruf: Ist die Live-API im
+   * Projekt nicht freigeschaltet oder der Browser zu alt, scheitert jeder
+   * weitere Versuch genauso — und zwar erst beim Sprechen, wenn es am meisten
+   * stört.
+   */
+  const liveUnavailableRef = useRef(false);
 
   const showResult = useCallback(async (result: AiAssistantResult, run?: LatencyRun) => {
     setToast({
@@ -81,8 +91,9 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
       draftCount: result.drafts?.length ?? 0,
     });
     run?.mark('antwort angezeigt');
-    // Speak answers from the AI
-    if (result.isAnswer && result.message) {
+    // Speak answers from the AI — im Gespräch hat das Modell den Satz bereits
+    // selbst gesprochen.
+    if (result.isAnswer && result.message && !result.spokenByModel) {
       // Bis zur Sprachausgabe wartet der Benutzer weiter — deshalb gehört
       // auch dieser Schritt in die Messung (Issue #740).
       await (run
@@ -93,6 +104,25 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
     }
     run?.finish();
   }, []);
+
+  /**
+   * Die laufende Antwort erscheint, während sie gesprochen wird. Vorher stand
+   * die Meldung erst am Ende des Beitrags — also dann, wenn der Satz längst
+   * gesprochen war.
+   *
+   * Nur `message` wird angefasst: „Rückgängig", Rückfragen und Entwürfe hängen
+   * am fertigen Ergebnis und kämen hier zu früh.
+   */
+  const handlePartialAnswer = useCallback((text: string) => {
+    setToast((prev) => ({ ...prev, open: true, message: text, severity: 'success' }));
+  }, []);
+
+  const live = useAiLiveAssistant(firecallItems, {
+    onPartialAnswer: handlePartialAnswer,
+    onTurn: (result) => {
+      void showResult(result);
+    },
+  });
 
   // Show recorder errors - reacting to external state change from hook
   useEffect(() => {
@@ -106,63 +136,93 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
     }
   }, [recorderError]);
 
+  /** Aufnahme beenden und den Einzelaufruf anstoßen (Rückfallweg). */
+  const stopAndProcess = useCallback(async (label: string) => {
+    if (maxRecordingTimerRef.current) {
+      clearTimeout(maxRecordingTimerRef.current);
+      maxRecordingTimerRef.current = null;
+    }
+
+    // Der Lauf beginnt hier, weil ab hier gewartet wird — alles davor ist
+    // Aufnahmezeit und zählt nicht zur Latenz (Issue #740).
+    const run = startLatencyRun(label);
+    playStopBeep();
+
+    const audio = await run.phase('aufnahme abschließen', () => stopRecording());
+    if (!audio) {
+      run.finish();
+      return;
+    }
+
+    setIsAiProcessing(true);
+    try {
+      await showResult(await processAudio(audio, run), run);
+    } finally {
+      setIsAiProcessing(false);
+    }
+  }, [processAudio, showResult, stopRecording]);
+
+  /**
+   * Ein Tippen startet das Gespräch, das nächste beendet es. Steht die
+   * Live-Sitzung nicht zur Verfügung, bleibt es beim Aufnehmen und Absenden
+   * eines einzelnen Befehls.
+   */
   const handleClick = useCallback(async (event: React.MouseEvent) => {
     event.stopPropagation();
     event.preventDefault();
 
-    if (recorderState === 'recording') {
-      // Stop recording
-      if (maxRecordingTimerRef.current) {
-        clearTimeout(maxRecordingTimerRef.current);
-        maxRecordingTimerRef.current = null;
-      }
-
-      // Der Lauf beginnt hier, weil ab hier gewartet wird — alles davor ist
-      // Aufnahmezeit und zählt nicht zur Latenz (Issue #740).
-      const run = startLatencyRun('sprachbefehl');
+    if (live.isActive) {
       playStopBeep();
-      const audio = await run.phase('aufnahme abschließen', () => stopRecording());
-      if (!audio) {
-        run.finish();
-        return;
-      }
-
-      setIsAiProcessing(true);
-      try {
-        await showResult(await processAudio(audio, run), run);
-      } finally {
-        setIsAiProcessing(false);
-      }
-    } else {
-      // Start recording
-      playStartBeep();
-      await startRecording();
-
-      // Auto-stop after max recording time
-      maxRecordingTimerRef.current = setTimeout(async () => {
-        const run = startLatencyRun('sprachbefehl (zeitlimit)');
-        playStopBeep();
-        const audio = await run.phase('aufnahme abschließen', () => stopRecording());
-        if (!audio) {
-          run.finish();
-          return;
-        }
-        setIsAiProcessing(true);
-        try {
-          await showResult(await processAudio(audio, run), run);
-        } finally {
-          setIsAiProcessing(false);
-        }
-      }, MAX_RECORDING_TIME_MS);
+      await live.endConversation();
+      return;
     }
-  }, [processAudio, recorderState, showResult, startRecording, stopRecording]);
+
+    if (recorderState === 'recording') {
+      await stopAndProcess('sprachbefehl');
+      return;
+    }
+
+    playStartBeep();
+
+    if (live.isSupported && !liveUnavailableRef.current) {
+      try {
+        await live.startConversation();
+        return;
+      } catch (error) {
+        // Der Benutzer will sprechen — hier ist kein Platz für eine
+        // Fehlermeldung, nur für den Weg, der funktioniert.
+        console.warn('[AI] Live-Gespräch nicht verfügbar, weiter im Einzelaufruf:', error);
+        liveUnavailableRef.current = true;
+        await live.endConversation();
+      }
+    }
+
+    await startRecording();
+    // Auto-stop after max recording time
+    maxRecordingTimerRef.current = setTimeout(() => {
+      void stopAndProcess('sprachbefehl (zeitlimit)');
+    }, MAX_RECORDING_TIME_MS);
+  }, [live, recorderState, startRecording, stopAndProcess]);
+
+  /**
+   * „Fertig" — schließt den gesprochenen Beitrag sofort. Ohne das wartet der
+   * Server die Sprechpause ab, was nach einem zögernden Satzende spürbar
+   * dauert.
+   */
+  const handleFinishSpeaking = useCallback(async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    await live.finishSpeaking();
+  }, [live]);
 
   const handleToastClose = useCallback(() => {
     setToast((prev) => ({ ...prev, open: false }));
   }, []);
 
   const handleUndo = useCallback(async () => {
-    const success = await undoLastAction();
+    // Welcher Weg das Element angelegt hat, weiß nur der jeweilige Hook — der
+    // andere meldet dann schlicht, dass er nichts zurückzunehmen hat.
+    const success = (await live.undoLastAction()) || (await undoLastAction());
     if (success) {
       setToast({
         open: true,
@@ -170,7 +230,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         severity: 'success',
       });
     }
-  }, [undoLastAction]);
+  }, [live, undoLastAction]);
 
   const handleClarificationSelect = useCallback(async (option: string) => {
     const run = startLatencyRun('rückfrage beantwortet');
@@ -206,16 +266,22 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const isProcessing = recorderState === 'processing' || isAiProcessing;
 
   const statusLabels: Record<string, string> = {
-    analyzing: 'Analysiere...',
+    listening: 'Gespräch läuft...',
     executing: 'Führe aus...',
+    speaking: 'Antwortet...',
+    analyzing: 'Analysiere...',
   };
+  // Beide Wege melden denselben Fortschritt, aktiv ist immer nur einer.
+  const activeStatus = live.status !== 'idle' ? live.status : processingStatus;
   const statusText = isRecording
     ? 'Aufnahme...'
-    : processingStatus !== 'idle'
-      ? statusLabels[processingStatus]
+    : activeStatus !== 'idle'
+      ? statusLabels[activeStatus]
       : isProcessing
         ? 'Verarbeitung...'
         : null;
+
+  const isOpen = live.isActive || isRecording;
 
   return (
     <>
@@ -238,7 +304,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
           <Typography
             variant="body2"
             sx={{
-              backgroundColor: isRecording ? 'error.main' : 'primary.main',
+              backgroundColor: isOpen ? 'error.main' : 'primary.main',
               color: 'white',
               px: 1.5,
               py: 0.5,
@@ -252,16 +318,38 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
             {statusText}
           </Typography>
         )}
-        <Tooltip title={isRecording ? 'Klicken zum Stoppen' : 'KI-Assistent (klicken zum Sprechen)'}>
+        {live.isActive && (
+          <Tooltip title="Fertig — jetzt antworten">
+            <span>
+              <Fab
+                color="primary"
+                aria-label="Beitrag beenden"
+                size="small"
+                onClick={handleFinishSpeaking}
+              >
+                <CheckIcon />
+              </Fab>
+            </span>
+          </Tooltip>
+        )}
+        <Tooltip
+          title={
+            live.isActive
+              ? 'Gespräch beenden'
+              : isRecording
+                ? 'Klicken zum Stoppen'
+                : 'KI-Assistent (klicken zum Sprechen)'
+          }
+        >
           <span>
             <Fab
-              color={isRecording ? 'error' : 'default'}
+              color={isOpen ? 'error' : 'default'}
               aria-label="AI assistant"
               size="small"
               onClick={handleClick}
               disabled={isProcessing}
               sx={{
-                animation: isRecording ? 'pulse 1s infinite' : 'none',
+                animation: isOpen ? 'pulse 1s infinite' : 'none',
                 '@keyframes pulse': {
                   '0%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0.4)' },
                   '70%': { boxShadow: '0 0 0 10px rgba(244, 67, 54, 0)' },
@@ -271,6 +359,8 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
             >
               {isProcessing ? (
                 <CircularProgress size={24} color="inherit" />
+              ) : live.isActive ? (
+                <StopIcon />
               ) : (
                 <AutoAwesomeIcon />
               )}

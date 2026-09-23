@@ -1,0 +1,236 @@
+import { FunctionResponse, Part } from 'firebase/ai';
+import { liveModelPath } from '../../common/aiLiveToken';
+import { LiveMessage } from './liveConversation';
+
+/**
+ * Die Live-Verbindung des Browsers — ohne Firebase-SDK.
+ *
+ * Warum von Hand: Das SDK (`@firebase/ai`) baut die WebSocket-Adresse fest mit
+ * `?key=<apiKey>` und kennt nur den Firebase-Proxy-Pfad. Ein kurzlebiges Token
+ * verlangt beides anders — `?access_token=` und den Endpunkt
+ * `BidiGenerateContentConstrained` —, und das SDK bietet keine Stelle, an der
+ * sich das ändern ließe. Die Verbindung ist deshalb hier nachgebaut; das
+ * Protokoll darüber (`liveConversation.ts`) bleibt unverändert, weil die Nachrichten
+ * genau so weitergereicht werden, wie das SDK sie geliefert hat.
+ *
+ * Hintergrund: [docs/ai-sprachassistent.md](../../../docs/ai-sprachassistent.md)
+ */
+
+const LIVE_WS_HOST = 'generativelanguage.googleapis.com';
+
+/**
+ * Kurzlebige Tokens gibt es nur unter `v1alpha` — so steht es im Live-Modul
+ * des offiziellen SDK (`js-genai`), das bei jeder anderen Fassung warnt.
+ * Die Übersichtsseite der Doku nennt `v1beta`; im Zweifel gilt der Code.
+ */
+export const LIVE_API_VERSION = 'v1alpha';
+
+export function liveWebSocketUrl(token: string): string {
+  const url = new URL(`wss://${LIVE_WS_HOST}`);
+  url.pathname = `/ws/google.ai.generativelanguage.${LIVE_API_VERSION}.GenerativeService.BidiGenerateContentConstrained`;
+  url.searchParams.set('access_token', token);
+  return url.toString();
+}
+
+export interface LiveConnection {
+  readonly isClosed: boolean;
+  /** Schließt den Sprecherwechsel ab und schickt den Text mit. */
+  send(parts: Part[], turnComplete: boolean): Promise<void>;
+  /** 16-bit-PCM, 16 kHz, base64 — laufend während der Aufnahme. */
+  sendAudioRealtime(blob: { mimeType: string; data: string }): Promise<void>;
+  /**
+   * „Ich bin fertig" von Hand. Die Sprechpausenerkennung des Servers schließt
+   * den Beitrag sonst selbst, sobald es still wird; das hier schließt ihn
+   * sofort, ohne auf die Pause zu warten.
+   */
+  sendAudioStreamEnd(): Promise<void>;
+  sendFunctionResponses(responses: FunctionResponse[]): Promise<void>;
+  receive(): AsyncGenerator<LiveMessage>;
+  close(): Promise<void>;
+}
+
+/** Wandelt `{serverContent: {...}}` in `{type: 'serverContent', ...}`. */
+function tagMessage(message: Record<string, unknown>): LiveMessage | undefined {
+  if ('serverContent' in message) {
+    return { type: 'serverContent', ...(message.serverContent as object) } as LiveMessage;
+  }
+  if ('toolCall' in message) {
+    return { type: 'toolCall', ...(message.toolCall as object) } as LiveMessage;
+  }
+  if ('toolCallCancellation' in message) {
+    return {
+      type: 'toolCallCancellation',
+      ...(message.toolCallCancellation as object),
+    } as LiveMessage;
+  }
+  if ('goAway' in message) {
+    const { timeLeft } = message.goAway as { timeLeft?: string };
+    return {
+      type: 'goingAwayNotice',
+      // Die API schreibt Dauern als `"30s"`.
+      timeLeft: timeLeft?.endsWith('s') ? Number(timeLeft.slice(0, -1)) : 0,
+    } as LiveMessage;
+  }
+  if ('sessionResumptionUpdate' in message) {
+    return {
+      type: 'sessionResumptionUpdate',
+      ...(message.sessionResumptionUpdate as object),
+    } as LiveMessage;
+  }
+  return undefined;
+}
+
+async function payloadText(data: unknown): Promise<string | undefined> {
+  if (typeof data === 'string') {
+    return data;
+  }
+  if (data instanceof Blob) {
+    return data.text();
+  }
+  return undefined;
+}
+
+/**
+ * Öffnet die Sitzung und wartet den Handshake ab.
+ *
+ * Das Setup, das hier hinausgeht, ist absichtlich mager: Steht im Token ein
+ * `bidiGenerateContentSetup` — und das tut es —, verwirft der Server das Setup
+ * des Browsers vollständig. Der Modellname bleibt trotzdem drin, damit die
+ * Nachricht für sich gültig ist und ein Fehler sich lesen lässt.
+ */
+export async function connectLiveSession(
+  token: string,
+  model: string,
+): Promise<LiveConnection> {
+  const socket = new WebSocket(liveWebSocketUrl(token));
+
+  /** Was eingetroffen ist, bevor jemand zuhört. `receive()` holt es nach. */
+  const queue: LiveMessage[] = [];
+  let notify: (() => void) | undefined;
+  let finished = false;
+  /** Der Handshake belegt die erste Nachricht; danach zählt die Schlange. */
+  let handshakeDone = false;
+
+  const wake = () => {
+    notify?.();
+    notify = undefined;
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const onMessage = async (event: Event) => {
+      const text = await payloadText((event as MessageEvent).data);
+      if (!text) {
+        return;
+      }
+      let message: Record<string, unknown>;
+      try {
+        message = JSON.parse(text);
+      } catch {
+        return;
+      }
+
+      if (!handshakeDone) {
+        handshakeDone = true;
+        if ('setupComplete' in message) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              'Live-Sitzung: der Server hat den Handshake nicht mit setupComplete bestätigt',
+            ),
+          );
+        }
+        return;
+      }
+
+      const tagged = tagMessage(message);
+      if (tagged) {
+        queue.push(tagged);
+        wake();
+      }
+    };
+
+    const onClose = (event: Event) => {
+      finished = true;
+      wake();
+      if (!handshakeDone) {
+        const { reason } = event as CloseEvent;
+        reject(
+          new Error(
+            `Live-Sitzung: Verbindung vom Server abgewiesen${reason ? `: ${reason}` : ''}`,
+          ),
+        );
+      }
+    };
+
+    socket.addEventListener('message', onMessage as EventListener);
+    socket.addEventListener('close', onClose);
+    socket.addEventListener('error', () => {
+      if (!handshakeDone) {
+        reject(new Error('Live-Sitzung: Verbindung fehlgeschlagen'));
+      }
+    });
+    socket.addEventListener(
+      'open',
+      () => {
+        socket.send(JSON.stringify({ setup: { model: liveModelPath(model) } }));
+      },
+      { once: true },
+    );
+  });
+
+  const sendRaw = (message: unknown) => {
+    if (finished) {
+      throw new Error('Live-Sitzung: die Verbindung ist bereits geschlossen');
+    }
+    socket.send(JSON.stringify(message));
+  };
+
+  return {
+    get isClosed() {
+      return finished;
+    },
+
+    async send(parts, turnComplete) {
+      sendRaw({
+        clientContent: { turns: [{ role: 'user', parts }], turnComplete },
+      });
+    },
+
+    async sendAudioRealtime(blob) {
+      sendRaw({ realtimeInput: { audio: blob } });
+    },
+
+    async sendAudioStreamEnd() {
+      sendRaw({ realtimeInput: { audioStreamEnd: true } });
+    },
+
+    async sendFunctionResponses(functionResponses) {
+      console.info(
+        '[AI-Live] >> Werkzeugantworten:',
+        functionResponses.map((response) => response.name),
+      );
+      sendRaw({ toolResponse: { functionResponses } });
+    },
+
+    async *receive() {
+      while (true) {
+        while (queue.length > 0) {
+          yield queue.shift()!;
+        }
+        if (finished) {
+          return;
+        }
+        await new Promise<void>((resolve) => {
+          notify = resolve;
+        });
+      }
+    },
+
+    async close() {
+      finished = true;
+      wake();
+      socket.close();
+    },
+  };
+}

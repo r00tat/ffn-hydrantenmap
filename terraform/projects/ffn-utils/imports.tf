@@ -91,6 +91,20 @@ import {
   id = "projects/${var.project}/secrets/BLAULICHTSMS_ENCRYPTION_KEY/versions/1"
 }
 
+# Der Gemini-Live-Key ist beim Umzug zwischen die Stühle gefallen: Der
+# prod-Root hat ihn beim Loslassen gelöscht, und weil ein API-Key nur **weich**
+# gelöscht wird, blieb der Name `gemini-live` 30 Tage reserviert. Das Anlegen
+# scheiterte seither mit „Resource already exists — apply blocked by lifecycle
+# params", ohne zu verraten, dass der Widersacher ein gelöschtes Objekt ist.
+# Zurückgeholt wird er mit `gcloud services api-keys undelete`; das bringt
+# denselben Key-String wieder, während ein neuer Key einen neuen String und
+# damit eine neue Secret-Version nach sich gezogen hätte. Hier wird er
+# übernommen statt angelegt.
+import {
+  to = module.project_base.google_apikeys_key.gemini_live
+  id = "projects/${var.project}/locations/global/keys/gemini-live"
+}
+
 import {
   to = module.project_base.google_iam_workload_identity_pool.github
   id = "projects/${var.project}/locations/global/workloadIdentityPools/github"
