@@ -271,3 +271,15 @@ describe('Seite bei nearItem', () => {
     expect(AI_SYSTEM_PROMPT).toMatch(/Korrektur wie "nein, links" ist ein neuer Werkzeugaufruf/);
   });
 });
+
+describe('Drehung per updateItem', () => {
+  it('bietet einen Winkel und eine relative Drehung an', () => {
+    const updates = (
+      AI_TOOL_DECLARATIONS.find((d) => d.name === 'updateItem')
+        ?.parameters as unknown as LooseSchema
+    ).properties?.updates?.properties;
+    expect(updates?.rotation?.type).toBeDefined();
+    expect(updates?.rotateBy?.type).toBeDefined();
+    expect(AI_SYSTEM_PROMPT).toMatch(/nach rechts drehen" = rotateBy 45/);
+  });
+});

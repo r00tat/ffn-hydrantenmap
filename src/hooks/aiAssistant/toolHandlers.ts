@@ -23,6 +23,7 @@ import type { TruppCommand } from '../../components/Atemschutz/truppAssistant';
 import { TRUPP_STATUSES, type TruppStatus } from '../../common/atemschutz';
 import { findFirecallItemByName } from './itemLookup';
 import { DIRECTION_LABELS, type PositionSpec } from './resolveOrigin';
+import { normalizeRotation } from '../../components/Map/markers/rotationGeometry';
 import { AiAssistantResult, ResolvedOrigin } from './types';
 import {
   calculateInverseSquareLaw,
@@ -177,6 +178,26 @@ const MARKER_KINDS: Record<string, { fallbackName: string; label: string }> = {
 function feuerwehrHinweis(fw: unknown): string {
   const name = typeof fw === 'string' ? fw.trim() : '';
   return name ? `(${name})` : 'ohne Feuerwehr';
+}
+
+/** Typen, die die Karte dreht — dieselben wie `isRotatable()` der Elemente. */
+const ROTATABLE_TYPES = new Set(['vehicle', 'rohr']);
+
+/**
+ * Drehung nach `updateItem`, in ganzen Grad im Uhrzeigersinn, 0 bis 359.
+ * `rotation` setzt den Winkel, `rotateBy` dreht vom jetzigen aus weiter —
+ * „um 45° nach rechts" ist +45. `undefined`, wenn keine Drehung verlangt ist.
+ */
+function neueDrehung(
+  item: FirecallItem,
+  updates: Record<string, unknown>,
+): number | 'nicht drehbar' | undefined {
+  const absolut = typeof updates.rotation === 'number' ? updates.rotation : undefined;
+  const relativ = typeof updates.rotateBy === 'number' ? updates.rotateBy : undefined;
+  if (absolut === undefined && relativ === undefined) return undefined;
+  if (!ROTATABLE_TYPES.has(item.type)) return 'nicht drehbar';
+  const winkel = absolut ?? normalizeRotation(item.rotation) + relativ!;
+  return normalizeRotation(Math.round(winkel));
 }
 
 /**
@@ -374,11 +395,25 @@ export async function executeToolCall(
       if (updates.name) updatedItem.name = updates.name as string;
       if (updates.color) (updatedItem as any).color = updates.color as string;
       if (updates.beschreibung) updatedItem.beschreibung = updates.beschreibung as string;
+
+      const drehung = neueDrehung(targetItem, updates);
+      if (drehung === 'nicht drehbar') {
+        return {
+          success: false,
+          message: `"${targetItem.name}" lässt sich nicht drehen, nur Fahrzeuge und Rohre`,
+        };
+      }
+      if (drehung !== undefined) updatedItem.rotation = String(drehung);
+
       await updateFirecallItem(updatedItem);
+      const teile = [
+        origin ? `${positionHinweis(positionSpec!, origin)} gesetzt` : undefined,
+        drehung !== undefined ? `auf ${drehung}° gedreht` : undefined,
+      ].filter(Boolean);
       return {
         success: true,
-        message: origin
-          ? `"${targetItem.name}" ${positionHinweis(positionSpec!, origin)} gesetzt`
+        message: teile.length
+          ? `"${targetItem.name}" ${teile.join(' und ')}`
           : `"${targetItem.name}" aktualisiert`,
       };
     }

@@ -34,6 +34,17 @@ describe('projectFirecallItem', () => {
     ).toMatchObject({ fw: 'FF N', besatzung: '1:8', ats: 2 });
   });
 
+  it('nennt die Drehung bei Fahrzeug und Rohr, aber nicht die 0', () => {
+    expect(projectFirecallItem(item({ type: 'vehicle', rotation: '45' })).rotation).toBe(45);
+    expect(projectFirecallItem(item({ type: 'rohr', rotation: '-90' })).rotation).toBe(270);
+    expect(projectFirecallItem(item({ type: 'vehicle', rotation: '0' }))).not.toHaveProperty(
+      'rotation',
+    );
+    expect(projectFirecallItem(item({ type: 'marker', rotation: '45' }))).not.toHaveProperty(
+      'rotation',
+    );
+  });
+
   it('gibt den Tagebuchtext nur auf Anforderung heraus', () => {
     const entry = item({ type: 'diary', beschreibung: 'Text', von: 'EL' });
     expect(projectFirecallItem(entry).beschreibung).toBeUndefined();

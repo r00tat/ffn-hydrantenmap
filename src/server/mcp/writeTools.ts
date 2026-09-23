@@ -267,6 +267,14 @@ export function registerWriteTools(
           beschreibung: z.string().optional(),
           color: z.string().optional(),
           position: positionSchema,
+          rotation: z
+            .number()
+            .optional()
+            .describe('Drehung in Grad im Uhrzeigersinn, nur Fahrzeug und Rohr'),
+          rotateBy: z
+            .number()
+            .optional()
+            .describe('Um so viele Grad weiterdrehen, positiv im Uhrzeigersinn'),
         }),
       }),
       annotations: {

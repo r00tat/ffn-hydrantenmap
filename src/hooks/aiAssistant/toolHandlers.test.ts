@@ -867,3 +867,51 @@ describe('executeToolCall — updateItem', () => {
     );
   });
 });
+
+describe('executeToolCall — updateItem dreht', () => {
+  const fahrzeug = { id: 'tlf', type: 'vehicle', name: 'TLF', lat: 47.9, lng: 16.8, rotation: '30' };
+
+  const drehe = async (updates: Record<string, unknown>, item: object = fahrzeug) => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const result = await executeToolCall(
+      call('updateItem', { itemName: 'TLF', updates }),
+      makeDeps({ existingItems: [item] as never, updateFirecallItem }),
+    );
+    return { result, updateFirecallItem };
+  };
+
+  it('dreht um einen Winkel vom jetzigen aus weiter', async () => {
+    const { result, updateFirecallItem } = await drehe({ rotateBy: 45 });
+    expect(result).toEqual({ success: true, message: '"TLF" auf 75° gedreht' });
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ rotation: '75', lat: 47.9, lng: 16.8 }),
+    );
+  });
+
+  it('dreht nach links über 0 hinaus auf den Rest des Vollkreises', async () => {
+    const { updateFirecallItem } = await drehe({ rotateBy: -45 });
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ rotation: '345' }),
+    );
+  });
+
+  it('setzt einen Winkel und nimmt einen fehlenden Winkel als 0', async () => {
+    const { updateFirecallItem } = await drehe(
+      { rotation: 90 },
+      { ...fahrzeug, rotation: undefined },
+    );
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ rotation: '90' }),
+    );
+  });
+
+  it('lehnt die Drehung bei Elementen ab, die die Karte nicht dreht', async () => {
+    const { result, updateFirecallItem } = await drehe(
+      { rotateBy: 45 },
+      { id: 'm', type: 'marker', name: 'TLF-Marker', lat: 1, lng: 2 },
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/lässt sich nicht drehen/);
+    expect(updateFirecallItem).not.toHaveBeenCalled();
+  });
+});

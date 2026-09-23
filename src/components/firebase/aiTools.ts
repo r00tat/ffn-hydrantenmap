@@ -466,7 +466,9 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: 'updateItem',
-    description: 'Update an existing item on the map',
+    description:
+      'Update an existing item on the map: name, color, description, position ' +
+      'or rotation (vehicles and Rohre only)',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -479,6 +481,19 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
             color: { type: SchemaType.STRING },
             beschreibung: { type: SchemaType.STRING },
             position: positionSchema,
+            rotation: {
+              type: SchemaType.NUMBER,
+              description:
+                'Set the rotation to this angle in degrees, clockwise, 0 = ' +
+                'upright. Only vehicles and Rohre rotate',
+            },
+            rotateBy: {
+              type: SchemaType.NUMBER,
+              description:
+                'Rotate by this many degrees from the current rotation: ' +
+                'positive = clockwise ("nach rechts"), negative = ' +
+                'counter-clockwise ("nach links")',
+            },
           },
         },
       },
@@ -754,7 +769,10 @@ Aktionen:
   frage den Benutzer und rufe erst nach seinem Ja mit recordAnyway erneut auf.
 - Die laufenden Trupps stehen im Kontext unter atemschutzTrupps. Fragen zum
   Truppstand ("wer ist noch drin?") beantwortest du daraus mit answerQuestion.
-- updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position)
+- updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position,
+  Drehung). "Um 45° nach rechts drehen" = rotateBy 45, "nach links" = rotateBy -45,
+  "auf 90° drehen" = rotation 90. Drehbar sind Fahrzeuge und Rohre; die
+  aktuelle Drehung steht im Kontext unter rotation.
 - deleteItem: Bestehendes Element löschen
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
 - calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)

@@ -314,6 +314,24 @@ selbst. `updateItem` meldet zurück, wohin das Element kam („links neben
 seine Antwort; eine Verschiebung ohne Aufruf zu behaupten, verbietet der
 Systemprompt ausdrücklich.
 
+## Was das Modell von einem Element sieht und ändern kann
+
+Das Modell sieht nicht das ganze Dokument, sondern die Projektion aus
+[itemDto.ts](../src/common/mcp/itemDto.ts), und ändern kann es nur, was
+`updateItem` als Feld führt. Ein Feld, das dort fehlt, gibt es für das Modell
+nicht — es sagt dann zu Recht, dass es das nicht kann. Wer ein Feld
+sprachfähig machen will, braucht beides: das Feld in der Projektion, damit
+das Modell den jetzigen Wert kennt, und den Parameter an `updateItem`.
+
+Die Drehung ist so ein Feld. `rotation` setzt den Winkel, `rotateBy` dreht
+vom jetzigen aus weiter; beides in Grad im Uhrzeigersinn, wie der Griff auf
+der Karte, und „nach rechts" ist positiv. Das relative Feld gibt es, weil
+„noch 45° weiter" die übliche Anweisung ist und das Modell sonst selbst
+rechnen müsste. Gedreht werden nur Fahrzeuge und Rohre — dieselben Typen,
+deren `isRotatable()` wahr ist; bei allen anderen liegt `rotation` zwar im
+Dokument, die Karte zeigt sie aber nicht. Die Projektion nennt die Drehung nur,
+wenn sie nicht 0 ist.
+
 ## Werkzeuge, die die Karte verlassen
 
 Die meisten Werkzeuge schreiben Elemente des laufenden Einsatzes oder rechnen.
