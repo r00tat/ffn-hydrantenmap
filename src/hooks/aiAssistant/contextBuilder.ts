@@ -1,5 +1,6 @@
 import { projectFirecallItem } from '../../common/mcp/itemDto';
 import { FirecallItem } from '../../components/firebase/firestore';
+import type { AiTruppContext } from '../../components/Atemschutz/truppAssistant';
 import { AiContext, AiContextItem, AiInteraction } from './types';
 
 export function buildAiContext({
@@ -9,6 +10,7 @@ export function buildAiContext({
   isPositionSet,
   position,
   interactions,
+  trupps,
 }: {
   map: { getCenter: () => { lat: number; lng: number }; getBounds: () => any; getZoom: () => number } | null;
   defaultPosition: { lat: number; lng: number };
@@ -16,6 +18,8 @@ export function buildAiContext({
   isPositionSet: boolean;
   position: { lat: number; lng: number };
   interactions: AiInteraction[];
+  /** Laufende Atemschutztrupps, siehe `truppKontext`. */
+  trupps?: AiTruppContext[];
 }): AiContext {
   const center = map ? map.getCenter() : defaultPosition;
   const bounds = map ? map.getBounds() : null;
@@ -41,5 +45,8 @@ export function buildAiContext({
     existingItems: contextItems,
     userPosition: isPositionSet ? { lat: position.lat, lng: position.lng } : null,
     recentInteractions: interactions,
+    // Nur mit Trupps: Der Kontext geht bei jedem Zug hinaus und soll dort,
+    // wo kein Atemschutz läuft, nicht wachsen.
+    ...(trupps && trupps.length > 0 ? { atemschutzTrupps: trupps } : {}),
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeSchemaTypes } from '../../common/aiLiveToken';
+import { TRUPP_STATUSES } from '../../common/atemschutz';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from './aiTools';
 
 /** Die Schema-Typen, die die Gemini-API kennt — großgeschrieben wie im Draht. */
@@ -165,5 +166,35 @@ describe('AI system prompt', () => {
 
   it('tells the model that one search call is enough', () => {
     expect(AI_SYSTEM_PROMPT).toContain('searchWaterSupply EINMAL aufrufen');
+  });
+});
+
+describe('Atemschutztrupp tools', () => {
+  const byName = (name: string) => AI_TOOL_DECLARATIONS.find((d) => d.name === name);
+
+  it('declares the three trupp tools', () => {
+    for (const name of [
+      'createAtemschutzTrupp',
+      'setAtemschutzTruppStatus',
+      'recordAtemschutzTruppReport',
+    ]) {
+      expect(byName(name)).toBeDefined();
+    }
+  });
+
+  it('offers exactly the stored trupp states', () => {
+    // Die Werte stehen so in Firestore und so im Kontext beim Modell. Eine
+    // englische Übersetzung im Schema wäre eine zweite Schreibweise für
+    // denselben Zustand.
+    const status = (
+      byName('setAtemschutzTruppStatus')?.parameters as unknown as LooseSchema
+    ).properties?.status;
+    expect(status?.enum).toEqual(TRUPP_STATUSES);
+  });
+
+  it('keeps trupps apart from tactical units and the ASSP marker', () => {
+    const section = AI_SYSTEM_PROMPT.slice(AI_SYSTEM_PROMPT.indexOf('createAtemschutzTrupp'));
+    expect(section).toContain('NICHT createTacticalUnit');
+    expect(section).toContain('createAssp');
   });
 });

@@ -1,4 +1,5 @@
 import { FunctionDeclaration, SchemaType } from 'firebase/ai';
+import { TRUPP_STATUSES } from '../../common/atemschutz';
 
 // Position schema used by multiple tools
 const positionSchema = {
@@ -318,6 +319,138 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'createAtemschutzTrupp',
+    description:
+      'Register a breathing apparatus team (Atemschutztrupp) for the time ' +
+      'monitoring (Atemschutzüberwachung). This is NOT a map element — not ' +
+      'createTacticalUnit, not createAssp. The team starts in state bereit; ' +
+      'the speaker takes over its time monitoring and gets its warnings.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        name: {
+          type: SchemaType.STRING,
+          description: 'Team designation as spoken, e.g. "Trupp 1" or "Angriffstrupp"',
+        },
+        fireDepartment: {
+          type: SchemaType.STRING,
+          description:
+            'Fire department of the team. Omit for the own fire department of the Einsatz',
+        },
+        members: {
+          type: SchemaType.ARRAY,
+          description: 'Names of the team members, usually three. At least one is required',
+          items: { type: SchemaType.STRING },
+        },
+        unit: {
+          type: SchemaType.STRING,
+          description: 'Vehicle or tactical unit the team belongs to, e.g. "RLFA"',
+        },
+        note: { type: SchemaType.STRING, description: 'Remark about the team' },
+      },
+      required: ['members'],
+    },
+  },
+  {
+    name: 'setAtemschutzTruppStatus',
+    description:
+      'Change the state of a breathing apparatus team: assign it to a unit ' +
+      '(zugeteilt), send it in under breathing apparatus (imEinsatz — this ' +
+      'starts the time monitoring), bring it back (zurueck), make a returned ' +
+      'team ready again (bereit) or sign it off (abgemeldet). A returned team ' +
+      'sent in again gets a new deployment row automatically.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        trupp: {
+          type: SchemaType.STRING,
+          description:
+            'Which team, as spoken — its name or a member name. Omit only when ' +
+            'exactly one team can be meant',
+        },
+        status: {
+          type: SchemaType.STRING,
+          enum: TRUPP_STATUSES,
+          description:
+            'Target state: bereit, zugeteilt, imEinsatz, zurueck or abgemeldet',
+        },
+        unit: {
+          type: SchemaType.STRING,
+          description: 'Vehicle or tactical unit the team is assigned to',
+        },
+        pressure: {
+          type: SchemaType.NUMBER,
+          description:
+            'Lowest cylinder pressure in the team in bar, as spoken — at ' +
+            'handover, departure or return depending on the state',
+        },
+        mission: {
+          type: SchemaType.STRING,
+          description: 'The order — what the team does, e.g. "Menschenrettung"',
+        },
+        target: {
+          type: SchemaType.STRING,
+          description: 'Where the team goes, e.g. "Keller Stiegenhaus links"',
+        },
+        monitoredBy: {
+          type: SchemaType.STRING,
+          description: 'Who keeps the time monitoring, e.g. "Maschinist RLFA"',
+        },
+        time: {
+          type: SchemaType.STRING,
+          description:
+            'Time of the change as HH:MM when it was stated. Omit for now',
+        },
+      },
+      required: ['status'],
+    },
+  },
+  {
+    name: 'recordAtemschutzTruppReport',
+    description:
+      'Record a radio report of a breathing apparatus team in action: a ' +
+      'pressure reading, arrival at the target, the start of the withdrawal ' +
+      'or a note ("starke Verrauchung"). A report may carry any of these. ' +
+      'Only for teams in state imEinsatz.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        trupp: {
+          type: SchemaType.STRING,
+          description:
+            'Which team, as spoken. Omit only when exactly one team is in action',
+        },
+        pressure: {
+          type: SchemaType.NUMBER,
+          description: 'Lowest cylinder pressure in the team in bar, as spoken',
+        },
+        atTarget: {
+          type: SchemaType.BOOLEAN,
+          description:
+            'The team reports it has reached its target. Not the same as ' +
+            '"task done" — only when the arrival was reported',
+        },
+        withdrawing: {
+          type: SchemaType.BOOLEAN,
+          description: 'The team reports it has started to withdraw',
+        },
+        note: { type: SchemaType.STRING, description: 'Free text of the report' },
+        logToDiary: {
+          type: SchemaType.BOOLEAN,
+          description:
+            'Also write a free report into the Einsatztagebuch. Arrival and ' +
+            'withdrawal go there anyway',
+        },
+        recordAnyway: {
+          type: SchemaType.BOOLEAN,
+          description:
+            'Record although the value looked implausible. Only after the ' +
+            'user confirmed it',
+        },
+      },
+    },
+  },
+  {
     name: 'updateItem',
     description: 'Update an existing item on the map',
     parameters: {
@@ -581,7 +714,8 @@ Verfügbare Elemente:
 - circle: Kreise mit Radius (createCircle)
 - el: Einsatzleitung-Marker (createEl)
 - assp: Atemschutzsammelplatz (createAssp)
-- tacticalUnit: Taktische Einheiten wie Trupp, Gruppe, Zug, Abschnitt (createTacticalUnit)
+- tacticalUnit: Taktische Einheiten wie Trupp, Gruppe, Zug, Abschnitt (createTacticalUnit) -
+  ein Kartenelement. Ein Atemschutztrupp zur Überwachung ist createAtemschutzTrupp
 
 Aktionen:
 - searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
@@ -594,6 +728,21 @@ Aktionen:
 - getFahrtenbuchCounters: Letzten Kilometer- bzw. Zählerstand eines Fahrzeugs
   nachsehen. Fragen nach einem Kilometerstand NIEMALS mit answerQuestion
   beantworten - die Zahl steht nur im Fahrtenbuch.
+- createAtemschutzTrupp: Atemschutztrupp für die Atemschutzüberwachung anlegen
+  ("Trupp anlegen", "neuer Atemschutztrupp"). NICHT createTacticalUnit - das
+  legt eine taktische Einheit auf der Karte an. NICHT createAssp - das ist nur
+  ein Marker für den Sammelplatz.
+- setAtemschutzTruppStatus: Trupp zuteilen, in den Einsatz schicken ("geht
+  unter Atemschutz", "Abmarsch"), zurückholen ("ist zurück", "wieder
+  draußen"), wieder bereitstellen oder abmelden.
+- recordAtemschutzTruppReport: Druckabfrage oder Meldung eines Trupps im
+  Einsatz ("Trupp 1 hat 210 bar", "am Ziel", "treten den Rückzug an",
+  "starke Verrauchung"). Eine Notiz zum Trupp während des Einsatzes ist eine
+  solche Meldung. Druckwerte so weitergeben, wie sie gesagt wurden.
+  Meldet das Ergebnis eine Auffälligkeit und fragt "trotzdem eintragen?",
+  frage den Benutzer und rufe erst nach seinem Ja mit recordAnyway erneut auf.
+- Die laufenden Trupps stehen im Kontext unter atemschutzTrupps. Fragen zum
+  Truppstand ("wer ist noch drin?") beantwortest du daraus mit answerQuestion.
 - updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position)
 - deleteItem: Bestehendes Element löschen
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")

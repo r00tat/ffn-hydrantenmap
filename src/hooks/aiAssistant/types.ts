@@ -1,4 +1,5 @@
 import { HoseLineDraft } from '../../common/waterSupply';
+import type { AiTruppContext } from '../../components/Atemschutz/truppAssistant';
 
 export interface AiInteraction {
   timestamp: number;
@@ -44,6 +45,8 @@ export interface AiContext {
   existingItems: AiContextItem[];
   userPosition: { lat: number; lng: number } | null;
   recentInteractions: AiInteraction[];
+  /** Laufende Atemschutztrupps; fehlt, solange es keine gibt. */
+  atemschutzTrupps?: AiTruppContext[];
 }
 
 export interface AiAssistantResult {

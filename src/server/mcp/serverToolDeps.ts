@@ -117,6 +117,13 @@ export function createServerToolDeps({
       success: false,
       message: 'Das Fahrtenbuch ist über den MCP-Zugang nicht erreichbar.',
     }),
+    // Nicht nur fehlend, sondern bewusst ausgesperrt: Ein über MCP entsendeter
+    // Trupp hätte niemanden, dessen Gerät die Warnungen abonniert — die
+    // Push-Registrierung gibt es nur im Browser.
+    runAtemschutzTruppCommand: async () => ({
+      success: false,
+      message: 'Die Atemschutzüberwachung ist über den MCP-Zugang nicht erreichbar.',
+    }),
     resolveOrigin,
     resolvePosition: async (positionSpec) => {
       const { lat, lng } = await resolveOrigin(positionSpec);

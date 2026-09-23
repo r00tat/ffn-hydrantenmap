@@ -54,6 +54,10 @@ function makeDeps(overrides: Partial<ToolHandlerDeps> = {}): ToolHandlerDeps {
       success: true,
       message: 'RLFA-A: Kilometerstand 1700 km.',
     })),
+    runAtemschutzTruppCommand: vi.fn(async () => ({
+      success: true,
+      message: 'Trupp 1 angelegt',
+    })),
     ...overrides,
   } as ToolHandlerDeps;
 }
@@ -544,5 +548,100 @@ describe('getFahrtenbuchCounters', () => {
     const deps = makeDeps();
     await executeToolCall(call('getFahrtenbuchCounters'), deps);
     expect(deps.getFahrtenbuchCounters).toHaveBeenCalledWith(undefined);
+  });
+});
+
+describe('Atemschutztrupps', () => {
+  it('reicht das Anlegen als Befehl durch', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createAtemschutzTrupp', {
+        name: 'Trupp 1',
+        members: ['Max Huber', 'Anna Gruber'],
+        unit: 'RLFA',
+      }),
+      deps
+    );
+
+    expect(deps.runAtemschutzTruppCommand).toHaveBeenCalledWith({
+      kind: 'create',
+      name: 'Trupp 1',
+      members: ['Max Huber', 'Anna Gruber'],
+      unit: 'RLFA',
+    });
+    expect(result.success).toBe(true);
+    // Ein Trupp ist kein Kartenelement — „rückgängig" fände ihn nie wieder.
+    expect(result.createdItemId).toBeUndefined();
+  });
+
+  it('reicht einen Statuswechsel samt Druck und Auftrag durch', async () => {
+    const deps = makeDeps();
+    await executeToolCall(
+      call('setAtemschutzTruppStatus', {
+        trupp: 'Trupp 1',
+        status: 'imEinsatz',
+        pressure: 300,
+        mission: 'Menschenrettung',
+        target: 'Keller',
+      }),
+      deps
+    );
+
+    expect(deps.runAtemschutzTruppCommand).toHaveBeenCalledWith({
+      kind: 'status',
+      trupp: 'Trupp 1',
+      status: 'imEinsatz',
+      pressure: 300,
+      mission: 'Menschenrettung',
+      target: 'Keller',
+    });
+  });
+
+  it('lehnt einen unbekannten Zustand ab, ohne zu schreiben', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('setAtemschutzTruppStatus', { trupp: 'Trupp 1', status: 'deployed' }),
+      deps
+    );
+
+    expect(result.success).toBe(false);
+    expect(deps.runAtemschutzTruppCommand).not.toHaveBeenCalled();
+  });
+
+  it('reicht eine Meldung samt Bestätigung durch', async () => {
+    const deps = makeDeps();
+    await executeToolCall(
+      call('recordAtemschutzTruppReport', {
+        trupp: 'Trupp 1',
+        pressure: 260,
+        atTarget: true,
+        recordAnyway: true,
+      }),
+      deps
+    );
+
+    expect(deps.runAtemschutzTruppCommand).toHaveBeenCalledWith({
+      kind: 'report',
+      trupp: 'Trupp 1',
+      pressure: 260,
+      atTarget: true,
+      recordAnyway: true,
+    });
+  });
+
+  it('gibt eine Rückfrage als Misserfolg zurück', async () => {
+    const deps = makeDeps({
+      runAtemschutzTruppCommand: vi.fn(async () => ({
+        success: false,
+        message: 'Trupp 1 hatte zuletzt 240 bar, jetzt 260 bar. Soll ich das trotzdem eintragen?',
+      })),
+    });
+    const result = await executeToolCall(
+      call('recordAtemschutzTruppReport', { trupp: 'Trupp 1', pressure: 260 }),
+      deps
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('trotzdem');
   });
 });
