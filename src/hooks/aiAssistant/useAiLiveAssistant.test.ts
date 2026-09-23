@@ -28,7 +28,11 @@ vi.mock('../useFirecall', () => ({
   useFirecallId: vi.fn(() => 'test-firecall'),
   useFirecall: vi.fn(() => ({ id: 'test-firecall', name: 'Test' })),
 }));
-vi.mock('../useMapEditor', () => ({ useHistoryPathSegments: vi.fn(() => []) }));
+vi.mock('../useMapEditor', () => ({
+  default: vi.fn(() => ({ lastSelectedLayer: '', setLastSelectedLayer: vi.fn() })),
+  useHistoryPathSegments: vi.fn(() => []),
+}));
+vi.mock('../useFirecallLayers', () => ({ useFirecallLayers: vi.fn(() => ({})) }));
 vi.mock('../../components/actions/maps/places', () => ({ searchPlace: vi.fn() }));
 vi.mock('./toolHandlers', () => ({ executeToolCall: vi.fn() }));
 vi.mock('../../components/Atemschutz/useTruppAssistant', () => ({

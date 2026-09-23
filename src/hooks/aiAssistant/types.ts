@@ -1,5 +1,6 @@
 import { HoseLineDraft } from '../../common/waterSupply';
 import type { AiTruppContext } from '../../components/Atemschutz/truppAssistant';
+import type { AiContextLayer } from './layerFields';
 
 export interface AiInteraction {
   timestamp: number;
@@ -47,6 +48,10 @@ export interface AiContext {
   recentInteractions: AiInteraction[];
   /** Laufende Atemschutztrupps; fehlt, solange es keine gibt. */
   atemschutzTrupps?: AiTruppContext[];
+  /** Ebenen mit ihren Datenfeldern; fehlt, solange es keine gibt. */
+  layers?: AiContextLayer[];
+  /** Name der aktiven Ebene — dorthin kommen neue Marker ohne genannte Ebene. */
+  activeLayer?: string;
 }
 
 export interface AiAssistantResult {

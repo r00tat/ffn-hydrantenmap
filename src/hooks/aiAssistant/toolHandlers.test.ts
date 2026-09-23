@@ -34,6 +34,7 @@ function makeDeps(overrides: Partial<ToolHandlerDeps> = {}): ToolHandlerDeps {
     addFirecallItem: vi.fn(async () => ({ id: 'new-id' })),
     updateFirecallItem: vi.fn(async () => {}),
     existingItems: [],
+    layers: [],
     lastCreatedItem: null,
     setLastCreatedItem: vi.fn(),
     map: null,
@@ -913,5 +914,144 @@ describe('executeToolCall — updateItem dreht', () => {
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/lässt sich nicht drehen/);
     expect(updateFirecallItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('Ebenen und Messwerte', () => {
+  const strahlen = {
+    id: 'l1',
+    type: 'layer',
+    name: 'Strahlenmessung',
+    dataSchema: [
+      { key: 'dosisleistung', label: 'Dosisleistung', unit: 'µSv/h', type: 'number' },
+    ],
+  };
+  const abschnitt = { id: 'l2', type: 'layer', name: 'Abschnitt Nord' };
+  const layers = [strahlen, abschnitt] as never;
+
+  it('legt eine Messung in die aktive Ebene und rechnet die Einheit um', async () => {
+    const addFirecallItem = vi.fn(async () => ({ id: 'm1' }));
+    const setActiveLayer = vi.fn();
+    const result = await executeToolCall(
+      call('createMarker', {
+        name: 'Messung',
+        values: [{ field: 'dosisleistung', value: '37', unit: 'mSv/h' }],
+      }),
+      makeDeps({ layers, activeLayerId: 'l1', setActiveLayer, addFirecallItem }),
+    );
+    expect(result.success).toBe(true);
+    expect(result.message).toBe(
+      'Marker "Messung" in Ebene "Strahlenmessung" erstellt: Dosisleistung 37000 µSv/h',
+    );
+    expect(addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ layer: 'l1', fieldData: { dosisleistung: 37000 } }),
+    );
+    // Die Ebene war schon aktiv und wurde nicht genannt.
+    expect(setActiveLayer).not.toHaveBeenCalled();
+  });
+
+  it('macht eine genannte Ebene zur aktiven', async () => {
+    const setActiveLayer = vi.fn();
+    await executeToolCall(
+      call('createMarker', { name: 'Sperre', layer: 'Abschnitt' }),
+      makeDeps({ layers, activeLayerId: 'l1', setActiveLayer }),
+    );
+    expect(setActiveLayer).toHaveBeenCalledWith('l2');
+  });
+
+  it('legt nichts an, wenn die Ebene oder ein Feld fehlt', async () => {
+    const addFirecallItem = vi.fn(async () => ({ id: 'x' }));
+    const deps = makeDeps({ layers, addFirecallItem });
+
+    const ohneEbene = await executeToolCall(
+      call('createMarker', { name: 'M', layer: 'Gibtsnicht' }),
+      deps,
+    );
+    expect(ohneEbene.message).toBe(
+      'Ebene "Gibtsnicht" nicht gefunden (Ebenen: "Strahlenmessung", "Abschnitt Nord")',
+    );
+
+    const ohneAktive = await executeToolCall(
+      call('createMarker', { name: 'M', values: [{ field: 'dosisleistung', value: '1' }] }),
+      deps,
+    );
+    expect(ohneAktive.success).toBe(false);
+    expect(ohneAktive.message).toMatch(/keine genannt und keine aktiv/);
+
+    const falschesFeld = await executeToolCall(
+      call('createMarker', {
+        name: 'M',
+        layer: 'Strahlenmessung',
+        values: [{ field: 'Temperatur', value: '20' }],
+      }),
+      deps,
+    );
+    expect(falschesFeld.success).toBe(false);
+    expect(addFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('ändert einen Messwert am Element in seiner Ebene', async () => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const messung = {
+      id: 'm1',
+      type: 'marker',
+      name: 'Messung',
+      layer: 'l1',
+      fieldData: { dosisleistung: 37000 },
+    };
+    const result = await executeToolCall(
+      call('updateItem', {
+        itemName: 'Messung',
+        updates: { values: [{ field: 'dosisleistung', value: '40', unit: 'µSv/h' }] },
+      }),
+      makeDeps({ layers, existingItems: [messung] as never, updateFirecallItem }),
+    );
+    expect(result.message).toBe('"Messung" Werte gesetzt: Dosisleistung 40 µSv/h');
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ fieldData: { dosisleistung: 40 } }),
+    );
+  });
+});
+
+describe('updateItem — Felder des Typs', () => {
+  const fahrzeug = { id: 'v1', type: 'vehicle', name: 'KLF', lat: 1, lng: 2 };
+
+  it('setzt Feuerwehr, Besatzung und Eintreffen', async () => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const result = await executeToolCall(
+      call('updateItem', {
+        itemName: 'KLF',
+        updates: { fw: 'Weiden', besatzung: '1:8', eintreffen: 'jetzt' },
+      }),
+      makeDeps({ existingItems: [fahrzeug] as never, updateFirecallItem }),
+    );
+    expect(result.message).toBe('"KLF" geändert: fw, besatzung, eintreffen');
+    const saved = (updateFirecallItem.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(saved).toMatchObject({ fw: 'Weiden', besatzung: '8' });
+    expect(Number.isNaN(Date.parse(saved.eintreffen as string))).toBe(false);
+  });
+
+  it('lehnt ein Feld ab, das der Typ nicht hat, und schreibt nichts', async () => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const result = await executeToolCall(
+      call('updateItem', { itemName: 'KLF', updates: { durchfluss: 400 } }),
+      makeDeps({ existingItems: [fahrzeug] as never, updateFirecallItem }),
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/"durchfluss" gibt es bei "KLF" nicht \(änderbar: fw,/);
+    expect(updateFirecallItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('zeitpunkt', () => {
+  const now = new Date('2026-09-23T18:00:00Z');
+
+  it('liest jetzt, eine Uhrzeit und ISO', async () => {
+    const { zeitpunkt } = await import('./toolHandlers');
+    expect(zeitpunkt('jetzt', now)).toBe(now.toISOString());
+    const uhrzeit = new Date(zeitpunkt('14:30', now)!);
+    expect([uhrzeit.getHours(), uhrzeit.getMinutes()]).toEqual([14, 30]);
+    expect(zeitpunkt('2026-09-23T12:00:00Z', now)).toBe('2026-09-23T12:00:00.000Z');
+    expect(zeitpunkt('gestern irgendwann', now)).toBeUndefined();
   });
 });

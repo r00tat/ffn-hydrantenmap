@@ -332,6 +332,47 @@ deren `isRotatable()` wahr ist; bei allen anderen liegt `rotation` zwar im
 Dokument, die Karte zeigt sie aber nicht. Die Projektion nennt die Drehung nur,
 wenn sie nicht 0 ist.
 
+Die übrigen Felder der Dialoge — Feuerwehr, Besatzung, Zeiten, Durchfluss,
+Radius und so fort — stehen je Typ in
+[editableFields.ts](../src/hooks/aiAssistant/editableFields.ts). Die Liste
+liegt dort und nicht in den Elementklassen, weil die an Leaflet hängen und im
+MCP-Server nicht laden; ein Test prüft sie gegen `fields()` der Klassen. Ein
+Feld, das der Typ nicht hat, lehnt `updateItem` mit den änderbaren Feldern ab
+und schreibt dann gar nichts — ein halb übernommener Befehl wäre schlimmer als
+eine Rückfrage. Zeiten nimmt es als „jetzt", „14:30" oder ISO und speichert
+ISO, wie der Dialog.
+
+## Ebenen und Messwerte: „Neue Messung 37 Millisievert pro Stunde"
+
+Eine Ebene kann Datenfelder haben (`dataSchema`: Schlüssel, Bezeichnung,
+Einheit, Typ, auch berechnete Felder), die Werte liegen am Element in
+`fieldData`. Der Kontext führt die Ebenen mit ihren Feldern, am Element Ebene
+und Werte, und `activeLayer`. `createMarker` und `updateItem` nehmen `layer`
+und `values`; die Logik steht in
+[layerFields.ts](../src/hooks/aiAssistant/layerFields.ts).
+
+- **Aktive Ebene.** Ohne genannte Ebene kommt ein neuer Marker in die zuletzt
+  gewählte, `lastSelectedLayer` des `MapEditorProvider` — dieselbe, die die
+  Oberfläche beim Anlegen vorbelegt. Eine genannte Ebene wird danach zur
+  aktiven, damit „noch eine Messung, 40" ohne erneute Angabe dort landet. Der
+  MCP-Server hat keine aktive Ebene; dort muss die Ebene genannt werden.
+- **Einheiten rechnet der Code, nicht das Modell.** Das Modell gibt Zahl und
+  gesagte Einheit weiter („37", „mSv/h"), `convertUnit` rechnet über
+  SI-Vorsätze derselben Grundeinheit in die Einheit des Felds. Ein Faktor 1000
+  zwischen Milli- und Mikrosievert ist genau der Fehler, der einem Modell
+  unterläuft und im Einsatz nicht auffallen darf. Unverträgliche Einheiten
+  (ppm gegen µSv/h) werden abgelehnt statt still übernommen.
+- **Berechnete Felder und Vorgaben** wie im Dialog: Nach dem Setzen rechnet
+  `computeAllFields` die Formeln neu; ein neues Element bekommt die
+  Vorgabewerte der Ebene. Ein berechnetes Feld lässt sich nicht setzen.
+- **Alles oder nichts.** Fehlt die Ebene, ein Feld oder ist ein Wert
+  unlesbar, wird nichts angelegt; die Rückmeldung nennt die vorhandenen
+  Ebenen bzw. Felder, damit das Modell nachfragen kann.
+
+Ebene und `fieldData` stehen damit auch in der Projektion des MCP-Servers. Eine
+Messreihe mit vielen Punkten macht den Kontext größer; das ist der Preis dafür,
+dass „die letzte Messung war 40" zugeordnet werden kann.
+
 ## Werkzeuge, die die Karte verlassen
 
 Die meisten Werkzeuge schreiben Elemente des laufenden Einsatzes oder rechnen.

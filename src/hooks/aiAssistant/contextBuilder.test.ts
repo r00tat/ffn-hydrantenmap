@@ -30,3 +30,41 @@ describe('buildAiContext — Atemschutztrupps', () => {
     expect(buildAiContext({ ...basis, trupps: [trupp] }).atemschutzTrupps).toEqual([trupp]);
   });
 });
+
+describe('buildAiContext — Ebenen', () => {
+  const layers = [
+    {
+      id: 'l1',
+      type: 'layer',
+      name: 'Strahlenmessung',
+      dataSchema: [
+        { key: 'dosisleistung', label: 'Dosisleistung', unit: 'µSv/h', type: 'number' as const },
+      ],
+    },
+    { id: 'l2', type: 'layer', name: 'Gelöscht', deleted: true },
+  ];
+
+  it('lässt Ebenen und aktive Ebene weg, solange es keine gibt', () => {
+    const context = buildAiContext(basis);
+    expect(context).not.toHaveProperty('layers');
+    expect(context).not.toHaveProperty('activeLayer');
+  });
+
+  it('nennt die Ebenen mit Feldern und die aktive beim Namen', () => {
+    const context = buildAiContext({ ...basis, layers, activeLayerId: 'l1' });
+    expect(context.layers).toEqual([
+      {
+        id: 'l1',
+        name: 'Strahlenmessung',
+        fields: [{ key: 'dosisleistung', label: 'Dosisleistung', unit: 'µSv/h', type: 'number' }],
+      },
+    ]);
+    expect(context.activeLayer).toBe('Strahlenmessung');
+  });
+
+  it('nennt keine aktive Ebene, die es nicht mehr gibt', () => {
+    expect(buildAiContext({ ...basis, layers, activeLayerId: 'l2' })).not.toHaveProperty(
+      'activeLayer',
+    );
+  });
+});

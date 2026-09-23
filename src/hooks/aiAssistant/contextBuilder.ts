@@ -1,7 +1,22 @@
 import { projectFirecallItem } from '../../common/mcp/itemDto';
-import { FirecallItem } from '../../components/firebase/firestore';
+import { FirecallItem, FirecallLayer } from '../../components/firebase/firestore';
+import { projectLayer } from './layerFields';
 import type { AiTruppContext } from '../../components/Atemschutz/truppAssistant';
 import { AiContext, AiContextItem, AiInteraction } from './types';
+
+/**
+ * Ebenen samt Datenfeldern und die aktive Ebene. Ohne Ebenen fehlt beides, wie
+ * die Trupps — der Kontext geht bei jedem Zug hinaus.
+ */
+function ebenenKontext(layers: FirecallLayer[], activeLayerId: string | undefined) {
+  const live = layers.filter((l) => !l.deleted && l.id);
+  if (live.length === 0) return {};
+  const active = live.find((l) => l.id === activeLayerId);
+  return {
+    layers: live.map(projectLayer),
+    ...(active ? { activeLayer: active.name } : {}),
+  };
+}
 
 export function buildAiContext({
   map,
@@ -11,6 +26,8 @@ export function buildAiContext({
   position,
   interactions,
   trupps,
+  layers = [],
+  activeLayerId,
 }: {
   map: { getCenter: () => { lat: number; lng: number }; getBounds: () => any; getZoom: () => number } | null;
   defaultPosition: { lat: number; lng: number };
@@ -20,6 +37,10 @@ export function buildAiContext({
   interactions: AiInteraction[];
   /** Laufende Atemschutztrupps, siehe `truppKontext`. */
   trupps?: AiTruppContext[];
+  /** Ebenen des Einsatzes; im Kontext nur, wenn es welche gibt. */
+  layers?: FirecallLayer[];
+  /** Zuletzt gewählte Ebene, dorthin kommen neue Marker ohne genannte Ebene. */
+  activeLayerId?: string;
 }): AiContext {
   const center = map ? map.getCenter() : defaultPosition;
   const bounds = map ? map.getBounds() : null;
@@ -48,5 +69,6 @@ export function buildAiContext({
     // Nur mit Trupps: Der Kontext geht bei jedem Zug hinaus und soll dort,
     // wo kein Atemschutz läuft, nicht wachsen.
     ...(trupps && trupps.length > 0 ? { atemschutzTrupps: trupps } : {}),
+    ...ebenenKontext(layers, activeLayerId),
   };
 }

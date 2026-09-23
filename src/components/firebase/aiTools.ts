@@ -56,6 +56,47 @@ const FW_DESCRIPTION =
   '"TLFA Neusiedl" is name TLFA and fw Neusiedl. Always set it when a place ' +
   'is named; never drop it.';
 
+/**
+ * Ebene eines Elements. Ohne Angabe legt `createMarker` in die aktive Ebene
+ * (`activeLayer` im Kontext), wie die Oberfläche.
+ */
+const LAYER_SCHEMA = {
+  type: SchemaType.STRING,
+  description:
+    'Name of the layer (Ebene) from context.layers. Only when the user names a ' +
+    'layer; without it a new marker goes to context.activeLayer',
+};
+
+/**
+ * Werte der Datenfelder einer Ebene. Der Wert geht als Text hinaus, weil ein
+ * Feld auch Text oder ja/nein sein kann; die Einheit rechnet der Handler um.
+ */
+const FIELD_VALUES_SCHEMA = {
+  type: SchemaType.ARRAY,
+  description:
+    'Values for the data fields of the layer (context.layers[].fields), e.g. a ' +
+    'measured dose rate. Pass the number and the unit as spoken; the unit is ' +
+    'converted to the unit of the field, do not convert yourself',
+  items: {
+    type: SchemaType.OBJECT,
+    properties: {
+      field: {
+        type: SchemaType.STRING,
+        description: 'Key or label of the field, e.g. "dosisleistung"',
+      },
+      value: {
+        type: SchemaType.STRING,
+        description: 'The value as spoken, e.g. "37" or "ja"',
+      },
+      unit: {
+        type: SchemaType.STRING,
+        description: 'Unit as a symbol, e.g. "mSv/h" for Millisievert pro Stunde, "µSv/h"',
+      },
+    },
+    required: ['field', 'value'],
+  },
+};
+
 export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'createMarker',
@@ -77,6 +118,8 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
         zeichen: { type: SchemaType.STRING, description: 'Tactical sign identifier (only kind marker)' },
         color: { type: SchemaType.STRING, description: 'Color in hex format (only kind marker)' },
         position: positionSchema,
+        layer: LAYER_SCHEMA,
+        values: FIELD_VALUES_SCHEMA,
       },
       required: ['name'],
     },
@@ -467,8 +510,9 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'updateItem',
     description:
-      'Update an existing item on the map: name, color, description, position ' +
-      'or rotation (vehicles and Rohre only)',
+      'Update an existing item on the map: name, color, description, position, ' +
+      'rotation (vehicles and Rohre only), its layer, the data fields of its ' +
+      'layer, and the fields of its type. Set only what the user changes',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -494,6 +538,48 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
                 'positive = clockwise ("nach rechts"), negative = ' +
                 'counter-clockwise ("nach links")',
             },
+            layer: {
+              type: SchemaType.STRING,
+              description: 'Move the item to this layer (name from context.layers)',
+            },
+            values: FIELD_VALUES_SCHEMA,
+            fw: { type: SchemaType.STRING, description: 'vehicle, tacticalUnit: ' + FW_DESCRIPTION },
+            kategorie: {
+              type: SchemaType.STRING,
+              description: 'vehicle: fahrzeug, boot, anhaenger or aufbau',
+            },
+            besatzung: {
+              type: SchemaType.STRING,
+              description: 'vehicle: crew without the commander, "1:8" is "8"',
+            },
+            ats: { type: SchemaType.NUMBER, description: 'vehicle, tacticalUnit: breathing apparatus carriers' },
+            alarmierung: {
+              type: SchemaType.STRING,
+              description: 'vehicle, tacticalUnit: alert time, "14:30" or "jetzt"',
+            },
+            eintreffen: {
+              type: SchemaType.STRING,
+              description: 'vehicle, tacticalUnit: arrival time, "14:30" or "jetzt"',
+            },
+            abruecken: {
+              type: SchemaType.STRING,
+              description: 'vehicle, tacticalUnit: departure time, "14:30" or "jetzt"',
+            },
+            fremd: { type: SchemaType.BOOLEAN, description: 'vehicle: belongs to another organisation' },
+            unitType: {
+              type: SchemaType.STRING,
+              enum: ['einheit', 'trupp', 'gruppe', 'zug', 'bereitschaft', 'abschnitt', 'bezirk', 'lfv', 'oebfv'],
+              description: 'tacticalUnit: kind of unit',
+            },
+            mann: { type: SchemaType.NUMBER, description: 'tacticalUnit: crew strength' },
+            fuehrung: { type: SchemaType.STRING, description: 'tacticalUnit: unit commander' },
+            art: { type: SchemaType.STRING, enum: ['C', 'B', 'Wasserwerfer'], description: 'rohr: type' },
+            durchfluss: { type: SchemaType.NUMBER, description: 'rohr: flow rate in l/min' },
+            zeichen: { type: SchemaType.STRING, description: 'marker: tactical sign' },
+            showLabel: { type: SchemaType.BOOLEAN, description: 'marker: show the name on the map' },
+            radius: { type: SchemaType.NUMBER, description: 'circle: radius in meters' },
+            fill: { type: SchemaType.BOOLEAN, description: 'circle: filled' },
+            opacity: { type: SchemaType.NUMBER, description: 'circle: opacity in percent' },
           },
         },
       },
@@ -770,10 +856,28 @@ Aktionen:
 - Die laufenden Trupps stehen im Kontext unter atemschutzTrupps. Fragen zum
   Truppstand ("wer ist noch drin?") beantwortest du daraus mit answerQuestion.
 - updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position,
-  Drehung). "Um 45° nach rechts drehen" = rotateBy 45, "nach links" = rotateBy -45,
+  Drehung, Ebene, Messwerte und die Felder seines Typs wie Feuerwehr, Besatzung,
+  Eintreffen, Durchfluss, Radius). "Um 45° nach rechts drehen" = rotateBy 45, "nach links" = rotateBy -45,
   "auf 90° drehen" = rotation 90. Drehbar sind Fahrzeuge und Rohre; die
   aktuelle Drehung steht im Kontext unter rotation.
 - deleteItem: Bestehendes Element löschen
+
+Ebenen und Messwerte:
+- Die Ebenen des Einsatzes stehen im Kontext unter layers, mit ihren Datenfeldern
+  (fields: key, label, unit). activeLayer ist die zuletzt gewählte Ebene.
+- "Neue Messung 37 Millisievert pro Stunde" = createMarker mit values
+  [{field: <passendes Feld, z.B. dosisleistung>, value: "37", unit: "mSv/h"}]. Ohne
+  genannte Ebene kommt der Marker in activeLayer; nenne layer nur, wenn der Benutzer
+  eine Ebene nennt ("in der Ebene Strahlenmessung"). Eine genannte Ebene wird danach
+  zur aktiven. Ohne Ortsangabe bei einer Messung: auto als position.type (dort, wo
+  der Benutzer steht). Als Name "Messung", wenn keiner genannt wird.
+- Gib Zahl und Einheit so weiter, wie sie gesagt wurden, die Einheit als Zeichen
+  (mSv/h, µSv/h, ppm). Rechne nicht selbst um - das Werkzeug rechnet in die Einheit
+  des Felds.
+- Einen Messwert ändern ("die letzte Messung war 40") = updateItem mit values.
+- Berechnete Felder (type computed) setzt du nicht, sie werden mitgerechnet.
+- Meldet das Werkzeug ein fehlendes Feld oder eine fehlende Ebene, frage nach und
+  nenne die vorhandenen.
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
 - calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)
 - Strahlenschutz-Berechnungen: Verwende calculateStrahlenschutz, nicht calculate. Wähle die Formel:

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { FirecallItem } from '../../components/firebase/firestore';
+import type { FirecallItem, FirecallLayer } from '../../components/firebase/firestore';
 import type { HoseLineDraft, WaterSupplyCandidate } from '../../common/waterSupply';
 import type { ToolHandlerDeps } from '../../hooks/aiAssistant/toolHandlers';
 import {
@@ -35,6 +35,8 @@ import { addMcpFirecallItem, updateMcpFirecallItem } from './writeOps';
 export interface ServerToolDepsInput {
   write: McpWriteContext;
   existingItems: FirecallItem[];
+  /** Ebenen des Einsatzes. Eine aktive Ebene gibt es ohne Oberfläche nicht. */
+  layers?: FirecallLayer[];
   /** Einsatzort, sofern gesetzt. */
   einsatzort?: { lat: number; lng: number };
   /** Darf dieser Aufruf schreiben? Ohne Schreibrecht werfen die Schreibpfade. */
@@ -51,6 +53,7 @@ export class McpWriteForbiddenError extends Error {}
 export function createServerToolDeps({
   write,
   existingItems,
+  layers = [],
   einsatzort,
   canWrite,
 }: ServerToolDepsInput): ServerToolDeps {
@@ -96,6 +99,7 @@ export function createServerToolDeps({
   return {
     collectedDrafts,
     existingItems,
+    layers,
     map: null,
     defaultPosition,
     lastCreatedItem: null,

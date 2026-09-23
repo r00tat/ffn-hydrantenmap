@@ -14,7 +14,7 @@ describe('projectFirecallItem', () => {
         lat: 1,
         lng: 2,
         geometry: { riesig: true },
-        fieldData: { a: 1 },
+        original: { a: 1 },
       }),
     );
     expect(projected).toEqual({
@@ -24,6 +24,17 @@ describe('projectFirecallItem', () => {
       lat: 1,
       lng: 2,
     });
+  });
+
+  it('nimmt Ebene und Messwerte mit, aber keine leeren Messwerte', () => {
+    expect(
+      projectFirecallItem(
+        item({ layer: 'l1', fieldData: { dosisleistung: 37000 } }),
+      ),
+    ).toMatchObject({ layer: 'l1', fieldData: { dosisleistung: 37000 } });
+    expect(projectFirecallItem(item({ fieldData: {} }))).not.toHaveProperty(
+      'fieldData',
+    );
   });
 
   it('nimmt bei Fahrzeugen die Einsatzmittel-Felder mit', () => {

@@ -6,7 +6,7 @@ import { isTruthy } from '../../common/boolish';
 import type { FirecallItem } from '../../components/firebase/firestore';
 import { executeToolCall } from '../../hooks/aiAssistant/toolHandlers';
 import { authorizationMessage, authorizeFirecall } from './authorizeFirecall';
-import { loadFirecallItems } from './firecallData';
+import { loadFirecallItems, loadFirecallLayers } from './firecallData';
 import { createServerToolDeps, McpWriteForbiddenError } from './serverToolDeps';
 import { errorResult, jsonResult } from './toolResult';
 import type { McpUser } from './userAccess';
@@ -69,6 +69,25 @@ const positionSchema = z
 
 const firecallId = z.string().min(1).describe('ID des Einsatzes');
 
+const layerName = z
+  .string()
+  .optional()
+  .describe('Name oder ID der Ebene (siehe `list_layers`), in die das Element kommt');
+
+const fieldValues = z
+  .array(
+    z.object({
+      field: z.string().describe('Schlüssel oder Bezeichnung des Datenfelds der Ebene'),
+      value: z.union([z.string(), z.number(), z.boolean()]),
+      unit: z
+        .string()
+        .optional()
+        .describe('Einheit des Werts, z.B. "mSv/h"; wird in die Einheit des Felds umgerechnet'),
+    }),
+  )
+  .optional()
+  .describe('Werte für die Datenfelder der Ebene, z.B. eine Dosisleistung');
+
 export interface WriteToolContext {
   user: McpUser;
   clientId: string;
@@ -86,7 +105,10 @@ export function registerWriteTools(
    */
   async function prepare(id: string) {
     const firecall = await authorizeFirecall(user, id, { requireWrite: true });
-    const existingItems = await loadFirecallItems(id);
+    const [existingItems, layers] = await Promise.all([
+      loadFirecallItems(id),
+      loadFirecallLayers(id),
+    ]);
     return {
       firecall,
       deps: createServerToolDeps({
@@ -97,6 +119,7 @@ export function registerWriteTools(
           clientName,
         },
         existingItems,
+        layers,
         einsatzort:
           firecall.lat && firecall.lng
             ? { lat: firecall.lat, lng: firecall.lng }
@@ -237,6 +260,8 @@ export function registerWriteTools(
         unitType: z.string().optional().describe('Art der taktischen Einheit, z.B. "zug"'),
         mann: z.number().optional().describe('Mannschaftsstärke (nur tacticalUnit)'),
         fuehrung: z.string().optional().describe('Führung (nur tacticalUnit)'),
+        layer: layerName.describe('Ebene (nur marker, el, assp)'),
+        values: fieldValues.describe('Datenfelder der Ebene (nur marker, el, assp)'),
       }),
       annotations: {
         readOnlyHint: false,
@@ -275,6 +300,26 @@ export function registerWriteTools(
             .number()
             .optional()
             .describe('Um so viele Grad weiterdrehen, positiv im Uhrzeigersinn'),
+          layer: layerName,
+          values: fieldValues,
+          fw: z.string().optional().describe('Feuerwehr (vehicle, tacticalUnit)'),
+          kategorie: z.string().optional().describe('Art des Einsatzmittels (vehicle)'),
+          besatzung: z.string().optional().describe('Mannschaft ohne Kommandant (vehicle)'),
+          ats: z.number().optional().describe('Atemschutzträger (vehicle, tacticalUnit)'),
+          alarmierung: z.string().optional().describe('Zeitpunkt, ISO oder "14:30" (vehicle, tacticalUnit)'),
+          eintreffen: z.string().optional().describe('Zeitpunkt, ISO oder "14:30" (vehicle, tacticalUnit)'),
+          abruecken: z.string().optional().describe('Zeitpunkt, ISO oder "14:30" (vehicle, tacticalUnit)'),
+          fremd: z.boolean().optional().describe('Fremdorganisation (vehicle)'),
+          unitType: z.string().optional().describe('Art der Einheit (tacticalUnit)'),
+          mann: z.number().optional().describe('Mannschaftsstärke (tacticalUnit)'),
+          fuehrung: z.string().optional().describe('Einheitsführer (tacticalUnit)'),
+          art: z.string().optional().describe('Rohrart (rohr)'),
+          durchfluss: z.number().optional().describe('Durchfluss in l/min (rohr)'),
+          zeichen: z.string().optional().describe('Taktisches Zeichen (marker)'),
+          showLabel: z.boolean().optional().describe('Label anzeigen (marker)'),
+          radius: z.number().optional().describe('Radius in m (circle)'),
+          fill: z.boolean().optional().describe('Kreis ausfüllen (circle)'),
+          opacity: z.number().optional().describe('Deckkraft in Prozent (circle)'),
         }),
       }),
       annotations: {

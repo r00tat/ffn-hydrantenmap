@@ -50,8 +50,10 @@ vi.mock('./useFirecall', () => ({
 }));
 
 vi.mock('./useMapEditor', () => ({
+  default: vi.fn(() => ({ lastSelectedLayer: '', setLastSelectedLayer: vi.fn() })),
   useHistoryPathSegments: vi.fn(() => []),
 }));
+vi.mock('./useFirecallLayers', () => ({ useFirecallLayers: vi.fn(() => ({})) }));
 
 vi.mock('../components/actions/maps/places', () => ({
   searchPlace: vi.fn(),

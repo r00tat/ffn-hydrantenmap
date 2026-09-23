@@ -1,6 +1,6 @@
 import { FunctionCall } from 'firebase/ai';
 import { evaluate } from 'mathjs';
-import { FirecallItem } from '../../components/firebase/firestore';
+import { FirecallItem, FirecallLayer } from '../../components/firebase/firestore';
 import { searchPlace } from '../../components/actions/maps/places';
 import { GeoPosition, GeoPositionObject } from '../../common/geo';
 import { GeohashCluster } from '../../common/gis-objects';
@@ -22,6 +22,8 @@ import type { AssistantEntryCommand } from '../../components/Fahrtenbuch/assista
 import type { TruppCommand } from '../../components/Atemschutz/truppAssistant';
 import { TRUPP_STATUSES, type TruppStatus } from '../../common/atemschutz';
 import { findFirecallItemByName } from './itemLookup';
+import { EDITABLE_FIELDS } from './editableFields';
+import { applyFieldValues, findLayer, type SpokenFieldValue } from './layerFields';
 import { DIRECTION_LABELS, type PositionSpec } from './resolveOrigin';
 import { normalizeRotation } from '../../components/Map/markers/rotationGeometry';
 import { AiAssistantResult, ResolvedOrigin } from './types';
@@ -52,6 +54,16 @@ export interface ToolHandlerDeps {
   addFirecallItem: AddFirecallItemFn;
   updateFirecallItem: UpdateFirecallItemFn;
   existingItems: FirecallItem[];
+  /** Ebenen des Einsatzes, samt ihren Datenfeldern (`dataSchema`). */
+  layers: FirecallLayer[];
+  /**
+   * Ebene, in die ein neuer Marker ohne genannte Ebene kommt — im Browser die
+   * zuletzt gewählte (`lastSelectedLayer`), wie beim Anlegen über die
+   * Oberfläche. Im MCP-Server gibt es keine.
+   */
+  activeLayerId?: string;
+  /** Eine genannte Ebene wird zur aktiven, damit die nächste Messung dort landet. */
+  setActiveLayer?: (layerId: string) => void;
   lastCreatedItem: { id: string; type: string } | null;
   setLastCreatedItem: (item: { id: string; type: string } | null) => void;
   map: { getCenter: () => { lat: number; lng: number }; panTo: (latlng: [number, number]) => void } | null;
@@ -180,6 +192,84 @@ function feuerwehrHinweis(fw: unknown): string {
   return name ? `(${name})` : 'ohne Feuerwehr';
 }
 
+/** Parameter von `updates`, die nicht in `EDITABLE_FIELDS` stehen. */
+const COMMON_UPDATE_KEYS = new Set([
+  'name',
+  'beschreibung',
+  'color',
+  'position',
+  'rotation',
+  'rotateBy',
+  'layer',
+  'values',
+]);
+
+/**
+ * Ein gesagter Zeitpunkt als ISO-Zeitstempel, wie ihn der Dialog speichert.
+ * „jetzt" und „14:30" (heute) werden umgerechnet; was sich nicht lesen lässt,
+ * bleibt `undefined`.
+ */
+export function zeitpunkt(value: unknown, now = new Date()): string | undefined {
+  const text = String(value ?? '').trim().toLocaleLowerCase('de');
+  if (!text) return undefined;
+  if (['jetzt', 'now', 'sofort'].includes(text)) return now.toISOString();
+  const uhrzeit = text.match(/^(\d{1,2})[:.](\d{2})(?:\s*uhr)?$/);
+  if (uhrzeit) {
+    const d = new Date(now);
+    d.setHours(Number(uhrzeit[1]), Number(uhrzeit[2]), 0, 0);
+    return d.toISOString();
+  }
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+/**
+ * Die typabhängigen Felder aus `updates` übernehmen. Liefert die geänderten
+ * Feldnamen oder einen Fehlersatz, wenn ein Feld nicht zum Typ passt — dann
+ * wird gar nichts geschrieben.
+ */
+function typFelder(
+  item: FirecallItem,
+  updates: Record<string, unknown>,
+): { werte: Record<string, unknown>; fehler?: string } {
+  const erlaubt = EDITABLE_FIELDS[item.type] ?? {};
+  const werte: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (COMMON_UPDATE_KEYS.has(key) || value === undefined || value === null) continue;
+    const art = erlaubt[key];
+    if (!art) {
+      const felder = Object.keys(erlaubt);
+      return {
+        werte,
+        fehler:
+          `"${key}" gibt es bei "${item.name}" nicht` +
+          (felder.length ? ` (änderbar: ${felder.join(', ')})` : ''),
+      };
+    }
+    if (art === 'number') {
+      const zahl = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
+      if (!Number.isFinite(zahl)) return { werte, fehler: `"${value}" ist keine Zahl für ${key}` };
+      werte[key] = zahl;
+    } else if (art === 'flag') {
+      // Schaltfelder liegen als 'true'/'false' im Dokument, wie im Dialog.
+      werte[key] = String(value === true || value === 'true' || value === 'ja');
+    } else if (art === 'time') {
+      const iso = zeitpunkt(value);
+      if (!iso) return { werte, fehler: `"${value}" ist kein Zeitpunkt für ${key}` };
+      werte[key] = iso;
+    } else if (art === 'besatzung') {
+      const besatzung = parseBesatzung(String(value));
+      if (besatzung === undefined) {
+        return { werte, fehler: `"${value}" ist keine Besatzung` };
+      }
+      werte[key] = String(besatzung);
+    } else {
+      werte[key] = String(value);
+    }
+  }
+  return { werte };
+}
+
 /** Typen, die die Karte dreht — dieselben wie `isRotatable()` der Elemente. */
 const ROTATABLE_TYPES = new Set(['vehicle', 'rohr']);
 
@@ -198,6 +288,15 @@ function neueDrehung(
   if (!ROTATABLE_TYPES.has(item.type)) return 'nicht drehbar';
   const winkel = absolut ?? normalizeRotation(item.rotation) + relativ!;
   return normalizeRotation(Math.round(winkel));
+}
+
+/** Eine genannte Ebene fehlt — mit den vorhandenen, damit das Modell nachfragen kann. */
+function ebeneFehlt(name: string, layers: FirecallLayer[]): string {
+  const namen = layers.filter((l) => !l.deleted).map((l) => `"${l.name}"`);
+  return (
+    `Ebene "${name}" nicht gefunden` +
+    (namen.length ? ` (Ebenen: ${namen.join(', ')})` : ' — der Einsatz hat keine Ebenen')
+  );
 }
 
 /**
@@ -228,6 +327,9 @@ export async function executeToolCall(
     addFirecallItem,
     updateFirecallItem,
     existingItems,
+    layers,
+    activeLayerId,
+    setActiveLayer,
     lastCreatedItem,
     setLastCreatedItem,
     map,
@@ -247,8 +349,37 @@ export async function executeToolCall(
       // beim allgemeinen Marker statt bei einem Fehler.
       const kind = MARKER_KINDS[args.kind as string] ? (args.kind as string) : 'marker';
       const { fallbackName, label } = MARKER_KINDS[kind];
+
+      // Eine genannte Ebene muss es geben; ohne Angabe die aktive, wie beim
+      // Anlegen über die Oberfläche.
+      const layerName = args.layer as string | undefined;
+      const layer = layerName
+        ? findLayer(layers, layerName)
+        : layers.find((l) => l.id === activeLayerId && !l.deleted);
+      if (layerName && !layer) {
+        return { success: false, message: ebeneFehlt(layerName, layers) };
+      }
+      const values = (args.values as SpokenFieldValue[] | undefined) ?? [];
+      if (values.length > 0 && !layer?.dataSchema?.length) {
+        return {
+          success: false,
+          message: layer
+            ? `Die Ebene "${layer.name}" hat keine Datenfelder`
+            : 'Messwerte brauchen eine Ebene mit Datenfeldern — keine genannt und keine aktiv',
+        };
+      }
+      const felder = layer?.dataSchema?.length
+        ? await applyFieldValues(layer.dataSchema, undefined, values, { isNew: true })
+        : undefined;
+      if (felder?.errors.length) {
+        return { success: false, message: felder.errors.join('; ') };
+      }
+
       const pos = await resolvePosition(args.position as any);
       const name = (args.name as string) || fallbackName;
+      const inEbene = layer
+        ? { layer: layer.id, ...(felder ? { fieldData: felder.fieldData } : {}) }
+        : {};
       const ref = await addFirecallItem(
         kind === 'marker'
           ? ({
@@ -257,14 +388,20 @@ export async function executeToolCall(
               beschreibung: args.beschreibung as string,
               zeichen: args.zeichen as string,
               color: args.color as string,
+              ...inEbene,
               ...pos,
             } as FirecallItem)
-          : { type: kind, name, ...pos }
+          : ({ type: kind, name, ...inEbene, ...pos } as FirecallItem)
       );
       setLastCreatedItem({ id: ref.id, type: kind });
+      if (layerName && layer?.id) setActiveLayer?.(layer.id);
       return {
         success: true,
-        message: `${label} "${args.name}" erstellt`,
+        message:
+          `${label} "${name}"` +
+          (layer ? ` in Ebene "${layer.name}"` : '') +
+          ' erstellt' +
+          (felder?.applied.length ? `: ${felder.applied.join(', ')}` : ''),
         createdItemId: ref.id,
         createdItemType: kind,
       };
@@ -380,6 +517,43 @@ export async function executeToolCall(
         return { success: false, message: 'Element nicht gefunden' };
       }
 
+      const typ = typFelder(targetItem, updates);
+      if (typ.fehler) return { success: false, message: typ.fehler };
+
+      const drehung = neueDrehung(targetItem, updates);
+      if (drehung === 'nicht drehbar') {
+        return {
+          success: false,
+          message: `"${targetItem.name}" lässt sich nicht drehen, nur Fahrzeuge und Rohre`,
+        };
+      }
+
+      // Ebene wechseln und Datenfelder: Die Werte gehören zur Ebene, in der
+      // das Element danach liegt.
+      const layerName = updates.layer as string | undefined;
+      const zielEbene = layerName
+        ? findLayer(layers, layerName)
+        : layers.find((l) => l.id === targetItem.layer && !l.deleted);
+      if (layerName && !zielEbene) {
+        return { success: false, message: ebeneFehlt(layerName, layers) };
+      }
+      const values = (updates.values as SpokenFieldValue[] | undefined) ?? [];
+      if (values.length > 0 && !zielEbene?.dataSchema?.length) {
+        return {
+          success: false,
+          message: zielEbene
+            ? `Die Ebene "${zielEbene.name}" hat keine Datenfelder`
+            : `"${targetItem.name}" liegt in keiner Ebene mit Datenfeldern`,
+        };
+      }
+      const felder =
+        values.length > 0 && zielEbene?.dataSchema
+          ? await applyFieldValues(zielEbene.dataSchema, targetItem.fieldData, values)
+          : undefined;
+      if (felder?.errors.length) {
+        return { success: false, message: felder.errors.join('; ') };
+      }
+
       const positionSpec = updates.position as PositionSpec | undefined;
       // Über `resolveOrigin`, damit die Antwort sagt, wohin das Element kam.
       // Ohne das hat das Modell eine verfehlte Verschiebung als gelungen
@@ -395,20 +569,20 @@ export async function executeToolCall(
       if (updates.name) updatedItem.name = updates.name as string;
       if (updates.color) (updatedItem as any).color = updates.color as string;
       if (updates.beschreibung) updatedItem.beschreibung = updates.beschreibung as string;
-
-      const drehung = neueDrehung(targetItem, updates);
-      if (drehung === 'nicht drehbar') {
-        return {
-          success: false,
-          message: `"${targetItem.name}" lässt sich nicht drehen, nur Fahrzeuge und Rohre`,
-        };
-      }
       if (drehung !== undefined) updatedItem.rotation = String(drehung);
+      Object.assign(updatedItem, typ.werte);
+      if (layerName && zielEbene) updatedItem.layer = zielEbene.id;
+      if (felder) updatedItem.fieldData = felder.fieldData;
 
       await updateFirecallItem(updatedItem);
+      if (layerName && zielEbene?.id) setActiveLayer?.(zielEbene.id);
+      const geaendert = Object.keys(typ.werte);
       const teile = [
         origin ? `${positionHinweis(positionSpec!, origin)} gesetzt` : undefined,
         drehung !== undefined ? `auf ${drehung}° gedreht` : undefined,
+        layerName && zielEbene ? `in Ebene "${zielEbene.name}" verschoben` : undefined,
+        felder?.applied.length ? `Werte gesetzt: ${felder.applied.join(', ')}` : undefined,
+        geaendert.length ? `geändert: ${geaendert.join(', ')}` : undefined,
       ].filter(Boolean);
       return {
         success: true,

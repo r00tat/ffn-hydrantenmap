@@ -283,3 +283,34 @@ describe('Drehung per updateItem', () => {
     expect(AI_SYSTEM_PROMPT).toMatch(/nach rechts drehen" = rotateBy 45/);
   });
 });
+
+describe('Ebenen und Messwerte', () => {
+  const params = (name: string) =>
+    AI_TOOL_DECLARATIONS.find((d) => d.name === name)?.parameters as unknown as LooseSchema;
+
+  it('nimmt an createMarker und updateItem Ebene und Werte mit Einheit', () => {
+    for (const props of [
+      params('createMarker').properties,
+      params('updateItem').properties?.updates?.properties,
+    ]) {
+      expect(props?.layer?.type).toBeDefined();
+      expect(Object.keys(props?.values?.items?.properties ?? {})).toEqual([
+        'field',
+        'value',
+        'unit',
+      ]);
+    }
+  });
+
+  it('bietet an updateItem die Felder der Elementtypen an', () => {
+    const updates = params('updateItem').properties?.updates?.properties ?? {};
+    for (const feld of ['fw', 'besatzung', 'eintreffen', 'durchfluss', 'radius', 'zeichen']) {
+      expect(updates).toHaveProperty(feld);
+    }
+  });
+
+  it('verlangt im Prompt die gesagte Einheit statt einer eigenen Umrechnung', () => {
+    expect(AI_SYSTEM_PROMPT).toMatch(/Rechne nicht selbst um/);
+    expect(AI_SYSTEM_PROMPT).toMatch(/activeLayer/);
+  });
+});

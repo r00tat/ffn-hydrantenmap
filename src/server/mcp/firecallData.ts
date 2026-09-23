@@ -12,6 +12,7 @@ import {
   FIRECALL_LAYERS_COLLECTION_ID,
   type Firecall,
   type FirecallItem,
+  type FirecallLayer,
 } from '../../components/firebase/firestore';
 import { firestore } from '../firebase/admin';
 import type { McpUser } from './userAccess';
@@ -177,7 +178,8 @@ export function listGeschaeftsbuchEntries(
   return listEntries(firecallId, 'gb', options);
 }
 
-export async function listLayers(firecallId: string): Promise<FirecallItemDto[]> {
+/** Ebenen samt `dataSchema` — die schreibenden Tools brauchen die Datenfelder. */
+export async function loadFirecallLayers(firecallId: string): Promise<FirecallLayer[]> {
   const snapshot = await firestore
     .collection(FIRECALL_COLLECTION_ID)
     .doc(firecallId)
@@ -185,9 +187,12 @@ export async function listLayers(firecallId: string): Promise<FirecallItemDto[]>
     .limit(MAX_ITEMS)
     .get();
   return snapshot.docs
-    .map((doc) => ({ id: doc.id, ...(doc.data() as FirecallItem) }))
-    .filter((item) => item.deleted !== true)
-    .map((item) => projectFirecallItem(item));
+    .map((doc) => ({ id: doc.id, ...(doc.data() as FirecallLayer) }))
+    .filter((item) => item.deleted !== true);
+}
+
+export async function listLayers(firecallId: string): Promise<FirecallItemDto[]> {
+  return (await loadFirecallLayers(firecallId)).map((item) => projectFirecallItem(item));
 }
 
 export interface FirecallContext {

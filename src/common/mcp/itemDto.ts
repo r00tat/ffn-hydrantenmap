@@ -39,6 +39,10 @@ export interface FirecallItemDto {
   beschreibung?: string;
   /** Drehung in Grad im Uhrzeigersinn, nur bei Fahrzeug und Rohr und ungleich 0. */
   rotation?: number;
+  /** ID der Ebene, in der das Element liegt. */
+  layer?: string;
+  /** Werte der Datenfelder seiner Ebene, z.B. eine Dosisleistung. */
+  fieldData?: Record<string, string | number | boolean>;
 }
 
 export interface ProjectItemOptions {
@@ -76,6 +80,12 @@ export function projectFirecallItem(
     lat: item.lat,
     lng: item.lng,
   };
+  // Ebene und Messwerte: Ohne sie weiß das Modell nicht, welche Messung
+  // welchen Wert hat, und kann „die letzte Messung war 40" nicht zuordnen.
+  if (item.layer) base.layer = item.layer;
+  if (item.fieldData && Object.keys(item.fieldData).length > 0) {
+    base.fieldData = item.fieldData;
+  }
 
   switch (item.type) {
     case 'vehicle': {
