@@ -73,6 +73,17 @@ export default function useAiLiveAssistant(
     callbacksRef.current = callbacks;
   }, [callbacks]);
 
+  // Dasselbe für Werkzeuge und Kontext. Beide schließen über `existingItems`
+  // und `lastCreatedItem` ein; hielte die Schleife die Fassung vom
+  // Gesprächsbeginn, fände „lösche das KLF" ein eben angelegtes KLF nicht, und
+  // der nachgereichte Kontext wäre immer der alte.
+  const executeToolRef = useRef(executeTool);
+  const buildContextTextRef = useRef(buildContextText);
+  useEffect(() => {
+    executeToolRef.current = executeTool;
+    buildContextTextRef.current = buildContextText;
+  }, [executeTool, buildContextText]);
+
   const cleanup = useCallback(async () => {
     const capture = captureRef.current;
     const playback = playbackRef.current;
@@ -101,14 +112,14 @@ export default function useAiLiveAssistant(
    */
   const sendContext = useCallback(
     async (session: LiveConnection) => {
-      const contextText = buildContextText();
+      const contextText = buildContextTextRef.current();
       if (contextText === sentContextRef.current) {
         return;
       }
       sentContextRef.current = contextText;
       await session.send([{ text: contextText }], false);
     },
-    [buildContextText],
+    [],
   );
 
   /**
@@ -184,7 +195,7 @@ export default function useAiLiveAssistant(
     // Läuft für sich weiter, bis die Sitzung endet — deshalb kein `await`.
     void runLiveConversation({
       messages: session.receive(),
-      executeTool,
+      executeTool: (call) => executeToolRef.current(call),
       sendFunctionResponses: (responses) => session.sendFunctionResponses(responses),
       onAudio: (base64Pcm) => playback.enqueue(base64Pcm),
       onInterrupt: () => playback.interrupt(),
@@ -204,7 +215,7 @@ export default function useAiLiveAssistant(
       console.error('[AI] Live-Gespräch abgebrochen:', error);
       setStatus('idle');
     });
-  }, [cleanup, executeTool, sendContext]);
+  }, [cleanup, sendContext]);
 
   /**
    * „Ich bin fertig" — schließt den gesprochenen Beitrag sofort, statt auf die

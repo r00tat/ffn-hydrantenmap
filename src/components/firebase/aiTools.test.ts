@@ -145,6 +145,17 @@ describe('AI tool declarations', () => {
   });
 });
 
+describe('Feuerwehr eines Einsatzmittels', () => {
+  it('erklärt, dass die Feuerwehr aus dem gesagten Namen abgetrennt wird', () => {
+    for (const name of ['createVehicle', 'createTacticalUnit']) {
+      const fw = (
+        AI_TOOL_DECLARATIONS.find((d) => d.name === name)?.parameters as unknown as LooseSchema
+      ).properties?.fw;
+      expect(fw?.description).toContain('KLF Weiden');
+    }
+  });
+});
+
 describe('AI system prompt', () => {
   it('carves water supply questions out of the answerQuestion rule', () => {
     // Ohne diese Ausnahme gewinnt die frühere, allgemeinere Regel „Bei Fragen

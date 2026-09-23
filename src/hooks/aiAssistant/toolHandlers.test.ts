@@ -645,3 +645,25 @@ describe('Atemschutztrupps', () => {
     expect(result.message).toContain('trotzdem');
   });
 });
+
+describe('createVehicle', () => {
+  it('nennt die gespeicherte Feuerwehr in der Rückmeldung', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createVehicle', { name: 'KLF', fw: 'Weiden' }),
+      deps
+    );
+
+    expect(deps.addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'vehicle', name: 'KLF', fw: 'Weiden' })
+    );
+    expect(result.message).toBe('Fahrzeug "KLF" (Weiden) erstellt');
+  });
+
+  it('sagt ohne Feuerwehr auch keine an', async () => {
+    // Die Rückmeldung ist, woraus das Modell seine Antwort baut. Nennt sie
+    // keine Feuerwehr, darf das Modell auch keine behaupten.
+    const result = await executeToolCall(call('createVehicle', { name: 'KLF' }), makeDeps());
+    expect(result.message).toBe('Fahrzeug "KLF" ohne Feuerwehr erstellt');
+  });
+});
