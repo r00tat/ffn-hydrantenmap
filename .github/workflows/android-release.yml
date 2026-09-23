@@ -254,7 +254,7 @@ jobs:
               '.releaseNotes = ($langs | map({language: ., text: ($notes | rtrimstr("\n"))}))' \
               <<<"${RELEASE}")
           else
-            echo "::warning::Keine Release-Notes ermittelt — „Was ist neu" bleibt leer."
+            echo "::warning::Keine Release-Notes ermittelt — Was ist neu bleibt leer."
           fi
           TRACK_BODY=$(jq -nc --argjson release "${RELEASE}" '{releases: [$release]}')
           for TRACK in ${TRACKS}; do
