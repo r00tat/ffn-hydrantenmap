@@ -257,6 +257,36 @@ zusammengesetzt. Die Ausgabe-Abschrift geht dabei **schon während des
 Sprechens** als `onPartialAnswer` hinaus: Die Meldung soll mit der Stimme
 erscheinen und nicht, wenn der Satz zu Ende gesprochen ist.
 
+## Wann Werkzeuge zusammengelegt werden
+
+Jedes Werkzeug kostet zweimal: Seine Deklaration geht in jedem Einzelaufruf und
+im Token der Live-Sitzung mit, und es ist eine weitere Wahl, die das Modell bei
+jedem Satz treffen muss. Zusammengelegt wird deshalb, was **gleich aufgebaut ist
+und sich nur in einer Art unterscheidet**:
+
+- `createMarker` legt über `kind` auch die Einsatzleitung (`el`) und den
+  Atemschutzsammelplatz (`assp`) an. Beide sind eigene Elementtypen, haben aber
+  keine eigenen Felder. Weil der Typ nicht mehr aus dem Werkzeugnamen folgt,
+  gibt der Handler ihn als `createdItemType` im Ergebnis zurück.
+- `calculateStrahlenschutz` rechnet über `formel` alle vier Formeln des
+  Strahlenschutz-Rechners. Jede Formel ist „gib alle Größen bis auf eine an";
+  die Parameter überschneiden sich nur in `r`, dessen Beschreibung beide
+  Bedeutungen nennt.
+
+Bewusst **nicht** zusammengelegt sind Werkzeuge mit eigenen Feldern und eigener
+Logik — Fahrzeug, taktische Einheit, Rohr, Kreis, Tagebuch und Geschäftsbuch,
+die Atemschutztrupps (Anlegen, Status, Meldung) und die beiden
+Fahrtenbuch-Werkzeuge (Schreiben gegen Nachsehen). Ein „lege irgendein Element
+an" oder „mach etwas mit dem Trupp" macht deren Parameter unscharf, und die
+Unterscheidung wandert vom Werkzeugnamen, auf den das Modell verlässlich
+auswählt, in ein Feld, das es leichter falsch belegt.
+
+Der MCP-Zugang behält `el` und `assp` als eigene Typen von `create_item`
+([writeTools.ts](../src/server/mcp/writeTools.ts)) und bildet sie auf
+`createMarker` mit `kind` ab; seine Strahlenschutz-Tools in
+[calcTools.ts](../src/server/mcp/calcTools.ts) sind ein eigenes Tool-Set und
+bleiben getrennt.
+
 ## Werkzeuge, die die Karte verlassen
 
 Die meisten Werkzeuge schreiben Elemente des laufenden Einsatzes oder rechnen.

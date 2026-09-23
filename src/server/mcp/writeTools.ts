@@ -36,8 +36,8 @@ const CREATE_HANDLERS: Record<string, string> = {
   vehicle: 'createVehicle',
   rohr: 'createRohr',
   circle: 'createCircle',
-  el: 'createEl',
-  assp: 'createAssp',
+  el: 'createMarker',
+  assp: 'createMarker',
   tacticalUnit: 'createTacticalUnit',
 };
 
@@ -236,8 +236,10 @@ export function registerWriteTools(
         openWorldHint: false,
       },
     },
-    async ({ firecallId: id, type, ...args }) =>
-      run(id, CREATE_HANDLERS[type], args),
+    async ({ firecallId: id, type, ...args }) => {
+      const handler = createCallFor(type, args)!;
+      return run(id, handler.name, handler.args);
+    },
   );
 
   server.registerTool(
@@ -294,9 +296,18 @@ export function registerWriteTools(
   );
 }
 
-/** Nur für Tests und die Doku: die Zuordnung Typ → Handler. */
-export function createHandlerFor(type: string): string | undefined {
-  return CREATE_HANDLERS[type];
+/**
+ * Aufruf des gemeinsamen Tool-Sets für einen Elementtyp. EL und ASSP sind im
+ * Browser-Assistenten nur Arten von `createMarker`; der MCP-Client behält sie
+ * als eigene Typen, weil `type` dort ohnehin gewählt werden muss.
+ */
+export function createCallFor(
+  type: string,
+  args: Record<string, unknown>,
+): { name: string; args: Record<string, unknown> } | undefined {
+  const name = CREATE_HANDLERS[type];
+  if (!name) return undefined;
+  return { name, args: name === 'createMarker' ? { ...args, kind: type } : args };
 }
 
 export type { FirecallItem };

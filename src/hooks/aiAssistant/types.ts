@@ -53,6 +53,11 @@ export interface AiAssistantResult {
   success: boolean;
   message: string;
   createdItemId?: string;
+  /**
+   * Elementtyp des angelegten Elements, wenn er sich nicht aus dem
+   * Werkzeugnamen ergibt — `createMarker` legt auch `el` und `assp` an.
+   */
+  createdItemType?: string;
   isAnswer?: boolean;
   data?: any; // Structured data for the AI to process
   /**

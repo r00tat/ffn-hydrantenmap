@@ -36,14 +36,23 @@ const positionSchema = {
 export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'createMarker',
-    description: 'Create a marker/tactical sign on the map',
+    description:
+      'Create a marker on the map: a general marker or tactical sign, an ' +
+      'Einsatzleitung (command post) or an Atemschutzsammelplatz (ASSP)',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
+        kind: {
+          type: SchemaType.STRING,
+          enum: ['marker', 'el', 'assp'],
+          description:
+            'marker = general marker/tactical sign (default), el = Einsatzleitung, ' +
+            'assp = Atemschutzsammelplatz',
+        },
         name: { type: SchemaType.STRING, description: 'Name/label for the marker' },
-        beschreibung: { type: SchemaType.STRING, description: 'Description' },
-        zeichen: { type: SchemaType.STRING, description: 'Tactical sign identifier' },
-        color: { type: SchemaType.STRING, description: 'Color in hex format' },
+        beschreibung: { type: SchemaType.STRING, description: 'Description (only kind marker)' },
+        zeichen: { type: SchemaType.STRING, description: 'Tactical sign identifier (only kind marker)' },
+        color: { type: SchemaType.STRING, description: 'Color in hex format (only kind marker)' },
         position: positionSchema,
       },
       required: ['name'],
@@ -149,30 +158,6 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
         position: positionSchema,
       },
       required: ['name', 'radius'],
-    },
-  },
-  {
-    name: 'createEl',
-    description: 'Add an Einsatzleitung (command post) marker',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        name: { type: SchemaType.STRING, description: 'Name for the EL marker' },
-        position: positionSchema,
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'createAssp',
-    description: 'Add an Atemschutzsammelplatz marker',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        name: { type: SchemaType.STRING, description: 'Name for the ASSP marker' },
-        position: positionSchema,
-      },
-      required: ['name'],
     },
   },
   {
@@ -323,7 +308,7 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     description:
       'Register a breathing apparatus team (Atemschutztrupp) for the time ' +
       'monitoring (Atemschutzüberwachung). This is NOT a map element — not ' +
-      'createTacticalUnit, not createAssp. The team starts in state bereit; ' +
+      'createTacticalUnit, not createMarker with kind assp. The team starts in state bereit; ' +
       'the speaker takes over its time monitoring and gets its warnings.',
     parameters: {
       type: SchemaType.OBJECT,
@@ -531,54 +516,45 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
-    name: 'calculateStrahlenschutzAbstand',
-    description: 'Berechne fehlende Werte des quadratischen Abstandsgesetzes (D1² × R1 = D2² × R2). Gib genau 3 der 4 Parameter an.',
+    name: 'calculateStrahlenschutz',
+    description:
+      'Radiation protection calculations. Pick the formula with formel and give ' +
+      'the known values; the missing one is calculated. ' +
+      'abstand: inverse square law D1² × R1 = D2² × R2, give 3 of d1, r1, d2, r2. ' +
+      'schutzwert: shielding R = R0 / S^n, give 3 of r0, r, s, n. ' +
+      'aufenthaltszeit: stay time t = D / R, give 2 of t, d, r. ' +
+      'nuklid: dose rate in 1 m from activity (Ḣ = Γ × A), give nuclide and ' +
+      'either activity or doseRate.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        d1: { type: SchemaType.NUMBER, description: 'Abstand 1 in Metern' },
-        r1: { type: SchemaType.NUMBER, description: 'Dosisleistung 1 in µSv/h' },
-        d2: { type: SchemaType.NUMBER, description: 'Abstand 2 in Metern' },
-        r2: { type: SchemaType.NUMBER, description: 'Dosisleistung 2 in µSv/h' },
+        formel: {
+          type: SchemaType.STRING,
+          enum: ['abstand', 'schutzwert', 'aufenthaltszeit', 'nuklid'],
+          description: 'Which formula to calculate',
+        },
+        d1: { type: SchemaType.NUMBER, description: 'abstand: distance 1 in m' },
+        r1: { type: SchemaType.NUMBER, description: 'abstand: dose rate 1 in µSv/h' },
+        d2: { type: SchemaType.NUMBER, description: 'abstand: distance 2 in m' },
+        r2: { type: SchemaType.NUMBER, description: 'abstand: dose rate 2 in µSv/h' },
+        r0: { type: SchemaType.NUMBER, description: 'schutzwert: dose rate without shielding' },
+        s: { type: SchemaType.NUMBER, description: 'schutzwert: Schutzwert of the material' },
+        n: { type: SchemaType.NUMBER, description: 'schutzwert: number of layers' },
+        r: {
+          type: SchemaType.NUMBER,
+          description:
+            'schutzwert: dose rate with shielding; aufenthaltszeit: dose rate in mSv/h',
+        },
+        t: { type: SchemaType.NUMBER, description: 'aufenthaltszeit: stay time in hours' },
+        d: { type: SchemaType.NUMBER, description: 'aufenthaltszeit: permitted dose in mSv' },
+        nuclide: {
+          type: SchemaType.STRING,
+          description: 'nuklid: name of the nuclide (e.g. Cs-137, Co-60, Am-241)',
+        },
+        activity: { type: SchemaType.NUMBER, description: 'nuklid: activity in GBq' },
+        doseRate: { type: SchemaType.NUMBER, description: 'nuklid: dose rate in 1 m in µSv/h' },
       },
-    },
-  },
-  {
-    name: 'calculateStrahlenschutzSchutzwert',
-    description: 'Berechne Dosisleistung mit Abschirmung, Schutzwert oder Schichten (R = R₀ / S^n). Gib genau 3 der 4 Parameter an.',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        r0: { type: SchemaType.NUMBER, description: 'Dosisleistung ohne Abschirmung' },
-        r: { type: SchemaType.NUMBER, description: 'Dosisleistung mit Abschirmung' },
-        s: { type: SchemaType.NUMBER, description: 'Schutzwert des Materials' },
-        n: { type: SchemaType.NUMBER, description: 'Anzahl der Schichten' },
-      },
-    },
-  },
-  {
-    name: 'calculateStrahlenschutzAufenthaltszeit',
-    description: 'Berechne Aufenthaltszeit, zulässige Dosis oder Dosisleistung (t = D / R). Gib genau 2 der 3 Parameter an.',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        t: { type: SchemaType.NUMBER, description: 'Aufenthaltszeit in Stunden (h)' },
-        d: { type: SchemaType.NUMBER, description: 'Zulässige Dosis in mSv' },
-        r: { type: SchemaType.NUMBER, description: 'Dosisleistung in mSv/h' },
-      },
-    },
-  },
-  {
-    name: 'calculateStrahlenschutzNuklid',
-    description: 'Berechne Dosisleistung in 1m aus Aktivität oder umgekehrt für ein bestimmtes Nuklid (Ḣ = Γ × A). Gib entweder activity oder doseRate an.',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        nuclide: { type: SchemaType.STRING, description: 'Name des Nuklids (z.B. Cs-137, Co-60, Am-241)' },
-        activity: { type: SchemaType.NUMBER, description: 'Aktivität in GBq' },
-        doseRate: { type: SchemaType.NUMBER, description: 'Dosisleistung in 1m in µSv/h' },
-      },
-      required: ['nuclide'],
+      required: ['formel'],
     },
   },
   {
@@ -707,13 +683,13 @@ Regeln:
 
 Verfügbare Elemente:
 - marker: Taktische Zeichen, allgemeine Marker (createMarker)
+- el: Einsatzleitung-Marker (createMarker mit kind el)
+- assp: Atemschutzsammelplatz (createMarker mit kind assp)
 - vehicle: Fahrzeuge wie TLFA, KLF, etc. (createVehicle)
 - rohr: Wasserabgabestellen C-Rohr, B-Rohr, Wasserwerfer (createRohr)
 - diary: Einsatztagebuch-Einträge (createDiary)
 - gb: Geschäftsbuch-Einträge (createGb)
 - circle: Kreise mit Radius (createCircle)
-- el: Einsatzleitung-Marker (createEl)
-- assp: Atemschutzsammelplatz (createAssp)
 - tacticalUnit: Taktische Einheiten wie Trupp, Gruppe, Zug, Abschnitt (createTacticalUnit) -
   ein Kartenelement. Ein Atemschutztrupp zur Überwachung ist createAtemschutzTrupp
 
@@ -730,8 +706,8 @@ Aktionen:
   beantworten - die Zahl steht nur im Fahrtenbuch.
 - createAtemschutzTrupp: Atemschutztrupp für die Atemschutzüberwachung anlegen
   ("Trupp anlegen", "neuer Atemschutztrupp"). NICHT createTacticalUnit - das
-  legt eine taktische Einheit auf der Karte an. NICHT createAssp - das ist nur
-  ein Marker für den Sammelplatz.
+  legt eine taktische Einheit auf der Karte an. NICHT createMarker mit kind assp -
+  das ist nur ein Marker für den Sammelplatz.
 - setAtemschutzTruppStatus: Trupp zuteilen, in den Einsatz schicken ("geht
   unter Atemschutz", "Abmarsch"), zurückholen ("ist zurück", "wieder
   draußen"), wieder bereitstellen oder abmelden.
@@ -747,11 +723,11 @@ Aktionen:
 - deleteItem: Bestehendes Element löschen
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
 - calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)
-- Strahlenschutz-Berechnungen: Verwende die spezifischen Tools calculateStrahlenschutzAbstand, calculateStrahlenschutzSchutzwert, calculateStrahlenschutzAufenthaltszeit und calculateStrahlenschutzNuklid.
-  - Wenn ein Benutzer nach Dosisleistung in einem anderen Abstand fragt -> calculateStrahlenschutzAbstand
-  - Wenn nach Abschirmung/Schutzwert gefragt wird -> calculateStrahlenschutzSchutzwert
-  - Wenn nach Aufenthaltszeit bei einer bestimmten Dosis gefragt wird -> calculateStrahlenschutzAufenthaltszeit
-  - Wenn nach Dosisleistung eines Nuklids (Aktivität) gefragt wird -> calculateStrahlenschutzNuklid
+- Strahlenschutz-Berechnungen: Verwende calculateStrahlenschutz, nicht calculate. Wähle die Formel:
+  - Dosisleistung in einem anderen Abstand -> formel abstand
+  - Abschirmung/Schutzwert -> formel schutzwert
+  - Aufenthaltszeit bei einer bestimmten Dosis -> formel aufenthaltszeit
+  - Dosisleistung eines Nuklids (Aktivität) -> formel nuklid
 
 Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Details:
 - Fahrzeuge: Name, Feuerwehr (fw), Besatzung, ATS-Geräte, Alarmierung, Eintreffen, Abrücken

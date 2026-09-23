@@ -195,6 +195,47 @@ describe('Atemschutztrupp tools', () => {
   it('keeps trupps apart from tactical units and the ASSP marker', () => {
     const section = AI_SYSTEM_PROMPT.slice(AI_SYSTEM_PROMPT.indexOf('createAtemschutzTrupp'));
     expect(section).toContain('NICHT createTacticalUnit');
-    expect(section).toContain('createAssp');
+    expect(section).toContain('createMarker');
+    expect(section).not.toContain('createAssp');
+  });
+});
+
+describe('zusammengelegte Werkzeuge', () => {
+  const byName = (name: string) => AI_TOOL_DECLARATIONS.find((d) => d.name === name);
+  const names = AI_TOOL_DECLARATIONS.map((d) => d.name);
+
+  it('legt EL und ASSP über createMarker an', () => {
+    expect(names).not.toContain('createEl');
+    expect(names).not.toContain('createAssp');
+    const kind = (byName('createMarker')?.parameters as unknown as LooseSchema)
+      .properties?.kind;
+    expect(kind?.enum).toEqual(['marker', 'el', 'assp']);
+  });
+
+  it('rechnet den Strahlenschutz mit einem Werkzeug', () => {
+    expect(names.filter((n) => n.startsWith('calculateStrahlenschutz'))).toEqual([
+      'calculateStrahlenschutz',
+    ]);
+    const params = byName('calculateStrahlenschutz')?.parameters as unknown as LooseSchema;
+    expect(params.properties?.formel?.enum).toEqual([
+      'abstand',
+      'schutzwert',
+      'aufenthaltszeit',
+      'nuklid',
+    ]);
+    expect(params.required).toEqual(['formel']);
+  });
+
+  it('nennt die alten Namen nicht mehr im Systemprompt', () => {
+    for (const name of [
+      'createEl',
+      'createAssp',
+      'calculateStrahlenschutzAbstand',
+      'calculateStrahlenschutzSchutzwert',
+      'calculateStrahlenschutzAufenthaltszeit',
+      'calculateStrahlenschutzNuklid',
+    ]) {
+      expect(AI_SYSTEM_PROMPT).not.toMatch(new RegExp(`\\b${name}\\b`));
+    }
   });
 });

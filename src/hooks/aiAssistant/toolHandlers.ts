@@ -165,6 +165,13 @@ function formatDuration(hours: number): string {
   return parts.length > 0 ? parts.join(' ') : '0 s';
 }
 
+/** Arten von createMarker: Elementtyp → Ersatzname und Bezeichnung in der Antwort. */
+const MARKER_KINDS: Record<string, { fallbackName: string; label: string }> = {
+  marker: { fallbackName: 'Marker', label: 'Marker' },
+  el: { fallbackName: 'Einsatzleitung', label: 'Einsatzleitung' },
+  assp: { fallbackName: 'ASSP', label: 'ASSP' },
+};
+
 export async function executeToolCall(
   call: FunctionCall,
   deps: ToolHandlerDeps,
@@ -190,17 +197,32 @@ export async function executeToolCall(
 
   switch (call.name) {
     case 'createMarker': {
+      // EL und ASSP sind eigene Elementtypen, für das Modell aber nur eine Art
+      // Marker — ein Werkzeug weniger zur Auswahl. Unbekannte Arten landen
+      // beim allgemeinen Marker statt bei einem Fehler.
+      const kind = MARKER_KINDS[args.kind as string] ? (args.kind as string) : 'marker';
+      const { fallbackName, label } = MARKER_KINDS[kind];
       const pos = await resolvePosition(args.position as any);
-      const ref = await addFirecallItem({
-        type: 'marker',
-        name: (args.name as string) || 'Marker',
-        beschreibung: args.beschreibung as string,
-        zeichen: args.zeichen as string,
-        color: args.color as string,
-        ...pos,
-      } as FirecallItem);
-      setLastCreatedItem({ id: ref.id, type: 'marker' });
-      return { success: true, message: `Marker "${args.name}" erstellt`, createdItemId: ref.id };
+      const name = (args.name as string) || fallbackName;
+      const ref = await addFirecallItem(
+        kind === 'marker'
+          ? ({
+              type: 'marker',
+              name,
+              beschreibung: args.beschreibung as string,
+              zeichen: args.zeichen as string,
+              color: args.color as string,
+              ...pos,
+            } as FirecallItem)
+          : { type: kind, name, ...pos }
+      );
+      setLastCreatedItem({ id: ref.id, type: kind });
+      return {
+        success: true,
+        message: `${label} "${args.name}" erstellt`,
+        createdItemId: ref.id,
+        createdItemType: kind,
+      };
     }
 
     case 'createVehicle': {
@@ -275,28 +297,6 @@ export async function executeToolCall(
       } as FirecallItem);
       setLastCreatedItem({ id: ref.id, type: 'circle' });
       return { success: true, message: `Kreis "${args.name}" erstellt`, createdItemId: ref.id };
-    }
-
-    case 'createEl': {
-      const pos = await resolvePosition(args.position as any);
-      const ref = await addFirecallItem({
-        type: 'el',
-        name: (args.name as string) || 'Einsatzleitung',
-        ...pos,
-      });
-      setLastCreatedItem({ id: ref.id, type: 'el' });
-      return { success: true, message: `Einsatzleitung "${args.name}" erstellt`, createdItemId: ref.id };
-    }
-
-    case 'createAssp': {
-      const pos = await resolvePosition(args.position as any);
-      const ref = await addFirecallItem({
-        type: 'assp',
-        name: (args.name as string) || 'ASSP',
-        ...pos,
-      });
-      setLastCreatedItem({ id: ref.id, type: 'assp' });
-      return { success: true, message: `ASSP "${args.name}" erstellt`, createdItemId: ref.id };
     }
 
     case 'createTacticalUnit': {
@@ -478,79 +478,89 @@ export async function executeToolCall(
       }
     }
 
-    case 'calculateStrahlenschutzAbstand': {
-      const result = calculateInverseSquareLaw({
-        d1: args.d1 as number ?? null,
-        r1: args.r1 as number ?? null,
-        d2: args.d2 as number ?? null,
-        r2: args.r2 as number ?? null,
-      });
-      if (!result) return { success: false, message: 'Ungültige Parameter für Abstandsgesetz' };
-      const labels: Record<string, string> = { d1: 'Abstand 1', r1: 'Dosisleistung 1', d2: 'Abstand 2', r2: 'Dosisleistung 2' };
-      const unit = result.field.startsWith('d') ? 'm' : 'µSv/h';
-      return { 
-        success: true, 
-        message: `Strahlenschutz (Abstandsgesetz): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
-        isAnswer: true,
-        data: { field: result.field, value: result.value, unit }
-      };
-    }
+    case 'calculateStrahlenschutz': {
+      switch (args.formel) {
+        case 'abstand': {
+          const result = calculateInverseSquareLaw({
+            d1: args.d1 as number ?? null,
+            r1: args.r1 as number ?? null,
+            d2: args.d2 as number ?? null,
+            r2: args.r2 as number ?? null,
+          });
+          if (!result) return { success: false, message: 'Ungültige Parameter für Abstandsgesetz' };
+          const labels: Record<string, string> = { d1: 'Abstand 1', r1: 'Dosisleistung 1', d2: 'Abstand 2', r2: 'Dosisleistung 2' };
+          const unit = result.field.startsWith('d') ? 'm' : 'µSv/h';
+          return { 
+            success: true, 
+            message: `Strahlenschutz (Abstandsgesetz): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
+            isAnswer: true,
+            data: { field: result.field, value: result.value, unit }
+          };
+        }
 
-    case 'calculateStrahlenschutzSchutzwert': {
-      const result = calculateSchutzwert({
-        r0: args.r0 as number ?? null,
-        r: args.r as number ?? null,
-        s: args.s as number ?? null,
-        n: args.n as number ?? null,
-      });
-      if (!result) return { success: false, message: 'Ungültige Parameter für Schutzwert' };
-      const labels: Record<string, string> = { r0: 'DLR ohne Abschirmung', r: 'DLR mit Abschirmung', s: 'Schutzwert (S)', n: 'Anzahl Schichten' };
-      const unit = result.field.startsWith('r') ? 'µSv/h' : '';
-      return { 
-        success: true, 
-        message: `Strahlenschutz (Schutzwert): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
-        isAnswer: true,
-        data: { field: result.field, value: result.value, unit }
-      };
-    }
+        case 'schutzwert': {
+          const result = calculateSchutzwert({
+            r0: args.r0 as number ?? null,
+            r: args.r as number ?? null,
+            s: args.s as number ?? null,
+            n: args.n as number ?? null,
+          });
+          if (!result) return { success: false, message: 'Ungültige Parameter für Schutzwert' };
+          const labels: Record<string, string> = { r0: 'DLR ohne Abschirmung', r: 'DLR mit Abschirmung', s: 'Schutzwert (S)', n: 'Anzahl Schichten' };
+          const unit = result.field.startsWith('r') ? 'µSv/h' : '';
+          return { 
+            success: true, 
+            message: `Strahlenschutz (Schutzwert): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
+            isAnswer: true,
+            data: { field: result.field, value: result.value, unit }
+          };
+        }
 
-    case 'calculateStrahlenschutzAufenthaltszeit': {
-      const result = calculateAufenthaltszeit({
-        t: args.t as number ?? null,
-        d: args.d as number ?? null,
-        r: args.r as number ?? null,
-      });
-      if (!result) return { success: false, message: 'Ungültige Parameter für Aufenthaltszeit' };
-      const labels: Record<string, string> = { t: 'Aufenthaltszeit', d: 'Zulässige Dosis', r: 'Dosisleistung' };
-      const unit = result.field === 't' ? 'h' : result.field === 'd' ? 'mSv' : 'mSv/h';
-      let message = `Strahlenschutz (Aufenthaltszeit): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`;
-      if (result.field === 't') message += ` (${formatDuration(result.value)})`;
-      return { 
-        success: true, 
-        message, 
-        isAnswer: true,
-        data: { field: result.field, value: result.value, unit, duration: result.field === 't' ? formatDuration(result.value) : undefined }
-      };
-    }
+        case 'aufenthaltszeit': {
+          const result = calculateAufenthaltszeit({
+            t: args.t as number ?? null,
+            d: args.d as number ?? null,
+            r: args.r as number ?? null,
+          });
+          if (!result) return { success: false, message: 'Ungültige Parameter für Aufenthaltszeit' };
+          const labels: Record<string, string> = { t: 'Aufenthaltszeit', d: 'Zulässige Dosis', r: 'Dosisleistung' };
+          const unit = result.field === 't' ? 'h' : result.field === 'd' ? 'mSv' : 'mSv/h';
+          let message = `Strahlenschutz (Aufenthaltszeit): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`;
+          if (result.field === 't') message += ` (${formatDuration(result.value)})`;
+          return { 
+            success: true, 
+            message, 
+            isAnswer: true,
+            data: { field: result.field, value: result.value, unit, duration: result.field === 't' ? formatDuration(result.value) : undefined }
+          };
+        }
 
-    case 'calculateStrahlenschutzNuklid': {
-      const nuclideName = args.nuclide as string;
-      const nuclide = NUCLIDES.find(n => n.name.toLowerCase() === nuclideName.toLowerCase());
-      if (!nuclide) return { success: false, message: `Nuklid "${nuclideName}" nicht gefunden` };
+        case 'nuklid': {
+          const nuclideName = (args.nuclide as string) ?? '';
+          const nuclide = NUCLIDES.find(n => n.name.toLowerCase() === nuclideName.toLowerCase());
+          if (!nuclide) return { success: false, message: `Nuklid "${nuclideName}" nicht gefunden` };
 
-      const result = calculateDosisleistungNuklid(nuclide.gamma, {
-        activity: args.activity as number ?? null,
-        doseRate: args.doseRate as number ?? null,
-      });
-      if (!result) return { success: false, message: 'Ungültige Parameter für Nuklid-Berechnung' };
-      const label = result.field === 'activity' ? 'Aktivität' : 'Dosisleistung in 1m';
-      const unit = result.field === 'activity' ? 'GBq' : 'µSv/h';
-      return { 
-        success: true, 
-        message: `Strahlenschutz (${nuclide.name}): ${label} = ${formatValue(result.value)} ${unit}`, 
-        isAnswer: true,
-        data: { nuclide: nuclide.name, field: result.field, value: result.value, unit }
-      };
+          const result = calculateDosisleistungNuklid(nuclide.gamma, {
+            activity: args.activity as number ?? null,
+            doseRate: args.doseRate as number ?? null,
+          });
+          if (!result) return { success: false, message: 'Ungültige Parameter für Nuklid-Berechnung' };
+          const label = result.field === 'activity' ? 'Aktivität' : 'Dosisleistung in 1m';
+          const unit = result.field === 'activity' ? 'GBq' : 'µSv/h';
+          return { 
+            success: true, 
+            message: `Strahlenschutz (${nuclide.name}): ${label} = ${formatValue(result.value)} ${unit}`, 
+            isAnswer: true,
+            data: { nuclide: nuclide.name, field: result.field, value: result.value, unit }
+          };
+        }
+
+        default:
+          return {
+            success: false,
+            message: `Unbekannte Strahlenschutz-Formel "${args.formel}" (abstand, schutzwert, aufenthaltszeit, nuklid)`,
+          };
+      }
     }
 
     case 'searchWaterSupply': {

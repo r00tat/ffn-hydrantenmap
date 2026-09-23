@@ -168,7 +168,8 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
           timestamp: Date.now(),
           action: call.name,
           createdItemId: result.createdItemId,
-          createdItemType: call.name.replace('create', '').toLowerCase(),
+          createdItemType:
+            result.createdItemType ?? call.name.replace('create', '').toLowerCase(),
         });
       }
 

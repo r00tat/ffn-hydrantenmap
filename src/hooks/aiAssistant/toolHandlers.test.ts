@@ -645,3 +645,114 @@ describe('Atemschutztrupps', () => {
     expect(result.message).toContain('trotzdem');
   });
 });
+
+describe('createMarker', () => {
+  it('legt ohne Art einen Marker an', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createMarker', { name: 'Absperrung', zeichen: 'Sperre' }),
+      deps
+    );
+
+    expect(result.success).toBe(true);
+    expect(deps.addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'marker', name: 'Absperrung', zeichen: 'Sperre' })
+    );
+    expect(result.createdItemType).toBe('marker');
+    expect(deps.setLastCreatedItem).toHaveBeenCalledWith({ id: 'new-id', type: 'marker' });
+  });
+
+  it.each([
+    ['el', 'Einsatzleitung'],
+    ['assp', 'ASSP'],
+  ])('legt mit kind=%s das eigene Element an', async (kind, label) => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createMarker', { kind, name: 'Feuerwehrhaus', zeichen: 'x', color: '#f00' }),
+      deps
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain(label);
+    expect(result.createdItemType).toBe(kind);
+    const item = vi.mocked(deps.addFirecallItem).mock.calls[0][0];
+    expect(item).toMatchObject({ type: kind, name: 'Feuerwehrhaus', ...einsatzort });
+    // Zeichen und Farbe gehören nur zum Marker.
+    expect(item).not.toHaveProperty('zeichen');
+    expect(item).not.toHaveProperty('color');
+    // „Rückgängig" nimmt das Element über lastCreatedItem zurück.
+    expect(deps.setLastCreatedItem).toHaveBeenCalledWith({ id: 'new-id', type: kind });
+  });
+
+  it('fällt bei einer unbekannten Art auf den Marker zurück', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createMarker', { kind: 'vehicle', name: 'X' }),
+      deps
+    );
+
+    expect(result.createdItemType).toBe('marker');
+    expect(deps.addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'marker' })
+    );
+  });
+
+  it.each(['createEl', 'createAssp'])('kennt %s nicht mehr', async (name) => {
+    const result = await executeToolCall(call(name, { name: 'X' }), makeDeps());
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('calculateStrahlenschutz', () => {
+  it('rechnet das Abstandsgesetz', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'abstand', d1: 1, r1: 100, d2: 10 }),
+      makeDeps()
+    );
+    expect(result.success).toBe(true);
+    expect(result.isAnswer).toBe(true);
+    expect(result.data).toMatchObject({ field: 'r2', value: 1, unit: 'µSv/h' });
+  });
+
+  it('rechnet den Schutzwert', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'schutzwert', r0: 100, s: 2, n: 2 }),
+      makeDeps()
+    );
+    expect(result.data).toMatchObject({ field: 'r', value: 25 });
+  });
+
+  it('rechnet die Aufenthaltszeit', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'aufenthaltszeit', d: 15, r: 5 }),
+      makeDeps()
+    );
+    expect(result.data).toMatchObject({ field: 't', value: 3, unit: 'h' });
+  });
+
+  it('rechnet die Dosisleistung eines Nuklids', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'nuklid', nuclide: 'cs-137', activity: 1 }),
+      makeDeps()
+    );
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({ nuclide: 'Cs-137', field: 'doseRate' });
+  });
+
+  it('meldet ein fehlendes Nuklid statt abzustürzen', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'nuklid', activity: 1 }),
+      makeDeps()
+    );
+    expect(result.success).toBe(false);
+  });
+
+  it('lehnt eine unbekannte Formel ab', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'foo', d1: 1 }),
+      makeDeps()
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('abstand');
+  });
+});
