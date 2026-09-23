@@ -33,6 +33,17 @@ const positionSchema = {
   },
 };
 
+/**
+ * Gesagt wird „KLF Weiden", gespeichert werden Name und Feuerwehr getrennt.
+ * Mit „Fire department name" allein hat das Modell den Ort weggelassen und in
+ * der Antwort trotzdem genannt.
+ */
+const FW_DESCRIPTION =
+  'Fire department (Feuerwehr) the unit belongs to. Usually the place name ' +
+  'spoken after the designation: "KLF Weiden" is name KLF and fw Weiden, ' +
+  '"TLFA Neusiedl" is name TLFA and fw Neusiedl. Always set it when a place ' +
+  'is named; never drop it.';
+
 export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'createMarker',
@@ -64,8 +75,14 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        name: { type: SchemaType.STRING, description: 'Vehicle name (e.g., TLFA 4000)' },
-        fw: { type: SchemaType.STRING, description: 'Fire department name' },
+        name: {
+          type: SchemaType.STRING,
+          description: 'Vehicle designation without the fire department (e.g., TLFA 4000, KLF)',
+        },
+        fw: {
+          type: SchemaType.STRING,
+          description: FW_DESCRIPTION,
+        },
         besatzung: {
           type: SchemaType.STRING,
           description:
@@ -172,7 +189,7 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
           enum: ['einheit', 'trupp', 'gruppe', 'zug', 'bereitschaft', 'abschnitt', 'bezirk', 'lfv', 'oebfv'],
           description: 'Type of tactical unit: einheit=Einheit, trupp=Trupp, gruppe=Gruppe, zug=Zug (default), bereitschaft=Bereitschaft, abschnitt=Abschnitt, bezirk=Bezirk, lfv=LFV, oebfv=ÖBFV',
         },
-        fw: { type: SchemaType.STRING, description: 'Fire department name' },
+        fw: { type: SchemaType.STRING, description: FW_DESCRIPTION },
         mann: { type: SchemaType.NUMBER, description: 'Crew strength (number of personnel)' },
         fuehrung: { type: SchemaType.STRING, description: 'Unit commander name' },
         ats: { type: SchemaType.NUMBER, description: 'Number of breathing apparatus carriers' },

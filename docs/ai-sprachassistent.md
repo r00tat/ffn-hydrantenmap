@@ -67,6 +67,15 @@ Was diese Entscheidung kostet, und wie es aufgefangen ist:
   Beitrag nachgereicht — aber nur, wenn er sich geändert hat (`sentContextRef`).
   Ein Werkzeug „aktuellen Kartenstand holen" bliebe die Alternative; es wäre ein
   Werkzeug mehr unter 32 und ein Modellaufruf mehr je ortsbezogenem Befehl.
+- **Die Schleife läuft länger als ein Render.** `runLiveConversation` startet
+  einmal und bekommt `executeTool` mit; der Kontext wird über `sendContext`
+  gebaut. Beide schließen über `existingItems` und `lastCreatedItem` ein.
+  Hielte die Schleife die Fassung vom Gesprächsbeginn, fände „nicht das KLF,
+  sondern das KRF" das eben angelegte KLF nicht („Element nicht gefunden"), und
+  der nachgereichte Kontext wäre immer der alte — und würde, weil unverändert,
+  gar nicht erst geschickt. Deshalb gehen beide wie die Rückrufe über ein Ref,
+  das jedem Render folgt. Innerhalb *eines* Werkzeugaufrufs mit mehreren
+  Funktionen bleibt der Stand der des Aufrufbeginns.
 - **Zeitgrenze und Wiederaufnahme.** Eine Audio-Sitzung endet nach rund
   15 Minuten und fasst 128k Token; ein Einsatz dauert Stunden. Ein Gespräch ist
   keine Einsatzdauer — es dauert Minuten, und danach wird neu gestartet.

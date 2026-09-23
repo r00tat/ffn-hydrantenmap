@@ -172,6 +172,16 @@ const MARKER_KINDS: Record<string, { fallbackName: string; label: string }> = {
   assp: { fallbackName: 'ASSP', label: 'ASSP' },
 };
 
+/**
+ * Die Feuerwehr in der Rückmeldung — auch, wenn keine gespeichert wurde. Aus
+ * der Rückmeldung baut das Modell seine Antwort; steht die Feuerwehr nicht
+ * darin, soll es sie auch nicht behaupten.
+ */
+function feuerwehrHinweis(fw: unknown): string {
+  const name = typeof fw === 'string' ? fw.trim() : '';
+  return name ? `(${name})` : 'ohne Feuerwehr';
+}
+
 export async function executeToolCall(
   call: FunctionCall,
   deps: ToolHandlerDeps,
@@ -243,7 +253,11 @@ export async function executeToolCall(
         ...pos,
       } as FirecallItem);
       setLastCreatedItem({ id: ref.id, type: 'vehicle' });
-      return { success: true, message: `Fahrzeug "${args.name}" erstellt`, createdItemId: ref.id };
+      return {
+        success: true,
+        message: `Fahrzeug "${args.name}" ${feuerwehrHinweis(args.fw)} erstellt`,
+        createdItemId: ref.id,
+      };
     }
 
     case 'createRohr': {
@@ -314,7 +328,11 @@ export async function executeToolCall(
         ...pos,
       } as FirecallItem);
       setLastCreatedItem({ id: ref.id, type: 'tacticalUnit' });
-      return { success: true, message: `Taktische Einheit "${args.name}" erstellt`, createdItemId: ref.id };
+      return {
+        success: true,
+        message: `Taktische Einheit "${args.name}" ${feuerwehrHinweis(args.fw)} erstellt`,
+        createdItemId: ref.id,
+      };
     }
 
     case 'updateItem': {
