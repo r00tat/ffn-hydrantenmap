@@ -48,7 +48,6 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     // eigene Laufzeit vom Gedächtnis abziehen — bei zwölf Sekunden je
     // Sprachbefehl ein spürbarer Anteil.
     if (hasMemory && Date.now() - lastActivityRef.current > MEMORY_TIMEOUT_MS) {
-      console.info('[AI] Memory timeout reached, resetting history');
       chatHistoryRef.current = [];
       interactionsRef.current = [];
     }
@@ -97,8 +96,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         },
       ];
 
-      console.info('[AI] Sending request with history length:', chatHistoryRef.current.length);
-      console.info('[AI] User input:', userParts.map((p) => 'text' in p ? p.text : '[Data]'));
+      console.info('[AI] verstanden:', userParts.map((p) => ('text' in p ? p.text : '[Data]')));
 
       setProcessingStatus('analyzing');
 
@@ -154,10 +152,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           try { responseText = response.text?.() || ''; } catch { /* ignore */ }
 
           if (responseText) {
-            console.info('[AI] Model response text:', responseText);
-          }
-          if (functionCalls && functionCalls.length > 0) {
-            console.info('[AI] Model function calls:', functionCalls.map(fc => ({ name: fc.name, args: fc.args })));
+            console.info('[AI] Antwort:', responseText);
           }
 
           if (!functionCalls || functionCalls.length === 0) {
@@ -171,7 +166,6 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             chatHistoryRef.current = stripMapContextParts(currentContents);
 
             setProcessingStatus('idle');
-            console.info('[AI] Interaction complete. Final message:', text || 'Aktion ausgeführt');
             return {
               success: true,
               message: text || lastResult?.message || 'Aktion ausgeführt',
