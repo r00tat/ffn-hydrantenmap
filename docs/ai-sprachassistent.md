@@ -257,12 +257,19 @@ zusammengesetzt. Die Ausgabe-Abschrift geht dabei **schon während des
 Sprechens** als `onPartialAnswer` hinaus: Die Meldung soll mit der Stimme
 erscheinen und nicht, wenn der Satz zu Ende gesprochen ist.
 
-## Das einzige Werkzeug, das die Karte verlässt
+## Werkzeuge, die die Karte verlassen
+
+Die meisten Werkzeuge schreiben Elemente des laufenden Einsatzes oder rechnen.
+Zwei Gruppen schreiben woanders hin: das Fahrtenbuch und die
+Atemschutzüberwachung. Für beide gilt dasselbe wie für die Kartenwerkzeuge —
+kein „Rückgängig", Fehlschläge als Rückfrage im Gespräch —, sie kommen aber auf
+verschiedenen Wegen ans Ziel.
+
+### Das Fahrtenbuch
 
 `createFahrtenbuchEntry` trägt eine Fahrt ins Fahrtenbuch ein — „Lege einen
 Fahrtenbucheintrag für das RLFA an, Kilometerstand 1723, gefahren bin ich."
-Alle übrigen Werkzeuge schreiben Elemente des laufenden Einsatzes oder rechnen;
-dieses schreibt in die Stammdaten einer Gruppe. Drei Dinge fallen dadurch
+Es schreibt in die Stammdaten einer Gruppe. Drei Dinge fallen dadurch
 anders aus:
 
 - **Es läuft über eine Server Action**, nicht über Firestore im Browser. Die
@@ -283,6 +290,25 @@ anders aus:
 Einsatz** ausgestellt und sagt nichts über die Mitgliedschaft in der Gruppe aus,
 die das Fahrtenbuch verlangt. `createServerToolDeps` weist den Weg deshalb
 ausdrücklich ab, statt ihn offen zu lassen.
+
+### Die Atemschutzüberwachung
+
+`createAtemschutzTrupp`, `setAtemschutzTruppStatus` und
+`recordAtemschutzTruppReport` führen die Zeitkontrolle — „Trupp 1 geht rein,
+280 bar", „Trupp 1 hat 190 bar". Anders als das Fahrtenbuch laufen sie **im
+Browser** über
+[useTruppAssistant.ts](../src/components/Atemschutz/useTruppAssistant.ts),
+denn jede Aktion an einem Trupp hat auf der Überwachungsseite Nebenwirkungen:
+Einsatztagebuch, Warntermin, Push-Registrierung. Eine Server Action hätte sie
+nachbauen müssen, und ein Sprachbefehl ohne Warntermin wäre eine stille Frist.
+Warum das so ist und welche Rückfragen es gibt:
+[atemschutzueberwachung.md](atemschutzueberwachung.md#per-sprach-assistent).
+
+Die laufenden Trupps stehen als `atemschutzTrupps` im Kontext — nur wenn es
+welche gibt, damit ein Einsatz ohne Atemschutz nicht jeden Beitrag mit einer
+leeren Liste belastet. Über den MCP-Zugang sind die drei Werkzeuge ebenso
+ausgesperrt wie das Fahrtenbuch: Ein dort entsendeter Trupp hätte kein Gerät,
+das seine Warnungen abonniert.
 
 ## Was gemeinsam bleibt
 

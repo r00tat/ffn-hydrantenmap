@@ -85,6 +85,8 @@ import {
 } from './einheiten';
 import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
 import useTruppTagebuch from './useTruppTagebuch';
+import AiAssistantButton from '../Map/AiAssistantButton';
+import { useFirecallItems } from '../firebase/firestoreHooks';
 import useUeberwachungHinweise from './useUeberwachungHinweise';
 
 /**
@@ -170,6 +172,9 @@ export default function UeberwachungPage() {
   const { flaschen, activeGeraete, feuerwehren } =
     useAtemschutzGeraete(groupId);
   const { trupps } = useAtemschutzEinsatzdaten(firecallId);
+  // Für den Sprach-Assistenten: Ohne die Elemente liefen dort `updateItem`,
+  // `deleteItem` und `answerQuestion` stillschweigend ins Leere.
+  const firecallItems = useFirecallItems();
   const { vehicles, tacticalUnits } = useVehicles();
 
   const suggestions = useAtemschutzPersonSuggestions(groupId, {
@@ -873,6 +878,16 @@ export default function UeberwachungPage() {
           )}
         </AccordionDetails>
       </Accordion>
+
+      {canWrite && (
+        // Derselbe Assistent wie auf Karte und Tagebuch — mit allen
+        // Werkzeugen, nicht nur den Trupp-Werkzeugen. Über dem Plus-Knopf:
+        // 24 px Rand, 56 px Fab, 16 px Abstand.
+        <AiAssistantButton
+          firecallItems={firecallItems}
+          containerSx={{ position: 'fixed', bottom: 96, right: 24 }}
+        />
+      )}
 
       {canWrite && (
         <Fab

@@ -61,6 +61,10 @@ vi.mock('./aiAssistant/toolHandlers', () => ({
   executeToolCall: vi.fn(),
 }));
 
+vi.mock('../components/Atemschutz/useTruppAssistant', () => ({
+  default: vi.fn(() => ({ runTruppCommand: vi.fn(), truppContext: [] })),
+}));
+
 import useAiAssistant from './useAiAssistant';
 
 describe('useAiAssistant', () => {

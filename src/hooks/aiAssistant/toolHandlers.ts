@@ -19,6 +19,8 @@ import {
   WATER_SUPPLY_LABELS,
 } from '../../common/waterSupply';
 import type { AssistantEntryCommand } from '../../components/Fahrtenbuch/assistantEntry';
+import type { TruppCommand } from '../../components/Atemschutz/truppAssistant';
+import { TRUPP_STATUSES, type TruppStatus } from '../../common/atemschutz';
 import { findFirecallItemByName } from './itemLookup';
 import { AiAssistantResult, ResolvedOrigin } from './types';
 import {
@@ -92,6 +94,18 @@ export interface ToolHandlerDeps {
   getFahrtenbuchCounters: (
     fahrzeug?: string,
   ) => Promise<{ success: boolean; message: string }>;
+  /**
+   * Einen Atemschutztrupp anlegen, seinen Zustand ändern oder eine Meldung
+   * erfassen.
+   *
+   * Als Abhängigkeit aus demselben Grund wie das Fahrtenbuch: Welcher Trupp
+   * gemeint ist, entscheidet `planTruppCommand` anhand der Trupps des
+   * Einsatzes, und die Nebenwirkungen (Tagebuch, Warntermin, Push) hängen an
+   * Hooks, die es nur im Browser gibt. Die Rückmeldung ist ein fertiger Satz.
+   */
+  runAtemschutzTruppCommand: (
+    command: TruppCommand,
+  ) => Promise<{ success: boolean; message: string }>;
 }
 
 /**
@@ -112,6 +126,17 @@ const DEFAULT_WATER_SUPPLY_RESULTS = 5;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Entfernt Felder, die das Modell nicht gesetzt hat. Der Befehl soll zeigen,
+ * was gesagt wurde — ein `pressure: undefined` sähe im Log aus wie ein
+ * verlorener Wert.
+ */
+function ohneLeere<T extends object>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== undefined && v !== null),
+  ) as T;
 }
 
 /** Nur Art und Bezeichnung an das Modell geben, nicht die Koordinaten. */
@@ -160,6 +185,7 @@ export async function executeToolCall(
     proposeHoseLineDrafts,
     createFahrtenbuchEntry,
     getFahrtenbuchCounters,
+    runAtemschutzTruppCommand,
   } = deps;
 
   switch (call.name) {
@@ -362,6 +388,64 @@ export async function executeToolCall(
         message: result.message,
         isAnswer: result.success,
       };
+    }
+
+    // Die drei Trupp-Werkzeuge reichen durch, ohne umzudeuten: Welcher Trupp
+    // gemeint ist und ob ein Druck plausibel ist, entscheidet
+    // `planTruppCommand`. `createdItemId` bleibt leer — ein Trupp ist kein
+    // Kartenelement, und „rückgängig" fände ihn nie wieder.
+    case 'createAtemschutzTrupp': {
+      const result = await runAtemschutzTruppCommand(
+        ohneLeere({
+          kind: 'create',
+          name: args.name as string | undefined,
+          fireDepartment: args.fireDepartment as string | undefined,
+          members: args.members as string[] | undefined,
+          unit: args.unit as string | undefined,
+          note: args.note as string | undefined,
+        }),
+      );
+      return { success: result.success, message: result.message };
+    }
+
+    case 'setAtemschutzTruppStatus': {
+      const status = args.status as TruppStatus;
+      if (!TRUPP_STATUSES.includes(status)) {
+        return {
+          success: false,
+          message: `Unbekannter Zustand „${String(args.status)}". Möglich: ${TRUPP_STATUSES.join(', ')}.`,
+        };
+      }
+      const result = await runAtemschutzTruppCommand(
+        ohneLeere({
+          kind: 'status',
+          trupp: args.trupp as string | undefined,
+          status,
+          unit: args.unit as string | undefined,
+          pressure: args.pressure as number | undefined,
+          mission: args.mission as string | undefined,
+          target: args.target as string | undefined,
+          monitoredBy: args.monitoredBy as string | undefined,
+          time: args.time as string | undefined,
+        }),
+      );
+      return { success: result.success, message: result.message };
+    }
+
+    case 'recordAtemschutzTruppReport': {
+      const result = await runAtemschutzTruppCommand(
+        ohneLeere({
+          kind: 'report',
+          trupp: args.trupp as string | undefined,
+          pressure: args.pressure as number | undefined,
+          atTarget: args.atTarget as boolean | undefined,
+          withdrawing: args.withdrawing as boolean | undefined,
+          note: args.note as string | undefined,
+          logToDiary: args.logToDiary as boolean | undefined,
+          recordAnyway: args.recordAnyway as boolean | undefined,
+        }),
+      );
+      return { success: result.success, message: result.message };
     }
 
     case 'askClarification':

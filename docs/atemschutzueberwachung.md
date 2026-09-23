@@ -1088,6 +1088,68 @@ Einheit steht am Trupp".
 Die Gesamtlage ist die ungefilterte Liste. Schreiben darf, wer am Einsatz
 schreiben darf; ein Nur-Lese-Gast sieht die Überwachung, ändert sie aber nicht.
 
+## Per Sprach-Assistent
+
+Wer einen Trupp überwacht, hat oft das Funkgerät in der einen und den Stift in
+der anderen Hand. Deshalb lässt sich die Zeitkontrolle auch sprechen — auf der
+Karte, im Einsatztagebuch und über den Assistenten-Knopf auf dieser Seite.
+Drei Werkzeuge decken alles ab, was auf der Seite ein Knopf ist:
+
+- `createAtemschutzTrupp` legt einen Trupp an, gleich **bereit** und mit dem
+  eigenen Gerät als Überwacher. Ohne Mitglieder kein Trupp, wie im Dialog.
+  Die Feuerwehr kommt aus dem Befehl, sonst aus dem Einsatz, sonst aus den
+  schon erfassten Trupps, wenn dort nur eine vorkommt — und erst dann wird
+  gefragt.
+- `setAtemschutzTruppStatus` führt durch alle fünf Zustände. Er nimmt
+  **dieselben** Patch-Bausteine wie die Seite (`zuteilungPatch`,
+  `entsendePatch`, `rueckkehrPatch`); ein zurückgekehrter Trupp bekommt beim
+  erneuten Einsatz eine neue Zeile (`erneuterEinsatz`), wie unter „Ein
+  zurückgekehrter Trupp geht in einem Schritt wieder hinein".
+- `recordAtemschutzTruppReport` trägt eine Druckabfrage ein, auch mit
+  „am Ziel", „Rückzug" oder einer Notiz. Angehängt wird wie auf der Seite mit
+  `arrayUnion`, damit ein zweites Gerät am selben Trupp nichts verliert.
+
+Entschieden wird in einer reinen Funktion
+([truppAssistant.ts](../src/components/Atemschutz/truppAssistant.ts)), die
+den Schreibvorgang und die Nebenwirkungen als Plan zurückgibt; der Hook führt
+ihn aus. Dadurch sind Tagebuch, Warntermin und Push-Registrierung dieselben
+wie auf der Seite: Ein gesprochenes „geht rein" startet die Uhr mit
+Terminplanung, ein gesprochenes „zurück" schreibt die Rückkehr ins Tagebuch.
+
+### Welcher Trupp gemeint ist
+
+Gesprochen wird „Trupp 1", „Trupp Rot" oder „der Trupp mit Muster" (ein
+Mitglied).
+Gesucht wird stufenweise: genauer Name (das Wort „Trupp" zählt nicht), Name
+samt Feuerwehr, Name enthält alle gesagten Wörter, Mitglied. Die erste Stufe
+mit Treffer gewinnt; mehrere Treffer in ihr sind eine Rückfrage, die die
+Kandidaten nennt. Ohne Namen trifft der Befehl nur, wenn **genau ein** Trupp
+passt — „der Trupp geht rein" bei einem einzigen bereiten Trupp. Abgemeldete
+Trupps sind nie gemeint.
+
+### Wann zurückgefragt wird
+
+Geschrieben wird sofort — eine Bestätigung vor jedem Eintrag wäre im Einsatz
+ein Sprecherwechsel zu viel. Zurückgefragt wird nur bei Auffälligkeiten:
+ein Druck außerhalb 0–330 bar, ein Druck, der gegenüber der letzten Abfrage
+gestiegen ist, ein Abfall von mehr als 100 bar, ein zweites „am Ziel" oder ein
+zweiter Rückzug. Die Antwort endet dann mit „Soll ich das trotzdem
+eintragen?"; bejaht die Einsatzkraft, wiederholt das Modell den Aufruf mit
+`recordAnyway`. Nicht erlaubte Übergänge (ein Trupp im Einsatz soll wieder „bereit"
+sein) sind keine Rückfrage, sondern eine Absage mit dem Grund — „Der Trupp muss
+erst zurück sein."
+
+### Warum der Kontext die Trupps mitbringt
+
+Das Modell sieht die laufenden Trupps samt Zustand, letztem Druck und
+Einheit. Nur so beantwortet es „wie viel Druck hat Trupp 2?" ohne eigenes
+Werkzeug und nimmt den richtigen Trupp, wenn „der" gesagt wird. Weil der
+Kontext jeden Beitrag neu gebaut wird, ist die Liste nie älter als der Satz.
+
+Die Antworten der Werkzeuge sind fest deutsch und laufen nicht über
+`next-intl`: Sie sind Werkzeugergebnisse für das Modell, das sie in der
+Sprache des Gesprächs wiedergibt.
+
 ## Was die Überwachung ausdrücklich nicht ist
 
 > „Die mit der Atemschutzüberwachung beauftragte Person übernimmt dabei NICHT

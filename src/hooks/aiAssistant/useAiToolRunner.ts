@@ -5,6 +5,7 @@ import {
   createFahrtenbuchEntryFromAssistant,
   getFahrtenbuchCountersForAssistant,
 } from '../../components/Fahrtenbuch/fahrtenbuchActions';
+import useTruppAssistant from '../../components/Atemschutz/useTruppAssistant';
 import { queryClusters } from '../../components/firebase/clusterQuery';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { usePositionContext } from '../../components/providers/PositionProvider';
@@ -58,6 +59,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
   const updateFirecallItem = useFirecallItemUpdate();
   const firecall = useFirecall();
   const { proposeDrafts } = useHoseLineDraft();
+  const { runTruppCommand, truppContext } = useTruppAssistant();
 
   const interactionsRef = useRef<AiInteraction[]>([]);
   /** Treffer der letzten Umkreissuche, siehe `ToolHandlerDeps` */
@@ -158,6 +160,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
         proposeHoseLineDrafts: proposeDrafts,
         createFahrtenbuchEntry,
         getFahrtenbuchCounters,
+        runAtemschutzTruppCommand: runTruppCommand,
       });
 
       if (result.success) {
@@ -181,6 +184,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
       proposeDrafts,
       resolveOrigin,
       resolvePosition,
+      runTruppCommand,
       updateFirecallItem,
     ]
   );
@@ -193,11 +197,12 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
       isPositionSet,
       position,
       interactions: interactionsRef.current,
+      trupps: truppContext,
     });
     // Kompakt statt eingerückt: Die Einrückung ist rund ein Drittel der
     // Zeichen und trägt für das Modell nichts bei (#740).
     return `${MAP_CONTEXT_PREFIX}\n${JSON.stringify(context)}`;
-  }, [existingItems, isPositionSet, map, position]);
+  }, [existingItems, isPositionSet, map, position, truppContext]);
 
   const contextStats = useCallback(
     () => ({ items: existingItems.filter((item) => !item.deleted).length }),

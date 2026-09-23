@@ -31,6 +31,9 @@ vi.mock('../useFirecall', () => ({
 vi.mock('../useMapEditor', () => ({ useHistoryPathSegments: vi.fn(() => []) }));
 vi.mock('../../components/actions/maps/places', () => ({ searchPlace: vi.fn() }));
 vi.mock('./toolHandlers', () => ({ executeToolCall: vi.fn() }));
+vi.mock('../../components/Atemschutz/useTruppAssistant', () => ({
+  default: vi.fn(() => ({ runTruppCommand: vi.fn(), truppContext: [] })),
+}));
 
 const capture = { stop: vi.fn().mockResolvedValue(undefined) };
 const playback = {
