@@ -22,7 +22,35 @@ const positionSchema = {
     },
     itemName: {
       type: SchemaType.STRING,
-      description: 'Name of item to place near (for nearItem type)',
+      description:
+        'Name of the item to place near (nearItem) or at (atItem). Leave it empty to ' +
+        'mean the item created last, e.g. "weiterer Messpunkt 10 m nordöstlich".',
+    },
+    direction: {
+      type: SchemaType.STRING,
+      enum: [
+        'left',
+        'right',
+        'above',
+        'below',
+        'north',
+        'south',
+        'east',
+        'west',
+        'northeast',
+        'northwest',
+        'southeast',
+        'southwest',
+      ],
+      description:
+        'Side or compass direction from the item for nearItem, on the north-up map: ' +
+        '"links" = left, "rechts" = right, "oberhalb" = above, "unterhalb" = below, ' +
+        '"nördlich" = north, "nordöstlich" = northeast, "südwestlich" = southwest and so on. ' +
+        'Set it whenever a side or direction is named.',
+    },
+    distance: {
+      type: SchemaType.NUMBER,
+      description: 'Distance from the item in meters for nearItem, default 20',
     },
     address: {
       type: SchemaType.STRING,
@@ -33,18 +61,81 @@ const positionSchema = {
   },
 };
 
+/**
+ * Gesagt wird „KLF Weiden", gespeichert werden Name und Feuerwehr getrennt.
+ * Mit „Fire department name" allein hat das Modell den Ort weggelassen und in
+ * der Antwort trotzdem genannt.
+ */
+const FW_DESCRIPTION =
+  'Fire department (Feuerwehr) the unit belongs to. Usually the place name ' +
+  'spoken after the designation: "KLF Weiden" is name KLF and fw Weiden, ' +
+  '"TLFA Neusiedl" is name TLFA and fw Neusiedl. Always set it when a place ' +
+  'is named; never drop it.';
+
+/**
+ * Ebene eines Elements. Ohne Angabe legt `createMarker` in die aktive Ebene
+ * (`activeLayer` im Kontext), wie die Oberfläche.
+ */
+const LAYER_SCHEMA = {
+  type: SchemaType.STRING,
+  description:
+    'Name of the layer (Ebene) from context.layers. Only when the user names a ' +
+    'layer; without it a new marker goes to context.activeLayer',
+};
+
+/**
+ * Werte der Datenfelder einer Ebene. Der Wert geht als Text hinaus, weil ein
+ * Feld auch Text oder ja/nein sein kann; die Einheit rechnet der Handler um.
+ */
+const FIELD_VALUES_SCHEMA = {
+  type: SchemaType.ARRAY,
+  description:
+    'Values for the data fields of the layer (context.layers[].fields), e.g. a ' +
+    'measured dose rate. Pass the number and the unit as spoken; the unit is ' +
+    'converted to the unit of the field, do not convert yourself',
+  items: {
+    type: SchemaType.OBJECT,
+    properties: {
+      field: {
+        type: SchemaType.STRING,
+        description: 'Key or label of the field, e.g. "dosisleistung"',
+      },
+      value: {
+        type: SchemaType.STRING,
+        description: 'The value as spoken, e.g. "37" or "ja"',
+      },
+      unit: {
+        type: SchemaType.STRING,
+        description: 'Unit as a symbol, e.g. "mSv/h" for Millisievert pro Stunde, "µSv/h"',
+      },
+    },
+    required: ['field', 'value'],
+  },
+};
+
 export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'createMarker',
-    description: 'Create a marker/tactical sign on the map',
+    description:
+      'Create a marker on the map: a general marker or tactical sign, an ' +
+      'Einsatzleitung (command post) or an Atemschutzsammelplatz (ASSP)',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
+        kind: {
+          type: SchemaType.STRING,
+          enum: ['marker', 'el', 'assp'],
+          description:
+            'marker = general marker/tactical sign (default), el = Einsatzleitung, ' +
+            'assp = Atemschutzsammelplatz',
+        },
         name: { type: SchemaType.STRING, description: 'Name/label for the marker' },
-        beschreibung: { type: SchemaType.STRING, description: 'Description' },
-        zeichen: { type: SchemaType.STRING, description: 'Tactical sign identifier' },
-        color: { type: SchemaType.STRING, description: 'Color in hex format' },
+        beschreibung: { type: SchemaType.STRING, description: 'Description (only kind marker)' },
+        zeichen: { type: SchemaType.STRING, description: 'Tactical sign identifier (only kind marker)' },
+        color: { type: SchemaType.STRING, description: 'Color in hex format (only kind marker)' },
         position: positionSchema,
+        layer: LAYER_SCHEMA,
+        values: FIELD_VALUES_SCHEMA,
       },
       required: ['name'],
     },
@@ -55,8 +146,14 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        name: { type: SchemaType.STRING, description: 'Vehicle name (e.g., TLFA 4000)' },
-        fw: { type: SchemaType.STRING, description: 'Fire department name' },
+        name: {
+          type: SchemaType.STRING,
+          description: 'Vehicle designation without the fire department (e.g., TLFA 4000, KLF)',
+        },
+        fw: {
+          type: SchemaType.STRING,
+          description: FW_DESCRIPTION,
+        },
         besatzung: {
           type: SchemaType.STRING,
           description:
@@ -152,30 +249,6 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
-    name: 'createEl',
-    description: 'Add an Einsatzleitung (command post) marker',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        name: { type: SchemaType.STRING, description: 'Name for the EL marker' },
-        position: positionSchema,
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'createAssp',
-    description: 'Add an Atemschutzsammelplatz marker',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        name: { type: SchemaType.STRING, description: 'Name for the ASSP marker' },
-        position: positionSchema,
-      },
-      required: ['name'],
-    },
-  },
-  {
     name: 'createTacticalUnit',
     description: 'Add a tactical unit (Taktische Einheit) to the map',
     parameters: {
@@ -187,7 +260,7 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
           enum: ['einheit', 'trupp', 'gruppe', 'zug', 'bereitschaft', 'abschnitt', 'bezirk', 'lfv', 'oebfv'],
           description: 'Type of tactical unit: einheit=Einheit, trupp=Trupp, gruppe=Gruppe, zug=Zug (default), bereitschaft=Bereitschaft, abschnitt=Abschnitt, bezirk=Bezirk, lfv=LFV, oebfv=ÖBFV',
         },
-        fw: { type: SchemaType.STRING, description: 'Fire department name' },
+        fw: { type: SchemaType.STRING, description: FW_DESCRIPTION },
         mann: { type: SchemaType.NUMBER, description: 'Crew strength (number of personnel)' },
         fuehrung: { type: SchemaType.STRING, description: 'Unit commander name' },
         ats: { type: SchemaType.NUMBER, description: 'Number of breathing apparatus carriers' },
@@ -323,7 +396,7 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     description:
       'Register a breathing apparatus team (Atemschutztrupp) for the time ' +
       'monitoring (Atemschutzüberwachung). This is NOT a map element — not ' +
-      'createTacticalUnit, not createAssp. The team starts in state bereit; ' +
+      'createTacticalUnit, not createMarker with kind assp. The team starts in state bereit; ' +
       'the speaker takes over its time monitoring and gets its warnings.',
     parameters: {
       type: SchemaType.OBJECT,
@@ -452,7 +525,10 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: 'updateItem',
-    description: 'Update an existing item on the map',
+    description:
+      'Update an existing item on the map: name, color, description, position, ' +
+      'rotation (vehicles and Rohre only), its layer, the data fields of its ' +
+      'layer, and the fields of its type. Set only what the user changes',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -465,6 +541,61 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
             color: { type: SchemaType.STRING },
             beschreibung: { type: SchemaType.STRING },
             position: positionSchema,
+            rotation: {
+              type: SchemaType.NUMBER,
+              description:
+                'Set the rotation to this angle in degrees, clockwise, 0 = ' +
+                'upright. Only vehicles and Rohre rotate',
+            },
+            rotateBy: {
+              type: SchemaType.NUMBER,
+              description:
+                'Rotate by this many degrees from the current rotation: ' +
+                'positive = clockwise ("nach rechts"), negative = ' +
+                'counter-clockwise ("nach links")',
+            },
+            layer: {
+              type: SchemaType.STRING,
+              description: 'Move the item to this layer (name from context.layers)',
+            },
+            values: FIELD_VALUES_SCHEMA,
+            fw: { type: SchemaType.STRING, description: 'vehicle, tacticalUnit: ' + FW_DESCRIPTION },
+            kategorie: {
+              type: SchemaType.STRING,
+              description: 'vehicle: fahrzeug, boot, anhaenger or aufbau',
+            },
+            besatzung: {
+              type: SchemaType.STRING,
+              description: 'vehicle: crew without the commander, "1:8" is "8"',
+            },
+            ats: { type: SchemaType.NUMBER, description: 'vehicle, tacticalUnit: breathing apparatus carriers' },
+            alarmierung: {
+              type: SchemaType.STRING,
+              description: 'vehicle, tacticalUnit: alert time, "14:30" or "jetzt"',
+            },
+            eintreffen: {
+              type: SchemaType.STRING,
+              description: 'vehicle, tacticalUnit: arrival time, "14:30" or "jetzt"',
+            },
+            abruecken: {
+              type: SchemaType.STRING,
+              description: 'vehicle, tacticalUnit: departure time, "14:30" or "jetzt"',
+            },
+            fremd: { type: SchemaType.BOOLEAN, description: 'vehicle: belongs to another organisation' },
+            unitType: {
+              type: SchemaType.STRING,
+              enum: ['einheit', 'trupp', 'gruppe', 'zug', 'bereitschaft', 'abschnitt', 'bezirk', 'lfv', 'oebfv'],
+              description: 'tacticalUnit: kind of unit',
+            },
+            mann: { type: SchemaType.NUMBER, description: 'tacticalUnit: crew strength' },
+            fuehrung: { type: SchemaType.STRING, description: 'tacticalUnit: unit commander' },
+            art: { type: SchemaType.STRING, enum: ['C', 'B', 'Wasserwerfer'], description: 'rohr: type' },
+            durchfluss: { type: SchemaType.NUMBER, description: 'rohr: flow rate in l/min' },
+            zeichen: { type: SchemaType.STRING, description: 'marker: tactical sign' },
+            showLabel: { type: SchemaType.BOOLEAN, description: 'marker: show the name on the map' },
+            radius: { type: SchemaType.NUMBER, description: 'circle: radius in meters' },
+            fill: { type: SchemaType.BOOLEAN, description: 'circle: filled' },
+            opacity: { type: SchemaType.NUMBER, description: 'circle: opacity in percent' },
           },
         },
       },
@@ -531,54 +662,45 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
-    name: 'calculateStrahlenschutzAbstand',
-    description: 'Berechne fehlende Werte des quadratischen Abstandsgesetzes (D1² × R1 = D2² × R2). Gib genau 3 der 4 Parameter an.',
+    name: 'calculateStrahlenschutz',
+    description:
+      'Radiation protection calculations. Pick the formula with formel and give ' +
+      'the known values; the missing one is calculated. ' +
+      'abstand: inverse square law D1² × R1 = D2² × R2, give 3 of d1, r1, d2, r2. ' +
+      'schutzwert: shielding R = R0 / S^n, give 3 of r0, r, s, n. ' +
+      'aufenthaltszeit: stay time t = D / R, give 2 of t, d, r. ' +
+      'nuklid: dose rate in 1 m from activity (Ḣ = Γ × A), give nuclide and ' +
+      'either activity or doseRate.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        d1: { type: SchemaType.NUMBER, description: 'Abstand 1 in Metern' },
-        r1: { type: SchemaType.NUMBER, description: 'Dosisleistung 1 in µSv/h' },
-        d2: { type: SchemaType.NUMBER, description: 'Abstand 2 in Metern' },
-        r2: { type: SchemaType.NUMBER, description: 'Dosisleistung 2 in µSv/h' },
+        formel: {
+          type: SchemaType.STRING,
+          enum: ['abstand', 'schutzwert', 'aufenthaltszeit', 'nuklid'],
+          description: 'Which formula to calculate',
+        },
+        d1: { type: SchemaType.NUMBER, description: 'abstand: distance 1 in m' },
+        r1: { type: SchemaType.NUMBER, description: 'abstand: dose rate 1 in µSv/h' },
+        d2: { type: SchemaType.NUMBER, description: 'abstand: distance 2 in m' },
+        r2: { type: SchemaType.NUMBER, description: 'abstand: dose rate 2 in µSv/h' },
+        r0: { type: SchemaType.NUMBER, description: 'schutzwert: dose rate without shielding' },
+        s: { type: SchemaType.NUMBER, description: 'schutzwert: Schutzwert of the material' },
+        n: { type: SchemaType.NUMBER, description: 'schutzwert: number of layers' },
+        r: {
+          type: SchemaType.NUMBER,
+          description:
+            'schutzwert: dose rate with shielding; aufenthaltszeit: dose rate in mSv/h',
+        },
+        t: { type: SchemaType.NUMBER, description: 'aufenthaltszeit: stay time in hours' },
+        d: { type: SchemaType.NUMBER, description: 'aufenthaltszeit: permitted dose in mSv' },
+        nuclide: {
+          type: SchemaType.STRING,
+          description: 'nuklid: name of the nuclide (e.g. Cs-137, Co-60, Am-241)',
+        },
+        activity: { type: SchemaType.NUMBER, description: 'nuklid: activity in GBq' },
+        doseRate: { type: SchemaType.NUMBER, description: 'nuklid: dose rate in 1 m in µSv/h' },
       },
-    },
-  },
-  {
-    name: 'calculateStrahlenschutzSchutzwert',
-    description: 'Berechne Dosisleistung mit Abschirmung, Schutzwert oder Schichten (R = R₀ / S^n). Gib genau 3 der 4 Parameter an.',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        r0: { type: SchemaType.NUMBER, description: 'Dosisleistung ohne Abschirmung' },
-        r: { type: SchemaType.NUMBER, description: 'Dosisleistung mit Abschirmung' },
-        s: { type: SchemaType.NUMBER, description: 'Schutzwert des Materials' },
-        n: { type: SchemaType.NUMBER, description: 'Anzahl der Schichten' },
-      },
-    },
-  },
-  {
-    name: 'calculateStrahlenschutzAufenthaltszeit',
-    description: 'Berechne Aufenthaltszeit, zulässige Dosis oder Dosisleistung (t = D / R). Gib genau 2 der 3 Parameter an.',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        t: { type: SchemaType.NUMBER, description: 'Aufenthaltszeit in Stunden (h)' },
-        d: { type: SchemaType.NUMBER, description: 'Zulässige Dosis in mSv' },
-        r: { type: SchemaType.NUMBER, description: 'Dosisleistung in mSv/h' },
-      },
-    },
-  },
-  {
-    name: 'calculateStrahlenschutzNuklid',
-    description: 'Berechne Dosisleistung in 1m aus Aktivität oder umgekehrt für ein bestimmtes Nuklid (Ḣ = Γ × A). Gib entweder activity oder doseRate an.',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        nuclide: { type: SchemaType.STRING, description: 'Name des Nuklids (z.B. Cs-137, Co-60, Am-241)' },
-        activity: { type: SchemaType.NUMBER, description: 'Aktivität in GBq' },
-        doseRate: { type: SchemaType.NUMBER, description: 'Dosisleistung in 1m in µSv/h' },
-      },
-      required: ['nuclide'],
+      required: ['formel'],
     },
   },
   {
@@ -656,6 +778,122 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'editLayer',
+    description:
+      'Create a layer (Ebene) or change an existing one: its name and its data fields ' +
+      '(Datenfelder) such as a Dosisleistung in µSv/h. Items in the layer carry values ' +
+      'for these fields. A new layer becomes the active one.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        action: {
+          type: SchemaType.STRING,
+          enum: ['create', 'update'],
+          description: 'create = new layer, update = change an existing one',
+        },
+        layer: {
+          type: SchemaType.STRING,
+          description:
+            'For update: name of the layer from context.layers. Empty = context.activeLayer',
+        },
+        name: {
+          type: SchemaType.STRING,
+          description: 'Name of the new layer, or the new name when renaming',
+        },
+        fields: {
+          type: SchemaType.ARRAY,
+          description:
+            'Data fields to add or change. An entry whose label matches an existing field, ' +
+            'or that names it in field, changes it; otherwise a new field is added.',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              field: {
+                type: SchemaType.STRING,
+                description: 'Existing field (key or label) to change; empty for a new field',
+              },
+              label: { type: SchemaType.STRING, description: 'Label, e.g. "Dosisleistung"' },
+              unit: {
+                type: SchemaType.STRING,
+                description: 'Unit as symbol, e.g. "µSv/h", "%", "ppm"; empty for none',
+              },
+              type: {
+                type: SchemaType.STRING,
+                enum: ['number', 'text', 'boolean', 'computed'],
+                description: 'Default number; computed needs a formula',
+              },
+              formula: {
+                type: SchemaType.STRING,
+                description:
+                  'Formula for computed fields over the keys of other fields, e.g. ' +
+                  '"dosisleistung * 8"',
+              },
+              defaultValue: {
+                type: SchemaType.STRING,
+                description: 'Value a new item in the layer starts with',
+              },
+            },
+          },
+        },
+        removeFields: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+          description: 'Fields (key or label) to remove',
+        },
+        activate: {
+          type: SchemaType.BOOLEAN,
+          description:
+            'Make the layer the active one. Default true for create, false for update',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'findItems',
+    description:
+      'Look up items of this Einsatz with their details: coordinates, times, ' +
+      'measured values, diary text. The context only holds an overview without ' +
+      'coordinates, measurement points or older diary entries - use this before ' +
+      'answering a question that needs those details. Read-only',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        type: {
+          type: SchemaType.STRING,
+          description: 'Item type, e.g. vehicle, marker, rohr, diary, gb, tacticalUnit, circle',
+        },
+        name: {
+          type: SchemaType.STRING,
+          description: 'Part of the name, fire department or description',
+        },
+        layer: { type: SchemaType.STRING, description: 'Name of the layer (context.layers)' },
+        field: {
+          type: SchemaType.STRING,
+          description: 'Data field of the layer to filter or sort by, e.g. "dosisleistung"',
+        },
+        min: { type: SchemaType.NUMBER, description: 'Only values of field at least this' },
+        max: { type: SchemaType.NUMBER, description: 'Only values of field at most this' },
+        unit: {
+          type: SchemaType.STRING,
+          description: 'Unit of min/max as spoken, e.g. "µSv/h"; converted to the unit of the field',
+        },
+        position: positionSchema,
+        radius: {
+          type: SchemaType.NUMBER,
+          description: 'Only items within this many meters of position',
+        },
+        sort: {
+          type: SchemaType.STRING,
+          enum: ['newest', 'nearest', 'highest', 'lowest'],
+          description:
+            'newest first (default), nearest to position, highest or lowest value of field',
+        },
+        limit: { type: SchemaType.NUMBER, description: 'How many items, default 10, max 50' },
+      },
+    },
+  },
+  {
     name: 'answerQuestion',
     description:
       'Answer a question. Use this whenever the user asks something rather than giving ' +
@@ -702,18 +940,29 @@ Regeln:
 - "Einsatzstelle" / "Einsatzort" / "zum Einsatz" = einsatzort als position.type
 - "von <Element>" / "beim TLFA" als Bezugspunkt einer Messung = atItem mit itemName
 - Referenzen wie "daneben", "neben dem X" zum PLATZIEREN = nearItem mit itemName
+- "links/rechts neben dem X", "oberhalb/unterhalb von X" = nearItem mit itemName und
+  direction left/right/above/below; ein genannter Abstand ("10 Meter links") = distance.
+  Himmelsrichtungen ("nördlich", "nordöstlich", "südwestlich") = direction north,
+  northeast, southwest usw. Gilt auch beim Verschieben mit updateItem.
+- "Weiterer Messpunkt 10 m nordöstlich" ohne genanntes Element = vom zuletzt angelegten
+  aus: nearItem mit direction und distance, itemName LEER lassen (nicht "Messung" oder
+  "Datenpunkt" - so heißen viele Punkte). Gib die Lage so wieder, wie die Rückmeldung
+  sie nennt, auch wenn der Bezug fehlte.
+- Eine Korrektur wie "nein, links" ist ein neuer Werkzeugaufruf. Sage nie, ein
+  Element sei verschoben oder geändert, ohne dass das Werkzeug in diesem Zug
+  aufgerufen wurde und Erfolg meldet. Gib wieder, was die Rückmeldung sagt.
 - Ohne jede Ortsangabe bei einer Messung oder Suche: auto als position.type
 - Für Adresssuche: verwende searchAddress (erstellt Marker und schwenkt Karte dorthin)
 
 Verfügbare Elemente:
 - marker: Taktische Zeichen, allgemeine Marker (createMarker)
+- el: Einsatzleitung-Marker (createMarker mit kind el)
+- assp: Atemschutzsammelplatz (createMarker mit kind assp)
 - vehicle: Fahrzeuge wie TLFA, KLF, etc. (createVehicle)
 - rohr: Wasserabgabestellen C-Rohr, B-Rohr, Wasserwerfer (createRohr)
 - diary: Einsatztagebuch-Einträge (createDiary)
 - gb: Geschäftsbuch-Einträge (createGb)
 - circle: Kreise mit Radius (createCircle)
-- el: Einsatzleitung-Marker (createEl)
-- assp: Atemschutzsammelplatz (createAssp)
 - tacticalUnit: Taktische Einheiten wie Trupp, Gruppe, Zug, Abschnitt (createTacticalUnit) -
   ein Kartenelement. Ein Atemschutztrupp zur Überwachung ist createAtemschutzTrupp
 
@@ -730,8 +979,8 @@ Aktionen:
   beantworten - die Zahl steht nur im Fahrtenbuch.
 - createAtemschutzTrupp: Atemschutztrupp für die Atemschutzüberwachung anlegen
   ("Trupp anlegen", "neuer Atemschutztrupp"). NICHT createTacticalUnit - das
-  legt eine taktische Einheit auf der Karte an. NICHT createAssp - das ist nur
-  ein Marker für den Sammelplatz.
+  legt eine taktische Einheit auf der Karte an. NICHT createMarker mit kind assp -
+  das ist nur ein Marker für den Sammelplatz.
 - setAtemschutzTruppStatus: Trupp zuteilen, in den Einsatz schicken ("geht
   unter Atemschutz", "Abmarsch"), zurückholen ("ist zurück", "wieder
   draußen"), wieder bereitstellen oder abmelden.
@@ -743,22 +992,61 @@ Aktionen:
   frage den Benutzer und rufe erst nach seinem Ja mit recordAnyway erneut auf.
 - Die laufenden Trupps stehen im Kontext unter atemschutzTrupps. Fragen zum
   Truppstand ("wer ist noch drin?") beantwortest du daraus mit answerQuestion.
-- updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position)
+- updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position,
+  Drehung, Ebene, Messwerte und die Felder seines Typs wie Feuerwehr, Besatzung,
+  Eintreffen, Durchfluss, Radius). "Um 45° nach rechts drehen" = rotateBy 45, "nach links" = rotateBy -45,
+  "auf 90° drehen" = rotation 90. Drehbar sind Fahrzeuge und Rohre; die
+  aktuelle Drehung steht im Kontext unter rotation.
 - deleteItem: Bestehendes Element löschen
-- answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
-- calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)
-- Strahlenschutz-Berechnungen: Verwende die spezifischen Tools calculateStrahlenschutzAbstand, calculateStrahlenschutzSchutzwert, calculateStrahlenschutzAufenthaltszeit und calculateStrahlenschutzNuklid.
-  - Wenn ein Benutzer nach Dosisleistung in einem anderen Abstand fragt -> calculateStrahlenschutzAbstand
-  - Wenn nach Abschirmung/Schutzwert gefragt wird -> calculateStrahlenschutzSchutzwert
-  - Wenn nach Aufenthaltszeit bei einer bestimmten Dosis gefragt wird -> calculateStrahlenschutzAufenthaltszeit
-  - Wenn nach Dosisleistung eines Nuklids (Aktivität) gefragt wird -> calculateStrahlenschutzNuklid
 
-Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Details:
-- Fahrzeuge: Name, Feuerwehr (fw), Besatzung, ATS-Geräte, Alarmierung, Eintreffen, Abrücken
-- Rohre: Name, Art (C/B/Wasserwerfer), Durchfluss in l/min
-- Tagebuch: Inhalt, Art (M=Meldung, B=Befehl, F=Feststellung), Von, An, Datum
-- Geschäftsbuch: Inhalt, Ausgehend/Eingehend, Von, An, Datum
-- Taktische Einheiten: Name, Art (Trupp/Gruppe/Zug/Abschnitt/etc.), Feuerwehr, Mannschaftsstärke, Einheitsführer, ATS-Träger
+Ebenen und Messwerte:
+- Die Ebenen des Einsatzes stehen im Kontext unter layers, mit ihren Datenfeldern
+  (fields: key, label, unit). activeLayer ist die zuletzt gewählte Ebene.
+- "Neue Messung 37 Millisievert pro Stunde" = createMarker mit values
+  [{field: <passendes Feld, z.B. dosisleistung>, value: "37", unit: "mSv/h"}]. Ohne
+  genannte Ebene kommt der Marker in activeLayer; nenne layer nur, wenn der Benutzer
+  eine Ebene nennt ("in der Ebene Strahlenmessung"). Eine genannte Ebene wird danach
+  zur aktiven. Ohne Ortsangabe bei einer Messung: auto als position.type (dort, wo
+  der Benutzer steht). Als Name "Messung", wenn keiner genannt wird.
+- Gib Zahl und Einheit so weiter, wie sie gesagt wurden, die Einheit als Zeichen
+  (mSv/h, µSv/h, ppm). Rechne nicht selbst um - das Werkzeug rechnet in die Einheit
+  des Felds.
+- Einen Messwert ändern ("die letzte Messung war 40") = updateItem mit values.
+- Berechnete Felder (type computed) setzt du nicht, sie werden mitgerechnet.
+- Meldet das Werkzeug ein fehlendes Feld oder eine fehlende Ebene, frage nach und
+  nenne die vorhandenen.
+- "Lege eine Ebene Strahlenmessung an mit Dosisleistung in Mikrosievert pro Stunde" =
+  editLayer action create, name "Strahlenmessung", fields [{label: "Dosisleistung",
+  unit: "µSv/h"}]. Die neue Ebene wird aktiv; die nächste Messung landet dort.
+- "Füge ein Feld Messgerät hinzu", "Benenne die Ebene um", "Entferne das Feld Notiz",
+  "Dosisleistung in Millisievert" = editLayer action update; ohne genannte Ebene gilt
+  activeLayer. Ein vorhandenes Feld änderst du über seine Bezeichnung oder field.
+- Berechnete Felder: type computed mit formula über die keys der anderen Felder
+  ("Dosis in 8 Stunden" = formula "dosisleistung * 8"). Einheit und Typ eines Felds,
+  das schon Werte hat, bleiben - das Werkzeug lehnt ab, gib das weiter.
+- answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
+- findItems: Elemente mit Details nachsehen, bevor du antwortest, wenn die Antwort
+  Koordinaten, Messwerte, Tagebuchtext oder ältere Einträge braucht ("Welche
+  Messungen liegen über 10 µSv/h?" = findItems mit field, min, unit; "höchste
+  Messung" = sort highest; "Was steht im Umkreis von 50 m?" = position und radius;
+  "Was wurde um 14 Uhr gemeldet?" = type diary). Danach answerQuestion.
+- calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)
+- Strahlenschutz-Berechnungen: Verwende calculateStrahlenschutz, nicht calculate. Wähle die Formel:
+  - Dosisleistung in einem anderen Abstand -> formel abstand
+  - Abschirmung/Schutzwert -> formel schutzwert
+  - Aufenthaltszeit bei einer bestimmten Dosis -> formel aufenthaltszeit
+  - Dosisleistung eines Nuklids (Aktivität) -> formel nuklid
+
+Der Kontext ist ein Überblick, nicht der ganze Einsatz:
+- existingItems: die benannten Elemente ohne Koordinaten und Messwerte -
+  Fahrzeuge mit Feuerwehr (fw), Besatzung, ATS, Alarmierung, Eintreffen, Abrücken;
+  Rohre mit Art und Durchfluss; taktische Einheiten mit Art, Feuerwehr, Stärke.
+- itemCounts: Anzahl je Typ, auch von allem, was nicht im Überblick steht.
+- latestDiary: die letzten Einträge im Einsatztagebuch, ohne Text.
+- layers: bei Messebenen nur measurements (Anzahl) und latest (letzte Messung);
+  die einzelnen Messpunkte fehlen.
+Was dort fehlt, holst du mit findItems. Behaupte nie, es gebe etwas nicht, nur
+weil es nicht im Überblick steht.
 
 Für Referenzen auf bestehende Elemente nutze itemName oder itemId.
 

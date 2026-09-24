@@ -37,6 +37,12 @@ export interface FirecallItemDto {
   radius?: number;
   color?: string;
   beschreibung?: string;
+  /** Drehung in Grad im Uhrzeigersinn, nur bei Fahrzeug und Rohr und ungleich 0. */
+  rotation?: number;
+  /** ID der Ebene, in der das Element liegt. */
+  layer?: string;
+  /** Werte der Datenfelder seiner Ebene, z.B. eine Dosisleistung. */
+  fieldData?: Record<string, string | number | boolean>;
 }
 
 export interface ProjectItemOptions {
@@ -52,6 +58,17 @@ export interface ProjectItemOptions {
   includeDescription?: boolean;
 }
 
+/**
+ * Die Drehung nur mitgeben, wenn gedreht ist — sonst trägt jedes Fahrzeug
+ * eine 0 in den Kontext, ohne etwas zu sagen.
+ */
+function addRotation(base: FirecallItemDto, item: FirecallItem) {
+  const winkel = Number.parseFloat(String(item.rotation ?? ''));
+  if (Number.isFinite(winkel) && winkel % 360 !== 0) {
+    base.rotation = ((winkel % 360) + 360) % 360;
+  }
+}
+
 export function projectFirecallItem(
   item: FirecallItem,
   { includeDescription = false }: ProjectItemOptions = {},
@@ -63,6 +80,12 @@ export function projectFirecallItem(
     lat: item.lat,
     lng: item.lng,
   };
+  // Ebene und Messwerte: Ohne sie weiß das Modell nicht, welche Messung
+  // welchen Wert hat, und kann „die letzte Messung war 40" nicht zuordnen.
+  if (item.layer) base.layer = item.layer;
+  if (item.fieldData && Object.keys(item.fieldData).length > 0) {
+    base.fieldData = item.fieldData;
+  }
 
   switch (item.type) {
     case 'vehicle': {
@@ -74,12 +97,14 @@ export function projectFirecallItem(
       if (v.alarmierung) base.alarmierung = v.alarmierung;
       if (v.eintreffen) base.eintreffen = v.eintreffen;
       if (v.abruecken) base.abruecken = v.abruecken;
+      addRotation(base, item);
       break;
     }
     case 'rohr': {
       const r = item as Record<string, any>;
       if (r.art) base.art = r.art;
       if (r.durchfluss) base.durchfluss = r.durchfluss;
+      addRotation(base, item);
       break;
     }
     case 'diary': {

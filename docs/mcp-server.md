@@ -220,7 +220,17 @@ weggelassen:
 - **Keine Benutzerposition.** Ein `userPosition`-Wunsch fällt auf den
   Einsatzort zurück.
 - **Kein Gedächtnis zwischen Aufrufen.** Der Transport ist zustandslos,
-  `lastCreatedItem` bleibt leer; ein Tool-Call muss sein Ziel benennen.
+  `lastCreatedItem` bleibt leer; ein Tool-Call muss sein Ziel benennen. Es
+  gibt auch keine aktive Ebene: `edit_layer` mit `action: "update"` braucht
+  `layer`, ein Messwert in `create_item` ebenso.
+
+`edit_layer` läuft über denselben Handler `editLayer`. Ebenen liegen in der
+Sammlung `layer`, nicht unter `item`; `writeOps.ts` wählt die Sammlung deshalb
+nach `type`, wie im Browser `firebaseCollectionName()`. Was der Browser beim
+Speichern einer Ebene zusätzlich tut — berechnete Felder in den vorhandenen
+Elementen neu rechnen (`useFirecallItemUpdate`) —, geschieht hier nicht; ein
+neu angelegtes berechnetes Feld erscheint an alten Elementen erst, wenn sie
+das nächste Mal gespeichert werden.
 
 Damit dasselbe für die Positionsauflösung und die Projektion der Elemente gilt,
 sind beide aus dem Browser-Code herausgezogen:

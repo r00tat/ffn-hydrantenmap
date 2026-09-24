@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GeohashCluster } from '../../common/gis-objects';
 import { HoseLineDraft, WaterSupplyCandidate } from '../../common/waterSupply';
 import { executeToolCall, ToolHandlerDeps } from './toolHandlers';
+import type { FirecallItem, FirecallLayer } from '../../components/firebase/firestore';
 
 const einsatzort = { lat: 47.9482913, lng: 16.848222 };
 const metersToLat = (m: number) => m / 111320;
@@ -34,6 +35,7 @@ function makeDeps(overrides: Partial<ToolHandlerDeps> = {}): ToolHandlerDeps {
     addFirecallItem: vi.fn(async () => ({ id: 'new-id' })),
     updateFirecallItem: vi.fn(async () => {}),
     existingItems: [],
+    layers: [],
     lastCreatedItem: null,
     setLastCreatedItem: vi.fn(),
     map: null,
@@ -643,5 +645,583 @@ describe('Atemschutztrupps', () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toContain('trotzdem');
+  });
+});
+
+describe('createMarker', () => {
+  it('legt ohne Art einen Marker an', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createMarker', { name: 'Absperrung', zeichen: 'Sperre' }),
+      deps
+    );
+
+    expect(result.success).toBe(true);
+    expect(deps.addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'marker', name: 'Absperrung', zeichen: 'Sperre' })
+    );
+    expect(result.createdItemType).toBe('marker');
+    expect(deps.setLastCreatedItem).toHaveBeenCalledWith({ id: 'new-id', type: 'marker' });
+  });
+
+  it.each([
+    ['el', 'Einsatzleitung'],
+    ['assp', 'ASSP'],
+  ])('legt mit kind=%s das eigene Element an', async (kind, label) => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createMarker', { kind, name: 'Feuerwehrhaus', zeichen: 'x', color: '#f00' }),
+      deps
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain(label);
+    expect(result.createdItemType).toBe(kind);
+    const item = vi.mocked(deps.addFirecallItem).mock.calls[0][0];
+    expect(item).toMatchObject({ type: kind, name: 'Feuerwehrhaus', ...einsatzort });
+    // Zeichen und Farbe gehören nur zum Marker.
+    expect(item).not.toHaveProperty('zeichen');
+    expect(item).not.toHaveProperty('color');
+    // „Rückgängig" nimmt das Element über lastCreatedItem zurück.
+    expect(deps.setLastCreatedItem).toHaveBeenCalledWith({ id: 'new-id', type: kind });
+  });
+
+  it('fällt bei einer unbekannten Art auf den Marker zurück', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createMarker', { kind: 'vehicle', name: 'X' }),
+      deps
+    );
+
+    expect(result.createdItemType).toBe('marker');
+    expect(deps.addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'marker' })
+    );
+  });
+
+  it.each(['createEl', 'createAssp'])('kennt %s nicht mehr', async (name) => {
+    const result = await executeToolCall(call(name, { name: 'X' }), makeDeps());
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('calculateStrahlenschutz', () => {
+  it('rechnet das Abstandsgesetz', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'abstand', d1: 1, r1: 100, d2: 10 }),
+      makeDeps()
+    );
+    expect(result.success).toBe(true);
+    expect(result.isAnswer).toBe(true);
+    expect(result.data).toMatchObject({ field: 'r2', value: 1, unit: 'µSv/h' });
+  });
+
+  it('rechnet den Schutzwert', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'schutzwert', r0: 100, s: 2, n: 2 }),
+      makeDeps()
+    );
+    expect(result.data).toMatchObject({ field: 'r', value: 25 });
+  });
+
+  it('rechnet die Aufenthaltszeit', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'aufenthaltszeit', d: 15, r: 5 }),
+      makeDeps()
+    );
+    expect(result.data).toMatchObject({ field: 't', value: 3, unit: 'h' });
+  });
+
+  it('rechnet die Dosisleistung eines Nuklids', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'nuklid', nuclide: 'cs-137', activity: 1 }),
+      makeDeps()
+    );
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({ nuclide: 'Cs-137', field: 'doseRate' });
+  });
+
+  it('meldet ein fehlendes Nuklid statt abzustürzen', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'nuklid', activity: 1 }),
+      makeDeps()
+    );
+    expect(result.success).toBe(false);
+  });
+
+  it('lehnt eine unbekannte Formel ab', async () => {
+    const result = await executeToolCall(
+      call('calculateStrahlenschutz', { formel: 'foo', d1: 1 }),
+      makeDeps()
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('abstand');
+  });
+});
+
+describe('createVehicle', () => {
+  it('nennt die gespeicherte Feuerwehr in der Rückmeldung', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(
+      call('createVehicle', { name: 'KLF', fw: 'Weiden' }),
+      deps
+    );
+
+    expect(deps.addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'vehicle', name: 'KLF', fw: 'Weiden' })
+    );
+    expect(result.message).toBe('Fahrzeug "KLF" (Weiden) erstellt');
+  });
+
+  it('sagt ohne Feuerwehr auch keine an', async () => {
+    // Die Rückmeldung ist, woraus das Modell seine Antwort baut. Nennt sie
+    // keine Feuerwehr, darf das Modell auch keine behaupten.
+    const result = await executeToolCall(call('createVehicle', { name: 'KLF' }), makeDeps());
+    expect(result.message).toBe('Fahrzeug "KLF" ohne Feuerwehr erstellt');
+  });
+});
+
+describe('executeToolCall — updateItem', () => {
+  const fahrzeug = {
+    id: 'tlf',
+    type: 'vehicle',
+    name: 'TLF',
+    fw: 'Parndorf',
+    lat: 47.9,
+    lng: 16.8,
+  };
+
+  it('nennt in der Rückmeldung, wohin das Element kam', async () => {
+    const resolveOrigin = vi.fn(async () => ({
+      lat: 47.95,
+      lng: 16.84,
+      type: 'nearItem',
+      label: '"TLFA 4000"',
+    }));
+    const updateFirecallItem = vi.fn(async () => {});
+    const result = await executeToolCall(
+      call('updateItem', {
+        itemName: 'TLF',
+        updates: {
+          position: { type: 'nearItem', itemName: 'TLFA', direction: 'left' },
+        },
+      }),
+      makeDeps({
+        existingItems: [fahrzeug] as never,
+        resolveOrigin,
+        updateFirecallItem,
+      }),
+    );
+
+    expect(result).toEqual({
+      success: true,
+      message: '"TLF" links neben "TLFA 4000" gesetzt',
+    });
+    expect(resolveOrigin).toHaveBeenCalledWith({
+      type: 'nearItem',
+      itemName: 'TLFA',
+      direction: 'left',
+      excludeItemId: 'tlf',
+    });
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'tlf', lat: 47.95, lng: 16.84 }),
+    );
+  });
+
+  it('sagt, wenn das Bezugselement fehlte', async () => {
+    const result = await executeToolCall(
+      call('updateItem', {
+        itemName: 'TLF',
+        updates: {
+          position: { type: 'nearItem', itemName: 'RLFA', direction: 'right' },
+        },
+      }),
+      makeDeps({
+        existingItems: [fahrzeug] as never,
+        resolveOrigin: vi.fn(async () => ({
+          lat: 1,
+          lng: 2,
+          type: 'mapCenter',
+          label: 'der Kartenmitte',
+        })),
+      }),
+    );
+    expect(result.message).toBe(
+      '"TLF" an der Kartenmitte (Element "RLFA" nicht gefunden) gesetzt',
+    );
+  });
+
+  it('lässt die Position ohne Angabe unverändert', async () => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const resolveOrigin = vi.fn();
+    const result = await executeToolCall(
+      call('updateItem', { itemName: 'TLF', updates: { beschreibung: 'Pumpe' } }),
+      makeDeps({
+        existingItems: [fahrzeug] as never,
+        resolveOrigin,
+        updateFirecallItem,
+      }),
+    );
+    expect(result.message).toBe('"TLF" aktualisiert');
+    expect(resolveOrigin).not.toHaveBeenCalled();
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ lat: 47.9, lng: 16.8, beschreibung: 'Pumpe' }),
+    );
+  });
+});
+
+describe('executeToolCall — updateItem dreht', () => {
+  const fahrzeug = { id: 'tlf', type: 'vehicle', name: 'TLF', lat: 47.9, lng: 16.8, rotation: '30' };
+
+  const drehe = async (updates: Record<string, unknown>, item: object = fahrzeug) => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const result = await executeToolCall(
+      call('updateItem', { itemName: 'TLF', updates }),
+      makeDeps({ existingItems: [item] as never, updateFirecallItem }),
+    );
+    return { result, updateFirecallItem };
+  };
+
+  it('dreht um einen Winkel vom jetzigen aus weiter', async () => {
+    const { result, updateFirecallItem } = await drehe({ rotateBy: 45 });
+    expect(result).toEqual({ success: true, message: '"TLF" auf 75° gedreht' });
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ rotation: '75', lat: 47.9, lng: 16.8 }),
+    );
+  });
+
+  it('dreht nach links über 0 hinaus auf den Rest des Vollkreises', async () => {
+    const { updateFirecallItem } = await drehe({ rotateBy: -45 });
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ rotation: '345' }),
+    );
+  });
+
+  it('setzt einen Winkel und nimmt einen fehlenden Winkel als 0', async () => {
+    const { updateFirecallItem } = await drehe(
+      { rotation: 90 },
+      { ...fahrzeug, rotation: undefined },
+    );
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ rotation: '90' }),
+    );
+  });
+
+  it('lehnt die Drehung bei Elementen ab, die die Karte nicht dreht', async () => {
+    const { result, updateFirecallItem } = await drehe(
+      { rotateBy: 45 },
+      { id: 'm', type: 'marker', name: 'TLF-Marker', lat: 1, lng: 2 },
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/lässt sich nicht drehen/);
+    expect(updateFirecallItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('Ebenen und Messwerte', () => {
+  const strahlen = {
+    id: 'l1',
+    type: 'layer',
+    name: 'Strahlenmessung',
+    dataSchema: [
+      { key: 'dosisleistung', label: 'Dosisleistung', unit: 'µSv/h', type: 'number' },
+    ],
+  };
+  const abschnitt = { id: 'l2', type: 'layer', name: 'Abschnitt Nord' };
+  const layers = [strahlen, abschnitt] as never;
+
+  it('legt eine Messung in die aktive Ebene und rechnet die Einheit um', async () => {
+    const addFirecallItem = vi.fn(async () => ({ id: 'm1' }));
+    const setActiveLayer = vi.fn();
+    const result = await executeToolCall(
+      call('createMarker', {
+        name: 'Messung',
+        values: [{ field: 'dosisleistung', value: '37', unit: 'mSv/h' }],
+      }),
+      makeDeps({ layers, activeLayerId: 'l1', setActiveLayer, addFirecallItem }),
+    );
+    expect(result.success).toBe(true);
+    expect(result.message).toBe(
+      'Marker "Messung" in Ebene "Strahlenmessung" erstellt: Dosisleistung 37000 µSv/h',
+    );
+    expect(addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ layer: 'l1', fieldData: { dosisleistung: 37000 } }),
+    );
+    // Die Ebene war schon aktiv und wurde nicht genannt.
+    expect(setActiveLayer).not.toHaveBeenCalled();
+  });
+
+  it('macht eine genannte Ebene zur aktiven', async () => {
+    const setActiveLayer = vi.fn();
+    await executeToolCall(
+      call('createMarker', { name: 'Sperre', layer: 'Abschnitt' }),
+      makeDeps({ layers, activeLayerId: 'l1', setActiveLayer }),
+    );
+    expect(setActiveLayer).toHaveBeenCalledWith('l2');
+  });
+
+  it('legt nichts an, wenn die Ebene oder ein Feld fehlt', async () => {
+    const addFirecallItem = vi.fn(async () => ({ id: 'x' }));
+    const deps = makeDeps({ layers, addFirecallItem });
+
+    const ohneEbene = await executeToolCall(
+      call('createMarker', { name: 'M', layer: 'Gibtsnicht' }),
+      deps,
+    );
+    expect(ohneEbene.message).toBe(
+      'Ebene "Gibtsnicht" nicht gefunden (Ebenen: "Strahlenmessung", "Abschnitt Nord")',
+    );
+
+    const ohneAktive = await executeToolCall(
+      call('createMarker', { name: 'M', values: [{ field: 'dosisleistung', value: '1' }] }),
+      deps,
+    );
+    expect(ohneAktive.success).toBe(false);
+    expect(ohneAktive.message).toMatch(/keine genannt und keine aktiv/);
+
+    const falschesFeld = await executeToolCall(
+      call('createMarker', {
+        name: 'M',
+        layer: 'Strahlenmessung',
+        values: [{ field: 'Temperatur', value: '20' }],
+      }),
+      deps,
+    );
+    expect(falschesFeld.success).toBe(false);
+    expect(addFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('ändert einen Messwert am Element in seiner Ebene', async () => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const messung = {
+      id: 'm1',
+      type: 'marker',
+      name: 'Messung',
+      layer: 'l1',
+      fieldData: { dosisleistung: 37000 },
+    };
+    const result = await executeToolCall(
+      call('updateItem', {
+        itemName: 'Messung',
+        updates: { values: [{ field: 'dosisleistung', value: '40', unit: 'µSv/h' }] },
+      }),
+      makeDeps({ layers, existingItems: [messung] as never, updateFirecallItem }),
+    );
+    expect(result.message).toBe('"Messung" Werte gesetzt: Dosisleistung 40 µSv/h');
+    expect(updateFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ fieldData: { dosisleistung: 40 } }),
+    );
+  });
+});
+
+describe('updateItem — Felder des Typs', () => {
+  const fahrzeug = { id: 'v1', type: 'vehicle', name: 'KLF', lat: 1, lng: 2 };
+
+  it('setzt Feuerwehr, Besatzung und Eintreffen', async () => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const result = await executeToolCall(
+      call('updateItem', {
+        itemName: 'KLF',
+        updates: { fw: 'Weiden', besatzung: '1:8', eintreffen: 'jetzt' },
+      }),
+      makeDeps({ existingItems: [fahrzeug] as never, updateFirecallItem }),
+    );
+    expect(result.message).toBe('"KLF" geändert: fw, besatzung, eintreffen');
+    const saved = (updateFirecallItem.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(saved).toMatchObject({ fw: 'Weiden', besatzung: '8' });
+    expect(Number.isNaN(Date.parse(saved.eintreffen as string))).toBe(false);
+  });
+
+  it('lehnt ein Feld ab, das der Typ nicht hat, und schreibt nichts', async () => {
+    const updateFirecallItem = vi.fn(async () => {});
+    const result = await executeToolCall(
+      call('updateItem', { itemName: 'KLF', updates: { durchfluss: 400 } }),
+      makeDeps({ existingItems: [fahrzeug] as never, updateFirecallItem }),
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/"durchfluss" gibt es bei "KLF" nicht \(änderbar: fw,/);
+    expect(updateFirecallItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('zeitpunkt', () => {
+  const now = new Date('2026-09-23T18:00:00Z');
+
+  it('liest jetzt, eine Uhrzeit und ISO', async () => {
+    const { zeitpunkt } = await import('./toolHandlers');
+    expect(zeitpunkt('jetzt', now)).toBe(now.toISOString());
+    const uhrzeit = new Date(zeitpunkt('14:30', now)!);
+    expect([uhrzeit.getHours(), uhrzeit.getMinutes()]).toEqual([14, 30]);
+    expect(zeitpunkt('2026-09-23T12:00:00Z', now)).toBe('2026-09-23T12:00:00.000Z');
+    expect(zeitpunkt('gestern irgendwann', now)).toBeUndefined();
+  });
+});
+
+describe('findItems', () => {
+  it('gibt die Treffer in data zurück und nennt den Bezugspunkt', async () => {
+    const result = await executeToolCall(
+      call('findItems', { type: 'vehicle', position: { type: 'einsatzort' }, radius: 50 }),
+      makeDeps({
+        existingItems: [
+          { id: 'v', type: 'vehicle', name: 'TLFA', lat: einsatzort.lat, lng: einsatzort.lng },
+          { id: 'w', type: 'vehicle', name: 'KLF', lat: einsatzort.lat + metersToLat(500), lng: einsatzort.lng },
+        ] as never,
+      }),
+    );
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('1 Treffer in data');
+    expect(result.data.items.map((i: { id: string }) => i.id)).toEqual(['v']);
+    expect(result.data.origin).toEqual({ type: 'einsatzort', label: 'dem Einsatzort' });
+  });
+
+  it('meldet einen Fehler der Abfrage als Misserfolg', async () => {
+    const result = await executeToolCall(call('findItems', { layer: 'Süd' }), makeDeps());
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/Ebene "Süd" nicht gefunden/);
+  });
+});
+
+describe('createMarker — Lage vom zuletzt angelegten Punkt', () => {
+  it('bezieht nearItem ohne Namen auf das zuletzt angelegte Element und nennt die Lage', async () => {
+    const resolveOrigin = vi.fn(async () => ({
+      lat: 47.1,
+      lng: 16.1,
+      type: 'nearItem',
+      label: '"Messung"',
+    }));
+    const deps = makeDeps({
+      resolveOrigin,
+      lastCreatedItem: { id: 'p1', type: 'marker' },
+    });
+    const result = await executeToolCall(
+      call('createMarker', {
+        name: 'Messung',
+        position: { type: 'nearItem', direction: 'northeast', distance: 10 },
+      }),
+      deps,
+    );
+    expect(resolveOrigin).toHaveBeenCalledWith({
+      type: 'nearItem',
+      direction: 'northeast',
+      distance: 10,
+      itemId: 'p1',
+    });
+    expect(deps.addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ lat: 47.1, lng: 16.1 }),
+    );
+    expect(result.message).toBe('Marker "Messung" erstellt 10 m nordöstlich von "Messung"');
+  });
+
+  it('sagt, wenn der Bezug fehlte, statt eine Lage zu behaupten', async () => {
+    const result = await executeToolCall(
+      call('createMarker', {
+        name: 'Messung',
+        position: { type: 'nearItem', direction: 'north', distance: 10 },
+      }),
+      makeDeps(),
+    );
+    expect(result.message).toBe(
+      'Marker "Messung" erstellt an dem Einsatzort (Bezugselement nicht gefunden)',
+    );
+  });
+});
+
+describe('editLayer', () => {
+  const strahlen = {
+    id: 'l1',
+    type: 'layer',
+    name: 'Strahlenmessung',
+    zIndex: 3,
+    dataSchema: [{ key: 'dosisleistung', label: 'Dosisleistung', unit: 'µSv/h', type: 'number' }],
+  } as FirecallLayer;
+
+  it('legt eine Ebene mit Datenfeldern an und macht sie aktiv', async () => {
+    const setActiveLayer = vi.fn();
+    const deps = makeDeps({ setActiveLayer, addFirecallItem: vi.fn(async () => ({ id: 'l9' })) });
+    const result = await executeToolCall(
+      call('editLayer', {
+        action: 'create',
+        name: 'EX Messung',
+        fields: [{ label: 'UEG', unit: '%' }],
+      }),
+      deps,
+    );
+    expect(result.success).toBe(true);
+    expect(deps.addFirecallItem).toHaveBeenCalledWith({
+      type: 'layer',
+      name: 'EX Messung',
+      dataSchema: [{ key: 'ueg', label: 'UEG', unit: '%', type: 'number' }],
+    });
+    expect(setActiveLayer).toHaveBeenCalledWith('l9');
+    expect(result.message).toBe('Ebene "EX Messung" angelegt: Feld UEG (%) angelegt; jetzt aktiv');
+    expect(result.createdItemId).toBeUndefined();
+  });
+
+  it('legt keine zweite Ebene mit demselben Namen an', async () => {
+    const deps = makeDeps({ layers: [strahlen] });
+    const result = await executeToolCall(
+      call('editLayer', { action: 'create', name: 'strahlenmessung' }),
+      deps,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/gibt es schon/);
+    expect(deps.addFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('ändert ohne genannte Ebene die aktive und schreibt sie vollständig zurück', async () => {
+    const deps = makeDeps({ layers: [strahlen], activeLayerId: 'l1' });
+    const result = await executeToolCall(
+      call('editLayer', {
+        action: 'update',
+        name: 'Strahlung Süd',
+        fields: [{ label: 'Messgerät', type: 'text' }],
+      }),
+      deps,
+    );
+    expect(result.success).toBe(true);
+    expect(deps.updateFirecallItem).toHaveBeenCalledWith({
+      ...strahlen,
+      name: 'Strahlung Süd',
+      dataSchema: [
+        ...strahlen.dataSchema!,
+        { key: 'messgeraet', label: 'Messgerät', unit: '', type: 'text' },
+      ],
+    });
+    expect(result.message).toBe(
+      'Ebene "Strahlenmessung" geändert: umbenannt in "Strahlung Süd", Feld Messgerät angelegt',
+    );
+  });
+
+  it('lehnt eine neue Einheit ab, wenn Messpunkte schon Werte haben', async () => {
+    const deps = makeDeps({
+      layers: [strahlen],
+      existingItems: [
+        { id: 'p', type: 'marker', name: 'Messung', layer: 'l1', fieldData: { dosisleistung: 5 } },
+      ] as FirecallItem[],
+    });
+    const result = await executeToolCall(
+      call('editLayer', {
+        action: 'update',
+        layer: 'Strahlen',
+        fields: [{ label: 'Dosisleistung', unit: 'mSv/h' }],
+      }),
+      deps,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/Einheit von "Dosisleistung" bleibt/);
+    expect(deps.updateFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('meldet eine fehlende Ebene und eine leere Änderung', async () => {
+    const fehlt = await executeToolCall(
+      call('editLayer', { action: 'update', layer: 'Nord' }),
+      makeDeps({ layers: [strahlen] }),
+    );
+    expect(fehlt.message).toMatch(/Ebene "Nord" nicht gefunden/);
+    const leer = await executeToolCall(
+      call('editLayer', { action: 'update', layer: 'Strahlen' }),
+      makeDeps({ layers: [strahlen] }),
+    );
+    expect(leer.message).toBe('Keine Änderung an der Ebene "Strahlenmessung" angegeben');
   });
 });

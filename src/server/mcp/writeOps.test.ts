@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const { addItem, addAudit, setDoc } = vi.hoisted(() => ({
+const { addItem, addAudit, setDoc, collections } = vi.hoisted(() => ({
+  collections: [] as string[],
   addItem: vi.fn(async (_data: Record<string, unknown>) => ({ id: 'neu-1' })),
   addAudit: vi.fn(async (_data: Record<string, unknown>) => ({ id: 'log-1' })),
   setDoc: vi.fn(
@@ -15,10 +16,11 @@ vi.mock('../firebase/admin', () => ({
   firestore: {
     collection: () => ({
       doc: () => ({
-        collection: (name: string) =>
-          name === 'auditlog'
-            ? { add: addAudit }
-            : { add: addItem, doc: () => ({ set: setDoc }) },
+        collection: (name: string) => {
+          if (name === 'auditlog') return { add: addAudit };
+          collections.push(name);
+          return { add: addItem, doc: () => ({ set: setDoc }) };
+        },
       }),
     }),
   },
@@ -37,6 +39,16 @@ beforeEach(() => {
   addItem.mockClear();
   addAudit.mockClear();
   setDoc.mockClear();
+  collections.length = 0;
+});
+
+describe('Sammlung je Typ', () => {
+  it('schreibt Ebenen nach layer und alles andere nach item', async () => {
+    await addMcpFirecallItem(context, { type: 'layer', name: 'Strahlenmessung' } as never);
+    await updateMcpFirecallItem(context, { id: 'l1', type: 'layer', name: 'Neu' } as never);
+    await addMcpFirecallItem(context, { type: 'marker', name: 'x' } as never);
+    expect(collections).toEqual(['layer', 'layer', 'item']);
+  });
 });
 
 describe('addMcpFirecallItem', () => {

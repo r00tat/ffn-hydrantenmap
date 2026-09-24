@@ -14,7 +14,7 @@ describe('projectFirecallItem', () => {
         lat: 1,
         lng: 2,
         geometry: { riesig: true },
-        fieldData: { a: 1 },
+        original: { a: 1 },
       }),
     );
     expect(projected).toEqual({
@@ -26,12 +26,34 @@ describe('projectFirecallItem', () => {
     });
   });
 
+  it('nimmt Ebene und Messwerte mit, aber keine leeren Messwerte', () => {
+    expect(
+      projectFirecallItem(
+        item({ layer: 'l1', fieldData: { dosisleistung: 37000 } }),
+      ),
+    ).toMatchObject({ layer: 'l1', fieldData: { dosisleistung: 37000 } });
+    expect(projectFirecallItem(item({ fieldData: {} }))).not.toHaveProperty(
+      'fieldData',
+    );
+  });
+
   it('nimmt bei Fahrzeugen die Einsatzmittel-Felder mit', () => {
     expect(
       projectFirecallItem(
         item({ type: 'vehicle', fw: 'FF N', besatzung: '1:8', ats: 2 }),
       ),
     ).toMatchObject({ fw: 'FF N', besatzung: '1:8', ats: 2 });
+  });
+
+  it('nennt die Drehung bei Fahrzeug und Rohr, aber nicht die 0', () => {
+    expect(projectFirecallItem(item({ type: 'vehicle', rotation: '45' })).rotation).toBe(45);
+    expect(projectFirecallItem(item({ type: 'rohr', rotation: '-90' })).rotation).toBe(270);
+    expect(projectFirecallItem(item({ type: 'vehicle', rotation: '0' }))).not.toHaveProperty(
+      'rotation',
+    );
+    expect(projectFirecallItem(item({ type: 'marker', rotation: '45' }))).not.toHaveProperty(
+      'rotation',
+    );
   });
 
   it('gibt den Tagebuchtext nur auf Anforderung heraus', () => {

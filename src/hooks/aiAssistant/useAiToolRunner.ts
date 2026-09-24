@@ -1,6 +1,6 @@
 import { LeafletContext } from '@react-leaflet/core';
 import { FunctionCall } from 'firebase/ai';
-import { useCallback, useContext, useRef, useState } from 'react';
+import { useCallback, useContext, useMemo, useRef, useState } from 'react';
 import {
   createFahrtenbuchEntryFromAssistant,
   getFahrtenbuchCountersForAssistant,
@@ -13,6 +13,8 @@ import { WaterSupplyCandidate } from '../../common/waterSupply';
 import { defaultPosition } from '../constants';
 import useFirecallItemAdd from '../useFirecallItemAdd';
 import useFirecallItemUpdate from '../useFirecallItemUpdate';
+import { useFirecallLayers } from '../useFirecallLayers';
+import useMapEditor from '../useMapEditor';
 import { useFirecall } from '../useFirecall';
 import { useHoseLineDraft } from '../useHoseLineDraft';
 import type { AssistantEntryCommand } from '../../components/Fahrtenbuch/assistantEntry';
@@ -56,6 +58,10 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
   const map = leafletContext?.map ?? null;
   const [position, isPositionSet] = usePositionContext();
   const addFirecallItem = useFirecallItemAdd();
+  const layersMap = useFirecallLayers();
+  const layers = useMemo(() => Object.values(layersMap), [layersMap]);
+  // Dieselbe „zuletzt gewählte Ebene" wie beim Anlegen über die Oberfläche.
+  const { lastSelectedLayer, setLastSelectedLayer } = useMapEditor();
   const updateFirecallItem = useFirecallItemUpdate();
   const firecall = useFirecall();
   const { proposeDrafts } = useHoseLineDraft();
@@ -150,6 +156,9 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
         addFirecallItem,
         updateFirecallItem,
         existingItems,
+        layers,
+        activeLayerId: lastSelectedLayer || undefined,
+        setActiveLayer: setLastSelectedLayer,
         lastCreatedItem,
         setLastCreatedItem,
         map,
@@ -168,7 +177,8 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
           timestamp: Date.now(),
           action: call.name,
           createdItemId: result.createdItemId,
-          createdItemType: call.name.replace('create', '').toLowerCase(),
+          createdItemType:
+            result.createdItemType ?? call.name.replace('create', '').toLowerCase(),
         });
       }
 
@@ -180,11 +190,14 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
       existingItems,
       getFahrtenbuchCounters,
       lastCreatedItem,
+      lastSelectedLayer,
+      layers,
       map,
       proposeDrafts,
       resolveOrigin,
       resolvePosition,
       runTruppCommand,
+      setLastSelectedLayer,
       updateFirecallItem,
     ]
   );
@@ -198,11 +211,13 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
       position,
       interactions: interactionsRef.current,
       trupps: truppContext,
+      layers,
+      activeLayerId: lastSelectedLayer || undefined,
     });
     // Kompakt statt eingerückt: Die Einrückung ist rund ein Drittel der
     // Zeichen und trägt für das Modell nichts bei (#740).
     return `${MAP_CONTEXT_PREFIX}\n${JSON.stringify(context)}`;
-  }, [existingItems, isPositionSet, map, position, truppContext]);
+  }, [existingItems, isPositionSet, lastSelectedLayer, layers, map, position, truppContext]);
 
   const contextStats = useCallback(
     () => ({ items: existingItems.filter((item) => !item.deleted).length }),

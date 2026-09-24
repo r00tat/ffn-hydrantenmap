@@ -8,6 +8,7 @@ import {
   FIRECALL_AUDITLOG_COLLECTION_ID,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
+  FIRECALL_LAYERS_COLLECTION_ID,
   type AuditLogEntry,
   type FirecallItem,
 } from '../../components/firebase/firestore';
@@ -39,11 +40,18 @@ function provenance(context: McpWriteContext): McpProvenance {
   };
 }
 
-function itemsCollection(firecallId: string) {
+/**
+ * Ebenen liegen in einer eigenen Sammlung, alle anderen Elemente unter
+ * `item` — dieselbe Unterscheidung, die im Browser `firebaseCollectionName()`
+ * der Elementklasse trifft.
+ */
+function itemsCollection(firecallId: string, type?: string) {
   return firestore
     .collection(FIRECALL_COLLECTION_ID)
     .doc(firecallId)
-    .collection(FIRECALL_ITEMS_COLLECTION_ID);
+    .collection(
+      type === 'layer' ? FIRECALL_LAYERS_COLLECTION_ID : FIRECALL_ITEMS_COLLECTION_ID,
+    );
 }
 
 /**
@@ -97,7 +105,7 @@ export async function addMcpFirecallItem(
     updatedBy: context.user,
   });
 
-  const ref = await itemsCollection(context.firecallId).add(data);
+  const ref = await itemsCollection(context.firecallId, item.type).add(data);
 
   await writeAuditLog(context, {
     action: 'create',
@@ -129,7 +137,7 @@ export async function updateMcpFirecallItem(
 
   // `merge`, nicht `set`: Ein Tool-Call liefert nur die geänderten Felder,
   // und `deleted: true` beim Soft-Delete darf den Rest nicht wegwerfen.
-  await itemsCollection(context.firecallId)
+  await itemsCollection(context.firecallId, item.type)
     .doc(id)
     .set(data, { merge: true });
 

@@ -28,7 +28,11 @@ vi.mock('../useFirecall', () => ({
   useFirecallId: vi.fn(() => 'test-firecall'),
   useFirecall: vi.fn(() => ({ id: 'test-firecall', name: 'Test' })),
 }));
-vi.mock('../useMapEditor', () => ({ useHistoryPathSegments: vi.fn(() => []) }));
+vi.mock('../useMapEditor', () => ({
+  default: vi.fn(() => ({ lastSelectedLayer: '', setLastSelectedLayer: vi.fn() })),
+  useHistoryPathSegments: vi.fn(() => []),
+}));
+vi.mock('../useFirecallLayers', () => ({ useFirecallLayers: vi.fn(() => ({})) }));
 vi.mock('../../components/actions/maps/places', () => ({ searchPlace: vi.fn() }));
 vi.mock('./toolHandlers', () => ({ executeToolCall: vi.fn() }));
 vi.mock('../../components/Atemschutz/useTruppAssistant', () => ({
@@ -266,6 +270,76 @@ describe('useAiLiveAssistant', () => {
     expect(createLiveToken).not.toHaveBeenCalled();
     expect(connect).not.toHaveBeenCalled();
     expect(playback.close).toHaveBeenCalled();
+  });
+
+  describe('Stand der Karte während des Gesprächs', () => {
+    const klf = { id: 'klf-1', type: 'vehicle', name: 'KLF', lat: 47.9, lng: 16.8 };
+
+    /**
+     * Ein Strom, der erst weiterläuft, wenn der Test es sagt — dazwischen
+     * ändert sich die Karte, wie am Einsatzort zwischen zwei Sätzen.
+     */
+    function toolCallAfter(gate: Promise<void>) {
+      session.receive.mockImplementation(async function* () {
+        await gate;
+        yield {
+          type: 'toolCall',
+          functionCalls: [{ name: 'deleteItem', args: { itemName: 'KLF' } }],
+        };
+        yield {
+          type: 'serverContent',
+          outputTranscription: { text: 'Gelöscht.' },
+          turnComplete: true,
+        };
+        await new Promise(() => undefined);
+      });
+    }
+
+    it('führt Werkzeuge mit den Elementen von jetzt aus, nicht vom Gesprächsbeginn', async () => {
+      const { executeToolCall } = await import('./toolHandlers');
+      vi.mocked(executeToolCall).mockResolvedValue({ success: true, message: 'ok' });
+      let release!: () => void;
+      toolCallAfter(new Promise<void>((resolve) => (release = resolve)));
+
+      const { result, rerender } = renderHook(
+        ({ items }) => useAiLiveAssistant(items as never),
+        { initialProps: { items: [] as unknown[] } },
+      );
+      await actAsync(() => result.current.startConversation());
+
+      // Das KLF entsteht erst im laufenden Gespräch.
+      rerender({ items: [klf] });
+      await actAsync(async () => {
+        release();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(executeToolCall).toHaveBeenCalledTimes(1);
+      const deps = vi.mocked(executeToolCall).mock.calls[0][1];
+      expect(deps.existingItems).toEqual([klf]);
+    });
+
+    it('reicht nach einem Beitrag den neuen Kartenkontext nach', async () => {
+      const { executeToolCall } = await import('./toolHandlers');
+      vi.mocked(executeToolCall).mockResolvedValue({ success: true, message: 'ok' });
+      let release!: () => void;
+      toolCallAfter(new Promise<void>((resolve) => (release = resolve)));
+
+      const { result, rerender } = renderHook(
+        ({ items }) => useAiLiveAssistant(items as never),
+        { initialProps: { items: [] as unknown[] } },
+      );
+      await actAsync(() => result.current.startConversation());
+      rerender({ items: [klf] });
+      await actAsync(async () => {
+        release();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      // Eröffnung: Kontext und Gesprächsregeln; danach der neue Stand.
+      const contextTexts = session.send.mock.calls.map(([parts]) => parts[0].text as string);
+      expect(contextTexts.at(-1)).toContain('KLF');
+    });
   });
 
   it('fällt nach einem gescheiterten Aufbau nicht im Zuhören stehen', async () => {

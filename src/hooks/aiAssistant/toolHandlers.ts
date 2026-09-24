@@ -1,6 +1,6 @@
 import { FunctionCall } from 'firebase/ai';
 import { evaluate } from 'mathjs';
-import { FirecallItem } from '../../components/firebase/firestore';
+import { FirecallItem, FirecallLayer } from '../../components/firebase/firestore';
 import { searchPlace } from '../../components/actions/maps/places';
 import { GeoPosition, GeoPositionObject } from '../../common/geo';
 import { GeohashCluster } from '../../common/gis-objects';
@@ -22,6 +22,12 @@ import type { AssistantEntryCommand } from '../../components/Fahrtenbuch/assista
 import type { TruppCommand } from '../../components/Atemschutz/truppAssistant';
 import { TRUPP_STATUSES, type TruppStatus } from '../../common/atemschutz';
 import { findFirecallItemByName } from './itemLookup';
+import { EDITABLE_FIELDS } from './editableFields';
+import { findItems, type FindItemsQuery } from './findItems';
+import { applyFieldValues, findLayer, projectLayer, type SpokenFieldValue } from './layerFields';
+import { editLayerSchema, type SpokenFieldSpec } from './layerSchema';
+import { DIRECTION_LABELS, type PositionSpec } from './resolveOrigin';
+import { normalizeRotation } from '../../components/Map/markers/rotationGeometry';
 import { AiAssistantResult, ResolvedOrigin } from './types';
 import {
   calculateInverseSquareLaw,
@@ -33,7 +39,7 @@ import {
 } from '../../common/strahlenschutz';
 
 type ResolvePositionFn = (
-  positionSpec: { type: string; itemName?: string; address?: string; lat?: number; lng?: number } | undefined
+  positionSpec: PositionSpec | undefined
 ) => Promise<{ lat: number; lng: number }>;
 
 type AddFirecallItemFn = (item: FirecallItem) => Promise<{ id: string }>;
@@ -46,14 +52,20 @@ export interface ToolHandlerDeps {
    * tatsächlich hinauslief — inklusive Rückfall. Die Wasserversorgungssuche
    * braucht das, weil eine Messung ohne genannten Bezugspunkt wertlos ist.
    */
-  resolveOrigin: (
-    positionSpec:
-      | { type: string; itemName?: string; address?: string; lat?: number; lng?: number }
-      | undefined
-  ) => Promise<ResolvedOrigin>;
+  resolveOrigin: (positionSpec: PositionSpec | undefined) => Promise<ResolvedOrigin>;
   addFirecallItem: AddFirecallItemFn;
   updateFirecallItem: UpdateFirecallItemFn;
   existingItems: FirecallItem[];
+  /** Ebenen des Einsatzes, samt ihren Datenfeldern (`dataSchema`). */
+  layers: FirecallLayer[];
+  /**
+   * Ebene, in die ein neuer Marker ohne genannte Ebene kommt — im Browser die
+   * zuletzt gewählte (`lastSelectedLayer`), wie beim Anlegen über die
+   * Oberfläche. Im MCP-Server gibt es keine.
+   */
+  activeLayerId?: string;
+  /** Eine genannte Ebene wird zur aktiven, damit die nächste Messung dort landet. */
+  setActiveLayer?: (layerId: string) => void;
   lastCreatedItem: { id: string; type: string } | null;
   setLastCreatedItem: (item: { id: string; type: string } | null) => void;
   map: { getCenter: () => { lat: number; lng: number }; panTo: (latlng: [number, number]) => void } | null;
@@ -165,6 +177,170 @@ function formatDuration(hours: number): string {
   return parts.length > 0 ? parts.join(' ') : '0 s';
 }
 
+/** Arten von createMarker: Elementtyp → Ersatzname und Bezeichnung in der Antwort. */
+const MARKER_KINDS: Record<string, { fallbackName: string; label: string }> = {
+  marker: { fallbackName: 'Marker', label: 'Marker' },
+  el: { fallbackName: 'Einsatzleitung', label: 'Einsatzleitung' },
+  assp: { fallbackName: 'ASSP', label: 'ASSP' },
+};
+
+/**
+ * Die Feuerwehr in der Rückmeldung — auch, wenn keine gespeichert wurde. Aus
+ * der Rückmeldung baut das Modell seine Antwort; steht die Feuerwehr nicht
+ * darin, soll es sie auch nicht behaupten.
+ */
+function feuerwehrHinweis(fw: unknown): string {
+  const name = typeof fw === 'string' ? fw.trim() : '';
+  return name ? `(${name})` : 'ohne Feuerwehr';
+}
+
+/** Parameter von `updates`, die nicht in `EDITABLE_FIELDS` stehen. */
+const COMMON_UPDATE_KEYS = new Set([
+  'name',
+  'beschreibung',
+  'color',
+  'position',
+  'rotation',
+  'rotateBy',
+  'layer',
+  'values',
+]);
+
+/**
+ * Ein gesagter Zeitpunkt als ISO-Zeitstempel, wie ihn der Dialog speichert.
+ * „jetzt" und „14:30" (heute) werden umgerechnet; was sich nicht lesen lässt,
+ * bleibt `undefined`.
+ */
+export function zeitpunkt(value: unknown, now = new Date()): string | undefined {
+  const text = String(value ?? '').trim().toLocaleLowerCase('de');
+  if (!text) return undefined;
+  if (['jetzt', 'now', 'sofort'].includes(text)) return now.toISOString();
+  const uhrzeit = text.match(/^(\d{1,2})[:.](\d{2})(?:\s*uhr)?$/);
+  if (uhrzeit) {
+    const d = new Date(now);
+    d.setHours(Number(uhrzeit[1]), Number(uhrzeit[2]), 0, 0);
+    return d.toISOString();
+  }
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+/**
+ * Die typabhängigen Felder aus `updates` übernehmen. Liefert die geänderten
+ * Feldnamen oder einen Fehlersatz, wenn ein Feld nicht zum Typ passt — dann
+ * wird gar nichts geschrieben.
+ */
+function typFelder(
+  item: FirecallItem,
+  updates: Record<string, unknown>,
+): { werte: Record<string, unknown>; fehler?: string } {
+  const erlaubt = EDITABLE_FIELDS[item.type] ?? {};
+  const werte: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (COMMON_UPDATE_KEYS.has(key) || value === undefined || value === null) continue;
+    const art = erlaubt[key];
+    if (!art) {
+      const felder = Object.keys(erlaubt);
+      return {
+        werte,
+        fehler:
+          `"${key}" gibt es bei "${item.name}" nicht` +
+          (felder.length ? ` (änderbar: ${felder.join(', ')})` : ''),
+      };
+    }
+    if (art === 'number') {
+      const zahl = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
+      if (!Number.isFinite(zahl)) return { werte, fehler: `"${value}" ist keine Zahl für ${key}` };
+      werte[key] = zahl;
+    } else if (art === 'flag') {
+      // Schaltfelder liegen als 'true'/'false' im Dokument, wie im Dialog.
+      werte[key] = String(value === true || value === 'true' || value === 'ja');
+    } else if (art === 'time') {
+      const iso = zeitpunkt(value);
+      if (!iso) return { werte, fehler: `"${value}" ist kein Zeitpunkt für ${key}` };
+      werte[key] = iso;
+    } else if (art === 'besatzung') {
+      const besatzung = parseBesatzung(String(value));
+      if (besatzung === undefined) {
+        return { werte, fehler: `"${value}" ist keine Besatzung` };
+      }
+      werte[key] = String(besatzung);
+    } else {
+      werte[key] = String(value);
+    }
+  }
+  return { werte };
+}
+
+/** Typen, die die Karte dreht — dieselben wie `isRotatable()` der Elemente. */
+const ROTATABLE_TYPES = new Set(['vehicle', 'rohr']);
+
+/**
+ * Drehung nach `updateItem`, in ganzen Grad im Uhrzeigersinn, 0 bis 359.
+ * `rotation` setzt den Winkel, `rotateBy` dreht vom jetzigen aus weiter —
+ * „um 45° nach rechts" ist +45. `undefined`, wenn keine Drehung verlangt ist.
+ */
+function neueDrehung(
+  item: FirecallItem,
+  updates: Record<string, unknown>,
+): number | 'nicht drehbar' | undefined {
+  const absolut = typeof updates.rotation === 'number' ? updates.rotation : undefined;
+  const relativ = typeof updates.rotateBy === 'number' ? updates.rotateBy : undefined;
+  if (absolut === undefined && relativ === undefined) return undefined;
+  if (!ROTATABLE_TYPES.has(item.type)) return 'nicht drehbar';
+  const winkel = absolut ?? normalizeRotation(item.rotation) + relativ!;
+  return normalizeRotation(Math.round(winkel));
+}
+
+/** Eine genannte Ebene fehlt — mit den vorhandenen, damit das Modell nachfragen kann. */
+function ebeneFehlt(name: string, layers: FirecallLayer[]): string {
+  const namen = layers.filter((l) => !l.deleted).map((l) => `"${l.name}"`);
+  return (
+    `Ebene "${name}" nicht gefunden` +
+    (namen.length ? ` (Ebenen: ${namen.join(', ')})` : ' — der Einsatz hat keine Ebenen')
+  );
+}
+
+/**
+ * Wohin ein verschobenes Element kam, für die Rückmeldung. Fand sich das
+ * Bezugselement nicht, steht das darin — sonst meldet das Modell „links
+ * neben dem TLFA", obwohl es in der Kartenmitte gelandet ist.
+ */
+function positionHinweis(spec: PositionSpec, origin: ResolvedOrigin): string {
+  if (origin.type === 'nearItem') {
+    const seite = (spec.direction && DIRECTION_LABELS[spec.direction]) || 'neben';
+    const abstand = spec.distance && spec.distance > 0 ? `${spec.distance} m ` : '';
+    return `${abstand}${seite} ${origin.label}`;
+  }
+  if (origin.type === 'atItem') return `auf ${origin.label}`;
+  if (spec.type === 'nearItem' || spec.type === 'atItem') {
+    const bezug = spec.itemName ? `Element "${spec.itemName}"` : 'Bezugselement';
+    return `an ${origin.label} (${bezug} nicht gefunden)`;
+  }
+  return `an ${origin.label}`;
+}
+
+/**
+ * `nearItem`/`atItem` ohne Namen meint das zuletzt angelegte Element —
+ * „weiterer Messpunkt 10 m nordöstlich". Ohne diese Zuordnung fiele die
+ * Angabe still auf den Rückfall, und alle Punkte lägen übereinander.
+ */
+function mitBezug(
+  spec: PositionSpec | undefined,
+  lastCreatedItem: { id: string } | null,
+): PositionSpec | undefined {
+  if (
+    spec &&
+    (spec.type === 'nearItem' || spec.type === 'atItem') &&
+    !spec.itemName?.trim() &&
+    !spec.itemId &&
+    lastCreatedItem
+  ) {
+    return { ...spec, itemId: lastCreatedItem.id };
+  }
+  return spec;
+}
+
 export async function executeToolCall(
   call: FunctionCall,
   deps: ToolHandlerDeps,
@@ -176,6 +352,9 @@ export async function executeToolCall(
     addFirecallItem,
     updateFirecallItem,
     existingItems,
+    layers,
+    activeLayerId,
+    setActiveLayer,
     lastCreatedItem,
     setLastCreatedItem,
     map,
@@ -190,21 +369,74 @@ export async function executeToolCall(
 
   switch (call.name) {
     case 'createMarker': {
-      const pos = await resolvePosition(args.position as any);
-      const ref = await addFirecallItem({
-        type: 'marker',
-        name: (args.name as string) || 'Marker',
-        beschreibung: args.beschreibung as string,
-        zeichen: args.zeichen as string,
-        color: args.color as string,
-        ...pos,
-      } as FirecallItem);
-      setLastCreatedItem({ id: ref.id, type: 'marker' });
-      return { success: true, message: `Marker "${args.name}" erstellt`, createdItemId: ref.id };
+      // EL und ASSP sind eigene Elementtypen, für das Modell aber nur eine Art
+      // Marker — ein Werkzeug weniger zur Auswahl. Unbekannte Arten landen
+      // beim allgemeinen Marker statt bei einem Fehler.
+      const kind = MARKER_KINDS[args.kind as string] ? (args.kind as string) : 'marker';
+      const { fallbackName, label } = MARKER_KINDS[kind];
+
+      // Eine genannte Ebene muss es geben; ohne Angabe die aktive, wie beim
+      // Anlegen über die Oberfläche.
+      const layerName = args.layer as string | undefined;
+      const layer = layerName
+        ? findLayer(layers, layerName)
+        : layers.find((l) => l.id === activeLayerId && !l.deleted);
+      if (layerName && !layer) {
+        return { success: false, message: ebeneFehlt(layerName, layers) };
+      }
+      const values = (args.values as SpokenFieldValue[] | undefined) ?? [];
+      if (values.length > 0 && !layer?.dataSchema?.length) {
+        return {
+          success: false,
+          message: layer
+            ? `Die Ebene "${layer.name}" hat keine Datenfelder`
+            : 'Messwerte brauchen eine Ebene mit Datenfeldern — keine genannt und keine aktiv',
+        };
+      }
+      const felder = layer?.dataSchema?.length
+        ? await applyFieldValues(layer.dataSchema, undefined, values, { isNew: true })
+        : undefined;
+      if (felder?.errors.length) {
+        return { success: false, message: felder.errors.join('; ') };
+      }
+
+      const spec = mitBezug(args.position as PositionSpec | undefined, lastCreatedItem);
+      const origin = await resolveOrigin(spec);
+      const pos = { lat: origin.lat, lng: origin.lng };
+      const name = (args.name as string) || fallbackName;
+      const inEbene = layer
+        ? { layer: layer.id, ...(felder ? { fieldData: felder.fieldData } : {}) }
+        : {};
+      const ref = await addFirecallItem(
+        kind === 'marker'
+          ? ({
+              type: 'marker',
+              name,
+              beschreibung: args.beschreibung as string,
+              zeichen: args.zeichen as string,
+              color: args.color as string,
+              ...inEbene,
+              ...pos,
+            } as FirecallItem)
+          : ({ type: kind, name, ...inEbene, ...pos } as FirecallItem)
+      );
+      setLastCreatedItem({ id: ref.id, type: kind });
+      if (layerName && layer?.id) setActiveLayer?.(layer.id);
+      return {
+        success: true,
+        message:
+          `${label} "${name}"` +
+          (layer ? ` in Ebene "${layer.name}"` : '') +
+          ' erstellt' +
+          (spec ? ` ${positionHinweis(spec, origin)}` : '') +
+          (felder?.applied.length ? `: ${felder.applied.join(', ')}` : ''),
+        createdItemId: ref.id,
+        createdItemType: kind,
+      };
     }
 
     case 'createVehicle': {
-      const pos = await resolvePosition(args.position as any);
+      const pos = await resolvePosition(mitBezug(args.position as PositionSpec, lastCreatedItem));
       const ref = await addFirecallItem({
         type: 'vehicle',
         name: (args.name as string) || 'Fahrzeug',
@@ -221,11 +453,15 @@ export async function executeToolCall(
         ...pos,
       } as FirecallItem);
       setLastCreatedItem({ id: ref.id, type: 'vehicle' });
-      return { success: true, message: `Fahrzeug "${args.name}" erstellt`, createdItemId: ref.id };
+      return {
+        success: true,
+        message: `Fahrzeug "${args.name}" ${feuerwehrHinweis(args.fw)} erstellt`,
+        createdItemId: ref.id,
+      };
     }
 
     case 'createRohr': {
-      const pos = await resolvePosition(args.position as any);
+      const pos = await resolvePosition(mitBezug(args.position as PositionSpec, lastCreatedItem));
       const ref = await addFirecallItem({
         type: 'rohr',
         name: (args.name as string) || 'Rohr',
@@ -265,7 +501,7 @@ export async function executeToolCall(
     }
 
     case 'createCircle': {
-      const pos = await resolvePosition(args.position as any);
+      const pos = await resolvePosition(mitBezug(args.position as PositionSpec, lastCreatedItem));
       const ref = await addFirecallItem({
         type: 'circle',
         name: (args.name as string) || 'Kreis',
@@ -277,30 +513,8 @@ export async function executeToolCall(
       return { success: true, message: `Kreis "${args.name}" erstellt`, createdItemId: ref.id };
     }
 
-    case 'createEl': {
-      const pos = await resolvePosition(args.position as any);
-      const ref = await addFirecallItem({
-        type: 'el',
-        name: (args.name as string) || 'Einsatzleitung',
-        ...pos,
-      });
-      setLastCreatedItem({ id: ref.id, type: 'el' });
-      return { success: true, message: `Einsatzleitung "${args.name}" erstellt`, createdItemId: ref.id };
-    }
-
-    case 'createAssp': {
-      const pos = await resolvePosition(args.position as any);
-      const ref = await addFirecallItem({
-        type: 'assp',
-        name: (args.name as string) || 'ASSP',
-        ...pos,
-      });
-      setLastCreatedItem({ id: ref.id, type: 'assp' });
-      return { success: true, message: `ASSP "${args.name}" erstellt`, createdItemId: ref.id };
-    }
-
     case 'createTacticalUnit': {
-      const pos = await resolvePosition(args.position as any);
+      const pos = await resolvePosition(mitBezug(args.position as PositionSpec, lastCreatedItem));
       const ref = await addFirecallItem({
         type: 'tacticalUnit',
         name: (args.name as string) || 'Einheit',
@@ -314,7 +528,11 @@ export async function executeToolCall(
         ...pos,
       } as FirecallItem);
       setLastCreatedItem({ id: ref.id, type: 'tacticalUnit' });
-      return { success: true, message: `Taktische Einheit "${args.name}" erstellt`, createdItemId: ref.id };
+      return {
+        success: true,
+        message: `Taktische Einheit "${args.name}" ${feuerwehrHinweis(args.fw)} erstellt`,
+        createdItemId: ref.id,
+      };
     }
 
     case 'updateItem': {
@@ -327,16 +545,79 @@ export async function executeToolCall(
         return { success: false, message: 'Element nicht gefunden' };
       }
 
-      const pos = updates.position ? await resolvePosition(updates.position as any) : {};
-      const updatedItem: FirecallItem = {
-        ...targetItem,
-        ...pos,
-      };
+      const typ = typFelder(targetItem, updates);
+      if (typ.fehler) return { success: false, message: typ.fehler };
+
+      const drehung = neueDrehung(targetItem, updates);
+      if (drehung === 'nicht drehbar') {
+        return {
+          success: false,
+          message: `"${targetItem.name}" lässt sich nicht drehen, nur Fahrzeuge und Rohre`,
+        };
+      }
+
+      // Ebene wechseln und Datenfelder: Die Werte gehören zur Ebene, in der
+      // das Element danach liegt.
+      const layerName = updates.layer as string | undefined;
+      const zielEbene = layerName
+        ? findLayer(layers, layerName)
+        : layers.find((l) => l.id === targetItem.layer && !l.deleted);
+      if (layerName && !zielEbene) {
+        return { success: false, message: ebeneFehlt(layerName, layers) };
+      }
+      const values = (updates.values as SpokenFieldValue[] | undefined) ?? [];
+      if (values.length > 0 && !zielEbene?.dataSchema?.length) {
+        return {
+          success: false,
+          message: zielEbene
+            ? `Die Ebene "${zielEbene.name}" hat keine Datenfelder`
+            : `"${targetItem.name}" liegt in keiner Ebene mit Datenfeldern`,
+        };
+      }
+      const felder =
+        values.length > 0 && zielEbene?.dataSchema
+          ? await applyFieldValues(zielEbene.dataSchema, targetItem.fieldData, values)
+          : undefined;
+      if (felder?.errors.length) {
+        return { success: false, message: felder.errors.join('; ') };
+      }
+
+      const positionSpec = updates.position as PositionSpec | undefined;
+      // Über `resolveOrigin`, damit die Antwort sagt, wohin das Element kam.
+      // Ohne das hat das Modell eine verfehlte Verschiebung als gelungen
+      // gemeldet.
+      const origin = positionSpec
+        ? await resolveOrigin({ ...positionSpec, excludeItemId: targetItem.id })
+        : undefined;
+      const updatedItem: FirecallItem = { ...targetItem };
+      if (origin) {
+        updatedItem.lat = origin.lat;
+        updatedItem.lng = origin.lng;
+      }
       if (updates.name) updatedItem.name = updates.name as string;
       if (updates.color) (updatedItem as any).color = updates.color as string;
       if (updates.beschreibung) updatedItem.beschreibung = updates.beschreibung as string;
+      if (drehung !== undefined) updatedItem.rotation = String(drehung);
+      Object.assign(updatedItem, typ.werte);
+      if (layerName && zielEbene) updatedItem.layer = zielEbene.id;
+      if (felder) updatedItem.fieldData = felder.fieldData;
+
       await updateFirecallItem(updatedItem);
-      return { success: true, message: `"${targetItem.name}" aktualisiert` };
+      if (layerName && zielEbene?.id) setActiveLayer?.(zielEbene.id);
+      const geaendert = Object.keys(typ.werte);
+      const teile = [
+        origin ? `${positionHinweis(positionSpec!, origin)} gesetzt` : undefined,
+        drehung !== undefined ? `auf ${drehung}° gedreht` : undefined,
+        layerName && zielEbene ? `in Ebene "${zielEbene.name}" verschoben` : undefined,
+        felder?.applied.length ? `Werte gesetzt: ${felder.applied.join(', ')}` : undefined,
+        geaendert.length ? `geändert: ${geaendert.join(', ')}` : undefined,
+      ].filter(Boolean);
+      return {
+        success: true,
+        message: teile.length
+          ? `"${targetItem.name}" ${teile.join(' und ')}`
+          : `"${targetItem.name}" aktualisiert`,
+      };
     }
 
     case 'deleteItem': {
@@ -458,6 +739,152 @@ export async function executeToolCall(
         },
       };
 
+    case 'editLayer': {
+      // Anlegen und Ändern in einem Werkzeug: Beide beschreiben die Ebene mit
+      // denselben Angaben (Name, Datenfelder), nur das Ziel unterscheidet sich.
+      const layerArg = (args.layer as string | undefined)?.trim();
+      const action =
+        args.action === 'update' || (!args.action && layerArg) ? 'update' : 'create';
+      const change = {
+        fields: args.fields as SpokenFieldSpec[] | undefined,
+        removeFields: args.removeFields as string[] | undefined,
+      };
+      const name = (args.name as string | undefined)?.trim();
+      const live = layers.filter((l) => !l.deleted);
+      const gleichnamig = (n: string, ausser?: string) =>
+        live.find(
+          (l) =>
+            l.id !== ausser &&
+            l.name?.toLocaleLowerCase('de') === n.toLocaleLowerCase('de'),
+        );
+
+      if (action === 'create') {
+        if (!name) {
+          return { success: false, message: 'Eine neue Ebene braucht einen Namen' };
+        }
+        const doppelt = gleichnamig(name);
+        if (doppelt) {
+          return {
+            success: false,
+            message: `Die Ebene "${doppelt.name}" gibt es schon — zum Ändern action update`,
+          };
+        }
+        const edited = await editLayerSchema([], change);
+        if (edited.errors.length) {
+          return { success: false, message: edited.errors.join('; ') };
+        }
+        const layer = {
+          type: 'layer',
+          name,
+          ...(edited.schema.length ? { dataSchema: edited.schema } : {}),
+        } as FirecallLayer;
+        const ref = await addFirecallItem(layer);
+        // Die neue Ebene wird zur aktiven, damit „neue Messung 37" gleich
+        // dort landet — wie nach dem Anlegen über die Oberfläche.
+        const aktiv = args.activate !== false && !!setActiveLayer;
+        if (aktiv) setActiveLayer!(ref.id);
+        return {
+          success: true,
+          message:
+            `Ebene "${name}" angelegt` +
+            (edited.changes.length ? `: ${edited.changes.join(', ')}` : ' ohne Datenfelder') +
+            (aktiv ? '; jetzt aktiv' : ''),
+          data: projectLayer({ ...layer, id: ref.id }),
+        };
+      }
+
+      const layer = layerArg
+        ? findLayer(layers, layerArg)
+        : live.find((l) => l.id === activeLayerId);
+      if (!layer) {
+        return {
+          success: false,
+          message: layerArg
+            ? ebeneFehlt(layerArg, layers)
+            : 'Keine Ebene genannt und keine aktiv',
+        };
+      }
+      const umbenennen = !!name && name !== layer.name;
+      if (umbenennen) {
+        const doppelt = gleichnamig(name!, layer.id);
+        if (doppelt) {
+          return { success: false, message: `Die Ebene "${doppelt.name}" gibt es schon` };
+        }
+      }
+      const edited = await editLayerSchema(
+        layer.dataSchema ?? [],
+        change,
+        existingItems.filter((i) => i.layer === layer.id),
+      );
+      if (edited.errors.length) {
+        return { success: false, message: edited.errors.join('; ') };
+      }
+      const parts = [
+        ...(umbenennen ? [`umbenannt in "${name}"`] : []),
+        ...edited.changes,
+      ];
+      const aktivieren = args.activate === true && !!setActiveLayer;
+      if (parts.length === 0 && !aktivieren) {
+        return {
+          success: false,
+          message: `Keine Änderung an der Ebene "${layer.name}" angegeben`,
+        };
+      }
+      const updated = {
+        ...layer,
+        ...(umbenennen ? { name } : {}),
+        dataSchema: edited.schema,
+      } as FirecallLayer;
+      if (parts.length) await updateFirecallItem(updated);
+      if (aktivieren) setActiveLayer!(layer.id!);
+      return {
+        success: true,
+        message:
+          `Ebene "${layer.name}" ` +
+          (parts.length ? `geändert: ${parts.join(', ')}` : 'unverändert') +
+          (aktivieren ? '; jetzt aktiv' : ''),
+        data: projectLayer(updated),
+      };
+    }
+
+    case 'findItems': {
+      const center = args.position
+        ? await resolveOrigin(args.position as PositionSpec)
+        : undefined;
+      const result = findItems(
+        existingItems,
+        layers,
+        {
+          type: args.type as string | undefined,
+          name: args.name as string | undefined,
+          layer: args.layer as string | undefined,
+          field: args.field as string | undefined,
+          min: args.min as number | undefined,
+          max: args.max as number | undefined,
+          unit: args.unit as string | undefined,
+          radius: args.radius as number | undefined,
+          sort: args.sort as FindItemsQuery['sort'],
+          limit: args.limit as number | undefined,
+        },
+        center,
+      );
+      if (result.error) return { success: false, message: result.error };
+      return {
+        success: true,
+        message:
+          result.total === 0
+            ? 'Keine passenden Elemente gefunden'
+            : result.total > result.items.length
+              ? `${result.total} Treffer, die ersten ${result.items.length} in data`
+              : `${result.total} Treffer in data`,
+        data: {
+          total: result.total,
+          items: result.items,
+          ...(center ? { origin: originInfo(center) } : {}),
+        },
+      };
+    }
+
     case 'answerQuestion':
       return {
         success: true,
@@ -478,79 +905,89 @@ export async function executeToolCall(
       }
     }
 
-    case 'calculateStrahlenschutzAbstand': {
-      const result = calculateInverseSquareLaw({
-        d1: args.d1 as number ?? null,
-        r1: args.r1 as number ?? null,
-        d2: args.d2 as number ?? null,
-        r2: args.r2 as number ?? null,
-      });
-      if (!result) return { success: false, message: 'Ungültige Parameter für Abstandsgesetz' };
-      const labels: Record<string, string> = { d1: 'Abstand 1', r1: 'Dosisleistung 1', d2: 'Abstand 2', r2: 'Dosisleistung 2' };
-      const unit = result.field.startsWith('d') ? 'm' : 'µSv/h';
-      return { 
-        success: true, 
-        message: `Strahlenschutz (Abstandsgesetz): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
-        isAnswer: true,
-        data: { field: result.field, value: result.value, unit }
-      };
-    }
+    case 'calculateStrahlenschutz': {
+      switch (args.formel) {
+        case 'abstand': {
+          const result = calculateInverseSquareLaw({
+            d1: args.d1 as number ?? null,
+            r1: args.r1 as number ?? null,
+            d2: args.d2 as number ?? null,
+            r2: args.r2 as number ?? null,
+          });
+          if (!result) return { success: false, message: 'Ungültige Parameter für Abstandsgesetz' };
+          const labels: Record<string, string> = { d1: 'Abstand 1', r1: 'Dosisleistung 1', d2: 'Abstand 2', r2: 'Dosisleistung 2' };
+          const unit = result.field.startsWith('d') ? 'm' : 'µSv/h';
+          return { 
+            success: true, 
+            message: `Strahlenschutz (Abstandsgesetz): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
+            isAnswer: true,
+            data: { field: result.field, value: result.value, unit }
+          };
+        }
 
-    case 'calculateStrahlenschutzSchutzwert': {
-      const result = calculateSchutzwert({
-        r0: args.r0 as number ?? null,
-        r: args.r as number ?? null,
-        s: args.s as number ?? null,
-        n: args.n as number ?? null,
-      });
-      if (!result) return { success: false, message: 'Ungültige Parameter für Schutzwert' };
-      const labels: Record<string, string> = { r0: 'DLR ohne Abschirmung', r: 'DLR mit Abschirmung', s: 'Schutzwert (S)', n: 'Anzahl Schichten' };
-      const unit = result.field.startsWith('r') ? 'µSv/h' : '';
-      return { 
-        success: true, 
-        message: `Strahlenschutz (Schutzwert): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
-        isAnswer: true,
-        data: { field: result.field, value: result.value, unit }
-      };
-    }
+        case 'schutzwert': {
+          const result = calculateSchutzwert({
+            r0: args.r0 as number ?? null,
+            r: args.r as number ?? null,
+            s: args.s as number ?? null,
+            n: args.n as number ?? null,
+          });
+          if (!result) return { success: false, message: 'Ungültige Parameter für Schutzwert' };
+          const labels: Record<string, string> = { r0: 'DLR ohne Abschirmung', r: 'DLR mit Abschirmung', s: 'Schutzwert (S)', n: 'Anzahl Schichten' };
+          const unit = result.field.startsWith('r') ? 'µSv/h' : '';
+          return { 
+            success: true, 
+            message: `Strahlenschutz (Schutzwert): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
+            isAnswer: true,
+            data: { field: result.field, value: result.value, unit }
+          };
+        }
 
-    case 'calculateStrahlenschutzAufenthaltszeit': {
-      const result = calculateAufenthaltszeit({
-        t: args.t as number ?? null,
-        d: args.d as number ?? null,
-        r: args.r as number ?? null,
-      });
-      if (!result) return { success: false, message: 'Ungültige Parameter für Aufenthaltszeit' };
-      const labels: Record<string, string> = { t: 'Aufenthaltszeit', d: 'Zulässige Dosis', r: 'Dosisleistung' };
-      const unit = result.field === 't' ? 'h' : result.field === 'd' ? 'mSv' : 'mSv/h';
-      let message = `Strahlenschutz (Aufenthaltszeit): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`;
-      if (result.field === 't') message += ` (${formatDuration(result.value)})`;
-      return { 
-        success: true, 
-        message, 
-        isAnswer: true,
-        data: { field: result.field, value: result.value, unit, duration: result.field === 't' ? formatDuration(result.value) : undefined }
-      };
-    }
+        case 'aufenthaltszeit': {
+          const result = calculateAufenthaltszeit({
+            t: args.t as number ?? null,
+            d: args.d as number ?? null,
+            r: args.r as number ?? null,
+          });
+          if (!result) return { success: false, message: 'Ungültige Parameter für Aufenthaltszeit' };
+          const labels: Record<string, string> = { t: 'Aufenthaltszeit', d: 'Zulässige Dosis', r: 'Dosisleistung' };
+          const unit = result.field === 't' ? 'h' : result.field === 'd' ? 'mSv' : 'mSv/h';
+          let message = `Strahlenschutz (Aufenthaltszeit): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`;
+          if (result.field === 't') message += ` (${formatDuration(result.value)})`;
+          return { 
+            success: true, 
+            message, 
+            isAnswer: true,
+            data: { field: result.field, value: result.value, unit, duration: result.field === 't' ? formatDuration(result.value) : undefined }
+          };
+        }
 
-    case 'calculateStrahlenschutzNuklid': {
-      const nuclideName = args.nuclide as string;
-      const nuclide = NUCLIDES.find(n => n.name.toLowerCase() === nuclideName.toLowerCase());
-      if (!nuclide) return { success: false, message: `Nuklid "${nuclideName}" nicht gefunden` };
+        case 'nuklid': {
+          const nuclideName = (args.nuclide as string) ?? '';
+          const nuclide = NUCLIDES.find(n => n.name.toLowerCase() === nuclideName.toLowerCase());
+          if (!nuclide) return { success: false, message: `Nuklid "${nuclideName}" nicht gefunden` };
 
-      const result = calculateDosisleistungNuklid(nuclide.gamma, {
-        activity: args.activity as number ?? null,
-        doseRate: args.doseRate as number ?? null,
-      });
-      if (!result) return { success: false, message: 'Ungültige Parameter für Nuklid-Berechnung' };
-      const label = result.field === 'activity' ? 'Aktivität' : 'Dosisleistung in 1m';
-      const unit = result.field === 'activity' ? 'GBq' : 'µSv/h';
-      return { 
-        success: true, 
-        message: `Strahlenschutz (${nuclide.name}): ${label} = ${formatValue(result.value)} ${unit}`, 
-        isAnswer: true,
-        data: { nuclide: nuclide.name, field: result.field, value: result.value, unit }
-      };
+          const result = calculateDosisleistungNuklid(nuclide.gamma, {
+            activity: args.activity as number ?? null,
+            doseRate: args.doseRate as number ?? null,
+          });
+          if (!result) return { success: false, message: 'Ungültige Parameter für Nuklid-Berechnung' };
+          const label = result.field === 'activity' ? 'Aktivität' : 'Dosisleistung in 1m';
+          const unit = result.field === 'activity' ? 'GBq' : 'µSv/h';
+          return { 
+            success: true, 
+            message: `Strahlenschutz (${nuclide.name}): ${label} = ${formatValue(result.value)} ${unit}`, 
+            isAnswer: true,
+            data: { nuclide: nuclide.name, field: result.field, value: result.value, unit }
+          };
+        }
+
+        default:
+          return {
+            success: false,
+            message: `Unbekannte Strahlenschutz-Formel "${args.formel}" (abstand, schutzwert, aufenthaltszeit, nuklid)`,
+          };
+      }
     }
 
     case 'searchWaterSupply': {

@@ -4,9 +4,10 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { isTruthy } from '../../common/boolish';
 import type { FirecallItem } from '../../components/firebase/firestore';
+import { DIRECTIONS } from '../../hooks/aiAssistant/resolveOrigin';
 import { executeToolCall } from '../../hooks/aiAssistant/toolHandlers';
 import { authorizationMessage, authorizeFirecall } from './authorizeFirecall';
-import { loadFirecallItems } from './firecallData';
+import { loadFirecallItems, loadFirecallLayers } from './firecallData';
 import { createServerToolDeps, McpWriteForbiddenError } from './serverToolDeps';
 import { errorResult, jsonResult } from './toolResult';
 import type { McpUser } from './userAccess';
@@ -36,8 +37,8 @@ const CREATE_HANDLERS: Record<string, string> = {
   vehicle: 'createVehicle',
   rohr: 'createRohr',
   circle: 'createCircle',
-  el: 'createEl',
-  assp: 'createAssp',
+  el: 'createMarker',
+  assp: 'createMarker',
   tacticalUnit: 'createTacticalUnit',
 };
 
@@ -55,10 +56,41 @@ const positionSchema = z
     lng: z.number().optional(),
     address: z.string().optional(),
     itemName: z.string().optional(),
+    direction: z
+      .enum(DIRECTIONS as [string, ...string[]])
+      .optional()
+      .describe(
+        'Seite (left/right/above/below) oder Himmelsrichtung (north … southwest) ' +
+          'vom Element bei "nearItem", auf der genordeten Karte',
+      ),
+    distance: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Abstand zum Element in Metern bei "nearItem", Standard 20'),
   })
   .optional();
 
 const firecallId = z.string().min(1).describe('ID des Einsatzes');
+
+const layerName = z
+  .string()
+  .optional()
+  .describe('Name oder ID der Ebene (siehe `list_layers`), in die das Element kommt');
+
+const fieldValues = z
+  .array(
+    z.object({
+      field: z.string().describe('Schlüssel oder Bezeichnung des Datenfelds der Ebene'),
+      value: z.union([z.string(), z.number(), z.boolean()]),
+      unit: z
+        .string()
+        .optional()
+        .describe('Einheit des Werts, z.B. "mSv/h"; wird in die Einheit des Felds umgerechnet'),
+    }),
+  )
+  .optional()
+  .describe('Werte für die Datenfelder der Ebene, z.B. eine Dosisleistung');
 
 export interface WriteToolContext {
   user: McpUser;
@@ -77,7 +109,10 @@ export function registerWriteTools(
    */
   async function prepare(id: string) {
     const firecall = await authorizeFirecall(user, id, { requireWrite: true });
-    const existingItems = await loadFirecallItems(id);
+    const [existingItems, layers] = await Promise.all([
+      loadFirecallItems(id),
+      loadFirecallLayers(id),
+    ]);
     return {
       firecall,
       deps: createServerToolDeps({
@@ -88,6 +123,7 @@ export function registerWriteTools(
           clientName,
         },
         existingItems,
+        layers,
         einsatzort:
           firecall.lat && firecall.lng
             ? { lat: firecall.lat, lng: firecall.lng }
@@ -228,6 +264,8 @@ export function registerWriteTools(
         unitType: z.string().optional().describe('Art der taktischen Einheit, z.B. "zug"'),
         mann: z.number().optional().describe('Mannschaftsstärke (nur tacticalUnit)'),
         fuehrung: z.string().optional().describe('Führung (nur tacticalUnit)'),
+        layer: layerName.describe('Ebene (nur marker, el, assp)'),
+        values: fieldValues.describe('Datenfelder der Ebene (nur marker, el, assp)'),
       }),
       annotations: {
         readOnlyHint: false,
@@ -236,8 +274,10 @@ export function registerWriteTools(
         openWorldHint: false,
       },
     },
-    async ({ firecallId: id, type, ...args }) =>
-      run(id, CREATE_HANDLERS[type], args),
+    async ({ firecallId: id, type, ...args }) => {
+      const handler = createCallFor(type, args)!;
+      return run(id, handler.name, handler.args);
+    },
   );
 
   server.registerTool(
@@ -256,6 +296,34 @@ export function registerWriteTools(
           beschreibung: z.string().optional(),
           color: z.string().optional(),
           position: positionSchema,
+          rotation: z
+            .number()
+            .optional()
+            .describe('Drehung in Grad im Uhrzeigersinn, nur Fahrzeug und Rohr'),
+          rotateBy: z
+            .number()
+            .optional()
+            .describe('Um so viele Grad weiterdrehen, positiv im Uhrzeigersinn'),
+          layer: layerName,
+          values: fieldValues,
+          fw: z.string().optional().describe('Feuerwehr (vehicle, tacticalUnit)'),
+          kategorie: z.string().optional().describe('Art des Einsatzmittels (vehicle)'),
+          besatzung: z.string().optional().describe('Mannschaft ohne Kommandant (vehicle)'),
+          ats: z.number().optional().describe('Atemschutzträger (vehicle, tacticalUnit)'),
+          alarmierung: z.string().optional().describe('Zeitpunkt, ISO oder "14:30" (vehicle, tacticalUnit)'),
+          eintreffen: z.string().optional().describe('Zeitpunkt, ISO oder "14:30" (vehicle, tacticalUnit)'),
+          abruecken: z.string().optional().describe('Zeitpunkt, ISO oder "14:30" (vehicle, tacticalUnit)'),
+          fremd: z.boolean().optional().describe('Fremdorganisation (vehicle)'),
+          unitType: z.string().optional().describe('Art der Einheit (tacticalUnit)'),
+          mann: z.number().optional().describe('Mannschaftsstärke (tacticalUnit)'),
+          fuehrung: z.string().optional().describe('Einheitsführer (tacticalUnit)'),
+          art: z.string().optional().describe('Rohrart (rohr)'),
+          durchfluss: z.number().optional().describe('Durchfluss in l/min (rohr)'),
+          zeichen: z.string().optional().describe('Taktisches Zeichen (marker)'),
+          showLabel: z.boolean().optional().describe('Label anzeigen (marker)'),
+          radius: z.number().optional().describe('Radius in m (circle)'),
+          fill: z.boolean().optional().describe('Kreis ausfüllen (circle)'),
+          opacity: z.number().optional().describe('Deckkraft in Prozent (circle)'),
         }),
       }),
       annotations: {
@@ -266,6 +334,52 @@ export function registerWriteTools(
       },
     },
     async ({ firecallId: id, ...args }) => run(id, 'updateItem', args),
+  );
+
+  server.registerTool(
+    'edit_layer',
+    {
+      title: 'Ebene anlegen oder ändern',
+      description:
+        'Legt eine Ebene an (`action: "create"`) oder ändert eine vorhandene ' +
+        '(`action: "update"`, Ziel über `layer`): Name und Datenfelder. Ein Eintrag in ' +
+        '`fields`, dessen Bezeichnung einem vorhandenen Feld entspricht oder der es in ' +
+        '`field` nennt, ändert dieses; sonst entsteht ein neues Feld. Einheit und Typ ' +
+        'eines Felds, das schon Werte hat, bleiben. Berechnete Felder in vorhandenen ' +
+        'Elementen werden hier nicht neu gerechnet.',
+      inputSchema: z.object({
+        firecallId,
+        action: z.enum(['create', 'update']),
+        layer: z.string().optional().describe('Name oder ID der Ebene (nur update)'),
+        name: z.string().optional().describe('Name der neuen Ebene oder neuer Name'),
+        fields: z
+          .array(
+            z.object({
+              field: z
+                .string()
+                .optional()
+                .describe('Vorhandenes Feld (Schlüssel oder Bezeichnung), das geändert wird'),
+              label: z.string().optional().describe('Bezeichnung, z.B. "Dosisleistung"'),
+              unit: z.string().optional().describe('Einheit als Zeichen, z.B. "µSv/h"'),
+              type: z.enum(['number', 'text', 'boolean', 'computed']).optional(),
+              formula: z
+                .string()
+                .optional()
+                .describe('Formel über die Schlüssel der anderen Felder (nur computed)'),
+              defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
+            }),
+          )
+          .optional(),
+        removeFields: z.array(z.string()).optional().describe('Zu entfernende Felder'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ firecallId: id, ...args }) => run(id, 'editLayer', args),
   );
 
   server.registerTool(
@@ -294,9 +408,18 @@ export function registerWriteTools(
   );
 }
 
-/** Nur für Tests und die Doku: die Zuordnung Typ → Handler. */
-export function createHandlerFor(type: string): string | undefined {
-  return CREATE_HANDLERS[type];
+/**
+ * Aufruf des gemeinsamen Tool-Sets für einen Elementtyp. EL und ASSP sind im
+ * Browser-Assistenten nur Arten von `createMarker`; der MCP-Client behält sie
+ * als eigene Typen, weil `type` dort ohnehin gewählt werden muss.
+ */
+export function createCallFor(
+  type: string,
+  args: Record<string, unknown>,
+): { name: string; args: Record<string, unknown> } | undefined {
+  const name = CREATE_HANDLERS[type];
+  if (!name) return undefined;
+  return { name, args: name === 'createMarker' ? { ...args, kind: type } : args };
 }
 
 export type { FirecallItem };

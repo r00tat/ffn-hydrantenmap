@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeSchemaTypes } from '../../common/aiLiveToken';
 import { TRUPP_STATUSES } from '../../common/atemschutz';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from './aiTools';
+import { DIRECTIONS } from '../../hooks/aiAssistant/resolveOrigin';
 
 /** Die Schema-Typen, die die Gemini-API kennt — großgeschrieben wie im Draht. */
 const SCHEMA_TYPES = new Set([
@@ -145,6 +146,17 @@ describe('AI tool declarations', () => {
   });
 });
 
+describe('Feuerwehr eines Einsatzmittels', () => {
+  it('erklärt, dass die Feuerwehr aus dem gesagten Namen abgetrennt wird', () => {
+    for (const name of ['createVehicle', 'createTacticalUnit']) {
+      const fw = (
+        AI_TOOL_DECLARATIONS.find((d) => d.name === name)?.parameters as unknown as LooseSchema
+      ).properties?.fw;
+      expect(fw?.description).toContain('KLF Weiden');
+    }
+  });
+});
+
 describe('AI system prompt', () => {
   it('carves water supply questions out of the answerQuestion rule', () => {
     // Ohne diese Ausnahme gewinnt die frühere, allgemeinere Regel „Bei Fragen
@@ -195,6 +207,135 @@ describe('Atemschutztrupp tools', () => {
   it('keeps trupps apart from tactical units and the ASSP marker', () => {
     const section = AI_SYSTEM_PROMPT.slice(AI_SYSTEM_PROMPT.indexOf('createAtemschutzTrupp'));
     expect(section).toContain('NICHT createTacticalUnit');
-    expect(section).toContain('createAssp');
+    expect(section).toContain('createMarker');
+    expect(section).not.toContain('createAssp');
+  });
+});
+
+describe('zusammengelegte Werkzeuge', () => {
+  const byName = (name: string) => AI_TOOL_DECLARATIONS.find((d) => d.name === name);
+  const names = AI_TOOL_DECLARATIONS.map((d) => d.name);
+
+  it('legt EL und ASSP über createMarker an', () => {
+    expect(names).not.toContain('createEl');
+    expect(names).not.toContain('createAssp');
+    const kind = (byName('createMarker')?.parameters as unknown as LooseSchema)
+      .properties?.kind;
+    expect(kind?.enum).toEqual(['marker', 'el', 'assp']);
+  });
+
+  it('rechnet den Strahlenschutz mit einem Werkzeug', () => {
+    expect(names.filter((n) => n.startsWith('calculateStrahlenschutz'))).toEqual([
+      'calculateStrahlenschutz',
+    ]);
+    const params = byName('calculateStrahlenschutz')?.parameters as unknown as LooseSchema;
+    expect(params.properties?.formel?.enum).toEqual([
+      'abstand',
+      'schutzwert',
+      'aufenthaltszeit',
+      'nuklid',
+    ]);
+    expect(params.required).toEqual(['formel']);
+  });
+
+  it('nennt die alten Namen nicht mehr im Systemprompt', () => {
+    for (const name of [
+      'createEl',
+      'createAssp',
+      'calculateStrahlenschutzAbstand',
+      'calculateStrahlenschutzSchutzwert',
+      'calculateStrahlenschutzAufenthaltszeit',
+      'calculateStrahlenschutzNuklid',
+    ]) {
+      expect(AI_SYSTEM_PROMPT).not.toMatch(new RegExp(`\\b${name}\\b`));
+    }
+  });
+});
+
+describe('Seite bei nearItem', () => {
+  it('bietet an der Position eine Richtung an', () => {
+    const position = (
+      AI_TOOL_DECLARATIONS.find((d) => d.name === 'updateItem')
+        ?.parameters as unknown as LooseSchema
+    ).properties?.updates?.properties?.position;
+    // Dieselbe Liste, die `resolveOrigin` auflösen kann — Seiten und
+    // Himmelsrichtungen.
+    expect(position?.properties?.direction?.enum).toEqual(DIRECTIONS);
+    expect(DIRECTIONS).toContain('northeast');
+    expect(position?.properties?.distance?.type).toBeDefined();
+  });
+
+  it('verlangt im Systemprompt die Richtung und einen neuen Aufruf bei Korrektur', () => {
+    expect(AI_SYSTEM_PROMPT).toMatch(/direction left\/right\/above\/below/);
+    expect(AI_SYSTEM_PROMPT).toMatch(/Korrektur wie "nein, links" ist ein neuer Werkzeugaufruf/);
+  });
+});
+
+describe('Drehung per updateItem', () => {
+  it('bietet einen Winkel und eine relative Drehung an', () => {
+    const updates = (
+      AI_TOOL_DECLARATIONS.find((d) => d.name === 'updateItem')
+        ?.parameters as unknown as LooseSchema
+    ).properties?.updates?.properties;
+    expect(updates?.rotation?.type).toBeDefined();
+    expect(updates?.rotateBy?.type).toBeDefined();
+    expect(AI_SYSTEM_PROMPT).toMatch(/nach rechts drehen" = rotateBy 45/);
+  });
+});
+
+describe('Ebenen und Messwerte', () => {
+  const params = (name: string) =>
+    AI_TOOL_DECLARATIONS.find((d) => d.name === name)?.parameters as unknown as LooseSchema;
+
+  it('nimmt an createMarker und updateItem Ebene und Werte mit Einheit', () => {
+    for (const props of [
+      params('createMarker').properties,
+      params('updateItem').properties?.updates?.properties,
+    ]) {
+      expect(props?.layer?.type).toBeDefined();
+      expect(Object.keys(props?.values?.items?.properties ?? {})).toEqual([
+        'field',
+        'value',
+        'unit',
+      ]);
+    }
+  });
+
+  it('bietet an updateItem die Felder der Elementtypen an', () => {
+    const updates = params('updateItem').properties?.updates?.properties ?? {};
+    for (const feld of ['fw', 'besatzung', 'eintreffen', 'durchfluss', 'radius', 'zeichen']) {
+      expect(updates).toHaveProperty(feld);
+    }
+  });
+
+  it('verlangt im Prompt die gesagte Einheit statt einer eigenen Umrechnung', () => {
+    expect(AI_SYSTEM_PROMPT).toMatch(/Rechne nicht selbst um/);
+    expect(AI_SYSTEM_PROMPT).toMatch(/activeLayer/);
+  });
+});
+
+describe('Überblick im Kontext, Details über findItems', () => {
+  it('bietet findItems an und verweist im Prompt darauf', () => {
+    const find = AI_TOOL_DECLARATIONS.find((d) => d.name === 'findItems');
+    const props = (find?.parameters as unknown as LooseSchema).properties ?? {};
+    for (const key of ['type', 'name', 'layer', 'field', 'min', 'unit', 'position', 'radius', 'sort']) {
+      expect(props).toHaveProperty(key);
+    }
+    expect(AI_SYSTEM_PROMPT).toMatch(/Der Kontext ist ein Überblick/);
+    expect(AI_SYSTEM_PROMPT).not.toMatch(/existingItems mit allen aktuellen Elementen/);
+  });
+});
+
+describe('editLayer', () => {
+  it('legt an oder ändert, mit Datenfeldern samt Typ und Formel', () => {
+    const decl = AI_TOOL_DECLARATIONS.find((d) => d.name === 'editLayer');
+    const schema = decl?.parameters as unknown as LooseSchema;
+    expect(schema.properties?.action?.enum).toEqual(['create', 'update']);
+    const field = schema.properties?.fields?.items?.properties ?? {};
+    for (const key of ['field', 'label', 'unit', 'type', 'formula', 'defaultValue']) {
+      expect(field).toHaveProperty(key);
+    }
+    expect(field.type?.enum).toEqual(['number', 'text', 'boolean', 'computed']);
+    expect(AI_SYSTEM_PROMPT).toMatch(/editLayer action create/);
   });
 });
