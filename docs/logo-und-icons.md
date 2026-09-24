@@ -39,6 +39,9 @@ Erzeugt werden:
   sind im Entwurf weiß und würden freigestellt in einer dunklen Tableiste
   verschwinden.
 - Android: Launcher-, Round- und Adaptive-Vordergrund sowie alle Splash-Größen.
+- `docs/design/vorschau-icons.png`: ein Übersichtsblatt der erzeugten Icons zur
+  Durchsicht. Es entsteht im selben Lauf, damit man nie ein veraltetes Blatt
+  begutachtet.
 
 Die Kachel in `launcher.jpeg` hat abgerundete Ecken. Das Skript schneidet deshalb
 nur einen festen Ausschnitt innerhalb der Kachel aus (`region` in `whiteArtwork()`).

@@ -12,7 +12,9 @@
  * home screen. The dev environment gets its own web set with a "DEV" band
  * (see appIconPath() in src/common/appEnvironment.ts).
  *
- * The outputs are committed; run this only after changing the logo:
+ * It also writes docs/design/vorschau-icons.png, a contact sheet of the
+ * results for review. The outputs are committed; run this only after changing
+ * the logo:
  *
  *   npm run icons
  */
@@ -311,6 +313,60 @@ async function androidSet(white: Cutout): Promise<void> {
   }
 }
 
+/** Contact sheet of the generated icons, so a review never looks at stale files. */
+async function previewSheet(): Promise<void> {
+  const tile = 240;
+  const gap = 20;
+  const res = (path: string) => join(ANDROID_RES, path);
+  const fit = (file: string, background?: string) => {
+    const image = sharp(file).resize(tile, tile, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    });
+    return (background ? image.flatten({ background }) : image).png().toBuffer();
+  };
+  // The adaptive foreground as a circular launcher mask would show it.
+  const circle = Buffer.from(
+    `<svg width="${tile}" height="${tile}"><circle cx="${tile / 2}" cy="${tile / 2}" r="${tile / 2}" fill="${PRIMARY_HEX}"/></svg>`,
+  );
+  const adaptive = await sharp(circle)
+    .composite([
+      { input: await fit(res('mipmap-xxxhdpi/ic_launcher_foreground.png')) },
+      { input: circle, blend: 'dest-in' },
+    ])
+    .png()
+    .toBuffer();
+  const rows: Buffer[][] = [
+    [
+      await fit(join(BRAND_DIR, 'icon-512.png')),
+      await fit(join(BRAND_DIR, 'icon-maskable-512.png')),
+      await fit(join(BRAND_DIR, 'dev/icon-512.png')),
+      await fit(res('mipmap-xxxhdpi/ic_launcher.png')),
+      await fit(res('mipmap-xxxhdpi/ic_launcher_round.png')),
+      await sharp(res('drawable-port-xxxhdpi/splash.png')).resize({ height: tile }).png().toBuffer(),
+    ],
+    [
+      adaptive,
+      await fit(join(BRAND_DIR, 'logo-weiss.png'), PRIMARY_HEX),
+      await fit(join(BRAND_DIR, 'logo.png'), '#202124'),
+    ],
+  ];
+  const cells = rows.flatMap((row, y) =>
+    row.map((input, x) => ({ input, left: gap + x * (tile + gap), top: gap + y * (tile + gap) })),
+  );
+  await sharp({
+    create: {
+      width: 6 * (tile + gap) + gap,
+      height: rows.length * (tile + gap) + gap,
+      channels: 3,
+      background: '#eeeeee',
+    },
+  })
+    .composite(cells)
+    .png()
+    .toFile(join(DESIGN_DIR, 'vorschau-icons.png'));
+}
+
 async function main(): Promise<void> {
   const colour = await colourArtwork();
   const white = await whiteArtwork();
@@ -324,6 +380,7 @@ async function main(): Promise<void> {
   // Browsers and crawlers ask for /favicon.ico without reading any <link>.
   await write(join(ROOT, 'public/favicon.ico'), await favicon(colour));
   await androidSet(white);
+  await previewSheet();
 }
 
 await main();
