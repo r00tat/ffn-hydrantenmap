@@ -7,6 +7,7 @@ import {
   LiveServerToolCallCancellation,
   LiveSessionResumptionUpdate,
 } from 'firebase/ai';
+import { ConversationExchange, describeToolCall } from './assistantMemory';
 import { AiAssistantResult } from './types';
 
 /** Was `LiveConnection.receive()` liefert. */
@@ -42,6 +43,11 @@ export interface LiveConversationDeps {
   onHeard?: (text: string) => void;
   /** Ein Beitrag des Modells ist abgeschlossen. */
   onTurn?: (result: AiAssistantResult) => void;
+  /**
+   * Derselbe Beitrag fürs Protokoll des Gedächtnisses: was gehört wurde, was
+   * geantwortet wurde und welche Werkzeuge liefen.
+   */
+  onExchange?: (exchange: ConversationExchange) => void;
   /** Die Sitzung ist zu Ende — der Strom ist versiegt. */
   onEnd?: () => void;
 }
@@ -80,6 +86,7 @@ export async function runLiveConversation({
   onPartialAnswer,
   onHeard,
   onTurn,
+  onExchange,
   onEnd,
 }: LiveConversationDeps): Promise<void> {
   onStatus?.('listening');
@@ -91,6 +98,8 @@ export async function runLiveConversation({
   let lastToolResult: AiAssistantResult | null = null;
   let drafts: AiAssistantResult['drafts'];
   let spoken = false;
+  /** Die Werkzeuge des laufenden Beitrags, fürs Protokoll. */
+  let tools: string[] = [];
   /**
    * Ein Werkzeugaufruf beendet den laufenden Sprecherwechsel; das Modell
    * spricht erst im nächsten. Dieses `turnComplete` ist also kein Beitrag und
@@ -151,6 +160,7 @@ export async function runLiveConversation({
 
       const responses: FunctionResponse[] = [];
       for (const call of functionCalls) {
+        tools.push(describeToolCall(call));
         const result = await executeTool(call);
         console.info(`[AI-Live] Werkzeugergebnis (${call.name}):`, {
           success: result.success,
@@ -198,6 +208,11 @@ export async function runLiveConversation({
         // Sprachsynthese des Browsers würde den Satz doppelt bringen.
         spokenByModel: spoken,
       });
+      onExchange?.({
+        heard: heard.trim(),
+        answer: message || lastToolResult?.message || '',
+        ...(tools.length > 0 ? { tools } : {}),
+      });
     }
 
     transcript = '';
@@ -205,6 +220,7 @@ export async function runLiveConversation({
     lastToolResult = null;
     drafts = undefined;
     spoken = false;
+    tools = [];
     onStatus?.('listening');
   }
 }

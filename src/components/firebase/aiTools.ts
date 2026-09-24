@@ -850,6 +850,36 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'remember',
+    description:
+      'Remember something for the rest of this Einsatz on this device, beyond the end of ' +
+      'the conversation, or forget it again. Only when the user explicitly asks ' +
+      '("merk dir", "ab jetzt", "für alle weiteren", "vergiss"). The notes are in ' +
+      'context.memory.notes.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        action: {
+          type: SchemaType.STRING,
+          enum: ['add', 'remove', 'clear'],
+          description: 'add = new note, remove = forget one note, clear = forget all notes',
+        },
+        text: {
+          type: SchemaType.STRING,
+          description:
+            'For add: the note in German as a standing instruction, e.g. "Weitere ' +
+            'Messwerte gehören zu Trupp 1 und kommen in die Ebene 7". For remove: ' +
+            'words of the note to forget',
+        },
+        noteId: {
+          type: SchemaType.STRING,
+          description: 'For remove: id of the note from context.memory.notes',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'findItems',
     description:
       'Look up items of this Einsatz with their details: coordinates, times, ' +
@@ -1036,6 +1066,21 @@ Ebenen und Messwerte:
   - Abschirmung/Schutzwert -> formel schutzwert
   - Aufenthaltszeit bei einer bestimmten Dosis -> formel aufenthaltszeit
   - Dosisleistung eines Nuklids (Aktivität) -> formel nuklid
+
+Gedächtnis (context.memory, fehlt, solange nichts gemerkt ist):
+- memory.notes sind stehende Vorgaben des Benutzers für diesen Einsatz. Wende sie
+  bei jedem passenden Befehl an, bis sie widerrufen werden - z.B. "Weitere
+  Messwerte gehören zu Trupp 1 und kommen in die Ebene 7": bei jeder Messung layer
+  "Ebene 7" nennen und Trupp 1 dort eintragen, wo es passt (Datenfeld, sonst
+  Beschreibung). Nennt der Benutzer im Satz etwas anderes, gilt der Satz.
+- remember nur auf ausdrückliche Bitte: "merk dir", "ab jetzt", "für alle
+  weiteren" = action add, die Notiz als Anweisung an dich selbst formuliert.
+  "Vergiss das mit Trupp 1" = action remove, "vergiss alles" = action clear.
+  Merke dir nie etwas aus eigenem Antrieb.
+- memory.previousConversation ist das Protokoll des vorigen Gesprächs, nur als
+  Bezug für "wie vorhin" oder "nochmal dasselbe". Führe daraus nichts erneut aus,
+  ohne dass es verlangt wird, und behaupte nichts als erledigt, was nicht im
+  Einsatz steht.
 
 Der Kontext ist ein Überblick, nicht der ganze Einsatz:
 - existingItems: die benannten Elemente ohne Koordinaten und Messwerte -

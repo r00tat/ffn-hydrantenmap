@@ -2455,7 +2455,12 @@
     "draftAdded": "{count, plural, one {Hose line added} other {# hose lines added}}",
     "draftFailed": "Hose line could not be created",
     "draftConfirmAll": "Apply all {count}",
-    "draftDiscardAll": "Discard all"
+    "draftDiscardAll": "Discard all",
+    "memoryTitle": "Remembered notes",
+    "memoryButton": "{count, plural, one {One remembered note} other {# remembered notes}}",
+    "memoryHint": "Apply to this operation on this device until forgotten. Add new notes by voice: \"Remember …\"",
+    "memoryForget": "Forget",
+    "memoryForgetAll": "Forget all"
   },
   "blaulichtSms": {
     "title": "Alarm SMS",

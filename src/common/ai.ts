@@ -88,4 +88,6 @@ export const CONVERSATION_PROMPT =
   'abzulegen — ein halb verstandener Satz wird nie zum Tagebucheintrag. ' +
   'Antworte kurz, in einem oder zwei Sätzen, und in ganzen Worten ohne ' +
   'Aufzählungszeichen — deine Antwort wird vorgelesen. ' +
-  'Der Kartenkontext liegt dir vor und wird nach jeder Änderung aufgefrischt.';
+  'Der Kartenkontext liegt dir vor und wird nach jeder Änderung aufgefrischt. ' +
+  'Stehen darin unter memory.notes Notizen, nenne sie in deiner ersten Antwort ' +
+  'in einem kurzen Satz, damit der Benutzer weiß, was noch gilt.';

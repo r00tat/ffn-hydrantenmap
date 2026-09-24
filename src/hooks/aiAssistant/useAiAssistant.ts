@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GenerateContentRequest, Content, GenerationConfig, ThinkingLevel } from 'firebase/ai';
 import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
@@ -9,6 +9,7 @@ import { AiAssistantResult, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types'
 import { stripInlineDataParts, stripMapContextParts } from './chatHistory';
 import { isUsableAudio } from './audioInput';
 import { LatencyRun, startLatencyRun, tokenDetail } from './latency';
+import { ConversationExchange, describeToolCall } from './assistantMemory';
 import useAiToolRunner from './useAiToolRunner';
 
 // Ohne eigenen Transkriptionsschritt gibt es keinen Zustand „transcribing" mehr:
@@ -31,11 +32,36 @@ const AI_GENERATION_CONFIG: GenerationConfig = {
 };
 
 export default function useAiAssistant(existingItems: FirecallItem[]) {
-  const { executeTool, buildContextText, contextStats, interactionsRef, lastCreatedItem, undoLastAction } =
-    useAiToolRunner(existingItems);
+  const {
+    executeTool,
+    buildContextText,
+    contextStats,
+    interactionsRef,
+    lastCreatedItem,
+    undoLastAction,
+    saveConversation,
+  } = useAiToolRunner(existingItems);
 
   const chatHistoryRef = useRef<Content[]>([]);
   const lastActivityRef = useRef<number>(0);
+  /**
+   * Protokoll fürs Gedächtnis. Der Einzelaufruf kennt kein „Gespräch
+   * beenden"; sein Gespräch endet, wenn die Historie verfällt.
+   */
+  const exchangesRef = useRef<ConversationExchange[]>([]);
+  const saveConversationRef = useRef(saveConversation);
+  useEffect(() => {
+    saveConversationRef.current = saveConversation;
+  }, [saveConversation]);
+
+  const flushConversation = useCallback(() => {
+    const exchanges = exchangesRef.current;
+    exchangesRef.current = [];
+    saveConversationRef.current(exchanges);
+  }, []);
+
+  // Wer die Karte verlässt, beendet das Gespräch auch.
+  useEffect(() => flushConversation, [flushConversation]);
 
   const [processingStatus, setProcessingStatus] = useState<AiProcessingStatus>('idle');
 
@@ -50,13 +76,14 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     if (hasMemory && Date.now() - lastActivityRef.current > MEMORY_TIMEOUT_MS) {
       chatHistoryRef.current = [];
       interactionsRef.current = [];
+      flushConversation();
     }
 
     // Also limit the number of entries in the history to keep context window small
     if (chatHistoryRef.current.length > MAX_INTERACTIONS * 2) {
       chatHistoryRef.current = chatHistoryRef.current.slice(-MAX_INTERACTIONS * 2);
     }
-  }, [interactionsRef]);
+  }, [flushConversation, interactionsRef]);
 
   /**
    * Ende einer Interaktion festhalten. Erst ab hier zählt das Zeitfenster des
@@ -107,6 +134,16 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       // antwortet nach dem Tool-Call noch mit Text, und erst diese Antwort
       // erreicht die Oberfläche.
       let pendingDrafts: HoseLineDraft[] | undefined;
+      const tools: string[] = [];
+      // Einen gesprochenen Befehl gibt es hier nur als Ton; was verstanden
+      // wurde, zeigen dann die Werkzeuge und die Antwort.
+      const heard = userParts
+        .map((part) => ('text' in part && part.text !== VOICE_TURN_PROMPT ? part.text : ''))
+        .join(' ')
+        .trim();
+      const record = (answer: string) => {
+        exchangesRef.current.push({ heard, answer, ...(tools.length > 0 ? { tools } : {}) });
+      };
 
       try {
         while (iterations < MAX_LOOP_ITERATIONS) {
@@ -166,6 +203,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             chatHistoryRef.current = stripMapContextParts(currentContents);
 
             setProcessingStatus('idle');
+            record(text || lastResult?.message || '');
             return {
               success: true,
               message: text || lastResult?.message || 'Aktion ausgeführt',
@@ -180,6 +218,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
           for (const fc of functionCalls) {
             console.info(`[AI] Executing tool: ${fc.name}`, fc.args);
+            tools.push(describeToolCall(fc));
             const execResult = await run.phase(`werkzeug ${fc.name}`, () =>
               executeTool(fc)
             );
@@ -208,6 +247,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         // Meist steht die Antwort schon im letzten Werkzeugergebnis, und das
         // wegzuwerfen wäre für den Benutzer ein Fehlschlag ohne Grund.
         if (lastResult?.success) {
+          record(lastResult.message);
           return { ...lastResult, isAnswer: true, drafts: pendingDrafts };
         }
         return { success: false, message: 'Zu viele Verarbeitungsschritte' };

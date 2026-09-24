@@ -93,6 +93,7 @@ vi.mock('../../app/actions/aiLiveToken', () => ({
 }));
 
 import useAiLiveAssistant from './useAiLiveAssistant';
+import { loadMemory } from './assistantMemory';
 
 /** Ein Strom, der offen bleibt — wie eine laufende Sitzung. */
 function neverEnding() {
@@ -116,6 +117,31 @@ describe('useAiLiveAssistant', () => {
     startupChunks = [];
     micChunk = undefined;
     neverEnding();
+    localStorage.clear();
+  });
+
+  it('legt das Protokoll erst beim Beenden ins Gedächtnis', async () => {
+    let release: () => void = () => undefined;
+    session.receive.mockImplementation(async function* () {
+      yield { type: 'serverContent', inputTranscription: { text: 'Wie ist die Lage?' } };
+      yield { type: 'serverContent', outputTranscription: { text: 'Ruhig.' }, turnComplete: true };
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    });
+    const { result } = renderHook(() => useAiLiveAssistant([]));
+
+    await actAsync(() => result.current.startConversation());
+    await actAsync(async () => undefined);
+    // Während des Gesprächs bleibt das vorige stehen.
+    expect(loadMemory('test-firecall').lastConversation).toBeUndefined();
+
+    await actAsync(() => result.current.endConversation());
+    release();
+
+    expect(loadMemory('test-firecall').lastConversation?.exchanges).toEqual([
+      { heard: 'Wie ist die Lage?', answer: 'Ruhig.' },
+    ]);
   });
 
   it('eröffnet mit Kartenkontext und Gesprächsregeln', async () => {

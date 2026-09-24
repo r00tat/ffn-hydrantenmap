@@ -60,6 +60,7 @@ function makeDeps(overrides: Partial<ToolHandlerDeps> = {}): ToolHandlerDeps {
       success: true,
       message: 'Trupp 1 angelegt',
     })),
+    runMemoryCommand: vi.fn(() => ({ success: true, message: 'Gemerkt', notes: [] })),
     ...overrides,
   } as ToolHandlerDeps;
 }
@@ -1223,5 +1224,29 @@ describe('editLayer', () => {
       makeDeps({ layers: [strahlen] }),
     );
     expect(leer.message).toBe('Keine Änderung an der Ebene "Strahlenmessung" angegeben');
+  });
+});
+
+describe('remember', () => {
+  it('reicht die Aktion durch und gibt die Rückmeldung als Satz zurück', async () => {
+    const runMemoryCommand = vi.fn(() => ({
+      success: true,
+      message: 'Gemerkt: „Trupp 1".',
+      notes: [{ id: 'n1', text: 'Trupp 1' }],
+    }));
+    const deps = makeDeps({ runMemoryCommand });
+    const result = await executeToolCall(call('remember', { action: 'add', text: 'Trupp 1' }), deps);
+    expect(runMemoryCommand).toHaveBeenCalledWith({ action: 'add', text: 'Trupp 1' });
+    expect(result).toMatchObject({ success: true, message: 'Gemerkt: „Trupp 1".' });
+    expect(result.data).toEqual({ notes: [{ id: 'n1', text: 'Trupp 1' }] });
+    expect(result.createdItemId).toBeUndefined();
+  });
+
+  it('lehnt eine unbekannte Aktion ab, ohne zu schreiben', async () => {
+    const runMemoryCommand = vi.fn();
+    const deps = makeDeps({ runMemoryCommand });
+    const result = await executeToolCall(call('remember', { action: 'merken' }), deps);
+    expect(result.success).toBe(false);
+    expect(runMemoryCommand).not.toHaveBeenCalled();
   });
 });

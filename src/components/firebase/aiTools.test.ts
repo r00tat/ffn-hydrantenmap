@@ -216,6 +216,12 @@ describe('zusammengelegte Werkzeuge', () => {
   const byName = (name: string) => AI_TOOL_DECLARATIONS.find((d) => d.name === name);
   const names = AI_TOOL_DECLARATIONS.map((d) => d.name);
 
+  it('merkt sich mit einem Werkzeug für Anlegen, Löschen und Leeren', () => {
+    expect(names.filter((n) => /remember|memory|forget/i.test(n))).toEqual(['remember']);
+    const action = (byName('remember')?.parameters as unknown as LooseSchema).properties?.action;
+    expect(action?.enum).toEqual(['add', 'remove', 'clear']);
+  });
+
   it('legt EL und ASSP über createMarker an', () => {
     expect(names).not.toContain('createEl');
     expect(names).not.toContain('createAssp');

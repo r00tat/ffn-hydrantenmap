@@ -127,6 +127,13 @@ export function createServerToolDeps({
       success: false,
       message: 'Die Atemschutzüberwachung ist über den MCP-Zugang nicht erreichbar.',
     }),
+    // Das Gedächtnis des Sprach-Assistenten liegt im Browser eines Geräts; ein
+    // MCP-Client hat keins, und ein Speicher je Aufruf wäre keiner.
+    runMemoryCommand: () => ({
+      success: false,
+      message: 'Das Gedächtnis des Sprach-Assistenten ist über den MCP-Zugang nicht erreichbar.',
+      notes: [],
+    }),
     resolveOrigin,
     resolvePosition: async (positionSpec) => {
       const { lat, lng } = await resolveOrigin(positionSpec);

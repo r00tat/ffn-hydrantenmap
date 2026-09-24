@@ -18,6 +18,8 @@ import { useHoseLineDraft } from '../../hooks/useHoseLineDraft';
 import { FirecallItem } from '../firebase/firestore';
 import type { AiAssistantResult } from '../../hooks/aiAssistant/types';
 import AiActionToast, { AiToastState } from './AiActionToast';
+import AiMemoryNotes from './AiMemoryNotes';
+import { useFirecallId } from '../../hooks/useFirecall';
 import { speakMessage } from '../../common/speech';
 import { LatencyRun, startLatencyRun } from '../../hooks/aiAssistant/latency';
 
@@ -61,6 +63,7 @@ function playStopBeep() {
 
 export default function AiAssistantButton({ firecallItems, containerSx }: AiAssistantButtonProps) {
   const t = useTranslations('ai');
+  const firecallId = useFirecallId();
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
   const { processAudio, processText, undoLastAction, processingStatus } = useAiAssistant(firecallItems);
   const { confirmAllDrafts, discardAllDrafts } = useHoseLineDraft();
@@ -318,6 +321,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
             {statusText}
           </Typography>
         )}
+        <AiMemoryNotes firecallId={firecallId} />
         {live.isActive && (
           <Tooltip title="Fertig — jetzt antworten">
             <span>
