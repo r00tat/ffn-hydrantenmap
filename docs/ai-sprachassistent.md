@@ -238,12 +238,13 @@ an der Einsatzstelle das robustere Verfahren.
 
 ## Was der Einzelaufruf kann und die Live-Sitzung nicht
 
-- **Gedächtnis über die Sitzung hinaus.** Der Einzelaufruf hält eine Historie
+- **Historie über die Sitzung hinaus.** Der Einzelaufruf hält eine Historie
   über 15 Minuten (`MEMORY_TIMEOUT_MS`), damit „und wie weit ist das?" auch nach
   einer Pause noch dieselbe Sache meint. Das Live-Gespräch erinnert sich
-  innerhalb der Sitzung an alles, aber mit dem Beenden ist es vergessen. Die
-  Rückfrage-Optionen des Toasts laufen deshalb weiterhin über den Einzelaufruf
-  (`processText`).
+  innerhalb der Sitzung an alles; nach dem Beenden bleibt nur, was im
+  [Gedächtnis](#gedächtnis-notizen-und-das-vorige-gespräch) steht — Notizen und
+  ein gekürztes Protokoll, keine Historie. Die Rückfrage-Optionen des Toasts
+  laufen deshalb weiterhin über den Einzelaufruf (`processText`).
 - **Denkaufwand steuern.** `ThinkingLevel.LOW` gibt es nur beim Einzelaufruf;
   die Live-API nimmt derzeit keine Konfiguration dafür entgegen.
 
@@ -496,11 +497,66 @@ leeren Liste belastet. Über den MCP-Zugang sind die drei Werkzeuge ebenso
 ausgesperrt wie das Fahrtenbuch: Ein dort entsendeter Trupp hätte kein Gerät,
 das seine Warnungen abonniert.
 
+## Gedächtnis: Notizen und das vorige Gespräch
+
+„Merk dir: weitere Messwerte gehören zu Trupp 1 und kommen in die Ebene 7" soll
+auch im nächsten Gespräch noch gelten. Dafür gibt es zwei Dinge, beide in
+[assistantMemory.ts](../src/hooks/aiAssistant/assistantMemory.ts) und beide als
+`memory` im Kartenkontext:
+
+- **Notizen**, angelegt und gelöscht mit dem Werkzeug `remember` (`action`
+  `add`, `remove`, `clear`). Freier Text, höchstens 25. Ausgelegt werden sie
+  vom Modell, nicht vom Code: „Ebene 7" wird zu `layer` an `createMarker`, und
+  was dann geschieht — Ebene wählen, Einheit umrechnen, fehlende Ebene
+  nachfragen —, leistet der vorhandene Weg. Eine feste Zuordnung von Notiz zu
+  Feld hätte jede neue Art von Vorgabe zu einem Stück Code gemacht.
+- **Das vorige Gespräch**: die letzten zehn Wechsel mit Gehörtem, Antwort und
+  den Namen der Werkzeuge, gekürzt, ohne Argumente. Gebaut im Code aus den
+  Abschriften, die ohnehin vorliegen — kein Modellaufruf für eine
+  Zusammenfassung, und es klappt auch im Funkloch.
+
+Die Entscheidungen dahinter:
+
+- **localStorage, je Einsatz und Gerät.** Schlüssel `ffn.aiMemory.<einsatzId>`.
+  Mehrere Geräte hängen oft an einem Google-Account; „Trupp 1" auf dem einen
+  Tablet darf nicht auf dem anderen gelten. localStorage ist von sich aus je
+  Gerät — Firestore bräuchte dafür Regeln, einen Schreibzugriff je Notiz und
+  legte Gesprächsabschriften am Einsatz ab. Ruhende Einsätze werden nach sieben
+  Tagen beim Laden weggeräumt. Fehlt der Speicher (gesperrte Website-Daten),
+  sagt `remember` das, und alles andere läuft weiter.
+- **Nur auf ausdrückliche Bitte.** „Merk dir", „ab jetzt", „für alle weiteren".
+  Eine Vorgabe, die das Modell sich selbst ausgedacht hat, wirkt unbemerkt
+  weiter — genau der Fehler, den Messwerte in der falschen Ebene nicht
+  verzeihen. Aus demselben Grund nennt das Modell die Notizen in seiner
+  ersten Antwort (`CONVERSATION_PROMPT`), und der Knopf zeigt sie als
+  Abzeichen mit Liste zum Löschen
+  ([AiMemoryNotes.tsx](../src/components/Map/AiMemoryNotes.tsx)).
+- **Die 26. Notiz wird abgelehnt, nicht die älteste verdrängt.** Die
+  Rückmeldung nennt die vorhandenen, das Modell fragt nach.
+- **Das Protokoll wird erst am Ende gespeichert.** Die Live-Sitzung legt es
+  beim Beenden oder Abreißen ab, der Einzelaufruf, wenn seine Historie
+  verfällt, und beide beim Verlassen der Karte. Während des Gesprächs bleibt
+  damit das *vorige* im Kontext stehen, und der Kontext ändert sich nicht bei
+  jedem Wechsel — sonst ginge er nach jedem Satz erneut hinaus. Notizen
+  dagegen werden sofort geschrieben und im nächsten Nachreichen gesehen.
+- **Frisch gelesen.** `buildContextText` liest das Gedächtnis bei jedem Bau aus
+  localStorage statt aus dem React-Zustand. Der Einzelaufruf legt das
+  verfallene Gespräch im selben Aufruf ab, der den Kontext baut; mit dem
+  Zustand käme es erst einen Befehl später an.
+- **Nichts daraus wird wiederholt.** `previousConversation` ist Bezug für „wie
+  vorhin", keine Aufgabenliste. Der Systemprompt verbietet, daraus etwas
+  erneut auszuführen oder als erledigt zu behaupten, was nicht im Einsatz
+  steht.
+
+Über den MCP-Zugang gibt es kein Gedächtnis: Es gehört einem Gerät, und ein
+MCP-Client hat keins (`createServerToolDeps`). „Rückgängig" nimmt eine Notiz
+nicht zurück; dafür gibt es `remove`.
+
 ## Was gemeinsam bleibt
 
 [useAiToolRunner.ts](../src/hooks/aiAssistant/useAiToolRunner.ts) hält
-Positionsauflösung, Werkzeugausführung, Kartenkontext und das Gedächtnis über
-zuletzt angelegte Elemente. Beide Wege hängen daran, denn was ein
+Positionsauflösung, Werkzeugausführung, Kartenkontext, das Gedächtnis über
+zuletzt angelegte Elemente und den Zugang zu Notizen und Gesprächsprotokoll. Beide Wege hängen daran, denn was ein
 Werkzeugaufruf bewirkt, darf nicht davon abhängen, über welche Leitung er
 hereinkam.
 

@@ -3,7 +3,8 @@ import { FirecallItem, FirecallLayer } from '../../components/firebase/firestore
 import { isMeasurementLayer, itemTime } from './findItems';
 import { type AiContextLayer, projectLayer } from './layerFields';
 import type { AiTruppContext } from '../../components/Atemschutz/truppAssistant';
-import { AiContext, AiContextItem, AiInteraction } from './types';
+import type { AssistantMemory } from './assistantMemory';
+import { AiContext, AiContextItem, AiInteraction, AiMemoryContext } from './types';
 
 /**
  * Ebenen samt Datenfeldern und die aktive Ebene. Ohne Ebenen fehlt beides, wie
@@ -43,6 +44,23 @@ function ebenenKontext(
   };
 }
 
+/**
+ * Das Gedächtnis: Notizen ohne Zeitstempel, das vorige Gespräch unverändert.
+ * Ohne beides fehlt der Abschnitt, wie die Trupps.
+ */
+function gedaechtnisKontext(memory: AssistantMemory | undefined): { memory?: AiMemoryContext } {
+  if (!memory) return {};
+  const notes = memory.notes.map(({ id, text }) => ({ id, text }));
+  const previous = memory.lastConversation;
+  if (notes.length === 0 && !previous) return {};
+  return {
+    memory: {
+      notes,
+      ...(previous ? { previousConversation: previous } : {}),
+    },
+  };
+}
+
 /** Einträge statt Kartenelemente: wachsen im Einsatz ohne Grenze. */
 const ENTRY_TYPES = new Set(['diary', 'gb']);
 /** So viele Tagebucheinträge stehen im Kontext, der Rest über `findItems`. */
@@ -68,6 +86,7 @@ export function buildAiContext({
   trupps,
   layers = [],
   activeLayerId,
+  memory,
 }: {
   map: { getCenter: () => { lat: number; lng: number }; getBounds: () => any; getZoom: () => number } | null;
   defaultPosition: { lat: number; lng: number };
@@ -81,6 +100,8 @@ export function buildAiContext({
   layers?: FirecallLayer[];
   /** Zuletzt gewählte Ebene, dorthin kommen neue Marker ohne genannte Ebene. */
   activeLayerId?: string;
+  /** Notizen und voriges Gespräch dieses Geräts, siehe `assistantMemory`. */
+  memory?: AssistantMemory;
 }): AiContext {
   const center = map ? map.getCenter() : defaultPosition;
   const bounds = map ? map.getBounds() : null;
@@ -130,5 +151,6 @@ export function buildAiContext({
     // wo kein Atemschutz läuft, nicht wachsen.
     ...(trupps && trupps.length > 0 ? { atemschutzTrupps: trupps } : {}),
     ...ebenenKontext(layers, activeLayerId, live),
+    ...gedaechtnisKontext(memory),
   };
 }

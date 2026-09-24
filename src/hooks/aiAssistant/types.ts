@@ -1,5 +1,6 @@
 import { HoseLineDraft } from '../../common/waterSupply';
 import type { AiTruppContext } from '../../components/Atemschutz/truppAssistant';
+import type { ConversationExchange } from './assistantMemory';
 import type { AiContextLayer } from './layerFields';
 
 export interface AiInteraction {
@@ -37,6 +38,14 @@ export interface AiContextItem {
   kategorie?: string;
 }
 
+/** Was sich der Assistent auf diesem Gerät für den Einsatz gemerkt hat. */
+export interface AiMemoryContext {
+  /** Ausdrücklich angesagte Vorgaben; gelten, bis sie widerrufen werden. */
+  notes: { id: string; text: string }[];
+  /** Protokoll des vorigen Gesprächs — nur als Bezug, nie zum Wiederholen. */
+  previousConversation?: { endedAt: string; exchanges: ConversationExchange[] };
+}
+
 export interface AiContext {
   mapCenter: { lat: number; lng: number };
   mapBounds: {
@@ -63,6 +72,8 @@ export interface AiContext {
   layers?: AiContextLayer[];
   /** Name der aktiven Ebene — dorthin kommen neue Marker ohne genannte Ebene. */
   activeLayer?: string;
+  /** Notizen und voriges Gespräch; fehlt, solange nichts gemerkt ist. */
+  memory?: AiMemoryContext;
 }
 
 export interface AiAssistantResult {

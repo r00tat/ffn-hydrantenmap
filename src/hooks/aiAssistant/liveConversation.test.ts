@@ -36,6 +36,29 @@ function turnEnd(): LiveMessage {
 const ok: AiAssistantResult = { success: true, message: 'Fahrzeug angelegt' };
 
 describe('runLiveConversation', () => {
+  it('meldet jeden Wechsel fürs Protokoll mit Gehörtem und Werkzeugen', async () => {
+    const onExchange = vi.fn();
+
+    await runLiveConversation({
+      messages: stream(
+        heard('Neue Messung 40'),
+        toolCall({ name: 'createMarker', args: { name: 'Messung', lat: 47 } } as FunctionCall),
+        turnEnd(),
+        transcript('Messung eingetragen.', true),
+        heard('Danke'),
+        transcript('Gern.', true),
+      ),
+      executeTool: vi.fn(async () => ok),
+      sendFunctionResponses: vi.fn(),
+      onExchange,
+    });
+
+    expect(onExchange.mock.calls.map((call) => call[0])).toEqual([
+      { heard: 'Neue Messung 40', answer: 'Messung eingetragen.', tools: ['createMarker → Messung'] },
+      { heard: 'Danke', answer: 'Gern.' },
+    ]);
+  });
+
   it('meldet jeden Beitrag einzeln, ohne die Sitzung zu beenden', async () => {
     const onTurn = vi.fn();
 

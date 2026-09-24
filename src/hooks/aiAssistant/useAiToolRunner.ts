@@ -18,6 +18,13 @@ import useMapEditor from '../useMapEditor';
 import { useFirecall } from '../useFirecall';
 import { useHoseLineDraft } from '../useHoseLineDraft';
 import type { AssistantEntryCommand } from '../../components/Fahrtenbuch/assistantEntry';
+import {
+  ConversationExchange,
+  loadMemory,
+  MemoryCommand,
+  runMemoryCommand as runMemoryCommandFor,
+  saveConversation as saveConversationFor,
+} from './assistantMemory';
 import { buildAiContext } from './contextBuilder';
 import { MAP_CONTEXT_PREFIX } from './chatHistory';
 import { PositionSpec, resolveOriginFrom } from './resolveOrigin';
@@ -41,6 +48,12 @@ export interface AiToolRunner {
   interactionsRef: React.RefObject<AiInteraction[]>;
   lastCreatedItem: { id: string; type: string } | null;
   undoLastAction: () => Promise<boolean>;
+  /**
+   * Protokoll eines beendeten Gesprächs ins Gedächtnis legen. Erst am Ende:
+   * Während des Gesprächs bleibt das vorige im Kontext stehen, und der
+   * Kontext ändert sich nicht bei jedem Wechsel.
+   */
+  saveConversation: (exchanges: ConversationExchange[]) => void;
 }
 
 /**
@@ -149,6 +162,18 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
     [firecall.id],
   );
 
+  const runMemoryCommand = useCallback(
+    (command: MemoryCommand) => runMemoryCommandFor(firecall.id, command),
+    [firecall.id],
+  );
+
+  const saveConversation = useCallback(
+    (exchanges: ConversationExchange[]) => {
+      if (firecall.id) saveConversationFor(firecall.id, exchanges);
+    },
+    [firecall.id],
+  );
+
   const executeTool = useCallback(
     async (call: FunctionCall): Promise<AiAssistantResult> => {
       const result = await executeToolCall(call, {
@@ -170,6 +195,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
         createFahrtenbuchEntry,
         getFahrtenbuchCounters,
         runAtemschutzTruppCommand: runTruppCommand,
+        runMemoryCommand,
       });
 
       if (result.success) {
@@ -196,6 +222,7 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
       proposeDrafts,
       resolveOrigin,
       resolvePosition,
+      runMemoryCommand,
       runTruppCommand,
       setLastSelectedLayer,
       updateFirecallItem,
@@ -213,11 +240,25 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
       trupps: truppContext,
       layers,
       activeLayerId: lastSelectedLayer || undefined,
+      // Frisch gelesen statt aus dem React-Zustand: Der Einzelaufruf legt das
+      // verfallene Gespräch im selben Aufruf ab, der den Kontext baut, und die
+      // Live-Sitzung soll eine eben gemerkte Notiz im nächsten Nachreichen
+      // sehen, ohne auf einen Render zu warten.
+      memory: firecall.id ? loadMemory(firecall.id) : undefined,
     });
     // Kompakt statt eingerückt: Die Einrückung ist rund ein Drittel der
     // Zeichen und trägt für das Modell nichts bei (#740).
     return `${MAP_CONTEXT_PREFIX}\n${JSON.stringify(context)}`;
-  }, [existingItems, isPositionSet, lastSelectedLayer, layers, map, position, truppContext]);
+  }, [
+    existingItems,
+    firecall.id,
+    isPositionSet,
+    lastSelectedLayer,
+    layers,
+    map,
+    position,
+    truppContext,
+  ]);
 
   const contextStats = useCallback(
     () => ({ items: existingItems.filter((item) => !item.deleted).length }),
@@ -243,5 +284,6 @@ export default function useAiToolRunner(existingItems: FirecallItem[]): AiToolRu
     interactionsRef,
     lastCreatedItem,
     undoLastAction,
+    saveConversation,
   };
 }

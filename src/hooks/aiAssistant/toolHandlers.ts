@@ -28,6 +28,7 @@ import { applyFieldValues, findLayer, projectLayer, type SpokenFieldValue } from
 import { editLayerSchema, type SpokenFieldSpec } from './layerSchema';
 import { DIRECTION_LABELS, type PositionSpec } from './resolveOrigin';
 import { normalizeRotation } from '../../components/Map/markers/rotationGeometry';
+import type { MemoryCommand, MemoryCommandResult } from './assistantMemory';
 import { AiAssistantResult, ResolvedOrigin } from './types';
 import {
   calculateInverseSquareLaw,
@@ -118,6 +119,12 @@ export interface ToolHandlerDeps {
   runAtemschutzTruppCommand: (
     command: TruppCommand,
   ) => Promise<{ success: boolean; message: string }>;
+  /**
+   * Notizen des Gedächtnisses anlegen, löschen oder leeren. Das Gedächtnis
+   * gehört einem Gerät und einem Einsatz (`assistantMemory`); der Einsatz steht
+   * erst im Hook fest, deshalb als Abhängigkeit.
+   */
+  runMemoryCommand: (command: MemoryCommand) => MemoryCommandResult;
 }
 
 /**
@@ -365,6 +372,7 @@ export async function executeToolCall(
     createFahrtenbuchEntry,
     getFahrtenbuchCounters,
     runAtemschutzTruppCommand,
+    runMemoryCommand,
   } = deps;
 
   switch (call.name) {
@@ -727,6 +735,30 @@ export async function executeToolCall(
         }),
       );
       return { success: result.success, message: result.message };
+    }
+
+    case 'remember': {
+      const action = args.action;
+      if (action !== 'add' && action !== 'remove' && action !== 'clear') {
+        return {
+          success: false,
+          message: `Unbekannte Aktion „${String(action)}". Möglich: add, remove, clear.`,
+        };
+      }
+      const result = runMemoryCommand(
+        ohneLeere({
+          action,
+          text: args.text as string | undefined,
+          noteId: args.noteId as string | undefined,
+        }) as MemoryCommand,
+      );
+      // `createdItemId` bleibt leer: Eine Notiz ist kein Kartenelement, und
+      // „Rückgängig" nimmt sie nicht zurück — dafür gibt es `remove`.
+      return {
+        success: result.success,
+        message: result.message,
+        data: { notes: result.notes },
+      };
     }
 
     case 'askClarification':

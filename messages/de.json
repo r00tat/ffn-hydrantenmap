@@ -2455,7 +2455,12 @@
     "draftAdded": "{count, plural, one {Leitung übernommen} other {# Leitungen übernommen}}",
     "draftFailed": "Leitung konnte nicht angelegt werden",
     "draftConfirmAll": "Alle {count} übernehmen",
-    "draftDiscardAll": "Alle verwerfen"
+    "draftDiscardAll": "Alle verwerfen",
+    "memoryTitle": "Gemerkte Notizen",
+    "memoryButton": "{count, plural, one {Eine gemerkte Notiz} other {# gemerkte Notizen}}",
+    "memoryHint": "Gelten für diesen Einsatz auf diesem Gerät, bis sie vergessen werden. Neue Notizen per Sprache: „Merk dir …\"",
+    "memoryForget": "Vergessen",
+    "memoryForgetAll": "Alle vergessen"
   },
   "blaulichtSms": {
     "title": "Alarm-SMS-Einsätze",

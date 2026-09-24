@@ -39,6 +39,13 @@ function deps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('createServerToolDeps', () => {
+  it('sperrt das Gedächtnis des Sprach-Assistenten aus', () => {
+    // Das Gedächtnis liegt im Browser eines Geräts; ein MCP-Client hat keins.
+    const result = deps().runMemoryCommand({ action: 'add', text: 'Ebene 7' });
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('MCP');
+  });
+
   it('bildet keinen Kartenzustand ab', () => {
     const d = deps();
     expect(d.map).toBeNull();

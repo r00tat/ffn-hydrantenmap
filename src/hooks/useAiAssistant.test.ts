@@ -108,6 +108,7 @@ describe('useAiAssistant loop exhaustion', () => {
 
 describe('useAiAssistant Gedächtnis', () => {
   beforeEach(async () => {
+    localStorage.clear();
     const { geminiModel } = await import('../components/firebase/vertexai');
     (geminiModel.generateContent as any).mockReset();
   });
@@ -160,9 +161,39 @@ describe('useAiAssistant Gedächtnis', () => {
     nowSpy.mockReturnValue(1_000_000 + 5 * MEMORY_TIMEOUT_MS);
     await actAsync(() => result.current.processText('viel später'));
     const thirdRequest = (geminiModel.generateContent as any).mock.calls[2][0];
-    expect(JSON.stringify(thirdRequest.contents)).not.toContain('erster Befehl');
+    // Nur noch der neue Beitrag. Der erste Befehl steht höchstens noch als
+    // `previousConversation` im Kartenkontext — als Bezug, nicht als Historie.
+    expect(thirdRequest.contents.filter((c: { role: string }) => c.role === 'user')).toHaveLength(1);
 
     nowSpy.mockRestore();
+  });
+
+  it('legt das verfallene Gespräch ins Gedächtnis und gibt es als Bezug mit', async () => {
+    localStorage.clear();
+    await mockPlainAnswer('Verstanden');
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { MEMORY_TIMEOUT_MS } = await import('./aiAssistant/types');
+    const { loadMemory } = await import('./aiAssistant/assistantMemory');
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    const nowSpy = vi.spyOn(Date, 'now');
+
+    nowSpy.mockReturnValue(1_000_000);
+    await actAsync(() => result.current.processText('erster Befehl'));
+    // Solange das Gespräch läuft, wird nichts abgelegt.
+    expect(loadMemory('test-firecall').lastConversation).toBeUndefined();
+
+    nowSpy.mockReturnValue(1_000_000 + 5 * MEMORY_TIMEOUT_MS);
+    await actAsync(() => result.current.processText('viel später'));
+    nowSpy.mockRestore();
+
+    expect(loadMemory('test-firecall').lastConversation?.exchanges).toEqual([
+      { heard: 'erster Befehl', answer: 'Verstanden' },
+    ]);
+    const secondRequest = JSON.stringify(
+      (geminiModel.generateContent as any).mock.calls[1][0].contents,
+    );
+    expect(secondRequest).toContain('previousConversation');
   });
 
   it('rechnet das Zeitfenster ab dem Ende der Antwort, nicht ab ihrem Beginn', async () => {

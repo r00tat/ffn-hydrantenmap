@@ -127,3 +127,33 @@ describe('buildAiContext — Überblick statt aller Elemente', () => {
     expect(context.latestDiary[0]).not.toHaveProperty('beschreibung');
   });
 });
+
+describe('buildAiContext — Gedächtnis', () => {
+  const leer = { version: 1 as const, updatedAt: '2026-09-24T12:00:00Z', notes: [] };
+
+  it('lässt den Abschnitt weg, solange nichts gemerkt ist', () => {
+    expect(buildAiContext(basis)).not.toHaveProperty('memory');
+    expect(buildAiContext({ ...basis, memory: leer })).not.toHaveProperty('memory');
+  });
+
+  it('führt Notizen und das vorige Gespräch', () => {
+    const context = buildAiContext({
+      ...basis,
+      memory: {
+        ...leer,
+        notes: [{ id: 'n1', text: 'Messwerte: Trupp 1, Ebene 7', createdAt: '2026-09-24T12:00:00Z' }],
+        lastConversation: {
+          endedAt: '2026-09-24T12:30:00Z',
+          exchanges: [{ heard: 'Neue Messung 40', answer: 'Eingetragen', tools: ['createMarker'] }],
+        },
+      },
+    });
+    expect(context.memory).toEqual({
+      notes: [{ id: 'n1', text: 'Messwerte: Trupp 1, Ebene 7' }],
+      previousConversation: {
+        endedAt: '2026-09-24T12:30:00Z',
+        exchanges: [{ heard: 'Neue Messung 40', answer: 'Eingetragen', tools: ['createMarker'] }],
+      },
+    });
+  });
+});

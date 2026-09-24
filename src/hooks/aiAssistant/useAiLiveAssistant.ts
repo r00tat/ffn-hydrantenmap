@@ -10,6 +10,7 @@ import {
 } from './liveAudio';
 import { connectLiveSession, LiveConnection } from './liveConnection';
 import { LiveConversationStatus, runLiveConversation } from './liveConversation';
+import type { ConversationExchange } from './assistantMemory';
 import { AiAssistantResult } from './types';
 import useAiToolRunner from './useAiToolRunner';
 
@@ -21,6 +22,12 @@ export type AiLiveStatus = 'idle' | LiveConversationStatus;
  * ist ein Riegel gegen unbegrenzten Speicherverbrauch, keine erwartete Länge.
  */
 const MAX_PENDING_CHUNKS = 300;
+
+/** Die Wechsel eines Gesprächs, bis sie beim Beenden ins Gedächtnis gehen. */
+interface ConversationLog {
+  exchanges: ConversationExchange[];
+  saved: boolean;
+}
 
 export interface AiLiveCallbacks {
   /** Ein abgeschlossener Beitrag des Modells. */
@@ -55,7 +62,7 @@ export default function useAiLiveAssistant(
   existingItems: FirecallItem[],
   callbacks: AiLiveCallbacks = {},
 ) {
-  const { executeTool, buildContextText, lastCreatedItem, undoLastAction } =
+  const { executeTool, buildContextText, lastCreatedItem, undoLastAction, saveConversation } =
     useAiToolRunner(existingItems);
 
   const sessionRef = useRef<LiveConnection | null>(null);
@@ -64,6 +71,21 @@ export default function useAiLiveAssistant(
   /** Zuletzt gesendeter Kartenkontext — verhindert unnötige Wiederholungen. */
   const sentContextRef = useRef<string | null>(null);
   const [status, setStatus] = useState<AiLiveStatus>('idle');
+  const conversationLogRef = useRef<ConversationLog | null>(null);
+  const saveConversationRef = useRef(saveConversation);
+  useEffect(() => {
+    saveConversationRef.current = saveConversation;
+  }, [saveConversation]);
+
+  /**
+   * Das Protokoll eines Gesprächs ablegen — genau einmal, egal ob der Benutzer
+   * beendet, die Verbindung abreißt oder ein neues Gespräch das alte ablöst.
+   */
+  const saveLog = useCallback((log: ConversationLog | null) => {
+    if (!log || log.saved) return;
+    log.saved = true;
+    saveConversationRef.current(log.exchanges);
+  }, []);
 
   // Die Rückrufe wandern in ein Ref, damit die laufende Schleife immer die
   // aktuellen erwischt: Sie startet einmal und läuft das ganze Gespräch lang,
@@ -92,13 +114,15 @@ export default function useAiLiveAssistant(
     playbackRef.current = null;
     sessionRef.current = null;
     sentContextRef.current = null;
+    saveLog(conversationLogRef.current);
+    conversationLogRef.current = null;
 
     await capture?.stop().catch(() => undefined);
     await playback?.close().catch(() => undefined);
     if (session && !session.isClosed) {
       await session.close().catch(() => undefined);
     }
-  }, []);
+  }, [saveLog]);
 
   useEffect(() => {
     return () => {
@@ -192,6 +216,9 @@ export default function useAiLiveAssistant(
       throw error;
     }
 
+    const log: ConversationLog = { exchanges: [], saved: false };
+    conversationLogRef.current = log;
+
     // Läuft für sich weiter, bis die Sitzung endet — deshalb kein `await`.
     void runLiveConversation({
       messages: session.receive(),
@@ -210,12 +237,16 @@ export default function useAiLiveAssistant(
           void sendContext(session).catch(() => undefined);
         }
       },
-      onEnd: () => setStatus('idle'),
+      onExchange: (exchange) => log.exchanges.push(exchange),
+      onEnd: () => {
+        saveLog(log);
+        setStatus('idle');
+      },
     }).catch((error) => {
       console.error('[AI] Live-Gespräch abgebrochen:', error);
       setStatus('idle');
     });
-  }, [cleanup, sendContext]);
+  }, [cleanup, saveLog, sendContext]);
 
   /**
    * „Ich bin fertig" — schließt den gesprochenen Beitrag sofort, statt auf die
