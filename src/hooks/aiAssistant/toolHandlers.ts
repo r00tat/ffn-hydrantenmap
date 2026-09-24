@@ -23,6 +23,7 @@ import type { TruppCommand } from '../../components/Atemschutz/truppAssistant';
 import { TRUPP_STATUSES, type TruppStatus } from '../../common/atemschutz';
 import { findFirecallItemByName } from './itemLookup';
 import { EDITABLE_FIELDS } from './editableFields';
+import { findItems, type FindItemsQuery } from './findItems';
 import { applyFieldValues, findLayer, type SpokenFieldValue } from './layerFields';
 import { DIRECTION_LABELS, type PositionSpec } from './resolveOrigin';
 import { normalizeRotation } from '../../components/Map/markers/rotationGeometry';
@@ -710,6 +711,44 @@ export async function executeToolCall(
           options: args.options as string[],
         },
       };
+
+    case 'findItems': {
+      const center = args.position
+        ? await resolveOrigin(args.position as PositionSpec)
+        : undefined;
+      const result = findItems(
+        existingItems,
+        layers,
+        {
+          type: args.type as string | undefined,
+          name: args.name as string | undefined,
+          layer: args.layer as string | undefined,
+          field: args.field as string | undefined,
+          min: args.min as number | undefined,
+          max: args.max as number | undefined,
+          unit: args.unit as string | undefined,
+          radius: args.radius as number | undefined,
+          sort: args.sort as FindItemsQuery['sort'],
+          limit: args.limit as number | undefined,
+        },
+        center,
+      );
+      if (result.error) return { success: false, message: result.error };
+      return {
+        success: true,
+        message:
+          result.total === 0
+            ? 'Keine passenden Elemente gefunden'
+            : result.total > result.items.length
+              ? `${result.total} Treffer, die ersten ${result.items.length} in data`
+              : `${result.total} Treffer in data`,
+        data: {
+          total: result.total,
+          items: result.items,
+          ...(center ? { origin: originInfo(center) } : {}),
+        },
+      };
+    }
 
     case 'answerQuestion':
       return {

@@ -314,3 +314,15 @@ describe('Ebenen und Messwerte', () => {
     expect(AI_SYSTEM_PROMPT).toMatch(/activeLayer/);
   });
 });
+
+describe('Überblick im Kontext, Details über findItems', () => {
+  it('bietet findItems an und verweist im Prompt darauf', () => {
+    const find = AI_TOOL_DECLARATIONS.find((d) => d.name === 'findItems');
+    const props = (find?.parameters as unknown as LooseSchema).properties ?? {};
+    for (const key of ['type', 'name', 'layer', 'field', 'min', 'unit', 'position', 'radius', 'sort']) {
+      expect(props).toHaveProperty(key);
+    }
+    expect(AI_SYSTEM_PROMPT).toMatch(/Der Kontext ist ein Überblick/);
+    expect(AI_SYSTEM_PROMPT).not.toMatch(/existingItems mit allen aktuellen Elementen/);
+  });
+});

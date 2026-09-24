@@ -762,6 +762,50 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'findItems',
+    description:
+      'Look up items of this Einsatz with their details: coordinates, times, ' +
+      'measured values, diary text. The context only holds an overview without ' +
+      'coordinates, measurement points or older diary entries - use this before ' +
+      'answering a question that needs those details. Read-only',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        type: {
+          type: SchemaType.STRING,
+          description: 'Item type, e.g. vehicle, marker, rohr, diary, gb, tacticalUnit, circle',
+        },
+        name: {
+          type: SchemaType.STRING,
+          description: 'Part of the name, fire department or description',
+        },
+        layer: { type: SchemaType.STRING, description: 'Name of the layer (context.layers)' },
+        field: {
+          type: SchemaType.STRING,
+          description: 'Data field of the layer to filter or sort by, e.g. "dosisleistung"',
+        },
+        min: { type: SchemaType.NUMBER, description: 'Only values of field at least this' },
+        max: { type: SchemaType.NUMBER, description: 'Only values of field at most this' },
+        unit: {
+          type: SchemaType.STRING,
+          description: 'Unit of min/max as spoken, e.g. "µSv/h"; converted to the unit of the field',
+        },
+        position: positionSchema,
+        radius: {
+          type: SchemaType.NUMBER,
+          description: 'Only items within this many meters of position',
+        },
+        sort: {
+          type: SchemaType.STRING,
+          enum: ['newest', 'nearest', 'highest', 'lowest'],
+          description:
+            'newest first (default), nearest to position, highest or lowest value of field',
+        },
+        limit: { type: SchemaType.NUMBER, description: 'How many items, default 10, max 50' },
+      },
+    },
+  },
+  {
     name: 'answerQuestion',
     description:
       'Answer a question. Use this whenever the user asks something rather than giving ' +
@@ -879,6 +923,11 @@ Ebenen und Messwerte:
 - Meldet das Werkzeug ein fehlendes Feld oder eine fehlende Ebene, frage nach und
   nenne die vorhandenen.
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
+- findItems: Elemente mit Details nachsehen, bevor du antwortest, wenn die Antwort
+  Koordinaten, Messwerte, Tagebuchtext oder ältere Einträge braucht ("Welche
+  Messungen liegen über 10 µSv/h?" = findItems mit field, min, unit; "höchste
+  Messung" = sort highest; "Was steht im Umkreis von 50 m?" = position und radius;
+  "Was wurde um 14 Uhr gemeldet?" = type diary). Danach answerQuestion.
 - calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)
 - Strahlenschutz-Berechnungen: Verwende calculateStrahlenschutz, nicht calculate. Wähle die Formel:
   - Dosisleistung in einem anderen Abstand -> formel abstand
@@ -886,12 +935,16 @@ Ebenen und Messwerte:
   - Aufenthaltszeit bei einer bestimmten Dosis -> formel aufenthaltszeit
   - Dosisleistung eines Nuklids (Aktivität) -> formel nuklid
 
-Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Details:
-- Fahrzeuge: Name, Feuerwehr (fw), Besatzung, ATS-Geräte, Alarmierung, Eintreffen, Abrücken
-- Rohre: Name, Art (C/B/Wasserwerfer), Durchfluss in l/min
-- Tagebuch: Inhalt, Art (M=Meldung, B=Befehl, F=Feststellung), Von, An, Datum
-- Geschäftsbuch: Inhalt, Ausgehend/Eingehend, Von, An, Datum
-- Taktische Einheiten: Name, Art (Trupp/Gruppe/Zug/Abschnitt/etc.), Feuerwehr, Mannschaftsstärke, Einheitsführer, ATS-Träger
+Der Kontext ist ein Überblick, nicht der ganze Einsatz:
+- existingItems: die benannten Elemente ohne Koordinaten und Messwerte -
+  Fahrzeuge mit Feuerwehr (fw), Besatzung, ATS, Alarmierung, Eintreffen, Abrücken;
+  Rohre mit Art und Durchfluss; taktische Einheiten mit Art, Feuerwehr, Stärke.
+- itemCounts: Anzahl je Typ, auch von allem, was nicht im Überblick steht.
+- latestDiary: die letzten Einträge im Einsatztagebuch, ohne Text.
+- layers: bei Messebenen nur measurements (Anzahl) und latest (letzte Messung);
+  die einzelnen Messpunkte fehlen.
+Was dort fehlt, holst du mit findItems. Behaupte nie, es gebe etwas nicht, nur
+weil es nicht im Überblick steht.
 
 Für Referenzen auf bestehende Elemente nutze itemName oder itemId.
 

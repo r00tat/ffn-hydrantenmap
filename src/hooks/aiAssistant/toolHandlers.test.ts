@@ -1055,3 +1055,27 @@ describe('zeitpunkt', () => {
     expect(zeitpunkt('gestern irgendwann', now)).toBeUndefined();
   });
 });
+
+describe('findItems', () => {
+  it('gibt die Treffer in data zurück und nennt den Bezugspunkt', async () => {
+    const result = await executeToolCall(
+      call('findItems', { type: 'vehicle', position: { type: 'einsatzort' }, radius: 50 }),
+      makeDeps({
+        existingItems: [
+          { id: 'v', type: 'vehicle', name: 'TLFA', lat: einsatzort.lat, lng: einsatzort.lng },
+          { id: 'w', type: 'vehicle', name: 'KLF', lat: einsatzort.lat + metersToLat(500), lng: einsatzort.lng },
+        ] as never,
+      }),
+    );
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('1 Treffer in data');
+    expect(result.data.items.map((i: { id: string }) => i.id)).toEqual(['v']);
+    expect(result.data.origin).toEqual({ type: 'einsatzort', label: 'dem Einsatzort' });
+  });
+
+  it('meldet einen Fehler der Abfrage als Misserfolg', async () => {
+    const result = await executeToolCall(call('findItems', { layer: 'Süd' }), makeDeps());
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/Ebene "Süd" nicht gefunden/);
+  });
+});

@@ -27,6 +27,10 @@ export interface AiContextLayer {
   id: string;
   name: string;
   fields?: { key: string; label: string; unit?: string; type: string }[];
+  /** Nur bei Messebenen: Zahl der Messpunkte, die nicht im Kontext stehen. */
+  measurements?: number;
+  /** Nur bei Messebenen: der jüngste Messpunkt. */
+  latest?: { id: string; name: string; fieldData?: Record<string, FieldValue> };
 }
 
 export function projectLayer(layer: FirecallLayer): AiContextLayer {

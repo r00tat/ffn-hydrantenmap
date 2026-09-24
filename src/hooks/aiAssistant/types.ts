@@ -32,6 +32,9 @@ export interface AiContextItem {
   radius?: number;
   color?: string;
   beschreibung?: string;
+  layer?: string;
+  rotation?: number;
+  kategorie?: string;
 }
 
 export interface AiContext {
@@ -43,7 +46,15 @@ export interface AiContext {
     west: number;
   };
   zoomLevel: number;
+  /**
+   * Überblick: benannte Elemente ohne Koordinaten und Messwerte. Messpunkte
+   * und ältere Tagebucheinträge fehlen, Details liefert `findItems`.
+   */
   existingItems: AiContextItem[];
+  /** Anzahl je Elementtyp, einschließlich allem, was nicht im Überblick steht. */
+  itemCounts: Record<string, number>;
+  /** Die jüngsten Einträge im Einsatztagebuch, ohne Text. */
+  latestDiary: AiContextItem[];
   userPosition: { lat: number; lng: number } | null;
   recentInteractions: AiInteraction[];
   /** Laufende Atemschutztrupps; fehlt, solange es keine gibt. */

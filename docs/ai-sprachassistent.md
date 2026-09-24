@@ -346,8 +346,8 @@ ISO, wie der Dialog.
 
 Eine Ebene kann Datenfelder haben (`dataSchema`: Schlüssel, Bezeichnung,
 Einheit, Typ, auch berechnete Felder), die Werte liegen am Element in
-`fieldData`. Der Kontext führt die Ebenen mit ihren Feldern, am Element Ebene
-und Werte, und `activeLayer`. `createMarker` und `updateItem` nehmen `layer`
+`fieldData`. Der Kontext führt die Ebenen mit ihren Feldern und `activeLayer`;
+die Werte der Messpunkte holt das Modell mit `findItems` (siehe unten). `createMarker` und `updateItem` nehmen `layer`
 und `values`; die Logik steht in
 [layerFields.ts](../src/hooks/aiAssistant/layerFields.ts).
 
@@ -369,9 +369,39 @@ und `values`; die Logik steht in
   unlesbar, wird nichts angelegt; die Rückmeldung nennt die vorhandenen
   Ebenen bzw. Felder, damit das Modell nachfragen kann.
 
-Ebene und `fieldData` stehen damit auch in der Projektion des MCP-Servers. Eine
-Messreihe mit vielen Punkten macht den Kontext größer; das ist der Preis dafür,
-dass „die letzte Messung war 40" zugeordnet werden kann.
+Ebene und `fieldData` stehen damit auch in der Projektion des MCP-Servers.
+
+## Der Kontext ist ein Überblick, Details holt `findItems`
+
+Früher lag jedes Element mit Koordinaten im Kontext. Das trägt nicht: eine
+Messreihe hat schnell hundert Punkte, das Einsatztagebuch wächst über Stunden,
+und beides geht in der Live-Sitzung bei jedem neuen Element erneut hinaus.
+Deshalb trägt der Kontext ([contextBuilder.ts](../src/hooks/aiAssistant/contextBuilder.ts))
+nur noch, was für Zuordnung und Rückfragen nötig ist:
+
+- `existingItems`: die benannten Elemente — Fahrzeuge, Marker, Leitungen —
+  mit ID, Namen und Feldern, aber **ohne** Koordinaten und `fieldData`. Das
+  reicht, damit „das TLFA" auf eine ID auflöst; Positionen rechnet ohnehin
+  `resolveOrigin` im Code, nicht das Modell.
+- `itemCounts`: wie viele Elemente je Typ es gibt, auch die nicht geführten.
+- `latestDiary`: die fünf jüngsten Tagebucheinträge ohne Text, damit
+  „der letzte Eintrag" und Anschlussfragen funktionieren.
+- `layers`: Messebenen (mit Datenfeldern oder Radiacode) nur als Zahl der
+  Punkte und jüngster Punkt mit seinen Werten — „die letzte Messung war 40"
+  bleibt so ohne Abfrage zuordenbar. Ihre Punkte fehlen in `existingItems`.
+
+Alles andere fragt das Modell mit `findItems` ab
+([findItems.ts](../src/hooks/aiAssistant/findItems.ts)): nach Typ, Text (Name,
+Feuerwehr, Beschreibung), Ebene, Feldwert mit Grenzen und Umkreis um eine
+Position, sortiert nach neu, nah, höchstem oder niedrigstem Wert, höchstens 50
+Treffer. Die Treffer kommen mit Koordinaten, `fieldData` und Tagebuchtext.
+Grenzen in einer anderen Einheit („über 10 mSv/h") rechnet derselbe
+`convertUnit` wie beim Setzen in die Einheit des Felds, je Ebene — zwei
+Ebenen können dasselbe Feld in verschiedenen Einheiten führen.
+
+Der Prompt sagt dem Modell ausdrücklich, dass der Kontext unvollständig ist
+und es nie behaupten darf, etwas gebe es nicht, nur weil es im Überblick fehlt.
+Der MCP-Server bekommt `findItems` nicht; dort gibt es schon `list_items`.
 
 ## Werkzeuge, die die Karte verlassen
 

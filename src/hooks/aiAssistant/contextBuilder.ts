@@ -1,6 +1,7 @@
 import { projectFirecallItem } from '../../common/mcp/itemDto';
 import { FirecallItem, FirecallLayer } from '../../components/firebase/firestore';
-import { projectLayer } from './layerFields';
+import { isMeasurementLayer, itemTime } from './findItems';
+import { type AiContextLayer, projectLayer } from './layerFields';
 import type { AiTruppContext } from '../../components/Atemschutz/truppAssistant';
 import { AiContext, AiContextItem, AiInteraction } from './types';
 
@@ -8,14 +9,53 @@ import { AiContext, AiContextItem, AiInteraction } from './types';
  * Ebenen samt Datenfeldern und die aktive Ebene. Ohne Ebenen fehlt beides, wie
  * die Trupps — der Kontext geht bei jedem Zug hinaus.
  */
-function ebenenKontext(layers: FirecallLayer[], activeLayerId: string | undefined) {
+function ebenenKontext(
+  layers: FirecallLayer[],
+  activeLayerId: string | undefined,
+  items: FirecallItem[],
+) {
   const live = layers.filter((l) => !l.deleted && l.id);
   if (live.length === 0) return {};
   const active = live.find((l) => l.id === activeLayerId);
   return {
-    layers: live.map(projectLayer),
+    layers: live.map((layer): AiContextLayer => {
+      const projected = projectLayer(layer);
+      if (!isMeasurementLayer(layer)) return projected;
+      const punkte = items
+        .filter((i) => i.layer === layer.id)
+        .sort((a, b) => itemTime(b) - itemTime(a));
+      const latest = punkte[0];
+      return {
+        ...projected,
+        measurements: punkte.length,
+        ...(latest
+          ? {
+              latest: {
+                id: latest.id!,
+                name: latest.name,
+                ...(latest.fieldData ? { fieldData: latest.fieldData } : {}),
+              },
+            }
+          : {}),
+      };
+    }),
     ...(active ? { activeLayer: active.name } : {}),
   };
+}
+
+/** Einträge statt Kartenelemente: wachsen im Einsatz ohne Grenze. */
+const ENTRY_TYPES = new Set(['diary', 'gb']);
+/** So viele Tagebucheinträge stehen im Kontext, der Rest über `findItems`. */
+const LATEST_DIARY = 5;
+
+/**
+ * Ein Element im Überblick: die Projektion des MCP-Servers ohne Koordinaten
+ * und Messwerte. Wohin „neben das TLFA" führt, rechnet der Code; das Modell
+ * braucht die Koordinaten dafür nicht.
+ */
+function overviewItem(item: FirecallItem): AiContextItem {
+  const { lat, lng, fieldData, ...rest } = projectFirecallItem(item);
+  return rest;
 }
 
 export function buildAiContext({
@@ -45,11 +85,29 @@ export function buildAiContext({
   const center = map ? map.getCenter() : defaultPosition;
   const bounds = map ? map.getBounds() : null;
 
-  // Dieselbe Projektion wie der MCP-Server (`projectFirecallItem`): Was der
-  // Browser-Assistent im Kontext sieht und was ein externer Client über MCP
-  // bekommt, soll nicht auseinanderlaufen.
-  const contextItems: AiContextItem[] = existingItems
-    .filter((i) => !i.deleted)
+  const live = existingItems.filter((i) => !i.deleted);
+  const messebenen = new Set(
+    layers.filter((l) => !l.deleted && isMeasurementLayer(l)).map((l) => l.id),
+  );
+  const istMesspunkt = (item: FirecallItem) =>
+    !!item.layer && messebenen.has(item.layer);
+
+  const itemCounts: Record<string, number> = {};
+  for (const item of live) {
+    itemCounts[item.type] = (itemCounts[item.type] ?? 0) + 1;
+  }
+
+  // Der Überblick: alles, was man beim Namen nennt. Messpunkte und das
+  // Tagebuch wachsen im Einsatz unbegrenzt und stehen deshalb nicht darin —
+  // Details holt das Modell mit `findItems`.
+  const contextItems: AiContextItem[] = live
+    .filter((i) => !ENTRY_TYPES.has(i.type) && !istMesspunkt(i))
+    .map(overviewItem);
+
+  const latestDiary: AiContextItem[] = live
+    .filter((i) => i.type === 'diary')
+    .sort((a, b) => itemTime(b) - itemTime(a))
+    .slice(0, LATEST_DIARY)
     .map((item) => projectFirecallItem(item));
 
   return {
@@ -64,11 +122,13 @@ export function buildAiContext({
       : { north: center.lat, south: center.lat, east: center.lng, west: center.lng },
     zoomLevel: map ? map.getZoom() : 15,
     existingItems: contextItems,
+    itemCounts,
+    latestDiary,
     userPosition: isPositionSet ? { lat: position.lat, lng: position.lng } : null,
     recentInteractions: interactions,
     // Nur mit Trupps: Der Kontext geht bei jedem Zug hinaus und soll dort,
     // wo kein Atemschutz läuft, nicht wachsen.
     ...(trupps && trupps.length > 0 ? { atemschutzTrupps: trupps } : {}),
-    ...ebenenKontext(layers, activeLayerId),
+    ...ebenenKontext(layers, activeLayerId, live),
   };
 }
