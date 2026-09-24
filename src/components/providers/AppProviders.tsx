@@ -3,6 +3,7 @@
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import { SessionProvider } from 'next-auth/react';
 import dynamic from 'next/dynamic';
@@ -30,6 +31,7 @@ import FirecallProvider from './FirecallProvider';
 import HoseLineDraftProvider from './HoseLineDraftProvider';
 import MapEditorProvider from './MapEditorProvider';
 import SnackbarProvider from './SnackbarProvider';
+import { appTheme } from './theme';
 
 const PositionProvider = dynamic(() => import('./PositionProvider'), {
   ssr: false,
@@ -162,35 +164,37 @@ export default function AppProviders({ children }: AppProps) {
   // Vorbild: `OneTapLoginUnlessPublic` weiter oben. Ein Fehler hier bricht die
   // Gastseite still: kein Test schlägt fehl, kein Linter warnt.
   return (
-    <Suspense
-      fallback={
-        <Typography>
-          Loading ... <CircularProgress />
-        </Typography>
-      }
-    >
-      <ErrorBoundary>
-        <SessionProvider>
-          <FirebaseUserProvider>
-            <SnackbarProvider>
-              <ServiceWorkerUpdateListener />
-              <CapacitorBackButton />
-              <OfflineWarning />
-              <DebugLoggingProvider>
-                <div className={`${styles.container} print-content-root`}>
-                  <CssBaseline enableColorScheme />
-                  <OneTapLoginUnlessPublic />
-                  <SettingsRedirectDialogProvider>
-                    <PermissionOnboardingProvider>
-                      <AuthorizationApp>{children}</AuthorizationApp>
-                    </PermissionOnboardingProvider>
-                  </SettingsRedirectDialogProvider>
-                </div>
-              </DebugLoggingProvider>
-            </SnackbarProvider>
-          </FirebaseUserProvider>
-        </SessionProvider>
-      </ErrorBoundary>
-    </Suspense>
+    <ThemeProvider theme={appTheme}>
+      <Suspense
+        fallback={
+          <Typography>
+            Loading ... <CircularProgress />
+          </Typography>
+        }
+      >
+        <ErrorBoundary>
+          <SessionProvider>
+            <FirebaseUserProvider>
+              <SnackbarProvider>
+                <ServiceWorkerUpdateListener />
+                <CapacitorBackButton />
+                <OfflineWarning />
+                <DebugLoggingProvider>
+                  <div className={`${styles.container} print-content-root`}>
+                    <CssBaseline enableColorScheme />
+                    <OneTapLoginUnlessPublic />
+                    <SettingsRedirectDialogProvider>
+                      <PermissionOnboardingProvider>
+                        <AuthorizationApp>{children}</AuthorizationApp>
+                      </PermissionOnboardingProvider>
+                    </SettingsRedirectDialogProvider>
+                  </div>
+                </DebugLoggingProvider>
+              </SnackbarProvider>
+            </FirebaseUserProvider>
+          </SessionProvider>
+        </ErrorBoundary>
+      </Suspense>
+    </ThemeProvider>
   );
 }

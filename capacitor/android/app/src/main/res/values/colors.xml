@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Farben des Logos, wie im MUI-Theme der Web-App (src/components/providers/theme.ts) -->
+    <color name="colorPrimary">#1976D2</color>
+    <color name="colorPrimaryDark">#1565C0</color>
+    <color name="colorAccent">#D32F2F</color>
+</resources>

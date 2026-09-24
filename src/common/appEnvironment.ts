@@ -29,3 +29,13 @@ export function isDevEnvironment(): boolean {
 export function withEnvironmentPrefix(title: string): string {
   return isDevEnvironment() ? `${DEV_TITLE_PREFIX}${title}` : title;
 }
+
+/**
+ * Pfad eines App-Icons der aktuellen Umgebung. In dev tragen alle Icons ein
+ * DEV-Band, damit eine installierte Dev-PWA auch am Icon und nicht nur am
+ * (auf dem Homescreen oft abgeschnittenen) Namen erkennbar ist. Erzeugt von
+ * `scripts/buildIcons.mts` aus den Entwürfen in `docs/design/`.
+ */
+export function appIconPath(file: string): string {
+  return isDevEnvironment() ? `/brand/dev/${file}` : `/brand/${file}`;
+}

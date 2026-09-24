@@ -71,7 +71,7 @@ function severityVon(hinweis: Hinweis): 'warning' | 'error' {
 async function zeige(meldung: Meldung): Promise<void> {
   const optionen = {
     body: meldung.body,
-    icon: '/app-icon.png',
+    icon: '/brand/icon-192.png',
     tag: meldung.tag,
     renotify: true,
     // Der Rückzugszeitpunkt ist eine Sicherheitsmeldung und darf nicht von

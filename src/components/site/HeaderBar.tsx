@@ -12,6 +12,7 @@ import Toolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import Link from 'next/link';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -20,6 +21,7 @@ import { useIsReadOnlyFirecallGuest } from '../../hooks/useFirecallWriteAccess';
 import useMapEditor from '../../hooks/useMapEditor';
 import { FirecallHistory } from '../firebase/firestore';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
+import { BRAND_ACCENT } from '../providers/theme';
 import HistoryDialog from './HistoryDialog';
 
 function HeaderBar({
@@ -50,7 +52,10 @@ function HeaderBar({
   return (
     <>
       <Box sx={{ flexShrink: 0 }}>
-        <AppBar position="static">
+        <AppBar
+          position="static"
+          sx={{ borderBottom: `3px solid ${BRAND_ACCENT}` }}
+        >
           <Toolbar>
             {isSignedIn && (
               <IconButton
@@ -64,6 +69,16 @@ function HeaderBar({
                 <MenuIcon />
               </IconButton>
             )}
+            {/* Dekorativ: der App-Titel steht daneben (ab sm) bzw. im
+                Tab-Titel. Auch auf dem Handy sichtbar, wo der Titel fehlt. */}
+            <Image
+              src="/brand/logo-weiss.png"
+              alt=""
+              width={36}
+              height={36}
+              priority
+              style={{ flexShrink: 0, marginRight: 8 }}
+            />
             <Box
               sx={{
                 flexGrow: 1,

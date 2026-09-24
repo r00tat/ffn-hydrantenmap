@@ -21,7 +21,7 @@ describe('Web-Manifest', () => {
     expect(short_name).toBe(`${DEV_TITLE_PREFIX}Einsatzkarte`);
   });
 
-  it('lässt Installationsverhalten und Icons unberührt', () => {
+  it('lässt das Installationsverhalten unberührt', () => {
     vi.stubEnv('NEXT_PUBLIC_FIRESTORE_DB', 'ffndev');
     expect(manifest()).toMatchObject({
       theme_color: '#1976d2',
@@ -29,7 +29,40 @@ describe('Web-Manifest', () => {
       display: 'standalone',
       scope: '/',
       start_url: '/',
-      icons: [{ src: '/app-icon.png', sizes: '144x144', type: 'image/png' }],
     });
+  });
+
+  it('liefert in prod die Icons mit weißem Hintergrund, auch maskable', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIRESTORE_DB', '');
+    expect(manifest().icons).toEqual([
+      {
+        src: '/brand/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/brand/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/brand/icon-maskable-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+    ]);
+  });
+
+  it('liefert in dev die Icons mit DEV-Band', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIRESTORE_DB', 'ffndev');
+    const sources = manifest().icons?.map((icon) => icon.src);
+    expect(sources).toEqual([
+      '/brand/dev/icon-192.png',
+      '/brand/dev/icon-512.png',
+      '/brand/dev/icon-maskable-512.png',
+    ]);
   });
 });
