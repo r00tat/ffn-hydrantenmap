@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeSchemaTypes } from '../../common/aiLiveToken';
 import { TRUPP_STATUSES } from '../../common/atemschutz';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from './aiTools';
+import { DIRECTIONS } from '../../hooks/aiAssistant/resolveOrigin';
 
 /** Die Schema-Typen, die die Gemini-API kennt — großgeschrieben wie im Draht. */
 const SCHEMA_TYPES = new Set([
@@ -257,12 +258,10 @@ describe('Seite bei nearItem', () => {
       AI_TOOL_DECLARATIONS.find((d) => d.name === 'updateItem')
         ?.parameters as unknown as LooseSchema
     ).properties?.updates?.properties?.position;
-    expect(position?.properties?.direction?.enum).toEqual([
-      'left',
-      'right',
-      'above',
-      'below',
-    ]);
+    // Dieselbe Liste, die `resolveOrigin` auflösen kann — Seiten und
+    // Himmelsrichtungen.
+    expect(position?.properties?.direction?.enum).toEqual(DIRECTIONS);
+    expect(DIRECTIONS).toContain('northeast');
     expect(position?.properties?.distance?.type).toBeDefined();
   });
 

@@ -92,3 +92,34 @@ describe('resolveOriginFrom — nearItem mit Richtung', () => {
     expect(ohneTlf.type).toBe('mapCenter');
   });
 });
+
+describe('resolveOriginFrom — Himmelsrichtungen und Bezug über ID', () => {
+  it('setzt nordöstlich schräg, im genannten Abstand', async () => {
+    const no = await resolveOriginFrom(
+      { type: 'nearItem', itemName: 'TLFA', direction: 'northeast', distance: 10 },
+      context,
+    );
+    const cos = Math.cos((tlfa.lat! * Math.PI) / 180);
+    const nord = (no.lat - tlfa.lat!) * meters;
+    const ost = (no.lng - tlfa.lng!) * meters * cos;
+    expect(nord).toBeCloseTo(10 * Math.SQRT1_2, 6);
+    expect(ost).toBeCloseTo(10 * Math.SQRT1_2, 6);
+  });
+
+  it('setzt südwestlich in die Gegenrichtung', async () => {
+    const sw = await resolveOriginFrom(
+      { type: 'nearItem', itemName: 'TLFA', direction: 'southwest' },
+      context,
+    );
+    expect(sw.lat).toBeLessThan(tlfa.lat!);
+    expect(sw.lng).toBeLessThan(tlfa.lng!);
+  });
+
+  it('findet den Bezug über itemId vor dem Namen', async () => {
+    const origin = await resolveOriginFrom(
+      { type: 'atItem', itemId: 'tlf', itemName: 'TLFA' },
+      context,
+    );
+    expect(origin).toMatchObject({ lat: tlf.lat, lng: tlf.lng, label: '"TLF"' });
+  });
+});

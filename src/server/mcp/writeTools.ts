@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { isTruthy } from '../../common/boolish';
 import type { FirecallItem } from '../../components/firebase/firestore';
+import { DIRECTIONS } from '../../hooks/aiAssistant/resolveOrigin';
 import { executeToolCall } from '../../hooks/aiAssistant/toolHandlers';
 import { authorizationMessage, authorizeFirecall } from './authorizeFirecall';
 import { loadFirecallItems, loadFirecallLayers } from './firecallData';
@@ -56,9 +57,12 @@ const positionSchema = z
     address: z.string().optional(),
     itemName: z.string().optional(),
     direction: z
-      .enum(['left', 'right', 'above', 'below'])
+      .enum(DIRECTIONS as [string, ...string[]])
       .optional()
-      .describe('Seite des Elements bei "nearItem", auf der genordeten Karte'),
+      .describe(
+        'Seite (left/right/above/below) oder Himmelsrichtung (north … southwest) ' +
+          'vom Element bei "nearItem", auf der genordeten Karte',
+      ),
     distance: z
       .number()
       .positive()

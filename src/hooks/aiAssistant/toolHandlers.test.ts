@@ -1079,3 +1079,48 @@ describe('findItems', () => {
     expect(result.message).toMatch(/Ebene "Süd" nicht gefunden/);
   });
 });
+
+describe('createMarker — Lage vom zuletzt angelegten Punkt', () => {
+  it('bezieht nearItem ohne Namen auf das zuletzt angelegte Element und nennt die Lage', async () => {
+    const resolveOrigin = vi.fn(async () => ({
+      lat: 47.1,
+      lng: 16.1,
+      type: 'nearItem',
+      label: '"Messung"',
+    }));
+    const deps = makeDeps({
+      resolveOrigin,
+      lastCreatedItem: { id: 'p1', type: 'marker' },
+    });
+    const result = await executeToolCall(
+      call('createMarker', {
+        name: 'Messung',
+        position: { type: 'nearItem', direction: 'northeast', distance: 10 },
+      }),
+      deps,
+    );
+    expect(resolveOrigin).toHaveBeenCalledWith({
+      type: 'nearItem',
+      direction: 'northeast',
+      distance: 10,
+      itemId: 'p1',
+    });
+    expect(deps.addFirecallItem).toHaveBeenCalledWith(
+      expect.objectContaining({ lat: 47.1, lng: 16.1 }),
+    );
+    expect(result.message).toBe('Marker "Messung" erstellt 10 m nordöstlich von "Messung"');
+  });
+
+  it('sagt, wenn der Bezug fehlte, statt eine Lage zu behaupten', async () => {
+    const result = await executeToolCall(
+      call('createMarker', {
+        name: 'Messung',
+        position: { type: 'nearItem', direction: 'north', distance: 10 },
+      }),
+      makeDeps(),
+    );
+    expect(result.message).toBe(
+      'Marker "Messung" erstellt an dem Einsatzort (Bezugselement nicht gefunden)',
+    );
+  });
+});

@@ -308,13 +308,36 @@ function ebeneFehlt(name: string, layers: FirecallLayer[]): string {
 function positionHinweis(spec: PositionSpec, origin: ResolvedOrigin): string {
   if (origin.type === 'nearItem') {
     const seite = (spec.direction && DIRECTION_LABELS[spec.direction]) || 'neben';
-    return `${seite} ${origin.label}`;
+    const abstand = spec.distance && spec.distance > 0 ? `${spec.distance} m ` : '';
+    return `${abstand}${seite} ${origin.label}`;
   }
   if (origin.type === 'atItem') return `auf ${origin.label}`;
-  if ((spec.type === 'nearItem' || spec.type === 'atItem') && spec.itemName) {
-    return `an ${origin.label} (Element "${spec.itemName}" nicht gefunden)`;
+  if (spec.type === 'nearItem' || spec.type === 'atItem') {
+    const bezug = spec.itemName ? `Element "${spec.itemName}"` : 'Bezugselement';
+    return `an ${origin.label} (${bezug} nicht gefunden)`;
   }
   return `an ${origin.label}`;
+}
+
+/**
+ * `nearItem`/`atItem` ohne Namen meint das zuletzt angelegte Element —
+ * „weiterer Messpunkt 10 m nordöstlich". Ohne diese Zuordnung fiele die
+ * Angabe still auf den Rückfall, und alle Punkte lägen übereinander.
+ */
+function mitBezug(
+  spec: PositionSpec | undefined,
+  lastCreatedItem: { id: string } | null,
+): PositionSpec | undefined {
+  if (
+    spec &&
+    (spec.type === 'nearItem' || spec.type === 'atItem') &&
+    !spec.itemName?.trim() &&
+    !spec.itemId &&
+    lastCreatedItem
+  ) {
+    return { ...spec, itemId: lastCreatedItem.id };
+  }
+  return spec;
 }
 
 export async function executeToolCall(
@@ -376,7 +399,9 @@ export async function executeToolCall(
         return { success: false, message: felder.errors.join('; ') };
       }
 
-      const pos = await resolvePosition(args.position as any);
+      const spec = mitBezug(args.position as PositionSpec | undefined, lastCreatedItem);
+      const origin = await resolveOrigin(spec);
+      const pos = { lat: origin.lat, lng: origin.lng };
       const name = (args.name as string) || fallbackName;
       const inEbene = layer
         ? { layer: layer.id, ...(felder ? { fieldData: felder.fieldData } : {}) }
@@ -402,6 +427,7 @@ export async function executeToolCall(
           `${label} "${name}"` +
           (layer ? ` in Ebene "${layer.name}"` : '') +
           ' erstellt' +
+          (spec ? ` ${positionHinweis(spec, origin)}` : '') +
           (felder?.applied.length ? `: ${felder.applied.join(', ')}` : ''),
         createdItemId: ref.id,
         createdItemType: kind,
@@ -409,7 +435,7 @@ export async function executeToolCall(
     }
 
     case 'createVehicle': {
-      const pos = await resolvePosition(args.position as any);
+      const pos = await resolvePosition(mitBezug(args.position as PositionSpec, lastCreatedItem));
       const ref = await addFirecallItem({
         type: 'vehicle',
         name: (args.name as string) || 'Fahrzeug',
@@ -434,7 +460,7 @@ export async function executeToolCall(
     }
 
     case 'createRohr': {
-      const pos = await resolvePosition(args.position as any);
+      const pos = await resolvePosition(mitBezug(args.position as PositionSpec, lastCreatedItem));
       const ref = await addFirecallItem({
         type: 'rohr',
         name: (args.name as string) || 'Rohr',
@@ -474,7 +500,7 @@ export async function executeToolCall(
     }
 
     case 'createCircle': {
-      const pos = await resolvePosition(args.position as any);
+      const pos = await resolvePosition(mitBezug(args.position as PositionSpec, lastCreatedItem));
       const ref = await addFirecallItem({
         type: 'circle',
         name: (args.name as string) || 'Kreis',
@@ -487,7 +513,7 @@ export async function executeToolCall(
     }
 
     case 'createTacticalUnit': {
-      const pos = await resolvePosition(args.position as any);
+      const pos = await resolvePosition(mitBezug(args.position as PositionSpec, lastCreatedItem));
       const ref = await addFirecallItem({
         type: 'tacticalUnit',
         name: (args.name as string) || 'Einheit',

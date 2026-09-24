@@ -33,6 +33,11 @@ export interface OriginContext {
 export interface PositionSpec {
   type: string;
   itemName?: string;
+  /**
+   * Bezugselement über seine ID — gesetzt vom Handler, wenn das Modell
+   * `nearItem` ohne Namen schickt („10 m nordöstlich" vom letzten Punkt).
+   */
+  itemId?: string;
   address?: string;
   lat?: number;
   lng?: number;
@@ -52,22 +57,42 @@ const NEAR_ITEM_DISTANCE = 20;
 const METERS_PER_DEGREE = 111320;
 
 /**
- * Versatz in Grad je Richtung. Die Karte ist genordet, links ist also
- * Westen — so, wie der Benutzer die Karte vor sich sieht.
+ * Versatz je Richtung als Einheitsvektor. Die Karte ist genordet, links ist
+ * also Westen — so, wie der Benutzer die Karte vor sich sieht. Neben den
+ * Seiten gibt es die acht Himmelsrichtungen, weil Messpunkte so angesagt
+ * werden („10 m nordöstlich").
  */
 const DIRECTION_VECTORS: Record<string, { north: number; east: number }> = {
   left: { north: 0, east: -1 },
   right: { north: 0, east: 1 },
   above: { north: 1, east: 0 },
   below: { north: -1, east: 0 },
+  north: { north: 1, east: 0 },
+  south: { north: -1, east: 0 },
+  east: { north: 0, east: 1 },
+  west: { north: 0, east: -1 },
+  northeast: { north: Math.SQRT1_2, east: Math.SQRT1_2 },
+  northwest: { north: Math.SQRT1_2, east: -Math.SQRT1_2 },
+  southeast: { north: -Math.SQRT1_2, east: Math.SQRT1_2 },
+  southwest: { north: -Math.SQRT1_2, east: -Math.SQRT1_2 },
 };
 
-/** Für die Antwort: „links neben", „oberhalb von". */
+export const DIRECTIONS = Object.keys(DIRECTION_VECTORS);
+
+/** Für die Antwort: „links neben", „nordöstlich von". */
 export const DIRECTION_LABELS: Record<string, string> = {
   left: 'links neben',
   right: 'rechts neben',
   above: 'oberhalb von',
   below: 'unterhalb von',
+  north: 'nördlich von',
+  south: 'südlich von',
+  east: 'östlich von',
+  west: 'westlich von',
+  northeast: 'nordöstlich von',
+  northwest: 'nordwestlich von',
+  southeast: 'südöstlich von',
+  southwest: 'südwestlich von',
 };
 
 function nearItemOffset(
@@ -116,10 +141,12 @@ export async function resolveOriginFrom(
 
     case 'atItem':
     case 'nearItem': {
-      const target = findFirecallItemByName(
-        existingItems.filter((i) => i.id !== positionSpec.excludeItemId),
-        positionSpec.itemName,
+      const candidates = existingItems.filter(
+        (i) => i.id !== positionSpec.excludeItemId && !i.deleted,
       );
+      const target = positionSpec.itemId
+        ? candidates.find((i) => i.id === positionSpec.itemId)
+        : findFirecallItemByName(candidates, positionSpec.itemName);
       if (target?.lat && target?.lng) {
         // `nearItem` setzt daneben (zum Platzieren neuer Elemente), `atItem`
         // genau darauf (als Bezugspunkt einer Messung).
