@@ -143,6 +143,10 @@ module.exports = async () => {
         {
           pathname: '/FFND_logo.png',
         },
+        {
+          // Logo in Kopfleiste und Login-Seite, siehe docs/logo-und-icons.md
+          pathname: '/brand/**',
+        },
       ],
       remotePatterns: [
         {
