@@ -314,6 +314,16 @@ selbst. `updateItem` meldet zurück, wohin das Element kam („links neben
 seine Antwort; eine Verschiebung ohne Aufruf zu behaupten, verbietet der
 Systemprompt ausdrücklich.
 
+Messpunkte werden in Himmelsrichtungen angesagt („weiterer Datenpunkt 10 m
+nordöstlich"), deshalb kennt `direction` auch `north` … `southwest`. Und sie
+beziehen sich auf den vorigen Punkt, der keinen unterscheidbaren Namen hat —
+alle heißen „Messung". `nearItem`/`atItem` **ohne** `itemName` meint daher das
+zuletzt angelegte Element (`itemId` aus `lastCreatedItem`, gesetzt in
+`mitBezug`). Vorher fiel eine solche Angabe still auf Standort oder
+Kartenmitte zurück, alle Punkte lagen übereinander, und das Modell meldete
+trotzdem „10 m nordöstlich". Deshalb nennt jetzt auch `createMarker` in der
+Rückmeldung, wo der Punkt tatsächlich liegt, samt fehlendem Bezug.
+
 ## Was das Modell von einem Element sieht und ändern kann
 
 Das Modell sieht nicht das ganze Dokument, sondern die Projektion aus
@@ -370,6 +380,36 @@ und `values`; die Logik steht in
   Ebenen bzw. Felder, damit das Modell nachfragen kann.
 
 Ebene und `fieldData` stehen damit auch in der Projektion des MCP-Servers.
+
+## Ebenen anlegen und ändern
+
+„Lege eine Ebene EX-Messung an mit UEG in Prozent" geht an `editLayer`, ein
+Werkzeug mit `action` `create` oder `update` — wie bei `createMarker` mit
+`kind` beschreiben beide dieselben Angaben (Name, Datenfelder). Die Logik der
+Felder steht in [layerSchema.ts](../src/hooks/aiAssistant/layerSchema.ts) und
+folgt dem `DataSchemaEditor`:
+
+- **Der Schlüssel entsteht aus der Bezeichnung** (`slugify`, doppelte bekommen
+  `_2`) und bleibt beim Umbenennen stehen — die Werte der Elemente hängen an
+  ihm.
+- **Ändern statt doppelt anlegen.** Ein Eintrag, dessen Bezeichnung einem
+  vorhandenen Feld entspricht oder der es in `field` nennt, ändert dieses.
+  „Dosisleistung in Millisievert" legt also kein zweites Feld an.
+- **Einheit und Typ bleiben, sobald Elemente Werte tragen.** Aus 5 µSv/h
+  würden sonst stillschweigend 5 mSv/h; umrechnen und alle Punkte neu
+  schreiben wäre die Alternative, ist aber ein Massenschreibvorgang, den
+  niemand angesagt hat. Das Werkzeug lehnt ab und nennt die Zahl der Punkte.
+- **Formeln werden geprüft**, bevor gespeichert wird: Jeder Name muss ein
+  Schlüssel eines nicht berechneten Felds oder eine Funktion von mathjs sein.
+  Das gilt auch beim Entfernen — ein Feld, von dem eine Formel abhängt, bleibt.
+- **Eine neue Ebene wird aktiv**, damit die nächste Messung dort landet. Ohne
+  genannte Ebene ändert `update` die aktive. Eine gleichnamige zweite Ebene
+  wird nicht angelegt.
+- Löschen ist bewusst nicht dabei: Beim Löschen einer Ebene werden alle ihre
+  Elemente mitgelöscht, das bleibt der Oberfläche.
+
+„Rückgängig" nimmt eine angelegte Ebene nicht zurück — `lastCreatedItem`
+sucht in den Kartenelementen, und Ebenen sind keine.
 
 ## Der Kontext ist ein Überblick, Details holt `findItems`
 

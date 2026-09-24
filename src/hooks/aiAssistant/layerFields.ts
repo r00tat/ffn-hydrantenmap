@@ -108,7 +108,7 @@ export function convertUnit(
   return undefined;
 }
 
-function findField(
+export function findField(
   schema: DataSchemaField[],
   name: string | undefined,
 ): DataSchemaField | undefined {
@@ -121,14 +121,14 @@ function findField(
   );
 }
 
-function parseNumber(value: unknown): number | undefined {
+export function parseNumber(value: unknown): number | undefined {
   if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
   if (typeof value !== 'string') return undefined;
   const parsed = Number(value.trim().replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function parseBoolean(value: unknown): boolean | undefined {
+export function parseBoolean(value: unknown): boolean | undefined {
   if (typeof value === 'boolean') return value;
   const text = String(value ?? '').trim().toLocaleLowerCase('de');
   if (['ja', 'true', 'wahr', '1', 'yes'].includes(text)) return true;

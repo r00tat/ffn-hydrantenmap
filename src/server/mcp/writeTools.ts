@@ -337,6 +337,52 @@ export function registerWriteTools(
   );
 
   server.registerTool(
+    'edit_layer',
+    {
+      title: 'Ebene anlegen oder ändern',
+      description:
+        'Legt eine Ebene an (`action: "create"`) oder ändert eine vorhandene ' +
+        '(`action: "update"`, Ziel über `layer`): Name und Datenfelder. Ein Eintrag in ' +
+        '`fields`, dessen Bezeichnung einem vorhandenen Feld entspricht oder der es in ' +
+        '`field` nennt, ändert dieses; sonst entsteht ein neues Feld. Einheit und Typ ' +
+        'eines Felds, das schon Werte hat, bleiben. Berechnete Felder in vorhandenen ' +
+        'Elementen werden hier nicht neu gerechnet.',
+      inputSchema: z.object({
+        firecallId,
+        action: z.enum(['create', 'update']),
+        layer: z.string().optional().describe('Name oder ID der Ebene (nur update)'),
+        name: z.string().optional().describe('Name der neuen Ebene oder neuer Name'),
+        fields: z
+          .array(
+            z.object({
+              field: z
+                .string()
+                .optional()
+                .describe('Vorhandenes Feld (Schlüssel oder Bezeichnung), das geändert wird'),
+              label: z.string().optional().describe('Bezeichnung, z.B. "Dosisleistung"'),
+              unit: z.string().optional().describe('Einheit als Zeichen, z.B. "µSv/h"'),
+              type: z.enum(['number', 'text', 'boolean', 'computed']).optional(),
+              formula: z
+                .string()
+                .optional()
+                .describe('Formel über die Schlüssel der anderen Felder (nur computed)'),
+              defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
+            }),
+          )
+          .optional(),
+        removeFields: z.array(z.string()).optional().describe('Zu entfernende Felder'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ firecallId: id, ...args }) => run(id, 'editLayer', args),
+  );
+
+  server.registerTool(
     'delete_item',
     {
       title: 'Element löschen',

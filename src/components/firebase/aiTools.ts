@@ -778,6 +778,78 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'editLayer',
+    description:
+      'Create a layer (Ebene) or change an existing one: its name and its data fields ' +
+      '(Datenfelder) such as a Dosisleistung in µSv/h. Items in the layer carry values ' +
+      'for these fields. A new layer becomes the active one.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        action: {
+          type: SchemaType.STRING,
+          enum: ['create', 'update'],
+          description: 'create = new layer, update = change an existing one',
+        },
+        layer: {
+          type: SchemaType.STRING,
+          description:
+            'For update: name of the layer from context.layers. Empty = context.activeLayer',
+        },
+        name: {
+          type: SchemaType.STRING,
+          description: 'Name of the new layer, or the new name when renaming',
+        },
+        fields: {
+          type: SchemaType.ARRAY,
+          description:
+            'Data fields to add or change. An entry whose label matches an existing field, ' +
+            'or that names it in field, changes it; otherwise a new field is added.',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              field: {
+                type: SchemaType.STRING,
+                description: 'Existing field (key or label) to change; empty for a new field',
+              },
+              label: { type: SchemaType.STRING, description: 'Label, e.g. "Dosisleistung"' },
+              unit: {
+                type: SchemaType.STRING,
+                description: 'Unit as symbol, e.g. "µSv/h", "%", "ppm"; empty for none',
+              },
+              type: {
+                type: SchemaType.STRING,
+                enum: ['number', 'text', 'boolean', 'computed'],
+                description: 'Default number; computed needs a formula',
+              },
+              formula: {
+                type: SchemaType.STRING,
+                description:
+                  'Formula for computed fields over the keys of other fields, e.g. ' +
+                  '"dosisleistung * 8"',
+              },
+              defaultValue: {
+                type: SchemaType.STRING,
+                description: 'Value a new item in the layer starts with',
+              },
+            },
+          },
+        },
+        removeFields: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+          description: 'Fields (key or label) to remove',
+        },
+        activate: {
+          type: SchemaType.BOOLEAN,
+          description:
+            'Make the layer the active one. Default true for create, false for update',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'findItems',
     description:
       'Look up items of this Einsatz with their details: coordinates, times, ' +
@@ -943,6 +1015,15 @@ Ebenen und Messwerte:
 - Berechnete Felder (type computed) setzt du nicht, sie werden mitgerechnet.
 - Meldet das Werkzeug ein fehlendes Feld oder eine fehlende Ebene, frage nach und
   nenne die vorhandenen.
+- "Lege eine Ebene Strahlenmessung an mit Dosisleistung in Mikrosievert pro Stunde" =
+  editLayer action create, name "Strahlenmessung", fields [{label: "Dosisleistung",
+  unit: "µSv/h"}]. Die neue Ebene wird aktiv; die nächste Messung landet dort.
+- "Füge ein Feld Messgerät hinzu", "Benenne die Ebene um", "Entferne das Feld Notiz",
+  "Dosisleistung in Millisievert" = editLayer action update; ohne genannte Ebene gilt
+  activeLayer. Ein vorhandenes Feld änderst du über seine Bezeichnung oder field.
+- Berechnete Felder: type computed mit formula über die keys der anderen Felder
+  ("Dosis in 8 Stunden" = formula "dosisleistung * 8"). Einheit und Typ eines Felds,
+  das schon Werte hat, bleiben - das Werkzeug lehnt ab, gib das weiter.
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
 - findItems: Elemente mit Details nachsehen, bevor du antwortest, wenn die Antwort
   Koordinaten, Messwerte, Tagebuchtext oder ältere Einträge braucht ("Welche

@@ -62,6 +62,8 @@ describe('createMcpServerForAuth', () => {
     expect(hasTool(['einsatz:write'], 'create_diary_entry')).toBe(true);
     expect(hasTool(['einsatz:read'], 'create_diary_entry')).toBe(false);
     expect(hasTool(['einsatz:read'], 'delete_item')).toBe(false);
+    expect(hasTool(['einsatz:write'], 'edit_layer')).toBe(true);
+    expect(hasTool(['einsatz:read'], 'edit_layer')).toBe(false);
   });
 
   it('registriert schreibende Tools nicht ohne MCP_WRITE_ENABLED', () => {

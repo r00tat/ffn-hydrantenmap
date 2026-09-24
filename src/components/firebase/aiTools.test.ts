@@ -325,3 +325,17 @@ describe('Überblick im Kontext, Details über findItems', () => {
     expect(AI_SYSTEM_PROMPT).not.toMatch(/existingItems mit allen aktuellen Elementen/);
   });
 });
+
+describe('editLayer', () => {
+  it('legt an oder ändert, mit Datenfeldern samt Typ und Formel', () => {
+    const decl = AI_TOOL_DECLARATIONS.find((d) => d.name === 'editLayer');
+    const schema = decl?.parameters as unknown as LooseSchema;
+    expect(schema.properties?.action?.enum).toEqual(['create', 'update']);
+    const field = schema.properties?.fields?.items?.properties ?? {};
+    for (const key of ['field', 'label', 'unit', 'type', 'formula', 'defaultValue']) {
+      expect(field).toHaveProperty(key);
+    }
+    expect(field.type?.enum).toEqual(['number', 'text', 'boolean', 'computed']);
+    expect(AI_SYSTEM_PROMPT).toMatch(/editLayer action create/);
+  });
+});

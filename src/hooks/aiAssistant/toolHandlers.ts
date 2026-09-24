@@ -24,7 +24,8 @@ import { TRUPP_STATUSES, type TruppStatus } from '../../common/atemschutz';
 import { findFirecallItemByName } from './itemLookup';
 import { EDITABLE_FIELDS } from './editableFields';
 import { findItems, type FindItemsQuery } from './findItems';
-import { applyFieldValues, findLayer, type SpokenFieldValue } from './layerFields';
+import { applyFieldValues, findLayer, projectLayer, type SpokenFieldValue } from './layerFields';
+import { editLayerSchema, type SpokenFieldSpec } from './layerSchema';
 import { DIRECTION_LABELS, type PositionSpec } from './resolveOrigin';
 import { normalizeRotation } from '../../components/Map/markers/rotationGeometry';
 import { AiAssistantResult, ResolvedOrigin } from './types';
@@ -737,6 +738,114 @@ export async function executeToolCall(
           options: args.options as string[],
         },
       };
+
+    case 'editLayer': {
+      // Anlegen und Ändern in einem Werkzeug: Beide beschreiben die Ebene mit
+      // denselben Angaben (Name, Datenfelder), nur das Ziel unterscheidet sich.
+      const layerArg = (args.layer as string | undefined)?.trim();
+      const action =
+        args.action === 'update' || (!args.action && layerArg) ? 'update' : 'create';
+      const change = {
+        fields: args.fields as SpokenFieldSpec[] | undefined,
+        removeFields: args.removeFields as string[] | undefined,
+      };
+      const name = (args.name as string | undefined)?.trim();
+      const live = layers.filter((l) => !l.deleted);
+      const gleichnamig = (n: string, ausser?: string) =>
+        live.find(
+          (l) =>
+            l.id !== ausser &&
+            l.name?.toLocaleLowerCase('de') === n.toLocaleLowerCase('de'),
+        );
+
+      if (action === 'create') {
+        if (!name) {
+          return { success: false, message: 'Eine neue Ebene braucht einen Namen' };
+        }
+        const doppelt = gleichnamig(name);
+        if (doppelt) {
+          return {
+            success: false,
+            message: `Die Ebene "${doppelt.name}" gibt es schon — zum Ändern action update`,
+          };
+        }
+        const edited = await editLayerSchema([], change);
+        if (edited.errors.length) {
+          return { success: false, message: edited.errors.join('; ') };
+        }
+        const layer = {
+          type: 'layer',
+          name,
+          ...(edited.schema.length ? { dataSchema: edited.schema } : {}),
+        } as FirecallLayer;
+        const ref = await addFirecallItem(layer);
+        // Die neue Ebene wird zur aktiven, damit „neue Messung 37" gleich
+        // dort landet — wie nach dem Anlegen über die Oberfläche.
+        const aktiv = args.activate !== false && !!setActiveLayer;
+        if (aktiv) setActiveLayer!(ref.id);
+        return {
+          success: true,
+          message:
+            `Ebene "${name}" angelegt` +
+            (edited.changes.length ? `: ${edited.changes.join(', ')}` : ' ohne Datenfelder') +
+            (aktiv ? '; jetzt aktiv' : ''),
+          data: projectLayer({ ...layer, id: ref.id }),
+        };
+      }
+
+      const layer = layerArg
+        ? findLayer(layers, layerArg)
+        : live.find((l) => l.id === activeLayerId);
+      if (!layer) {
+        return {
+          success: false,
+          message: layerArg
+            ? ebeneFehlt(layerArg, layers)
+            : 'Keine Ebene genannt und keine aktiv',
+        };
+      }
+      const umbenennen = !!name && name !== layer.name;
+      if (umbenennen) {
+        const doppelt = gleichnamig(name!, layer.id);
+        if (doppelt) {
+          return { success: false, message: `Die Ebene "${doppelt.name}" gibt es schon` };
+        }
+      }
+      const edited = await editLayerSchema(
+        layer.dataSchema ?? [],
+        change,
+        existingItems.filter((i) => i.layer === layer.id),
+      );
+      if (edited.errors.length) {
+        return { success: false, message: edited.errors.join('; ') };
+      }
+      const parts = [
+        ...(umbenennen ? [`umbenannt in "${name}"`] : []),
+        ...edited.changes,
+      ];
+      const aktivieren = args.activate === true && !!setActiveLayer;
+      if (parts.length === 0 && !aktivieren) {
+        return {
+          success: false,
+          message: `Keine Änderung an der Ebene "${layer.name}" angegeben`,
+        };
+      }
+      const updated = {
+        ...layer,
+        ...(umbenennen ? { name } : {}),
+        dataSchema: edited.schema,
+      } as FirecallLayer;
+      if (parts.length) await updateFirecallItem(updated);
+      if (aktivieren) setActiveLayer!(layer.id!);
+      return {
+        success: true,
+        message:
+          `Ebene "${layer.name}" ` +
+          (parts.length ? `geändert: ${parts.join(', ')}` : 'unverändert') +
+          (aktivieren ? '; jetzt aktiv' : ''),
+        data: projectLayer(updated),
+      };
+    }
 
     case 'findItems': {
       const center = args.position

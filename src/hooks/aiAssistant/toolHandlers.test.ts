@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GeohashCluster } from '../../common/gis-objects';
 import { HoseLineDraft, WaterSupplyCandidate } from '../../common/waterSupply';
 import { executeToolCall, ToolHandlerDeps } from './toolHandlers';
+import type { FirecallItem, FirecallLayer } from '../../components/firebase/firestore';
 
 const einsatzort = { lat: 47.9482913, lng: 16.848222 };
 const metersToLat = (m: number) => m / 111320;
@@ -1122,5 +1123,105 @@ describe('createMarker — Lage vom zuletzt angelegten Punkt', () => {
     expect(result.message).toBe(
       'Marker "Messung" erstellt an dem Einsatzort (Bezugselement nicht gefunden)',
     );
+  });
+});
+
+describe('editLayer', () => {
+  const strahlen = {
+    id: 'l1',
+    type: 'layer',
+    name: 'Strahlenmessung',
+    zIndex: 3,
+    dataSchema: [{ key: 'dosisleistung', label: 'Dosisleistung', unit: 'µSv/h', type: 'number' }],
+  } as FirecallLayer;
+
+  it('legt eine Ebene mit Datenfeldern an und macht sie aktiv', async () => {
+    const setActiveLayer = vi.fn();
+    const deps = makeDeps({ setActiveLayer, addFirecallItem: vi.fn(async () => ({ id: 'l9' })) });
+    const result = await executeToolCall(
+      call('editLayer', {
+        action: 'create',
+        name: 'EX Messung',
+        fields: [{ label: 'UEG', unit: '%' }],
+      }),
+      deps,
+    );
+    expect(result.success).toBe(true);
+    expect(deps.addFirecallItem).toHaveBeenCalledWith({
+      type: 'layer',
+      name: 'EX Messung',
+      dataSchema: [{ key: 'ueg', label: 'UEG', unit: '%', type: 'number' }],
+    });
+    expect(setActiveLayer).toHaveBeenCalledWith('l9');
+    expect(result.message).toBe('Ebene "EX Messung" angelegt: Feld UEG (%) angelegt; jetzt aktiv');
+    expect(result.createdItemId).toBeUndefined();
+  });
+
+  it('legt keine zweite Ebene mit demselben Namen an', async () => {
+    const deps = makeDeps({ layers: [strahlen] });
+    const result = await executeToolCall(
+      call('editLayer', { action: 'create', name: 'strahlenmessung' }),
+      deps,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/gibt es schon/);
+    expect(deps.addFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('ändert ohne genannte Ebene die aktive und schreibt sie vollständig zurück', async () => {
+    const deps = makeDeps({ layers: [strahlen], activeLayerId: 'l1' });
+    const result = await executeToolCall(
+      call('editLayer', {
+        action: 'update',
+        name: 'Strahlung Süd',
+        fields: [{ label: 'Messgerät', type: 'text' }],
+      }),
+      deps,
+    );
+    expect(result.success).toBe(true);
+    expect(deps.updateFirecallItem).toHaveBeenCalledWith({
+      ...strahlen,
+      name: 'Strahlung Süd',
+      dataSchema: [
+        ...strahlen.dataSchema!,
+        { key: 'messgeraet', label: 'Messgerät', unit: '', type: 'text' },
+      ],
+    });
+    expect(result.message).toBe(
+      'Ebene "Strahlenmessung" geändert: umbenannt in "Strahlung Süd", Feld Messgerät angelegt',
+    );
+  });
+
+  it('lehnt eine neue Einheit ab, wenn Messpunkte schon Werte haben', async () => {
+    const deps = makeDeps({
+      layers: [strahlen],
+      existingItems: [
+        { id: 'p', type: 'marker', name: 'Messung', layer: 'l1', fieldData: { dosisleistung: 5 } },
+      ] as FirecallItem[],
+    });
+    const result = await executeToolCall(
+      call('editLayer', {
+        action: 'update',
+        layer: 'Strahlen',
+        fields: [{ label: 'Dosisleistung', unit: 'mSv/h' }],
+      }),
+      deps,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/Einheit von "Dosisleistung" bleibt/);
+    expect(deps.updateFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('meldet eine fehlende Ebene und eine leere Änderung', async () => {
+    const fehlt = await executeToolCall(
+      call('editLayer', { action: 'update', layer: 'Nord' }),
+      makeDeps({ layers: [strahlen] }),
+    );
+    expect(fehlt.message).toMatch(/Ebene "Nord" nicht gefunden/);
+    const leer = await executeToolCall(
+      call('editLayer', { action: 'update', layer: 'Strahlen' }),
+      makeDeps({ layers: [strahlen] }),
+    );
+    expect(leer.message).toBe('Keine Änderung an der Ebene "Strahlenmessung" angegeben');
   });
 });
