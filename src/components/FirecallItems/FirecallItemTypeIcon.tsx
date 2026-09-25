@@ -1,8 +1,23 @@
 'use client';
 
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import SvgIcon from '@mui/material/SvgIcon';
 import Image from 'next/image';
 import { getItemClass } from './elements';
+
+/**
+ * Types that never appear on the map and therefore have no map icon of their
+ * own; they would fall back to the generic marker icon, which says nothing
+ * about what they are. `upload` is a pseudo type without an item class; diary
+ * and Geschäftsbuch use the icons of their pages in the navigation.
+ */
+const MUI_TYPE_ICONS: Record<string, typeof SvgIcon> = {
+  upload: PhotoCameraIcon,
+  diary: LibraryBooksIcon,
+  gb: MenuBookIcon,
+};
 
 export interface FirecallItemTypeIconOptions {
   /** firecall item type key, e.g. `vehicle` or `hydrant` */
@@ -19,10 +34,9 @@ export default function FirecallItemTypeIcon({
   type,
   size = 24,
 }: FirecallItemTypeIconOptions) {
-  // `upload` is a pseudo type without an item class and would fall back to the
-  // generic marker icon, which says nothing about what it does.
-  if (type === 'upload') {
-    return <PhotoCameraIcon sx={{ width: size, height: size }} />;
+  const MuiIcon = MUI_TYPE_ICONS[type];
+  if (MuiIcon) {
+    return <MuiIcon sx={{ width: size, height: size }} />;
   }
 
   const icon = getItemClass(type).factory().icon();

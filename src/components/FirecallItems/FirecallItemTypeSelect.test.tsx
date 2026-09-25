@@ -75,6 +75,21 @@ describe('FirecallItemTypeSelect', () => {
     }
   });
 
+  it('never falls back to the generic fallback marker icon', async () => {
+    const user = userEvent.setup();
+    render(<FirecallItemTypeSelect value="marker" onChange={vi.fn()} />);
+    await user.click(screen.getByLabelText('Element Typ'));
+
+    const withMarkerIcon = screen
+      .getAllByRole('option')
+      .filter((o) => o.hasAttribute('data-value'))
+      .filter((o) =>
+        o.querySelector('img')?.getAttribute('src')?.includes('marker.svg')
+      )
+      .map((o) => o.getAttribute('data-value'));
+    expect(withMarkerIcon).toEqual([]);
+  });
+
   it('does not select anything when a group heading is clicked', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

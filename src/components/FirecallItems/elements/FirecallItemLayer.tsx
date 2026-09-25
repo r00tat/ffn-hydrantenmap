@@ -55,6 +55,10 @@ export class FirecallItemLayer extends FirecallItemBase {
     });
   }
 
+  public static factory(): FirecallItemBase {
+    return new FirecallItemLayer();
+  }
+
   public copy(): FirecallItemBase {
     return Object.assign(new FirecallItemLayer(this.data()), this);
   }
