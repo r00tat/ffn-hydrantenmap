@@ -2505,7 +2505,7 @@
     "diaryNoFirecall": "No operation selected – the query was not recorded in the operational diary."
   },
   "about": {
-    "title": "About",
+    "title": "About the operations map",
     "intro": "The operations map is the digital situation management of the volunteer fire brigade Neusiedl am See. It runs in the browser, as an installed web app and as an Android app, and shows every responder the same, continuously updated situation.",
     "featuresIntro": "Main features:",
     "features": {

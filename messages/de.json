@@ -2505,7 +2505,7 @@
     "diaryNoFirecall": "Kein Einsatz ausgewählt – die Abfrage wurde nicht ins Einsatztagebuch eingetragen."
   },
   "about": {
-    "title": "Über",
+    "title": "Über die Einsatzkarte",
     "intro": "Die Einsatzkarte ist die digitale Lageführung der Freiwilligen Feuerwehr Neusiedl am See. Sie läuft im Browser, als installierte Web-App und als Android-App und zeigt allen Einsatzkräften dieselbe, laufend aktuelle Lage.",
     "featuresIntro": "Die wichtigsten Funktionen:",
     "features": {
