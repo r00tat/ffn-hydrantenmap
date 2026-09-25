@@ -12,9 +12,7 @@ import {
 } from 'react';
 import { SimpleMap } from '../common/types';
 
-import { getAnalytics, logEvent } from 'firebase/analytics';
 import { v4 as uuid } from 'uuid';
-import app from '../components/firebase/firebase';
 
 export interface DebugLogging {
   info: (message: string, properties?: SimpleMap<any>) => Promise<void>;
@@ -183,10 +181,11 @@ export const useFirebaseDebugging = (): DebugLogging => {
   }, [displayMessages]);
 
   return useMemo((): DebugLogging => {
-    const analytics = getAnalytics(app);
-
+    // Die Meldungen bleiben im Browser (Debug-Anzeige, Bug-Report). Frueher
+    // gingen sie zusaetzlich an Firebase Analytics; das setzte ohne
+    // Einwilligung Cookies von Google Analytics (§ 165 Abs. 3 TKG 2021) und
+    // wurde nie ausgewertet.
     const addMessage = (message: string, properties?: SimpleMap<any>) => {
-      logEvent(analytics, message, properties);
       const msg: DebugMessage = {
         message,
         properties,

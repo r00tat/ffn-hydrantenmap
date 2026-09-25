@@ -1,4 +1,16 @@
 import { SerwistProvider } from '@serwist/turbopack/react';
+// Roboto aus dem eigenen Build statt von fonts.googleapis.com: sonst ging
+// bei jedem Seitenaufruf die IP-Adresse an Google. Nur latin und latin-ext,
+// die anderen Subsets blaehten den Precache auf. MUIs Standardtheme erwartet
+// die Familie "Roboto", die @fontsource unveraendert so nennt.
+import '@fontsource/roboto/latin-300.css';
+import '@fontsource/roboto/latin-400.css';
+import '@fontsource/roboto/latin-500.css';
+import '@fontsource/roboto/latin-700.css';
+import '@fontsource/roboto/latin-ext-300.css';
+import '@fontsource/roboto/latin-ext-400.css';
+import '@fontsource/roboto/latin-ext-500.css';
+import '@fontsource/roboto/latin-ext-700.css';
 import 'leaflet/dist/leaflet.css';
 import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
@@ -70,8 +82,6 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  /* eslint-disable @next/next/no-page-custom-font */
-
   const locale = await getLocale();
   const messages = await getMessages();
 
@@ -94,15 +104,6 @@ export default async function RootLayout({
             app/manifest.ts kommt, die Icons aus `metadata.icons`. */}
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#1976d2" />
-
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/icon?family=Material+Icons"
-        />
       </head>
       <body>
         {/* Registriert den von src/app/serwist/[path]/route.ts ausgelieferten

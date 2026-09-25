@@ -49,8 +49,8 @@ export const isWorkerBootstrap = (url: URL): boolean =>
  * Daraus folgt die Regel für dieses Modul: **jeder Matcher wird so eng gefasst
  * wie möglich.** Trifft eine Regel mehr, als sie meint, verdrängt sie eine
  * passendere aus `defaultCache` — ohne dass irgendwo ein Fehler auftaucht. Genau
- * so kamen die beiden Google-Fonts-Stylesheets aus dem Root-Layout nie mehr aus
- * dem Cache: das Muster war auf `*.googleapis.com` gefasst und nahm
+ * so kamen die beiden Google-Fonts-Stylesheets, die das Root-Layout damals
+ * noch lud, nie mehr aus dem Cache: das Muster war auf `*.googleapis.com` gefasst und nahm
  * `fonts.googleapis.com` mit.
  *
  * Zwei Eigenheiten der Auswertung gehören dazu (`RegExpRoute` in serwist):
@@ -167,10 +167,12 @@ export const cachePatterns: RuntimeCaching[] = [
   // Cache. Zwei Einzelheiten sind Absicht und dürfen nicht wegvereinfacht
   // werden:
   //
-  // `fonts.googleapis.com` ist ausgenommen. Die beiden Stylesheets im
-  // Root-Layout blockieren das Rendern; unter `NetworkOnly` konnten sie bei
-  // keinem Kaltstart aus dem Cache kommen. Serwist versorgt diesen Host selbst
-  // mit `StaleWhileRevalidate` — dieser Regel gehört er nicht.
+  // `fonts.googleapis.com` ist ausgenommen. Die App selbst lädt keine Google
+  // Fonts mehr (Roboto kommt aus `@fontsource`), die Ausnahme bleibt aber:
+  // Stylesheets von dort blockieren das Rendern und konnten unter
+  // `NetworkOnly` bei keinem Kaltstart aus dem Cache kommen. Serwist versorgt
+  // diesen Host selbst mit `StaleWhileRevalidate` — dieser Regel gehört er
+  // nicht.
   //
   // Kein `networkTimeoutSeconds`. Firestores `Listen`-Kanal ist eine
   // langlebige Verbindung, die länger offen steht als jedes sinnvolle Timeout;
@@ -272,7 +274,7 @@ function resilient(entry: RuntimeCaching): RuntimeCaching {
       } catch (error) {
         console.warn(
           `[sw] Strategie für ${options.request.url} gescheitert, weiche aufs Netz aus`,
-          error
+          error,
         );
         return fetch(options.request);
       }
