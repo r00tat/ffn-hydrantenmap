@@ -74,8 +74,18 @@ export default function DocsMarkdown({ markdown }: DocsMarkdownProps) {
           {children}
         </Typography>
       ),
-      p: ({ children }) => (
-        <Typography component="p" sx={{ mb: 2 }}>
+      // Ein Bild steht im Markdown in einem Absatz, Screenshot ist aber ein
+      // <div>. Ein <div> in einem <p> ist ungültiges HTML und stört die
+      // Hydration, deshalb wird ein solcher Absatz ein <div>.
+      p: ({ children, node }) => (
+        <Typography
+          component={
+            node?.children.some((child) => child.type === 'element' && child.tagName === 'img')
+              ? 'div'
+              : 'p'
+          }
+          sx={{ mb: 2 }}
+        >
           {children}
         </Typography>
       ),
@@ -95,7 +105,7 @@ export default function DocsMarkdown({ markdown }: DocsMarkdownProps) {
           );
         }
         const childArray = Children.toArray(children).filter(
-          (c) => !(typeof c === 'string' && c.trim() === '')
+          (c) => !(typeof c === 'string' && c.trim() === ''),
         );
         const [first, ...rest] = childArray;
         const firstIsStrong =
@@ -126,9 +136,7 @@ export default function DocsMarkdown({ markdown }: DocsMarkdownProps) {
         return <Screenshot src={src} alt={alt || ''} />;
       },
       div: ({ children, ...props }) => {
-        const directive = (props as { 'data-directive'?: string })[
-          'data-directive'
-        ];
+        const directive = (props as { 'data-directive'?: string })['data-directive'];
         if (directive && ALERT_SEVERITIES.includes(directive as AlertColor)) {
           return (
             <Alert severity={directive as AlertColor} sx={{ my: 2 }}>
@@ -154,7 +162,7 @@ export default function DocsMarkdown({ markdown }: DocsMarkdownProps) {
         </Box>
       ),
     }),
-    []
+    [],
   );
 
   return (
