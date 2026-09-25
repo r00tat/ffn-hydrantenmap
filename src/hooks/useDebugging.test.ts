@@ -2,15 +2,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('firebase/analytics', () => ({
-  getAnalytics: vi.fn(() => ({})),
-  logEvent: vi.fn(),
-}));
-
-vi.mock('../components/firebase/firebase', () => ({
-  default: {},
-}));
-
 import { useFirebaseDebugging } from './useDebugging';
 
 describe('useFirebaseDebugging console capture', () => {

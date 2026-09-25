@@ -29,7 +29,6 @@ const app =
       });
 export default app;
 export { app as firebaseApp };
-// export const analytics: Analytics = getAnalytics(app);
 
 const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DB;
 
