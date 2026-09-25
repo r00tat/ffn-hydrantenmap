@@ -1000,7 +1000,9 @@
     "newFirecallTooltip": "Neuer Einsatz",
     "historyTooltip": "Historie aufrufen",
     "loginButton": "Login",
-    "menuAria": "Menü"
+    "menuAria": "Menü",
+    "mapLink": "Zur Karte",
+    "firecallDetailsTooltip": "Einsatzdetails"
   },
   "drawer": {
     "atemschutz": "Atemschutzsammelplatz",
@@ -2504,7 +2506,19 @@
   },
   "about": {
     "title": "Über",
-    "intro": "Diese Webseite zeigt Hydranten im Raum Neusiedl am See an, um diese im Einsatzfall einfach zu lokalisieren.",
+    "intro": "Die Einsatzkarte ist die digitale Lageführung der Freiwilligen Feuerwehr Neusiedl am See. Sie läuft im Browser, als installierte Web-App und als Android-App und zeigt allen Einsatzkräften dieselbe, laufend aktuelle Lage.",
+    "featuresIntro": "Die wichtigsten Funktionen:",
+    "features": {
+      "map": "Lagekarte mit Hydranten, Einsatzstellen, Fahrzeugen, Leitungen und eigenen Ebenen, dazu Live-Standorte der Einsatzkräfte",
+      "operation": "Einsatzführung mit Einsatztagebuch, Geschäftsbuch, Einsatzmitteln und Chat",
+      "breathing": "Atemschutz: Sammelplatz, Atemschutzüberwachung mit Warnungen und Füllprotokoll",
+      "water": "Löschwasserversorgung mit Förderung, Pendelverkehr und Sandsackbedarf für den Dammbau",
+      "reference": "Nachschlagewerke: Gefahrstoffe, Strahlenschutz, Rettungskarten und Wetterdaten",
+      "assistant": "Sprach-Assistent und KI-Zusammenfassungen",
+      "admin": "Verwaltung mit Fahrtenbuch, Kostenersatz und Einsatzberichten zum Drucken"
+    },
+    "docsIntro": "Anleitungen zu allen Funktionen stehen in der ",
+    "docsLink": "Dokumentation",
     "impressum": "Impressum",
     "responsible": "Für den Inhalt verantwortlich",
     "copyright": "Urheberrechte",

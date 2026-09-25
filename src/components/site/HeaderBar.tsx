@@ -33,11 +33,9 @@ function HeaderBar({
 }) {
   const t = useTranslations('header');
   const tShare = useTranslations('firecallShare');
-  const { isSignedIn, displayName, photoURL, isAuthorized } =
-    useFirebaseLogin();
+  const { isSignedIn, displayName, photoURL, isAuthorized } = useFirebaseLogin();
   const firecall = useFirecall();
-  const { history, selectHistory, selectedHistory, historyModeActive } =
-    useMapEditor();
+  const { history, selectHistory, selectedHistory, historyModeActive } = useMapEditor();
   const isReadOnlyGuest = useIsReadOnlyFirecallGuest();
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const historyDialogClose = useCallback(
@@ -45,17 +43,14 @@ function HeaderBar({
       setIsHistoryDialogOpen(false);
       selectHistory(history?.id);
     },
-    [selectHistory]
+    [selectHistory],
   );
   const [einsatzDialog, setEinsatzDialog] = useState(false);
 
   return (
     <>
       <Box sx={{ flexShrink: 0 }}>
-        <AppBar
-          position="static"
-          sx={{ borderBottom: `3px solid ${BRAND_ACCENT}` }}
-        >
+        <AppBar position="static" sx={{ borderBottom: `3px solid ${BRAND_ACCENT}` }}>
           <Toolbar>
             {isSignedIn && (
               <IconButton
@@ -69,16 +64,46 @@ function HeaderBar({
                 <MenuIcon />
               </IconButton>
             )}
-            {/* Dekorativ: der App-Titel steht daneben (ab sm) bzw. im
-                Tab-Titel. Auch auf dem Handy sichtbar, wo der Titel fehlt. */}
-            <Image
-              src="/brand/logo-weiss.png"
-              alt=""
-              width={36}
-              height={36}
-              priority
-              style={{ flexShrink: 0, marginRight: 8 }}
-            />
+            {/* Logo und App-Titel führen zurück zur Karte, der Einsatzname
+                daneben zur Detailseite. Das Logo ist auch auf dem Handy
+                sichtbar, wo der Titel fehlt; deshalb trägt der Link ein
+                eigenes Label. */}
+            <Tooltip title={t('mapLink')}>
+              <Link
+                href={firecall?.id ? `/einsatz/${firecall.id}` : '/'}
+                aria-label={t('mapLink')}
+                style={{
+                  color: 'inherit',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                  paddingRight: 4,
+                }}
+              >
+                <Image
+                  src="/brand/logo-weiss.png"
+                  alt=""
+                  width={36}
+                  height={36}
+                  priority
+                  style={{ flexShrink: 0, marginRight: 8 }}
+                />
+                <Typography
+                  variant="h6"
+                  component="span"
+                  noWrap
+                  sx={(theme) => ({
+                    display: 'none',
+                    [theme.breakpoints.up('sm')]: {
+                      display: 'inline',
+                    },
+                  })}
+                >
+                  {t('appTitle')}
+                </Typography>
+              </Link>
+            </Tooltip>
             <Box
               sx={{
                 flexGrow: 1,
@@ -91,34 +116,20 @@ function HeaderBar({
                 variant="h6"
                 component="div"
                 noWrap
-                sx={(theme) => ({
-                  display: 'none',
-                  [theme.breakpoints.up('sm')]: {
-                    display: 'inline',
-                  },
-                })}
-                style={{
-                  paddingRight: 4,
-                }}
-              >
-                {t('appTitle')}{' '}
-              </Typography>
-              <Typography
-                variant="h6"
-                component="div"
-                noWrap
                 sx={{
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                 }}
               >
                 {firecall?.id ? (
-                  <Link
-                    href={`/einsatz/${firecall.id}/details`}
-                    style={{ color: 'inherit', textDecoration: 'none' }}
-                  >
-                    {firecall.name || ''}
-                  </Link>
+                  <Tooltip title={t('firecallDetailsTooltip')} describeChild>
+                    <Link
+                      href={`/einsatz/${firecall.id}/details`}
+                      style={{ color: 'inherit', textDecoration: 'none' }}
+                    >
+                      {firecall.name || ''}
+                    </Link>
+                  </Tooltip>
                 ) : (
                   firecall?.name || ''
                 )}
@@ -207,9 +218,7 @@ function HeaderBar({
         </AppBar>
       </Box>
       {isHistoryDialogOpen && <HistoryDialog onClose={historyDialogClose} />}
-      {einsatzDialog && (
-        <EinsatzDialog onClose={() => setEinsatzDialog(false)} />
-      )}
+      {einsatzDialog && <EinsatzDialog onClose={() => setEinsatzDialog(false)} />}
     </>
   );
 }

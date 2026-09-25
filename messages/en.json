@@ -1000,7 +1000,9 @@
     "newFirecallTooltip": "New operation",
     "historyTooltip": "Open history",
     "loginButton": "Login",
-    "menuAria": "Menu"
+    "menuAria": "Menu",
+    "mapLink": "To the map",
+    "firecallDetailsTooltip": "Operation details"
   },
   "drawer": {
     "atemschutz": "Breathing apparatus",
@@ -2504,7 +2506,19 @@
   },
   "about": {
     "title": "About",
-    "intro": "This website shows the hydrants around Neusiedl am See to make them easy to locate during operations.",
+    "intro": "The operations map is the digital situation management of the volunteer fire brigade Neusiedl am See. It runs in the browser, as an installed web app and as an Android app, and shows every responder the same, continuously updated situation.",
+    "featuresIntro": "Main features:",
+    "features": {
+      "map": "Situation map with hydrants, incident sites, vehicles, hose lines and custom layers, plus live locations of the responders",
+      "operation": "Operation management with operational diary, business log, resources and chat",
+      "breathing": "Breathing apparatus: staging area, monitoring with alerts and cylinder filling log",
+      "water": "Firefighting water supply with relay pumping, shuttle service and sandbag needs for dams",
+      "reference": "Reference: hazardous materials, radiation protection, rescue sheets and weather data",
+      "assistant": "Voice assistant and AI summaries",
+      "admin": "Administration with vehicle logbook, cost recovery and printable operation reports"
+    },
+    "docsIntro": "Guides for every feature are in the ",
+    "docsLink": "documentation",
     "impressum": "Imprint",
     "responsible": "Responsible for the content",
     "copyright": "Copyright",
