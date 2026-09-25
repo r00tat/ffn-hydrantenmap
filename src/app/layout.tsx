@@ -4,7 +4,7 @@ import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import React from 'react';
-import { withEnvironmentPrefix } from '../common/appEnvironment';
+import { appIconPath, withEnvironmentPrefix } from '../common/appEnvironment';
 import { SERWIST_SW_URL } from '../common/serviceWorker';
 import AppProviders from '../components/providers/AppProviders';
 import '../styles/globals.css';
@@ -23,6 +23,14 @@ export const metadata: Metadata = {
     template: APP_TITLE_TEMPLATE,
   },
   description: APP_DESCRIPTION,
+  // In dev mit DEV-Band, s. appIconPath().
+  icons: {
+    icon: [
+      { url: appIconPath('favicon.ico'), sizes: '16x16 32x32 48x48' },
+      { url: appIconPath('icon-192.png'), sizes: '192x192', type: 'image/png' },
+    ],
+    apple: { url: appIconPath('apple-touch-icon.png'), sizes: '180x180' },
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -83,8 +91,7 @@ export default async function RootLayout({
             kodiertes <title> hier verdoppelte sie nicht nur, es unterdrückte
             auch die Titel der Unterseiten aus APP_TITLE_TEMPLATE. Den
             <link rel="manifest"> setzt Next selbst, seit das Manifest aus
-            app/manifest.ts kommt. */}
-        <link rel="icon" href="/favicon.ico" />
+            app/manifest.ts kommt, die Icons aus `metadata.icons`. */}
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#1976d2" />
 

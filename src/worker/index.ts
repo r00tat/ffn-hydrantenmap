@@ -165,7 +165,7 @@ console.info(
 
 // self.registration.showNotification('Einsatz Chat', {
 //   body: 'hello world!',
-//   icon: '/app-icon.png',
+//   icon: '/brand/icon-192.png',
 //   actions: [
 //     {
 //       action: 'chat',
@@ -191,7 +191,7 @@ addEventListener('message', (event) => {
   //     console.info(`[${scope}] showing hello world!`);
   //     self.registration.showNotification('Einsatz Chat', {
   //       body: 'Started!',
-  //       icon: '/app-icon.png',
+  //       icon: '/brand/icon-192.png',
   //       actions: [
   //         {
   //           action: 'chat',
@@ -262,7 +262,7 @@ function startBackgroundMessaging(config: FirebaseOptions) {
       const warnung = payload.data;
       self.registration.showNotification(warnung.title, {
         body: warnung.body,
-        icon: '/app-icon.png',
+        icon: '/brand/icon-192.png',
         // Je Trupp: Eine neue Warnung ersetzt die alte, statt sich darunter zu
         // stapeln.
         tag: pushTag(warnung.truppId),
@@ -283,7 +283,7 @@ function startBackgroundMessaging(config: FirebaseOptions) {
       }`;
       const notificationOptions: NotificationOptionsWithActions = {
         body: message.message,
-        icon: '/app-icon.png',
+        icon: '/brand/icon-192.png',
         actions: [
           {
             action: 'chat',

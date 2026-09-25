@@ -12,6 +12,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import { LoginStep } from '../../hooks/auth/types';
 import { useDebugLogging } from '../../hooks/useDebugging';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -150,6 +151,15 @@ export default function LoginUi() {
       {!isSignedIn && (
         <>
           <Paper sx={{ p: 2, m: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Image
+                src="/brand/logo.png"
+                alt=""
+                width={160}
+                height={160}
+                priority
+              />
+            </Box>
             <Typography>{t('intro')}</Typography>
             {/* Erst rendern, wenn die Plattform feststeht. FirebaseUI startet
                 sein Widget beim Einhängen und entscheidet dabei ein für alle

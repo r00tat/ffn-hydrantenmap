@@ -3,11 +3,11 @@ import { render, RenderOptions, RenderResult } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { ReactElement, ReactNode } from 'react';
 import deMessages from '../../messages/de.json';
+import { appTheme } from '../components/providers/theme';
 
 /**
- * Das Theme der Tests: MUIs Standardtheme ohne Animationen. Die App selbst
- * ruft nirgends `createTheme` auf und läuft auf demselben Standardtheme,
- * deshalb ändert das an der Darstellung nichts außer den Übergängen.
+ * Das Theme der Tests: das Theme der App (`appTheme`) ohne Animationen. An der
+ * Darstellung ändert das nichts außer den Übergängen.
  *
  * Der Grund ist die Bestimmtheit, nicht die Geschwindigkeit. Die teuersten
  * Testdateien sind Dialog-Tests, die mit `userEvent` ganze MUI-Formulare
@@ -23,7 +23,7 @@ import deMessages from '../../messages/de.json';
  * sind es 29 Tests à etwa 150ms, gleichmäßig verteilt, ohne dominierenden
  * Einzeltest. An dieser Stelle ist mit Stellschrauben nichts mehr zu holen.
  */
-export const testTheme = createTheme({
+export const testTheme = createTheme(appTheme, {
   transitions: { create: () => 'none' },
   components: {
     MuiButtonBase: { defaultProps: { disableRipple: true } },
