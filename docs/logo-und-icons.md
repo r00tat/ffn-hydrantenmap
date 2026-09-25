@@ -39,6 +39,12 @@ Erzeugt werden:
   sind im Entwurf weiß und würden freigestellt in einer dunklen Tableiste
   verschwinden.
 - Android: Launcher-, Round- und Adaptive-Vordergrund sowie alle Splash-Größen.
+- `drawable-*/ic_stat_einsatzkarte.png`: das Benachrichtigungs-Icon (24 dp),
+  weißes Motiv auf transparent. Android wertet bei einem Small Icon nur den
+  Alphakanal aus. Ein eigenes Icon ist nötig, denn der Adaptive-Vordergrund
+  liegt als Mipmap vor und wäre in der Statusleiste nur ein weißer Fleck.
+  Verwendet wird es von der Radiacode-Benachrichtigung
+  (`RadiacodeForegroundService`).
 - `docs/design/vorschau-icons.png`: ein Übersichtsblatt der erzeugten Icons zur
   Durchsicht. Es entsteht im selben Lauf, damit man nie ein veraltetes Blatt
   begutachtet.

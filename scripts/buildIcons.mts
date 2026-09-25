@@ -304,6 +304,13 @@ async function androidSet(white: Cutout): Promise<void> {
       join(dir, 'ic_launcher_foreground.png'),
       await compose(white, adaptive, adaptive, 0.54, TRANSPARENT),
     );
+    // Status bar / notification small icon: 24dp, Android uses only its
+    // alpha channel, so it is the white artwork on transparent.
+    const status = Math.round(24 * factor);
+    await write(
+      join(ANDROID_RES, `drawable-${bucket}`, 'ic_stat_einsatzkarte.png'),
+      await compose(white, status, status, 0.92, TRANSPARENT),
+    );
   }
   for (const [folder, [width, height]] of Object.entries(SPLASHES)) {
     await write(
