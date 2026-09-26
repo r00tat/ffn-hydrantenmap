@@ -7,6 +7,7 @@ import { calculateDistance } from '../../FirecallItems/elements/connection/dista
 import HoseLengthOverlay from '../../FirecallItems/elements/connection/HoseLengthOverlay';
 import { leafletIcons } from '../../FirecallItems/icons';
 import { useLeitungen } from './context';
+import { finishedPositions } from './finishDrawing';
 
 const DRAWING_PANE = 'drawingPane';
 const DRAWING_PANE_Z = 650;
@@ -136,12 +137,16 @@ const LeitungenDraw = () => {
           autoPan={false}
           pane={DRAWING_PANE}
           eventHandlers={{
-            click: (event) => {
-              console.info(`click on ${p} ${index}`);
-              if (index == positions.length - 1) {
+            click: () => {
+              const finished = finishedPositions(
+                positions,
+                index,
+                item?.type !== 'area'
+              );
+              if (finished) {
                 setComplete(true);
                 leitungen.setIsDrawing(false);
-                void leitungen.complete([...positions]);
+                void leitungen.complete(finished);
                 setPositions([]);
               }
             },
