@@ -43,6 +43,7 @@ import { foerderungView } from './foerderung/foerderung';
 import HoseLengthOverlay from './HoseLengthOverlay';
 import { versorgungsart } from './pendel/pendelRoute';
 import { nearestInsertIndex } from './pointGeometry';
+import { useStickyPointMarkers } from './useStickyPointMarkers';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
@@ -70,7 +71,7 @@ export default function ConnectionMarker({
   const { email } = useFirebaseLogin();
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
-  const [showMarkers, setShowMarkers] = useState(false);
+  const stickyMarkers = useStickyPointMarkers();
   const [pointMenu, setPointMenu] = useState<{
     index: number;
     top: number;
@@ -221,7 +222,7 @@ export default function ConnectionMarker({
         .map(
           (p, index) =>
             (record.alwaysShowMarker === 'true' ||
-              showMarkers ||
+              stickyMarkers.visible ||
               index === 0 ||
               index === positions.length - 1) && (
               <Marker
@@ -255,11 +256,10 @@ export default function ConnectionMarker({
                       email
                     );
                   },
-                  // Keep the point markers visible while a point popup is open
-                  // (see AreaComponent for the detailed rationale) so tapping a
-                  // point opens the point's popup instead of the line's.
-                  popupopen: () => setShowMarkers(true),
-                  popupclose: () => setShowMarkers(false),
+                  // Closing a popup no longer hides the points (see
+                  // useStickyPointMarkers), so a point stays put when its popup
+                  // opens and the line popup closes.
+                  popupopen: stickyMarkers.show,
                   ...(editable
                     ? {
                         contextmenu: (event: L.LeafletMouseEvent) => {
@@ -327,6 +327,7 @@ export default function ConnectionMarker({
         }}
         eventHandlers={{
           click: (event) => {
+            stickyMarkers.markOwnClick(event);
             // nearestInsertIndex handles clicks anywhere near the line, so a new
             // point can be added via left-click without hitting a segment exactly.
             const index = nearestInsertIndex(
@@ -337,10 +338,7 @@ export default function ConnectionMarker({
             setPoint(event.latlng);
             setPointIndex(index);
           },
-          // mouseover: () => setShowMarkers(true),
-          // mouseout: () => setShowMarkers(false),
-          popupopen: () => setShowMarkers(true),
-          popupclose: () => setShowMarkers(false),
+          popupopen: stickyMarkers.show,
           ...(onContextMenu
             ? {
                 contextmenu: (e: L.LeafletMouseEvent) => {

@@ -22,6 +22,7 @@ import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallArea } from '../FirecallArea';
 import PointContextMenu from '../PointContextMenu';
 import { nearestInsertIndex } from '../connection/pointGeometry';
+import { useStickyPointMarkers } from '../connection/useStickyPointMarkers';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
@@ -45,7 +46,7 @@ export default function AreaMarker({
   const t = useTranslations('firecallElements');
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
-  const [showMarkers, setShowMarkers] = useState(false);
+  const stickyMarkers = useStickyPointMarkers();
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
   const [pointMenu, setPointMenu] = useState<{
@@ -79,7 +80,7 @@ export default function AreaMarker({
 
   return (
     <>
-      {(record.alwaysShowMarker === 'true' || showMarkers) &&
+      {(record.alwaysShowMarker === 'true' || stickyMarkers.visible) &&
         positions.map((p, index) => (
           <Marker
             key={index}
@@ -98,14 +99,10 @@ export default function AreaMarker({
                   email,
                 );
               },
-              // Keep the point markers visible while a point popup is open.
-              // Opening a marker popup closes the polygon popup first; without
-              // these handlers showMarkers would flip to false and unmount the
-              // marker mid-tap, so on touch the tap fell through to the polygon
-              // and its popup opened instead of the point's. React batches the
-              // polygon-popupclose and this popupopen into one render.
-              popupopen: () => setShowMarkers(true),
-              popupclose: () => setShowMarkers(false),
+              // Closing a popup no longer hides the points (see
+              // useStickyPointMarkers), so a point stays put when its popup
+              // opens and the polygon popup closes.
+              popupopen: stickyMarkers.show,
               ...(editable
                 ? {
                     contextmenu: (event: L.LeafletMouseEvent) => {
@@ -172,6 +169,7 @@ export default function AreaMarker({
         }}
         eventHandlers={{
           click: (event) => {
+            stickyMarkers.markOwnClick(event);
             // nearestInsertIndex also handles clicks on the area fill (not just
             // exactly on an edge), so a new point can be added anywhere on the
             // Fläche via left-click.
@@ -183,10 +181,7 @@ export default function AreaMarker({
             setPoint(event.latlng);
             setPointIndex(index);
           },
-          // mouseover: () => setShowMarkers(true),
-          // mouseout: () => setShowMarkers(false),
-          popupopen: () => setShowMarkers(true),
-          popupclose: () => setShowMarkers(false),
+          popupopen: stickyMarkers.show,
           ...(onContextMenu
             ? {
                 contextmenu: (e: L.LeafletMouseEvent) => {
