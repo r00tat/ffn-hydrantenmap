@@ -2,9 +2,17 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import useBarcodeScanner, {
+  createScanConfirmation,
   normalizeFormatName,
   toScanEvent,
+  type BarcodeScanEvent,
 } from './useBarcodeScanner';
+
+const reading = (value: string, format = 'code_128'): BarcodeScanEvent => ({
+  value,
+  results: [{ rawValue: value, format }],
+  engine: 'native',
+});
 
 function mockMediaDevices(getUserMedia: () => Promise<MediaStream>) {
   Object.defineProperty(globalThis.navigator, 'mediaDevices', {
@@ -107,5 +115,42 @@ describe('toScanEvent', () => {
   it('meldet nichts, wenn das Bild nichts Brauchbares hergab', () => {
     expect(toScanEvent([], 'native')).toBeUndefined();
     expect(toScanEvent([{ rawValue: '   ' }], 'native')).toBeUndefined();
+  });
+});
+
+describe('createScanConfirmation', () => {
+  it('bestätigt erst die dritte gleiche Lesung', () => {
+    const b = createScanConfirmation({ required: 3, windowMs: 2000 });
+    expect(b.push(reading('2016-FL-045'), 0)).toEqual({ confirmed: false, hits: 1 });
+    expect(b.push(reading('2016-FL-045'), 100)).toEqual({ confirmed: false, hits: 2 });
+    expect(b.push(reading('2016-FL-045'), 200)).toEqual({ confirmed: true, hits: 3 });
+  });
+
+  it('lässt ein einzelnes Fehllesen zwischen richtigen Lesungen nie durch', () => {
+    // Der Fall aus dem Einsatz: Ein Etikett „2016-FL-045" kam einmal als
+    // „1016-FL-045" heraus — mit gültiger Prüfsumme. Wiederholt hat sich das
+    // Fehllesen nicht, die richtige Lesung schon.
+    const b = createScanConfirmation({ required: 3, windowMs: 2000 });
+    const sequence = ['2016-FL-045', '1016-FL-045', '2016-FL-045', '2016-FL-045'];
+    const outcomes = sequence.map((v, i) => b.push(reading(v), i * 100));
+    expect(outcomes.map((e) => e.confirmed)).toEqual([false, false, false, true]);
+  });
+
+  it('zählt gleichen Text in anderer Symbologie nicht mit', () => {
+    const b = createScanConfirmation({ required: 2, windowMs: 2000 });
+    b.push(reading('2016', 'code_39'), 0);
+    expect(b.push(reading('2016', 'code_128'), 100).confirmed).toBe(false);
+  });
+
+  it('vergisst Lesungen, die älter als das Fenster sind', () => {
+    const b = createScanConfirmation({ required: 2, windowMs: 1000 });
+    b.push(reading('2016-FL-062'), 0);
+    expect(b.push(reading('2016-FL-062'), 1500)).toEqual({ confirmed: false, hits: 1 });
+    expect(b.push(reading('2016-FL-062'), 1600).confirmed).toBe(true);
+  });
+
+  it('übernimmt mit required 1 sofort', () => {
+    const b = createScanConfirmation({ required: 1, windowMs: 1000 });
+    expect(b.push(reading('X'), 0).confirmed).toBe(true);
   });
 });

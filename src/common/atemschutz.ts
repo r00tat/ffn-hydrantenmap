@@ -660,6 +660,52 @@ export function findByCode(
   return (stark.length > 0 ? stark : treffer).map((t) => t.g);
 }
 
+/** Ab dieser Länge (normalisiert) lohnt ein Vorschlag für einen Fast-Treffer. */
+const SIMILAR_MIN_LENGTH = 6;
+
+/** Ob sich zwei Codes um höchstens ein Zeichen unterscheiden (ersetzt, fehlt, zu viel). */
+function isWithinOneEdit(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  let i = 0;
+  while (i < shorter.length && shorter[i] === longer[i]) i++;
+  // Ab der ersten Abweichung muss der Rest passen: bei gleicher Länge ab dem
+  // nächsten Zeichen beider Codes, sonst ab dem nächsten des längeren.
+  return shorter.length === longer.length
+    ? shorter.slice(i + 1) === longer.slice(i + 1)
+    : shorter.slice(i) === longer.slice(i + 1);
+}
+
+/**
+ * Geräte, deren starke Kennung nur ein Zeichen neben einem Code liegt, der
+ * *nichts* trifft.
+ *
+ * Der Anlass ist ein Fehllesen der Kamera: Das Etikett `2016-FL-045` kam als
+ * `1016-FL-045` heraus — Code 128 mit gültiger Prüfsumme, denn die fängt nur
+ * einen einzelnen falschen Balken sicher ab. Der Scan wird inzwischen über
+ * mehrere Bilder bestätigt, ganz ausschließen lässt sich das Fehllesen damit
+ * nicht. Statt die Fehllesung dann still als Flaschennummer einzutragen,
+ * bietet der Dialog die naheliegende Flasche an. Gewählt wird von Hand.
+ *
+ * Nur starke Kennungen, aus demselben Grund wie in `findByCode`. Und erst ab
+ * sechs Zeichen: Bei kurzen Nummern liegt fast jede ein Zeichen neben einer
+ * anderen.
+ */
+export function findSimilar(
+  geraete: AtemschutzGeraet[],
+  raw: string,
+): AtemschutzGeraet[] {
+  const needle = normalizeCode(raw);
+  if (needle.length < SIMILAR_MIN_LENGTH) return [];
+  if (findByCode(geraete, needle).length > 0) return [];
+  return geraete.filter((g) =>
+    lookupEntries(g).some(
+      (e) => istStarkesFeld(e.feld) && isWithinOneEdit(e.code, needle),
+    ),
+  );
+}
+
 /** Vorgabe für die Trefferzahl der Suche — eine Liste, die man überblickt. */
 export const MATCH_LIMIT = 30;
 
