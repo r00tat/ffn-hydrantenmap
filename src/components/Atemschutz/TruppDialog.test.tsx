@@ -70,3 +70,32 @@ describe('TruppDialog', () => {
     expect(screen.getByLabelText(/Taktische Einheit/)).toHaveValue('TLFA');
   });
 });
+
+describe('TruppDialog: Namen korrigieren', () => {
+  it('gibt eine Korrektur als Umbenennung heraus', async () => {
+    const { onSave } = render({
+      trupp: {
+        truppKey: 'k1',
+        laufendeNummer: 1,
+        feuerwehr: 'Neusiedl am See',
+        mitglieder: ['Franz', 'Anna Beispiel'],
+        status: 'bereit',
+        bereitSeit: '2026-09-02T10:00:00.000Z',
+        createdAt: '',
+        createdBy: '',
+        updatedAt: '',
+        updatedBy: '',
+      },
+    });
+    fireEvent.click(screen.getByText('Franz'));
+    const feld = screen.getAllByLabelText(/Truppmitglieder/)[0];
+    fireEvent.change(feld, { target: { value: 'Franz Beispiel' } });
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: /speichern/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].umbenennungen).toEqual({
+      Franz: 'Franz Beispiel',
+    });
+  });
+});
+

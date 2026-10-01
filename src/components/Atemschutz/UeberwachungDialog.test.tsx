@@ -130,6 +130,9 @@ describe('UeberwachungDialog: Truppmitglieder', () => {
       'Anna Beispiel',
       'Franz Beispiel',
     ]);
+    expect(onSave.mock.calls[0][0].umbenennungen).toEqual({
+      Franz: 'Franz Beispiel',
+    });
   });
 
   it('speichert nicht ohne Truppmitglieder', () => {

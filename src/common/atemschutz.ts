@@ -1419,6 +1419,63 @@ export interface TruppInput {
    * Sekunde.
    */
   entsendetAn?: string;
+  /** Im Dialog korrigierte Namen, siehe `merkeUmbenennung`. */
+  umbenennungen?: Umbenennungen;
+}
+
+/**
+ * Korrigierte Namen der Truppmitglieder: ursprünglicher Name → neuer Name.
+ *
+ * Die Träger der Geräte (`TruppGeraet.person`) stehen als Text am Gerät und
+ * nicht als Verweis auf ein Mitglied. Ohne diese Zuordnung stünde nach dem
+ * Ergänzen von „Franz" zu „Franz Beispiel" die Flasche weiter bei „Franz".
+ */
+export type Umbenennungen = Record<string, string>;
+
+/**
+ * Nimmt eine Korrektur auf. Wird ein schon korrigierter Name noch einmal
+ * geändert, zählt nur der ursprüngliche: Nur der steht am Gerät. Endet eine
+ * Korrektur wieder beim ursprünglichen Namen, fällt sie weg.
+ */
+export function merkeUmbenennung(
+  bisher: Umbenennungen,
+  alt: string,
+  neu: string,
+): Umbenennungen {
+  const ursprung =
+    Object.keys(bisher).find((key) => bisher[key] === alt) ?? alt;
+  const result = { ...bisher };
+  if (ursprung === neu) {
+    delete result[ursprung];
+  } else {
+    result[ursprung] = neu;
+  }
+  return result;
+}
+
+/**
+ * Der Patch, der die Träger an den Geräten auf die korrigierten Namen setzt.
+ *
+ * Umbenannt wird nur, wenn der neue Name auch in der gespeicherten
+ * Mitgliederliste steht: Wurde der korrigierte Name danach doch entfernt, ist
+ * es ein Austausch der Person, und der Träger bleibt, wie er war. Ohne
+ * betroffenes Gerät bleibt der Patch leer, damit ein bloßes Umbenennen nicht
+ * die Geräteliste eines anderen Geräts überschreibt.
+ */
+export function traegerUmbenennenPatch(
+  trupp: Pick<AtemschutzTrupp, 'truppGeraete'>,
+  mitglieder: string[],
+  umbenennungen: Umbenennungen = {},
+): Pick<AtemschutzTrupp, 'truppGeraete'> {
+  const namen = sanitizeMitglieder(mitglieder);
+  let geaendert = false;
+  const truppGeraete = (trupp.truppGeraete ?? []).map((g) => {
+    const neu = g.person ? umbenennungen[g.person.trim()] : undefined;
+    if (!neu || !namen.includes(neu)) return g;
+    geaendert = true;
+    return { ...g, person: neu };
+  });
+  return geaendert ? { truppGeraete: sanitizeTruppGeraete(truppGeraete) } : {};
 }
 
 /**
@@ -1509,7 +1566,10 @@ export type UeberwachungPatch = Partial<AtemschutzTrupp>;
 
 export interface UebernahmeInput {
   /** Der bestehende Zustand — entscheidet, ob die Übernahme neu ist. */
-  trupp: Pick<AtemschutzTrupp, 'ueberwachungSeit' | 'ueberwachungUids'>;
+  trupp: Pick<
+    AtemschutzTrupp,
+    'ueberwachungSeit' | 'ueberwachungUids' | 'truppGeraete'
+  >;
   jetzt: string;
   uid: string;
   ueberwachtVon?: string;
@@ -1531,6 +1591,8 @@ export interface UebernahmeInput {
    * der Trupp zunächst nur mit Vornamen erfasst wurde.
    */
   mitglieder?: string[];
+  /** Im Dialog korrigierte Namen — die Träger der Geräte ziehen mit. */
+  umbenennungen?: Umbenennungen;
   paTyp?: PaTypKey;
   /** Nur bei `paTyp === 'custom'` von Belang, aber immer mitgeschrieben. */
   satz?: Geraetesatz;
@@ -1569,7 +1631,13 @@ export function uebernahmePatch(input: UebernahmeInput): UeberwachungPatch {
   // Ein Trupp ohne Mitglieder ist keiner: Eine leere Liste lässt die
   // vorhandenen Namen stehen, statt sie zu löschen.
   const mitglieder = sanitizeMitglieder(input.mitglieder ?? []);
-  if (mitglieder.length > 0) patch.mitglieder = mitglieder;
+  if (mitglieder.length > 0) {
+    patch.mitglieder = mitglieder;
+    Object.assign(
+      patch,
+      traegerUmbenennenPatch(input.trupp, mitglieder, input.umbenennungen),
+    );
+  }
 
   if (input.paTyp) {
     patch.paTyp = input.paTyp;

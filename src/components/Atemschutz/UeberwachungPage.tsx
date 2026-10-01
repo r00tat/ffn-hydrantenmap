@@ -30,6 +30,7 @@ import {
   newTruppKey,
   sammelplatzUebergabePatch,
   sanitizeMitglieder,
+  traegerUmbenennenPatch,
   sanitizeTruppGeraete,
   uebernahmePatch,
   type AtemschutzTrupp,
@@ -470,7 +471,19 @@ export default function UeberwachungPage() {
             : {}),
       };
       if (trupp?.id) {
-        await updateTrupp(firecallId, trupp.id, basis, stamp);
+        await updateTrupp(
+          firecallId,
+          trupp.id,
+          {
+            ...basis,
+            ...traegerUmbenennenPatch(
+              trupp,
+              basis.mitglieder,
+              input.umbenennungen,
+            ),
+          },
+          stamp,
+        );
         return;
       }
       await addTrupp(
@@ -514,6 +527,7 @@ export default function UeberwachungPage() {
           auftrag: input.auftrag,
           entsendetAn: input.entsendetAn,
           mitglieder: input.mitglieder,
+          umbenennungen: input.umbenennungen,
           paTyp: input.paTyp,
           satz: input.satz,
         }),

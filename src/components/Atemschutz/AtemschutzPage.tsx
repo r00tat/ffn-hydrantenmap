@@ -15,6 +15,7 @@ import {
   newTruppKey,
   nextBereitstellung,
   sanitizeMitglieder,
+  traegerUmbenennenPatch,
   truppLabel,
   type AtemschutzFuellung,
   type AtemschutzGeraet,
@@ -214,7 +215,21 @@ export default function AtemschutzPage() {
       };
 
       if (trupp?.id) {
-        await updateTrupp(firecallId, trupp.id, basis, stamp);
+        // Korrigierte Namen ziehen die Träger der Geräte mit — sonst stünde
+        // die Flasche weiter beim Vornamen.
+        await updateTrupp(
+          firecallId,
+          trupp.id,
+          {
+            ...basis,
+            ...traegerUmbenennenPatch(
+              trupp,
+              basis.mitglieder,
+              input.umbenennungen,
+            ),
+          },
+          stamp,
+        );
         return;
       }
       await addTrupp(

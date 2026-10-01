@@ -446,9 +446,18 @@ Geändert wird die Mitgliederliste im Trupp-Dialog des Sammelplatzes **und** im
 Bearbeiten-Dialog der Überwachung: Ein Trupp, der bei der eigenen Einheit
 erfasst wurde, hat keinen anderen Dialog, und oft steht anfangs nur der
 Vorname da. Ein Klick auf einen Namen holt ihn zum Ergänzen zurück ins
-Eingabefeld (`PersonChipsInput`). Ein schon gesetzter Träger wird dabei nicht
-mit umbenannt — er bleibt als „nicht (mehr) im Trupp" sichtbar und wird in
-der Ausrüstung neu gewählt.
+Eingabefeld (`PersonChipsInput`).
+
+Ein schon gesetzter Träger **zieht dabei mit**: Der Träger steht als Text am
+Gerät und nicht als Verweis auf ein Mitglied, aus „Franz" zu „Franz Beispiel"
+korrigiert stünde die Flasche sonst weiter bei „Franz". Das Feld meldet jede
+Korrektur als Paar alt → neu (`merkeUmbenennung` fasst eine zweite Korrektur
+desselben Namens zusammen, weil am Gerät nur der ursprüngliche steht), und
+beim Speichern setzt `traegerUmbenennenPatch` die Träger um. Als Korrektur gilt
+nur, was über das Antippen läuft und nicht zwischendurch geleert wurde: Ein
+gelöschter und neu getippter Name kann ebenso gut eine andere Person sein, und
+ein falsch umgehängtes Gerät fiele erst im Füllprotokoll auf. Ebenso bleibt der
+Träger stehen, wenn der neue Name beim Speichern nicht mehr im Trupp steht.
 
 Auf der Karte steht die Ausrüstung **nach Träger gebündelt**, eine Zeile je
 Person (`gruppiereTruppGeraete`): Gefragt ist „was trägt Huber?" und nicht „was

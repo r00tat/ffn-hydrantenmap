@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import {
   MAX_TRUPP_MITGLIEDER,
+  merkeUmbenennung,
   PA_SAETZE,
   PA_TYPEN,
   sanitizeMitglieder,
@@ -23,6 +24,7 @@ import {
   type AtemschutzTrupp,
   type Geraetesatz,
   type PaTypKey,
+  type Umbenennungen,
 } from '../../common/atemschutz';
 import {
   geraetesatzVon,
@@ -39,6 +41,8 @@ export interface UeberwachungEingabe {
   entsendetAn: string;
   /** Die Namen des Trupps — hier nachgetragen oder korrigiert. */
   mitglieder: string[];
+  /** Korrigierte Namen — die Träger der Geräte ziehen mit. */
+  umbenennungen: Umbenennungen;
   paTyp: PaTypKey;
   satz: Geraetesatz;
 }
@@ -107,6 +111,7 @@ export default function UeberwachungDialog({
   const [einsatzziel, setEinsatzziel] = useState(trupp.einsatzziel ?? '');
   const [auftrag, setAuftrag] = useState(trupp.auftrag ?? '');
   const [entsendetAn, setEntsendetAn] = useState(trupp.entsendetAn ?? '');
+  const [umbenennungen, setUmbenennungen] = useState<Umbenennungen>({});
   const [mitglieder, setMitglieder] = useState<string[]>(
     () => trupp.mitglieder ?? [],
   );
@@ -142,6 +147,7 @@ export default function UeberwachungDialog({
         auftrag,
         entsendetAn,
         mitglieder,
+        umbenennungen,
         paTyp,
         satz: aktuellerSatz,
       });
@@ -192,6 +198,9 @@ export default function UeberwachungDialog({
             options={namen}
             max={MAX_TRUPP_MITGLIEDER}
             onChange={setMitglieder}
+            onUmbenennen={(alt, neu) =>
+              setUmbenennungen((prev) => merkeUmbenennung(prev, alt, neu))
+            }
           />
           {/* Die Einheit steht oben: Sie ist die Frage, die vor allen anderen
               beantwortet ist — „welches Fahrzeug hat den Trupp?" —, und sie

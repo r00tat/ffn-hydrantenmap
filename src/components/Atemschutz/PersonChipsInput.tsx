@@ -17,6 +17,12 @@ export interface PersonChipsInputProps {
   vollText?: string;
   disabled?: boolean;
   onChange: (value: string[]) => void;
+  /**
+   * Ein per Klick korrigierter Name ist wieder übernommen — `alt` ist der Name
+   * vor der Korrektur. Wird der Text dabei geleert, ist es keine Korrektur
+   * mehr, sondern ein Austausch der Person, und es kommt keine Meldung.
+   */
+  onUmbenennen?: (alt: string, neu: string) => void;
 }
 
 /**
@@ -51,12 +57,25 @@ export default function PersonChipsInput({
   vollText,
   disabled,
   onChange,
+  onUmbenennen,
 }: PersonChipsInputProps) {
   const [eingabe, setEingabe] = useState('');
+  /** Der Name, der gerade zum Korrigieren im Eingabefeld steht. */
+  const [korrektur, setKorrektur] = useState<string>();
+
+  const meldeKorrektur = (next: string[]) => {
+    if (korrektur == null) return;
+    const neu = next.find((n) => !value.includes(n));
+    if (neu == null) return;
+    if (neu !== korrektur) onUmbenennen?.(korrektur, neu);
+    setKorrektur(undefined);
+  };
 
   const uebernehmen = (namen: string[]) => {
     const geteilt = namen.flatMap((n) => (n ?? '').split(/[,;]/));
-    onChange(sanitizePersonen(geteilt, max));
+    const next = sanitizePersonen(geteilt, max);
+    meldeKorrektur(next);
+    onChange(next);
   };
 
   const voll = max != null && value.length >= max;
@@ -64,8 +83,11 @@ export default function PersonChipsInput({
   const korrigieren = (index: number) => {
     const name = value[index];
     const rest = value.filter((_, i) => i !== index);
-    onChange(sanitizePersonen([...rest, ...eingabe.split(/[,;]/)], max));
+    const next = sanitizePersonen([...rest, ...eingabe.split(/[,;]/)], max);
+    meldeKorrektur(next);
+    onChange(next);
     setEingabe(name);
+    setKorrektur(name);
   };
 
   return (
@@ -86,7 +108,12 @@ export default function PersonChipsInput({
       }
       value={value}
       inputValue={eingabe}
-      onInputChange={(_, next) => setEingabe(next ?? '')}
+      onInputChange={(_, next, reason) => {
+        setEingabe(next ?? '');
+        // Selbst geleert heißt: Dieser Name ist weg, was danach kommt, ist
+        // eine andere Person.
+        if (reason === 'input' && !next?.trim()) setKorrektur(undefined);
+      }}
       onChange={(_, next) => uebernehmen(next as string[])}
       renderValue={(namen, getItemProps, ownerState) =>
         namen.map((name, index) => {
