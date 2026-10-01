@@ -846,10 +846,46 @@ Solange nichts gelesen ist, steht stattdessen die **Auflösung des Videobildes
 und die Zahl der geprüften Bilder** da. „Kamera läuft, Decoder findet nichts"
 sah vorher aus wie ein Hänger, und die Auflösung erklärt den Fall: Ein
 Strichcode braucht Pixel je Modul. Ein Code-128-Etikett aus 30 cm Abstand ist in
-einem 640×480-Bild nachweislich nicht lesbar — der Hook zeichnet das Videobild
-1:1 ins Canvas, ohne Zuschnitt auf den Zielrahmen und ohne Hochskalierung. Der
-Rahmen im Dialog (`inset: '30% 10%'`) ist reine Dekoration; ausgewertet wird das
-ganze Bild.
+einem 640×480-Bild nachweislich nicht lesbar. Ausgewertet wird das ganze Bild,
+ohne Zuschnitt auf den Zielrahmen und ohne Hochskalierung.
+
+### Ein Code gilt erst nach drei gleichen Lesungen
+
+Im Einsatz kamen zwei Flaschenetiketten falsch heraus: `2016-FL-045` als
+`1016-FL-045`, `2016-FL-062` als `2016-FL301`. Beide Etiketten sind Code 128
+(Zeichensatz A), und beide Fehllesungen tragen eine **gültige Prüfsumme**. Die
+Prüfsumme von Code 128 (gewichtet, mod 103) fängt einen einzelnen falsch
+vermessenen Balken sicher ab, zwei nur noch mit etwa 102 zu 103. Bei
+`1016-FL-045` sind es genau zwei: das erste Datenzeichen nach dem Start und das
+Prüfzeichen vor dem Stopp. Das sind die Enden des Codes, und dort ist das
+Etikett an der Flaschenschulter am stärksten gekrümmt.
+
+Damals galt der **erste** Treffer. Bei 10 Bildern je Sekunde fallen unter
+schlechten Bedingungen genug Fehllesungen an, dass eine davon durchrutscht.
+Deshalb:
+
+- **`createScanConfirmation`** lässt einen Code erst gelten, wenn er
+  `SCAN_CONFIRMATIONS` (3) Mal innerhalb von 2 Sekunden gelesen wurde, mit
+  gleichem Text **und** gleicher Symbologie. Fehllesungen sind zufällig und
+  wiederholen sich praktisch nie gleich. Die Lesungen müssen nicht in
+  aufeinanderfolgenden Bildern liegen; eine dazwischengerutschte Fehllesung
+  setzt die richtige nicht zurück. Bis dahin zeigt `ScanLauf` die Lesung mit
+  „wird bestätigt (1/3)". Jede Rohlesung, auch die unbestätigte, steht im
+  `console.info` und damit im Bug-Report.
+- **Die Kamera wird mit `ideal` 1920 × 1080 angefordert.** Ohne Angabe liefert
+  der Android-WebView 640 × 480. Ein Flaschenetikett ist rund 175 Module lang;
+  hochkant im Bild blieben davon etwa 1,5 Pixel je Modul. Beim nativen Detektor
+  wird das Bild nicht mehr ins Canvas kopiert, das braucht nur ZXing.
+- **Der Zielrahmen ist quadratisch** (70 % der kürzeren Bildkante). Der frühere
+  querformatige Rahmen ließ ein hochkant liegendes Etikett nur hineinpassen,
+  wenn man das Handy weit weghielt. Mit automatischem Drehen drehte er beim
+  Querhalten mit. Der Detektor liest in jeder Lage, der Rahmen bleibt Hilfe
+  zum Zielen.
+- **`findSimilar`** schlägt nach einem Kamera-Scan, der nichts trifft, Geräte
+  vor, deren starke Kennung nur ein Zeichen abweicht (ersetzt, fehlt, zu
+  viel); erst ab sechs Zeichen, sonst liegt fast jede Nummer neben einer
+  anderen. Gewählt wird von Hand, übernommen die Kennung des Geräts, nicht die
+  Fehllesung. Bei Handeingabe gibt es den Vorschlag nicht.
 
 ## Mangel-Verallgemeinerung
 

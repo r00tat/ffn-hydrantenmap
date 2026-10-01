@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import type {
   BarcodeScan,
   BarcodeScanEvent,
+  ScanCandidate,
   ScannerEngine,
 } from '../../hooks/useBarcodeScanner';
 
@@ -77,6 +78,8 @@ export interface ScanLaufProps {
   /** Die Auflösung, in der ausgewertet wird. */
   frameSize?: { width: number; height: number };
   frames: number;
+  /** Eine Lesung, die noch auf ihre Bestätigung wartet. */
+  candidate?: ScanCandidate;
 }
 
 /**
@@ -87,10 +90,27 @@ export interface ScanLaufProps {
  * den Fall von einer eingefrorenen Kamera, die Auflösung erklärt ihn — ein
  * Strichcode braucht Pixel je Modul, und was `getUserMedia` von sich aus
  * liefert, reicht dafür nicht immer.
+ *
+ * Steht schon eine unbestätigte Lesung, wird stattdessen sie gezeigt: Ein Code
+ * gilt erst nach mehreren gleichen Lesungen, und das Warten darauf soll nicht
+ * aussehen wie „liest nichts".
  */
-export function ScanLauf({ engine, frameSize, frames }: ScanLaufProps) {
+export function ScanLauf({ engine, frameSize, frames, candidate }: ScanLaufProps) {
   const t = useTranslations('atemschutz');
   const engineLabel = useEngineLabel();
+
+  if (candidate) {
+    return (
+      <Typography variant="caption" color="text.secondary" component="div">
+        {t('scanner.confirming', {
+          code: candidate.value,
+          format: candidate.format ?? t('scanner.formatUnknown'),
+          hits: candidate.hits,
+          required: candidate.required,
+        })}
+      </Typography>
+    );
+  }
 
   return (
     <Typography variant="caption" color="text.secondary" component="div">

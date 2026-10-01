@@ -15,6 +15,7 @@ import {
   darfFuellungAendern,
   entsendePatch,
   erneuterEinsatz,
+  findSimilar,
   findByCode,
   fuellungSperre,
   geraetDetails,
@@ -1852,3 +1853,37 @@ describe('traegerUmbenennenPatch', () => {
   });
 });
 
+
+describe('findSimilar', () => {
+  const fl045 = geraet({ id: 'fl045', inventarNr: '2016-FL-045' });
+  const fl062 = geraet({ id: 'fl062', inventarNr: '2016-FL-062' });
+  const withSerial = geraet({ id: 'serie', seriennummer: '2016-FL-046' });
+
+  it('schlägt die Flasche vor, deren Inventarnummer nur ein Zeichen abweicht', () => {
+    // Fehllesen aus dem Einsatz: Etikett „2016-FL-045", gelesen „1016-FL-045".
+    expect(findSimilar([fl045, fl062], '1016-FL-045').map((g) => g.id)).toEqual(['fl045']);
+  });
+
+  it('erkennt auch ein fehlendes oder zusätzliches Zeichen', () => {
+    expect(findSimilar([fl045, fl062], '2016-FL-45').map((g) => g.id)).toEqual(['fl045']);
+    expect(findSimilar([fl045, fl062], '2016-FL-0452').map((g) => g.id)).toEqual(['fl045']);
+  });
+
+  it('schlägt nichts vor, wenn mehr als ein Zeichen abweicht', () => {
+    expect(findSimilar([fl045, fl062], '2016-FL301')).toEqual([]);
+  });
+
+  it('schlägt nichts vor, wenn der Code ein Gerät exakt trifft', () => {
+    expect(findSimilar([fl045, fl062], '2016-FL-045')).toEqual([]);
+  });
+
+  it('übergeht schwache Kennungen wie die Seriennummer', () => {
+    expect(findSimilar([withSerial], '2016-FL-047')).toEqual([]);
+  });
+
+  it('schlägt bei kurzen Codes nichts vor', () => {
+    // Bei vier Zeichen liegt fast jede Nummer ein Zeichen neben einer anderen.
+    const short = geraet({ id: 'k', nummer: '2.16' });
+    expect(findSimilar([short], '2.17')).toEqual([]);
+  });
+});

@@ -99,6 +99,61 @@ export function toScanEvent(
   return { value, results, engine };
 }
 
+/**
+ * Wie oft derselbe Code gelesen sein muss, bevor er gilt, und in welchem
+ * Zeitfenster.
+ *
+ * Der Anlass steht im Einsatz: Zwei Flaschenetiketten in Code 128 kamen als
+ * `1016-FL-045` und `2016-FL301` heraus — beide mit gültiger Prüfsumme. Die
+ * Prüfsumme von Code 128 fängt einen einzelnen falsch vermessenen Balken
+ * sicher ab, zwei nur noch mit etwa 102 zu 103. Bei 10 Bildern je Sekunde,
+ * einem kleinen Kamerabild und einem schräg gehaltenen, gekrümmten Etikett
+ * fallen genug Fehllesungen an, dass eine davon durchrutscht — und bisher galt
+ * der erste Treffer. Fehllesungen sind zufällig und wiederholen sich praktisch
+ * nie gleich, eine richtige Lesung schon. Drei gleiche Lesungen kosten bei
+ * gutem Bild 0,3 Sekunden.
+ */
+export const SCAN_CONFIRMATIONS = 3;
+export const SCAN_CONFIRMATION_WINDOW_MS = 2000;
+
+/** Eine Lesung, die noch auf ihre Bestätigung wartet — für die Anzeige. */
+export interface ScanCandidate {
+  value: string;
+  format?: string;
+  /** Wie oft der Code im Zeitfenster gelesen wurde, diese Lesung mitgezählt. */
+  hits: number;
+  required: number;
+}
+
+/**
+ * Zählt gleiche Lesungen über die Bilder hinweg und sagt, wann eine gilt.
+ *
+ * „Gleich" heißt gleicher Text **und** gleiche Symbologie: Ein Etikett, das
+ * einmal als `code_128` und einmal als `code_39` herauskommt, ist ein
+ * Widerspruch und keine Bestätigung. Nicht verlangt wird, dass die Lesungen
+ * in aufeinanderfolgenden Bildern liegen — zwischen zwei Treffern liefert der
+ * Detektor oft ein Bild lang nichts, und eine dazwischengerutschte Fehllesung
+ * soll die richtige nicht zurücksetzen.
+ *
+ * Ohne React und mit der Zeit als Argument, damit die Regel prüfbar bleibt,
+ * ohne eine Kamera zu mocken.
+ */
+export function createScanConfirmation({
+  required = SCAN_CONFIRMATIONS,
+  windowMs = SCAN_CONFIRMATION_WINDOW_MS,
+}: { required?: number; windowMs?: number } = {}) {
+  let history: { key: string; at: number }[] = [];
+  return {
+    push(scan: BarcodeScanEvent, now: number) {
+      const key = `${scan.results[0]?.format ?? ''}\u0000${scan.value}`;
+      history = history.filter((v) => now - v.at < windowMs);
+      history.push({ key, at: now });
+      const hits = history.filter((v) => v.key === key).length;
+      return { confirmed: hits >= required, hits };
+    },
+  };
+}
+
 interface BarcodeDetectorLike {
   detect(source: CanvasImageSource): Promise<BarcodeScan[]>;
 }
@@ -161,6 +216,7 @@ async function zxingDetector(): Promise<BarcodeDetectorLike> {
 export interface UseBarcodeScannerOptions {
   /** Solange `false`, wird die Kamera nicht angefasst. */
   active: boolean;
+  /** Erst für eine bestätigte Lesung, siehe `SCAN_CONFIRMATIONS`. */
   onDetected: (scan: BarcodeScanEvent) => void;
 }
 
@@ -188,6 +244,14 @@ export interface UseBarcodeScannerResult {
    * aussieht.
    */
   frames: number;
+  /**
+   * Die zuletzt gelesene, noch nicht bestätigte Lesung.
+   *
+   * Ohne sie sähe das Warten auf die Bestätigung aus wie „liest nichts" — und
+   * steht hier immer wieder ein anderer Text, liegt das Etikett schlecht im
+   * Bild.
+   */
+  candidate?: ScanCandidate;
 }
 
 /** Wie oft ein Einzelbild ausgewertet wird. 100 ms reicht für die Hand. */
@@ -203,6 +267,7 @@ export default function useBarcodeScanner({
   const [engine, setEngine] = useState<ScannerEngine>();
   const [frameSize, setFrameSize] = useState<{ width: number; height: number }>();
   const [frames, setFrames] = useState(0);
+  const [candidate, setCandidate] = useState<ScanCandidate>();
 
   // Über eine Ref, damit ein neu erzeugter Callback des Aufrufers nicht die
   // Kamera neu startet — das ließe das Bild bei jedem Tastendruck flackern.
@@ -244,7 +309,18 @@ export default function useBarcodeScanner({
         stream = await navigator.mediaDevices.getUserMedia({
           // Die rückwärtige Kamera: Wer eine Flasche scannt, hält das Gerät
           // von sich weg.
-          video: { facingMode: { ideal: 'environment' } },
+          //
+          // Die Auflösung als `ideal`, nicht als Pflicht: Ohne Angabe liefert
+          // der Android-WebView 640 × 480. Ein Flaschenetikett in Code 128 ist
+          // rund 175 Module lang; liegt es hochkant im Bild, bleiben davon
+          // etwa 1,5 Pixel je Modul — zu wenig, um schmale und breite Balken
+          // sicher zu trennen. Kann die Kamera kein Full HD, nimmt der
+          // Browser das Nächstbeste, statt zu scheitern.
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         });
       } catch (err) {
         if (cancelled) return;
@@ -305,9 +381,14 @@ export default function useBarcodeScanner({
         return;
       }
 
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      // Das Canvas braucht nur ZXing. Der native Detektor liest direkt aus
+      // dem Video; ihm jedes Bild erst umzukopieren, kostete bei Full HD
+      // zehnmal je Sekunde 8 MB Speicherbewegung für nichts.
+      const canvas = Native ? undefined : document.createElement('canvas');
+      const ctx = canvas?.getContext('2d');
+      const confirmation = createScanConfirmation();
       setEngine(engineInUse);
+      setCandidate(undefined);
       setStatus('running');
 
       let busy = false;
@@ -316,17 +397,24 @@ export default function useBarcodeScanner({
       timer = setInterval(() => {
         // Ohne diese Sperre stapeln sich die Auswertungen, sobald eine länger
         // als das Intervall braucht — auf schwächeren Geräten der Regelfall.
-        if (busy || !ctx || video.readyState < 2) return;
+        if (busy || video.readyState < 2) return;
+        if (canvas && !ctx) return;
         busy = true;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        if (canvas && ctx) {
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(video, 0, 0);
+        }
 
         // Die Auflösung steht erst, wenn das erste Bild da ist, und ändert sich
-        // danach praktisch nie — deshalb nur beim Wechsel in den State.
-        if (canvas.width !== gemeldeteBreite) {
-          gemeldeteBreite = canvas.width;
-          setFrameSize({ width: canvas.width, height: canvas.height });
+        // danach praktisch nie — deshalb nur beim Wechsel in den State. Dreht
+        // sich das Gerät, tauschen Breite und Höhe, und der Rahmen im Dialog
+        // muss mit.
+        if (width !== gemeldeteBreite) {
+          gemeldeteBreite = width;
+          setFrameSize({ width, height });
         }
         geprueft += 1;
         // Nur jedes zehnte Bild in den State: Bei 100 ms Takt wäre das sonst
@@ -334,20 +422,34 @@ export default function useBarcodeScanner({
         // überhaupt etwas läuft.
         if (geprueft % 10 === 0) setFrames(geprueft);
         void detector
-          .detect(Native ? video : canvas)
+          .detect(canvas ?? video)
           .then((results) => {
             const scan = toScanEvent(results, engineInUse);
-            if (!scan) return;
+            if (!scan || cancelled) return;
+            const { confirmed, hits } = confirmation.push(scan, Date.now());
+            // Jede Rohlesung ins Protokoll, auch die unbestätigte: Genau die
+            // Fehllesungen, die jetzt nicht mehr durchkommen, sollen in einem
+            // Bug-Report noch zu sehen sein.
             console.info('Atemschutz-Scan:', {
               engine: scan.engine,
-              bild: `${canvas.width}x${canvas.height}`,
+              bild: `${width}x${height}`,
               nachBildern: geprueft,
               value: scan.value,
+              bestaetigt: `${hits}/${SCAN_CONFIRMATIONS}`,
               results: scan.results.map(
                 (r) => `${r.format ?? 'unbekannt'}: ${r.rawValue}`,
               ),
             });
-            onDetectedRef.current(scan);
+            if (confirmed) {
+              onDetectedRef.current(scan);
+              return;
+            }
+            setCandidate({
+              value: scan.value,
+              format: scan.results[0]?.format,
+              hits,
+              required: SCAN_CONFIRMATIONS,
+            });
           })
           .catch(() => undefined)
           .finally(() => {
@@ -372,5 +474,6 @@ export default function useBarcodeScanner({
     engine: active ? engine : undefined,
     frameSize: active ? frameSize : undefined,
     frames: active ? frames : 0,
+    candidate: active ? candidate : undefined,
   };
 }

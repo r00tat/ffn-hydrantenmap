@@ -189,6 +189,34 @@ Projekt-Basis: [docs/deployment.md](docs/deployment.md).
 
 Tests use **Vitest** with `@testing-library/react` and `@testing-library/jest-dom`. Place test files **directly next to** the source file they test using the `*.test.ts` / `*.test.tsx` naming convention (e.g., `utils.ts` → `utils.test.ts` in the same directory). Do **not** use `__tests__/` folders.
 
+## Sprache im Code
+
+**Bezeichner sind englisch:** Funktionen, Variablen, Konstanten, Parameter,
+Typen, Interfaces, Komponenten, Hooks und Dateinamen neuer Module.
+**Kommentare, Doku, Testbeschreibungen und Werte dürfen deutsch sein** —
+UI-Texte, Fachbegriffe als Daten, Log-Meldungen.
+
+```ts
+// Richtig:
+export function findSimilar(devices: AtemschutzGeraet[], raw: string) { … }
+const SCAN_CONFIRMATIONS = 3;
+
+// Falsch:
+export function findAehnlich(geraete: AtemschutzGeraet[], raw: string) { … }
+const SCAN_BESTAETIGUNGEN = 3;
+```
+
+Ausnahmen:
+
+- **Persistierte Feldnamen** in Firestore (`inventarNr`, `flaschenNummer`,
+  `atemschutzTrupp`) und Message-Schlüssel bleiben, wie sie sind. Sie umzubenennen
+  ist eine Datenmigration, keine Stilfrage.
+- **Bestehender Code mit deutschen Namen** wird nicht nebenbei umbenannt. Wer
+  darin arbeitet, benennt neue Bezeichner englisch; ein Umbenennen des
+  Bestands gehört in einen eigenen `refactor:`-Commit.
+- Ein Fachbegriff ohne gute englische Entsprechung darf als Wortteil stehen,
+  wenn er im Datenmodell schon so heißt (`truppKey`, `geraetId`).
+
 ## Tech Stack
 
 - **Next.js 16** with App Router (not Pages Router)
