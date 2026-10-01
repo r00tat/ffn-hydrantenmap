@@ -11,7 +11,9 @@ export const readCsvFile = <T>(inputCsv: string) => {
 
   const csvData = fs.readFileSync(inputCsv, { encoding: 'utf8' });
 
-  const records: T[] = parse(csvData, {
+  // Die Spaltennamen entstehen erst zur Laufzeit aus dem Header, ein Bezug zu
+  // den Schlüsseln von T lässt sich für csv-parse nicht typisieren.
+  const records = parse<Record<string, string>>(csvData, {
     columns: (header: string[]) =>
       header.map((column: string) =>
         column.toLowerCase().replace(/[^a-z0-9]+/g, '_')
@@ -21,5 +23,5 @@ export const readCsvFile = <T>(inputCsv: string) => {
 
   console.info(`parsed ${records.length} records`);
 
-  return records;
+  return records as T[];
 };
