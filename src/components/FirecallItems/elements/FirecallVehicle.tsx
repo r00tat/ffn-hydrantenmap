@@ -122,6 +122,11 @@ export class FirecallVehicle extends FirecallItemBase {
     return `${this.name} ${this.fw || ''}`.trim();
   }
 
+  /** Rot, bei einer Fremdorganisation blau — die Vorgabe nach Zugehörigkeit. */
+  public defaultColor(): string {
+    return vehicleMarkerColor({ fremd: this.fremd });
+  }
+
   /** Gehört das Fahrzeug einer fremden Organisation? */
   public isFremd(): boolean {
     return isFremdesFahrzeug(this);
