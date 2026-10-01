@@ -5,7 +5,10 @@
  * Nur `NEXT_PUBLIC_*` gehört hier hinein: Der gebaute Worker wird als Skript
  * ausgeliefert, sein Inhalt ist öffentlich.
  */
-export const SERVICE_WORKER_ENV_KEYS = ['NEXT_PUBLIC_FIREBASE_APIKEY'] as const;
+export const SERVICE_WORKER_ENV_KEYS = [
+  'NEXT_PUBLIC_FIREBASE_APIKEY',
+  'NEXT_PUBLIC_BUILD_ID',
+] as const;
 
 /**
  * `define`-Tabelle für den esbuild-Lauf, mit dem `@serwist/turbopack` den
