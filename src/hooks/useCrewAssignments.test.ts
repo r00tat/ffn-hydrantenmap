@@ -8,7 +8,9 @@ vi.mock('../components/firebase/firebase', () => ({
   firestore: { type: 'mock-firestore' },
 }));
 
-const mockGetDocsResult = { docs: [] as { data: () => Record<string, unknown> }[] };
+const mockGetDocsResult = {
+  docs: [] as { id?: string; data: () => Record<string, unknown> }[],
+};
 
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn((...args: unknown[]) => ({
@@ -158,6 +160,69 @@ describe('useCrewAssignments', () => {
       expect(mockAddDoc).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ recipientId: 'r2', name: 'Bob' }),
+      );
+    });
+    it('legt eine Person aus zwei Alarmen unter verschiedenen IDs nur einmal an', async () => {
+      const alarm1 = makeAlarm('alarm1', [
+        { id: 'a1-max', name: 'Mustermann Max', participation: 'yes' },
+      ]);
+      const alarm2 = makeAlarm('alarm2', [
+        { id: 'a2-max', name: 'Mustermann Max', participation: 'yes' },
+      ]);
+
+      const { result } = renderHook(() => useCrewAssignments());
+      await act(async () => {
+        await result.current.syncFromAlarms([alarm1, alarm2]);
+      });
+
+      expect(mockAddDoc).toHaveBeenCalledTimes(1);
+      expect(mockAddDoc).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ recipientId: 'a1-max' }),
+      );
+    });
+
+    it('löst bestehende Duplikate auf und behält den bearbeiteten Eintrag', async () => {
+      mockGetDocsResult.docs = [
+        {
+          id: 'doc-plain',
+          data: () => ({
+            recipientId: 'a1-max',
+            name: 'Mustermann Max',
+            vehicleId: null,
+            vehicleName: '',
+            funktion: 'Feuerwehrmann',
+            source: 'alarm',
+          }),
+        },
+        {
+          id: 'doc-edited',
+          data: () => ({
+            recipientId: 'a2-max',
+            name: 'Mustermann Max',
+            vehicleId: 'v1',
+            vehicleName: 'TLFA',
+            funktion: 'Maschinist',
+            source: 'alarm',
+          }),
+        },
+      ];
+      const alarm1 = makeAlarm('alarm1', [
+        { id: 'a1-max', name: 'Mustermann Max', participation: 'yes' },
+      ]);
+      const alarm2 = makeAlarm('alarm2', [
+        { id: 'a2-max', name: 'Mustermann Max', participation: 'yes' },
+      ]);
+
+      const { result } = renderHook(() => useCrewAssignments());
+      await act(async () => {
+        await result.current.syncFromAlarms([alarm1, alarm2]);
+      });
+
+      expect(mockAddDoc).not.toHaveBeenCalled();
+      expect(mockDeleteDoc).toHaveBeenCalledTimes(1);
+      expect(mockDeleteDoc).toHaveBeenCalledWith(
+        expect.objectContaining({ path: expect.stringContaining('doc-plain') }),
       );
     });
   });
