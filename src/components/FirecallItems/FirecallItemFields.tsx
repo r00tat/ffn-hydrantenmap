@@ -263,11 +263,18 @@ export default function FirecallItemFields({
             </>
           )}
 
-          {/* Color picker */}
+          {/* Farbwähler. Ohne gewählte Farbe bleibt er leer und nennt die
+              geltende Vorgabe nur als Platzhalter: Ein vorgetäuschter Wert
+              (früher `#0000ff`) zeigt ein Fahrzeug blau, das rot gezeichnet
+              wird, und ein `fallbackValue` schriebe ihn bei ungültiger Eingabe
+              als gewählte Farbe ins Dokument (#836). */}
           {item.fieldTypes()[key] === 'color' && (
             <MuiColorInput
-              value={(item as any)[key] || '#0000ff'}
-              fallbackValue="#0000ff"
+              value={(item as any)[key] || ''}
+              placeholder={item.defaultColor()}
+              // Sonst verdeckt das Label den Platzhalter, solange das Feld
+              // nicht fokussiert ist.
+              slotProps={{ inputLabel: { shrink: true } }}
               format="hex8"
               onChange={(newValue) => setItemField(key, newValue)}
               isAlphaHidden={false}

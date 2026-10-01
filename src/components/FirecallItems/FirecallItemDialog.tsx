@@ -47,7 +47,7 @@ import {
   HeatmapConfig,
   filterDisplayableItems,
 } from '../firebase/firestore';
-import { getItemInstance } from './elements';
+import { changeItemType, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import DataSchemaEditor from './DataSchemaEditor';
 import FirecallItemFields from './FirecallItemFields';
@@ -140,7 +140,7 @@ export default function FirecallItemDialog({
   );
 
   const handleTypeChange = useCallback((type: string) => {
-    setFirecallItem((prev) => getItemInstance({ ...prev.data(), type }));
+    setFirecallItem((prev) => changeItemType(prev, type));
   }, []);
 
   const isUpload = item.type === 'upload';

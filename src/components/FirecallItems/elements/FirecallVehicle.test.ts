@@ -160,6 +160,17 @@ describe('FirecallVehicle: Fremdfahrzeug und Farbe', () => {
     expect(decodeIcon(vehicle)).toContain('fill:#2e7d32');
   });
 
+  it('nennt dem Farbwähler die geltende Vorgabe, nicht ein fremdes Blau', () => {
+    const own = new FirecallVehicle({ name: 'TLF', type: 'vehicle' } as any);
+    expect(own.defaultColor()).toBe('#ff0000');
+    const fremd = new FirecallVehicle({
+      name: 'RTW',
+      type: 'vehicle',
+      fremd: 'true',
+    } as any);
+    expect(fremd.defaultColor()).toBe('#1976d2');
+  });
+
   it('führt Schalter und Farbe als Felder', () => {
     const vehicle = new FirecallVehicle();
     expect(Object.keys(vehicle.fields())).toContain('fremd');
