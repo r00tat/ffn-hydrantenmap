@@ -9,6 +9,7 @@ import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
 import { disableNavigationPreload, Serwist } from 'serwist';
 import { isAtemschutzPush, pushTag } from '../common/atemschutzPush';
 import { ChatMessage } from '../common/chat';
+import { SW_BUILD_ID_REQUEST } from '../common/serviceWorker';
 import { parseFirebaseConfig } from './firebaseConfig';
 import { isWorkerBootstrap, runtimeCaching } from './patterns';
 
@@ -78,6 +79,23 @@ self.addEventListener('error', (event) => {
 
 self.addEventListener('unhandledrejection', (event) => {
   console.error('[sw] unbehandelte Rejection', event.reason);
+});
+
+/**
+ * Build-ID dieses Workers. Die Seite fragt sie nach einem `controllerchange`
+ * ab und meldet „Neue Version verfügbar" nur, wenn sie von ihrer eigenen
+ * abweicht — sonst erschiene die Meldung auch dann, wenn die Seite schon frisch
+ * vom Netz kam und nur der Worker hinterherzog, oder wenn der Worker eine
+ * bislang unkontrollierte Seite übernimmt. Eingesetzt beim Bauen, siehe
+ * `serviceWorkerDefine`.
+ */
+const buildId = process.env.NEXT_PUBLIC_BUILD_ID;
+
+addEventListener('message', (event) => {
+  const message = event as unknown as ExtendableMessageEvent;
+  const data = message.data as { type?: string } | undefined;
+  if (data?.type !== SW_BUILD_ID_REQUEST) return;
+  message.ports[0]?.postMessage({ buildId });
 });
 
 /**

@@ -95,6 +95,32 @@ einen Rückfall aufs Netz. Dazu kommen in [index.ts](../src/worker/index.ts):
   seine Caches und meldet sich ab. Ohne ihn bleibt einem Benutzer nur „Website-Daten
   löschen" — in einer installierten PWA am Telefon praktisch unauffindbar.
 
+## „Neue Version verfügbar" nur bei einem anderen Build
+
+Der Worker läuft mit `skipWaiting` und `clientsClaim`; die Meldung in
+[useServiceWorkerUpdate.ts](../src/hooks/useServiceWorkerUpdate.ts) hängt am
+`controllerchange`. Das Ereignis allein heißt aber keine neue Version, und so
+erschien die Meldung auch auf Geräten, die schon den neuesten Stand hatten,
+oft erst nach einer Weile, wenn die App wieder aktiv wurde:
+
+- **Erste Übernahme.** Hatte die Seite beim Laden keinen Controller
+  (Erstaufruf, harter Reload, nach `sw-reset`), übernimmt sie der Worker per
+  `clientsClaim()`, und auch das ist ein `controllerchange`. Der Hook merkt sich
+  deshalb, ob beim Mounten ein Controller da war, und schweigt beim ersten
+  Wechsel, wenn nicht.
+- **Seite neu, Worker zieht nach.** Navigationen gehen über NetworkFirst. Die
+  Seite kommt also schon mit dem neuen Build vom Netz, und der Browser findet
+  den neuen Worker erst danach (beim Navigieren oder beim Fortsetzen der App).
+  Neu laden brächte dann nichts.
+
+Der Hook fragt den neuen Controller deshalb per `MessageChannel` nach seiner
+Build-ID (`SW_BUILD_ID_REQUEST` in
+[serviceWorker.ts](../src/common/serviceWorker.ts)) und meldet nur, wenn sie von
+`NEXT_PUBLIC_BUILD_ID` der Seite abweicht. Damit der Worker die ID kennt, steht
+sie in `SERVICE_WORKER_ENV_KEYS`. Ist eine der beiden IDs unbekannt (lokaler
+Build, keine Antwort), wird gemeldet: lieber einmal zu oft als ein echtes
+Update verschwiegen.
+
 ## Push: die Nutzlast muss unterscheidbar sein
 
 `onBackgroundMessage` hat bis zur Atemschutzüberwachung **jede** Data-Message als
