@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Autocomplete from '@mui/material/Autocomplete';
+import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
 import { sanitizePersonen } from '../../common/atemschutz';
 
@@ -25,6 +26,12 @@ export interface PersonChipsInputProps {
  * am Sammelplatz ein Klick zu viel je Name. Hier läuft die Eingabe in einem
  * Feld durch; die Vorschläge sorgen weiter dafür, dass derselbe Name nicht
  * zweimal unterschiedlich geschrieben wird.
+ *
+ * Ein Klick auf einen Namen holt ihn zum Korrigieren zurück ins Eingabefeld:
+ * Am Sammelplatz wird oft erst der Vorname erfasst, und den Nachnamen
+ * nachzutragen soll nicht heißen, den Chip zu löschen und alles neu zu tippen.
+ * Ein noch offener Text wird dabei zuerst übernommen, damit er nicht verloren
+ * geht.
  *
  * Drei Feinheiten, ohne die das Feld Eingaben verlöre:
  * - `autoSelect`: Wer den letzten Namen tippt und direkt auf „Speichern"
@@ -54,6 +61,13 @@ export default function PersonChipsInput({
 
   const voll = max != null && value.length >= max;
 
+  const korrigieren = (index: number) => {
+    const name = value[index];
+    const rest = value.filter((_, i) => i !== index);
+    onChange(sanitizePersonen([...rest, ...eingabe.split(/[,;]/)], max));
+    setEingabe(name);
+  };
+
   return (
     <Autocomplete
       multiple
@@ -74,6 +88,20 @@ export default function PersonChipsInput({
       inputValue={eingabe}
       onInputChange={(_, next) => setEingabe(next ?? '')}
       onChange={(_, next) => uebernehmen(next as string[])}
+      renderValue={(namen, getItemProps, ownerState) =>
+        namen.map((name, index) => {
+          const { key, ...itemProps } = getItemProps({ index });
+          return (
+            <Chip
+              key={key}
+              {...itemProps}
+              label={name}
+              size={ownerState.size}
+              onClick={disabled ? undefined : () => korrigieren(index)}
+            />
+          );
+        })
+      }
       renderInput={(params) => (
         <TextField
           {...params}

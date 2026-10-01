@@ -111,3 +111,33 @@ describe('UeberwachungDialog: Auftrag', () => {
     expect(onSave.mock.calls[0][0].auftrag).toBe('Brandbekämpfung');
   });
 });
+
+describe('UeberwachungDialog: Truppmitglieder', () => {
+  it('ändert die Namen der Truppmitglieder', async () => {
+    // Ein Trupp, der nur mit Vornamen erfasst wurde, muss sich hier ergänzen
+    // lassen — der Bearbeiten-Knopf der Überwachung führt in diesen Dialog.
+    const { onSave } = render({
+      istUebernahme: false,
+      trupp: trupp({ mitglieder: ['Franz', 'Anna Beispiel'] }),
+    });
+    fireEvent.click(screen.getByText('Franz'));
+    const feld = screen.getByLabelText(/Truppmitglieder/);
+    fireEvent.change(feld, { target: { value: 'Franz Beispiel' } });
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].mitglieder).toEqual([
+      'Anna Beispiel',
+      'Franz Beispiel',
+    ]);
+  });
+
+  it('speichert nicht ohne Truppmitglieder', () => {
+    render({ istUebernahme: false, trupp: trupp({ mitglieder: ['Franz'] }) });
+    fireEvent.click(screen.getByText('Franz'));
+    fireEvent.change(screen.getByLabelText(/Truppmitglieder/), {
+      target: { value: '' },
+    });
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+});

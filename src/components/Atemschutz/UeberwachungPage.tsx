@@ -513,6 +513,7 @@ export default function UeberwachungPage() {
           einsatzziel: input.einsatzziel,
           auftrag: input.auftrag,
           entsendetAn: input.entsendetAn,
+          mitglieder: input.mitglieder,
           paTyp: input.paTyp,
           satz: input.satz,
         }),

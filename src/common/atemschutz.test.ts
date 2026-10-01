@@ -1242,6 +1242,21 @@ describe('uebernahmePatch', () => {
     });
     expect('entsendetAn' in patch).toBe(false);
   });
+
+  it('schreibt geänderte Truppmitglieder bereinigt mit', () => {
+    const patch = uebernahmePatch({
+      trupp: {},
+      jetzt,
+      uid: 'u1',
+      mitglieder: [' Franz Beispiel ', 'franz beispiel', 'Anna Beispiel'],
+    });
+    expect(patch.mitglieder).toEqual(['Franz Beispiel', 'Anna Beispiel']);
+  });
+
+  it('leert die Truppmitglieder nicht durch eine leere Liste', () => {
+    const patch = uebernahmePatch({ trupp: {}, jetzt, uid: 'u1', mitglieder: [' '] });
+    expect('mitglieder' in patch).toBe(false);
+  });
 });
 
 describe('buildDruckabfrage', () => {

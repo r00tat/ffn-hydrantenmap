@@ -1526,6 +1526,11 @@ export interface UebernahmeInput {
    * Trupp bekommen hat.
    */
   entsendetAn?: string;
+  /**
+   * Die Namen der Truppmitglieder — nachgetragen oder korrigiert, etwa wenn
+   * der Trupp zunächst nur mit Vornamen erfasst wurde.
+   */
+  mitglieder?: string[];
   paTyp?: PaTypKey;
   /** Nur bei `paTyp === 'custom'` von Belang, aber immer mitgeschrieben. */
   satz?: Geraetesatz;
@@ -1561,6 +1566,10 @@ export function uebernahmePatch(input: UebernahmeInput): UeberwachungPatch {
   // eingetragene Einheit soll eine Übernahme ohne Angabe nicht wegwerfen.
   const einheit = input.entsendetAn?.trim();
   if (einheit) patch.entsendetAn = einheit;
+  // Ein Trupp ohne Mitglieder ist keiner: Eine leere Liste lässt die
+  // vorhandenen Namen stehen, statt sie zu löschen.
+  const mitglieder = sanitizeMitglieder(input.mitglieder ?? []);
+  if (mitglieder.length > 0) patch.mitglieder = mitglieder;
 
   if (input.paTyp) {
     patch.paTyp = input.paTyp;

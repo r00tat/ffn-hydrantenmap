@@ -442,6 +442,14 @@ gesetzter Träger zurücknehmbar sein muss, und ein bereits erfasster Name, der
 nicht (mehr) im Trupp steht — sonst verschwände er stillschweigend aus dem Feld,
 sobald jemand die Mitgliederliste ändert.
 
+Geändert wird die Mitgliederliste im Trupp-Dialog des Sammelplatzes **und** im
+Bearbeiten-Dialog der Überwachung: Ein Trupp, der bei der eigenen Einheit
+erfasst wurde, hat keinen anderen Dialog, und oft steht anfangs nur der
+Vorname da. Ein Klick auf einen Namen holt ihn zum Ergänzen zurück ins
+Eingabefeld (`PersonChipsInput`). Ein schon gesetzter Träger wird dabei nicht
+mit umbenannt — er bleibt als „nicht (mehr) im Trupp" sichtbar und wird in
+der Ausrüstung neu gewählt.
+
 Auf der Karte steht die Ausrüstung **nach Träger gebündelt**, eine Zeile je
 Person (`gruppiereTruppGeraete`): Gefragt ist „was trägt Huber?" und nicht „was
 wurde als Drittes gescannt". Bei einem Trupp zu drei Personen mit Flasche, Maske
