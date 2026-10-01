@@ -194,6 +194,17 @@ export class FirecallItemBase {
   }
 
   /**
+   * Die Farbe, die auf der Karte gilt, solange am Element keine gewählt ist.
+   * Der Farbwähler zeigt sie als Platzhalter — als Wert gesetzt, landete sie
+   * beim Speichern im Dokument und wäre von einer Wahl nicht mehr zu
+   * unterscheiden (#836). Blau ist, was Leitungen und Flächen ohne Farbe
+   * zeichnen.
+   */
+  public defaultColor(): string {
+    return '#0000ff';
+  }
+
+  /**
    * Darf das Element über den Griff in der Karte gedreht werden? `true` nur bei
    * Typen, die die Drehung auch in `fields()` führen — bei allen anderen liegt
    * `rotation` zwar im Dokument, ist aber immer '0'.

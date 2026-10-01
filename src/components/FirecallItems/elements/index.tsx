@@ -59,3 +59,34 @@ export function getItemInstance(record?: FirecallItem): FirecallItemBase {
   const cls = getItemClass(record?.type);
   return new cls(record);
 }
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Wechselt den Typ eines Elements im Dialog und behält, was eingegeben wurde.
+ *
+ * Werte, die nur die Vorgabe des **bisherigen** Typs sind, bleiben zurück: Der
+ * Dialog öffnet als Markierung, und die bringt `color: '#0000ff'` mit. Ginge
+ * die Vorgabe mit, stünde sie beim Fahrzeug als gewählte Farbe im Dokument —
+ * das Fahrzeug wäre blau, und „Fremdorganisation" bliebe wirkungslos (#836).
+ * Der neue Typ setzt danach seine eigenen Vorgaben. Wer genau den Vorgabewert
+ * bewusst gewählt hat, verliert ihn beim Typwechsel; das ist der Preis dafür,
+ * dass sich Vorgabe und Wahl am Element nicht unterscheiden lassen.
+ */
+export function changeItemType(
+  item: FirecallItemBase,
+  type: string
+): FirecallItemBase {
+  const defaults = getItemInstance({ type: item.type } as FirecallItem).data() as
+    unknown as Record<string, unknown>;
+  const carried = Object.fromEntries(
+    Object.entries(item.data()).filter(
+      ([key, value]) => !(key in defaults && sameValue(value, defaults[key]))
+    )
+  );
+  return getItemInstance({ ...carried, type } as FirecallItem);
+}
