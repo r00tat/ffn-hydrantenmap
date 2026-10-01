@@ -26,6 +26,7 @@ import {
   istGueltigeUid,
   lookupKeys,
   matchGeraete,
+  merkeUmbenennung,
   mitUeberwachungsUid,
   naechsteZuteilung,
   nextBereitstellung,
@@ -37,6 +38,7 @@ import {
   sammelplatzUebergabePatch,
   sanitizeUeberwachungUids,
   tagebuchVermerk,
+  traegerUmbenennenPatch,
   truppGeraetLabel,
   truppGeraetVonGeraet,
   uebernahmePatch,
@@ -1242,6 +1244,21 @@ describe('uebernahmePatch', () => {
     });
     expect('entsendetAn' in patch).toBe(false);
   });
+
+  it('schreibt geänderte Truppmitglieder bereinigt mit', () => {
+    const patch = uebernahmePatch({
+      trupp: {},
+      jetzt,
+      uid: 'u1',
+      mitglieder: [' Franz Beispiel ', 'franz beispiel', 'Anna Beispiel'],
+    });
+    expect(patch.mitglieder).toEqual(['Franz Beispiel', 'Anna Beispiel']);
+  });
+
+  it('leert die Truppmitglieder nicht durch eine leere Liste', () => {
+    const patch = uebernahmePatch({ trupp: {}, jetzt, uid: 'u1', mitglieder: [' '] });
+    expect('mitglieder' in patch).toBe(false);
+  });
 });
 
 describe('buildDruckabfrage', () => {
@@ -1767,3 +1784,71 @@ describe('gruppiereTrupps mit zugeteilt', () => {
     expect(g.protokoll.map((t) => t.id)).toEqual(['b']);
   });
 });
+
+describe('merkeUmbenennung', () => {
+  it('merkt alt → neu', () => {
+    expect(merkeUmbenennung({}, 'Franz', 'Franz Beispiel')).toEqual({
+      Franz: 'Franz Beispiel',
+    });
+  });
+
+  it('fasst eine zweite Korrektur desselben Namens zusammen', () => {
+    // Am Gerät steht noch der ursprüngliche Name — der Zwischenstand hat nie
+    // irgendwo gestanden.
+    const erst = merkeUmbenennung({}, 'Franz', 'Franz Beispil');
+    expect(merkeUmbenennung(erst, 'Franz Beispil', 'Franz Beispiel')).toEqual({
+      Franz: 'Franz Beispiel',
+    });
+  });
+
+  it('vergisst eine Korrektur, die beim ursprünglichen Namen endet', () => {
+    const erst = merkeUmbenennung({}, 'Franz', 'Frank');
+    expect(merkeUmbenennung(erst, 'Frank', 'Franz')).toEqual({});
+  });
+});
+
+describe('traegerUmbenennenPatch', () => {
+  const geraete = [
+    { typ: 'flasche' as const, bezeichnung: 'Flasche 1', person: 'Franz' },
+    { typ: 'maske' as const, bezeichnung: 'Maske 1', person: 'Anna Beispiel' },
+    { typ: 'flasche' as const, bezeichnung: 'Flasche 2' },
+  ];
+
+  it('setzt den Träger auf den korrigierten Namen', () => {
+    expect(
+      traegerUmbenennenPatch(
+        { truppGeraete: geraete },
+        ['Franz Beispiel', 'Anna Beispiel'],
+        { Franz: 'Franz Beispiel' },
+      ),
+    ).toEqual({
+      truppGeraete: [
+        { typ: 'flasche', bezeichnung: 'Flasche 1', person: 'Franz Beispiel' },
+        geraete[1],
+        geraete[2],
+      ],
+    });
+  });
+
+  it('lässt den Träger stehen, wenn der neue Name nicht im Trupp ist', () => {
+    // Korrigiert und danach doch wieder entfernt: Dann ist es kein
+    // Umbenennen, sondern ein Austausch der Person.
+    expect(
+      traegerUmbenennenPatch({ truppGeraete: geraete }, ['Anna Beispiel'], {
+        Franz: 'Franz Beispiel',
+      }),
+    ).toEqual({});
+  });
+
+  it('schreibt nichts, wenn kein Gerät betroffen ist', () => {
+    expect(
+      traegerUmbenennenPatch({ truppGeraete: geraete }, ['Josef'], {
+        Sepp: 'Josef',
+      }),
+    ).toEqual({});
+    expect(
+      traegerUmbenennenPatch({}, ['Franz Beispiel'], { Franz: 'Franz Beispiel' }),
+    ).toEqual({});
+  });
+});
+

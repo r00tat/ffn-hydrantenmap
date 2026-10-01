@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import PersonChipsInput from './PersonChipsInput';
@@ -93,4 +94,83 @@ describe('PersonChipsInput', () => {
     fireEvent.keyDown(feld, { key: 'Enter' });
     expect(onChange).toHaveBeenCalledWith(['Anna', 'Bernd']);
   });
+
+  it('holt einen Namen per Klick zum Korrigieren zurück ins Feld', () => {
+    // Am Sammelplatz wird oft erst der Vorname erfasst; den Nachnamen
+    // nachzutragen darf nicht heißen, den Namen zu löschen und neu zu tippen.
+    function Gesteuert() {
+      const [namen, setNamen] = useState(['Anna', 'Bernd Maier']);
+      return (
+        <>
+          <PersonChipsInput
+            label="Truppmitglieder"
+            value={namen}
+            options={[]}
+            onChange={setNamen}
+          />
+          <output data-testid="namen">{namen.join('|')}</output>
+        </>
+      );
+    }
+    renderWithIntl(<Gesteuert />);
+    fireEvent.click(screen.getByText('Anna'));
+    const feld = screen.getByLabelText('Truppmitglieder') as HTMLInputElement;
+    expect(feld.value).toBe('Anna');
+    expect(screen.getByTestId('namen')).toHaveTextContent(/^Bernd Maier$/);
+
+    fireEvent.change(feld, { target: { value: 'Anna Huber' } });
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    expect(screen.getByTestId('namen')).toHaveTextContent(
+      'Bernd Maier|Anna Huber',
+    );
+  });
+
+  it('meldet eine Korrektur als Umbenennung', () => {
+    // Daran hängen die Träger der Geräte: Wer „Anna" zu „Anna Huber"
+    // ergänzt, meint dieselbe Person.
+    const onUmbenennen = vi.fn();
+    function Gesteuert() {
+      const [namen, setNamen] = useState(['Anna', 'Bernd Maier']);
+      return (
+        <PersonChipsInput
+          label="Truppmitglieder"
+          value={namen}
+          options={[]}
+          onChange={setNamen}
+          onUmbenennen={onUmbenennen}
+        />
+      );
+    }
+    renderWithIntl(<Gesteuert />);
+    fireEvent.click(screen.getByText('Anna'));
+    const feld = screen.getByLabelText('Truppmitglieder');
+    fireEvent.change(feld, { target: { value: 'Anna Huber' } });
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    expect(onUmbenennen).toHaveBeenCalledWith('Anna', 'Anna Huber');
+  });
+
+  it('meldet keine Umbenennung, wenn der korrigierte Name gelöscht wird', () => {
+    // Text geleert und ein anderer Name getippt: ein Austausch der Person.
+    const onUmbenennen = vi.fn();
+    function Gesteuert() {
+      const [namen, setNamen] = useState(['Anna']);
+      return (
+        <PersonChipsInput
+          label="Truppmitglieder"
+          value={namen}
+          options={[]}
+          onChange={setNamen}
+          onUmbenennen={onUmbenennen}
+        />
+      );
+    }
+    renderWithIntl(<Gesteuert />);
+    fireEvent.click(screen.getByText('Anna'));
+    const feld = screen.getByLabelText('Truppmitglieder');
+    fireEvent.change(feld, { target: { value: '' } });
+    fireEvent.change(feld, { target: { value: 'Christian' } });
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    expect(onUmbenennen).not.toHaveBeenCalled();
+  });
 });
+

@@ -163,7 +163,7 @@
       "nameHint": "Optional, e.g. “Team 1”",
       "feuerwehr": "Brigade",
       "mitglieder": "Team members",
-      "mitgliederHint": "Type a name and press Enter.",
+      "mitgliederHint": "Type a name and press Enter. Tap a name to correct it.",
       "mitgliederVoll": "At most {max} names per team.",
       "bemerkung": "Note",
       "laufendeNummer": "Deployment {n}",

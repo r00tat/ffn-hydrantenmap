@@ -163,7 +163,7 @@
       "nameHint": "Optional, z.B. „Trupp 1“",
       "feuerwehr": "Feuerwehr",
       "mitglieder": "Truppmitglieder",
-      "mitgliederHint": "Namen eintippen und mit Enter übernehmen.",
+      "mitgliederHint": "Namen eintippen und mit Enter übernehmen. Einen Namen antippen, um ihn zu korrigieren.",
       "mitgliederVoll": "Höchstens {max} Namen je Trupp.",
       "bemerkung": "Bemerkung",
       "laufendeNummer": "{n}. Einsatz",
