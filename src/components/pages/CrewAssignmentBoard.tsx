@@ -46,6 +46,11 @@ import {
   normalizePersonName,
   personDisplayName,
 } from '../../common/fahrtenbuch';
+import {
+  collectUnconfirmedRecipients,
+  isManualEntry,
+  visibleCrewAssignments,
+} from '../../common/crewMerge';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useCrewAssignments, {
   BlaulichtSmsRecipient,
@@ -217,10 +222,6 @@ function CrewRow({
 
 /* ─── Main component ─── */
 
-// A crew entry counts as manually added when its source is 'manual' OR — for
-// legacy entries created before the `source` field existed — when its
-// recipientId carries the historical `manual-` prefix. Such entries must stay
-// visible and removable even while an alarm is loaded.
 /**
  * Ein Eintrag der Auswahl „Weitere Person hinzufügen".
  *
@@ -235,10 +236,6 @@ interface CrewPersonOption {
   /** Nur bei einem Alarm-Empfänger; die Personenliste hat keine Empfänger-ID. */
   recipient?: BlaulichtSmsRecipient;
 }
-
-const isManualEntry = (a: CrewAssignment) =>
-  a.source === 'manual' ||
-  (a.source === undefined && a.recipientId.startsWith('manual-'));
 
 export default function CrewAssignmentBoard({
   alarms,
@@ -274,10 +271,10 @@ export default function CrewAssignmentBoard({
   );
 
   // Recipients across all alarms who did NOT confirm (no / unknown / pending),
-  // deduped by id, excluding anyone already in the crew list — dazu die
+  // je Person einmal, ohne wen, der in einem anderen Alarm zugesagt hat oder —
+  // auch unter anderer ID — schon in der Besatzung steht (#835). Dazu die
   // Personenliste des Fahrtenbuchs.
   const additionalPersonOptions = useMemo<CrewPersonOption[]>(() => {
-    const alreadyAdded = new Set(crewAssignments.map((a) => a.recipientId));
     // Über `normalizePersonName`, nicht über den rohen Namen: Aus BlaulichtSMS
     // kommt „Nachname Vorname", die Personenliste führt „Vorname Nachname" —
     // ohne das stünde derselbe Mensch zweimal in der Auswahl.
@@ -286,21 +283,10 @@ export default function CrewAssignmentBoard({
     );
     const options: CrewPersonOption[] = [];
 
-    const byId = new Map<string, BlaulichtSmsRecipient>();
-    for (const alarm of alarms ?? []) {
-      for (const r of alarm.recipients) {
-        if (r.participation === 'yes') continue;
-        if (alreadyAdded.has(r.id)) continue;
-        if (!byId.has(r.id)) {
-          byId.set(r.id, {
-            id: r.id,
-            name: r.name,
-            participation: r.participation,
-          });
-        }
-      }
-    }
-    for (const recipient of byId.values()) {
+    for (const recipient of collectUnconfirmedRecipients(
+      alarms ?? [],
+      crewAssignments,
+    )) {
       options.push({
         key: `recipient:${recipient.id}`,
         name: recipient.name,
@@ -463,33 +449,14 @@ export default function CrewAssignmentBoard({
     syncFromAlarms(alarms);
   }, [alarms, alarmKey, syncFromAlarms]);
 
-  // Union of confirmed (yes) recipient ids across ALL alarms.
-  // null when no alarms are available → then all crew entries are shown.
-  const confirmedIds = useMemo(() => {
-    if (!alarms || alarms.length === 0) return null;
-    const ids = new Set<string>();
-    for (const alarm of alarms) {
-      for (const r of alarm.recipients) {
-        if (r.participation === 'yes') ids.add(r.id);
-      }
-    }
-    return ids;
-  }, [alarms]);
-
-  // Show an entry when it was explicitly added (source 'manual') OR when its
-  // recipient is currently in the union of confirmed ids. Legacy entries
-  // without a source are treated as 'alarm'. Dedupe by recipientId.
-  const validAssignments = useMemo(() => {
-    const seen = new Set<string>();
-    return crewAssignments.filter((a) => {
-      const isManual = isManualEntry(a);
-      if (!isManual && confirmedIds && !confirmedIds.has(a.recipientId))
-        return false;
-      if (seen.has(a.recipientId)) return false;
-      seen.add(a.recipientId);
-      return true;
-    });
-  }, [crewAssignments, confirmedIds]);
+  // Von Hand angelegte Einträge immer, aus Alarmen übernommene nur, solange
+  // die Person in einem der Alarme zugesagt hat — unter welcher ID auch immer,
+  // denn BlaulichtSMS vergibt sie je Alarm (#835). Je Person ein Eintrag, der
+  // bearbeitete. Ohne Alarme alle Einträge.
+  const validAssignments = useMemo(
+    () => visibleCrewAssignments(crewAssignments, alarms),
+    [crewAssignments, alarms],
+  );
 
   /**
    * Dieselben Einträge, aber mit dem Namen in der Schreibweise der
