@@ -14,7 +14,9 @@ import { useTranslations } from 'next-intl';
 import {
   MAX_TRUPP_MITGLIEDER,
   type AtemschutzTrupp,
+  merkeUmbenennung,
   type TruppInput,
+  type Umbenennungen,
   validateTruppInput,
 } from '../../common/atemschutz';
 import PersonChipsInput from './PersonChipsInput';
@@ -55,6 +57,7 @@ export default function TruppDialog({
 
   const [truppName, setTruppName] = useState(trupp?.truppName ?? '');
   const [feuerwehr, setFeuerwehr] = useState(trupp?.feuerwehr ?? '');
+  const [umbenennungen, setUmbenennungen] = useState<Umbenennungen>({});
   const [mitglieder, setMitglieder] = useState<string[]>(
     () => trupp?.mitglieder ?? [],
   );
@@ -70,6 +73,7 @@ export default function TruppDialog({
     mitglieder,
     bemerkung,
     entsendetAn,
+    umbenennungen,
   };
   const fehler = validateTruppInput(input);
 
@@ -118,6 +122,9 @@ export default function TruppDialog({
             options={personSuggestions}
             max={MAX_TRUPP_MITGLIEDER}
             onChange={setMitglieder}
+            onUmbenennen={(alt, neu) =>
+              setUmbenennungen((prev) => merkeUmbenennung(prev, alt, neu))
+            }
           />
           {einheitVorschlaege && (
             <Autocomplete

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Autocomplete from '@mui/material/Autocomplete';
+import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
 import { sanitizePersonen } from '../../common/atemschutz';
 
@@ -16,6 +17,12 @@ export interface PersonChipsInputProps {
   vollText?: string;
   disabled?: boolean;
   onChange: (value: string[]) => void;
+  /**
+   * Ein per Klick korrigierter Name ist wieder übernommen — `alt` ist der Name
+   * vor der Korrektur. Wird der Text dabei geleert, ist es keine Korrektur
+   * mehr, sondern ein Austausch der Person, und es kommt keine Meldung.
+   */
+  onUmbenennen?: (alt: string, neu: string) => void;
 }
 
 /**
@@ -25,6 +32,12 @@ export interface PersonChipsInputProps {
  * am Sammelplatz ein Klick zu viel je Name. Hier läuft die Eingabe in einem
  * Feld durch; die Vorschläge sorgen weiter dafür, dass derselbe Name nicht
  * zweimal unterschiedlich geschrieben wird.
+ *
+ * Ein Klick auf einen Namen holt ihn zum Korrigieren zurück ins Eingabefeld:
+ * Am Sammelplatz wird oft erst der Vorname erfasst, und den Nachnamen
+ * nachzutragen soll nicht heißen, den Chip zu löschen und alles neu zu tippen.
+ * Ein noch offener Text wird dabei zuerst übernommen, damit er nicht verloren
+ * geht.
  *
  * Drei Feinheiten, ohne die das Feld Eingaben verlöre:
  * - `autoSelect`: Wer den letzten Namen tippt und direkt auf „Speichern"
@@ -44,15 +57,38 @@ export default function PersonChipsInput({
   vollText,
   disabled,
   onChange,
+  onUmbenennen,
 }: PersonChipsInputProps) {
   const [eingabe, setEingabe] = useState('');
+  /** Der Name, der gerade zum Korrigieren im Eingabefeld steht. */
+  const [korrektur, setKorrektur] = useState<string>();
+
+  const meldeKorrektur = (next: string[]) => {
+    if (korrektur == null) return;
+    const neu = next.find((n) => !value.includes(n));
+    if (neu == null) return;
+    if (neu !== korrektur) onUmbenennen?.(korrektur, neu);
+    setKorrektur(undefined);
+  };
 
   const uebernehmen = (namen: string[]) => {
     const geteilt = namen.flatMap((n) => (n ?? '').split(/[,;]/));
-    onChange(sanitizePersonen(geteilt, max));
+    const next = sanitizePersonen(geteilt, max);
+    meldeKorrektur(next);
+    onChange(next);
   };
 
   const voll = max != null && value.length >= max;
+
+  const korrigieren = (index: number) => {
+    const name = value[index];
+    const rest = value.filter((_, i) => i !== index);
+    const next = sanitizePersonen([...rest, ...eingabe.split(/[,;]/)], max);
+    meldeKorrektur(next);
+    onChange(next);
+    setEingabe(name);
+    setKorrektur(name);
+  };
 
   return (
     <Autocomplete
@@ -72,8 +108,27 @@ export default function PersonChipsInput({
       }
       value={value}
       inputValue={eingabe}
-      onInputChange={(_, next) => setEingabe(next ?? '')}
+      onInputChange={(_, next, reason) => {
+        setEingabe(next ?? '');
+        // Selbst geleert heißt: Dieser Name ist weg, was danach kommt, ist
+        // eine andere Person.
+        if (reason === 'input' && !next?.trim()) setKorrektur(undefined);
+      }}
       onChange={(_, next) => uebernehmen(next as string[])}
+      renderValue={(namen, getItemProps, ownerState) =>
+        namen.map((name, index) => {
+          const { key, ...itemProps } = getItemProps({ index });
+          return (
+            <Chip
+              key={key}
+              {...itemProps}
+              label={name}
+              size={ownerState.size}
+              onClick={disabled ? undefined : () => korrigieren(index)}
+            />
+          );
+        })
+      }
       renderInput={(params) => (
         <TextField
           {...params}
