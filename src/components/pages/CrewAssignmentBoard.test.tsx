@@ -447,6 +447,70 @@ describe('CrewAssignmentBoard', () => {
     );
   });
 
+  describe('mehrere Alarme (#835)', () => {
+    // BlaulichtSMS vergibt die Empfänger-ID je Alarm: Dieselbe Person kommt im
+    // zweiten Alarm mit einer anderen ID.
+    const recipient = (
+      id: string,
+      name: string,
+      participation: 'yes' | 'no' | 'pending',
+    ) => ({
+      ...mockAlarm.recipients[0],
+      id,
+      name,
+      participation,
+    });
+    const withdrawnFirst: BlaulichtSmsAlarm = {
+      ...mockAlarm,
+      recipients: mockAlarm.recipients.map((r) =>
+        r.id === 'r2' ? { ...r, participation: 'no' as const } : r,
+      ),
+    };
+    const secondAlarm: BlaulichtSmsAlarm = {
+      ...mockAlarm,
+      alarmId: 'alarm2',
+      recipients: [
+        recipient('r1-b', 'Max Mustermann', 'yes'),
+        recipient('r2-b', 'Anna Beispiel', 'yes'),
+        recipient('r4-b', 'Nina Ausstehend', 'yes'),
+      ],
+    };
+    const originalLength = mockAssignments.length;
+
+    afterEach(() => {
+      mockAssignments.splice(originalLength);
+    });
+
+    it('zeigt einen Eintrag, dessen Person nur im anderen Alarm zugesagt hat', () => {
+      render(<CrewAssignmentBoard alarms={[withdrawnFirst, secondAlarm]} />);
+      expect(screen.getByText('Anna Beispiel')).toBeInTheDocument();
+    });
+
+    it('zeigt eine Person mit zwei Einträgen nur einmal', () => {
+      mockAssignments.push({
+        id: 'a5',
+        recipientId: 'r1-b',
+        name: 'Max Mustermann',
+        vehicleId: 'v2',
+        vehicleName: 'TLFA 4000',
+        funktion: 'Maschinist',
+        source: 'alarm',
+      });
+      render(<CrewAssignmentBoard alarms={[mockAlarm, secondAlarm]} />);
+      expect(screen.getAllByText('Max Mustermann')).toHaveLength(1);
+    });
+
+    it('bietet niemanden an, der in einem anderen Alarm zugesagt hat', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      const user = userEvent.setup();
+      render(<CrewAssignmentBoard alarms={[mockAlarm, secondAlarm]} />);
+      await user.click(screen.getByLabelText('Weitere Person hinzufügen'));
+      expect(
+        screen.queryByText(/Nina Ausstehend \(/),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe('Aufbauten und Anhänger', () => {
     beforeEach(() => {
       mockVehicles.push({
