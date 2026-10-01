@@ -319,25 +319,32 @@ class RadiacodeForegroundService : Service() {
                 // hier stopSelf() rufen, killt Android den gesamten Service
                 // inklusive GATT-Session — siehe Bug-Analyse 2026-04-22.
                 // Session-Teardown ausschliesslich via ACTION_BLE_DISCONNECT.
-                if (radiaCode != null || gpsTrackRecorder != null || liveLocationPusher != null) {
-                    Log.w(TAG, "ACTION_STOP ignoriert — Session/GPS-Track/Live-Share aktiv, Service bleibt laufen")
-                } else {
-                    Log.i(TAG, "ACTION_STOP — keine Session, Service wird beendet")
-                    releaseWakeLock()
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
+                if (!stopServiceIfIdle("ACTION_STOP")) {
+                    Log.w(TAG, "ACTION_STOP ignoriert — Session/Aufzeichnung/Live-Share aktiv, Service bleibt laufen")
                 }
             }
             ACTION_DISCONNECT_REQUESTED -> {
+                // „Trennen" aus der Notification. JS gleicht seinen React-Status
+                // über disconnectRequested ab, die BLE-Session baut der Service
+                // aber selbst ab: Ist der Auto-Connect beim App-Start
+                // gescheitert (Gerät aus), hat JS keinen Client mehr, ruft beim
+                // disconnect() nie nativeDisconnect auf — und der Service
+                // versuchte endlos weiter, samt Notification.
                 RadiacodeNotificationPlugin.onDisconnectRequested()
+                teardownSession()
+                if (!stopServiceIfIdle("ACTION_DISCONNECT_REQUESTED")) {
+                    updateNotificationForState()
+                }
             }
             ACTION_STOP_REQUESTED -> {
                 // Generische „Beenden"-Action: JS-Owner beenden jeden aktiven
                 // Modus über ihren regulären Stop-Pfad (hält den React-Status
                 // konsistent). Der Service stoppt sich nach dem letzten Modus
                 // selbst — kein nativer Teardown hier, um die ACTION_STOP-Races
-                // (siehe oben) nicht zu reaktivieren.
+                // (siehe oben) nicht zu reaktivieren. Läuft gar nichts mehr,
+                // ist die Notification verwaist und der Service geht sofort.
                 RadiacodeNotificationPlugin.onStopRequested()
+                stopServiceIfIdle("ACTION_STOP_REQUESTED")
             }
             ACTION_BLE_CONNECT -> {
                 val address = intent?.getStringExtra(EXTRA_DEVICE_ADDRESS)
@@ -350,13 +357,7 @@ class RadiacodeForegroundService : Service() {
             }
             ACTION_BLE_DISCONNECT -> {
                 teardownSession()
-                if (gpsTrackRecorder == null && liveLocationPusher == null) {
-                    Log.i(TAG, "ACTION_BLE_DISCONNECT — no GPS track / live-share, stopping service")
-                    stopHighAccuracyLocation()
-                    releaseWakeLock()
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                } else {
+                if (!stopServiceIfIdle("ACTION_BLE_DISCONNECT")) {
                     updateNotificationForState()
                 }
             }
@@ -399,6 +400,9 @@ class RadiacodeForegroundService : Service() {
                 Log.i(TAG, "ACTION_STOP_TRACK")
                 trackRecorder?.stop()
                 trackRecorder = null
+                if (!stopServiceIfIdle("ACTION_STOP_TRACK")) {
+                    updateNotificationForState()
+                }
             }
             ACTION_START_GPS_TRACK -> {
                 val firecallId = intent?.getStringExtra(EXTRA_FIRECALL_ID)
@@ -431,12 +435,7 @@ class RadiacodeForegroundService : Service() {
                 Log.i(TAG, "GPS track stop")
                 gpsTrackRecorder?.stop()
                 gpsTrackRecorder = null
-                if (radiaCode == null && liveLocationPusher == null) {
-                    stopHighAccuracyLocation()
-                    releaseWakeLock()
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                } else {
+                if (!stopServiceIfIdle("ACTION_STOP_GPS_TRACK")) {
                     updateNotificationForState()
                 }
             }
@@ -499,12 +498,7 @@ class RadiacodeForegroundService : Service() {
                 }
                 liveLocationPusher = null
                 liveShareFirecallName = ""
-                if (radiaCode == null && gpsTrackRecorder == null) {
-                    stopHighAccuracyLocation()
-                    releaseWakeLock()
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                } else {
+                if (!stopServiceIfIdle("ACTION_STOP_LIVE_SHARE")) {
                     updateNotificationForState()
                 }
             }
@@ -514,6 +508,7 @@ class RadiacodeForegroundService : Service() {
                 val pusher = liveLocationPusher
                 if (pusher == null) {
                     Log.i(TAG, "ACTION_UPDATE_LIVE_SHARE ignored — pusher not running")
+                    stopServiceIfIdle("ACTION_UPDATE_LIVE_SHARE")
                 } else if (intervalMs <= 0L || distanceM < 0.0) {
                     Log.w(TAG, "ACTION_UPDATE_LIVE_SHARE rejected — invalid intervalMs=$intervalMs distanceM=$distanceM")
                 } else {
@@ -523,6 +518,34 @@ class RadiacodeForegroundService : Service() {
             }
         }
         return START_NOT_STICKY
+    }
+
+    /**
+     * Läuft noch etwas, das den Foreground-Service braucht? Eine BLE-Session
+     * zählt schon ab dem Connect-Request (`currentAddress`), nicht erst ab dem
+     * fertigen Handshake — sonst würde ein Stop-Pfad den laufenden
+     * Verbindungsaufbau bzw. die Reconnect-Schleife mit abschießen.
+     */
+    private fun hasActiveMode(): Boolean =
+        currentAddress != null || radiaCode != null || trackRecorder != null ||
+            gpsTrackRecorder != null || liveLocationPusher != null
+
+    /**
+     * Beendet den Service samt Notification, wenn kein Modus mehr läuft. Jeder
+     * Stop-Pfad endet hier — sonst bleibt nach dem letzten Modus (oder nach
+     * einem Stop-Intent, der den Service erst gestartet hat) eine
+     * Notification ohne Inhalt stehen.
+     *
+     * @return true, wenn der Service beendet wurde.
+     */
+    private fun stopServiceIfIdle(reason: String): Boolean {
+        if (hasActiveMode()) return false
+        Log.i(TAG, "$reason — kein aktiver Modus, Service wird beendet")
+        stopHighAccuracyLocation()
+        releaseWakeLock()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        return true
     }
 
     private var lastForegroundType: Int = 0
@@ -1037,6 +1060,10 @@ class RadiacodeForegroundService : Service() {
         val track = gpsTrackRecorder != null || trackRecorder != null
         val liveShare = liveLocationPusher != null
         val title = when {
+            // Verbindungsaufbau bzw. Reconnect-Schleife: `radiaCode` ist dann
+            // noch null, `currentAddress` aber gesetzt. Früher fiel das bis
+            // zum „Radiacode getrennt" durch — mit „Trennen" als Action.
+            currentAddress != null && radiaCode == null -> "Radiacode – Verbindung wird hergestellt …"
             radiaCode != null && !deviceReady -> "Radiacode – Verbindung verloren"
             radiaCode != null && trackRecorder != null && gpsTrackRecorder != null -> "Radiacode + GPS-Aufzeichnung"
             radiaCode != null && trackRecorder != null -> "Strahlenmessung läuft"
@@ -1130,7 +1157,7 @@ class RadiacodeForegroundService : Service() {
         val track = gpsTrackRecorder != null || trackRecorder != null
         val liveShare = liveLocationPusher != null
         return when {
-            radiaCode != null -> StopAction(
+            radiaCode != null || currentAddress != null -> StopAction(
                 R.string.radiacode_notification_action_disconnect,
                 ACTION_DISCONNECT_REQUESTED,
             )
