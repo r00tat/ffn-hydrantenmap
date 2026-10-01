@@ -15,6 +15,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import {
+  findSimilar,
   findByCode,
   geraetKennung,
   geraetLabel,
@@ -49,6 +50,33 @@ export interface BarcodeScannerDialogProps {
   ) => void;
 }
 
+/**
+ * Lage des Zielrahmens über dem Video: ein Quadrat, mittig.
+ *
+ * Quadratisch, weil die Lage des Etiketts dem Detektor gleich ist — er wertet
+ * das ganze Bild in jeder Drehung aus. Der frühere querformatige Rahmen
+ * (`inset: '30% 10%'`) legte das Gegenteil nahe: Ein hochkant liegendes
+ * Flaschenetikett passte nur hinein, wenn man das Handy weit weghielt, und
+ * dann blieben zu wenige Pixel je Balken. Mit automatischem Drehen half auch
+ * Querhalten nicht, der Rahmen drehte mit.
+ *
+ * Die Seite ist 70 % der kürzeren Bildkante, ausgedrückt in Prozent beider
+ * Kanten, weil das Video in voller Breite und mit seinem eigenen
+ * Seitenverhältnis dargestellt wird.
+ */
+function targetFrameStyle(frameSize?: { width: number; height: number }) {
+  if (!frameSize?.width || !frameSize.height) return { inset: '15%' };
+  const side = 70;
+  const widthPct = side * Math.min(1, frameSize.height / frameSize.width);
+  const heightPct = side * Math.min(1, frameSize.width / frameSize.height);
+  return {
+    left: `${(100 - widthPct) / 2}%`,
+    width: `${widthPct}%`,
+    top: `${(100 - heightPct) / 2}%`,
+    height: `${heightPct}%`,
+  };
+}
+
 export default function BarcodeScannerDialog({
   open,
   geraete,
@@ -80,6 +108,12 @@ export default function BarcodeScannerDialog({
     () => (code ? findByCode(geraete, code) : []),
     [code, geraete],
   );
+  // Nur für einen Kamera-Scan: Wer von Hand tippt, hat den Code vor Augen, und
+  // eine Fremdflasche mit ähnlicher Nummer ist dort kein Lesefehler.
+  const similar = useMemo(
+    () => (code && scan && treffer.length === 0 ? findSimilar(geraete, code) : []),
+    [code, scan, treffer, geraete],
+  );
 
   // Der Scanner läuft weiter, solange kein Code steht: Ein Fehlscan soll den
   // Dialog nicht sperren.
@@ -90,7 +124,7 @@ export default function BarcodeScannerDialog({
     setScan((prev) => prev ?? next);
   }, []);
 
-  const { videoRef, status, errorMessage, engine, frameSize, frames } =
+  const { videoRef, status, errorMessage, engine, frameSize, frames, candidate } =
     useBarcodeScanner({
       active: open && !code,
       onDetected: handleDetected,
@@ -152,7 +186,7 @@ export default function BarcodeScannerDialog({
                 <Box
                   sx={{
                     position: 'absolute',
-                    inset: '30% 10%',
+                    ...targetFrameStyle(frameSize),
                     border: '2px solid',
                     borderColor: 'primary.main',
                     borderRadius: 1,
@@ -169,6 +203,7 @@ export default function BarcodeScannerDialog({
                     engine={engine}
                     frameSize={frameSize}
                     frames={frames}
+                    candidate={candidate}
                   />
                 </>
               )}
@@ -205,6 +240,31 @@ export default function BarcodeScannerDialog({
 
           {code && treffer.length === 0 && (
             <Alert severity="info">{t('scanner.noMatch', { code })}</Alert>
+          )}
+
+          {similar.length > 0 && (
+            <>
+              <Typography variant="body2">{t('scanner.similar')}</Typography>
+              <List dense>
+                {similar.map((g) => (
+                  <ListItemButton
+                    key={g.id}
+                    onClick={() => {
+                      // Übernommen wird die Kennung des gewählten Stücks, nicht
+                      // die Fehllesung; die Rohlesung reist trotzdem mit.
+                      onPicked(geraetKennung(g) ?? g.bezeichnung, g, scan);
+                      onClose();
+                    }}
+                  >
+                    <ListItemText
+                      primary={geraetLabel(g)}
+                      secondary={g.feuerwehr}
+                      slotProps={{ primary: { variant: 'h6' } }}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </>
           )}
 
           {code && treffer.length > 1 && (

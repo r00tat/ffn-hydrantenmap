@@ -50,6 +50,22 @@ public class RadiacodeNotificationPlugin extends Plugin {
         }
     }
 
+    /**
+     * Stop-Aufrufe (Trennen, Aufzeichnung/Live-Share beenden) dürfen den
+     * Service nicht erst starten: jeder Intent an einen nicht laufenden Service
+     * erzeugt ihn neu und blendet über ensureForeground() eine Notification
+     * ohne aktiven Modus ein. JS ruft diese Stops auch vorsorglich auf, etwa
+     * beim Beenden der App oder nach einem gescheiterten Auto-Connect.
+     *
+     * @return true, wenn kein Service läuft und der Aufruf erledigt ist.
+     */
+    private boolean resolveIfServiceNotRunning(PluginCall call, String method) {
+        if (RadiacodeForegroundService.Companion.getInstance() != null) return false;
+        Log.i(TAG, "plugin." + method + " — service not running, nothing to stop");
+        call.resolve();
+        return true;
+    }
+
     @PluginMethod
     public void connectNative(PluginCall call) {
         String address = call.getString("deviceAddress");
@@ -135,6 +151,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
     @PluginMethod
     public void disconnectNative(PluginCall call) {
         Log.i(TAG, "plugin.disconnectNative");
+        if (resolveIfServiceNotRunning(call, "disconnectNative")) return;
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_BLE_DISCONNECT);
         startService(intent);
@@ -181,6 +198,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
     @PluginMethod
     public void stopTrackRecording(PluginCall call) {
         Log.i(TAG, "plugin.stopTrackRecording");
+        if (resolveIfServiceNotRunning(call, "stopTrackRecording")) return;
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_STOP_TRACK);
         // Kein startForegroundService — der Service läuft bereits (BLE aktiv).
@@ -226,6 +244,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
     @PluginMethod
     public void stopGpsTrack(PluginCall call) {
         Log.i(TAG, "plugin.stopGpsTrack");
+        if (resolveIfServiceNotRunning(call, "stopGpsTrack")) return;
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_STOP_GPS_TRACK);
         getContext().startService(intent);
@@ -274,6 +293,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
     @PluginMethod
     public void stopLiveShare(PluginCall call) {
         Log.i(TAG, "plugin.stopLiveShare");
+        if (resolveIfServiceNotRunning(call, "stopLiveShare")) return;
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_STOP_LIVE_SHARE);
         getContext().startService(intent);

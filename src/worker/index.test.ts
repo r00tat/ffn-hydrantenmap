@@ -87,3 +87,12 @@ describe('service worker: Selbstheilung', () => {
     expect(code).toMatch(/registration\.unregister\(\)/);
   });
 });
+
+describe('service worker: Build-ID', () => {
+  it('nennt der Seite auf Anfrage seine Build-ID', () => {
+    // Die Seite meldet „Neue Version verfügbar" nur, wenn der neue Worker aus
+    // einem anderen Build stammt als sie selbst.
+    expect(code).toMatch(/SW_BUILD_ID_REQUEST/);
+    expect(code).toMatch(/process\.env\.NEXT_PUBLIC_BUILD_ID/);
+  });
+});

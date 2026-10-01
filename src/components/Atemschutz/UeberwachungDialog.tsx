@@ -14,18 +14,23 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import {
+  MAX_TRUPP_MITGLIEDER,
+  merkeUmbenennung,
   PA_SAETZE,
   PA_TYPEN,
+  sanitizeMitglieder,
   sanitizePersonen,
   truppLabel,
   type AtemschutzTrupp,
   type Geraetesatz,
   type PaTypKey,
+  type Umbenennungen,
 } from '../../common/atemschutz';
 import {
   geraetesatzVon,
   rechnerischeEinsatzdauerMin,
 } from '../../common/atemschutzUeberwachung';
+import PersonChipsInput from './PersonChipsInput';
 
 export interface UeberwachungEingabe {
   ueberwachtVon: string;
@@ -34,6 +39,10 @@ export interface UeberwachungEingabe {
   auftrag: string;
   /** Die taktische Einheit, der der Trupp zugeordnet ist. */
   entsendetAn: string;
+  /** Die Namen des Trupps — hier nachgetragen oder korrigiert. */
+  mitglieder: string[];
+  /** Korrigierte Namen — die Träger der Geräte ziehen mit. */
+  umbenennungen: Umbenennungen;
   paTyp: PaTypKey;
   satz: Geraetesatz;
 }
@@ -102,6 +111,10 @@ export default function UeberwachungDialog({
   const [einsatzziel, setEinsatzziel] = useState(trupp.einsatzziel ?? '');
   const [auftrag, setAuftrag] = useState(trupp.auftrag ?? '');
   const [entsendetAn, setEntsendetAn] = useState(trupp.entsendetAn ?? '');
+  const [umbenennungen, setUmbenennungen] = useState<Umbenennungen>({});
+  const [mitglieder, setMitglieder] = useState<string[]>(
+    () => trupp.mitglieder ?? [],
+  );
   const [paTyp, setPaTyp] = useState<PaTypKey>(
     // Ohne Angabe am Trupp `custom` mit der Bestandsvorgabe: Das ist genau der
     // Satz, mit dem ohnehin gerechnet würde, und er steht damit sichtbar im
@@ -115,6 +128,7 @@ export default function UeberwachungDialog({
 
   const aktuellerSatz = paTyp === 'custom' ? satz : PA_SAETZE[paTyp];
   const dauer = rechnerischeEinsatzdauerMin(aktuellerSatz);
+  const ohneMitglieder = sanitizeMitglieder(mitglieder).length === 0;
 
   const setSatzFeld = (feld: keyof Geraetesatz, wert: string) => {
     const zahl = Number(wert.replace(',', '.'));
@@ -132,6 +146,8 @@ export default function UeberwachungDialog({
         einsatzziel,
         auftrag,
         entsendetAn,
+        mitglieder,
+        umbenennungen,
         paTyp,
         satz: aktuellerSatz,
       });
@@ -170,6 +186,22 @@ export default function UeberwachungDialog({
               </Typography>
             </>
           )}
+          {/* Die Namen sind hier änderbar und nicht nur am Sammelplatz: Ein
+              Trupp, der bei der eigenen Einheit erfasst wurde, hat keinen
+              anderen Dialog, in dem ein nur mit Vornamen erfasster Name zu
+              ergänzen wäre. */}
+          <PersonChipsInput
+            label={t('trupp.mitglieder')}
+            helperText={t('trupp.mitgliederHint')}
+            vollText={t('trupp.mitgliederVoll', { max: MAX_TRUPP_MITGLIEDER })}
+            value={mitglieder}
+            options={namen}
+            max={MAX_TRUPP_MITGLIEDER}
+            onChange={setMitglieder}
+            onUmbenennen={(alt, neu) =>
+              setUmbenennungen((prev) => merkeUmbenennung(prev, alt, neu))
+            }
+          />
           {/* Die Einheit steht oben: Sie ist die Frage, die vor allen anderen
               beantwortet ist — „welches Fahrzeug hat den Trupp?" —, und sie
               fehlt vollständig, wenn der Trupp nie über einen Sammelplatz lief. */}
@@ -275,7 +307,7 @@ export default function UeberwachungDialog({
         <Button onClick={onClose}>{tCommon('cancel')}</Button>
         <Button
           variant="contained"
-          disabled={saving || !(dauer > 0)}
+          disabled={saving || !(dauer > 0) || ohneMitglieder}
           onClick={handleSave}
         >
           {istUebernahme

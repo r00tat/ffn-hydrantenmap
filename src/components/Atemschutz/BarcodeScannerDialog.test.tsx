@@ -5,6 +5,7 @@ import { renderWithIntl } from '../../test-utils/intlRender';
 import type { AtemschutzGeraet } from '../../common/atemschutz';
 import type {
   BarcodeScanEvent,
+  ScanCandidate,
   UseBarcodeScannerOptions,
 } from '../../hooks/useBarcodeScanner';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
@@ -13,6 +14,7 @@ import BarcodeScannerDialog from './BarcodeScannerDialog';
 // aus einem Treffer macht, nicht ob getUserMedia läuft — das deckt
 // useBarcodeScanner.test.ts ab.
 let melde: ((scan: BarcodeScanEvent) => void) | undefined;
+let candidate: ScanCandidate | undefined;
 
 vi.mock('../../hooks/useBarcodeScanner', () => ({
   default: ({ onDetected }: UseBarcodeScannerOptions) => {
@@ -23,6 +25,7 @@ vi.mock('../../hooks/useBarcodeScanner', () => ({
       engine: 'zxing',
       frameSize: { width: 640, height: 480 },
       frames: 120,
+      candidate,
     };
   },
 }));
@@ -50,6 +53,7 @@ const scan = (over: Partial<BarcodeScanEvent> = {}): BarcodeScanEvent => ({
 
 beforeEach(() => {
   melde = undefined;
+  candidate = undefined;
 });
 
 describe('BarcodeScannerDialog', () => {
@@ -173,5 +177,47 @@ describe('BarcodeScannerDialog', () => {
     expect(
       screen.getByText(/ebenfalls im Bild: „2016-MU-046“ · code_128/),
     ).toBeInTheDocument();
+  });
+
+  it('zeigt eine noch unbestätigte Lesung samt Fortschritt', () => {
+    candidate = { value: '2016-FL-045', format: 'code_128', hits: 2, required: 3 };
+    renderWithIntl(
+      <BarcodeScannerDialog
+        open
+        geraete={[]}
+        onClose={vi.fn()}
+        onPicked={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(/Erkannt: „2016-FL-045“ · code_128 — wird bestätigt \(2\/3\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('schlägt bei einem unbekannten Code ein Gerät vor, das nur ein Zeichen abweicht', () => {
+    const onPicked = vi.fn();
+    const fl045 = geraet({
+      id: 'fl045',
+      typ: 'flasche',
+      bezeichnung: 'Atemluftflasche',
+      inventarNr: '2016-FL-045',
+    });
+    renderWithIntl(
+      <BarcodeScannerDialog
+        open
+        geraete={[fl045]}
+        onClose={vi.fn()}
+        onPicked={onPicked}
+      />,
+    );
+    const misread = scan({
+      value: '1016-FL-045',
+      results: [{ rawValue: '1016-FL-045', format: 'code_128' }],
+    });
+    act(() => melde?.(misread));
+    expect(screen.getByText(/Ähnliche Kennung im Bestand/)).toBeInTheDocument();
+    act(() => screen.getByText(/2016-FL-045/).click());
+    // Übernommen wird die Kennung des gewählten Geräts, nicht die Fehllesung.
+    expect(onPicked).toHaveBeenCalledWith('2016-FL-045', fl045, misread);
   });
 });
