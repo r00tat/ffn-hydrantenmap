@@ -56,3 +56,64 @@ export async function unregisterLegacyServiceWorker(
 
   return results.filter(Boolean).length;
 }
+
+/**
+ * Nachricht, mit der die Seite den Service Worker nach seiner Build-ID fragt.
+ * Die Antwort `{ buildId }` kommt über den mitgeschickten `MessagePort`.
+ */
+export const SW_BUILD_ID_REQUEST = 'sw-build-id';
+
+/**
+ * Fragt `worker` nach der Build-ID, aus der er gebaut wurde. Antwortet er nicht
+ * innerhalb von `timeoutMs` — etwa ein Worker aus einem Build vor dieser
+ * Nachricht —, ist das Ergebnis `undefined`.
+ */
+export function requestWorkerBuildId(
+  worker: ServiceWorker | null | undefined,
+  timeoutMs = 3000,
+): Promise<string | undefined> {
+  if (!worker || typeof MessageChannel === 'undefined') {
+    return Promise.resolve(undefined);
+  }
+
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => {
+      channel.port1.close();
+      resolve(undefined);
+    }, timeoutMs);
+
+    channel.port1.onmessage = (event: MessageEvent<{ buildId?: unknown }>) => {
+      clearTimeout(timer);
+      channel.port1.close();
+      const buildId = event.data?.buildId;
+      resolve(typeof buildId === 'string' ? buildId : undefined);
+    };
+
+    try {
+      worker.postMessage({ type: SW_BUILD_ID_REQUEST }, [channel.port2]);
+    } catch (err) {
+      console.warn('failed to ask the service worker for its build id', err);
+      clearTimeout(timer);
+      channel.port1.close();
+      resolve(undefined);
+    }
+  });
+}
+
+/**
+ * Ob ein Service Worker mit `workerBuildId` neuer ist als die laufende Seite.
+ *
+ * Ist eine der beiden IDs unbekannt (lokaler Build, alter Worker ohne Antwort),
+ * gilt der Worker als neu: lieber einmal zu oft melden als ein echtes Update
+ * verschweigen.
+ */
+export function isNewWorkerBuild(
+  pageBuildId: string | undefined,
+  workerBuildId: string | undefined,
+): boolean {
+  if (!pageBuildId || !workerBuildId) {
+    return true;
+  }
+  return pageBuildId !== workerBuildId;
+}
