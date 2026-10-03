@@ -208,8 +208,16 @@ export function measurementSummary(table: MeasurementTable): string {
   return [`${table.layerName}: ${count}`, ...ranges].join('; ');
 }
 
+/**
+ * Eine Zelle für die CSV. Namen von Messpunkten und Ebenen sind Freitext: Was
+ * mit `=`, `+`, `-` oder `@` beginnt, führte Excel als Formel aus. Solche
+ * Zellen bekommen ein `'` vorangestellt — außer echten Zahlen, damit negative
+ * Messwerte Zahlen bleiben.
+ */
 function csvCell(value: string): string {
-  return /[";\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  const isNumber = value !== '' && !Number.isNaN(Number(value.replace(',', '.')));
+  const v = !isNumber && /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[";\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
 /**

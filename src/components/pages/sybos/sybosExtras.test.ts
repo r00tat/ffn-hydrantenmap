@@ -176,6 +176,26 @@ describe('buildMeasurementTables', () => {
   });
 });
 
+describe('measurementCsv – Formeln', () => {
+  it('entschärft Formeln in Freitext, lässt negative Zahlen stehen', () => {
+    const [table] = buildMeasurementTables(
+      [
+        {
+          id: 'p',
+          type: 'marker',
+          name: '=HYPERLINK("x")',
+          layer: 'l1',
+          fieldData: { dl: -0.5 },
+        },
+      ],
+      [layer],
+      {},
+    );
+    const line = measurementCsv(table).split('\r\n')[1];
+    expect(line).toBe(`"'=HYPERLINK(""x"")";;-0,5;;`);
+  });
+});
+
 describe('buildSpectrumRows', () => {
   it('nimmt das manuell bestimmte Nuklid vor dem erkannten', () => {
     const spectrum = {
