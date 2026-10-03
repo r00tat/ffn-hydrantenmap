@@ -9,9 +9,16 @@ describe('appViewport', () => {
     expect(appViewport).toMatchObject({
       width: 'device-width',
       initialScale: 1,
+      minimumScale: 1,
       maximumScale: 1,
       userScalable: false,
     });
+  });
+
+  // Dialoge hängen am Layout-Viewport; verkleinert die Tastatur nur den
+  // sichtbaren Ausschnitt, bleibt die Ansicht danach verschoben.
+  it('lässt die Tastatur den Layout-Viewport verkleinern', () => {
+    expect(appViewport.interactiveWidget).toBe('resizes-content');
   });
 
   it('behält die Themenfarbe', () => {

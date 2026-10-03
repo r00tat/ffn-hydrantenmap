@@ -10,6 +10,11 @@ body {
      übergeht user-scalable=no, touch-action nicht. Die Karte setzt selbst
      touch-action: none und zoomt über Leaflet. */
   touch-action: pan-x pan-y;
+  /* Nichts darf den Layout-Viewport verbreitern: Ragte ein Element (etwa in
+     einem Dialog) über den Rand, zoomte Chrome unter Android die Seite heraus
+     und blieb auch nach dem Schließen dort. clip statt hidden, weil hidden
+     einen Scroll-Container erzeugt und position: sticky bricht. */
+  overflow-x: clip;
 }
 
 a {
