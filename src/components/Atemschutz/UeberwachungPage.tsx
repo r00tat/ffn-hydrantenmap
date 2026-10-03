@@ -49,7 +49,7 @@ import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSugge
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
-import useOwnFw from '../../hooks/useOwnFw';
+import useOwnFleet from '../../hooks/useOwnFleet';
 import { sortVehiclesOwnFirst } from '../../common/vehicleGroups';
 import useNotificationPermission, {
   pruefeNotificationErlaubnis,
@@ -163,7 +163,7 @@ export default function UeberwachungPage() {
   const t = useTranslations('atemschutz');
   const firecallId = useFirecallId();
   const firecall = useFirecall();
-  const ownFw = useOwnFw();
+  const fleet = useOwnFleet();
   const hatEinsatz = !!firecallId && firecallId !== 'unknown';
   // Ohne Einsatz kein Schreiben: `firecallId` ist dann die Platzhalter-ID
   // `unknown`, und jeder Schreibvorgang darauf endet in permission-denied.
@@ -221,10 +221,10 @@ export default function UeberwachungPage() {
       namen.push(v);
     };
     // Die eigenen Fahrzeuge zuerst, die fremden nach Feuerwehr.
-    for (const fzg of sortVehiclesOwnFirst(vehicles, ownFw)) add(fzg.name);
+    for (const fzg of sortVehiclesOwnFirst(vehicles, fleet)) add(fzg.name);
     for (const e of tacticalUnits) add(e.name);
     return namen;
-  }, [vehicles, tacticalUnits, ownFw]);
+  }, [vehicles, tacticalUnits, fleet]);
 
   /**
    * Die Einheiten zur Wahl und als Vorschlag: die am Trupp vergebenen *und* die

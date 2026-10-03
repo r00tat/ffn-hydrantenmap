@@ -33,17 +33,50 @@ export function normalizeFwName(fw: string | undefined): string {
 }
 
 /**
- * Ein eigenes Fahrzeug: nicht als fremd markiert und entweder ohne
- * Feuerwehrangabe oder mit der Feuerwehr des Einsatzes.
- *
- * Ohne Angabe zählt es als eigenes, weil die gewachsenen Einträge der eigenen
- * Wehr oft kein `fw` tragen — sie in eine Gruppe „ohne Feuerwehr" zu schieben,
- * nähme den Fahrzeugen, um die es im Board geht, den Platz vorne.
+ * Was die eigene Feuerwehr im Einsatz ausmacht: ihr Name und die Namen ihrer
+ * vorgefertigten Fahrzeuge — derselben Liste, aus der die Chip-Leiste
+ * Fahrzeuge anlegt.
  */
-export function isOwnVehicle(vehicle: Fzg, ownFw: string): boolean {
+export interface OwnFleet {
+  fw: string;
+  /** Normalisiert über `normalizeVehicleName`. */
+  vehicleNames: ReadonlySet<string>;
+}
+
+export function normalizeVehicleName(name: string | undefined): string {
+  return (name ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export function ownFleet(fw: string, vehicleNames: Iterable<string>): OwnFleet {
+  return {
+    fw,
+    vehicleNames: new Set(
+      Array.from(vehicleNames, normalizeVehicleName).filter(Boolean),
+    ),
+  };
+}
+
+/**
+ * Ob ein Fahrzeug zur eigenen Feuerwehr gehört.
+ *
+ * Erkennungsmerkmal ist in erster Linie der Name: Die eigenen Fahrzeuge sind
+ * die vorgefertigten. Die Feuerwehrangabe allein trägt nicht, weil sie im
+ * Dialog leer vorbelegt ist — ein Rettungswagen, der von Hand angelegt wurde,
+ * hat ebenso keine wie viele gewachsene Einträge der eigenen Wehr.
+ *
+ * Reihenfolge: Der `fremd`-Schalter und eine ausdrücklich andere Feuerwehr
+ * gehen vor — ein „TLFA 4000" aus Weiden gehört nach Weiden, auch wenn die
+ * eigene Wehr ein gleichnamiges Fahrzeug führt. Danach ist eigen, was ein
+ * vorgefertigtes Fahrzeug ist oder ausdrücklich die eigene Feuerwehr trägt.
+ * Alles übrige — keine Feuerwehr, kein bekannter Name — ist fremd.
+ */
+export function isOwnVehicle(vehicle: Fzg, own: OwnFleet): boolean {
   if (isFremdesFahrzeug(vehicle)) return false;
   const fw = normalizeFwName(vehicle.fw);
-  return fw === '' || fw === normalizeFwName(ownFw);
+  const ownFw = normalizeFwName(own.fw);
+  if (fw && fw !== ownFw) return false;
+  if (own.vehicleNames.has(normalizeVehicleName(vehicle.name))) return true;
+  return fw === ownFw;
 }
 
 /**
@@ -53,18 +86,18 @@ export function isOwnVehicle(vehicle: Fzg, ownFw: string): boolean {
  */
 export function groupVehiclesByFw(
   vehicles: Fzg[],
-  ownFw: string,
+  fleet: OwnFleet,
 ): VehicleGroup[] {
   const own: VehicleGroup = {
-    key: normalizeFwName(ownFw),
-    label: ownFw,
+    key: normalizeFwName(fleet.fw),
+    label: fleet.fw,
     own: true,
     vehicles: [],
   };
   const foreign = new Map<string, VehicleGroup>();
 
   for (const vehicle of vehicles) {
-    if (isOwnVehicle(vehicle, ownFw)) {
+    if (isOwnVehicle(vehicle, fleet)) {
       own.vehicles.push(vehicle);
       continue;
     }
@@ -87,6 +120,9 @@ export function groupVehiclesByFw(
 }
 
 /** Dieselbe Reihenfolge wie `groupVehiclesByFw`, als flache Liste. */
-export function sortVehiclesOwnFirst(vehicles: Fzg[], ownFw: string): Fzg[] {
-  return groupVehiclesByFw(vehicles, ownFw).flatMap((g) => g.vehicles);
+export function sortVehiclesOwnFirst(
+  vehicles: Fzg[],
+  fleet: OwnFleet,
+): Fzg[] {
+  return groupVehiclesByFw(vehicles, fleet).flatMap((g) => g.vehicles);
 }

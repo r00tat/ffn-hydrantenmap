@@ -14,7 +14,16 @@ const mockVehicles: Fzg[] = [
   { id: 'j1', name: 'TLF Jois', fw: 'Jois', type: 'vehicle' } as Fzg,
   { id: 'v1', name: 'TLF', type: 'vehicle' } as Fzg,
   { id: 'v2', name: 'KLF', fw: 'Neusiedl am See', type: 'vehicle' } as Fzg,
+  { id: 'r1', name: 'RTW', type: 'vehicle' } as Fzg,
 ];
+
+// Die vorgefertigten Fahrzeuge der eigenen Wehr; der echte Hook öffnet ein
+// Firestore-Abo.
+vi.mock('../../hooks/useKostenersatzVehicles', () => ({
+  useKostenersatzVehicles: () => ({
+    vehicles: [{ id: 'tlf', name: 'TLF', rateId: '2.05', sortOrder: 1 }],
+  }),
+}));
 
 vi.mock('../../hooks/useFirecall', () => ({
   useCrewForVehicle: () => mockCrew,
@@ -54,6 +63,8 @@ describe('VehicleCrewSection', () => {
     expect(container.textContent).toBe('');
   });
 
+  // TLF ist vorgefertigt, KLF trägt die eigene Feuerwehr, RTW hat weder das
+  // eine noch das andere und gilt deshalb als fremd.
   it('bietet zuerst die eigenen, dann die fremden Fahrzeuge nach Feuerwehr an', () => {
     render(<VehicleCrewSection vehicleId="v1" />);
     // Je Person Funktion und Fahrzeug; das zweite Auswahlfeld ist das Fahrzeug.
@@ -61,6 +72,15 @@ describe('VehicleCrewSection', () => {
     const listbox = screen.getByRole('listbox');
     expect(
       Array.from(listbox.children).map((el) => el.textContent?.trim()),
-    ).toEqual(['Verfügbar', 'Neusiedl am See', 'TLF', 'KLF', 'Jois', 'TLF Jois']);
+    ).toEqual([
+      'Verfügbar',
+      'Neusiedl am See',
+      'TLF',
+      'KLF',
+      'Jois',
+      'TLF Jois',
+      'Ohne Feuerwehr',
+      'RTW',
+    ]);
   });
 });

@@ -10,7 +10,7 @@ import {
   useCrewAssignmentActions,
   useCrewForVehicle,
 } from '../../hooks/useFirecall';
-import useOwnFw from '../../hooks/useOwnFw';
+import useOwnFleet from '../../hooks/useOwnFleet';
 import useVehicles from '../../hooks/useVehicles';
 import {
   CREW_FUNKTIONEN,
@@ -26,7 +26,7 @@ export default function VehicleCrewSection({
   const crew = useCrewForVehicle(vehicleId);
   const { assignVehicle, updateFunktion } = useCrewAssignmentActions();
   const { vehicles } = useVehicles();
-  const ownFw = useOwnFw();
+  const fleet = useOwnFleet();
   const t = useTranslations('crew');
 
   if (!vehicleId) return null;
@@ -110,7 +110,7 @@ export default function VehicleCrewSection({
                     <MenuItem value="">Verfügbar</MenuItem>
                     {vehicleSelectItems(
                       vehicles,
-                      ownFw,
+                      fleet,
                       t('noFireDepartment'),
                     )}
                   </Select>

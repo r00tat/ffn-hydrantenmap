@@ -65,8 +65,12 @@ import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import useVehicles from '../../hooks/useVehicles';
 import { nimmtBesatzung } from '../../common/vehicle-utils';
-import { groupVehiclesByFw, VehicleGroup } from '../../common/vehicleGroups';
-import useOwnFw from '../../hooks/useOwnFw';
+import {
+  groupVehiclesByFw,
+  OwnFleet,
+  VehicleGroup,
+} from '../../common/vehicleGroups';
+import useOwnFleet from '../../hooks/useOwnFleet';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import {
   CrewAssignment,
@@ -117,7 +121,7 @@ function DroppableTableBody({
 function CrewRow({
   assignment,
   vehicles,
-  ownFw,
+  fleet,
   noFwLabel,
   onFunktionChange,
   onVehicleChange,
@@ -126,7 +130,7 @@ function CrewRow({
 }: {
   assignment: CrewAssignment;
   vehicles: Fzg[];
-  ownFw: string;
+  fleet: OwnFleet;
   noFwLabel: string;
   onFunktionChange: (funktion: CrewFunktion) => void;
   onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
@@ -213,7 +217,7 @@ function CrewRow({
             readOnly={readOnly}
           >
             <MenuItem value="">—</MenuItem>
-            {vehicleSelectItems(vehicles, ownFw, noFwLabel)}
+            {vehicleSelectItems(vehicles, fleet, noFwLabel)}
           </Select>
         </FormControl>
       </TableCell>
@@ -270,7 +274,7 @@ export default function CrewAssignmentBoard({
   const { activePersons } = useFahrtenbuchPersons(firecall?.group);
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
-  const ownFw = useOwnFw();
+  const fleet = useOwnFleet();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -531,8 +535,8 @@ export default function CrewAssignmentBoard({
    * nur, wenn dort schon Personen stehen oder jemand ihn aufklappt.
    */
   const boardGroups = useMemo(
-    () => groupVehiclesByFw(boardVehicles, ownFw),
-    [boardVehicles, ownFw],
+    () => groupVehiclesByFw(boardVehicles, fleet),
+    [boardVehicles, fleet],
   );
   const ownBoardVehicles = boardGroups.find((g) => g.own)?.vehicles ?? [];
   const foreignBoardGroups = boardGroups.filter((g) => !g.own);
@@ -607,7 +611,7 @@ export default function CrewAssignmentBoard({
         key={a.id || a.recipientId}
         assignment={a}
         vehicles={crewVehicles}
-        ownFw={ownFw}
+        fleet={fleet}
         noFwLabel={t('noFireDepartment')}
         onFunktionChange={(funktion) =>
           handleFunktionChange(a.id || a.recipientId, funktion)

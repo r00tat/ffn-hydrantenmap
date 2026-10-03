@@ -585,6 +585,8 @@ describe('CrewAssignmentBoard', () => {
       { id: 'w2', name: 'KLF Weiden', fw: 'FF Weiden am See', type: 'vehicle' },
       { id: 'j1', name: 'TLF Jois', fw: 'Jois', type: 'vehicle' },
       { id: 'r1', name: 'RTW', fremd: 'true', type: 'vehicle' },
+      // Weder Feuerwehr noch vorgefertigtes Fahrzeug: fremd.
+      { id: 'p1', name: 'Polizei', type: 'vehicle' },
     ] as Fzg[];
 
     beforeEach(() => {
@@ -618,12 +620,11 @@ describe('CrewAssignmentBoard', () => {
 
     it('fasst Schreibvarianten derselben Feuerwehr zusammen', () => {
       render(<CrewAssignmentBoard />);
-      expect(
-        screen
-          .getAllByTestId('crew-fw-group')
-          .filter((h) => h.textContent?.includes('Weiden')),
-      ).toHaveLength(1);
-      expect(screen.getByText(/2 Fahrzeuge/)).toBeInTheDocument();
+      const weiden = screen
+        .getAllByTestId('crew-fw-group')
+        .filter((h) => h.textContent?.includes('Weiden'));
+      expect(weiden).toHaveLength(1);
+      expect(weiden[0]).toHaveTextContent(/2 Fahrzeuge/);
     });
 
     it('klappt einen Abschnitt auf Klick auf', async () => {
@@ -687,6 +688,7 @@ describe('CrewAssignmentBoard', () => {
         'KLF Weiden',
         'Ohne Feuerwehr',
         'RTW',
+        'Polizei',
       ]);
     });
   });

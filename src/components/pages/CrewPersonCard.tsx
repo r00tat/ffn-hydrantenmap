@@ -21,6 +21,8 @@ import {
   CREW_FUNKTIONEN,
   Fzg,
 } from '../firebase/firestore';
+import { getDefaultVehicles } from '../../common/defaultKostenersatzRates';
+import { OwnFleet, ownFleet } from '../../common/vehicleGroups';
 import { DEFAULT_EINSATZ_FW } from '../FirecallItems/einsatzDefaults';
 import { vehicleSelectItems } from '../FirecallItems/vehicleSelectItems';
 
@@ -31,11 +33,16 @@ export interface CrewPersonCardProps {
   onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
   onRemove?: () => void;
   showVehicleSelect?: boolean;
-  /** Feuerwehr, deren Fahrzeuge im Auswahlfeld vorne stehen. */
-  ownFw?: string;
+  /** Eigene Feuerwehr; ihre Fahrzeuge stehen im Auswahlfeld vorne. */
+  fleet?: OwnFleet;
   /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
   readOnly?: boolean;
 }
+
+const DEFAULT_FLEET = ownFleet(
+  DEFAULT_EINSATZ_FW,
+  getDefaultVehicles().map((v) => v.name),
+);
 
 export default function CrewPersonCard({
   assignment,
@@ -44,7 +51,7 @@ export default function CrewPersonCard({
   onVehicleChange,
   onRemove,
   showVehicleSelect = false,
-  ownFw = DEFAULT_EINSATZ_FW,
+  fleet = DEFAULT_FLEET,
   readOnly = false,
 }: CrewPersonCardProps) {
   const t = useTranslations('crew');
@@ -132,7 +139,7 @@ export default function CrewPersonCard({
             readOnly={readOnly}
           >
             <MenuItem value="">-- Nicht zugeordnet --</MenuItem>
-            {vehicleSelectItems(vehicles, ownFw, t('noFireDepartment'))}
+            {vehicleSelectItems(vehicles, fleet, t('noFireDepartment'))}
           </Select>
         </FormControl>
       )}

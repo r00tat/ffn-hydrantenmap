@@ -132,7 +132,6 @@ describe('CrewPersonCard', () => {
           { id: 'w1', name: 'TLFA Weiden', fw: 'Weiden am See', type: 'vehicle' } as Fzg,
           ...mockVehicles,
         ]}
-        ownFw="Neusiedl am See"
         showVehicleSelect
       />,
     );

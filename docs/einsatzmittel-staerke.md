@@ -127,18 +127,32 @@ Fahrzeuge vorne, danach die fremden je Feuerwehr, alphabetisch; fremde ohne
 Feuerwehrangabe — Rettung, Polizei — zuletzt unter „Ohne Feuerwehr". Die
 Logik steht in `src/common/vehicleGroups.ts`.
 
-Eigen ist ein Fahrzeug, wenn es **nicht** als `fremd` markiert ist und seine
-`fw` leer ist oder der Feuerwehr des Einsatzes entspricht. Anders als bei der
-Stärke taugt `fw` hier als Merkmal: Verglichen wird nicht, *ob* ein
-Feuerwehrname dasteht, sondern *welcher* — gegen den des Einsatzes. Der
-Vergleich ist normalisiert (Groß-/Kleinschreibung, Leerraum, Präfix „FF"),
-weil die Chip-Leiste „Neusiedl am See" schreibt und eine Eingabe von Hand oft
-„FF Neusiedl am See". Ein Fahrzeug ohne `fw` zählt als eigen, weil viele
-gewachsene Einträge der eigenen Wehr keines tragen.
+Erkennungsmerkmal eines eigenen Fahrzeugs ist der **Name**: Eigen sind die
+vorgefertigten Fahrzeuge — dieselbe Liste der Kostenersatz-Fahrzeuge, aus der
+die Chip-Leiste Fahrzeuge anlegt (`useKostenersatzVehicles`). Die
+Feuerwehrangabe allein trägt nicht, weil sie im Fahrzeugdialog leer vorbelegt
+ist: Ein von Hand angelegter Rettungswagen hat ebenso keine wie viele
+gewachsene Einträge der eigenen Wehr.
+
+Die Regel in der Reihenfolge, in der sie geprüft wird (`isOwnVehicle()`):
+
+1. Als `fremd` markiert → fremd.
+2. Feuerwehr gesetzt und nicht die des Einsatzes → fremd. Ein „TLFA 4000"
+   aus Weiden gehört nach Weiden, auch wenn die eigene Wehr ein
+   gleichnamiges Fahrzeug führt.
+3. Vorgefertigtes Fahrzeug → eigen.
+4. Feuerwehr ausdrücklich die des Einsatzes → eigen; wer sie einträgt, meint es.
+5. Sonst — keine Feuerwehr, kein bekannter Name → fremd, „Ohne Feuerwehr".
+
+Der Vergleich der Feuerwehr ist normalisiert (Groß-/Kleinschreibung,
+Leerraum, Präfix „FF"), weil die Chip-Leiste „Neusiedl am See" schreibt und
+eine Eingabe von Hand oft „FF Neusiedl am See"; der des Namens ebenso
+(Groß-/Kleinschreibung, Leerraum). Die Feuerwehr des Einsatzes ist sein
+`fw`, ohne Angabe die Vorgabe „Neusiedl am See".
 
 Die beiden Merkmale können auseinanderlaufen: Ein Fahrzeug einer Nachbarwehr
-ohne gesetzten `fremd`-Schalter steht im Board unter seiner Feuerwehr, in der
-Stärketabelle aber bei den eigenen Kräften. Das ist gewollt — das Board
+oder ein Rettungswagen ohne gesetzten `fremd`-Schalter steht im Board bei den
+fremden, in der Stärketabelle aber bei den eigenen Kräften. Das ist gewollt — das Board
 ordnet nach Zugehörigkeit, die Stärke folgt der ausdrücklichen Kennzeichnung.
 
 Fremden Fahrzeugen wird selten jemand zugeordnet. Ihr Abschnitt im Board ist

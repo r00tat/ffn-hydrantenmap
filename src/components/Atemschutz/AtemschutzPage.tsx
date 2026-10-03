@@ -34,7 +34,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
-import useOwnFw from '../../hooks/useOwnFw';
+import useOwnFleet from '../../hooks/useOwnFleet';
 import { sortVehiclesOwnFirst } from '../../common/vehicleGroups';
 import useVehicles from '../../hooks/useVehicles';
 import { updateDoc } from '../../lib/firestoreClient';
@@ -69,7 +69,7 @@ export default function AtemschutzPage() {
   const t = useTranslations('atemschutz');
   const firecallId = useFirecallId();
   const firecall = useFirecall();
-  const ownFw = useOwnFw();
+  const fleet = useOwnFleet();
   const canWrite = useFirecallWriteAccess();
   const {
     email,
@@ -153,10 +153,10 @@ export default function AtemschutzPage() {
       namen.push(v);
     };
     // Die eigenen Fahrzeuge zuerst, die fremden nach Feuerwehr.
-    for (const fzg of sortVehiclesOwnFirst(vehicles, ownFw)) add(fzg.name);
+    for (const fzg of sortVehiclesOwnFirst(vehicles, fleet)) add(fzg.name);
     for (const einheit of tacticalUnits) add(einheit.name);
     return namen;
-  }, [vehicles, tacticalUnits, ownFw]);
+  }, [vehicles, tacticalUnits, fleet]);
 
   const actor: AtemschutzActor = useMemo(
     () => ({ userId: uid ?? '', now: new Date().toISOString() }),
