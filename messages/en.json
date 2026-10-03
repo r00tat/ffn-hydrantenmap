@@ -639,7 +639,8 @@
         "rueckzugVoraus": "{trupp}: withdraw in {minuten} min",
         "body": "{einsatz} · estimated {druck} bar · withdraw {zeit}",
         "zeile": "{titel} · est. {druck} bar · withdraw {zeit}"
-      }
+      },
+      "wakeLockAktiv": "The screen stays on while a team is under breathing apparatus."
     }
   },
   "common": {

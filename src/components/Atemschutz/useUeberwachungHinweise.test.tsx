@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PA_SAETZE, type AtemschutzTrupp } from '../../common/atemschutz';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import useUeberwachungHinweise from './useUeberwachungHinweise';
@@ -8,6 +9,16 @@ const { showSnackbar } = vi.hoisted(() => ({ showSnackbar: vi.fn() }));
 
 vi.mock('../providers/SnackbarProvider', () => ({
   useSnackbar: () => showSnackbar,
+}));
+
+const native = vi.hoisted(() => ({
+  available: false,
+  sync: vi.fn(async () => {}),
+}));
+
+vi.mock('../../lib/nativeLocalNotifications', () => ({
+  isNativeLocalNotificationsAvailable: () => native.available,
+  syncNativeNotifications: native.sync,
 }));
 
 const ABMARSCH = '2026-09-02T10:00:00.000Z';
@@ -128,5 +139,63 @@ describe('useUeberwachungHinweise', () => {
     // Intl-Wrapper und damit den Hook-Zustand.
     rerender(<Probe trupps={[trupp()]} jetzt={nachAbmarsch(9.1)} />);
     expect(showSnackbar).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useUeberwachungHinweise — lokaler Termin', () => {
+  beforeEach(() => {
+    showSnackbar.mockClear();
+    native.sync.mockClear();
+    native.available = false;
+    vi.useFakeTimers();
+    vi.setSystemTime(nachAbmarsch(1));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('weckt sich zum Termin selbst, auch ohne Sekundentakt', () => {
+    // `jetzt` bleibt stehen — wie ein im Hintergrund gedrosselter Ticker.
+    renderWithIntl(<Probe trupps={[trupp()]} jetzt={nachAbmarsch(1)} />);
+    expect(showSnackbar).not.toHaveBeenCalled();
+
+    // Das erste Drittel liegt bei 8,6 min.
+    act(() => {
+      vi.advanceTimersByTime(7 * 60_000);
+    });
+    expect(showSnackbar).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(showSnackbar).toHaveBeenCalledTimes(1);
+    expect(ersterAufruf().message).toMatch(
+      /keine Meldung nach einem Drittel der Einsatzzeit/,
+    );
+  });
+
+  it('hinterlegt in der App den nächsten Termin je Trupp beim Betriebssystem', () => {
+    native.available = true;
+    renderWithIntl(<Probe trupps={[trupp()]} jetzt={nachAbmarsch(1)} />);
+
+    expect(native.sync).toHaveBeenCalled();
+    const [group, items] = native.sync.mock.calls.at(-1) as unknown as [
+      string,
+      Array<{ key: string; at: Date; title: string; url?: string }>,
+    ];
+    expect(group).toBe('asue-f1');
+    expect(items).toHaveLength(1);
+    expect(items[0].key).toBe('asue-t1');
+    const minuten =
+      (items[0].at.getTime() - new Date(ABMARSCH).getTime()) / 60_000;
+    expect(minuten).toBeCloseTo(8.6, 0);
+    expect(items[0].title).toMatch(/Trupp 1/);
+    expect(items[0].url).toBe('/einsatz/f1/atemschutzueberwachung');
+  });
+
+  it('plant in der App nichts, solange das Plugin fehlt', () => {
+    renderWithIntl(<Probe trupps={[trupp()]} jetzt={nachAbmarsch(1)} />);
+    expect(native.sync).not.toHaveBeenCalled();
   });
 });

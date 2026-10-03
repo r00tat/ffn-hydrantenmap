@@ -95,6 +95,8 @@ import useTruppTagebuch from './useTruppTagebuch';
 import AiAssistantButton from '../Map/AiAssistantButton';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import useUeberwachungHinweise from './useUeberwachungHinweise';
+import useReplanWarningsOnReconnect from './useReplanWarningsOnReconnect';
+import useWakeLock from '../../hooks/useWakeLock';
 
 /**
  * Die **eigene** Einheit des Geräts steht im `localStorage` — nicht am
@@ -356,6 +358,22 @@ export default function UeberwachungPage() {
     jetzt,
     vorgabe,
   });
+
+  // Offline kommt kein Push: Solange ein Trupp unter Atemschutz ist, bleibt
+  // der Bildschirm an, damit die Warnung aus der Seite gesehen wird.
+  const bildschirmAn = useWakeLock(hatEinsatz && trupps.imEinsatz.length > 0);
+
+  // Beim Reconnect die Serverwarnung aller Trupps im Einsatz nachplanen — auch
+  // derer, die ein anderes Gerät angelegt hat.
+  const aktiveTruppIds = useMemo(
+    () =>
+      trupps.imEinsatz.flatMap((tr) => (tr.id ? [tr.id] : [])),
+    [trupps.imEinsatz],
+  );
+  useReplanWarningsOnReconnect(
+    hatEinsatz ? firecallId : undefined,
+    aktiveTruppIds,
+  );
 
   const [dialog, setDialog] = useState<Dialog>();
   // Nur die einmalige Bestätigung nach dem Einschalten — kein Dauerzustand.
@@ -812,6 +830,17 @@ export default function UeberwachungPage() {
             `ueberwachung.pushHinweis.${PUSH_HINWEIS[pushErlaubnis]}` as 'ueberwachung.pushHinweis.offen',
           )}
         </Alert>
+      )}
+
+      {bildschirmAn && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          component="div"
+          sx={{ mb: 1 }}
+        >
+          {t('ueberwachung.wakeLockAktiv')}
+        </Typography>
       )}
 
       {hatEinsatz && (

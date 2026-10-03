@@ -639,7 +639,8 @@
         "rueckzugVoraus": "{trupp}: Rückzug in {minuten} min",
         "body": "{einsatz} · vermutet {druck} bar · Rückzug {zeit}",
         "zeile": "{titel} · vermutet {druck} bar · Rückzug {zeit}"
-      }
+      },
+      "wakeLockAktiv": "Der Bildschirm bleibt eingeschaltet, solange ein Trupp unter Atemschutz ist."
     }
   },
   "common": {

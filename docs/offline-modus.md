@@ -255,3 +255,26 @@ Wechsel vom Cache- zum Server-Stand nicht, wenn sich kein Dokument ändert,
 und `fromCache` bliebe nach dem ersten Cache-Ergebnis stehen. Angezeigt wird
 nur im Offline-Zustand des Verbindungsstatus: Online ist ein Cache-Ergebnis
 der kurze Moment vor der Antwort des Servers.
+
+## Atemschutzüberwachung offline
+
+Offline kommt keine Atemschutzwarnung vom Server: Die Terminplanung
+(`planeUeberwachungWarnung`) ist eine Server Action, und FCM erreicht das
+Gerät nicht. Die offene Überwachungsseite warnt deshalb selbst — das tat sie
+schon vorher im Sekundentakt (`useUeberwachungHinweise`), dazu kommen vier
+Bausteine. Hintergrund in
+[atemschutzueberwachung.md](atemschutzueberwachung.md#offline-warnt-das-gerät-selbst).
+
+- **Wecker auf den nächsten Termin** (`localWarningSchedule.ts`): Ein einzelner
+  `setTimeout` auf genau die nächste fällige Warnung, gerechnet mit
+  `naechsteWarnung` wie am Server. Der Sekundentakt (`setInterval`) wird im
+  Hintergrund auf einmal je Minute gedrosselt; der Wecker nicht.
+- **Wake Lock** (`useWakeLock`): Solange ein Trupp im Einsatz ist, bleibt der
+  Bildschirm an; nach jeder Rückkehr auf die Seite wird die Sperre neu
+  angefordert, weil der Browser sie beim Verbergen freigibt.
+- **Native Benachrichtigung in der App** (`src/lib/nativeLocalNotifications.ts`):
+  je Trupp der nächste Termin beim Betriebssystem hinterlegt, damit er den
+  gesperrten Bildschirm erreicht — nur, wenn `@capacitor/local-notifications`
+  installiert ist (Laufzeitprüfung, bis dahin ein No-op).
+- **Nachplanen beim Reconnect** (`useReplanWarningsOnReconnect`): für alle
+  Trupps im Einsatz, über `planWarningOrQueue` und damit die Warteschlange.
