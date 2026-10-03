@@ -31,7 +31,9 @@
  * Parameter `_rsc`, einen Hash über den Router-Zustand, der sich nicht
  * vorhersagen lässt. Scheitert der RSC-Abruf, navigiert Next.js selbst hart
  * („Falling back to browser navigation"), und diese Navigation beantwortet
- * dieses Modul.
+ * dieses Modul. Damit das auch im WLAN ohne Internet geschieht, statt dass der
+ * Klick ins Leere läuft, haben RSC-Abrufe eine eigene Regel mit Zeitgrenze
+ * (`handleAppShellRsc`).
  *
  * Das Modul ist rein bis auf die übergebenen Abhängigkeiten (Cache, fetch),
  * damit es sich ohne Service Worker testen lässt.
@@ -46,9 +48,32 @@ export const OFFLINE_PAGE_PATH = '/offline';
  * langsame, aber funktionierende Verbindung frische Seiten bekommen soll.
  */
 export const NAVIGATION_TIMEOUT_MS = 8_000;
+/**
+ * Zeitgrenze, solange das Netz gerade erst ausgefallen ist. Nach einem
+ * gescheiterten RSC-Abruf folgt sofort die harte Navigation; die soll nicht
+ * noch einmal die volle Zeit warten.
+ */
+export const FAST_NAVIGATION_TIMEOUT_MS = 2_000;
+/** So lange gilt ein Ausfall als „gerade eben". */
+export const RECENT_FAILURE_WINDOW_MS = 30_000;
 /** Zeitgrenze je Seite beim Vorwärmen. */
 export const WARM_TIMEOUT_MS = 15_000;
-export const APP_SHELL_MAX_ENTRIES = 80;
+/**
+ * Gleichzeitige Abrufe beim Vorwärmen. Zwei statt einem halbieren die Dauer
+ * des ersten Laufs (rund hundert Seiten), ohne der offenen Seite die Leitung
+ * zu nehmen.
+ */
+export const WARM_CONCURRENCY = 2;
+/**
+ * Obergrenze des Caches. Die Seiten ohne Einsatz (rund 65) werden beim Kürzen
+ * nie verdrängt, dazu passen die Seiten (je 23) mehrerer Einsätze.
+ */
+export const APP_SHELL_MAX_ENTRIES = 200;
+/**
+ * RSC-Caches von Serwists `defaultCache`. Seit der eigenen RSC-Regel liest sie
+ * niemand mehr; sie hielten RSC-Daten früherer Builds und werden gelöscht.
+ */
+export const LEGACY_RSC_CACHES = ['pages-rsc', 'pages-rsc-prefetch'] as const;
 
 export function appShellCacheName(buildId: string | undefined): string {
   return APP_SHELL_CACHE_PREFIX + (buildId || 'local');
@@ -68,21 +93,59 @@ const EXCLUDED_PREFIXES = [
   '/fahrtenbuch/teilen/',
 ];
 
-export function isAppShellNavigation({
-  request,
-  url,
-  sameOrigin,
-}: {
+interface RouteMatch {
   request: Request;
   url: URL;
   sameOrigin: boolean;
-}): boolean {
+}
+
+const isExcludedPath = (pathname: string) =>
+  EXCLUDED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+export function isAppShellNavigation({ request, url, sameOrigin }: RouteMatch): boolean {
   return (
     sameOrigin &&
     request.mode === 'navigate' &&
     request.method === 'GET' &&
-    !EXCLUDED_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))
+    !isExcludedPath(url.pathname)
   );
+}
+
+/**
+ * RSC-Abruf des App Routers für eine eigene Seite (Navigation oder Prefetch).
+ * Server Actions sind POST und bleiben außen vor.
+ */
+export function isAppShellRscRequest({ request, url, sameOrigin }: RouteMatch): boolean {
+  return (
+    sameOrigin &&
+    request.method === 'GET' &&
+    request.headers.get('RSC') === '1' &&
+    !isExcludedPath(url.pathname)
+  );
+}
+
+export interface NetworkHealth {
+  report: (ok: boolean) => void;
+  timeoutMs: () => number;
+}
+
+/**
+ * Merkt sich, ob das Netz gerade ausgefallen ist, und verkürzt dann die
+ * Zeitgrenze der Navigation. Lebt im Worker; nach seinem Neustart beginnt sie
+ * wieder bei der vollen Zeitgrenze.
+ */
+export function createNetworkHealth(now: () => number = Date.now): NetworkHealth {
+  let lastFailure: number | null = null;
+  return {
+    report(ok) {
+      lastFailure = ok ? null : now();
+    },
+    timeoutMs() {
+      return lastFailure !== null && now() - lastFailure <= RECENT_FAILURE_WINDOW_MS
+        ? FAST_NAVIGATION_TIMEOUT_MS
+        : NAVIGATION_TIMEOUT_MS;
+    },
+  };
 }
 
 /**
@@ -109,11 +172,26 @@ export function isCacheableShellResponse(res: Response): boolean {
   );
 }
 
+/**
+ * Kürzt auf `maxEntries`, älteste zuerst. Verdrängt werden zuerst Seiten eines
+ * Einsatzes und Adressen mit Query, erst danach die Seiten ohne Einsatz: Die
+ * gelten für jeden Einsatz, und das Vorwärmen holt sie nur einmal je Build.
+ */
 async function trimCache(cache: Cache, maxEntries: number): Promise<void> {
   const keys = await cache.keys();
-  const excess = keys.length - maxEntries;
-  for (let i = 0; i < excess; i++) {
-    await cache.delete(keys[i]);
+  let excess = keys.length - maxEntries;
+  if (excess <= 0) return;
+  const isExpendable = (key: Request) => {
+    const url = new URL(key.url);
+    return url.search !== '' || parseFirecallPath(url.pathname) !== null;
+  };
+  const ordered = [
+    ...keys.filter(isExpendable),
+    ...keys.filter((key) => !isExpendable(key)),
+  ];
+  for (const key of ordered) {
+    if (excess-- <= 0) break;
+    await cache.delete(key);
   }
 }
 
@@ -209,6 +287,8 @@ export interface NavigationDeps {
    */
   matchPrecache: (request: Request) => Promise<Response | undefined>;
   timeoutMs?: number;
+  /** Ob das Netz geantwortet hat (`createNetworkHealth`). */
+  onNetworkResult?: (ok: boolean) => void;
 }
 
 export async function handleAppShellNavigation(
@@ -228,6 +308,7 @@ export async function handleAppShellNavigation(
   } catch {
     network = undefined;
   }
+  deps.onNetworkResult?.(network !== undefined && network.status < 500);
 
   let cache: Cache | null = null;
   const getCache = async () => {
@@ -248,8 +329,10 @@ export async function handleAppShellNavigation(
   }
 
   const c = await getCache();
+  const withoutSearch = url.search ? url.origin + url.pathname : null;
   const found =
     (c && (await c.match(key, { ignoreVary: true }))) ||
+    (c && withoutSearch && (await c.match(withoutSearch, { ignoreVary: true }))) ||
     (await deps.matchPrecache(request).catch(() => undefined)) ||
     (c && (await findTemplateFallback(c, url).catch(() => null))) ||
     (c &&
@@ -265,21 +348,72 @@ export async function handleAppShellNavigation(
   });
 }
 
+export interface RscDeps {
+  fetchFn: (request: Request) => Promise<Response>;
+  timeoutMs: number;
+  onNetworkResult?: (ok: boolean) => void;
+}
+
+/**
+ * RSC-Abruf mit Zeitgrenze. Ohne Netz antwortet der Worker mit einem 503 ohne
+ * RSC-Inhalt; Next.js navigiert darauf hart, und die Navigation beantwortet
+ * die App-Shell. Für den Benutzer ist der Seitenwechsel damit offline wie
+ * online, nur mit einem Neuladen der Seite.
+ *
+ * Vorher lagen RSC-Abrufe bei Serwists `NetworkFirst` ohne Zeitgrenze: Im WLAN
+ * ohne Internet lief der Klick ins Leere, bis der Browser aufgab, und der
+ * Cache konnte RSC-Daten eines früheren Builds liefern.
+ */
+export async function handleAppShellRsc(
+  request: Request,
+  deps: RscDeps,
+): Promise<Response> {
+  try {
+    const res = await withTimeout(
+      deps.fetchFn(request),
+      deps.timeoutMs,
+      `rsc ${new URL(request.url).pathname}`,
+    );
+    deps.onNetworkResult?.(res.status < 500);
+    return res;
+  } catch {
+    deps.onNetworkResult?.(false);
+    return new Response('offline', {
+      status: 503,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+}
+
 export interface WarmDeps {
   openCache: () => Promise<Cache>;
   fetchFn: (request: Request) => Promise<Response>;
   origin: string;
+  concurrency?: number;
 }
 
 export interface WarmResult {
+  /** Neu abgelegt. */
   cached: number;
+  /** Schon im Cache dieses Builds, nicht erneut abgerufen. */
+  present: number;
+  /** Netzfehler, Zeitüberschreitung oder 5xx — ein neuer Versuch lohnt. */
   failed: string[];
+  /** Antwort ohne Seite (Umleitung, 4xx) — ein neuer Versuch ändert nichts. */
+  rejected: string[];
 }
 
 /**
- * Ruft die Seiten der Reihe nach ab und legt sie in die App-Shell. Der Reihe
- * nach, damit das Vorwärmen nicht mit der Seite um die Leitung konkurriert.
- * Fremde Adressen werden übergangen.
+ * Ruft die Seiten ab und legt sie in die App-Shell, höchstens
+ * `WARM_CONCURRENCY` gleichzeitig, damit das Vorwärmen der offenen Seite die
+ * Leitung nicht nimmt. Seiten, die der Cache dieses Builds schon hält, werden
+ * übersprungen: Die Seite bittet bei jedem Start erneut, und ein
+ * abgebrochener Lauf setzt dort fort, wo er stand. Aktuell hält sie ohnehin
+ * jede Navigation, die online eine Seite holt. Fremde Adressen werden
+ * übergangen.
  */
 export async function warmAppShell(
   urls: string[],
@@ -287,8 +421,7 @@ export async function warmAppShell(
 ): Promise<WarmResult> {
   const cache = await deps.openCache();
   const seen = new Set<string>();
-  const result: WarmResult = { cached: 0, failed: [] };
-
+  const queue: { raw: string; url: URL }[] = [];
   for (const raw of urls) {
     let url: URL;
     try {
@@ -298,29 +431,58 @@ export async function warmAppShell(
     }
     if (url.origin !== deps.origin || seen.has(url.href)) continue;
     seen.add(url.href);
-    try {
-      const res = await withTimeout(
-        deps.fetchFn(
-          new Request(url.href, {
-            credentials: 'same-origin',
-            headers: { Accept: 'text/html' },
-          }),
-        ),
-        WARM_TIMEOUT_MS,
-        `warm ${url.pathname}`,
-      );
-      if (!isCacheableShellResponse(res)) {
-        result.failed.push(raw);
-        continue;
-      }
-      await cache.put(url.href, res);
-      result.cached++;
-    } catch {
-      result.failed.push(raw);
-    }
+    queue.push({ raw, url });
   }
+
+  // Ergebnisse je Position, damit die Listen der Reihenfolge der Eingabe
+  // folgen, egal welcher Abruf zuerst fertig wird.
+  const outcomes: ('cached' | 'present' | 'failed' | 'rejected')[] = [];
+  let next = 0;
+  const work = async () => {
+    while (next < queue.length) {
+      const index = next++;
+      const { url } = queue[index];
+      outcomes[index] = await warmOne(url, cache, deps);
+    }
+  };
+  const workers = Math.max(1, deps.concurrency ?? WARM_CONCURRENCY);
+  await Promise.all(Array.from({ length: Math.min(workers, queue.length) }, work));
+
+  const result: WarmResult = { cached: 0, present: 0, failed: [], rejected: [] };
+  queue.forEach(({ raw }, index) => {
+    const outcome = outcomes[index];
+    if (outcome === 'cached') result.cached++;
+    else if (outcome === 'present') result.present++;
+    else result[outcome].push(raw);
+  });
   await trimCache(cache, APP_SHELL_MAX_ENTRIES);
   return result;
+}
+
+async function warmOne(
+  url: URL,
+  cache: Cache,
+  deps: WarmDeps,
+): Promise<'cached' | 'present' | 'failed' | 'rejected'> {
+  try {
+    if (await cache.match(url.href, { ignoreVary: true })) return 'present';
+    const res = await withTimeout(
+      deps.fetchFn(
+        new Request(url.href, {
+          credentials: 'same-origin',
+          headers: { Accept: 'text/html' },
+        }),
+      ),
+      WARM_TIMEOUT_MS,
+      `warm ${url.pathname}`,
+    );
+    if (res.status >= 500) return 'failed';
+    if (!isCacheableShellResponse(res)) return 'rejected';
+    await cache.put(url.href, res);
+    return 'cached';
+  } catch {
+    return 'failed';
+  }
 }
 
 export async function cleanupOldAppShellCaches(
@@ -328,9 +490,14 @@ export async function cleanupOldAppShellCaches(
   cacheStorage: Pick<CacheStorage, 'keys' | 'delete'>,
 ): Promise<void> {
   const names = await cacheStorage.keys();
+  const legacy: readonly string[] = LEGACY_RSC_CACHES;
   await Promise.all(
     names
-      .filter((name) => name.startsWith(APP_SHELL_CACHE_PREFIX) && name !== current)
+      .filter(
+        (name) =>
+          (name.startsWith(APP_SHELL_CACHE_PREFIX) && name !== current) ||
+          legacy.includes(name),
+      )
       .map((name) => cacheStorage.delete(name)),
   );
 }

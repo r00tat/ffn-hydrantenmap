@@ -121,6 +121,8 @@ addEventListener('message', (event) => {
 // Das HTML eines früheren Builds verweist auf Chunks, die der Precache dieses
 // Builds nicht mehr hält — offline wäre es kaputt. Die Seite wärmt die neue
 // App-Shell nach dem Wechsel selbst wieder vor (`useAppShellWarmup`).
+// Dabei gehen auch Serwists frühere RSC-Caches, die seit der eigenen
+// RSC-Regel niemand mehr liest.
 self.addEventListener('activate', (ev) => {
   const event = ev as ExtendableEvent;
   event.waitUntil(
@@ -148,7 +150,12 @@ addEventListener('message', (event) => {
       .then((result) => extendable.ports[0]?.postMessage(result))
       .catch((err) => {
         console.warn('[sw] App-Shell nicht vorgewärmt', err);
-        extendable.ports[0]?.postMessage({ cached: 0, failed: urls });
+        extendable.ports[0]?.postMessage({
+          cached: 0,
+          present: 0,
+          failed: urls,
+          rejected: [],
+        });
       })
   );
 });

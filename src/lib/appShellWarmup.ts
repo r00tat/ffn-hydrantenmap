@@ -1,71 +1,45 @@
 'use client';
 
+import {
+  APP_SHELL_FIRECALL_PATHS,
+  APP_SHELL_PAGES,
+} from '../common/appShellRoutes';
 import { APP_SHELL_WARM_REQUEST } from '../common/serviceWorker';
 
 /**
- * Seiten, die der Service Worker für den Kaltstart ohne Netz vorhält
- * (`src/worker/appShell.ts`). Die Inhalte kommen aus Firestore; vorgehalten
- * wird nur das HTML, das die App startet.
- *
- * `/offline` ist die Rückfallseite für alles, was nicht vorgehalten ist.
+ * Alle Seiten der App-Shell (`src/common/appShellRoutes.ts`), mit Einsatz auch
+ * dessen Seiten. Die Einsatzseiten stehen vorne: Sie werden im Einsatz zuerst
+ * gebraucht, und für einen offline angelegten Einsatz dienen sie als Vorlage.
  */
-export const APP_SHELL_PAGES: string[] = [
-  '/',
-  '/map',
-  '/einsaetze',
-  '/tagebuch',
-  '/atemschutz',
-  '/atemschutzueberwachung',
-  '/einsatzmittel',
-  '/einsatzorte',
-  '/geschaeftsbuch',
-  '/ebenen',
-  '/offline',
-];
-
-/**
- * Abschnitte unter `/einsatz/<id>/…` (siehe
- * `src/app/einsatz/[firecallId]/[section]/page.tsx`), die im Einsatz offline
- * gebraucht werden. Die Seiten eines offline angelegten Einsatzes baut der
- * Worker aus denen des zuletzt vorgewärmten (`findTemplateFallback`).
- */
-export const APP_SHELL_FIRECALL_SECTIONS = [
-  'tagebuch',
-  'atemschutz',
-  'atemschutzueberwachung',
-  'einsatzmittel',
-  'einsatzorte',
-  'geschaeftsbuch',
-  'ebenen',
-  'details',
-  'loeschwasserversorgung',
-  'hochwasser',
-  'dammbau',
-] as const;
-
 export function buildAppShellUrls(firecallId?: string): string[] {
   if (!firecallId || firecallId === 'unknown') return [...APP_SHELL_PAGES];
   const base = `/einsatz/${encodeURIComponent(firecallId)}`;
   return [
+    ...APP_SHELL_FIRECALL_PATHS.map((path) => `${base}${path}`),
     ...APP_SHELL_PAGES,
-    base,
-    ...APP_SHELL_FIRECALL_SECTIONS.map((section) => `${base}/${section}`),
   ];
 }
 
 export interface AppShellWarmResult {
+  /** Neu abgelegt. */
   cached: number;
+  /** Schon im Cache dieses Builds, nicht erneut abgerufen. */
+  present: number;
+  /** Netzfehler, Zeitüberschreitung oder 5xx — ein neuer Versuch lohnt. */
   failed: string[];
+  /** Antwort ohne Seite (Umleitung, 4xx) — ein neuer Versuch ändert nichts. */
+  rejected: string[];
 }
 
 /**
  * Bittet den Service Worker, die Seiten vorzuhalten. `null`, wenn es keinen
  * kontrollierenden Worker gibt (Entwicklung, erster Aufruf) oder er nicht
- * rechtzeitig antwortet.
+ * rechtzeitig antwortet. Die Zeitgrenze ist großzügig: Beim ersten Mal ruft
+ * der Worker rund hundert Seiten ab.
  */
 export function requestAppShellWarmup(
   urls: string[],
-  timeoutMs = 120_000,
+  timeoutMs = 10 * 60_000,
 ): Promise<AppShellWarmResult | null> {
   const controller =
     typeof navigator !== 'undefined'

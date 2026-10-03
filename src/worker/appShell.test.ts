@@ -2,11 +2,19 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   APP_SHELL_CACHE_PREFIX,
   APP_SHELL_MAX_ENTRIES,
+  FAST_NAVIGATION_TIMEOUT_MS,
+  LEGACY_RSC_CACHES,
+  NAVIGATION_TIMEOUT_MS,
   OFFLINE_PAGE_PATH,
+  RECENT_FAILURE_WINDOW_MS,
+  WARM_CONCURRENCY,
   appShellCacheName,
   cleanupOldAppShellCaches,
+  createNetworkHealth,
   handleAppShellNavigation,
+  handleAppShellRsc,
   isAppShellNavigation,
+  isAppShellRscRequest,
   matchInPrecache,
   parseFirecallPath,
   warmAppShell,
@@ -222,6 +230,31 @@ describe('handleAppShellNavigation', () => {
     expect(await res.text()).toBe('offline-seite');
   });
 
+  it('nimmt für eine Adresse mit Query die vorgehaltene Seite ohne Query', async () => {
+    const cache = new FakeCache();
+    await cache.put(`${ORIGIN}/map`, html('karte'));
+    await cache.put(`${ORIGIN}${OFFLINE_PAGE_PATH}`, html('offline-seite'));
+    const res = await handleAppShellNavigation(
+      navigation('/map?lat=47.9&lng=16.8'),
+      deps(cache, offlineFetch),
+    );
+    expect(await res.text()).toBe('karte');
+  });
+
+  it('meldet Erfolg und Ausfall des Netzes', async () => {
+    const onNetworkResult = vi.fn();
+    const cache = new FakeCache();
+    await handleAppShellNavigation(navigation('/'), {
+      ...deps(cache, offlineFetch),
+      onNetworkResult,
+    });
+    await handleAppShellNavigation(navigation('/'), {
+      ...deps(cache, async () => html('ok')),
+      onNetworkResult,
+    });
+    expect(onNetworkResult.mock.calls).toEqual([[false], [true]]);
+  });
+
   it('fragt vorher den Precache dieses Builds', async () => {
     const cache = new FakeCache();
     const d = deps(cache, offlineFetch);
@@ -260,48 +293,185 @@ describe('handleAppShellNavigation', () => {
   });
 });
 
+function warmDeps(cache: FakeCache, fetchFn: (req: Request) => Promise<Response>) {
+  return {
+    openCache: async () => cache as unknown as Cache,
+    fetchFn: vi.fn(fetchFn),
+    origin: ORIGIN,
+  };
+}
+
 describe('warmAppShell', () => {
   it('ruft die Seiten ab und legt sie in den Cache', async () => {
     const cache = new FakeCache();
-    const fetchFn = vi.fn(async (req: Request) => html(`seite ${new URL(req.url).pathname}`));
-    const result = await warmAppShell(['/', '/tagebuch', '/'], {
-      openCache: async () => cache as unknown as Cache,
-      fetchFn,
-      origin: ORIGIN,
-    });
-    expect(result).toEqual({ cached: 2, failed: [] });
-    expect(fetchFn).toHaveBeenCalledTimes(2);
+    const d = warmDeps(cache, async (req) => html(`seite ${new URL(req.url).pathname}`));
+    const result = await warmAppShell(['/', '/tagebuch', '/'], d);
+    expect(result).toEqual({ cached: 2, present: 0, failed: [], rejected: [] });
+    expect(d.fetchFn).toHaveBeenCalledTimes(2);
     expect(await (await cache.match(`${ORIGIN}/tagebuch`))?.text()).toBe('seite /tagebuch');
   });
 
-  it('meldet gescheiterte Seiten und lässt fremde Adressen aus', async () => {
+  it('überspringt Seiten, die dieser Build schon vorhält', async () => {
+    // Jeder Seitenstart wärmt erneut vor. Ohne Überspringen holte das jedes
+    // Mal rund hundert Seiten, und ein abgebrochener Lauf finge von vorne an.
     const cache = new FakeCache();
-    const fetchFn = vi.fn(async (req: Request) =>
-      new URL(req.url).pathname === '/kaputt' ? html('x', { status: 500 }) : html('ok'),
-    );
-    const result = await warmAppShell(['/kaputt', 'https://example.org/', '/ok'], {
-      openCache: async () => cache as unknown as Cache,
-      fetchFn,
-      origin: ORIGIN,
-    });
-    expect(result.cached).toBe(1);
-    expect(result.failed).toEqual(['/kaputt']);
-    expect(fetchFn).toHaveBeenCalledTimes(2);
+    await cache.put(`${ORIGIN}/tagebuch`, html('alt'));
+    const d = warmDeps(cache, async () => html('neu'));
+    const result = await warmAppShell(['/tagebuch', '/atemschutzueberwachung'], d);
+    expect(result).toEqual({ cached: 1, present: 1, failed: [], rejected: [] });
+    expect(d.fetchFn).toHaveBeenCalledTimes(1);
+    expect(await (await cache.match(`${ORIGIN}/tagebuch`))?.text()).toBe('alt');
   });
 
-  it(`hält höchstens ${APP_SHELL_MAX_ENTRIES} Einträge und wirft die ältesten hinaus`, async () => {
+  it('trennt vorübergehende Fehler von Antworten ohne Seite', async () => {
     const cache = new FakeCache();
-    for (let i = 0; i < APP_SHELL_MAX_ENTRIES; i++) {
-      await cache.put(`${ORIGIN}/alt/${i}`, html('alt'));
-    }
-    await warmAppShell(['/neu'], {
-      openCache: async () => cache as unknown as Cache,
-      fetchFn: async () => html('neu'),
-      origin: ORIGIN,
+    const d = warmDeps(cache, async (req) => {
+      const path = new URL(req.url).pathname;
+      if (path === '/kaputt') return html('x', { status: 500 });
+      if (path === '/offline-netz') throw new TypeError('Failed to fetch');
+      if (path === '/fehlt') return html('x', { status: 404 });
+      if (path === '/umgeleitet') {
+        const res = html('x');
+        Object.defineProperty(res, 'redirected', { value: true });
+        return res;
+      }
+      return html('ok');
     });
+    const result = await warmAppShell(
+      ['/kaputt', 'https://example.org/', '/offline-netz', '/fehlt', '/umgeleitet', '/ok'],
+      d,
+    );
+    expect(result.cached).toBe(1);
+    expect(result.failed).toEqual(['/kaputt', '/offline-netz']);
+    expect(result.rejected).toEqual(['/fehlt', '/umgeleitet']);
+    expect(d.fetchFn).toHaveBeenCalledTimes(5);
+  });
+
+  it(`ruft höchstens ${WARM_CONCURRENCY} Seiten gleichzeitig ab`, async () => {
+    const cache = new FakeCache();
+    let running = 0;
+    let peak = 0;
+    const d = warmDeps(cache, async () => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      running--;
+      return html('ok');
+    });
+    const urls = Array.from({ length: 8 }, (_, i) => `/seite/${i}`);
+    const result = await warmAppShell(urls, d);
+    expect(result.cached).toBe(8);
+    expect(peak).toBe(WARM_CONCURRENCY);
+  });
+
+  it(`hält höchstens ${APP_SHELL_MAX_ENTRIES} Einträge und opfert zuerst alte Einsatzseiten`, async () => {
+    const cache = new FakeCache();
+    await cache.put(`${ORIGIN}/atemschutzueberwachung`, html('allgemein'));
+    for (let i = 0; i < APP_SHELL_MAX_ENTRIES; i++) {
+      const id = `E${String(i).padStart(19, '0')}`;
+      await cache.put(`${ORIGIN}/einsatz/${id}/tagebuch`, html('einsatz'));
+    }
+    await warmAppShell(['/neu'], warmDeps(cache, async () => html('neu')));
     expect(cache.entries.size).toBe(APP_SHELL_MAX_ENTRIES);
-    expect(cache.entries.has(`${ORIGIN}/alt/0`)).toBe(false);
+    // Die Seite ohne Einsatz ist die älteste, bleibt aber: Sie gilt für jeden
+    // Einsatz und wird nur einmal je Build abgerufen.
+    expect(cache.entries.has(`${ORIGIN}/atemschutzueberwachung`)).toBe(true);
+    expect(cache.entries.has(`${ORIGIN}/einsatz/E0000000000000000000/tagebuch`)).toBe(false);
     expect(cache.entries.has(`${ORIGIN}/neu`)).toBe(true);
+  });
+
+  it('reicht für alle Seiten ohne Einsatz und mehrere Einsätze', () => {
+    expect(APP_SHELL_MAX_ENTRIES).toBeGreaterThanOrEqual(200);
+  });
+});
+
+describe('isAppShellRscRequest', () => {
+  const rsc = (path: string, init: { method?: string; prefetch?: boolean } = {}) => {
+    const headers = new Headers({ RSC: '1' });
+    if (init.prefetch) headers.set('Next-Router-Prefetch', '1');
+    return {
+      request: new Request(ORIGIN + path, { method: init.method ?? 'GET', headers }),
+      url: new URL(ORIGIN + path),
+      sameOrigin: true,
+    };
+  };
+
+  it('nimmt RSC-Abrufe eigener Seiten, auch Prefetches', () => {
+    expect(isAppShellRscRequest(rsc('/einsatz/AAAAAAAAAAAAAAAAAAAA/atemschutzueberwachung?_rsc=x1'))).toBe(true);
+    expect(isAppShellRscRequest(rsc('/tagebuch?_rsc=x1', { prefetch: true }))).toBe(true);
+  });
+
+  it('lässt Server Actions, API und fremde Origins aus', () => {
+    expect(isAppShellRscRequest(rsc('/tagebuch', { method: 'POST' }))).toBe(false);
+    expect(isAppShellRscRequest(rsc('/api/einsatz'))).toBe(false);
+    expect(isAppShellRscRequest({ ...rsc('/tagebuch'), sameOrigin: false })).toBe(false);
+  });
+
+  it('nimmt keine gewöhnlichen Abrufe', () => {
+    const request = new Request(`${ORIGIN}/tagebuch`);
+    expect(isAppShellRscRequest({ request, url: new URL(request.url), sameOrigin: true })).toBe(false);
+  });
+});
+
+describe('handleAppShellRsc', () => {
+  const request = () => new Request(`${ORIGIN}/atemschutzueberwachung?_rsc=x1`, { headers: { RSC: '1' } });
+
+  it('reicht online die Antwort des Servers durch', async () => {
+    const onNetworkResult = vi.fn();
+    const res = await handleAppShellRsc(request(), {
+      fetchFn: async () => new Response('0:rsc', { headers: { 'Content-Type': 'text/x-component' } }),
+      timeoutMs: 1000,
+      onNetworkResult,
+    });
+    expect(await res.text()).toBe('0:rsc');
+    expect(onNetworkResult).toHaveBeenCalledWith(true);
+  });
+
+  it('antwortet offline mit 503, damit Next.js hart navigiert und die App-Shell greift', async () => {
+    const onNetworkResult = vi.fn();
+    const res = await handleAppShellRsc(request(), {
+      fetchFn: offlineFetch,
+      timeoutMs: 1000,
+      onNetworkResult,
+    });
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Content-Type')).not.toContain('text/x-component');
+    expect(onNetworkResult).toHaveBeenCalledWith(false);
+  });
+
+  it('wartet nicht ewig auf ein hängendes Netz (WLAN ohne Internet)', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = handleAppShellRsc(request(), {
+        fetchFn: () => new Promise<Response>(() => {}),
+        timeoutMs: 1000,
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect((await pending).status).toBe(503);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('createNetworkHealth', () => {
+  it('verkürzt die Zeitgrenze kurz nach einem Ausfall', () => {
+    let now = 1_000_000;
+    const health = createNetworkHealth(() => now);
+    expect(health.timeoutMs()).toBe(NAVIGATION_TIMEOUT_MS);
+    // Ein RSC-Abruf ist gerade gescheitert; die harte Navigation danach soll
+    // nicht noch einmal acht Sekunden warten.
+    health.report(false);
+    expect(health.timeoutMs()).toBe(FAST_NAVIGATION_TIMEOUT_MS);
+    now += RECENT_FAILURE_WINDOW_MS + 1;
+    expect(health.timeoutMs()).toBe(NAVIGATION_TIMEOUT_MS);
+  });
+
+  it('kehrt nach einem Erfolg sofort zur vollen Zeitgrenze zurück', () => {
+    const health = createNetworkHealth(() => 0);
+    health.report(false);
+    health.report(true);
+    expect(health.timeoutMs()).toBe(NAVIGATION_TIMEOUT_MS);
   });
 });
 
@@ -317,5 +487,20 @@ describe('cleanupOldAppShellCaches', () => {
       },
     });
     expect(deleted).toEqual([appShellCacheName('alt')]);
+  });
+
+  it('löscht die RSC-Caches, die Serwist früher gefüllt hat', async () => {
+    // Sie hielten RSC-Daten früherer Builds; seit der eigenen RSC-Regel liest
+    // sie niemand mehr.
+    const names = [appShellCacheName('neu'), ...LEGACY_RSC_CACHES, 'others'];
+    const deleted: string[] = [];
+    await cleanupOldAppShellCaches(appShellCacheName('neu'), {
+      keys: async () => names,
+      delete: async (name: string) => {
+        deleted.push(name);
+        return true;
+      },
+    });
+    expect(deleted.sort()).toEqual([...LEGACY_RSC_CACHES].sort());
   });
 });
