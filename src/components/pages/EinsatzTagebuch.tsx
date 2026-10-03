@@ -45,6 +45,8 @@ import useFirecall, {
   useFirecallId,
 } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import usePendingDocIds from '../../hooks/usePendingDocIds';
+import PendingSyncIcon from '../site/PendingSyncIcon';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import AiAssistantButton from '../Map/AiAssistantButton';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
@@ -447,8 +449,16 @@ export function EinsatzTagebuch({
 }: EinsatzTagebuchOptions) {
   const t = useTranslations('tagebuch');
   const firecall = useFirecall();
+  const firecallId = useFirecallId();
+  const historyPathSegments = useHistoryPathSegments();
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter } = useDiaries(sortAscending);
+  // Einträge, die erst auf dem Gerät liegen — im Verlauf gibt es keine.
+  const pendingIds = usePendingDocIds(
+    historyPathSegments.length === 0
+      ? [FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID]
+      : null,
+  );
   const addEinsatzTagebuch = useFirecallItemAdd();
   const firecallItems = useFirecallItems();
 
@@ -762,6 +772,7 @@ export function EinsatzTagebuch({
                     </React.Fragment>
                   ))}
                 </b>
+                {e.id && pendingIds.has(e.id) && <PendingSyncIcon />}
                 <McpOriginChip item={e} />
               </Grid>
               <Grid

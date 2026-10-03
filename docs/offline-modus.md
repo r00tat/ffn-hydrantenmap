@@ -60,3 +60,19 @@ verschwindet im Nachhinein, und ohne eigene Anzeige merkt es niemand.
 Arbeitsspeicher: Die Wiederholung ist eine Closure über den ursprünglichen
 Schreibvorgang, und die übersteht kein Neuladen. Er fasst höchstens 100
 Einträge.
+
+Angezeigt wird das im `NetworkStatusChip` der Kopfzeile (`SyncErrorsChip`): ein roter Chip „N
+Änderungen nicht übertragen". Ein Klick öffnet `SyncErrorsDialog` mit den
+Einzelheiten und je Eintrag „Erneut versuchen" (setzt denselben Schreibvorgang
+noch einmal ab; scheitert er wieder, steht er wieder in der Liste) und
+„Verwerfen".
+
+## Synchronisations-Symbol am Eintrag
+
+Im Einsatztagebuch und an der Druckabfrage zeigt ein kleines Wolkensymbol, dass
+ein Eintrag erst auf dem Gerät liegt. Quelle ist
+`snapshot.metadata.hasPendingWrites` eines eigenen Listeners mit
+`includeMetadataChanges: true` (`usePendingDocIds`, Symbol `PendingSyncIcon`). Er hängt bewusst nicht am
+allgemeinen `useFirestoreQuery`: Metadaten-Änderungen lösten dort für jede
+Liste der App zusätzliche Renders aus. Firestore teilt sich für dieselbe
+Abfrage ein Target, der zweite Listener kostet also keinen zweiten Abruf.

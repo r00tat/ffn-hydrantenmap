@@ -940,7 +940,18 @@
     "offlineHint": "No connection to the server. Changes are stored on the device and transferred once the connection is back. Tap to check the connection again.",
     "syncing": "{count, plural, one {# change is} other {# changes are}} being transferred…",
     "syncingHint": "The connection is back. Changes made offline are being transferred to the server.",
-    "synced": "Changes have been synced"
+    "synced": "Changes have been synced",
+    "syncErrors": "{count, plural, one {# change} other {# changes}} not transferred",
+    "syncErrorsHint": "The server rejected changes. Tap for details.",
+    "syncErrorsTitle": "Changes not transferred",
+    "syncErrorsIntro": "These changes were stored on the device, but the server rejected them during synchronisation. They are therefore no longer visible.",
+    "syncErrorsEmpty": "No rejected changes.",
+    "syncErrorKind": "{kind, select, add {Create} set {Save} update {Update} delete {Delete} batch {Batch change} other {Write}}",
+    "syncErrorCode": "Error code: {code}",
+    "syncErrorRetry": "Try again",
+    "syncErrorDiscard": "Discard",
+    "syncErrorsDiscardAll": "Discard all",
+    "pendingWrite": "Not transferred yet – only stored on this device"
   },
   "einsatzDetails": {
     "notFound": "Operation not found",

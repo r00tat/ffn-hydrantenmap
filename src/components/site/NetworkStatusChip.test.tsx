@@ -2,6 +2,7 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnectivityState } from '../../lib/connectivity';
+import { clearSyncErrors, recordSyncError } from '../../lib/syncErrors';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import NetworkStatusChip, { SYNCING_DISPLAY_DELAY_MS } from './NetworkStatusChip';
 
@@ -108,5 +109,18 @@ describe('NetworkStatusChip', () => {
     setState({ status: 'online', pendingWrites: 0 });
     rerender(<NetworkStatusChip />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('zeigt abgelehnte Änderungen zusätzlich zum Verbindungsstatus', () => {
+    setState({ reachable: false, status: 'offline' });
+    act(() => {
+      recordSyncError({ kind: 'add', path: 'call/1/item/x', error: 'x' });
+    });
+    renderWithIntl(<NetworkStatusChip />);
+    expect(screen.getByText('Offline-Modus')).toBeInTheDocument();
+    expect(
+      screen.getByText('1 Änderung nicht übertragen'),
+    ).toBeInTheDocument();
+    act(() => clearSyncErrors());
   });
 });

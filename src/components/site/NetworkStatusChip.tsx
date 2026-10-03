@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import useConnectivity from '../../hooks/useConnectivity';
 import { checkConnectivityNow } from '../../lib/connectivity';
+import SyncErrorsChip from './SyncErrorsChip';
 
 /**
  * So lange muss `syncing` anstehen, bevor der Chip es zeigt. Online ist jeder
@@ -38,11 +39,23 @@ function useDelayedFlag(flag: boolean, delayMs: number): boolean {
  *   noch Schreibvorgänge offen sind.
  * - online: nichts.
  *
+ * Daneben, unabhängig vom Zustand: `SyncErrorsChip`, sobald der Server
+ * Änderungen beim Synchronisieren abgelehnt hat.
+ *
  * Ersetzt die frühere Snackbar (`OfflineWarning`), die oben mittig Inhalte
  * verdeckte. Die Bestätigung „Änderungen wurden synchronisiert" kommt weiter
  * als Snackbar aus `useOfflineSync`.
  */
 export default function NetworkStatusChip() {
+  return (
+    <>
+      <ConnectivityChip />
+      <SyncErrorsChip />
+    </>
+  );
+}
+
+function ConnectivityChip() {
   const t = useTranslations('networkStatus');
   const { status, pendingWrites } = useConnectivity();
   const showSyncing = useDelayedFlag(

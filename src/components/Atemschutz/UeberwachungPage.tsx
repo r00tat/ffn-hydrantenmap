@@ -21,6 +21,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import {
+  ATEMSCHUTZ_TRUPP_COLLECTION_ID,
   buildDruckabfrage,
   canTransition,
   entsendePatch,
@@ -51,6 +52,8 @@ import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useOwnFleet from '../../hooks/useOwnFleet';
 import { sortVehiclesOwnFirst } from '../../common/vehicleGroups';
+import usePendingDocIds from '../../hooks/usePendingDocIds';
+import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import useNotificationPermission, {
   pruefeNotificationErlaubnis,
   type NotificationErlaubnis,
@@ -168,6 +171,13 @@ export default function UeberwachungPage() {
   // Ohne Einsatz kein Schreiben: `firecallId` ist dann die Platzhalter-ID
   // `unknown`, und jeder Schreibvorgang darauf endet in permission-denied.
   const canWrite = useFirecallWriteAccess() && hatEinsatz;
+  // Trupps, deren letzte Änderung (etwa eine Druckabfrage) erst auf dem Gerät
+  // liegt — für das Synchronisations-Symbol an der Karte.
+  const pendingTruppIds = usePendingDocIds(
+    hatEinsatz
+      ? [FIRECALL_COLLECTION_ID, firecallId, ATEMSCHUTZ_TRUPP_COLLECTION_ID]
+      : null,
+  );
   const { uid, displayName, email } = useFirebaseLogin();
   const jetzt = useTicker();
   const registerMessaging = useRegisterMessaging();
@@ -715,6 +725,7 @@ export default function UeberwachungPage() {
       }
       onBereitZumAbmarsch={() => void handleBereitZumAbmarsch(trupp)}
       onAnSammelplatz={() => void handleAnSammelplatz(trupp)}
+      pendingSync={!!trupp.id && pendingTruppIds.has(trupp.id)}
     />
   );
 
