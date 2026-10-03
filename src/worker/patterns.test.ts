@@ -387,6 +387,28 @@ describe('Erreichbarkeitsprüfung /api/ping', () => {
   });
 });
 
+describe('Drive-Dateien eines Einsatzes', () => {
+  it('geht immer ans Netz und landet nicht im API-Cache', () => {
+    // Fotos und Videos aus dem Shared Drive: groß, hinter der Anmeldung und
+    // auf einem geteilten Gerät nicht für den nächsten Benutzer gedacht.
+    for (const path of [
+      '/api/einsatz/fc1/drive/abc/download',
+      '/api/einsatz/fc1/drive/abc/thumbnail',
+    ]) {
+      expect(ownRuleFor(`${APP_ORIGIN}${path}`)?.handler).toBeInstanceOf(
+        NetworkOnly,
+      );
+    }
+  });
+
+  it('greift nicht auf andere Einsatz-Routen oder fremde Origins über', () => {
+    expect(ownRuleFor(`${APP_ORIGIN}/api/einsatz/fc1/export`)).toBeUndefined();
+    expect(
+      ownRuleFor('https://example.com/api/einsatz/fc1/drive/abc/download'),
+    ).toBeUndefined();
+  });
+});
+
 describe('App-Shell für Navigationen', () => {
   const navigate = (path: string) => ({
     url: new URL(`${APP_ORIGIN}${path}`),

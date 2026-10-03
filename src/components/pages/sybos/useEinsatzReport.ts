@@ -6,6 +6,7 @@ import type { BlaulichtSmsAlarm } from '../../../common/blaulichtsms';
 import { vorgabeGeraetesatz } from '../../../common/atemschutzUeberwachung';
 import useAtemschutzEinsatzdaten from '../../../hooks/useAtemschutzEinsatzdaten';
 import useAtemschutzGeraete from '../../../hooks/useAtemschutzGeraete';
+import useOnline from '../../../hooks/useOnline';
 import { firecallAlarmIds, type Firecall } from '../../firebase/firestore';
 import {
   buildAusgabeRows,
@@ -14,11 +15,17 @@ import {
   buildTruppRows,
 } from './sybosExtras';
 
-/** Die Alarmierungen aus BlaulichtSMS, die dem Einsatz zugeordnet sind. */
+/**
+ * Die Alarmierungen aus BlaulichtSMS, die dem Einsatz zugeordnet sind.
+ *
+ * Kommen über eine Server Action — offline wird nicht angefragt (die
+ * bisherigen bleiben stehen) und nach dem Reconnect nachgeholt.
+ */
 export function useFirecallAlarms(firecall: Firecall) {
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
   const idsKey = firecallAlarmIds(firecall).join(',');
   const group = firecall.group;
+  const online = useOnline();
   useEffect(() => {
     let active = true;
     (async () => {
@@ -26,6 +33,7 @@ export function useFirecallAlarms(firecall: Firecall) {
         if (active) setAlarms([]);
         return;
       }
+      if (!online) return;
       try {
         const results = await Promise.all(
           idsKey.split(',').map((id) => getBlaulichtSmsAlarmById(group, id)),
@@ -39,7 +47,7 @@ export function useFirecallAlarms(firecall: Firecall) {
     return () => {
       active = false;
     };
-  }, [group, idsKey]);
+  }, [group, idsKey, online]);
   return alarms;
 }
 

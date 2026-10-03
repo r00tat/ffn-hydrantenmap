@@ -188,6 +188,17 @@ export const cachePatterns: RuntimeCaching[] = [
     handler: new NetworkOnly(),
   },
 
+  // Drive-Dateien eines Einsatzes (Sybos-Übertrag): Fotos und Videos aus dem
+  // Shared Drive, über den Server und hinter der Anmeldung. Ohne diese Regel
+  // fiele die Anfrage unter Serwists `apis`-Regel (NetworkFirst) und landete
+  // im Cache — groß, und auf einem geteilten Gerät auch für den nächsten
+  // Benutzer abrufbar.
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && /^\/api\/einsatz\/[^/]+\/drive\//.test(url.pathname),
+    handler: new NetworkOnly(),
+  },
+
   // Terrain-Kacheln des eigenen Höhenmodells.
   //
   // **Diese Regel muss vor der googleapis-Regel darunter stehen.** Firebase

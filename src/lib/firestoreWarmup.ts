@@ -22,6 +22,7 @@ import {
   GROUP_CONFIG_COLLECTION_ID,
   GROUP_STAMMDATEN_DOC,
 } from '../common/groupStammdaten';
+import { KOSTENERSATZ_VEHICLES_COLLECTION } from '../common/kostenersatz';
 import { FIRECALL_MAP_LAYERS_COLLECTION_ID } from '../common/mapLayers';
 import { queryClusters } from '../components/firebase/clusterQuery';
 import { firestore } from '../components/firebase/firebase';
@@ -154,6 +155,9 @@ export function warmGroupCache(
       collectionTask(`${base}/${FAHRTENBUCH_VEHICLE_COLLECTION_ID}`),
       collectionTask(`${base}/${FAHRTENBUCH_PERSON_COLLECTION_ID}`),
       docTask(`${base}/${GROUP_CONFIG_COLLECTION_ID}/${GROUP_STAMMDATEN_DOC}`),
+      // Eigene Flotte: ordnet in der Besatzung die eigenen Fahrzeuge vor
+      // (useOwnFleet). Liegt nicht unter der Gruppe, sondern global.
+      collectionTask(KOSTENERSATZ_VEHICLES_COLLECTION),
     );
   }
 

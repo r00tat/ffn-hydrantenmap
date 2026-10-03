@@ -13,6 +13,7 @@ import type { DriveFile } from '../../../common/drive';
 import { getFirecallDriveState } from '../../drive/driveFileActions';
 import { downloadBlob } from '../../firebase/download';
 import { downloadStorageFile } from '../../inputs/storageFile';
+import OnlineOnly from '../../site/OnlineOnly';
 import { useSnackbar } from '../../providers/SnackbarProvider';
 import type { AttachmentRef } from './sybosExtras';
 
@@ -44,15 +45,18 @@ function DownloadButton({ label, onDownload }: { label: string; onDownload: () =
       setBusy(false);
     }
   };
+  // Anhänge liegen in Storage, Fotos im Drive — beides nur übers Netz.
   return (
-    <Button
-      size="small"
-      startIcon={busy ? <CircularProgress size={16} /> : <DownloadIcon />}
-      onClick={click}
-      disabled={busy}
-    >
-      {label}
-    </Button>
+    <OnlineOnly>
+      <Button
+        size="small"
+        startIcon={busy ? <CircularProgress size={16} /> : <DownloadIcon />}
+        onClick={click}
+        disabled={busy}
+      >
+        {label}
+      </Button>
+    </OnlineOnly>
   );
 }
 

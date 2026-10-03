@@ -49,7 +49,11 @@ fälschlich „online" — genau die Lagen, in denen es im Einsatz darauf ankomm
   antwortet gern mit 200 und einer Login-Seite.
 - **Service Worker:** `/api/ping` hat eine eigene `NetworkOnly`-Regel als
   erste in `cachePatterns`. Eine Regel mit Cache-Rückfall würde offline eine
-  alte Antwort liefern und „online" vortäuschen.
+  alte Antwort liefern und „online" vortäuschen. Ebenso `NetworkOnly` sind
+  die Drive-Dateien eines Einsatzes (`/api/einsatz/*/drive/*`, Sybos-Übertrag):
+  Sonst fielen sie unter Serwists `apis`-Regel und lägen als große Fotos und
+  Videos hinter der Anmeldung im Cache — auf einem geteilten Gerät auch für
+  den nächsten Benutzer.
 - **Takt:** alle 30 s, offline alle 10 s; sofort beim `online`-Ereignis, bei
   Fokus und bei `visibilitychange`. Das `offline`-Ereignis schaltet ohne Ping
   um. Im Hintergrund wird nicht gepingt (Akku); die Rückkehr auf die Seite
@@ -162,7 +166,7 @@ Jede Server Action im Client-Pfad gehört deshalb in eine von drei Gruppen:
 | --- | --- | --- |
 | Nachholen | `planeUeberwachungWarnung`, Anhänge am Einsatz und an Elementen | Warteschlange, beim Reconnect abgearbeitet |
 | Firestore lesen | Atemschutz-Gerätebestand (`useAtemschutzGeraete`) | liest ohnehin aus dem Cache |
-| Nur online | KI-Assistent, Verrechnung (`runTransaction`), Blaulicht-SMS-Import und Duplikatsprüfung, Mail-Versand, PDF über den Server, Fahrtenbuch, Mängel, Drive-Fotos, Verwaltung | erkennbar deaktiviert, mit Hinweis |
+| Nur online | KI-Assistent, Verrechnung (`runTransaction`), Blaulicht-SMS-Import und Duplikatsprüfung, Mail-Versand, PDF über den Server, Fahrtenbuch, Mängel, Drive-Fotos, Downloads und KI-Zusammenfassung im Sybos-Übertrag, Verwaltung | erkennbar deaktiviert, mit Hinweis |
 
 Der Gerätebestand wurde schon vorher clientseitig gelesen; `atemschutzStammdaten.ts`
 ist `server-only` und dient nur Server Actions (Import, Mangel, Verrechnung), die
@@ -310,7 +314,9 @@ Einsatzes einmal vom Server:
   `mapLayer`, `atemschutzTrupp`, `atemschutzAusgabe`. Der Verlauf (`history`)
   fehlt bewusst — groß und offline nicht gefragt.
 - **Gruppe des Einsatzes:** Atemschutz-Gerätebestand, Fahrzeuge und Personen
-  des Fahrtenbuchs, Stammdaten (`groupConfig/stammdaten`).
+  des Fahrtenbuchs, Stammdaten (`groupConfig/stammdaten`) und die eigene
+  Flotte (`kostenersatzVehicles`, global), nach der die Besatzung die eigenen
+  Fahrzeuge vorreiht.
 - **Gruppen des Benutzers:** die Einsatzliste der letzten 28 Tage, mit
   denselben Bedingungen wie die Einsatzliste, damit derselbe Index trägt.
 - **Umgebung:** Hydranten-Cluster im Umkreis von 3 km um den Einsatzort.

@@ -87,6 +87,8 @@ describe('firestoreWarmup', () => {
     expect(paths).toContain('groups/g1/atemschutzGeraet');
     expect(paths).toContain('groups/g1/vehicle');
     expect(paths).toContain('groups/g1/person');
+    // Eigene Flotte für die Besatzungsgruppen (useOwnFleet).
+    expect(paths).toContain('kostenersatzVehicles');
 
     const list = calls.find((q) => q.path === 'call');
     const cutoff = new Date(
