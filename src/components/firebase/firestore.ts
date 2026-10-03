@@ -180,9 +180,9 @@ export interface Fzg extends FirecallItem {
    * Fahrzeug einer fremden Organisation — Rettung, Polizei, Nachbarwehr.
    *
    * Als Zeichenkette `'true'`/`'false'` wie jedes andere Schaltfeld eines
-   * Elements. Der Schalter färbt nur vor und kennzeichnet: An Besatzung,
-   * Personal-Board und Auswertungen ändert er nichts, denn ein Fremdfahrzeug
-   * ist auf der Lagekarte ein Einsatzmittel wie jedes andere.
+   * Elements. Der Schalter färbt vor, trennt in der Stärketabelle eigene von
+   * fremden Kräften und reiht das Fahrzeug im Personal-Board hinter die
+   * eigenen (siehe docs/einsatzmittel-staerke.md).
    */
   fremd?: string;
   /**

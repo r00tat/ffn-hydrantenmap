@@ -985,7 +985,9 @@
     "removeVehicleConfirm": "Really remove {name} from the operation?",
     "removeVehicleConfirmWithCrew": "Really remove {name} from the operation? {count, plural, one {The assigned person will be} other {The # assigned persons will be}} moved back to \"Available\".",
     "available": "Available",
-    "noCrewVehicle": "No crew assignment"
+    "noCrewVehicle": "No crew assignment",
+    "noFireDepartment": "No fire department",
+    "fwGroupSummary": "{vehicles, plural, one {# vehicle} other {# vehicles}} · {persons, plural, =0 {no person} one {# person} other {# persons}}"
   },
   "einsatzorte": {
     "placeholderNew": "New address...",

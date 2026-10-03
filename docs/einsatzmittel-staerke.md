@@ -119,6 +119,49 @@ ohne Fahrzeug führen will, braucht das Feld dort ebenfalls.
 Die Farbe setzt der Schalter **nicht**, er ändert nur die Vorgabe. Sonst
 verlöre, wer einmal eine eigene Farbe gewählt hat, sie beim nächsten Umschalten.
 
+## Fahrzeuge nach Feuerwehr in der Besatzung
+
+Im Personal-Board und in jedem Fahrzeug-Auswahlfeld der Besatzung (Tabelle,
+Fahrzeugdialog, „Entsendet an" der Atemschutzseiten) stehen die **eigenen**
+Fahrzeuge vorne, danach die fremden je Feuerwehr, alphabetisch; fremde ohne
+Feuerwehrangabe — Rettung, Polizei — zuletzt unter „Ohne Feuerwehr". Die
+Logik steht in `src/common/vehicleGroups.ts`.
+
+Erkennungsmerkmal eines eigenen Fahrzeugs ist der **Name**: Eigen sind die
+vorgefertigten Fahrzeuge — dieselbe Liste der Kostenersatz-Fahrzeuge, aus der
+die Chip-Leiste Fahrzeuge anlegt (`useKostenersatzVehicles`). Die
+Feuerwehrangabe allein trägt nicht, weil sie im Fahrzeugdialog leer vorbelegt
+ist: Kommen mehrere Feuerwehren zum Einsatz, wird sie bei den fremden
+Fahrzeugen leicht vergessen. Ein solches Fahrzeug hat dann ebenso keine wie
+viele gewachsene Einträge der eigenen Wehr — erst der Name trennt die beiden.
+
+Die Regel in der Reihenfolge, in der sie geprüft wird (`isOwnVehicle()`):
+
+1. Als `fremd` markiert → fremd.
+2. Feuerwehr gesetzt und nicht die des Einsatzes → fremd. Ein „TLFA 4000"
+   aus Weiden gehört nach Weiden, auch wenn die eigene Wehr ein
+   gleichnamiges Fahrzeug führt.
+3. Vorgefertigtes Fahrzeug → eigen.
+4. Feuerwehr ausdrücklich die des Einsatzes → eigen; wer sie einträgt, meint es.
+5. Sonst — keine Feuerwehr, kein bekannter Name → fremd, „Ohne Feuerwehr".
+
+Der Vergleich der Feuerwehr ist normalisiert (Groß-/Kleinschreibung,
+Leerraum, Präfix „FF"), weil die Chip-Leiste „Neusiedl am See" schreibt und
+eine Eingabe von Hand oft „FF Neusiedl am See"; der des Namens ebenso
+(Groß-/Kleinschreibung, Leerraum). Die Feuerwehr des Einsatzes ist sein
+`fw`, ohne Angabe die Vorgabe „Neusiedl am See".
+
+Die beiden Merkmale können auseinanderlaufen: Ein Fahrzeug einer Nachbarwehr
+oder ein Rettungswagen ohne gesetzten `fremd`-Schalter steht im Board bei den
+fremden, in der Stärketabelle aber bei den eigenen Kräften. Das ist gewollt — das Board
+ordnet nach Zugehörigkeit, die Stärke folgt der ausdrücklichen Kennzeichnung.
+
+Fremden Fahrzeugen wird selten jemand zugeordnet. Ihr Abschnitt im Board ist
+deshalb **zugeklappt**, solange dort niemand steht; mit zugeordneten Personen
+ist er offen, damit niemand unsichtbar an einem Fahrzeug hängt. Von Hand
+umgeschaltet gilt die Wahl, bis die Seite neu geladen wird. Gibt es keine
+fremden Fahrzeuge, bleibt alles ohne Überschriften wie zuvor.
+
 ## Anzeige und Austausch
 
 `formatBesatzung()` ist die einzige Stelle, die das `1:` schreibt — Marker-Popup,
