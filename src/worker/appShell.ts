@@ -173,11 +173,41 @@ h1{font-size:1.4rem}a,button{font-size:1rem;margin:8px 8px 0 0;padding:8px 16px}
 </html>`;
 }
 
+/** Der Ausschnitt der Cache API, den `matchInPrecache` braucht. */
+export interface PrecacheStorage {
+  keys: () => Promise<string[]>;
+  open: (name: string) => Promise<Cache>;
+}
+
+/**
+ * Sucht eine Seite nur in den Precache-Caches von Serwist
+ * (`serwist-precache-…`). Deren Inhalt gehört zum aktuellen Build und wird
+ * beim Aktivieren eines neuen Workers ausgetauscht.
+ */
+export async function matchInPrecache(
+  request: Request,
+  storage: PrecacheStorage,
+): Promise<Response | undefined> {
+  const names = (await storage.keys()).filter((name) =>
+    name.includes('-precache-'),
+  );
+  for (const name of names) {
+    const cache = await storage.open(name);
+    const found = await cache.match(request, { ignoreVary: true });
+    if (found) return found;
+  }
+  return undefined;
+}
+
 export interface NavigationDeps {
   openCache: () => Promise<Cache>;
   fetchFn: (request: Request) => Promise<Response>;
-  /** Suche über alle Caches (Seiten aus Besuchen vor dieser Version). */
-  matchAnyCache: (request: Request) => Promise<Response | undefined>;
+  /**
+   * Suche im Precache dieses Builds (`matchInPrecache`). Bewusst nicht über
+   * alle Caches: Serwists Auffangregel `others` hält HTML früherer Builds,
+   * deren Chunks offline fehlen — dann lieber die Offline-Seite.
+   */
+  matchPrecache: (request: Request) => Promise<Response | undefined>;
   timeoutMs?: number;
 }
 
@@ -220,7 +250,7 @@ export async function handleAppShellNavigation(
   const c = await getCache();
   const found =
     (c && (await c.match(key, { ignoreVary: true }))) ||
-    (await deps.matchAnyCache(request).catch(() => undefined)) ||
+    (await deps.matchPrecache(request).catch(() => undefined)) ||
     (c && (await findTemplateFallback(c, url).catch(() => null))) ||
     (c &&
       (await c.match(new URL(OFFLINE_PAGE_PATH, url).href, { ignoreVary: true })));

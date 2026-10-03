@@ -110,9 +110,11 @@ nach einem Tag ohne Besuch war die Seite weg.
   Precache. Beim `activate` löscht der Worker deshalb die App-Shell früherer
   Builds; `useAppShellWarmup` wärmt nach dem `controllerchange` neu vor.
 - **Netz zuerst, acht Sekunden.** Danach, bei einem Netzfehler oder einer
-  5xx-Antwort, der Cache: erst die eigene Seite, dann die übrigen Caches
-  (Besuche vor dieser Version), dann eine **Vorlage**, dann `/offline`, zuletzt
-  eine eingebaute HTML-Seite. Gespeichert wird nur eine `200` ohne Umleitung
+  5xx-Antwort, der Cache: erst die eigene Seite, dann der Precache dieses
+  Builds, dann eine **Vorlage**, dann `/offline`, zuletzt eine eingebaute
+  HTML-Seite. Bewusst nicht die übrigen Caches: Die Auffangregel `others` hält
+  HTML früherer Builds, dessen Chunks offline fehlen — eine weiße Seite wäre
+  schlechter als `/offline`. Gespeichert wird nur eine `200` ohne Umleitung
   mit `text/html`.
 - **Vorlage für Einsatzseiten.** Ein offline angelegter Einsatz hat seine ID
   auf dem Gerät bekommen; seine Seiten hat nie jemand abgerufen. Die Seite

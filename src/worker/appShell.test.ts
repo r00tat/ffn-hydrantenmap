@@ -7,6 +7,7 @@ import {
   cleanupOldAppShellCaches,
   handleAppShellNavigation,
   isAppShellNavigation,
+  matchInPrecache,
   parseFirecallPath,
   warmAppShell,
 } from './appShell';
@@ -59,7 +60,7 @@ function deps(cache: FakeCache, fetchFn: (req: Request) => Promise<Response>) {
   return {
     openCache: async () => cache as unknown as Cache,
     fetchFn: vi.fn(fetchFn),
-    matchAnyCache: vi.fn(async () => undefined),
+    matchPrecache: vi.fn(async () => undefined),
     timeoutMs: 1000,
   };
 }
@@ -221,12 +222,29 @@ describe('handleAppShellNavigation', () => {
     expect(await res.text()).toBe('offline-seite');
   });
 
-  it('fragt vorher die übrigen Caches (Seiten aus früheren Besuchen)', async () => {
+  it('fragt vorher den Precache dieses Builds', async () => {
     const cache = new FakeCache();
     const d = deps(cache, offlineFetch);
-    d.matchAnyCache.mockResolvedValueOnce(html('aus anderem cache') as never);
+    d.matchPrecache.mockResolvedValueOnce(html('aus dem precache') as never);
     const res = await handleAppShellNavigation(navigation('/wetter/1'), d);
-    expect(await res.text()).toBe('aus anderem cache');
+    expect(await res.text()).toBe('aus dem precache');
+  });
+
+  it('sucht nur im Precache, nicht in Runtime-Caches mit HTML früherer Builds', async () => {
+    const precache = new FakeCache();
+    const others = new FakeCache();
+    await others.put(`${ORIGIN}/fahrtenbuch`, html('altes html'));
+    const storage = {
+      keys: async () => ['others', 'serwist-precache-v2-https://einsatz.example.at/'],
+      open: async (name: string) =>
+        (name === 'others' ? others : precache) as unknown as Cache,
+    };
+    const req = navigation('/fahrtenbuch');
+    expect(await matchInPrecache(req, storage)).toBeUndefined();
+
+    await precache.put(`${ORIGIN}/fahrtenbuch`, html('aus dem precache'));
+    const found = await matchInPrecache(req, storage);
+    expect(await found?.text()).toBe('aus dem precache');
   });
 
   it('liefert ohne jeden Cache eine eingebaute Offline-Seite statt eines Netzfehlers', async () => {

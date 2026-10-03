@@ -183,6 +183,17 @@ describe('cachePatterns', () => {
       expect(cacheNameOf(rule!)).toBe('basemap');
     });
 
+    it('erfasst jede vorladbare Quelle mit derselben Regel wie die Vorschau', async () => {
+      const { OfflineTilesFirst } = await import('./patterns');
+      const { OFFLINE_TILE_SOURCES, tileUrl } = await import(
+        '../common/offlineTiles'
+      );
+      for (const source of OFFLINE_TILE_SOURCES) {
+        const href = tileUrl(source, { z: 16, x: 35833, y: 22795 });
+        expect(ownRuleFor(href)?.handler).toBeInstanceOf(OfflineTilesFirst);
+      }
+    });
+
     it('findet die Kachel im eigenen Cache trotz Vary: Origin', async () => {
       const { matchOfflineTile } = await import('./patterns');
       const { OFFLINE_TILE_CACHE } = await import('../common/offlineTiles');

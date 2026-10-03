@@ -10,8 +10,12 @@ import {
   StaleWhileRevalidate,
   type StrategyHandler,
 } from 'serwist';
-import { OFFLINE_TILE_CACHE } from '../common/offlineTiles';
-import { handleAppShellNavigation, isAppShellNavigation } from './appShell';
+import { OFFLINE_TILE_CACHE, isOfflineTileUrl } from '../common/offlineTiles';
+import {
+  handleAppShellNavigation,
+  isAppShellNavigation,
+  matchInPrecache,
+} from './appShell';
 
 const oneDayCachePlugin = new ExpirationPlugin({
   maxEntries: 64,
@@ -288,9 +292,10 @@ export const cachePatterns: RuntimeCaching[] = [
   },
 
   // basemap.at: vorgeladene Kacheln zuerst (siehe `OfflineTilesFirst`), sonst
-  // der kurzlebige Cache der laufenden Kartenbenutzung.
+  // der kurzlebige Cache der laufenden Kartenbenutzung. Derselbe Matcher wie
+  // beim Vorladen (`isOfflineTileUrl`), damit beide nicht auseinanderlaufen.
   {
-    matcher: /^https:\/\/mapsneu\.wien\.gv\.at\/basemap\//i,
+    matcher: ({ url }) => isOfflineTileUrl(url),
     handler: new OfflineTilesFirst({
       cacheName: 'basemap',
       plugins: [oneDayCachePlugin],
@@ -384,7 +389,7 @@ export function appShellRoute(cacheName: string): RuntimeCaching {
         handleAppShellNavigation(request, {
           openCache: () => caches.open(cacheName),
           fetchFn: (r) => fetch(r),
-          matchAnyCache: (r) => caches.match(r, { ignoreVary: true }),
+          matchPrecache: (r) => matchInPrecache(r, caches),
         }),
     },
   };
