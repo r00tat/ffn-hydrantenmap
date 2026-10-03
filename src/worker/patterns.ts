@@ -63,6 +63,22 @@ export const isWorkerBootstrap = (url: URL): boolean =>
  *   kein Regex.
  */
 export const cachePatterns: RuntimeCaching[] = [
+  // Erreichbarkeitsprüfung des Verbindungsstatus (`src/lib/connectivity.ts`).
+  //
+  // Der Ping soll herausfinden, ob der **Server** erreichbar ist — nicht, ob
+  // irgendein Cache eine Antwort hat. Serwists `defaultCache` beantwortet
+  // `/api/*` mit NetworkFirst: ohne Netz käme die letzte 204 aus dem Cache, und
+  // die App hielte sich im WLAN ohne Internet für online. `NetworkOnly` lässt
+  // den Abruf stattdessen scheitern, und genau das ist das Signal.
+  //
+  // Ganz vorne, weil die erste passende Regel entscheidet; exakter Pfad, damit
+  // nichts Ähnliches (`/api/pingback`) mitgenommen wird.
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname === '/api/ping',
+    handler: new NetworkOnly(),
+  },
+
   // Der Firebase-Auth-Handler unter `/__/auth/*` liegt nur scheinbar bei uns:
   // `next.config.js` spiegelt ihn per Rewrite von der Firebase-Hosting-Domain
   // hierher, damit der Google-Login same-origin ablaufen kann (siehe
@@ -75,7 +91,8 @@ export const cachePatterns: RuntimeCaching[] = [
   // erneut und der Ablauf bliebe stehen, ohne dass irgendwo ein Fehler
   // auftaucht.
   //
-  // Diese Regel steht deshalb ganz vorne: Die erste passende entscheidet.
+  // Diese Regel steht deshalb vorne (nur der Ping davor): Die erste passende
+  // entscheidet.
   {
     matcher: ({ sameOrigin, url }) =>
       sameOrigin && url.pathname.startsWith('/__/auth/'),

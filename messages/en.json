@@ -935,8 +935,11 @@
     "reload": "Reload"
   },
   "networkStatus": {
-    "offlineTitle": "No connection",
-    "offline": "The device is offline. Changes are cached and will be synced once the connection is restored.",
+    "offlineMode": "Offline mode",
+    "offlinePending": "Offline mode · {count, plural, one {# change} other {# changes}} pending",
+    "offlineHint": "No connection to the server. Changes are stored on the device and transferred once the connection is back. Tap to check the connection again.",
+    "syncing": "{count, plural, one {# change is} other {# changes are}} being transferred…",
+    "syncingHint": "The connection is back. Changes made offline are being transferred to the server.",
     "synced": "Changes have been synced"
   },
   "einsatzDetails": {

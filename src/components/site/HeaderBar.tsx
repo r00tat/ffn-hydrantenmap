@@ -23,6 +23,7 @@ import { FirecallHistory } from '../firebase/firestore';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import { BRAND_ACCENT } from '../providers/theme';
 import HistoryDialog from './HistoryDialog';
+import NetworkStatusChip from './NetworkStatusChip';
 
 function HeaderBar({
   isDrawerOpen,
@@ -150,6 +151,10 @@ function HeaderBar({
                 </Typography>
               )}
             </Box>
+
+            {/* Verbindungsstatus: offline bzw. „wird übertragen", online
+                unsichtbar. Auch vor dem Login sichtbar. */}
+            <NetworkStatusChip />
 
             {/* Erklärt dem Einsatz-Gast, warum keine Bedienelemente zum
                 Bearbeiten sichtbar sind. */}

@@ -935,8 +935,11 @@
     "reload": "Neu laden"
   },
   "networkStatus": {
-    "offlineTitle": "Keine Verbindung",
-    "offline": "Das Gerät ist offline. Änderungen werden zwischengespeichert und synchronisiert, sobald die Verbindung wiederhergestellt ist.",
+    "offlineMode": "Offline-Modus",
+    "offlinePending": "Offline-Modus · {count, plural, one {# Änderung} other {# Änderungen}} ausstehend",
+    "offlineHint": "Keine Verbindung zum Server. Änderungen werden auf dem Gerät gespeichert und übertragen, sobald die Verbindung wieder steht. Antippen, um die Verbindung erneut zu prüfen.",
+    "syncing": "{count, plural, one {# Änderung wird} other {# Änderungen werden}} übertragen…",
+    "syncingHint": "Die Verbindung steht wieder. Offline erfasste Änderungen werden gerade an den Server übertragen.",
     "synced": "Änderungen wurden synchronisiert"
   },
   "einsatzDetails": {

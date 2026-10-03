@@ -302,3 +302,24 @@ describe('Firebase-Auth-Handler', () => {
     }
   });
 });
+
+describe('Erreichbarkeitsprüfung /api/ping', () => {
+  it('geht immer ans Netz', () => {
+    for (const path of ['/api/ping', '/api/ping?t=123']) {
+      expect(ownRuleFor(`${APP_ORIGIN}${path}`)?.handler).toBeInstanceOf(
+        NetworkOnly,
+      );
+    }
+  });
+
+  it('steht ganz vorne, damit keine andere Regel sie beantwortet', () => {
+    // Eine Antwort aus einem Cache meldete „online", obwohl der Server nicht
+    // erreichbar ist — genau das soll der Ping aufdecken.
+    expect(cachePatterns.indexOf(ownRuleFor(`${APP_ORIGIN}/api/ping`)!)).toBe(0);
+  });
+
+  it('greift nicht auf ähnlich benannte Pfade oder fremde Origins über', () => {
+    expect(ownRuleFor(`${APP_ORIGIN}/api/pingback`)).toBeUndefined();
+    expect(ownRuleFor('https://example.com/api/ping')).toBeUndefined();
+  });
+});

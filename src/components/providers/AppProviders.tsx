@@ -23,8 +23,8 @@ import FirebaseUserProvider from '../firebase/FirebaseUserProvider';
 import DynamicLogin from '../pages/LoginUi';
 import AppDrawer from '../site/AppDrawer';
 import HeaderBar from '../site/HeaderBar';
-import OfflineWarning from '../site/OfflineWarning';
 import CapacitorBackButton from './CapacitorBackButton';
+import ConnectivityProvider from './ConnectivityProvider';
 import ErrorBoundary from './ErrorBoundary';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
@@ -178,18 +178,19 @@ export default function AppProviders({ children }: AppProps) {
               <SnackbarProvider>
                 <ServiceWorkerUpdateListener />
                 <CapacitorBackButton />
-                <OfflineWarning />
-                <DebugLoggingProvider>
-                  <div className={`${styles.container} print-content-root`}>
-                    <CssBaseline enableColorScheme />
-                    <OneTapLoginUnlessPublic />
-                    <SettingsRedirectDialogProvider>
-                      <PermissionOnboardingProvider>
-                        <AuthorizationApp>{children}</AuthorizationApp>
-                      </PermissionOnboardingProvider>
-                    </SettingsRedirectDialogProvider>
-                  </div>
-                </DebugLoggingProvider>
+                <ConnectivityProvider>
+                  <DebugLoggingProvider>
+                    <div className={`${styles.container} print-content-root`}>
+                      <CssBaseline enableColorScheme />
+                      <OneTapLoginUnlessPublic />
+                      <SettingsRedirectDialogProvider>
+                        <PermissionOnboardingProvider>
+                          <AuthorizationApp>{children}</AuthorizationApp>
+                        </PermissionOnboardingProvider>
+                      </SettingsRedirectDialogProvider>
+                    </div>
+                  </DebugLoggingProvider>
+                </ConnectivityProvider>
               </SnackbarProvider>
             </FirebaseUserProvider>
           </SessionProvider>
