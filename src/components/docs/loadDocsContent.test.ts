@@ -22,6 +22,14 @@ describe('loadDocsContent', () => {
     expect(en).not.toBe(de);
   });
 
+  it('bundles the offline guide in german and english', async () => {
+    expect(availableDocsSlugs()).toContain('offline');
+    const de = await loadDocsContent('offline', 'de');
+    const en = await loadDocsContent('offline', 'en');
+    expect(de).toContain('Offline-Modus');
+    expect(en).toContain('Offline mode');
+  });
+
   it('falls back to german for an unsupported locale', async () => {
     const de = await loadDocsContent('karte', 'de');
     await expect(loadDocsContent('karte', 'fr')).resolves.toBe(de);

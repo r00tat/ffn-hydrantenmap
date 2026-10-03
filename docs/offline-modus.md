@@ -1,8 +1,77 @@
 # Offline-Modus
 
-Die App soll ohne Internetverbindung einsatzfähig bleiben (Issue #839). Dieses
-Dokument wächst mit den Phasen des Issues; hier steht bisher, wie geschrieben
-wird und wie abgelehnte Schreibvorgänge sichtbar werden.
+Die App soll ohne Internetverbindung einsatzfähig bleiben (Issue #839): einen
+neuen Einsatz offline anlegen und befüllen, beim Reconnect von selbst
+synchronisieren, den Verbindungsstatus selbst erkennen und anzeigen, und auch
+einen Kaltstart ohne Netz überstehen. Die Benutzerdoku dazu steht unter
+[content/docs/de/offline.md](../content/docs/de/offline.md) (`/docs/offline`).
+
+Der Unterbau ist Firestore mit `persistentLocalCache`: Geladenes ist offline
+lesbar, Schreibvorgänge landen im lokalen Cache und in einer Warteschlange, die
+ein Neuladen übersteht. Zeitstempel kommen vom Gerät (`actor.now`), nicht von
+`serverTimestamp()`; offline erfasste Zeiten stimmen also. Alles in diesem
+Dokument ist das, was der Cache allein **nicht** leistet.
+
+## Was offline geht und was nicht
+
+| Geht offline | Geht nur online |
+| --- | --- |
+| Einsatz anlegen und ändern, Einsatztagebuch, Elemente auf der Karte, Ebenen, Besatzung, Einsatzorte | KI-Assistent und Sprach-Assistent |
+| Atemschutzsammelplatz (Trupps, Ausgabe), Füllprotokoll erfassen | Verrechnung (`runTransaction`), Mail-Versand (Rechnung, Kostenersatz) |
+| Atemschutzüberwachung samt lokaler Warnungen | PDF über den Server, Fahrtenbuch-Fahrten, Mängel samt Bildern |
+| Anhänge an bestehenden Einsatz/Element (Upload wird nachgeholt) | Einsatz-Fotos im Drive, Blaulicht-SMS-Import und Duplikatsprüfung |
+| Karte, soweit vorgeladen oder schon angesehen (basemap.at) | Straßen-Routing und Höhenprofil einer Leitung (siehe Grenzen) |
+| Kaltstart mit zwischengespeicherter Anmeldung (72 h) | Verwaltung (Benutzer, Gruppen, Tokens, MCP), Freigabe-Links, Import/Export |
+
+Was offline nicht geht, ist **erkennbar deaktiviert** (`OnlineOnly`, siehe
+unten) und bricht nicht mit einem Fehler ab. Die Grenze verläuft entlang der
+Technik: Firestore-Schreibvorgänge reiht das SDK ein, Server Actions,
+Storage-Uploads und Transaktionen nicht. Was davon nachholbar und idempotent
+ist, kommt in eine eigene Warteschlange; der Rest ist „nur online".
+
+## Verbindungsstatus erkennen
+
+`src/lib/connectivity.ts` ist ein modulweiter Store (für
+`useSyncExternalStore`, aber auch außerhalb von React lesbar: `isOffline()`,
+`onReconnect()`), gestartet vom `ConnectivityProvider` in `AppProviders`.
+
+**Warum nicht `navigator.onLine`:** Es sagt nur, ob das Gerät *irgendeine*
+Netzverbindung hat. Im WLAN ohne Internet (Fahrzeug-Router ohne LTE), hinter
+einem Captive Portal oder bei einer Mobilverbindung ohne Durchsatz steht dort
+fälschlich „online" — genau die Lagen, in denen es im Einsatz darauf ankommt.
+`navigator.onLine === false` wird deshalb nur als sicheres *offline* genommen;
+*online* heißt erst: der eigene Server hat geantwortet.
+
+- **Ping gegen `/api/ping`:** `HEAD`, `cache: 'no-store'`, ohne Anmeldung,
+  Zeitgrenze 5 s. Der Endpunkt antwortet `204` ohne Firestore und ohne
+  Sitzung, damit er in jedem Zustand des Servers billig bleibt und auch vor dem
+  Login funktioniert. **Nur die 204 zählt**, nicht `res.ok`: Ein Captive Portal
+  antwortet gern mit 200 und einer Login-Seite.
+- **Service Worker:** `/api/ping` hat eine eigene `NetworkOnly`-Regel als
+  erste in `cachePatterns`. Eine Regel mit Cache-Rückfall würde offline eine
+  alte Antwort liefern und „online" vortäuschen.
+- **Takt:** alle 30 s, offline alle 10 s; sofort beim `online`-Ereignis, bei
+  Fokus und bei `visibilitychange`. Das `offline`-Ereignis schaltet ohne Ping
+  um. Im Hintergrund wird nicht gepingt (Akku); die Rückkehr auf die Seite
+  prüft sofort. Gleichzeitige Prüfungen teilen sich einen Ping.
+- **`syncing`** heißt erreichbar und `getPendingWriteCount() > 0`. Der Store
+  hängt direkt am Zähler in `pendingWrites.ts`, nicht am Ping-Takt.
+- **`onReconnect`** feuert beim Wechsel unerreichbar → erreichbar. Daran
+  hängen die Warteschlangen, die Anmeldung am Server und das Nachplanen der
+  Atemschutzwarnungen.
+
+Angezeigt wird der Status als Chip in der Kopfzeile (`NetworkStatusChip`)
+statt der früheren Snackbar, die Inhalte verdeckte: „Offline-Modus" (mit Zahl
+der ausstehenden Änderungen), „N Änderungen werden übertragen…", online
+nichts. Antippen prüft sofort. `syncing` zeigt der Chip erst, wenn es 1,5 s
+anhält (`SYNCING_DISPLAY_DELAY_MS`): Online ist jeder Schreibvorgang einen
+Moment unbestätigt, der Chip würde sonst bei jedem Speichern aufblitzen. Der
+Store selbst meldet `syncing` sofort.
+
+Firestore erkennt seine Verbindung unabhängig vom Ping. Der Chip kann deshalb
+einen Moment früher auf online springen, als das SDK überträgt; die Meldung
+„Änderungen wurden synchronisiert" (`useOfflineSync`) wartet auf
+`waitForPendingWrites` und kommt erst, wenn wirklich alles bestätigt ist.
 
 ## Regel: Dialoge warten nie auf den Server
 
@@ -166,8 +235,20 @@ müssen drei Dinge offline vorhanden sein:
    Sekunden nicht antwortet oder die App schon weiß, dass sie offline ist.
    `getMyGroupsFromServer` hat dieselbe Zeitgrenze. Beim Reconnect wird die
    Anmeldung am Server nachgeholt. Der Status-Chip nennt im Tooltip, dass die
-   Rechte aus dem Zwischenspeicher stammen. Sicherheitsüberlegung:
-   [berechtigungen.md](berechtigungen.md).
+   Rechte aus dem Zwischenspeicher stammen.
+
+**Warum der Zwischenspeicher vertretbar ist:** Er öffnet nur die Oberfläche,
+er gewährt keine Daten. Gelesen wird aus dem Firestore-Cache genau dieses
+Firebase-Benutzers, also nur, was er online schon lesen durfte; geschrieben
+wird über Firestore, und die Regeln prüfen beim Synchronisieren gegen das
+echte ID-Token. Wer sich die Einträge in localStorage selbst zurechtbiegt,
+sieht ein Admin-Menü, dessen Aktionen alle am Server scheitern — und offline
+erfasste Schreibvorgänge ohne Recht erscheinen in der Fehlerliste. Damit die
+Frist nicht offline endlos weiterläuft, schreibt nur eine echte Antwort des
+Servers den Zwischenspeicher, nie er sich selbst; ein Zeitstempel in der
+Zukunft gilt als ungültig, Gäste behalten ihn höchstens bis
+`firecallExpiresAt`, Abmelden und eine abgelehnte Anmeldung löschen ihn.
+Ausführlich: [berechtigungen.md](berechtigungen.md#zwischenspeicher-der-anmeldung-für-den-kaltstart-ohne-netz).
 
 ### Android-App
 
@@ -278,3 +359,44 @@ Bausteine. Hintergrund in
   installiert ist (Laufzeitprüfung, bis dahin ein No-op).
 - **Nachplanen beim Reconnect** (`useReplanWarningsOnReconnect`): für alle
   Trupps im Einsatz, über `planWarningOrQueue` und damit die Warteschlange.
+
+## Grenzen
+
+- **Kein Abgleich zwischen Geräten ohne Internet.** Firestore synchronisiert
+  über den Server. Zwei Geräte, die gleichzeitig offline sind, sehen die
+  Einträge des anderen erst nach dem Reconnect. Das ist eine Frage der
+  Ausrüstung (LTE-Router im Fahrzeug), nicht der Software. Für die
+  Atemschutzüberwachung heißt das: Überwacht wird an dem Gerät, an dem die
+  Druckabfragen erfasst werden.
+- **Bei Konflikten gewinnt der letzte Schreibvorgang, Feld für Feld.** Listen
+  deshalb mit `arrayUnion` ergänzen (wie die Druckabfragen und die Anhänge),
+  nie das ganze Array überschreiben. Ein offenes Element-Formular, das nach
+  einem nachgeholten Upload gespeichert wird, überschreibt das Anhangsfeld mit
+  seinem alten Stand — der Fall ist bekannt und selten.
+- **Ablehnung durch die Regeln erst beim Synchronisieren.** Die Fehlerliste
+  ist deshalb Pflicht. Sie lebt im Arbeitsspeicher: Nach einem Neuladen sind
+  abgelehnte Einträge weg, nur die Warteschlange der Server Actions und
+  Uploads überdauert.
+- **Ungeladenes fehlt.** Was nie online geladen wurde, ist offline nicht da;
+  das Vorwärmen deckt den geöffneten Einsatz und seine Gruppe ab, nicht den
+  Verlauf (`history`), das Füllprotokoll oder die Verrechnung. Leere Listen
+  sind gekennzeichnet, nicht gefüllt.
+- **Kartenkacheln** nur von basemap.at vorladbar; OpenStreetMap, OpenTopoMap,
+  Burgenland-WMS und WISA gibt es offline nur, soweit sie zuvor angesehen
+  wurden und noch im kurzlebigen Cache liegen.
+- **Straßen-Routing und Höhenprofil** einer Leitung scheitern offline und
+  werden nicht eingereiht. Die Leitung bleibt dann bei der Luftlinie; der
+  Fehlschlag ist an der Signatur vermerkt, ein neuer Versuch kommt erst, wenn
+  sich die Leitung ändert.
+- **Einige Schreibvorgänge warten noch auf den Server:** Kostenersatz
+  (`useKostenersatzMutations`, Mailvorlagen), die Token-Verwaltung und der
+  Backup-Import. Das sind Arbeiten nach dem Einsatz oder am Schreibtisch.
+- **Atemschutzwarnungen offline** kommen nur von dem Gerät, auf dem die
+  Überwachungsseite offen ist. In der Android-App erreichen sie den
+  gesperrten Bildschirm erst, wenn `@capacitor/local-notifications`
+  installiert ist; die Screen Wake Lock API fehlt in der WebView vermutlich.
+- **Android-Kaltstart ohne Netz** geht noch nicht (siehe oben): Die WebView
+  kommt nach einem Prozessstart ohne Firebase-Benutzer hoch.
+- **Client-Navigation im WLAN ohne Internet** (`router.push`) hat im Service
+  Worker keine Zeitgrenze für den RSC-Abruf und kann hängen, bis der Browser
+  aufgibt und Next.js hart navigiert; dann antwortet die App-Shell.

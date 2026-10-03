@@ -19,6 +19,7 @@ const docPages = [
   { key: 'fahrzeuge', href: '/docs/fahrzeuge' },
   { key: 'einsatzmittel', href: '/docs/einsatzmittel' },
   { key: 'einsatzorte', href: '/docs/einsatzorte' },
+  { key: 'offline', href: '/docs/offline' },
   { key: 'ebenen', href: '/docs/ebenen' },
   { key: 'chat', href: '/docs/chat' },
   { key: 'ki', href: '/docs/ki' },

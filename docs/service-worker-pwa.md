@@ -133,8 +133,10 @@ nach einem Tag ohne Besuch war die Seite weg.
   einen Hash über den Router-Zustand, der sich nicht vorhersagen lässt.
   Scheitert der RSC-Abruf, navigiert Next.js selbst hart („Falling back to
   browser navigation"), und diese Navigation beantwortet die App-Shell.
-- Die Regel steht **hinter** `cachePatterns` (die `NetworkOnly`-Regeln für die
-  Gastseite und den Auth-Handler greifen weiter zuerst) und ist wie jede
+- Die Regel steht **hinter** `cachePatterns` (die `NetworkOnly`-Regeln für den
+  Ping `/api/ping`, die Gastseite und den Auth-Handler greifen weiter zuerst;
+  der Ping darf nie aus einem Cache kommen, sonst täuschte er offline „online"
+  vor, siehe [offline-modus.md](offline-modus.md#verbindungsstatus-erkennen)) und ist wie jede
   andere in `resilient` eingepackt. Sie wirft selbst nie: Am Ende steht die
   eingebaute Seite.
 
