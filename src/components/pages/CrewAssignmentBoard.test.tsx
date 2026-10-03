@@ -579,6 +579,129 @@ describe('CrewAssignmentBoard', () => {
     });
   });
 
+  describe('Fahrzeuge fremder Feuerwehren', () => {
+    const foreign: Fzg[] = [
+      { id: 'w1', name: 'TLFA Weiden', fw: 'Weiden am See', type: 'vehicle' },
+      { id: 'w2', name: 'KLF Weiden', fw: 'FF Weiden am See', type: 'vehicle' },
+      { id: 'j1', name: 'TLF Jois', fw: 'Jois', type: 'vehicle' },
+      { id: 'r1', name: 'RTW', fremd: 'true', type: 'vehicle' },
+    ] as Fzg[];
+
+    beforeEach(() => {
+      // Fremde vor die eigenen gemischt: Die Reihenfolge aus Firestore darf
+      // nicht durchschlagen.
+      mockVehicles.unshift(...foreign);
+    });
+
+    afterEach(() => {
+      mockVehicles.splice(0, foreign.length);
+    });
+
+    it('zeigt je fremder Feuerwehr einen zugeklappten Abschnitt nach den eigenen', () => {
+      render(<CrewAssignmentBoard />);
+      const headers = screen.getAllByTestId('crew-fw-group');
+      expect(headers.map((h) => h.textContent)).toEqual([
+        expect.stringContaining('Jois'),
+        expect.stringContaining('Weiden am See'),
+        expect.stringContaining('Ohne Feuerwehr'),
+      ]);
+      // Zugeklappt: Die Fahrzeuge der fremden Wehren stehen nicht im Board.
+      expect(screen.queryByText('TLFA Weiden')).not.toBeInTheDocument();
+      expect(screen.queryByText('RTW')).not.toBeInTheDocument();
+      // Die eigenen Spalten stehen davor.
+      const kdtfa = screen.getAllByText('KDTFA').at(-1)!;
+      expect(
+        kdtfa.compareDocumentPosition(headers[0]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('fasst Schreibvarianten derselben Feuerwehr zusammen', () => {
+      render(<CrewAssignmentBoard />);
+      expect(
+        screen
+          .getAllByTestId('crew-fw-group')
+          .filter((h) => h.textContent?.includes('Weiden')),
+      ).toHaveLength(1);
+      expect(screen.getByText(/2 Fahrzeuge/)).toBeInTheDocument();
+    });
+
+    it('klappt einen Abschnitt auf Klick auf', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      const user = userEvent.setup();
+      render(<CrewAssignmentBoard />);
+      await user.click(screen.getByRole('button', { name: /Weiden am See/ }));
+      expect(await screen.findByText('TLFA Weiden')).toBeInTheDocument();
+      expect(screen.getByText('KLF Weiden')).toBeInTheDocument();
+      expect(screen.queryByText('TLF Jois')).not.toBeInTheDocument();
+    });
+
+    it('zeigt einen Abschnitt mit zugeordneten Personen aufgeklappt', () => {
+      mockAssignments.push({
+        id: 'a6',
+        recipientId: 'r6',
+        name: 'Gast Helfer',
+        vehicleId: 'j1',
+        vehicleName: 'TLF Jois',
+        funktion: 'Feuerwehrmann',
+        source: 'manual',
+      });
+      try {
+        render(<CrewAssignmentBoard />);
+        expect(screen.getByText('TLF Jois')).toBeInTheDocument();
+        expect(screen.getByText('Gast Helfer')).toBeInTheDocument();
+        expect(screen.queryByText('TLFA Weiden')).not.toBeInTheDocument();
+      } finally {
+        mockAssignments.pop();
+      }
+    });
+
+    it('klappt die Abschnitte auch mobil zu', async () => {
+      mockUseMediaQuery.mockReturnValue(true);
+      const userEvent = (await import('@testing-library/user-event')).default;
+      const user = userEvent.setup();
+      render(<CrewAssignmentBoard />);
+      expect(screen.getAllByTestId('crew-fw-group')).toHaveLength(3);
+      expect(screen.queryByText(/TLFA Weiden/)).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Weiden am See/ }));
+      expect(screen.getByText(/TLFA Weiden/)).toBeInTheDocument();
+    });
+
+    it('bietet im Auswahlfeld zuerst die eigenen, dann die fremden nach Feuerwehr an', async () => {
+      mockUseMediaQuery.mockReturnValue(true);
+      render(<CrewAssignmentBoard />);
+      fireEvent.mouseDown(screen.getAllByRole('combobox')[2]);
+      const listbox = await screen.findByRole('listbox');
+      const entries = Array.from(listbox.children).map((el) =>
+        el.textContent?.trim(),
+      );
+      expect(entries).toEqual([
+        '—',
+        'Neusiedl am See',
+        'KDTFA',
+        'TLFA 4000',
+        'Jois',
+        'TLF Jois',
+        'Weiden am See',
+        'TLFA Weiden',
+        'KLF Weiden',
+        'Ohne Feuerwehr',
+        'RTW',
+      ]);
+    });
+  });
+
+  it('zeigt ohne fremde Fahrzeuge keine Feuerwehr-Überschriften', async () => {
+    mockUseMediaQuery.mockReturnValue(true);
+    render(<CrewAssignmentBoard />);
+    expect(screen.queryAllByTestId('crew-fw-group')).toHaveLength(0);
+    fireEvent.mouseDown(screen.getAllByRole('combobox')[2]);
+    const listbox = await screen.findByRole('listbox');
+    expect(
+      Array.from(listbox.children).map((el) => el.textContent?.trim()),
+    ).toEqual(['—', 'KDTFA', 'TLFA 4000']);
+  });
+
   describe('removing a vehicle', () => {
     const removeVehicle = async (name: string) => {
       const userEvent = (await import('@testing-library/user-event')).default;

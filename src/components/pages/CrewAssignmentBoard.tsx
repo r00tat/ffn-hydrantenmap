@@ -9,8 +9,12 @@ import React, {
   useState,
 } from 'react';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Autocomplete,
   Box,
+  ButtonBase,
   FormControl,
   IconButton,
   MenuItem,
@@ -29,6 +33,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   DndContext,
   DragEndEvent,
@@ -60,6 +65,8 @@ import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import useVehicles from '../../hooks/useVehicles';
 import { nimmtBesatzung } from '../../common/vehicle-utils';
+import { groupVehiclesByFw, VehicleGroup } from '../../common/vehicleGroups';
+import useOwnFw from '../../hooks/useOwnFw';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import {
   CrewAssignment,
@@ -69,6 +76,7 @@ import {
   funktionAbkuerzung,
 } from '../firebase/firestore';
 import VehicleQuickAddChips from '../FirecallItems/VehicleQuickAddChips';
+import { vehicleSelectItems } from '../FirecallItems/vehicleSelectItems';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import CrewVehicleColumn from './CrewVehicleColumn';
 
@@ -109,6 +117,8 @@ function DroppableTableBody({
 function CrewRow({
   assignment,
   vehicles,
+  ownFw,
+  noFwLabel,
   onFunktionChange,
   onVehicleChange,
   onRemove,
@@ -116,6 +126,8 @@ function CrewRow({
 }: {
   assignment: CrewAssignment;
   vehicles: Fzg[];
+  ownFw: string;
+  noFwLabel: string;
   onFunktionChange: (funktion: CrewFunktion) => void;
   onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
   onRemove?: () => void;
@@ -201,11 +213,7 @@ function CrewRow({
             readOnly={readOnly}
           >
             <MenuItem value="">—</MenuItem>
-            {vehicles.map((v) => (
-              <MenuItem key={v.id} value={v.id}>
-                {v.name}
-              </MenuItem>
-            ))}
+            {vehicleSelectItems(vehicles, ownFw, noFwLabel)}
           </Select>
         </FormControl>
       </TableCell>
@@ -262,6 +270,7 @@ export default function CrewAssignmentBoard({
   const { activePersons } = useFahrtenbuchPersons(firecall?.group);
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
+  const ownFw = useOwnFw();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -515,6 +524,43 @@ export default function CrewAssignmentBoard({
     [displayAssignments],
   );
 
+  /**
+   * Die Spalten nach Feuerwehr: die eigenen Fahrzeuge vorne und immer offen,
+   * die fremden je Feuerwehr in einem Abschnitt zum Aufklappen. Fremden
+   * Fahrzeugen wird selten jemand zugeordnet; offen ist ein Abschnitt deshalb
+   * nur, wenn dort schon Personen stehen oder jemand ihn aufklappt.
+   */
+  const boardGroups = useMemo(
+    () => groupVehiclesByFw(boardVehicles, ownFw),
+    [boardVehicles, ownFw],
+  );
+  const ownBoardVehicles = boardGroups.find((g) => g.own)?.vehicles ?? [];
+  const foreignBoardGroups = boardGroups.filter((g) => !g.own);
+
+  // Nur, was jemand von Hand umgeschaltet hat; sonst entscheidet die Besatzung.
+  const [groupToggles, setGroupToggles] = useState<Record<string, boolean>>(
+    {},
+  );
+  const groupCrewCount = useCallback(
+    (group: VehicleGroup) =>
+      group.vehicles.reduce(
+        (sum, v) => sum + (v.id ? assignedToVehicle(v.id).length : 0),
+        0,
+      ),
+    [assignedToVehicle],
+  );
+  const isGroupOpen = (group: VehicleGroup) =>
+    groupToggles[group.key] ?? groupCrewCount(group) > 0;
+  const toggleGroup = (group: VehicleGroup) =>
+    setGroupToggles((prev) => ({ ...prev, [group.key]: !isGroupOpen(group) }));
+  const groupLabel = (group: VehicleGroup) =>
+    group.label || t('noFireDepartment');
+  const groupSummary = (group: VehicleGroup) =>
+    t('fwGroupSummary', {
+      vehicles: group.vehicles.length,
+      persons: groupCrewCount(group),
+    });
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
@@ -561,6 +607,8 @@ export default function CrewAssignmentBoard({
         key={a.id || a.recipientId}
         assignment={a}
         vehicles={crewVehicles}
+        ownFw={ownFw}
+        noFwLabel={t('noFireDepartment')}
         onFunktionChange={(funktion) =>
           handleFunktionChange(a.id || a.recipientId, funktion)
         }
@@ -575,6 +623,66 @@ export default function CrewAssignmentBoard({
         readOnly={!canWrite}
       />
     ));
+
+  const renderVehicleTableBody = (v: Fzg) => {
+    const assigned = assignedToVehicle(v.id!);
+    return (
+      <DroppableTableBody
+        key={v.id}
+        droppableId={v.id!}
+        disabled={!nimmtBesatzung(v)}
+      >
+        <TableRow>
+          <TableCell
+            colSpan={4}
+            sx={{ p: 0.5, backgroundColor: 'action.hover' }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Typography variant="subtitle2">
+                {v.name} ({assigned.length})
+                {!nimmtBesatzung(v) && ` — ${t('noCrewVehicle')}`}
+              </Typography>
+              {canWrite && v.id && (
+                <IconButton
+                  size="small"
+                  color="error"
+                  aria-label={t('removeVehicleTooltip', {
+                    name: v.name,
+                  })}
+                  onClick={() => handleRemoveVehicleRequest(v.id!)}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              )}
+            </Box>
+          </TableCell>
+        </TableRow>
+        {renderRows(assigned)}
+      </DroppableTableBody>
+    );
+  };
+
+  const renderVehicleColumn = (v: Fzg) => (
+    <CrewVehicleColumn
+      key={v.id}
+      vehicleId={v.id!}
+      vehicleName={v.name}
+      assignments={assignedToVehicle(v.id!)}
+      vehicles={crewVehicles}
+      noCrew={!nimmtBesatzung(v)}
+      onFunktionChange={handleFunktionChange}
+      onVehicleChange={handleVehicleChange}
+      onRemove={removeAssignment}
+      onRemoveVehicle={canWrite ? handleRemoveVehicleRequest : undefined}
+      readOnly={!canWrite}
+    />
+  );
 
   return (
     <Box>
@@ -662,82 +770,91 @@ export default function CrewAssignmentBoard({
                 </TableRow>
                 {renderRows(unassigned)}
               </DroppableTableBody>
-              {boardVehicles.map((v) => {
-                const assigned = assignedToVehicle(v.id!);
+              {ownBoardVehicles.map(renderVehicleTableBody)}
+              {foreignBoardGroups.map((group) => {
+                const open = isGroupOpen(group);
                 return (
-                  <DroppableTableBody
-                    key={v.id}
-                    droppableId={v.id!}
-                    disabled={!nimmtBesatzung(v)}
-                  >
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        sx={{ p: 0.5, backgroundColor: 'action.hover' }}
-                      >
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          <Typography variant="subtitle2">
-                            {v.name} ({assigned.length})
-                            {!nimmtBesatzung(v) && ` — ${t('noCrewVehicle')}`}
-                          </Typography>
-                          {canWrite && v.id && (
-                            <IconButton
-                              size="small"
-                              color="error"
-                              aria-label={t('removeVehicleTooltip', {
-                                name: v.name,
-                              })}
-                              onClick={() =>
-                                handleRemoveVehicleRequest(v.id!)
-                              }
-                            >
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          )}
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                    {renderRows(assigned)}
-                  </DroppableTableBody>
+                  <React.Fragment key={`fw:${group.key}`}>
+                    <TableBody>
+                      <TableRow data-testid="crew-fw-group">
+                        <TableCell colSpan={4} sx={{ p: 0 }}>
+                          <ButtonBase
+                            aria-expanded={open}
+                            onClick={() => toggleGroup(group)}
+                            sx={{
+                              width: '100%',
+                              justifyContent: 'flex-start',
+                              gap: 1,
+                              p: 0.5,
+                              textAlign: 'left',
+                            }}
+                          >
+                            <ExpandMoreIcon
+                              fontSize="small"
+                              sx={{
+                                transform: open ? 'none' : 'rotate(-90deg)',
+                                transition: 'transform 0.2s',
+                              }}
+                            />
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                              {groupLabel(group)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {groupSummary(group)}
+                            </Typography>
+                          </ButtonBase>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                    {open && group.vehicles.map(renderVehicleTableBody)}
+                  </React.Fragment>
                 );
               })}
             </Table>
           </TableContainer>
         ) : (
           /* ─── Desktop: Kanban columns ─── */
-          <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
-            <CrewVehicleColumn
-              vehicleId={null}
-              vehicleName={t('available')}
-              assignments={unassigned}
-              vehicles={crewVehicles}
-              onFunktionChange={handleFunktionChange}
-              onVehicleChange={handleVehicleChange}
-              onRemove={removeAssignment}
-              readOnly={!canWrite}
-            />
-            {boardVehicles.map((v) => (
+          <Box>
+            <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
               <CrewVehicleColumn
-                key={v.id}
-                vehicleId={v.id!}
-                vehicleName={v.name}
-                assignments={assignedToVehicle(v.id!)}
+                vehicleId={null}
+                vehicleName={t('available')}
+                assignments={unassigned}
                 vehicles={crewVehicles}
-                noCrew={!nimmtBesatzung(v)}
                 onFunktionChange={handleFunktionChange}
                 onVehicleChange={handleVehicleChange}
                 onRemove={removeAssignment}
-                onRemoveVehicle={
-                  canWrite ? handleRemoveVehicleRequest : undefined
-                }
                 readOnly={!canWrite}
               />
+              {ownBoardVehicles.map(renderVehicleColumn)}
+            </Box>
+            {foreignBoardGroups.map((group) => (
+              <Accordion
+                key={`fw:${group.key}`}
+                data-testid="crew-fw-group"
+                expanded={isGroupOpen(group)}
+                onChange={() => toggleGroup(group)}
+                disableGutters
+                variant="outlined"
+                slotProps={{ transition: { unmountOnExit: true } }}
+                sx={{ mt: 1 }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                      {groupLabel(group)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {groupSummary(group)}
+                    </Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
+                    {group.vehicles.map(renderVehicleColumn)}
+                  </Box>
+                </AccordionDetails>
+              </Accordion>
             ))}
           </Box>
         )}

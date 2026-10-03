@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
+import { renderWithIntl as render } from '../../test-utils/intlRender';
 import { describe, expect, it, vi } from 'vitest';
 import { CrewAssignment, Fzg } from '../firebase/firestore';
 import VehicleCrewSection from './VehicleCrewSection';
@@ -10,8 +11,9 @@ const mockCrew: CrewAssignment[] = [
 ];
 
 const mockVehicles: Fzg[] = [
+  { id: 'j1', name: 'TLF Jois', fw: 'Jois', type: 'vehicle' } as Fzg,
   { id: 'v1', name: 'TLF', type: 'vehicle' } as Fzg,
-  { id: 'v2', name: 'KLF', type: 'vehicle' } as Fzg,
+  { id: 'v2', name: 'KLF', fw: 'Neusiedl am See', type: 'vehicle' } as Fzg,
 ];
 
 vi.mock('../../hooks/useFirecall', () => ({
@@ -21,6 +23,7 @@ vi.mock('../../hooks/useFirecall', () => ({
     updateFunktion: vi.fn(),
   }),
   useFirecallId: () => 'fc1',
+  useFirecall: () => ({ fw: 'Neusiedl am See' }),
 }));
 
 vi.mock('../../hooks/useVehicles', () => ({
@@ -49,5 +52,15 @@ describe('VehicleCrewSection', () => {
   it('renders nothing when no vehicle id', () => {
     const { container } = render(<VehicleCrewSection vehicleId="" />);
     expect(container.textContent).toBe('');
+  });
+
+  it('bietet zuerst die eigenen, dann die fremden Fahrzeuge nach Feuerwehr an', () => {
+    render(<VehicleCrewSection vehicleId="v1" />);
+    // Je Person Funktion und Fahrzeug; das zweite Auswahlfeld ist das Fahrzeug.
+    fireEvent.mouseDown(screen.getAllByRole('combobox')[1]);
+    const listbox = screen.getByRole('listbox');
+    expect(
+      Array.from(listbox.children).map((el) => el.textContent?.trim()),
+    ).toEqual(['Verfügbar', 'Neusiedl am See', 'TLF', 'KLF', 'Jois', 'TLF Jois']);
   });
 });

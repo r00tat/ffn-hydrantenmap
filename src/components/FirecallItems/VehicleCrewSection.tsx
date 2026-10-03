@@ -5,15 +5,18 @@ import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import {
   useCrewAssignmentActions,
   useCrewForVehicle,
 } from '../../hooks/useFirecall';
+import useOwnFw from '../../hooks/useOwnFw';
 import useVehicles from '../../hooks/useVehicles';
 import {
   CREW_FUNKTIONEN,
   CrewFunktion,
 } from '../firebase/firestore';
+import { vehicleSelectItems } from './vehicleSelectItems';
 
 export default function VehicleCrewSection({
   vehicleId,
@@ -23,6 +26,8 @@ export default function VehicleCrewSection({
   const crew = useCrewForVehicle(vehicleId);
   const { assignVehicle, updateFunktion } = useCrewAssignmentActions();
   const { vehicles } = useVehicles();
+  const ownFw = useOwnFw();
+  const t = useTranslations('crew');
 
   if (!vehicleId) return null;
 
@@ -103,11 +108,11 @@ export default function VehicleCrewSection({
                     sx={{ fontSize: '0.875rem' }}
                   >
                     <MenuItem value="">Verfügbar</MenuItem>
-                    {vehicles.map((v) => (
-                      <MenuItem key={v.id} value={v.id}>
-                        {v.name}
-                      </MenuItem>
-                    ))}
+                    {vehicleSelectItems(
+                      vehicles,
+                      ownFw,
+                      t('noFireDepartment'),
+                    )}
                   </Select>
                 </FormControl>
               </Box>

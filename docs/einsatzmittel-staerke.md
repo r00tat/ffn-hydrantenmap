@@ -119,6 +119,34 @@ ohne Fahrzeug führen will, braucht das Feld dort ebenfalls.
 Die Farbe setzt der Schalter **nicht**, er ändert nur die Vorgabe. Sonst
 verlöre, wer einmal eine eigene Farbe gewählt hat, sie beim nächsten Umschalten.
 
+## Fahrzeuge nach Feuerwehr in der Besatzung
+
+Im Personal-Board und in jedem Fahrzeug-Auswahlfeld der Besatzung (Tabelle,
+Fahrzeugdialog, „Entsendet an" der Atemschutzseiten) stehen die **eigenen**
+Fahrzeuge vorne, danach die fremden je Feuerwehr, alphabetisch; fremde ohne
+Feuerwehrangabe — Rettung, Polizei — zuletzt unter „Ohne Feuerwehr". Die
+Logik steht in `src/common/vehicleGroups.ts`.
+
+Eigen ist ein Fahrzeug, wenn es **nicht** als `fremd` markiert ist und seine
+`fw` leer ist oder der Feuerwehr des Einsatzes entspricht. Anders als bei der
+Stärke taugt `fw` hier als Merkmal: Verglichen wird nicht, *ob* ein
+Feuerwehrname dasteht, sondern *welcher* — gegen den des Einsatzes. Der
+Vergleich ist normalisiert (Groß-/Kleinschreibung, Leerraum, Präfix „FF"),
+weil die Chip-Leiste „Neusiedl am See" schreibt und eine Eingabe von Hand oft
+„FF Neusiedl am See". Ein Fahrzeug ohne `fw` zählt als eigen, weil viele
+gewachsene Einträge der eigenen Wehr keines tragen.
+
+Die beiden Merkmale können auseinanderlaufen: Ein Fahrzeug einer Nachbarwehr
+ohne gesetzten `fremd`-Schalter steht im Board unter seiner Feuerwehr, in der
+Stärketabelle aber bei den eigenen Kräften. Das ist gewollt — das Board
+ordnet nach Zugehörigkeit, die Stärke folgt der ausdrücklichen Kennzeichnung.
+
+Fremden Fahrzeugen wird selten jemand zugeordnet. Ihr Abschnitt im Board ist
+deshalb **zugeklappt**, solange dort niemand steht; mit zugeordneten Personen
+ist er offen, damit niemand unsichtbar an einem Fahrzeug hängt. Von Hand
+umgeschaltet gilt die Wahl, bis die Seite neu geladen wird. Gibt es keine
+fremden Fahrzeuge, bleibt alles ohne Überschriften wie zuvor.
+
 ## Anzeige und Austausch
 
 `formatBesatzung()` ist die einzige Stelle, die das `1:` schreibt — Marker-Popup,
