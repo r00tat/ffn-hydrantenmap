@@ -16,14 +16,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc } from 'firebase/firestore';
 import { useTranslations } from 'next-intl';
-import {
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useFirecall, { FirecallContext } from '../../../hooks/useFirecall';
 import useFirecallLocations from '../../../hooks/useFirecallLocations';
@@ -67,7 +60,7 @@ function useCopy() {
         showSnackbar(t('copyFailed'), 'error');
       }
     },
-    [showSnackbar, t]
+    [showSnackbar, t],
   );
 }
 
@@ -192,29 +185,20 @@ export default function SybosPage() {
 
   const basis = useMemo(
     () => buildBasisdaten({ firecall, items: firecallItems, locations }),
-    [firecall, firecallItems, locations]
+    [firecall, firecallItems, locations],
   );
   const kraefte = useMemo(
     () => buildKraefte(firecallItems, crewAssignments),
-    [firecallItems, crewAssignments]
+    [firecallItems, crewAssignments],
   );
-  const mannschaft = useMemo(
-    () => buildMannschaftText(crewAssignments),
-    [crewAssignments]
-  );
+  const mannschaft = useMemo(() => buildMannschaftText(crewAssignments), [crewAssignments]);
   const material = useMemo(
-    () =>
-      buildMaterialText(firecallItems, (item) =>
-        getItemInstance(item).markerName()
-      ),
-    [firecallItems]
+    () => buildMaterialText(firecallItems, (item) => getItemInstance(item).markerName()),
+    [firecallItems],
   );
   const notizen = useMemo(() => buildNotizenText(locations), [locations]);
   const tagebuch = useMemo(() => buildTagebuchText(diaries), [diaries]);
-  const geschaeftsbuch = useMemo(
-    () => buildGeschaeftsbuchText(eintraege),
-    [eintraege]
-  );
+  const geschaeftsbuch = useMemo(() => buildGeschaeftsbuchText(eintraege), [eintraege]);
 
   // Die beiden Texte stehen am Einsatz, damit sie nicht bei jedem Öffnen neu
   // erzeugt werden müssen und Korrekturen von Hand erhalten bleiben.
@@ -228,10 +212,7 @@ export default function SybosPage() {
   const [generating, setGenerating] = useState(false);
 
   const saveSummary = useCallback(
-    async (fields: {
-      sybosEinsatzablauf?: string;
-      sybosTaetigkeit?: string;
-    }) => {
+    async (fields: { sybosEinsatzablauf?: string; sybosTaetigkeit?: string }) => {
       if (!firecall.id || !canWrite) return;
       try {
         await setDoc(
@@ -241,14 +222,14 @@ export default function SybosPage() {
             updatedAt: new Date().toISOString(),
             updatedBy: email,
           },
-          { merge: true }
+          { merge: true },
         );
       } catch (err) {
         console.error('failed to save sybos summary', err);
         showSnackbar(t('saveFailed'), 'error');
       }
     },
-    [canWrite, email, firecall.id, showSnackbar, t]
+    [canWrite, email, firecall.id, showSnackbar, t],
   );
 
   const sections = useMemo(
@@ -258,20 +239,25 @@ export default function SybosPage() {
         text: basis.map((b) => `${t(`basis.${b.key}`)}: ${b.value}`).join('\n'),
       },
       { title: t('eigeneKraefte'), text: kraefte.eigene },
-      { title: t('mannschaft'), text: mannschaft },
+      // Die Namen der Mannschaft gehen nicht an das Modell: Im Berichtstext
+      // haben sie nichts verloren, und was nicht hinausgeht, kann auch nicht
+      // dort auftauchen. Kopiert werden sie trotzdem mit.
+      { title: t('mannschaft'), text: mannschaft, private: true },
       { title: t('sonstigeKraefte'), text: kraefte.fremde },
       { title: t('material'), text: material },
       { title: t('einsatzorte'), text: notizen },
       { title: t('sectionTagebuch'), text: tagebuch },
       { title: t('geschaeftsbuch'), text: geschaeftsbuch },
     ],
-    [basis, geschaeftsbuch, kraefte, mannschaft, material, notizen, t, tagebuch]
+    [basis, geschaeftsbuch, kraefte, mannschaft, material, notizen, t, tagebuch],
   );
 
   const generate = useCallback(async () => {
     setGenerating(true);
     try {
-      const summary = await generateSybosSummary(buildAiContext(sections));
+      const summary = await generateSybosSummary(
+        buildAiContext(sections.filter((s) => !s.private)),
+      );
       setEinsatzablauf(summary.einsatzablauf);
       setTaetigkeit(summary.taetigkeit);
       await saveSummary({
@@ -312,11 +298,7 @@ export default function SybosPage() {
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
           {t('title')}
         </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<ContentCopyIcon />}
-          onClick={copyAll}
-        >
+        <Button variant="outlined" startIcon={<ContentCopyIcon />} onClick={copyAll}>
           {t('copyAll')}
         </Button>
       </Box>
@@ -327,9 +309,7 @@ export default function SybosPage() {
       <Stack spacing={2}>
         {/* 1. Basisdaten */}
         <Section title={t('sectionBasis')}>
-          {basis.length === 0 && (
-            <Typography color="text.secondary">{t('empty')}</Typography>
-          )}
+          {basis.length === 0 && <Typography color="text.secondary">{t('empty')}</Typography>}
           <Box
             sx={{
               display: 'grid',
@@ -341,9 +321,7 @@ export default function SybosPage() {
               <Box
                 key={b.key}
                 sx={
-                  b.key === 'name' ||
-                  b.key === 'einsatzort' ||
-                  b.key === 'beschreibung'
+                  b.key === 'name' || b.key === 'einsatzort' || b.key === 'beschreibung'
                     ? { gridColumn: '1 / -1' }
                     : undefined
                 }
@@ -362,25 +340,21 @@ export default function SybosPage() {
         <Section
           title={t('sectionAblauf')}
           hint={t('ablaufHint')}
+          // Nur mit Schreibrecht: Ein Gast mit reinem Lesezugriff könnte das
+          // Ergebnis nicht speichern, der Aufruf kostete nur Kontingent.
           action={
-            <Button
-              variant="contained"
-              startIcon={
-                generating ? (
-                  <CircularProgress size={20} color="inherit" />
-                ) : (
-                  <AutoAwesomeIcon />
-                )
-              }
-              onClick={generate}
-              disabled={generating}
-            >
-              {generating
-                ? t('generating')
-                : hasSummary
-                  ? t('regenerate')
-                  : t('generate')}
-            </Button>
+            canWrite && (
+              <Button
+                variant="contained"
+                startIcon={
+                  generating ? <CircularProgress size={20} color="inherit" /> : <AutoAwesomeIcon />
+                }
+                onClick={generate}
+                disabled={generating}
+              >
+                {generating ? t('generating') : hasSummary ? t('regenerate') : t('generate')}
+              </Button>
+            )
           }
         >
           {hasSummary && <Alert severity="info">{t('aiReview')}</Alert>}
@@ -391,8 +365,7 @@ export default function SybosPage() {
             placeholder={t('summaryPlaceholder')}
             onChange={canWrite ? setEinsatzablauf : undefined}
             onBlur={() =>
-              einsatzablauf !== storedAblauf &&
-              saveSummary({ sybosEinsatzablauf: einsatzablauf })
+              einsatzablauf !== storedAblauf && saveSummary({ sybosEinsatzablauf: einsatzablauf })
             }
           />
           <CopyField
@@ -402,8 +375,7 @@ export default function SybosPage() {
             placeholder={t('summaryPlaceholder')}
             onChange={canWrite ? setTaetigkeit : undefined}
             onBlur={() =>
-              taetigkeit !== storedTaetigkeit &&
-              saveSummary({ sybosTaetigkeit: taetigkeit })
+              taetigkeit !== storedTaetigkeit && saveSummary({ sybosTaetigkeit: taetigkeit })
             }
           />
         </Section>
@@ -425,36 +397,20 @@ export default function SybosPage() {
                 })}
               />
             )}
-            {kraefte.summe.ats > 0 && (
-              <Chip label={t('summeAts', { count: kraefte.summe.ats })} />
-            )}
+            {kraefte.summe.ats > 0 && <Chip label={t('summeAts', { count: kraefte.summe.ats })} />}
           </Box>
-          <CopyField
-            label={t('eigeneKraefte')}
-            value={kraefte.eigene}
-            multiline
-          />
+          <CopyField label={t('eigeneKraefte')} value={kraefte.eigene} multiline />
           <CopyField label={t('mannschaft')} value={mannschaft} multiline />
-          <CopyField
-            label={t('sonstigeKraefte')}
-            value={kraefte.fremde}
-            multiline
-          />
+          <CopyField label={t('sonstigeKraefte')} value={kraefte.fremde} multiline />
           <CopyField label={t('material')} value={material} multiline />
         </Section>
 
         {/* 4. Sonstige Notizen */}
         {(notizen || geschaeftsbuch) && (
           <Section title={t('sectionNotizen')}>
-            {notizen && (
-              <CopyField label={t('einsatzorte')} value={notizen} multiline />
-            )}
+            {notizen && <CopyField label={t('einsatzorte')} value={notizen} multiline />}
             {geschaeftsbuch && (
-              <CopyField
-                label={t('geschaeftsbuch')}
-                value={geschaeftsbuch}
-                multiline
-              />
+              <CopyField label={t('geschaeftsbuch')} value={geschaeftsbuch} multiline />
             )}
           </Section>
         )}
@@ -466,11 +422,7 @@ export default function SybosPage() {
           title={t('sectionTagebuch')}
           action={
             tagebuch ? (
-              <Button
-                size="small"
-                startIcon={<ContentCopyIcon />}
-                onClick={() => copy(tagebuch)}
-              >
+              <Button size="small" startIcon={<ContentCopyIcon />} onClick={() => copy(tagebuch)}>
                 {t('copy')}
               </Button>
             ) : undefined

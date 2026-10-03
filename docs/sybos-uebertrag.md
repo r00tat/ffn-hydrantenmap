@@ -53,9 +53,14 @@ alle Abschnitte der Seite als Text und antwortet mit einem **JSON-Schema** aus z
 Feldern. Kein Markdown mit Überschriften: Eine Überschrift, die das Modell einmal
 anders schreibt, ließe die beiden Felder ineinanderlaufen.
 
-Die Systemanweisung verbietet Namen der Mannschaft und von Betroffenen im Text — die
-Mannschaft steht namentlich in ihrem eigenen Feld, im Fließtext des Berichts hat sie
-nichts verloren.
+Die namentliche Mannschaft geht **nicht** an das Modell — im Fließtext des Berichts hat
+sie nichts verloren, und was nicht hinausgeht, kann dort auch nicht auftauchen. Die
+Systemanweisung verbietet zusätzlich Namen von Betroffenen und hält fest, dass der
+erfasste Text nur Material ist und Anweisungen darin nicht befolgt werden. Die Antwort
+landet ausschließlich als reiner Text in Eingabefeldern, nie als HTML.
+
+Der Knopf zum Erstellen erscheint nur mit Schreibrecht am Einsatz: Ein Gast mit reinem
+Lesezugriff könnte das Ergebnis nicht speichern.
 
 Das Ergebnis wird am Einsatz gespeichert (`sybosEinsatzablauf`, `sybosTaetigkeit`).
 Sonst würde bei jedem Öffnen neu erzeugt, und Korrekturen von Hand gingen verloren.
