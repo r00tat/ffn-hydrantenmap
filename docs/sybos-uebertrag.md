@@ -8,32 +8,68 @@ Karte, Tagebuch und Einsatzmittel-Übersicht.
 
 ## Aufbau
 
-Die Reihenfolge folgt der Erfassung in Sybos:
+Ganz oben steht die Übersichtskarte wie auf der Druckseite, zum Nachsehen. Danach
+folgt die Reihenfolge der Erfassung in Sybos:
 
-1. **Basisdaten** — Einsatz, Feuerwehr, Beginn, Alarmierung, Eintreffen, Ende, Dauer,
-   Einsatzort, Beschreibung.
+1. **Basisdaten** — Einsatz, Feuerwehr, Alarmierung, Eintreffen, Ende, Dauer,
+   Einsatzort, Beschreibung, dazu der Alarmierungstext aus BlaulichtSMS.
 2. **Einsatzablauf** — die beiden Freitextfelder „Einsatzablauf" und
    „Tätigkeit / Bemerkungen", von Gemini erstellt.
 3. **Kräfte und Material** — eigene Fahrzeuge und Einheiten, namentliche Mannschaft,
-   sonstige Kräfte, eingesetztes Material.
-4. **Sonstige Notizen** — Einsatzorte mit ihren Notizen, Geschäftsbuch.
-5. **Einsatztagebuch** — vollständig. Angezeigt als dieselbe Tabelle wie auf der
+   sonstige Kräfte, eingesetztes Material, Fahrten aus dem Fahrtenbuch mit Kilometern.
+4. **Atemschutz** — Leiter des Sammelplatzes und Füllpersonal, eine Zeile je
+   Bereitstellung eines Trupps mit Auftrag, Zeiten und Druck.
+5. **Messungen** — Gammaspektren und je Ebene mit Datenfeldern (Strahlenmessung,
+   Radiacode, eigene Messreihen) eine Tabelle der Messpunkte, als CSV herunterladbar.
+6. **Sonstige Notizen** — Einsatzorte mit ihren Notizen, Geschäftsbuch,
+   Kostenersatz-Berechnungen.
+7. **Anhänge und Fotos** — Anhänge aus dem Storage (am Einsatz und an Elementen) und
+   die Dateien im Drive-Ordner, je Datei und gesammelt herunterladbar.
+8. **Einsatztagebuch** — vollständig. Angezeigt als dieselbe Tabelle wie auf der
    Druckseite (`DiaryTable`), kopiert als Text mit einem Eintrag je Zeile.
 
-## Warum fertiger Text und nicht Tabellen
+Abschnitte ohne Daten bleiben weg. Die Builder für 3.–7. stehen in
+[sybosExtras.ts](../src/components/pages/sybos/sybosExtras.ts), getrennt von
+`sybosReport.ts`, weil sie aus eigenen Sammlungen lesen.
 
-Jedes Feld wird einzeln kopiert und in Sybos eingefügt. Die Funktionen in
-`sybosReport.ts` liefern deshalb Text in genau der Form, in der er dort landet —
-Zeitpunkte als `DD.MM.YYYY HH:mm` ohne Sekunden, eine Zeile je Einsatzmittel oder
-Tagebucheintrag. Der Text ist deutsch, auch bei englischer Oberfläche: Er ist Inhalt
-des Einsatzberichts, nicht Bedienoberfläche. Übersetzt sind nur die Feldbeschriftungen.
+## Kopierfelder und Tabellen
+
+Freitext (Basisdaten, Einsatzablauf, Notizen, Geschäftsbuch) steht in Kopierfeldern:
+Er wird einzeln kopiert und in Sybos eingefügt, deshalb liefern die Funktionen Text in
+genau der Form, in der er dort landet — Zeitpunkte als `DD.MM.YYYY HH:mm` ohne
+Sekunden.
+
+Listen (Kräfte, Mannschaft, Material, Trupps, Fahrten, Messungen) stehen dagegen als
+schlichte HTML-Tabellen: In Sybos werden sie Zeile für Zeile ausgewählt, von Hand oder
+über eine Browser-Erweiterung, die Tabellen ausliest. Sie sind **alphabetisch**
+sortiert (`compareAlphabetically`, Zahlen natürlich), so wie die Listen in Sybos
+stehen; Messpunkte und Spektren nach Zeit.
+
+Die Werte sind deutsch, auch bei englischer Oberfläche: Sie sind Inhalt des
+Einsatzberichts, nicht Bedienoberfläche. Übersetzt sind nur die Beschriftungen.
+
+## Herunterladen von Anhängen und Fotos
+
+Anhänge liegen im Firebase Storage und werden mit `downloadStorageFile` unter ihrem
+Originalnamen gespeichert. Die Fotos im Google Drive kommen über
+`/api/einsatz/<id>/drive/<fileId>/download`: Die `webViewLink` öffnet nur, wer im
+Shared Drive Mitglied ist. Die Route prüft wie die Vorschaubild-Route die Berechtigung
+am Einsatz **und** dass die Datei im Ordner des Einsatzes liegt — sonst wäre sie ein
+Download-Proxy auf das ganze Shared Drive. Der Client holt die Datei per `fetch` und
+speichert sie mit `downloadBlob`, weil die WebView der Android-App `<a download>`
+ignoriert. „Alle herunterladen" lädt nacheinander, nicht parallel.
+
+Messreihen gibt es als CSV mit Semikolon, Dezimalkomma und BOM, damit Excel mit
+deutscher Einstellung Umlaute und „µ" richtig liest.
 
 ## Zeiten
 
-Steht ein Zeitpunkt am Einsatz selbst (`eintreffen`, `abruecken`), gilt er. Sonst wird
-er aus den Einsatzmitteln abgeleitet: erste Alarmierung, erstes Eintreffen, letztes
-Abrücken — dieselbe Ableitung wie auf der Druckseite. Die Dauer läuft vom
-Einsatzbeginn (`date`) bis zum Ende.
+`date` am Einsatz **ist** die Alarmierung — so heißt das Feld im Einsatzdialog; ein
+eigenes Feld `alarmierung` hat der Einsatz nicht. Steht ein Zeitpunkt am Einsatz
+selbst (`date`, `eintreffen`, `abruecken`), gilt er. Sonst wird er aus den
+Einsatzmitteln abgeleitet: erste Alarmierung, erstes Eintreffen, letztes Abrücken —
+dieselbe Ableitung wie auf der Druckseite. Die Dauer läuft von der Alarmierung bis zum
+Ende.
 
 ## Kräfte
 
@@ -54,7 +90,10 @@ Feldern. Kein Markdown mit Überschriften: Eine Überschrift, die das Modell ein
 anders schreibt, ließe die beiden Felder ineinanderlaufen.
 
 Die namentliche Mannschaft geht **nicht** an das Modell — im Fließtext des Berichts hat
-sie nichts verloren, und was nicht hinausgeht, kann dort auch nicht auftauchen. Die
+sie nichts verloren, und was nicht hinausgeht, kann dort auch nicht auftauchen. Aus
+demselben Grund bleiben Fahrer (Fahrtenbuch), Sammelplatz-Personal und Kostenersatz
+draußen; die Atemschutz-Zeilen für das Modell nennen nur die Zahl der Geräteträger,
+Messungen gehen als Kurzfassung (Anzahl und Spanne je Zahlenfeld). Die
 Systemanweisung verbietet zusätzlich Namen von Betroffenen und hält fest, dass der
 erfasste Text nur Material ist und Anweisungen darin nicht befolgt werden. Die Antwort
 landet ausschließlich als reiner Text in Eingabefeldern, nie als HTML.

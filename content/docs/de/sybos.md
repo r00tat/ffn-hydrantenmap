@@ -4,10 +4,14 @@ Die Seite „Sybos-Übertrag" bereitet einen Einsatz so auf, dass er bequem in d
 
 ## Funktionen
 
-- **Basisdaten:** Einsatz, Feuerwehr, Beginn, Alarmierung, Eintreffen, Ende, Dauer, Einsatzort und Beschreibung
+- **Übersichtskarte:** ganz oben, wie auf der Druckseite
+- **Basisdaten:** Einsatz, Feuerwehr, Alarmierung, Eintreffen, Ende, Dauer, Einsatzort, Beschreibung und der Alarmierungstext
 - **Einsatzablauf:** Zusammenfassung durch die KI, aufgeteilt in „Einsatzablauf" und „Tätigkeit / Bemerkungen"
-- **Kräfte und Material:** eigene Fahrzeuge mit Stärke und Zeiten, namentliche Mannschaft, sonstige Kräfte (Rettung, Polizei, andere Feuerwehren) und eingesetztes Material
-- **Sonstige Notizen:** Einsatzorte mit Notizen und das Geschäftsbuch
+- **Kräfte und Material:** Tabellen der eigenen Fahrzeuge mit Stärke und Zeiten, der Mannschaft, der sonstigen Kräfte (Rettung, Polizei, andere Feuerwehren), des Materials und der Fahrten aus dem Fahrtenbuch — alphabetisch sortiert
+- **Atemschutz:** Sammelplatz-Leitung und alle Trupps mit Auftrag, Zeiten und Druck
+- **Messungen:** Gammaspektren und Messreihen (z.B. Strahlenmessung), jede Messreihe auch als CSV
+- **Sonstige Notizen:** Einsatzorte mit Notizen, Geschäftsbuch und Kostenersatz
+- **Anhänge und Fotos:** zum Herunterladen, einzeln oder alle auf einmal
 - **Einsatztagebuch:** alle Einträge, eine Zeile pro Eintrag
 - **Alles kopieren:** der ganze Bericht auf einmal
 
@@ -16,7 +20,8 @@ Die Seite „Sybos-Übertrag" bereitet einen Einsatz so auf, dass er bequem in d
 1. Im Menü unter „Einsatz-Dokumentation" auf „Sybos-Übertrag" klicken
 2. Bei „Einsatzablauf" auf „Mit KI erstellen" klicken
 3. Den erstellten Text prüfen und bei Bedarf direkt im Feld korrigieren — Änderungen werden gespeichert
-4. Feld für Feld mit dem Kopier-Symbol kopieren und in Sybos einfügen
+4. Feld für Feld mit dem Kopier-Symbol kopieren und in Sybos einfügen; Tabellenzeilen von Hand oder mit einer Browser-Erweiterung übernehmen
+5. Anhänge und Fotos herunterladen und in Sybos hochladen
 
 ## Hinweise
 

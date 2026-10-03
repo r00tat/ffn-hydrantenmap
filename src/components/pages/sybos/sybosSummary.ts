@@ -28,7 +28,7 @@ export const SYBOS_SYSTEM_INSTRUCTION = `Du schreibst den Einsatzbericht einer �
 Aus den Einsatzdaten erstellst du zwei Texte:
 
 1. "einsatzablauf": Der Ablauf des Einsatzes in zeitlicher Reihenfolge — Alarmierung, Anfahrt, Lage beim Eintreffen, Verlauf, Ende und Einrücken. Uhrzeiten im Format HH:MM nennen, wo sie bekannt sind.
-2. "taetigkeit": Die durchgeführten Tätigkeiten und Bemerkungen — was gemacht wurde, welches Gerät und Material eingesetzt wurde, Zusammenarbeit mit anderen Organisationen, Besonderheiten, Schäden, Übergaben, offene Punkte.
+2. "taetigkeit": Die durchgeführten Tätigkeiten und Bemerkungen — was gemacht wurde, welches Gerät und Material eingesetzt wurde, Atemschutzeinsätze (Anzahl der Trupps, Auftrag, Dauer), Messungen und ihre Ergebnisse, Zusammenarbeit mit anderen Organisationen, Besonderheiten, Schäden, Übergaben, offene Punkte.
 
 Regeln:
 - Sachlich und knapp, in ganzen Sätzen, im Präteritum, aus Sicht der Feuerwehr ("Die Feuerwehr …", "Es wurde …").
@@ -48,9 +48,7 @@ const summaryModel = getGenerativeModel(vertexAI, {
   },
 });
 
-export async function generateSybosSummary(
-  context: string
-): Promise<SybosSummary> {
+export async function generateSybosSummary(context: string): Promise<SybosSummary> {
   const result = await summaryModel.generateContent({
     systemInstruction: SYBOS_SYSTEM_INSTRUCTION,
     contents: [
@@ -61,10 +59,7 @@ export async function generateSybosSummary(
         // entschärft, sonst könnte er den Block vorzeitig beenden.
         parts: [
           {
-            text: `<einsatzdaten>\n${context.replace(
-              /<\/?einsatzdaten>/gi,
-              ''
-            )}\n</einsatzdaten>`,
+            text: `<einsatzdaten>\n${context.replace(/<\/?einsatzdaten>/gi, '')}\n</einsatzdaten>`,
           },
         ],
       },

@@ -38,9 +38,7 @@ export function formatDauer(start?: string, end?: string): string {
   if (minutes <= 0) return '';
   const h = Math.floor(minutes / 60);
   const min = minutes % 60;
-  return [h > 0 ? `${h} h` : '', min > 0 ? `${min} min` : '']
-    .filter(Boolean)
-    .join(' ');
+  return [h > 0 ? `${h} h` : '', min > 0 ? `${min} min` : ''].filter(Boolean).join(' ');
 }
 
 /** Zeitpunkte als sortierbare Millisekunden, ungültige fallen heraus. */
@@ -61,14 +59,13 @@ type Unit = FirecallItem & {
 };
 
 function units(items: FirecallItem[]): Unit[] {
-  return items.filter(
-    (i) => i.type === 'vehicle' || i.type === 'tacticalUnit'
-  ) as Unit[];
+  return items.filter((i) => i.type === 'vehicle' || i.type === 'tacticalUnit') as Unit[];
 }
 
 /**
- * Die vier Zeitpunkte des Einsatzes.
+ * Die drei Zeitpunkte des Einsatzes.
  *
+ * `firecall.date` ist die Alarmierung — so heißt das Feld im Einsatzdialog.
  * Steht ein Zeitpunkt am Einsatz selbst, gilt er; sonst wird er aus den
  * Einsatzmitteln abgeleitet — erste Alarmierung, erstes Eintreffen, letztes
  * Abrücken. So steht auch bei einem Einsatz, an dem nur die Fahrzeuge
@@ -80,18 +77,11 @@ export function einsatzZeiten(firecall: Firecall, items: FirecallItem[]) {
   const eintreffen = times(u.map((v) => v.eintreffen));
   const abruecken = times(u.map((v) => v.abruecken));
 
-  const beginn = firecall.date;
-  const ende =
-    firecall.abruecken ??
-    isoOf(abruecken.length ? Math.max(...abruecken) : undefined);
+  const ende = firecall.abruecken ?? isoOf(abruecken.length ? Math.max(...abruecken) : undefined);
   return {
-    beginn,
-    alarmierung:
-      firecall.alarmierung ??
-      isoOf(alarmierung.length ? Math.min(...alarmierung) : undefined),
+    alarmierung: firecall.date ?? isoOf(alarmierung.length ? Math.min(...alarmierung) : undefined),
     eintreffen:
-      firecall.eintreffen ??
-      isoOf(eintreffen.length ? Math.min(...eintreffen) : undefined),
+      firecall.eintreffen ?? isoOf(eintreffen.length ? Math.min(...eintreffen) : undefined),
     ende,
   };
 }
@@ -102,15 +92,7 @@ export function formatAddress(loc: FirecallLocation): string {
 }
 
 export type BasisKey =
-  | 'name'
-  | 'fw'
-  | 'beginn'
-  | 'alarmierung'
-  | 'eintreffen'
-  | 'ende'
-  | 'dauer'
-  | 'einsatzort'
-  | 'beschreibung';
+  'name' | 'fw' | 'alarmierung' | 'eintreffen' | 'ende' | 'dauer' | 'einsatzort' | 'beschreibung';
 
 export interface BasisField {
   key: BasisKey;
@@ -138,13 +120,12 @@ export function buildBasisdaten({
   const fields: BasisField[] = [
     { key: 'name', value: firecall.name || '' },
     { key: 'fw', value: firecall.fw || '' },
-    { key: 'beginn', value: formatSybosTime(zeiten.beginn) },
     { key: 'alarmierung', value: formatSybosTime(zeiten.alarmierung) },
     { key: 'eintreffen', value: formatSybosTime(zeiten.eintreffen) },
     { key: 'ende', value: formatSybosTime(zeiten.ende) },
     {
       key: 'dauer',
-      value: formatDauer(zeiten.beginn ?? zeiten.alarmierung, zeiten.ende),
+      value: formatDauer(zeiten.alarmierung, zeiten.ende),
     },
     { key: 'einsatzort', value: einsatzort },
     { key: 'beschreibung', value: firecall.description || '' },
@@ -165,9 +146,7 @@ function kraftZeile(row: StrengthRow): string {
     row.abruecken ? `Abrücken ${formatSybosTime(row.abruecken)}` : '',
   ].filter(Boolean);
   const name = row.fw ? `${row.name} (${row.fw})` : row.name;
-  return [`${name} [${row.typ}]`, details.join(', ')]
-    .filter(Boolean)
-    .join(' – ');
+  return [`${name} [${row.typ}]`, details.join(', ')].filter(Boolean).join(' – ');
 }
 
 /**
@@ -203,13 +182,9 @@ export interface Kraefte {
  * Gerechnet wird mit derselben Stärke wie in der Einsatzmittel-Übersicht
  * (`calculateStrength`), damit die Zahl in Sybos zur Zahl in der App passt.
  */
-export function buildKraefte(
-  items: FirecallItem[],
-  crewAssignments: CrewAssignment[]
-): Kraefte {
+export function buildKraefte(items: FirecallItem[], crewAssignments: CrewAssignment[]): Kraefte {
   const { eigene, fremde } = calculateStrength(items, crewAssignments);
-  const byName = (a: StrengthRow, b: StrengthRow) =>
-    compareAlphabetically(a.name, b.name);
+  const byName = (a: StrengthRow, b: StrengthRow) => compareAlphabetically(a.name, b.name);
   const eigeneRows = [...eigene.rows].sort(byName);
   const fremdeRows = [...fremde.rows].sort(byName);
   return {
@@ -234,10 +209,7 @@ export function sortCrew(crew: CrewAssignment[]): CrewAssignment[] {
 
 export function buildMannschaftText(crew: CrewAssignment[]): string {
   return sortCrew(crew)
-    .map(
-      (c) =>
-        `${c.name} – ${c.funktion}${c.vehicleName ? ` (${c.vehicleName})` : ''}`
-    )
+    .map((c) => `${c.name} – ${c.funktion}${c.vehicleName ? ` (${c.vehicleName})` : ''}`)
     .join('\n');
 }
 
@@ -257,7 +229,7 @@ export interface MaterialCount {
 
 export function countMaterial(
   items: FirecallItem[],
-  typeLabel: (item: FirecallItem) => string
+  typeLabel: (item: FirecallItem) => string,
 ): MaterialCount[] {
   const counts = new Map<string, number>();
   for (const item of items) {
@@ -282,7 +254,7 @@ export function countMaterial(
 
 export function buildMaterialText(
   items: FirecallItem[],
-  typeLabel: (item: FirecallItem) => string
+  typeLabel: (item: FirecallItem) => string,
 ): string {
   return countMaterial(items, typeLabel)
     .map(({ label, count }) => `${count}× ${label}`)
@@ -312,21 +284,15 @@ export function buildTagebuchText(diaries: Diary[]): string {
       ]
         .filter(Boolean)
         .join(' ');
-      const body = [singleLine(d.name), singleLine(d.beschreibung)]
-        .filter(Boolean)
-        .join(' – ');
-      const done = d.erledigt
-        ? ` (erledigt ${formatSybosTime(d.erledigt) || d.erledigt})`
-        : '';
+      const body = [singleLine(d.name), singleLine(d.beschreibung)].filter(Boolean).join(' – ');
+      const done = d.erledigt ? ` (erledigt ${formatSybosTime(d.erledigt) || d.erledigt})` : '';
       const hasMeta = d.nummer || d.art || d.von || d.an;
       return `${head}${hasMeta ? ':' : ''} ${body}${done}`.trim();
     })
     .join('\n');
 }
 
-export function buildGeschaeftsbuchText(
-  entries: GeschaeftsbuchEintrag[]
-): string {
+export function buildGeschaeftsbuchText(entries: GeschaeftsbuchEintrag[]): string {
   return entries
     .map((e) => {
       const head = [
@@ -338,12 +304,8 @@ export function buildGeschaeftsbuchText(
       ]
         .filter(Boolean)
         .join(' ');
-      const body = [singleLine(e.name), singleLine(e.beschreibung)]
-        .filter(Boolean)
-        .join(' – ');
-      const weiter = e.weiterleitung
-        ? ` (weitergeleitet an ${e.weiterleitung})`
-        : '';
+      const body = [singleLine(e.name), singleLine(e.beschreibung)].filter(Boolean).join(' – ');
+      const weiter = e.weiterleitung ? ` (weitergeleitet an ${e.weiterleitung})` : '';
       return `${head}: ${body}${weiter}`;
     })
     .join('\n');
@@ -354,12 +316,8 @@ export function buildNotizenText(locations: FirecallLocation[]): string {
   return locations
     .map((loc) => {
       const address = formatAddress(loc);
-      const name = [loc.name, address ? `(${address})` : '']
-        .filter(Boolean)
-        .join(' ');
-      const notes = [singleLine(loc.description), singleLine(loc.info)]
-        .filter(Boolean)
-        .join(' – ');
+      const name = [loc.name, address ? `(${address})` : ''].filter(Boolean).join(' ');
+      const notes = [singleLine(loc.description), singleLine(loc.info)].filter(Boolean).join(' – ');
       return notes ? `${name}: ${notes}` : name;
     })
     .filter(Boolean)
@@ -394,10 +352,7 @@ export function parseSybosSummary(raw: string): SybosSummary {
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '');
   const parsed = JSON.parse(json) as Partial<SybosSummary>;
-  if (
-    typeof parsed?.einsatzablauf !== 'string' ||
-    typeof parsed?.taetigkeit !== 'string'
-  ) {
+  if (typeof parsed?.einsatzablauf !== 'string' || typeof parsed?.taetigkeit !== 'string') {
     throw new Error('Antwort ohne einsatzablauf/taetigkeit');
   }
   return {

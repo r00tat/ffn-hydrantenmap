@@ -2,6 +2,7 @@
 
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DownloadIcon from '@mui/icons-material/Download';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -17,14 +18,28 @@ import Typography from '@mui/material/Typography';
 import { doc } from 'firebase/firestore';
 import { useTranslations } from 'next-intl';
 import { ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { getBlaulichtSmsAlarmById } from '../../../app/blaulicht-sms/actions';
+import type { BlaulichtSmsAlarm } from '../../../common/blaulichtsms';
+import { computeAllFields } from '../../../common/computeFieldValue';
+import useAtemschutzEinsatzdaten from '../../../hooks/useAtemschutzEinsatzdaten';
+import useFahrtenbuchEntries from '../../../hooks/useFahrtenbuchEntries';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useFirecall, { FirecallContext } from '../../../hooks/useFirecall';
+import { useFirecallLayersSorted } from '../../../hooks/useFirecallLayers';
 import useFirecallLocations from '../../../hooks/useFirecallLocations';
 import useFirecallWriteAccess from '../../../hooks/useFirecallWriteAccess';
+import { useFirecallKostenersatz } from '../../../hooks/useKostenersatz';
 import useVehicles from '../../../hooks/useVehicles';
 import { setDoc } from '../../../lib/firestoreClient';
 import { firestore } from '../../firebase/firebase';
-import { FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
+import { downloadText } from '../../firebase/download';
+import {
+  FIRECALL_COLLECTION_ID,
+  firecallAlarmIds,
+  type Firecall,
+  type FirecallItem,
+  type FirecallLayer,
+} from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
 import DynamicMap from '../../Map/PositionedMap';
 import { useSnackbar } from '../../providers/SnackbarProvider';
@@ -42,8 +57,30 @@ import {
   buildTagebuchText,
   sortCrew,
 } from './sybosReport';
+import {
+  buildAtemschutzText,
+  buildFahrtenRows,
+  buildMeasurementTables,
+  buildSpectrumRows,
+  buildSpectrumText,
+  buildTruppRows,
+  collectAttachments,
+  measurementCsv,
+  measurementSummary,
+  type MeasurementTable,
+} from './sybosExtras';
+import { AttachmentList, DriveFiles } from './SybosFiles';
 import { generateSybosSummary } from './sybosSummary';
-import { CrewTable, MaterialTable, StrengthRowsTable } from './SybosTables';
+import {
+  CrewTable,
+  FahrtenTable,
+  MaterialTable,
+  MeasurementTableView,
+  SpectrumTable,
+  StrengthRowsTable,
+  TitledTable,
+  TruppTable,
+} from './SybosTables';
 
 const overviewMapSx = {
   height: { xs: 350, md: 500 },
@@ -186,6 +223,87 @@ function Section({
   );
 }
 
+const euro = new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' });
+
+/** Messreihe als CSV — zum Hochladen in Sybos oder zum Öffnen in Excel. */
+function CsvButton({ table }: { table: MeasurementTable }) {
+  const t = useTranslations('sybos');
+  return (
+    <Button
+      size="small"
+      startIcon={<DownloadIcon />}
+      onClick={() =>
+        // Mit BOM, sonst liest Excel die Umlaute und „µ" als Latin-1.
+        downloadText(
+          `\ufeff${measurementCsv(table)}`,
+          `${table.layerName || 'messungen'}.csv`,
+          'text/csv;charset=utf-8',
+        )
+      }
+    >
+      {t('csv')}
+    </Button>
+  );
+}
+
+/** Die Alarmierungen aus BlaulichtSMS, die dem Einsatz zugeordnet sind. */
+function useAlarms(firecall: Firecall) {
+  const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
+  const idsKey = firecallAlarmIds(firecall).join(',');
+  const group = firecall.group;
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!idsKey || !group) {
+        if (active) setAlarms([]);
+        return;
+      }
+      try {
+        const results = await Promise.all(
+          idsKey.split(',').map((id) => getBlaulichtSmsAlarmById(group, id)),
+        );
+        if (active) setAlarms(results.filter((a): a is BlaulichtSmsAlarm => a !== null));
+      } catch (err) {
+        console.error('failed to load BlaulichtSMS alarms', err);
+        if (active) setAlarms([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [group, idsKey]);
+  return alarms;
+}
+
+/**
+ * Berechnete Datenfelder je Element. Sie stehen nicht am Element, sondern
+ * werden aus der Formel der Ebene gerechnet — asynchron, weil mathjs erst
+ * nachgeladen wird.
+ */
+function useComputedFields(items: FirecallItem[], layers: FirecallLayer[]) {
+  const [computed, setComputed] = useState<Record<string, Record<string, number>>>({});
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const result: Record<string, Record<string, number>> = {};
+      for (const layer of layers) {
+        const schema = layer.dataSchema ?? [];
+        if (!schema.some((f) => f.type === 'computed')) continue;
+        for (const item of items) {
+          if (item.id && item.layer === layer.id && item.fieldData) {
+            result[item.id] = await computeAllFields(item.fieldData, schema);
+          }
+        }
+      }
+      if (active) setComputed(result);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [items, layers]);
+  return computed;
+}
+
 export default function SybosPage() {
   const t = useTranslations('sybos');
   const firecall = useFirecall();
@@ -198,6 +316,15 @@ export default function SybosPage() {
   const canWrite = useFirecallWriteAccess();
   const showSnackbar = useSnackbar();
   const copy = useCopy();
+  const tKosten = useTranslations('kostenersatz.status');
+  const layers = useFirecallLayersSorted();
+  const { trupps } = useAtemschutzEinsatzdaten(firecall.id);
+  const fahrtenbuch = useFahrtenbuchEntries(firecall.group, {
+    firecallId: firecall.id,
+  });
+  const { calculations } = useFirecallKostenersatz(firecall.id);
+  const alarms = useAlarms(firecall);
+  const computed = useComputedFields(firecallItems, layers);
 
   const basis = useMemo(
     () => buildBasisdaten({ firecall, items: firecallItems, locations }),
@@ -220,6 +347,54 @@ export default function SybosPage() {
   const notizen = useMemo(() => buildNotizenText(locations), [locations]);
   const tagebuch = useMemo(() => buildTagebuchText(diaries), [diaries]);
   const geschaeftsbuch = useMemo(() => buildGeschaeftsbuchText(eintraege), [eintraege]);
+  const alarmText = useMemo(
+    () =>
+      alarms
+        .map((a) => a.alarmText?.trim())
+        .filter(Boolean)
+        .join('\n\n'),
+    [alarms],
+  );
+  const truppRows = useMemo(() => buildTruppRows(trupps.protokoll), [trupps.protokoll]);
+  const atemschutz = useMemo(() => buildAtemschutzText(truppRows), [truppRows]);
+  const assp = useMemo(
+    () =>
+      [
+        firecall.asspLeiter ? `${t('asspLeiter')}: ${firecall.asspLeiter}` : '',
+        firecall.asspFuellpersonal?.length
+          ? `${t('asspFuellpersonal')}: ${firecall.asspFuellpersonal.join(', ')}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    [firecall.asspFuellpersonal, firecall.asspLeiter, t],
+  );
+  const spectrumRows = useMemo(() => buildSpectrumRows(firecallItems), [firecallItems]);
+  const spectren = useMemo(() => buildSpectrumText(spectrumRows), [spectrumRows]);
+  const measurementTables = useMemo(
+    () => buildMeasurementTables(firecallItems, layers, computed),
+    [computed, firecallItems, layers],
+  );
+  const messungen = useMemo(
+    () => measurementTables.map(measurementSummary).join('\n'),
+    [measurementTables],
+  );
+  const fahrtenRows = useMemo(() => buildFahrtenRows(fahrtenbuch), [fahrtenbuch]);
+  const fahrten = useMemo(
+    () =>
+      fahrtenRows
+        .map((r) =>
+          [r.fahrzeug, r.fahrer, `${r.abfahrt}–${r.ankunft}`, r.km ? `${r.km} km` : '', r.ziel]
+            .filter(Boolean)
+            .join(', '),
+        )
+        .join('\n'),
+    [fahrtenRows],
+  );
+  const attachments = useMemo(
+    () => collectAttachments(firecall, firecallItems),
+    [firecall, firecallItems],
+  );
 
   // Die beiden Texte stehen am Einsatz, damit sie nicht bei jedem Öffnen neu
   // erzeugt werden müssen und Korrekturen von Hand erhalten bleiben.
@@ -266,11 +441,34 @@ export default function SybosPage() {
       { title: t('mannschaft'), text: mannschaft, private: true },
       { title: t('sonstigeKraefte'), text: kraefte.fremde },
       { title: t('material'), text: material },
+      // Fahrer stehen mit Namen darin, deshalb wie die Mannschaft privat.
+      { title: t('fahrten'), text: fahrten, private: true },
+      { title: t('alarmtext'), text: alarmText },
+      // Die Zeilen zum Atemschutz nennen bewusst keine Geräteträger.
+      { title: t('sectionAtemschutz'), text: atemschutz },
+      { title: t('assp'), text: assp, private: true },
+      { title: t('spektren'), text: spectren },
+      { title: t('sectionMessungen'), text: messungen },
       { title: t('einsatzorte'), text: notizen },
       { title: t('sectionTagebuch'), text: tagebuch },
       { title: t('geschaeftsbuch'), text: geschaeftsbuch },
     ],
-    [basis, geschaeftsbuch, kraefte, mannschaft, material, notizen, t, tagebuch],
+    [
+      alarmText,
+      assp,
+      atemschutz,
+      basis,
+      fahrten,
+      geschaeftsbuch,
+      kraefte,
+      mannschaft,
+      material,
+      messungen,
+      notizen,
+      spectren,
+      t,
+      tagebuch,
+    ],
   );
 
   const generate = useCallback(async () => {
@@ -361,6 +559,7 @@ export default function SybosPage() {
               </Box>
             ))}
           </Box>
+          {alarmText && <CopyField label={t('alarmtext')} value={alarmText} multiline />}
         </Section>
 
         {/* 2. Einsatzablauf (Gemini) */}
@@ -430,17 +629,71 @@ export default function SybosPage() {
           <CrewTable title={t('mannschaft')} crew={crewSorted} />
           <StrengthRowsTable title={t('sonstigeKraefte')} rows={kraefte.fremdeRows} />
           <MaterialTable title={t('material')} material={materialCounts} />
+          <FahrtenTable title={t('fahrten')} rows={fahrtenRows} />
         </Section>
 
+        {/* 4. Atemschutz */}
+        {(truppRows.length > 0 || assp) && (
+          <Section
+            title={t('sectionAtemschutz')}
+            action={
+              atemschutz ? (
+                <Button
+                  size="small"
+                  startIcon={<ContentCopyIcon />}
+                  onClick={() => copy(atemschutz)}
+                >
+                  {t('copy')}
+                </Button>
+              ) : undefined
+            }
+          >
+            {assp && <CopyField label={t('assp')} value={assp} multiline />}
+            <TruppTable title={t('trupps')} rows={truppRows} />
+          </Section>
+        )}
+
+        {/* 5. Messungen */}
+        {(spectrumRows.length > 0 || measurementTables.length > 0) && (
+          <Section title={t('sectionMessungen')}>
+            <SpectrumTable title={t('spektren')} rows={spectrumRows} />
+            {measurementTables.map((table) => (
+              <MeasurementTableView
+                key={table.layerId}
+                table={table}
+                action={<CsvButton table={table} />}
+              />
+            ))}
+          </Section>
+        )}
+
         {/* 4. Sonstige Notizen */}
-        {(notizen || geschaeftsbuch) && (
+        {(notizen || geschaeftsbuch || calculations.length > 0) && (
           <Section title={t('sectionNotizen')}>
             {notizen && <CopyField label={t('einsatzorte')} value={notizen} multiline />}
             {geschaeftsbuch && (
               <CopyField label={t('geschaeftsbuch')} value={geschaeftsbuch} multiline />
             )}
+            <TitledTable
+              title={t('kostenersatz')}
+              head={[t('cols.empfaenger'), t('cols.status'), t('cols.summe')]}
+              rows={calculations.map((c) => [
+                c.recipient?.name || '',
+                tKosten(c.status),
+                euro.format(c.totalSum ?? 0),
+              ])}
+            />
           </Section>
         )}
+
+        {/* Anhänge und Fotos zum Hochladen in Sybos */}
+        <Section title={t('sectionDateien')} hint={t('dateienHint')}>
+          {attachments.length === 0 && !firecall.driveFolderId && (
+            <Typography color="text.secondary">{t('empty')}</Typography>
+          )}
+          <AttachmentList attachments={attachments} />
+          {firecall.id && firecall.driveFolderId && <DriveFiles firecallId={firecall.id} />}
+        </Section>
 
         {/* 5. Einsatztagebuch */}
         {/* Zum Lesen dieselbe Tabelle wie auf der Druckseite, kopiert wird
