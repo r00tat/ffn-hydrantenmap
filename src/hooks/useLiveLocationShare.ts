@@ -2,7 +2,8 @@
 import { doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useCallback, useEffect, useRef } from 'react';
 import { firestore } from '../components/firebase/firebase';
-import { deleteDoc, setDoc } from '../lib/firestoreClient';
+import { isOffline } from '../lib/connectivity';
+import { deleteDoc, setDocLocal } from '../lib/firestoreClient';
 import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
 import {
   liveLocationDocId,
@@ -88,6 +89,10 @@ export function useLiveLocationShare(
       location: GeolocationPosition | undefined
     ) => {
       if (!identity) return;
+      // Offline sieht die Position niemand. Jeder Schreibvorgang bliebe als
+      // ausstehend liegen und ginge beim Reconnect veraltet hinaus — der
+      // erste Aufruf danach sendet die aktuelle Position.
+      if (isOffline()) return;
       const now = Date.now();
       if (
         !shouldSendUpdate(
@@ -127,7 +132,10 @@ export function useLiveLocationShare(
       if (typeof speed === 'number' && Number.isFinite(speed)) {
         payload.speed = speed;
       }
-      await setDoc(ref, payload);
+      // Lokal schreiben und sofort weiter: Ein gewartetes `setDoc` kehrt bei
+      // schlechter Verbindung nicht zurück, die Drosselung griffe nie und
+      // jeder Aufruf erzeugte einen weiteren Schreibvorgang.
+      setDocLocal(ref, payload);
       lastSentMsRef.current = now;
       lastPosRef.current = { lat: pos.lat, lng: pos.lng };
 
@@ -136,7 +144,7 @@ export function useLiveLocationShare(
       // Pin bis zum TTL-Ablauf (1 h) doppelt auf den Karten der anderen.
       if (!legacyCleanedRef.current && identity.deviceId) {
         legacyCleanedRef.current = true;
-        await deleteDoc(docRefFor(identity, identity.uid)).catch(() => {});
+        void deleteDoc(docRefFor(identity, identity.uid)).catch(() => {});
       }
     },
     [identity, settings, docRefFor]

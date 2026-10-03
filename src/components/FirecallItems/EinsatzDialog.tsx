@@ -44,6 +44,7 @@ import {
 } from '../../app/blaulicht-sms/actions';
 import { getGroupsWithBlaulichtsmsConfig } from '../../app/blaulicht-sms/credentialsActions';
 import { stripNullish } from '../../common/stripNullish';
+import { withTimeout } from '../../lib/withTimeout';
 import {
   buildFirecallFromAlarm,
   buildNewFirecallPayload,
@@ -55,6 +56,9 @@ import {
   type ExistingFirecall,
 } from './duplicateFirecallCheck';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+
+/** Höchstwartezeit der Duplikatsprüfung, danach wird trotzdem gespeichert. */
+export const DUPLICATE_CHECK_TIMEOUT_MS = 8_000;
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -332,7 +336,13 @@ export default function EinsatzDialog({
     setSaving(true);
     let existing: ExistingFirecall[];
     try {
-      const firecallsByAlarmId = await getFirecallsByAlarmIds(selectedAlarmIds);
+      // Der Verbindungsstatus kann bis zu einem Ping-Intervall alt sein; im
+      // Funkloch hinge die Server Action sonst, bis der Browser aufgibt.
+      const firecallsByAlarmId = await withTimeout(
+        getFirecallsByAlarmIds(selectedAlarmIds),
+        DUPLICATE_CHECK_TIMEOUT_MS,
+        'getFirecallsByAlarmIds',
+      );
       existing = findExistingFirecallsForAlarms(
         selectedAlarmIds,
         firecallsByAlarmId,

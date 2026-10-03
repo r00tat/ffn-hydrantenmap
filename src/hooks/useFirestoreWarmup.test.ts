@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
     hasFirebaseUser: true,
     groups: ['g1'] as string[],
   },
-  connectivity: { status: 'online' as string },
+  connectivity: { reachable: true, status: 'online' as string },
   firecall: {
     id: 'fc1',
     name: '',
@@ -48,7 +48,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   resetWarmupForTests();
   mocks.login = { isAuthorized: true, hasFirebaseUser: true, groups: ['g1'] };
-  mocks.connectivity = { status: 'online' };
+  mocks.connectivity = { reachable: true, status: 'online' };
   mocks.firecall = { id: 'fc1', name: '', group: 'g1', lat: 47.9, lng: 16.8 };
   mocks.warmFirecall.mockReset().mockResolvedValue({ ok: ['x'], failed: [] });
   mocks.warmGroup.mockReset().mockResolvedValue({ ok: ['x'], failed: [] });
@@ -81,8 +81,23 @@ describe('useFirestoreWarmup', () => {
     expect(mocks.warmGroup).toHaveBeenCalledTimes(1);
   });
 
+  it('startet die Wartezeit nicht neu, wenn nur Schreibvorgänge kommen und gehen', async () => {
+    const { rerender } = renderHook(() => useFirestoreWarmup());
+    for (let i = 0; i < 4; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(FIRESTORE_WARMUP_DELAY_MS / 2);
+      });
+      mocks.connectivity = {
+        reachable: true,
+        status: i % 2 === 0 ? 'syncing' : 'online',
+      };
+      rerender();
+    }
+    expect(mocks.warmFirecall).toHaveBeenCalledTimes(1);
+  });
+
   it('wärmt offline nicht vor', async () => {
-    mocks.connectivity = { status: 'offline' };
+    mocks.connectivity = { reachable: false, status: 'offline' };
     renderHook(() => useFirestoreWarmup());
     await flush();
     expect(mocks.warmFirecall).not.toHaveBeenCalled();

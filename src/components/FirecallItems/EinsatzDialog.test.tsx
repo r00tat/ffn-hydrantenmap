@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithIntl as render } from '../../test-utils/intlRender';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -77,7 +77,7 @@ vi.mock('../inputs/FileUploader', () => ({ default: () => null }));
 vi.mock('../inputs/AttachmentGallery', () => ({ default: () => null }));
 vi.mock('../inputs/AutoSnapshotIntervalSelect', () => ({ default: () => null }));
 
-import EinsatzDialog from './EinsatzDialog';
+import EinsatzDialog, { DUPLICATE_CHECK_TIMEOUT_MS } from './EinsatzDialog';
 
 const ALARM_ID = 'alarm-1';
 
@@ -192,6 +192,29 @@ describe('EinsatzDialog duplicate check', () => {
       expect.stringContaining('Prüfung'),
       'warning',
     );
+  });
+
+  it('saves anyway when the duplicate check hangs', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      getFirecallsByAlarmIdsMock.mockReturnValue(new Promise(() => {}));
+      render(<EinsatzDialog einsatz={einsatzFromAlarm} onClose={vi.fn()} />);
+
+      await clickSave();
+      expect(addDocMock).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(DUPLICATE_CHECK_TIMEOUT_MS);
+      });
+
+      await waitFor(() => expect(addDocMock).toHaveBeenCalledTimes(1));
+      expect(showSnackbarMock).toHaveBeenCalledWith(
+        expect.stringContaining('Prüfung'),
+        'warning',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

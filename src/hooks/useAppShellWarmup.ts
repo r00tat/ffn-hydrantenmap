@@ -30,7 +30,9 @@ export function resetAppShellWarmupForTests(): void {
  */
 export default function useAppShellWarmup(): void {
   const { isAuthorized, hasFirebaseUser } = useFirebaseLogin();
-  const { status } = useConnectivity();
+  // Nur die Erreichbarkeit zählt: `status` wechselt mit jedem Schreibvorgang
+  // zwischen `online` und `syncing` und startete die Wartezeit sonst neu.
+  const { reachable } = useConnectivity();
   const firecall = useFirecall();
   const firecallId =
     firecall?.id && firecall.id !== 'unknown' ? firecall.id : undefined;
@@ -49,7 +51,7 @@ export default function useAppShellWarmup(): void {
   }, []);
 
   useEffect(() => {
-    if (!isAuthorized || !hasFirebaseUser || status === 'offline') return;
+    if (!isAuthorized || !hasFirebaseUser || !reachable) return;
     const key = firecallId ?? '';
     if (warmed.has(key)) return;
 
@@ -73,5 +75,5 @@ export default function useAppShellWarmup(): void {
       );
     }, APP_SHELL_WARMUP_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [isAuthorized, hasFirebaseUser, status, firecallId, generation]);
+  }, [isAuthorized, hasFirebaseUser, reachable, firecallId, generation]);
 }

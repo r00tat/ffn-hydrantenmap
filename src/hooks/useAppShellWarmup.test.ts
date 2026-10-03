@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   login: { isAuthorized: true, hasFirebaseUser: true },
-  connectivity: { status: 'online' as string },
+  connectivity: { reachable: true, status: 'online' as string },
   firecallId: 'AAAAAAAAAAAAAAAAAAAA' as string | undefined,
   request: vi.fn(),
 }));
@@ -28,7 +28,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   resetAppShellWarmupForTests();
   mocks.login = { isAuthorized: true, hasFirebaseUser: true };
-  mocks.connectivity = { status: 'online' };
+  mocks.connectivity = { reachable: true, status: 'online' };
   mocks.firecallId = 'AAAAAAAAAAAAAAAAAAAA';
   mocks.request.mockReset();
   mocks.request.mockResolvedValue({ cached: 3, failed: [] });
@@ -64,8 +64,23 @@ describe('useAppShellWarmup', () => {
     expect(mocks.request).toHaveBeenCalledTimes(1);
   });
 
+  it('startet die Wartezeit nicht neu, wenn nur Schreibvorgänge kommen und gehen', async () => {
+    const { rerender } = renderHook(() => useAppShellWarmup());
+    for (let i = 0; i < 4; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(APP_SHELL_WARMUP_DELAY_MS / 2);
+      });
+      mocks.connectivity = {
+        reachable: true,
+        status: i % 2 === 0 ? 'syncing' : 'online',
+      };
+      rerender();
+    }
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+  });
+
   it('wärmt offline nicht vor', async () => {
-    mocks.connectivity = { status: 'offline' };
+    mocks.connectivity = { reachable: false, status: 'offline' };
     renderHook(() => useAppShellWarmup());
     await act(async () => {
       await vi.advanceTimersByTimeAsync(APP_SHELL_WARMUP_DELAY_MS * 2);

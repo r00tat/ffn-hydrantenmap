@@ -24,7 +24,9 @@ export const FIRESTORE_WARMUP_DELAY_MS = 3_000;
  */
 export default function useFirestoreWarmup(): void {
   const { isAuthorized, hasFirebaseUser, groups } = useFirebaseLogin();
-  const { status } = useConnectivity();
+  // Nur die Erreichbarkeit zählt: `status` wechselt mit jedem Schreibvorgang
+  // zwischen `online` und `syncing` und startete die Wartezeit sonst neu.
+  const { reachable } = useConnectivity();
   const firecall = useFirecall();
 
   const firecallId =
@@ -42,7 +44,7 @@ export default function useFirestoreWarmup(): void {
   );
 
   useEffect(() => {
-    if (!isAuthorized || !hasFirebaseUser || status === 'offline') return;
+    if (!isAuthorized || !hasFirebaseUser || !reachable) return;
 
     const timer = setTimeout(() => {
       if (firecallId) {
@@ -62,5 +64,5 @@ export default function useFirestoreWarmup(): void {
       );
     }, FIRESTORE_WARMUP_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [isAuthorized, hasFirebaseUser, status, firecallId, groupId, groupsKey, center]);
+  }, [isAuthorized, hasFirebaseUser, reachable, firecallId, groupId, groupsKey, center]);
 }

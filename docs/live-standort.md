@@ -68,6 +68,13 @@ Position aus einem Ref, damit er nicht bei jedem Fix neu anläuft, und die
 Drosselung bleibt allein in `useLiveLocationShare`: geschrieben wird höchstens
 einmal je `heartbeatMs`. Der Tick öffnet nur das Zeitfenster.
 
+Geschrieben wird mit `setDocLocal`, und die Drosselung zählt ab dem Absenden,
+nicht ab der Bestätigung: Ein gewartetes `setDoc` kehrt im Funkloch nie zurück,
+die Drosselung griffe nie, und jeder Tick erzeugte einen weiteren ausstehenden
+Schreibvorgang. Offline (`isOffline()`) wird gar nicht geschrieben — die
+Position sieht dann niemand, und beim Reconnect ginge sie veraltet hinaus. Der
+erste Aufruf danach sendet die aktuelle.
+
 Auf Android bleibt der Takt beim Foreground-Service
 ([`LiveLocationPusher`](../capacitor/android/app/src/main/java/at/ffnd/einsatzkarte/livelocation/LiveLocationPusher.kt)) —
 ein zweiter Takt aus dem WebView wäre nur eine Verdoppelung der
