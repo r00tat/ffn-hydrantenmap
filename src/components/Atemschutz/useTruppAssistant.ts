@@ -21,7 +21,7 @@ import {
   type TruppCommand,
 } from './truppAssistant';
 import type { TruppDiaryTrupp } from './truppDiaryEntry';
-import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
+import { planWarningOrQueue } from './ueberwachungWarnungQueue';
 import useTruppTagebuch from './useTruppTagebuch';
 
 const NO_FIRECALL_MESSAGE =
@@ -44,7 +44,7 @@ export interface TruppAssistant {
  * Entschieden wird in `planTruppCommand`; hier wird nur ausgeführt — mit
  * **denselben** Schreibwegen und Nebenwirkungen wie auf der
  * Überwachungsseite (`UeberwachungPage`): Einsatztagebuch über
- * `useTruppTagebuch`, Warntermin über `planeUeberwachungWarnung`,
+ * `useTruppTagebuch`, Warntermin über `planWarningOrQueue` (offline eingereiht),
  * Push-Registrierung über `useRegisterMessaging`. Ein Sprachbefehl, der nur
  * das Dokument schreibt, hätte stille Fristen und ein lückenhaftes Tagebuch.
  *
@@ -137,7 +137,7 @@ export default function useTruppAssistant(): TruppAssistant {
         });
       }
       if (plan.warnung) {
-        await planeUeberwachungWarnung(firecallId, truppId).catch((err) => {
+        await planWarningOrQueue(firecallId, truppId).catch((err) => {
           console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
         });
       }

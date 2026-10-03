@@ -14,8 +14,13 @@ import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import React, { useCallback, useMemo } from 'react';
 import { parseTimestamp } from '../../common/time-format';
+import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
-import { NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
+  NON_DISPLAYABLE_ITEMS,
+} from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import DownloadAllButton from '../inputs/DownloadAllButton';
 import AttachmentGallery from '../inputs/AttachmentGallery';
@@ -42,6 +47,7 @@ export default function FirecallItemFields({
   autoFocusField,
 }: FirecallItemFieldsProps) {
   const layers = useFirecallLayers();
+  const firecallId = useFirecallId();
   const t = useTranslations();
   const translateLabel = useCallback(
     (key: string, fallback: string) => {
@@ -235,6 +241,17 @@ export default function FirecallItemFields({
               >
                 <FileUploader
                   onFileUploadComplete={(ref) => fileUploadComplete(key, ref)}
+                  // Offline nur an einem bestehenden Element: Ein neues hat
+                  // noch kein Dokument, in das der Upload später schreiben
+                  // könnte.
+                  offlineTarget={
+                    item.id && firecallId && firecallId !== 'unknown'
+                      ? {
+                          docPath: `${FIRECALL_COLLECTION_ID}/${firecallId}/${FIRECALL_ITEMS_COLLECTION_ID}/${item.id}`,
+                          field: key,
+                        }
+                      : undefined
+                  }
                 />
                 {(item as any)[key] &&
                   ((item as any)[key] as string[]).length > 0 && (

@@ -28,6 +28,7 @@ import { GeoPositionObject } from '../../common/geo';
 import { parseTimestamp } from '../../common/time-format';
 import { defaultPosition } from '../../hooks/constants';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useOnline from '../../hooks/useOnline';
 import { useFirecallSelect } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
@@ -35,6 +36,7 @@ import { useSnackbar } from '../providers/SnackbarProvider';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import AttachmentGallery from '../inputs/AttachmentGallery';
 import FileUploader from '../inputs/FileUploader';
+import Alert from '@mui/material/Alert';
 import {
   getBlaulichtSmsAlarms,
   getFirecallsByAlarmIds,
@@ -77,6 +79,10 @@ export default function EinsatzDialog({
   const format = useFormatter();
 
   const isNewEinsatz = !einsatzDefault;
+  // Offline gehen Blaulicht-SMS-Import und Duplikatsprüfung nicht: Beide sind
+  // Server Actions. Sie werden mit Hinweis übersprungen, der Einsatz lässt
+  // sich trotzdem anlegen — er entsteht lokal und wird später übertragen.
+  const online = useOnline();
 
   const [configuredGroups, setConfiguredGroups] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>(einsatz.group ?? '');
@@ -99,13 +105,16 @@ export default function EinsatzDialog({
 
   // Load which groups have BlaulichtSMS credentials (once on dialog mount).
   // The server filters this list by the caller's group membership.
+  // Offline nicht: Die Server Action hinge, bis der Ping die Verbindung
+  // zurückmeldet — dann lädt der Effekt nach.
   useEffect(() => {
+    if (!online) return;
     getGroupsWithBlaulichtsmsConfig()
       .then(setConfiguredGroups)
       .catch((err) =>
         console.error('Failed to load BlaulichtSMS configured groups:', err)
       );
-  }, []);
+  }, [online]);
 
   // For new Einsätze: default the group to the first one the user is a
   // member of as soon as `myGroups` is available. Avoids a hardcoded
@@ -311,6 +320,15 @@ export default function EinsatzDialog({
       return;
     }
 
+    // Offline gibt es keine Duplikatsprüfung (Server Action). Im Einsatz geht
+    // das Anlegen vor — mit Hinweis, statt auf eine Zeitüberschreitung zu
+    // warten.
+    if (!online) {
+      showSnackbar(t('einsatzDialog.offlineDuplicateCheckSkipped'), 'info');
+      await persistAndClose(einsatz);
+      return;
+    }
+
     setSaving(true);
     let existing: ExistingFirecall[];
     try {
@@ -337,7 +355,7 @@ export default function EinsatzDialog({
     }
 
     await persistAndClose(einsatz);
-  }, [selectedAlarmIds, einsatz, persistAndClose, showSnackbar, t]);
+  }, [selectedAlarmIds, einsatz, online, persistAndClose, showSnackbar, t]);
 
   const handleChange = (event: SelectChangeEvent) => {
     const newGroup = event.target.value;
@@ -350,6 +368,11 @@ export default function EinsatzDialog({
       <DialogTitle>{t('einsatzDialog.title')}</DialogTitle>
       <DialogContent>
         <DialogContentText>{t('einsatzDialog.subtitleNew')}</DialogContentText>
+        {!online && isNewEinsatz && (
+          <Alert severity="info" sx={{ my: 1 }}>
+            {t('einsatzDialog.offlineAlarmsSkipped')}
+          </Alert>
+        )}
         {alarmsLoading && (
           <DialogContentText
             sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 1 }}
@@ -491,7 +514,13 @@ export default function EinsatzDialog({
             <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
               {t('firecall.fields.attachments')}
             </Typography>
-            <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+            <FileUploader
+              onFileUploadComplete={handleFileUploadComplete}
+              offlineTarget={{
+                docPath: `${FIRECALL_COLLECTION_ID}/${einsatz.id}`,
+                field: 'attachments',
+              }}
+            />
             <Box sx={{ mt: 1 }}>
               <AttachmentGallery
                 urls={einsatz.attachments ?? []}

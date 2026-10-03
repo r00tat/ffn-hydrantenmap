@@ -13,6 +13,7 @@ import { useTranslations } from 'next-intl';
 import { fehlerText } from './rechnungFehler';
 import { useEffect, useState } from 'react';
 import { buildFuellungRechnungMail, sendFuellungRechnung } from './rechnungActions';
+import OnlineOnly from '../site/OnlineOnly';
 
 export interface RechnungMailDialogProps {
   open: boolean;
@@ -129,13 +130,15 @@ export default function RechnungMailDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t('rechnung.cancel')}</Button>
-        <Button
-          variant="contained"
-          onClick={handleSend}
-          disabled={laedt || sendet || !to || !subject || !body}
-        >
-          {t('rechnung.send')}
-        </Button>
+        <OnlineOnly>
+          <Button
+            variant="contained"
+            onClick={handleSend}
+            disabled={laedt || sendet || !to || !subject || !body}
+          >
+            {t('rechnung.send')}
+          </Button>
+        </OnlineOnly>
       </DialogActions>
     </Dialog>
   );

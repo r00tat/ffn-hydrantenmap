@@ -441,7 +441,17 @@ export default function EinsatzDetails() {
           {t('attachmentsExplanation')}
         </Typography>
         {canWrite && (
-          <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+          <FileUploader
+            onFileUploadComplete={handleFileUploadComplete}
+            offlineTarget={
+              firecallId && firecallId !== 'unknown'
+                ? {
+                    docPath: `${FIRECALL_COLLECTION_ID}/${firecallId}`,
+                    field: 'attachments',
+                  }
+                : undefined
+            }
+          />
         )}
         {firecall.attachments && firecall.attachments.length > 0 ? (
           <Box sx={{ mt: 2 }}>

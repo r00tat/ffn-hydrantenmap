@@ -22,6 +22,7 @@ import {
   useEntryFormState,
   type FahrtenbuchFirecallOption,
 } from './useEntryFormState';
+import OnlineOnly from '../site/OnlineOnly';
 
 export interface FahrtenbuchDialogProps {
   open: boolean;
@@ -85,16 +86,19 @@ export default function FahrtenbuchDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t('cancel')}</Button>
-        <Button
-          variant="contained"
-          onClick={async () => {
-            const result = await form.submit();
-            if (result.success) onClose();
-          }}
-          disabled={form.saving}
-        >
-          {t('save')}
-        </Button>
+        {/* Fahrten speichert eine Server Action — nur online. */}
+        <OnlineOnly>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              const result = await form.submit();
+              if (result.success) onClose();
+            }}
+            disabled={form.saving}
+          >
+            {t('save')}
+          </Button>
+        </OnlineOnly>
       </DialogActions>
     </Dialog>
   );

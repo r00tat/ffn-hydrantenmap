@@ -2,7 +2,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithIntl as render } from '../../test-utils/intlRender';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
@@ -46,9 +46,16 @@ vi.mock('../../app/blaulicht-sms/actions', () => ({
     getFirecallsByAlarmIdsMock(...args),
 }));
 
+const getGroupsWithConfigMock = vi.fn(
+  async (..._args: unknown[]): Promise<string[]> => [],
+);
 vi.mock('../../app/blaulicht-sms/credentialsActions', () => ({
-  getGroupsWithBlaulichtsmsConfig: vi.fn(async () => []),
+  getGroupsWithBlaulichtsmsConfig: (...args: unknown[]) =>
+    getGroupsWithConfigMock(...args),
 }));
+
+const onlineState = vi.hoisted(() => ({ value: true }));
+vi.mock('../../hooks/useOnline', () => ({ default: () => onlineState.value }));
 
 const showSnackbarMock = vi.fn();
 vi.mock('../providers/SnackbarProvider', () => ({
@@ -229,5 +236,47 @@ describe('EinsatzDialog offline', () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(setDocMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('EinsatzDialog without connection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    onlineState.value = false;
+    addDocMock.mockReturnValue({ id: 'local-firecall-id' });
+    getBlaulichtSmsAlarmsMock.mockResolvedValue([]);
+    getFirecallsByAlarmIdsMock.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    onlineState.value = true;
+  });
+
+  it('skips the BlaulichtSMS import and says so', async () => {
+    render(<EinsatzDialog onClose={vi.fn()} />);
+
+    expect(
+      await screen.findByText(/Blaulicht-SMS-Alarme können nicht geladen werden/),
+    ).toBeInTheDocument();
+    expect(getGroupsWithConfigMock).not.toHaveBeenCalled();
+    expect(getBlaulichtSmsAlarmsMock).not.toHaveBeenCalled();
+  });
+
+  it('skips the duplicate check and saves with a hint', async () => {
+    const onClose = vi.fn();
+    render(<EinsatzDialog einsatz={einsatzFromAlarm} onClose={onClose} />);
+
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: /hinzufügen|speichern/i }),
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(getFirecallsByAlarmIdsMock).not.toHaveBeenCalled();
+    expect(addDocMock).toHaveBeenCalledTimes(1);
+    expect(showSnackbarMock).toHaveBeenCalledWith(
+      expect.stringContaining('übersprungen'),
+      'info',
+    );
   });
 });

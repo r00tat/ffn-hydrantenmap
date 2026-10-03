@@ -62,7 +62,7 @@ import { buildFuellungDocument } from './fuellungErfassung';
 import AusruestungTab from './AusruestungTab';
 import FuellprotokollTab from './FuellprotokollTab';
 import TruppsTab from './TruppsTab';
-import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
+import { planWarningOrQueue } from './ueberwachungWarnungQueue';
 import useTruppTagebuch from './useTruppTagebuch';
 
 export default function AtemschutzPage() {
@@ -272,7 +272,8 @@ export default function AtemschutzPage() {
       // Auch ein am Sammelplatz zugeteilter Trupp braucht die Terminplanung —
       // sie stellt fest, dass für ihn (noch) nichts fällig ist. Nicht
       // abgewartet: Eine Server Action hängt offline, der Dialog soll es nicht.
-      void planeUeberwachungWarnung(firecallId, trupp.id).catch((err) => {
+      // Offline reiht `planWarningOrQueue` die Planung zum Nachholen ein.
+      void planWarningOrQueue(firecallId, trupp.id).catch((err) => {
         console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
       });
     },

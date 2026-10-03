@@ -32,6 +32,7 @@ import { formatCurrency } from '../../common/kostenersatz';
 import { fehlerText } from './rechnungFehler';
 import EmpfaengerDialog from './EmpfaengerDialog';
 import { createFuellungRechnung, type RechnungPositionWahl } from './rechnungActions';
+import OnlineOnly from '../site/OnlineOnly';
 
 export interface RechnungDialogProps {
   open: boolean;
@@ -259,13 +260,15 @@ export default function RechnungDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t('rechnung.cancel')}</Button>
-        <Button
-          variant="contained"
-          onClick={handleCreate}
-          disabled={!empfaengerId || positionen.length === 0 || speichert}
-        >
-          {t('rechnung.create')}
-        </Button>
+        <OnlineOnly>
+          <Button
+            variant="contained"
+            onClick={handleCreate}
+            disabled={!empfaengerId || positionen.length === 0 || speichert}
+          >
+            {t('rechnung.create')}
+          </Button>
+        </OnlineOnly>
       </DialogActions>
 
       {empfaengerOffen && (

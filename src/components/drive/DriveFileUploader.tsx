@@ -10,6 +10,7 @@ import LinearProgressWithLabel from '../inputs/LinearProgressWithLabel';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import { createDriveUploadSessions } from './driveFileActions';
 import { uploadToDriveSession } from './uploadToDriveSession';
+import OnlineOnly from '../site/OnlineOnly';
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -90,26 +91,30 @@ export default function DriveFileUploader({
 
   return (
     <>
-      <Button
-        component="label"
-        variant="outlined"
-        startIcon={<CloudUploadIcon />}
-        disabled={uploading}
-      >
-        {t('uploadButton')}
-        <VisuallyHiddenInput
-          type="file"
-          multiple
-          onChange={(event) => {
-            (async () => {
-              if (event.target.files) {
-                await handleUpload(event.target.files);
-                event.target.value = '';
-              }
-            })();
-          }}
-        />
-      </Button>
+      {/* Der Upload braucht eine Upload-Sitzung vom Server und Google Drive —
+          offline nicht möglich, und eine Sitzung lässt sich nicht vorhalten. */}
+      <OnlineOnly>
+        <Button
+          component="label"
+          variant="outlined"
+          startIcon={<CloudUploadIcon />}
+          disabled={uploading}
+        >
+          {t('uploadButton')}
+          <VisuallyHiddenInput
+            type="file"
+            multiple
+            onChange={(event) => {
+              (async () => {
+                if (event.target.files) {
+                  await handleUpload(event.target.files);
+                  event.target.value = '';
+                }
+              })();
+            }}
+          />
+        </Button>
+      </OnlineOnly>
       {uploading && (
         <>
           <Typography>{t('uploading')}</Typography>

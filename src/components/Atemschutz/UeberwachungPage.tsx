@@ -89,7 +89,7 @@ import {
   truppPasstZuEinheit,
   type EinheitTab,
 } from './einheiten';
-import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
+import { planWarningOrQueue } from './ueberwachungWarnungQueue';
 import useTruppTagebuch from './useTruppTagebuch';
 import AiAssistantButton from '../Map/AiAssistantButton';
 import { useFirecallItems } from '../firebase/firestoreHooks';
@@ -461,7 +461,7 @@ export default function UeberwachungPage() {
   const planeWarnung = useCallback(
     async (truppId?: string) => {
       if (!truppId || !hatEinsatz) return;
-      void planeUeberwachungWarnung(firecallId, truppId).catch((err) => {
+      void planWarningOrQueue(firecallId, truppId).catch((err) => {
         console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
       });
     },

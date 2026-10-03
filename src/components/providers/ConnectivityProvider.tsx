@@ -1,13 +1,15 @@
 'use client';
 
 import { ReactNode, useEffect } from 'react';
+import useOfflineQueue from '../../hooks/useOfflineQueue';
 import useOfflineSync from '../../hooks/useOfflineSync';
 import { startConnectivityMonitor } from '../../lib/connectivity';
 
 /**
  * Startet die Überwachung des Verbindungsstatus (`src/lib/connectivity.ts`)
  * für die ganze App und meldet über `useOfflineSync`, wenn offline erfasste
- * Änderungen übertragen sind.
+ * Änderungen übertragen sind. Außerdem startet er die Warteschlange für
+ * nachzuholende Server Actions und Uploads (`useOfflineQueue`).
  *
  * Hängt in `AppProviders` innerhalb des `SnackbarProvider` und damit oberhalb
  * von `AuthorizationApp` — er läuft also auch auf öffentlichen Routen und vor
@@ -25,5 +27,6 @@ export default function ConnectivityProvider({
 }) {
   useEffect(() => startConnectivityMonitor(), []);
   useOfflineSync();
+  useOfflineQueue();
   return <>{children}</>;
 }

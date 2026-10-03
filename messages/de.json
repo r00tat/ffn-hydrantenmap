@@ -946,12 +946,16 @@
     "syncErrorsTitle": "Nicht übertragene Änderungen",
     "syncErrorsIntro": "Diese Änderungen wurden auf dem Gerät gespeichert, der Server hat sie beim Synchronisieren aber abgelehnt. Sie sind deshalb nicht mehr sichtbar.",
     "syncErrorsEmpty": "Keine abgelehnten Änderungen.",
-    "syncErrorKind": "{kind, select, add {Anlegen} set {Speichern} update {Ändern} delete {Löschen} batch {Sammeländerung} other {Schreiben}}",
+    "syncErrorKind": "{kind, select, add {Anlegen} set {Speichern} update {Ändern} delete {Löschen} batch {Sammeländerung} action {Nachgeholte Serveraktion} upload {Datei hochladen} other {Schreiben}}",
     "syncErrorCode": "Fehlercode: {code}",
     "syncErrorRetry": "Erneut versuchen",
     "syncErrorDiscard": "Verwerfen",
     "syncErrorsDiscardAll": "Alle verwerfen",
-    "pendingWrite": "Noch nicht übertragen – liegt erst auf diesem Gerät"
+    "pendingWrite": "Noch nicht übertragen – liegt erst auf diesem Gerät",
+    "onlineOnly": "Nur mit Internetverbindung verfügbar",
+    "pendingUpload": "{name} – wartet auf Upload",
+    "pendingUploadHint": "Offline gespeichert. Die Datei wird hochgeladen, sobald die Verbindung wieder steht.",
+    "uploadQueued": "{count, plural, one {# Datei wird} other {# Dateien werden}} hochgeladen, sobald die Verbindung wieder steht."
   },
   "einsatzDetails": {
     "notFound": "Einsatz nicht gefunden",
@@ -1886,7 +1890,9 @@
     "duplicateTitle": "Einsatz existiert bereits",
     "duplicateText": "Für diesen Alarm existiert bereits der Einsatz „{names}“. Wenn du einen zweiten Einsatz anlegst, werden Mannschaft, Einsatztagebuch und Kostenersatz auf zwei Einsätze aufgeteilt. Trotzdem einen neuen Einsatz anlegen?",
     "duplicateConfirm": "Trotzdem anlegen",
-    "duplicateCheckFailed": "Prüfung auf bestehende Einsätze fehlgeschlagen. Bitte Verbindung prüfen."
+    "duplicateCheckFailed": "Prüfung auf bestehende Einsätze fehlgeschlagen. Bitte Verbindung prüfen.",
+    "offlineAlarmsSkipped": "Offline: Blaulicht-SMS-Alarme können nicht geladen werden. Der Einsatz lässt sich trotzdem anlegen.",
+    "offlineDuplicateCheckSkipped": "Offline: Prüfung auf bestehende Einsätze übersprungen."
   },
   "firecallItem": {
     "uploadTitle": "Datei zum Einsatz hochladen",

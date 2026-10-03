@@ -2,14 +2,17 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const { startMock, stopMock, offlineSyncMock } = vi.hoisted(() => {
-  const stopMock = vi.fn();
-  return {
-    stopMock,
-    startMock: vi.fn(() => stopMock),
-    offlineSyncMock: vi.fn(),
-  };
-});
+const { startMock, stopMock, offlineSyncMock, offlineQueueMock } = vi.hoisted(
+  () => {
+    const stopMock = vi.fn();
+    return {
+      stopMock,
+      startMock: vi.fn(() => stopMock),
+      offlineSyncMock: vi.fn(),
+      offlineQueueMock: vi.fn(),
+    };
+  },
+);
 
 vi.mock('../../lib/connectivity', () => ({
   startConnectivityMonitor: startMock,
@@ -17,6 +20,10 @@ vi.mock('../../lib/connectivity', () => ({
 
 vi.mock('../../hooks/useOfflineSync', () => ({
   default: offlineSyncMock,
+}));
+
+vi.mock('../../hooks/useOfflineQueue', () => ({
+  default: offlineQueueMock,
 }));
 
 import ConnectivityProvider from './ConnectivityProvider';
@@ -39,5 +46,10 @@ describe('ConnectivityProvider', () => {
   it('meldet die Synchronisation nach dem Reconnect', () => {
     render(<ConnectivityProvider>{null}</ConnectivityProvider>);
     expect(offlineSyncMock).toHaveBeenCalled();
+  });
+
+  it('startet die Warteschlange für Server Actions und Uploads', () => {
+    render(<ConnectivityProvider>{null}</ConnectivityProvider>);
+    expect(offlineQueueMock).toHaveBeenCalled();
   });
 });

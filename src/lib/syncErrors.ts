@@ -17,7 +17,15 @@
  * bis sich etwas ändert.
  */
 
-export type SyncWriteKind = 'add' | 'set' | 'update' | 'delete' | 'batch';
+export type SyncWriteKind =
+  | 'add'
+  | 'set'
+  | 'update'
+  | 'delete'
+  | 'batch'
+  // Aus der Warteschlange `offlineQueue.ts`: nachgeholte Server Action bzw. Upload.
+  | 'action'
+  | 'upload';
 
 export interface SyncError {
   id: string;

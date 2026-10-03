@@ -310,7 +310,13 @@ export default function FirecallItemDialog({
           )}
           {isUpload ? (
             <Box sx={{ mt: 2 }}>
-              <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+              <FileUploader
+                onFileUploadComplete={handleFileUploadComplete}
+                offlineTarget={{
+                  docPath: `${FIRECALL_COLLECTION_ID}/${firecallId}`,
+                  field: 'attachments',
+                }}
+              />
               {uploadedRefs.length > 0 && (
                 <Box sx={{ mt: 2 }}>
                   <AttachmentGallery

@@ -946,12 +946,16 @@
     "syncErrorsTitle": "Changes not transferred",
     "syncErrorsIntro": "These changes were stored on the device, but the server rejected them during synchronisation. They are therefore no longer visible.",
     "syncErrorsEmpty": "No rejected changes.",
-    "syncErrorKind": "{kind, select, add {Create} set {Save} update {Update} delete {Delete} batch {Batch change} other {Write}}",
+    "syncErrorKind": "{kind, select, add {Create} set {Save} update {Update} delete {Delete} batch {Batch change} action {Deferred server action} upload {File upload} other {Write}}",
     "syncErrorCode": "Error code: {code}",
     "syncErrorRetry": "Try again",
     "syncErrorDiscard": "Discard",
     "syncErrorsDiscardAll": "Discard all",
-    "pendingWrite": "Not transferred yet – only stored on this device"
+    "pendingWrite": "Not transferred yet – only stored on this device",
+    "onlineOnly": "Only available with an internet connection",
+    "pendingUpload": "{name} – waiting for upload",
+    "pendingUploadHint": "Saved offline. The file will be uploaded as soon as the connection is back.",
+    "uploadQueued": "{count, plural, one {# file} other {# files}} will be uploaded as soon as the connection is back."
   },
   "einsatzDetails": {
     "notFound": "Operation not found",
@@ -1886,7 +1890,9 @@
     "duplicateTitle": "Operation already exists",
     "duplicateText": "The operation “{names}” already exists for this alarm. Creating a second operation splits crew, diary and cost recovery across two operations. Create a new operation anyway?",
     "duplicateConfirm": "Create anyway",
-    "duplicateCheckFailed": "Could not check for existing operations. Please check your connection."
+    "duplicateCheckFailed": "Could not check for existing operations. Please check your connection.",
+    "offlineAlarmsSkipped": "Offline: BlaulichtSMS alarms cannot be loaded. You can still create the operation.",
+    "offlineDuplicateCheckSkipped": "Offline: check for existing operations skipped."
   },
   "firecallItem": {
     "uploadTitle": "Upload file to the operation",

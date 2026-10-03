@@ -31,6 +31,7 @@ import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
 import useGroupStammdaten from '../../hooks/useGroupStammdaten';
 import { useKostenersatzEmailConfig } from '../../hooks/useKostenersatzEmailConfig';
 import { Firecall } from '../firebase/firestore';
+import OnlineOnly from '../site/OnlineOnly';
 
 export interface KostenersatzEmailDialogProps {
   open: boolean;
@@ -293,14 +294,16 @@ export default function KostenersatzEmailDialog({
         <Button onClick={onClose} disabled={sending} color="inherit">
           {tCommon('cancel')}
         </Button>
-        <Button
-          onClick={handleSend}
-          disabled={sending || !isValid() || configLoading}
-          variant="contained"
-          startIcon={sending ? <CircularProgress size={16} /> : <SendIcon />}
-        >
-          {sending ? t('sending') : t('send')}
-        </Button>
+        <OnlineOnly>
+          <Button
+            onClick={handleSend}
+            disabled={sending || !isValid() || configLoading}
+            variant="contained"
+            startIcon={sending ? <CircularProgress size={16} /> : <SendIcon />}
+          >
+            {sending ? t('sending') : t('send')}
+          </Button>
+        </OnlineOnly>
       </DialogActions>
     </Dialog>
   );
