@@ -21,8 +21,24 @@ vi.mock('../lib/appShellWarmup', async (importOriginal) => ({
 
 import useAppShellWarmup, {
   APP_SHELL_WARMUP_DELAY_MS,
+  APP_SHELL_WARMUP_MAX_RETRIES,
+  APP_SHELL_WARMUP_RETRY_MS,
   resetAppShellWarmupForTests,
 } from './useAppShellWarmup';
+
+const done = { cached: 3, present: 0, failed: [], rejected: [] };
+
+/**
+ * Spult die Zeit in Schritten vor. React wendet eine Zustandsänderung aus
+ * einem Timer erst am Ende von `act` an; erst danach steht der nächste Timer.
+ */
+async function advanceInSteps(totalMs: number, stepMs = APP_SHELL_WARMUP_DELAY_MS) {
+  for (let elapsed = 0; elapsed < totalMs; elapsed += stepMs) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(stepMs);
+    });
+  }
+}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -31,7 +47,7 @@ beforeEach(() => {
   mocks.connectivity = { reachable: true, status: 'online' };
   mocks.firecallId = 'AAAAAAAAAAAAAAAAAAAA';
   mocks.request.mockReset();
-  mocks.request.mockResolvedValue({ cached: 3, failed: [] });
+  mocks.request.mockResolvedValue(done);
 });
 
 afterEach(() => {
@@ -95,6 +111,57 @@ describe('useAppShellWarmup', () => {
       await vi.advanceTimersByTimeAsync(APP_SHELL_WARMUP_DELAY_MS * 2);
     });
     expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it('versucht gescheiterte Seiten nach einer Pause erneut', async () => {
+    // Beim Offline-Test fehlte die Atemschutzüberwachung: Ein einzelner
+    // gescheiterter Abruf blieb bis zum nächsten Neuladen aus.
+    mocks.request.mockResolvedValueOnce({
+      cached: 20,
+      present: 0,
+      failed: ['/einsatz/AAAAAAAAAAAAAAAAAAAA/atemschutzueberwachung'],
+      rejected: [],
+    });
+    renderHook(() => useAppShellWarmup());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(APP_SHELL_WARMUP_DELAY_MS);
+    });
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    await advanceInSteps(APP_SHELL_WARMUP_RETRY_MS + APP_SHELL_WARMUP_DELAY_MS);
+    expect(mocks.request).toHaveBeenCalledTimes(2);
+    // Danach ist alles da, es wird nicht weiter gefragt.
+    await advanceInSteps(APP_SHELL_WARMUP_RETRY_MS * 10);
+    expect(mocks.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('gibt nach einigen Versuchen auf', async () => {
+    mocks.request.mockResolvedValue({ cached: 0, present: 0, failed: ['/x'], rejected: [] });
+    renderHook(() => useAppShellWarmup());
+    await advanceInSteps(APP_SHELL_WARMUP_RETRY_MS * 2 ** (APP_SHELL_WARMUP_MAX_RETRIES + 2));
+    expect(mocks.request).toHaveBeenCalledTimes(APP_SHELL_WARMUP_MAX_RETRIES + 1);
+  });
+
+  it('wiederholt keine Seiten, die keine Seite liefern (Umleitung, 404)', async () => {
+    mocks.request.mockResolvedValue({ cached: 10, present: 0, failed: [], rejected: ['/admin'] });
+    renderHook(() => useAppShellWarmup());
+    await advanceInSteps(APP_SHELL_WARMUP_RETRY_MS * 10);
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+  });
+
+  it('holt nach dem Reconnect nach, was offline gescheitert ist', async () => {
+    mocks.request.mockResolvedValueOnce({ cached: 0, present: 0, failed: ['/x'], rejected: [] });
+    const { rerender } = renderHook(() => useAppShellWarmup());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(APP_SHELL_WARMUP_DELAY_MS);
+    });
+    mocks.connectivity = { reachable: false, status: 'offline' };
+    rerender();
+    mocks.connectivity = { reachable: true, status: 'online' };
+    rerender();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(APP_SHELL_WARMUP_DELAY_MS);
+    });
+    expect(mocks.request).toHaveBeenCalledTimes(2);
   });
 
   it('versucht es erneut, wenn kein Service Worker geantwortet hat', async () => {

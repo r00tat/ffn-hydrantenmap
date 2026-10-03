@@ -255,10 +255,11 @@ Damit die App nach einem Neustart im Flugmodus ohne Login-Bildschirm aufgeht,
 müssen drei Dinge offline vorhanden sein:
 
 1. **Die Seite selbst.** Der Service Worker hält eine App-Shell je Build vor,
-   die nach der Anmeldung vorgewärmt wird (Kernseiten und die Abschnitte des
-   aktuellen Einsatzes), und baut die Seiten eines offline angelegten Einsatzes
-   aus denen eines anderen. Für alles andere gibt es die Rückfallseite
-   `/offline`. Details: [service-worker-pwa.md](service-worker-pwa.md).
+   die nach der Anmeldung im Hintergrund vorgewärmt wird — alle Seiten aus
+   [appShellRoutes.ts](../src/common/appShellRoutes.ts) und die des aktuellen
+   Einsatzes —, und baut die Seiten eines offline angelegten Einsatzes aus
+   denen eines anderen. Für die wenigen ausgenommenen Routen gibt es die
+   Rückfallseite `/offline`. Details: [service-worker-pwa.md](service-worker-pwa.md).
 2. **Der Firebase-Benutzer.** Firebase Auth lädt ihn aus IndexedDB, auch mit
    abgelaufenem ID-Token; ein Netzfehler beim Neuladen des Profils behält ihn.
    Firestore liest damit aus dem Cache dieses Benutzers und reiht
@@ -455,6 +456,7 @@ Bausteine. Hintergrund in
   Screen Wake Lock API fehlt in der WebView vermutlich.
 - **Android-Kaltstart ohne Netz** ist ungeprüft (siehe oben): Er hängt daran,
   ob die WebView ihren Firebase-Benutzer über einen Prozessstart behält.
-- **Client-Navigation im WLAN ohne Internet** (`router.push`) hat im Service
-  Worker keine Zeitgrenze für den RSC-Abruf und kann hängen, bis der Browser
-  aufgibt und Next.js hart navigiert; dann antwortet die App-Shell.
+- **Seitenwechsel offline laden die Seite neu.** Der RSC-Abruf einer
+  Client-Navigation scheitert (nach höchstens acht Sekunden, kurz nach einem
+  Ausfall nach zwei), Next.js navigiert hart, und die App-Shell antwortet.
+  Der Zustand der Seite (offene Dialoge, Eingaben) geht dabei verloren.

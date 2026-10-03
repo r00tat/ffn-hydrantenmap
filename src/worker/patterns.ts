@@ -12,9 +12,13 @@ import {
 } from 'serwist';
 import { OFFLINE_TILE_CACHE, isOfflineTileUrl } from '../common/offlineTiles';
 import {
+  createNetworkHealth,
   handleAppShellNavigation,
+  handleAppShellRsc,
   isAppShellNavigation,
+  isAppShellRscRequest,
   matchInPrecache,
+  type NetworkHealth,
 } from './appShell';
 
 const oneDayCachePlugin = new ExpirationPlugin({
@@ -391,7 +395,10 @@ function resilient(entry: RuntimeCaching): RuntimeCaching {
  * `defaultCache`, dessen Auffangregel `others` Navigationen sonst ohne
  * Zeitgrenze und nur einen Tag lang hielte.
  */
-export function appShellRoute(cacheName: string): RuntimeCaching {
+export function appShellRoute(
+  cacheName: string,
+  health: NetworkHealth = createNetworkHealth(),
+): RuntimeCaching {
   return {
     matcher: ({ request, url, sameOrigin }) =>
       isAppShellNavigation({ request, url, sameOrigin }),
@@ -401,6 +408,31 @@ export function appShellRoute(cacheName: string): RuntimeCaching {
           openCache: () => caches.open(cacheName),
           fetchFn: (r) => fetch(r),
           matchPrecache: (r) => matchInPrecache(r, caches),
+          timeoutMs: health.timeoutMs(),
+          onNetworkResult: health.report,
+        }),
+    },
+  };
+}
+
+/**
+ * RSC-Abrufe eigener Seiten: Netz mit Zeitgrenze, sonst ein 503, auf den
+ * Next.js hart navigiert — dann antwortet `appShellRoute`. Steht vor
+ * `defaultCache`, dessen RSC-Regeln (`pages-rsc`, `pages-rsc-prefetch`) ohne
+ * Zeitgrenze warten und RSC-Daten früherer Builds liefern konnten.
+ */
+export function appShellRscRoute(
+  health: NetworkHealth = createNetworkHealth(),
+): RuntimeCaching {
+  return {
+    matcher: ({ request, url, sameOrigin }) =>
+      isAppShellRscRequest({ request, url, sameOrigin }),
+    handler: {
+      handle: ({ request }) =>
+        handleAppShellRsc(request, {
+          fetchFn: (r) => fetch(r),
+          timeoutMs: health.timeoutMs(),
+          onNetworkResult: health.report,
         }),
     },
   };
@@ -417,8 +449,11 @@ export function runtimeCaching(
   defaults: RuntimeCaching[],
   options: { appShellCacheName?: string } = {},
 ): RuntimeCaching[] {
+  // Navigation und RSC teilen sich den Netzstatus: Scheitert ein RSC-Abruf,
+  // wartet die harte Navigation danach nur noch kurz.
+  const health = createNetworkHealth();
   const shell = options.appShellCacheName
-    ? [appShellRoute(options.appShellCacheName)]
+    ? [appShellRoute(options.appShellCacheName, health), appShellRscRoute(health)]
     : [];
   return [...cachePatterns, ...shell, ...defaults].map(resilient);
 }

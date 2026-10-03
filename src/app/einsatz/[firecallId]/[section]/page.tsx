@@ -1,8 +1,11 @@
 import { notFound } from 'next/navigation';
 import type { ComponentType } from 'react';
+import type { FirecallSectionName } from '../../../../common/appShellRoutes';
 
+// Die Schlüssel sind an `FIRECALL_SECTION_NAMES` gebunden: Ein Abschnitt, der
+// dort fehlt, würde offline nicht vorgehalten (siehe appShellRoutes.ts).
 const SECTIONS: Record<
-  string,
+  FirecallSectionName,
   () => Promise<{ default: ComponentType }>
 > = {
   ebenen: () => import('../../../../components/pages/LayersWrapper'),
@@ -34,11 +37,11 @@ export default async function EinsatzSectionPage({
 }) {
   const { section } = await params;
 
-  const loader = SECTIONS[section];
-  if (!loader) {
+  if (!Object.hasOwn(SECTIONS, section)) {
     notFound();
   }
 
+  const loader = SECTIONS[section as FirecallSectionName];
   const { default: SectionComponent } = await loader();
   return <SectionComponent />;
 }
