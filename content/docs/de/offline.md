@@ -89,7 +89,7 @@ Hast du dich in den letzten 90 Tagen online angemeldet und die App benutzt, öff
 Eine Seite, die auf dem Gerät nicht vorgehalten wurde, zeigt offline „Offline – Seite nicht verfügbar" mit einem Knopf **Zur Karte**.
 
 :::warning
-In der Android-App funktioniert der Start ohne Netz derzeit noch nicht. Lass die App während des Einsatzes geöffnet, statt sie zu beenden.
+In der Android-App ist der Start ohne Netz noch nicht auf allen Geräten verlässlich. Lass die App während des Einsatzes geöffnet, statt sie zu beenden. Startet sie ohne Daten, meldet sie sich beim nächsten Verbindungsaufbau von selbst wieder an.
 :::
 
 ### Atemschutzüberwachung offline

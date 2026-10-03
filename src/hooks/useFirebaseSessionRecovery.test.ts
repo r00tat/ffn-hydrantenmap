@@ -12,6 +12,8 @@ const {
   sessionTokenMock,
   nativeExchangeMock,
   useSessionMock,
+  connectivity,
+  recordErrorMock,
 } = vi.hoisted(() => ({
   authMock: {
     currentUser: null as unknown,
@@ -25,7 +27,30 @@ const {
   sessionTokenMock: vi.fn(),
   nativeExchangeMock: vi.fn(),
   useSessionMock: vi.fn(),
+  connectivity: {
+    offline: false,
+    reconnect: new Set<() => void>(),
+  },
+  recordErrorMock: vi.fn(async () => {}),
 }));
+
+vi.mock('../lib/connectivity', () => ({
+  isOffline: () => connectivity.offline,
+  onReconnect: (cb: () => void) => {
+    connectivity.reconnect.add(cb);
+    return () => connectivity.reconnect.delete(cb);
+  },
+}));
+
+vi.mock('../components/firebase/crashlytics', () => ({
+  recordError: recordErrorMock,
+}));
+
+/** Verbindung zurück: wie `connectivity.ts` alle Zuhörer aufrufen. */
+function reconnect() {
+  connectivity.offline = false;
+  [...connectivity.reconnect].forEach((cb) => cb());
+}
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: isNativePlatformMock },
@@ -65,6 +90,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
   authMock.currentUser = null;
+  connectivity.offline = false;
+  connectivity.reconnect.clear();
   isNativePlatformMock.mockReturnValue(true);
   useSessionMock.mockReturnValue({ status: 'authenticated' });
   getCurrentUserMock.mockResolvedValue({ user: { uid: 'native-uid' } });
@@ -270,5 +297,93 @@ describe('useFirebaseSessionRecovery', () => {
       setItem.mockRestore();
       getItem.mockRestore();
     }
+  });
+  // Kaltstart der Android-App ohne Netz: Der Tausch gegen ein Custom Token
+  // braucht den Server. Offline wird nicht vergeblich gefragt, sondern beim
+  // Reconnect — sonst bliebe die App bis zum nächsten Neuladen ohne Daten.
+  it('wartet offline auf die Verbindung und meldet dann an', async () => {
+    connectivity.offline = true;
+    const { useFirebaseSessionRecovery } = await loadHook();
+    renderHook(() => useFirebaseSessionRecovery());
+
+    await waitFor(() => expect(connectivity.reconnect.size).toBe(1));
+    expect(nativeExchangeMock).not.toHaveBeenCalled();
+
+    reconnect();
+    await waitFor(() =>
+      expect(signInWithCustomTokenMock).toHaveBeenCalledWith(
+        authMock,
+        'custom-from-native'
+      )
+    );
+  });
+
+  it('holt einen Versuch nach, der am Verbindungsabbruch scheiterte', async () => {
+    nativeExchangeMock.mockImplementationOnce(async () => {
+      connectivity.offline = true;
+      throw new TypeError('Failed to fetch');
+    });
+    sessionTokenMock.mockImplementationOnce(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const { useFirebaseSessionRecovery } = await loadHook();
+    renderHook(() => useFirebaseSessionRecovery());
+
+    await waitFor(() => expect(connectivity.reconnect.size).toBe(1));
+    expect(signInWithCustomTokenMock).not.toHaveBeenCalled();
+
+    reconnect();
+    await waitFor(() =>
+      expect(signInWithCustomTokenMock).toHaveBeenCalledWith(
+        authMock,
+        'custom-from-native'
+      )
+    );
+  });
+
+  it('verliert den wartenden Versuch nicht, wenn NextAuth den Status wechselt', async () => {
+    connectivity.offline = true;
+    useSessionMock.mockReturnValue({ status: 'unauthenticated' });
+    const { useFirebaseSessionRecovery } = await loadHook();
+    const { rerender } = renderHook(() => useFirebaseSessionRecovery());
+    await waitFor(() => expect(connectivity.reconnect.size).toBe(1));
+
+    useSessionMock.mockReturnValue({ status: 'authenticated' });
+    rerender();
+    expect(connectivity.reconnect.size).toBe(1);
+
+    reconnect();
+    await waitFor(() => expect(signInWithCustomTokenMock).toHaveBeenCalled());
+  });
+
+  it('meldet den wartenden Versuch beim Abbau ab', async () => {
+    connectivity.offline = true;
+    const { useFirebaseSessionRecovery } = await loadHook();
+    const { unmount } = renderHook(() => useFirebaseSessionRecovery());
+    await waitFor(() => expect(connectivity.reconnect.size).toBe(1));
+    unmount();
+    expect(connectivity.reconnect.size).toBe(0);
+  });
+
+  // Ob die WebView ihre Anmeldung bei einem normalen Neustart verliert, ist an
+  // keinem Gerät belegt. Die Meldung macht es im Betrieb zählbar.
+  it('meldet in der App eine WebView ohne Benutzer an Crashlytics', async () => {
+    const { useFirebaseSessionRecovery } = await loadHook();
+    renderHook(() => useFirebaseSessionRecovery());
+
+    await waitFor(() => expect(recordErrorMock).toHaveBeenCalledTimes(1));
+    expect(recordErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ offline: false })
+    );
+  });
+
+  it('meldet im Browser nichts an Crashlytics', async () => {
+    isNativePlatformMock.mockReturnValue(false);
+    const { useFirebaseSessionRecovery } = await loadHook();
+    renderHook(() => useFirebaseSessionRecovery());
+
+    await waitFor(() => expect(sessionTokenMock).toHaveBeenCalled());
+    expect(recordErrorMock).not.toHaveBeenCalled();
   });
 });

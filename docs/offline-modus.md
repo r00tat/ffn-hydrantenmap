@@ -289,14 +289,31 @@ Ausführlich: [berechtigungen.md](berechtigungen.md#zwischenspeicher-der-anmeldu
 Die Capacitor-App lädt ihre Seiten **vom Server** (`server.url` in
 `capacitor/capacitor.config.ts`, `webDir: 'empty'`), nicht aus dem APK. Die
 WebView registriert denselben Service Worker; die App-Shell wirkt dort also
-genauso. Offen ist die Anmeldung: Laut `useFirebaseSessionRecovery` kommt die
-WebView nach einem Prozessstart **ohne** Firebase-Benutzer hoch, und die
-Wiederherstellung tauscht das native ID-Token über eine Server Action
-(`exchangeNativeIdTokenForFirebaseToken`). Ohne Netz bleibt die WebView damit
-ohne Benutzer: Der Zwischenspeicher greift nicht (er verlangt einen
-Firebase-Benutzer mit derselben UID), und der Firestore-Cache des Benutzers ist
-nicht erreichbar. Der Kaltstart ohne Netz funktioniert unter Android deshalb
-erst, wenn die WebView ihre Firebase-Anmeldung selbst hält.
+genauso.
+
+Offen ist die Anmeldung. Das JS-SDK legt seinen Benutzer wie im Browser in
+IndexedDB ab (Origin `einsatz.ffnd.at`), und abgemeldet wird nur von Hand
+(`fbSignOut`). Behält die WebView diesen Speicher über einen Prozessstart,
+geht der Kaltstart ohne Netz wie im Browser. In #817 kam die WebView auf einem
+Gerät aber **ohne** Benutzer hoch; ob das bei jedem Neustart passiert oder ein
+einmal verlorener Speicher war, ist an keinem Gerät belegt. Ohne Benutzer hilft
+offline nichts: Die Wiederherstellung (`useFirebaseSessionRecovery`) tauscht
+das native ID-Token über eine Server Action gegen ein Custom Token, der
+Zwischenspeicher verlangt einen Firebase-Benutzer mit derselben UID, und ohne
+Benutzer schrieben Firestore-Schreibvorgänge in die Warteschlange des
+anonymen Benutzers, die der Server beim Synchronisieren ablehnt.
+
+Deshalb:
+
+- **Offline wartet die Wiederherstellung auf den Reconnect**, statt vergeblich
+  zu fragen, und ein Versuch, der am Verbindungsabbruch scheitert, wird dort
+  nachgeholt. Vorher blieb die App nach dem Reconnect bis zum Neuladen ohne
+  Daten. Der wartende Versuch hängt an der Lebensdauer der Komponente, nicht
+  am Effekt — NextAuth wechselt beim Reconnect gern den Status.
+- **Crashlytics zählt den Fall:** Kommt die WebView in der App ohne Benutzer
+  hoch, geht ein Non-Fatal `webview started without firebase user` (mit
+  `offline`) hinaus. Erst diese Zahl sagt, ob ein eigener Weg nötig ist, etwa
+  ein natives Ablegen des JS-SDK-Benutzers.
 
 ## Daten für den Offline-Fall vorbereiten
 
@@ -436,8 +453,8 @@ Bausteine. Hintergrund in
   bleiben die beim Betriebssystem hinterlegten Termine stehen). Ohne die
   Erlaubnis für exakte Alarme können sie sich dort um Minuten verspäten; die
   Screen Wake Lock API fehlt in der WebView vermutlich.
-- **Android-Kaltstart ohne Netz** geht noch nicht (siehe oben): Die WebView
-  kommt nach einem Prozessstart ohne Firebase-Benutzer hoch.
+- **Android-Kaltstart ohne Netz** ist ungeprüft (siehe oben): Er hängt daran,
+  ob die WebView ihren Firebase-Benutzer über einen Prozessstart behält.
 - **Client-Navigation im WLAN ohne Internet** (`router.push`) hat im Service
   Worker keine Zeitgrenze für den RSC-Abruf und kann hängen, bis der Browser
   aufgibt und Next.js hart navigiert; dann antwortet die App-Shell.

@@ -9,7 +9,9 @@ import {
   createFirebaseTokenForSession,
   exchangeNativeIdTokenForFirebaseToken,
 } from '../app/actions/auth';
+import { recordError } from '../components/firebase/crashlytics';
 import { auth } from '../components/firebase/firebase';
+import { isOffline, onReconnect } from '../lib/connectivity';
 import { isSessionRecoverySuppressed } from './auth/recoverySuppression';
 
 /** Woher das Custom Token kam — entscheidet, was danach noch zu tun ist. */
@@ -97,12 +99,39 @@ async function recoveryToken(
  * Bewusst genau **ein** Versuch je Seitenaufbau: Schlaegt er fehl, ist der
  * Login von Hand faellig, und eine Schleife aus Server-Aufrufen waere das
  * Letzte, was ein Geraet mit schlechter Verbindung braucht.
+ *
+ * Ausnahme ist die fehlende Verbindung (Kaltstart ohne Netz, Issue #839):
+ * Beide Wege brauchen den Server. Offline wird deshalb nicht gefragt,
+ * sondern beim Reconnect; ein Versuch, der am Verbindungsabbruch scheitert,
+ * wird dort ebenso nachgeholt. Sonst bliebe die App nach dem Reconnect bis
+ * zum naechsten Neuladen ohne Daten. Mehr als ein Versuch je Reconnect wird
+ * es dadurch nicht.
  */
 export function useFirebaseSessionRecovery() {
   const { status } = useSession();
   const attemptedRef = useRef(false);
   const [isRecovering, setIsRecovering] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // Ein nachgeholter Versuch haengt an der Lebensdauer der Komponente, nicht
+  // am Effekt: NextAuth aendert beim Reconnect gern seinen Status, und das
+  // Aufraeumen des Effekts wuerde den wartenden Versuch sonst abmelden.
+  const statusRef = useRef(status);
+  const unmountedRef = useRef(false);
+  const stopWaitingRef = useRef<(() => void) | undefined>(undefined);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      stopWaitingRef.current?.();
+      stopWaitingRef.current = undefined;
+    };
+  }, []);
 
   useEffect(() => {
     // `loading` heisst nur "NextAuth weiss es noch nicht". Abwarten, sonst
@@ -111,22 +140,26 @@ export function useFirebaseSessionRecovery() {
 
     let cancelled = false;
 
-    (async () => {
-      // Erst wenn Firebase seinen gespeicherten Zustand geladen hat, sagt
-      // `currentUser === null` wirklich "kein Benutzer" und nicht "noch nicht
-      // nachgesehen".
-      await auth.authStateReady();
-      if (cancelled || auth.currentUser || isSessionRecoverySuppressed()) {
+    // Einen Versuch beim naechsten Reconnect nachholen, hoechstens einmal.
+    const retryWhenOnline = () => {
+      stopWaitingRef.current?.();
+      stopWaitingRef.current = onReconnect(() => {
+        stopWaitingRef.current?.();
+        stopWaitingRef.current = undefined;
+        if (!unmountedRef.current && !auth.currentUser) void attempt();
+      });
+    };
+
+    const attempt = async () => {
+      if (isOffline()) {
+        retryWhenOnline();
         return;
       }
-
-      attemptedRef.current = true;
       setIsRecovering(true);
-      console.info(
-        'no firebase user in the webview, recovering the firebase login',
-      );
       try {
-        const recovered = await recoveryToken(status === 'authenticated');
+        const recovered = await recoveryToken(
+          statusRef.current === 'authenticated',
+        );
         if (!recovered) {
           throw new Error('no token available to recover the login');
         }
@@ -150,13 +183,46 @@ export function useFirebaseSessionRecovery() {
           }
         }
       } catch (err) {
-        console.error('firebase session recovery failed', err);
-        if (!cancelled) setError(err as Error);
+        if (unmountedRef.current) return;
+        if (isOffline()) {
+          console.warn('firebase session recovery deferred until online', err);
+          retryWhenOnline();
+        } else {
+          console.error('firebase session recovery failed', err);
+          setError(err as Error);
+        }
       } finally {
-        if (!cancelled) setIsRecovering(false);
+        if (!unmountedRef.current) setIsRecovering(false);
       }
+    };
+
+    (async () => {
+      // Erst wenn Firebase seinen gespeicherten Zustand geladen hat, sagt
+      // `currentUser === null` wirklich "kein Benutzer" und nicht "noch nicht
+      // nachgesehen".
+      await auth.authStateReady();
+      if (cancelled || auth.currentUser || isSessionRecoverySuppressed()) {
+        return;
+      }
+
+      attemptedRef.current = true;
+      console.info(
+        'no firebase user in the webview, recovering the firebase login',
+      );
+      // Ob die WebView ihre Anmeldung bei einem normalen Neustart verliert,
+      // ist an keinem Geraet belegt — davon haengt der Kaltstart ohne Netz
+      // in der App ab (docs/offline-modus.md). Die Meldung macht es zaehlbar.
+      if (Capacitor.isNativePlatform()) {
+        void recordError(new Error('webview started without firebase user'), {
+          area: 'sessionRecovery',
+          offline: isOffline(),
+        });
+      }
+      await attempt();
     })();
 
+    // Bricht nur die Vorpruefung ab. Ein laufender oder wartender Versuch
+    // gehoert ab `attemptedRef` der Komponente (siehe oben).
     return () => {
       cancelled = true;
     };

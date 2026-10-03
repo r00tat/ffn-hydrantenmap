@@ -89,7 +89,7 @@ If you signed in online and used the app within the last 90 days, it opens witho
 A page that was not kept on the device shows "Offline – page not available" offline, with a **Go to map** button.
 
 :::warning
-In the Android app, starting without network does not work yet. Keep the app open during the operation instead of closing it.
+In the Android app, starting without network is not yet reliable on every device. Keep the app open during the operation instead of closing it. If it starts without data, it signs in again by itself as soon as the connection is back.
 :::
 
 ### Breathing apparatus monitoring offline
