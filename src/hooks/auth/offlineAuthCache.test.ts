@@ -53,9 +53,9 @@ describe('offlineAuthCache', () => {
     expect(loadOfflineAuth(undefined, NOW)?.uid).toBe('uid-1');
   });
 
-  it('verfällt nach 72 Stunden und räumt den Eintrag weg', () => {
+  it('verfällt nach 90 Tagen und räumt den Eintrag weg', () => {
     saveOfflineAuth(data(), NOW);
-    expect(OFFLINE_AUTH_MAX_AGE_MS).toBe(72 * 60 * 60 * 1000);
+    expect(OFFLINE_AUTH_MAX_AGE_MS).toBe(90 * 24 * 60 * 60 * 1000);
     expect(loadOfflineAuth('uid-1', NOW + OFFLINE_AUTH_MAX_AGE_MS - 1)).not.toBeNull();
     expect(loadOfflineAuth('uid-1', NOW + OFFLINE_AUTH_MAX_AGE_MS + 1)).toBeNull();
     expect(window.localStorage.getItem(OFFLINE_AUTH_STORAGE_KEY)).toBeNull();

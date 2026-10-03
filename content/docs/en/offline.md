@@ -9,7 +9,7 @@ The operations map also works without an internet connection. While offline you 
 - **Automatic sync** on reconnect, even after the app has been restarted
 - **Rejected changes are reported** and can be retried or discarded
 - **Attachments are uploaded later** – a file added offline is uploaded once the connection is back
-- **Cold start without network** – the app opens in airplane mode too, if you signed in online within the last 72 hours
+- **Cold start without network** – the app opens in airplane mode too, if you signed in online within the last 90 days
 - **Prepare map for offline use** – download map tiles for the area around the operation in advance
 - **Breathing apparatus warnings offline** – the monitoring page warns by itself when no push message arrives
 
@@ -84,7 +84,7 @@ Empty lists are marked offline ("Offline – no entries on this device"), filled
 
 ### Starting the app without network
 
-If you signed in online and used the app within the last 72 hours, it opens without the login screen even in airplane mode. Your permissions then come from the last sign-in; the tooltip on the status says so. As soon as the connection is back, the sign-in is checked with the server again.
+If you signed in online and used the app within the last 90 days, it opens without the login screen even in airplane mode. Your permissions then come from the last sign-in; the tooltip on the status says so. As soon as the connection is back, the sign-in is checked with the server again.
 
 A page that was not kept on the device shows "Offline – page not available" offline, with a **Go to map** button.
 

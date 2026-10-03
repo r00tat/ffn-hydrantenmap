@@ -9,7 +9,7 @@ Die Einsatzkarte funktioniert auch ohne Internetverbindung. Du kannst offline ei
 - **Automatische Synchronisation** beim Reconnect, auch nach einem Neustart der App
 - **Abgelehnte Änderungen werden gemeldet** und lassen sich erneut versuchen oder verwerfen
 - **Anhänge werden nachgeholt** – eine offline angefügte Datei wird hochgeladen, sobald die Verbindung steht
-- **Kaltstart ohne Netz** – die App öffnet auch im Flugmodus, wenn du dich in den letzten 72 Stunden online angemeldet hast
+- **Kaltstart ohne Netz** – die App öffnet auch im Flugmodus, wenn du dich in den letzten 90 Tagen online angemeldet hast
 - **Karte für offline vorbereiten** – Kartenkacheln für das Gebiet um den Einsatzort vorab laden
 - **Atemschutz-Warnungen offline** – die Überwachungsseite warnt selbst, wenn keine Push-Nachricht ankommt
 
@@ -84,7 +84,7 @@ Leere Listen sind offline gekennzeichnet („Offline – keine Einträge auf die
 
 ### App ohne Netz starten
 
-Hast du dich in den letzten 72 Stunden online angemeldet und die App benutzt, öffnet sie auch im Flugmodus ohne Login-Bildschirm. Die Rechte stammen dann aus der letzten Anmeldung; der Tooltip am Status weist darauf hin. Sobald die Verbindung wieder steht, wird die Anmeldung am Server erneut geprüft.
+Hast du dich in den letzten 90 Tagen online angemeldet und die App benutzt, öffnet sie auch im Flugmodus ohne Login-Bildschirm. Die Rechte stammen dann aus der letzten Anmeldung; der Tooltip am Status weist darauf hin. Sobald die Verbindung wieder steht, wird die Anmeldung am Server erneut geprüft.
 
 Eine Seite, die auf dem Gerät nicht vorgehalten wurde, zeigt offline „Offline – Seite nicht verfügbar" mit einem Knopf **Zur Karte**.
 

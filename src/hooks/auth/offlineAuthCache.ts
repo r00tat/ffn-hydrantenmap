@@ -16,8 +16,10 @@ import type { Group } from '../../app/groups/groupTypes';
  *   in dem die Sitzung des Browsers weg ist.
  * - **An die Firebase-UID gebunden:** Meldet sich am selben Gerät jemand
  *   anderer an, erbt er nichts.
- * - **72 Stunden ab der letzten Bestätigung am Server.** Gelesen wird der
- *   Eintrag nur offline; online wird er nur erneuert. Ein Zeitstempel aus der
+ * - **90 Tage ab der letzten Bestätigung am Server.** Viele starten die App
+ *   nur im Einsatz; eine kurze Frist ließe genau sie beim Kaltstart ohne Netz
+ *   vor dem Login-Bildschirm stehen. Gelesen wird der Eintrag nur offline;
+ *   online wird er nur erneuert. Ein Zeitstempel aus der
  *   Zukunft gilt als ungültig, damit eine verstellte Uhr die Frist nicht
  *   verlängert.
  * - **Beim Abmelden gelöscht.**
@@ -27,7 +29,7 @@ import type { Group } from '../../app/groups/groupTypes';
  */
 
 export const OFFLINE_AUTH_STORAGE_KEY = 'fbAuthOffline';
-export const OFFLINE_AUTH_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+export const OFFLINE_AUTH_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 /** Spielraum für Uhren, die zwischen zwei Aufrufen leicht nachgestellt wurden. */
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
 

@@ -140,9 +140,13 @@ Die Grenzen, und warum sie so gezogen sind:
   sonst erst nach acht Sekunden ohne Antwort oder beim Fehlschlag der Anmeldung.
   Antwortet der Server später doch noch oder kommt die Verbindung zurück
   (`onReconnect`), gilt wieder seine Prüfung.
-- **72 Stunden ab der letzten Bestätigung.** Das trägt einen Einsatz über ein
-  Wochenende, ohne dass ein Gerät, dem die Freigabe entzogen wurde, wochenlang
-  die Oberfläche zeigt. Ein Zeitstempel aus der Zukunft gilt als ungültig, eine
+- **90 Tage ab der letzten Bestätigung.** Viele Mitglieder öffnen die App nur
+  im Einsatz, oft wochenlang nicht. Eine kurze Frist (anfangs 72 h) hätte
+  genau sie beim Kaltstart ohne Netz vor den Login-Bildschirm gestellt — dort,
+  wo es am meisten stört. Die lange Frist kostet wenig: Ein Gerät, dem die
+  Freigabe entzogen wurde, sieht offline nur, was ohnehin schon in seinem
+  Cache liegt, seine Schreibvorgänge scheitern beim Synchronisieren an den
+  Regeln, und beim ersten Start mit Netz ist der Eintrag weg. Ein Zeitstempel aus der Zukunft gilt als ungültig, eine
   verstellte Uhr verlängert also nichts. Ein **Einsatz-Gast** behält höchstens
   bis zum Ende seines Gastzugangs (`firecallExpiresAt`).
 - **An die Firebase-UID gebunden.** Meldet sich am selben Gerät jemand anderer

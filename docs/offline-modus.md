@@ -21,7 +21,7 @@ Dokument ist das, was der Cache allein **nicht** leistet.
 | Atemschutzüberwachung samt lokaler Warnungen | PDF über den Server, Fahrtenbuch-Fahrten, Mängel samt Bildern |
 | Anhänge an bestehenden Einsatz/Element (Upload wird nachgeholt) | Einsatz-Fotos im Drive, Blaulicht-SMS-Import und Duplikatsprüfung |
 | Karte, soweit vorgeladen oder schon angesehen (basemap.at) | Straßen-Routing und Höhenprofil einer Leitung (siehe Grenzen) |
-| Kaltstart mit zwischengespeicherter Anmeldung (72 h) | Verwaltung (Benutzer, Gruppen, Tokens, MCP), Freigabe-Links, Import/Export |
+| Kaltstart mit zwischengespeicherter Anmeldung (90 Tage) | Verwaltung (Benutzer, Gruppen, Tokens, MCP), Freigabe-Links, Import/Export |
 
 Was offline nicht geht, ist **erkennbar deaktiviert** (`OnlineOnly`, siehe
 unten) und bricht nicht mit einem Fehler ab. Die Grenze verläuft entlang der
@@ -264,8 +264,8 @@ müssen drei Dinge offline vorhanden sein:
    Firestore liest damit aus dem Cache dieses Benutzers und reiht
    Schreibvorgänge ein.
 3. **Die Rechte der Oberfläche.** Die kommen sonst vom Server. Der
-   Zwischenspeicher der letzten Anmeldung (`offlineAuthCache.ts`, 72 h, an die
-   UID gebunden) springt ein, wenn die Anmeldung am Server scheitert, nach acht
+   Zwischenspeicher der letzten Anmeldung (`offlineAuthCache.ts`, 90 Tage, an
+   die UID gebunden) springt ein, wenn die Anmeldung am Server scheitert, nach acht
    Sekunden nicht antwortet oder die App schon weiß, dass sie offline ist.
    `getMyGroupsFromServer` hat dieselbe Zeitgrenze. Beim Reconnect wird die
    Anmeldung am Server nachgeholt. Der Status-Chip nennt im Tooltip, dass die
