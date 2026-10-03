@@ -6,6 +6,10 @@ body {
     Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
   height: 100%;
   overscroll-behavior-x: none;
+  /* Kein Pinch-Zoom der Seite (siehe src/app/viewportConfig.ts). iOS Safari
+     übergeht user-scalable=no, touch-action nicht. Die Karte setzt selbst
+     touch-action: none und zoomt über Leaflet. */
+  touch-action: pan-x pan-y;
 }
 
 a {

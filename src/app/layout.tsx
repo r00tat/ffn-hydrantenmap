@@ -20,6 +20,7 @@ import { appIconPath, withEnvironmentPrefix } from '../common/appEnvironment';
 import { SERWIST_SW_URL } from '../common/serviceWorker';
 import AppProviders from '../components/providers/AppProviders';
 import '../styles/globals.css';
+import { appViewport } from './viewportConfig';
 
 // In der Dev-Umgebung vorangestellt gekennzeichnet, damit Tab und installierte
 // PWA von der Produktion unterscheidbar sind — s. common/appEnvironment.ts.
@@ -71,9 +72,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = {
-  themeColor: '#1976d2',
-};
+export const viewport: Viewport = appViewport;
 
 export default async function RootLayout({
   // Layouts must accept a children prop.
@@ -101,9 +100,8 @@ export default async function RootLayout({
             kodiertes <title> hier verdoppelte sie nicht nur, es unterdrückte
             auch die Titel der Unterseiten aus APP_TITLE_TEMPLATE. Den
             <link rel="manifest"> setzt Next selbst, seit das Manifest aus
-            app/manifest.ts kommt, die Icons aus `metadata.icons`. */}
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#1976d2" />
+            app/manifest.ts kommt, die Icons aus `metadata.icons`, Viewport
+            und Themenfarbe aus `viewport` (viewportConfig.ts). */}
       </head>
       <body>
         {/* Registriert den von src/app/serwist/[path]/route.ts ausgelieferten
