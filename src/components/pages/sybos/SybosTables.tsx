@@ -36,12 +36,14 @@ export function TitledTable({
   if (rows.length === 0) return null;
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-        <Typography variant="h6" gutterBottom sx={{ flexGrow: 1 }}>
-          {title}
-        </Typography>
-        {action}
-      </Box>
+      {(title || action) && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Typography variant="h6" gutterBottom sx={{ flexGrow: 1 }}>
+            {title}
+          </Typography>
+          {action}
+        </Box>
+      )}
       <Box sx={{ overflowX: 'auto' }}>
         <Table size="small">
           <TableHead>

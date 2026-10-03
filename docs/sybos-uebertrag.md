@@ -18,7 +18,13 @@ folgt die Reihenfolge der Erfassung in Sybos:
 3. **Kräfte und Material** — eigene Fahrzeuge und Einheiten, namentliche Mannschaft,
    sonstige Kräfte, eingesetztes Material, Fahrten aus dem Fahrtenbuch mit Kilometern.
 4. **Atemschutz** — Leiter des Sammelplatzes und Füllpersonal, eine Zeile je
-   Bereitstellung eines Trupps mit Auftrag, Zeiten und Druck.
+   Bereitstellung eines Trupps mit Auftrag, Zeiten und Druck, die Geräte der Trupps
+   (eine Zeile je Gerät mit Träger und Kennung), die Ausgabe am Sammelplatz und je
+   Bereitstellung das ganze Protokoll: Kopfdaten (Überwachung, Gerätesatz, Bemerkung),
+   alle Ereignisse mit Druck — Übergabe, Übernahme der Zeitkontrolle, Abmarsch, jede
+   Druckabfrage und Statusmeldung, verschickte Warnungen, Rückkehr — und die Druckkurve
+   der Überwachungsseite, gezeichnet bis zur Rückkehr. Ankunft und Rückzug heißen nur an
+   der ersten Meldung so, wie auf der Überwachungsseite.
 5. **Messungen** — Gammaspektren und je Ebene mit Datenfeldern (Strahlenmessung,
    Radiacode, eigene Messreihen) eine Tabelle der Messpunkte, als CSV herunterladbar.
 6. **Sonstige Notizen** — Einsatzorte mit ihren Notizen, Geschäftsbuch,
@@ -31,6 +37,18 @@ folgt die Reihenfolge der Erfassung in Sybos:
 Abschnitte ohne Daten bleiben weg. Die Builder für 3.–7. stehen in
 [sybosExtras.ts](../src/components/pages/sybos/sybosExtras.ts), getrennt von
 `sybosReport.ts`, weil sie aus eigenen Sammlungen lesen.
+
+## Dieselben Abschnitte auf der Druckseite
+
+Alarmierungstext, Einsatzablauf und Tätigkeit, Mannschaft und Fahrten, der ganze
+Atemschutz samt Protokoll je Trupp und die Anhänge an Elementen stehen auch auf der
+Druckseite ([PrintEinsatzExtras.tsx](../src/components/pages/PrintEinsatzExtras.tsx)).
+Sie verwenden dieselben Tabellen und Hooks (`useAtemschutzReport`,
+`useFirecallAlarmText` in [useEinsatzReport.ts](../src/components/pages/sybos/useEinsatzReport.ts)),
+damit Ausdruck und Übertrag nicht auseinanderlaufen. Auf Papier fehlen nur die
+Kopier-Knöpfe. Messreihen bekommen dort keine eigene Tabelle: Die Datenfelder stehen
+schon in den Einsatzmittel-Details je Ebene. Kostenersatz bleibt draußen, er hat einen
+eigenen Beleg.
 
 ## Kopierfelder und Tabellen
 
@@ -91,8 +109,8 @@ anders schreibt, ließe die beiden Felder ineinanderlaufen.
 
 Die namentliche Mannschaft geht **nicht** an das Modell — im Fließtext des Berichts hat
 sie nichts verloren, und was nicht hinausgeht, kann dort auch nicht auftauchen. Aus
-demselben Grund bleiben Fahrer (Fahrtenbuch), Sammelplatz-Personal und Kostenersatz
-draußen; die Atemschutz-Zeilen für das Modell nennen nur die Zahl der Geräteträger,
+demselben Grund bleiben Fahrer (Fahrtenbuch), Sammelplatz-Personal, Trupp-Protokolle,
+Geräte der Trupps und Kostenersatz draußen; die Atemschutz-Zeilen für das Modell nennen nur die Zahl der Geräteträger,
 Messungen gehen als Kurzfassung (Anzahl und Spanne je Zahlenfeld). Die
 Systemanweisung verbietet zusätzlich Namen von Betroffenen und hält fest, dass der
 erfasste Text nur Material ist und Anweisungen darin nicht befolgt werden. Die Antwort

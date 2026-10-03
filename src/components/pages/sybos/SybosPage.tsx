@@ -18,10 +18,7 @@ import Typography from '@mui/material/Typography';
 import { doc } from 'firebase/firestore';
 import { useTranslations } from 'next-intl';
 import { ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getBlaulichtSmsAlarmById } from '../../../app/blaulicht-sms/actions';
-import type { BlaulichtSmsAlarm } from '../../../common/blaulichtsms';
 import { computeAllFields } from '../../../common/computeFieldValue';
-import useAtemschutzEinsatzdaten from '../../../hooks/useAtemschutzEinsatzdaten';
 import useFahrtenbuchEntries from '../../../hooks/useFahrtenbuchEntries';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useFirecall, { FirecallContext } from '../../../hooks/useFirecall';
@@ -35,7 +32,6 @@ import { firestore } from '../../firebase/firebase';
 import { downloadText } from '../../firebase/download';
 import {
   FIRECALL_COLLECTION_ID,
-  firecallAlarmIds,
   type Firecall,
   type FirecallItem,
   type FirecallLayer,
@@ -59,18 +55,20 @@ import {
 } from './sybosReport';
 import {
   buildAtemschutzText,
+  truppProtokollText,
   buildFahrtenRows,
   buildMeasurementTables,
   buildSpectrumRows,
   buildSpectrumText,
-  buildTruppRows,
   collectAttachments,
   measurementCsv,
   measurementSummary,
   type MeasurementTable,
 } from './sybosExtras';
+import { AusgabeTable, GeraeteTable, TruppProtokollView } from './SybosAtemschutz';
 import { AttachmentList, DriveFiles } from './SybosFiles';
 import { generateSybosSummary } from './sybosSummary';
+import { useAtemschutzReport, useFirecallAlarmText } from './useEinsatzReport';
 import {
   CrewTable,
   FahrtenTable,
@@ -246,35 +244,6 @@ function CsvButton({ table }: { table: MeasurementTable }) {
   );
 }
 
-/** Die Alarmierungen aus BlaulichtSMS, die dem Einsatz zugeordnet sind. */
-function useAlarms(firecall: Firecall) {
-  const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
-  const idsKey = firecallAlarmIds(firecall).join(',');
-  const group = firecall.group;
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      if (!idsKey || !group) {
-        if (active) setAlarms([]);
-        return;
-      }
-      try {
-        const results = await Promise.all(
-          idsKey.split(',').map((id) => getBlaulichtSmsAlarmById(group, id)),
-        );
-        if (active) setAlarms(results.filter((a): a is BlaulichtSmsAlarm => a !== null));
-      } catch (err) {
-        console.error('failed to load BlaulichtSMS alarms', err);
-        if (active) setAlarms([]);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [group, idsKey]);
-  return alarms;
-}
-
 /**
  * Berechnete Datenfelder je Element. Sie stehen nicht am Element, sondern
  * werden aus der Formel der Ebene gerechnet — asynchron, weil mathjs erst
@@ -318,12 +287,13 @@ export default function SybosPage() {
   const copy = useCopy();
   const tKosten = useTranslations('kostenersatz.status');
   const layers = useFirecallLayersSorted();
-  const { trupps } = useAtemschutzEinsatzdaten(firecall.id);
+  const { vorgabe, truppRows, truppsById, protokolle, geraeteRows, ausgabeRows } =
+    useAtemschutzReport(firecall);
   const fahrtenbuch = useFahrtenbuchEntries(firecall.group, {
     firecallId: firecall.id,
   });
   const { calculations } = useFirecallKostenersatz(firecall.id);
-  const alarms = useAlarms(firecall);
+  const alarmText = useFirecallAlarmText(firecall);
   const computed = useComputedFields(firecallItems, layers);
 
   const basis = useMemo(
@@ -347,16 +317,20 @@ export default function SybosPage() {
   const notizen = useMemo(() => buildNotizenText(locations), [locations]);
   const tagebuch = useMemo(() => buildTagebuchText(diaries), [diaries]);
   const geschaeftsbuch = useMemo(() => buildGeschaeftsbuchText(eintraege), [eintraege]);
-  const alarmText = useMemo(
-    () =>
-      alarms
-        .map((a) => a.alarmText?.trim())
-        .filter(Boolean)
-        .join('\n\n'),
-    [alarms],
-  );
-  const truppRows = useMemo(() => buildTruppRows(trupps.protokoll), [trupps.protokoll]);
   const atemschutz = useMemo(() => buildAtemschutzText(truppRows), [truppRows]);
+  const protokolleText = useMemo(
+    () => protokolle.map(truppProtokollText).join('\n\n'),
+    [protokolle],
+  );
+  const geraete = useMemo(
+    () =>
+      geraeteRows
+        .map((r) =>
+          [r.trupp, r.person, r.typ, r.bezeichnung, r.kennung].filter(Boolean).join(' – '),
+        )
+        .join('\n'),
+    [geraeteRows],
+  );
   const assp = useMemo(
     () =>
       [
@@ -447,6 +421,9 @@ export default function SybosPage() {
       // Die Zeilen zum Atemschutz nennen bewusst keine Geräteträger.
       { title: t('sectionAtemschutz'), text: atemschutz },
       { title: t('assp'), text: assp, private: true },
+      // Protokolle und Geräte nennen Geräteträger beim Namen.
+      { title: t('truppProtokolle'), text: protokolleText, private: true },
+      { title: t('truppGeraete'), text: geraete, private: true },
       { title: t('spektren'), text: spectren },
       { title: t('sectionMessungen'), text: messungen },
       { title: t('einsatzorte'), text: notizen },
@@ -459,12 +436,14 @@ export default function SybosPage() {
       atemschutz,
       basis,
       fahrten,
+      geraete,
       geschaeftsbuch,
       kraefte,
       mannschaft,
       material,
       messungen,
       notizen,
+      protokolleText,
       spectren,
       t,
       tagebuch,
@@ -633,7 +612,7 @@ export default function SybosPage() {
         </Section>
 
         {/* 4. Atemschutz */}
-        {(truppRows.length > 0 || assp) && (
+        {(truppRows.length > 0 || assp || ausgabeRows.length > 0) && (
           <Section
             title={t('sectionAtemschutz')}
             action={
@@ -650,6 +629,21 @@ export default function SybosPage() {
           >
             {assp && <CopyField label={t('assp')} value={assp} multiline />}
             <TruppTable title={t('trupps')} rows={truppRows} />
+            <GeraeteTable title={t('truppGeraete')} rows={geraeteRows} />
+            <AusgabeTable title={t('ausgaben')} rows={ausgabeRows} />
+            {protokolle.length > 0 && <Typography variant="h6">{t('truppProtokolle')}</Typography>}
+            {protokolle.map((pr) => {
+              const trupp = truppsById.get(pr.id);
+              return trupp ? (
+                <TruppProtokollView
+                  key={pr.id}
+                  protokoll={pr}
+                  trupp={trupp}
+                  vorgabe={vorgabe}
+                  onCopy={copy}
+                />
+              ) : null;
+            })}
           </Section>
         )}
 

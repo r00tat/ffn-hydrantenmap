@@ -8,7 +8,7 @@ The "Sybos transfer" page prepares an operation so it can be copied into the Syb
 - **Basic data:** operation, fire brigade, alarm, arrival, end, duration, location, description and the alarm text
 - **Course of operation:** AI summary split into "course of operation" and "activities / remarks"
 - **Forces and equipment:** tables of own vehicles with strength and times, crew, other forces (ambulance, police, other fire brigades), equipment and trips from the vehicle log — sorted alphabetically
-- **Breathing apparatus:** staging area lead and all teams with task, times and pressure
+- **Breathing apparatus:** staging area lead, all teams with task, times and pressure, the recorded equipment per wearer, items issued at the staging area and per team the full log with all pressure checks and the pressure chart
 - **Measurements:** gamma spectra and measurement series (e.g. radiation), each series also as CSV
 - **Other notes:** operation sites with notes, business log and cost recovery
 - **Attachments and photos:** to download, one by one or all at once

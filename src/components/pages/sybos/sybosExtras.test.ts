@@ -10,6 +10,10 @@ import type {
 } from '../../firebase/firestore';
 import {
   buildAtemschutzText,
+  buildAusgabeRows,
+  buildGeraeteRows,
+  buildTruppProtokoll,
+  truppProtokollText,
   buildFahrtenRows,
   buildMeasurementTables,
   buildSpectrumRows,
@@ -307,6 +311,154 @@ describe('collectAttachments', () => {
         name: 'foto.jpg',
         source: 'Gefahrgut',
       },
+    ]);
+  });
+});
+
+describe('buildTruppProtokoll', () => {
+  const trupp: AtemschutzTrupp = {
+    ...truppA1,
+    uebergabeZeit: '2026-03-01T14:06:00',
+    druckUebergabe: 300,
+    ueberwachtVon: 'Maschinist TLFA',
+    ueberwachungSeit: '2026-03-01T14:07:00',
+    ueberwachungBis: '2026-03-01T14:40:00',
+    paTyp: 'standard300',
+    abfragen: [
+      {
+        zeitpunkt: '2026-03-01T14:25:00',
+        druck: 160,
+        rueckzug: true,
+      },
+      { zeitpunkt: '2026-03-01T14:15:00', druck: 240, amZiel: true },
+      { zeitpunkt: '2026-03-01T14:20:00', druck: 200 },
+      {
+        zeitpunkt: '2026-03-01T14:22:00',
+        bemerkung: 'Starke Verrauchung',
+      },
+      { zeitpunkt: '2026-03-01T14:23:00', druck: 180, amZiel: true },
+    ],
+    warnungen: { drittel: '2026-03-01T14:18:00' },
+    bemerkung: 'Flasche 2 undicht',
+  };
+
+  it('listet Kopfdaten des Trupps', () => {
+    const p = buildTruppProtokoll(trupp);
+    expect(p.titel).toBe('Neusiedl Trupp 2');
+    expect(Object.fromEntries(p.kopf.map((k) => [k.label, k.value]))).toEqual({
+      Mitglieder: 'Max Muster, Erika Beispiel',
+      Einheit: 'TLFA 4000',
+      Auftrag: 'Brandbekämpfung',
+      Einsatzziel: 'Keller',
+      'Überwacht von': 'Maschinist TLFA',
+      Zeitkontrolle: '01.03.2026 14:07 – 01.03.2026 14:40',
+      Gerätesatz: 'Standard-PA, 1 × 6 l / 300 bar',
+      Bemerkung: 'Flasche 2 undicht',
+    });
+  });
+
+  it('ordnet alle Ereignisse und Druckabfragen nach Zeit', () => {
+    const p = buildTruppProtokoll(trupp);
+    expect(p.ereignisse.map((e) => [e.zeit, e.ereignis, e.druck, e.bemerkung])).toEqual([
+      ['01.03.2026 14:00', 'Bereitgestellt', '', ''],
+      ['01.03.2026 14:06', 'Übergabe an Einheit', '300 bar', ''],
+      ['01.03.2026 14:07', 'Zeitkontrolle übernommen', '', 'Maschinist TLFA'],
+      ['01.03.2026 14:10', 'Abmarsch', '300 bar', ''],
+      ['01.03.2026 14:15', 'Am Einsatzziel', '240 bar', ''],
+      ['01.03.2026 14:18', 'Warnung: 1/3 der Einsatzzeit', '', ''],
+      ['01.03.2026 14:20', 'Druckabfrage', '200 bar', ''],
+      ['01.03.2026 14:22', 'Statusmeldung', '', 'Starke Verrauchung'],
+      // Nur die erste Zielmeldung ist die Ankunft.
+      ['01.03.2026 14:23', 'Druckabfrage', '180 bar', ''],
+      ['01.03.2026 14:25', 'Rückzug angetreten', '160 bar', ''],
+      ['01.03.2026 14:35', 'Rückkehr', '120 bar', ''],
+      ['01.03.2026 14:40', 'Zeitkontrolle beendet', '', ''],
+    ]);
+  });
+
+  it('gibt das Protokoll als Text aus', () => {
+    const text = truppProtokollText(buildTruppProtokoll(trupp));
+    expect(text.split('\n').slice(0, 3)).toEqual([
+      'Neusiedl Trupp 2',
+      'Mitglieder: Max Muster, Erika Beispiel',
+      'Einheit: TLFA 4000',
+    ]);
+    expect(text).toContain('01.03.2026 14:22 Statusmeldung – Starke Verrauchung');
+    expect(text).toContain('01.03.2026 14:25 Rückzug angetreten, 160 bar');
+  });
+});
+
+describe('buildGeraeteRows', () => {
+  it('listet die Geräte je Trupp, nach Trupp und Träger sortiert', () => {
+    const rows = buildGeraeteRows([
+      {
+        ...truppB,
+        truppGeraete: [
+          {
+            typ: 'flasche',
+            bezeichnung: 'Flasche 6 l',
+            kennung: 'AF-2.16.19',
+            person: 'Bernd Beispiel',
+          },
+          { typ: 'maske', bezeichnung: 'Maske M3', person: 'Anna Muster' },
+        ],
+      },
+      {
+        ...truppA1,
+        truppGeraete: [{ typ: 'pressluftatmer', bezeichnung: 'PA 7', kennung: '1234' }],
+      },
+    ]);
+    expect(rows).toEqual([
+      {
+        trupp: 'Neusiedl Trupp 2',
+        person: '',
+        typ: 'Pressluftatmer',
+        bezeichnung: 'PA 7',
+        kennung: '1234',
+      },
+      {
+        trupp: 'Weiden Trupp 1',
+        person: 'Anna Muster',
+        typ: 'Atemmaske',
+        bezeichnung: 'Maske M3',
+        kennung: '',
+      },
+      {
+        trupp: 'Weiden Trupp 1',
+        person: 'Bernd Beispiel',
+        typ: 'Atemluftflasche',
+        bezeichnung: 'Flasche 6 l',
+        kennung: 'AF-2.16.19',
+      },
+    ]);
+  });
+});
+
+describe('buildAusgabeRows', () => {
+  it('listet die Ausgaben am Sammelplatz alphabetisch nach Gerät', () => {
+    const base = { createdAt: '', createdBy: '', updatedAt: '', updatedBy: '' };
+    expect(
+      buildAusgabeRows([
+        {
+          ...base,
+          geraetId: 'g2',
+          geraetName: 'PA 9',
+          status: 'zurueck',
+          ausgegebenAn: 'Weiden Trupp 1',
+          ausgabeZeit: '2026-03-01T14:05:00',
+          ruecknahmeZeit: '2026-03-01T15:00:00',
+        },
+        { ...base, geraetId: 'g1', geraetName: 'PA 10', status: 'ausgegeben' },
+      ]),
+    ).toEqual([
+      {
+        geraet: 'PA 9',
+        an: 'Weiden Trupp 1',
+        status: 'Zurück',
+        ausgabe: '01.03.2026 14:05',
+        ruecknahme: '01.03.2026 15:00',
+      },
+      { geraet: 'PA 10', an: '', status: 'Ausgegeben', ausgabe: '', ruecknahme: '' },
     ]);
   });
 });

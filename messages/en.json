@@ -749,7 +749,10 @@
       "entry": "Entry"
     },
     "mapImageAlt": "Operations map",
-    "doneAt": "✓ done {time}"
+    "doneAt": "✓ done {time}",
+    "sectionAblauf": "Course of operation",
+    "sectionMannschaft": "Crew and trips",
+    "sectionAtemschutz": "Breathing apparatus"
   },
   "sybos": {
     "title": "Transfer to Sybos",
@@ -812,6 +815,9 @@
     "downloadFailed": "Download failed",
     "driveFailed": "The photos from Google Drive could not be loaded.",
     "csv": "CSV",
+    "truppProtokolle": "Log per team",
+    "truppGeraete": "Team equipment",
+    "ausgaben": "Issued at staging area",
     "cols": {
       "name": "Name",
       "fw": "Organisation",
@@ -847,7 +853,16 @@
       "ziel": "Destination",
       "empfaenger": "Recipient",
       "status": "Status",
-      "summe": "Total"
+      "summe": "Total",
+      "ereignis": "Event",
+      "traeger": "Wearer",
+      "geraetTyp": "Type",
+      "bezeichnung": "Name",
+      "kennung": "Serial / ID",
+      "ausgegebenAn": "Issued to",
+      "ausgabe": "Issued",
+      "ruecknahme": "Returned",
+      "bemerkung": "Remark"
     }
   },
   "passkey": {

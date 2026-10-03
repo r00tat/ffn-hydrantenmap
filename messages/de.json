@@ -749,7 +749,10 @@
       "entry": "Eintrag"
     },
     "mapImageAlt": "Einsatzkarte",
-    "doneAt": "✓ erledigt {time}"
+    "doneAt": "✓ erledigt {time}",
+    "sectionAblauf": "Einsatzablauf",
+    "sectionMannschaft": "Mannschaft und Fahrten",
+    "sectionAtemschutz": "Atemschutz"
   },
   "sybos": {
     "title": "Übertrag nach Sybos",
@@ -812,6 +815,9 @@
     "downloadFailed": "Download fehlgeschlagen",
     "driveFailed": "Die Fotos aus Google Drive konnten nicht geladen werden.",
     "csv": "CSV",
+    "truppProtokolle": "Protokoll je Trupp",
+    "truppGeraete": "Geräte der Trupps",
+    "ausgaben": "Ausgabe am Sammelplatz",
     "cols": {
       "name": "Name",
       "fw": "Organisation",
@@ -847,7 +853,16 @@
       "ziel": "Ziel",
       "empfaenger": "Empfänger",
       "status": "Status",
-      "summe": "Summe"
+      "summe": "Summe",
+      "ereignis": "Ereignis",
+      "traeger": "Träger",
+      "geraetTyp": "Typ",
+      "bezeichnung": "Bezeichnung",
+      "kennung": "Kennung",
+      "ausgegebenAn": "Ausgegeben an",
+      "ausgabe": "Ausgabe",
+      "ruecknahme": "Rücknahme",
+      "bemerkung": "Bemerkung"
     }
   },
   "passkey": {
