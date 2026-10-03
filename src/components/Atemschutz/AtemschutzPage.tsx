@@ -26,6 +26,7 @@ import {
 } from '../../common/atemschutz';
 import { isFirecallGuest } from '../../common/firecallGuest';
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
+import OfflineListHint from '../site/OfflineListHint';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
@@ -102,7 +103,8 @@ export default function AtemschutzPage() {
   const groupId = firecall?.group;
   const { flaschen, activeGeraete, fuellstationen, feuerwehren } =
     useAtemschutzGeraete(groupId);
-  const { trupps, ausgabeByGeraet } = useAtemschutzEinsatzdaten(firecallId);
+  const { trupps, ausgabeByGeraet, fromCache } =
+    useAtemschutzEinsatzdaten(firecallId);
   // Das Füllprotokoll liegt unter der Gruppe; hier wird es auf diesen Einsatz
   // eingeschränkt.
   const { fuellungen, flaschenGesamt } = useAtemschutzFuellungen(groupId, {
@@ -412,6 +414,14 @@ export default function AtemschutzPage() {
           />
         ))}
 
+      {(tab === 'trupps' || tab === 'ausruestung') && (
+        <OfflineListHint
+          fromCache={fromCache}
+          // Im Ausrüstungsreiter zeigt die Liste den Gerätebestand; dass
+          // nichts ausgegeben ist, ist dort kein leerer Reiter.
+          empty={tab === 'trupps' && trupps.protokoll.length === 0}
+        />
+      )}
       {tab === 'trupps' && (
         <TruppsTab
           trupps={trupps}

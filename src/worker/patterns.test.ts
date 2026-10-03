@@ -172,6 +172,55 @@ describe('cachePatterns', () => {
     });
   });
 
+  describe('vorgeladene Kartenkacheln (Für offline vorbereiten)', () => {
+    const tile =
+      'https://mapsneu.wien.gv.at/basemap/bmaphidpi/normal/google3857/16/22795/35833.jpeg';
+
+    it('basemap.at fragt zuerst den Vorrat, dann den Basemap-Cache', async () => {
+      const { OfflineTilesFirst } = await import('./patterns');
+      const rule = ownRuleFor(tile);
+      expect(rule?.handler).toBeInstanceOf(OfflineTilesFirst);
+      expect(cacheNameOf(rule!)).toBe('basemap');
+    });
+
+    it('findet die Kachel im eigenen Cache trotz Vary: Origin', async () => {
+      const { matchOfflineTile } = await import('./patterns');
+      const { OFFLINE_TILE_CACHE } = await import('../common/offlineTiles');
+      const response = new Response('x');
+      const match = vi.fn(async () => response);
+      const result = await matchOfflineTile(new Request(tile), {
+        match,
+      } as unknown as CacheStorage);
+      expect(result).toBe(response);
+      expect(match).toHaveBeenCalledWith(expect.any(Request), {
+        cacheName: OFFLINE_TILE_CACHE,
+        ignoreVary: true,
+      });
+    });
+
+    it('ohne Vorrat oder bei einem Fehler gibt es keinen Treffer', async () => {
+      const { matchOfflineTile } = await import('./patterns');
+      expect(
+        await matchOfflineTile(new Request(tile), {
+          match: async () => undefined,
+        } as unknown as CacheStorage),
+      ).toBeUndefined();
+      expect(
+        await matchOfflineTile(new Request(tile), {
+          match: async () => {
+            throw new Error('kaputt');
+          },
+        } as unknown as CacheStorage),
+      ).toBeUndefined();
+    });
+
+    it('OSM-Kacheln kommen nie aus dem Vorrat', async () => {
+      const { OfflineTilesFirst } = await import('./patterns');
+      const rule = ownRuleFor('https://a.tile.openstreetmap.org/12/1/1.png');
+      expect(rule?.handler).not.toBeInstanceOf(OfflineTilesFirst);
+    });
+  });
+
   describe('Höhenmodell', () => {
     const tile = storageUrl('terrain/v1/detail/CRS3035RES1000mN2783000E4831000.png');
     const index = storageUrl('terrain/v1/index.json');

@@ -960,7 +960,9 @@
     "offlinePageText": "This page was not stored on this device and cannot be loaded without a connection to the server. The map, the incident list, the operational diary and the breathing apparatus pages keep working offline.",
     "offlinePageToMap": "Go to map",
     "offlinePageRetry": "Try again",
-    "offlineAuthHint": "Signed in with the permissions this device last confirmed with the server. They will be checked again once the connection is back."
+    "offlineAuthHint": "Signed in with the permissions this device last confirmed with the server. They will be checked again once the connection is back.",
+    "offlineListEmpty": "Offline – no entries on this device. The list may be incomplete because it has never been loaded here while online.",
+    "offlineListIncomplete": "Offline – possibly incomplete"
   },
   "einsatzDetails": {
     "notFound": "Operation not found",
@@ -988,7 +990,8 @@
       "einsatzorte": "Operation sites",
       "besatzung": "Crew",
       "tagebuch": "Operation log",
-      "kostenersatz": "Cost recovery"
+      "kostenersatz": "Cost recovery",
+      "offline": "Offline map"
     }
   },
   "crew": {
@@ -3777,5 +3780,34 @@
     "noGroup": "No group available.",
     "unvollstaendig": "Without these entries no document can be created: {felder}.",
     "zuDenStammdaten": "Go to master data"
+  },
+  "offlineMap": {
+    "title": "Prepare map for offline use",
+    "description": "Downloads map tiles from basemap.at (zoom 13–18) for the area around the incident location to this device. OpenStreetMap and OpenTopoMap prohibit bulk downloading and are only available offline as far as the map was viewed before.",
+    "centerFirecall": "Centre: incident location",
+    "centerDevice": "Centre: this device's location",
+    "noCenter": "No incident location set and no device location known.",
+    "useLocation": "Use location",
+    "radius": "Radius",
+    "radiusMeters": "{meters} m",
+    "radiusKm": "{km} km",
+    "layer": {
+      "basemap_hdpi": "Basemap",
+      "basemap_ortofoto": "Orthophoto",
+      "basemap_grey": "Basemap grey",
+      "adressen": "Addresses"
+    },
+    "estimate": "{count} tiles, about {size} MB",
+    "tooLarge": "Too many tiles (at most {max}). Please reduce the radius or select fewer layers.",
+    "start": "Prepare for offline use",
+    "cancel": "Cancel",
+    "offline": "Requires an internet connection.",
+    "progress": "{done} of {total} tiles · {size} MB",
+    "done": "Done: {loaded} downloaded, {skipped} already present, {failed} failed ({size} MB).",
+    "aborted": "Preparation cancelled: {loaded} tiles downloaded ({size} MB).",
+    "quota": "Not enough storage on the device. The tile store was cleared – please choose a smaller area.",
+    "failed": "The map tiles could not be downloaded.",
+    "stored": "{count} tiles on this device",
+    "clear": "Delete"
   }
 }

@@ -39,7 +39,7 @@ import {
   getEffectiveAts,
   getEffectiveBesatzung,
 } from '../../common/vehicle-utils';
-import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
 import useFirecall, {
   FirecallContext,
   useFirecallId,
@@ -47,6 +47,7 @@ import useFirecall, {
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import usePendingDocIds from '../../hooks/usePendingDocIds';
 import PendingSyncIcon from '../site/PendingSyncIcon';
+import OfflineListHint from '../site/OfflineListHint';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import AiAssistantButton from '../Map/AiAssistantButton';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
@@ -68,7 +69,10 @@ import {
   useMapEditorCanEdit,
 } from '../../hooks/useMapEditor';
 
-export function useDiaries(sortAscending: boolean = false) {
+export function useDiaries(
+  sortAscending: boolean = false,
+  options: { trackCache?: boolean } = {}
+) {
   const firecallId = useFirecallId();
   const t = useTranslations('tagebuch');
   const [diaries, setDiaries] = useState<Diary[]>([]);
@@ -76,17 +80,20 @@ export function useDiaries(sortAscending: boolean = false) {
   const historyPathSegments = useHistoryPathSegments();
   const { crewAssignments } = useContext(FirecallContext);
 
-  const firecallItems = useFirebaseCollection<FirecallItem>({
-    collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [
-      firecallId,
-      ...historyPathSegments,
-      FIRECALL_ITEMS_COLLECTION_ID,
-    ],
-    // queryConstraints: [where('type', '==', 'vehicle')],
-    queryConstraints: [],
-    filterFn: filterActiveItems,
-  });
+  const { records: firecallItems, fromCache } =
+    useFirebaseCollectionState<FirecallItem>({
+      collectionName: FIRECALL_COLLECTION_ID,
+      pathSegments: [
+        firecallId,
+        ...historyPathSegments,
+        FIRECALL_ITEMS_COLLECTION_ID,
+      ],
+      queryConstraints: [],
+      filterFn: filterActiveItems,
+      // Nur auf der Tagebuchseite selbst (Offline-Hinweis): Metadaten-
+      // Änderungen kosten bei jedem Schreibvorgang einen weiteren Render.
+      includeMetadataChanges: options.trackCache === true,
+    });
 
   useEffect(() => {
     const cars: Fzg[] = firecallItems.filter(
@@ -282,7 +289,7 @@ export function useDiaries(sortAscending: boolean = false) {
       setDiaryCounter(diaries.length + 1);
     })();
   }, [firecallItems, sortAscending, crewAssignments, t]);
-  return { diaries, diaryCounter };
+  return { diaries, diaryCounter, fromCache };
 }
 
 function downloadDiaries(
@@ -452,7 +459,9 @@ export function EinsatzTagebuch({
   const firecallId = useFirecallId();
   const historyPathSegments = useHistoryPathSegments();
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
-  const { diaries, diaryCounter } = useDiaries(sortAscending);
+  const { diaries, diaryCounter, fromCache } = useDiaries(sortAscending, {
+    trackCache: true,
+  });
   // Einträge, die erst auf dem Gerät liegen — im Verlauf gibt es keine.
   const pendingIds = usePendingDocIds(
     historyPathSegments.length === 0
@@ -602,6 +611,8 @@ export function EinsatzTagebuch({
             <span dangerouslySetInnerHTML={{ __html: resultHtml }}></span>
           </Typography>
         )}
+
+        <OfflineListHint fromCache={fromCache} empty={diaries.length === 0} />
 
         <Grid container>
           <Grid size={{ xs: 3, md: 2, lg: 1 }}>

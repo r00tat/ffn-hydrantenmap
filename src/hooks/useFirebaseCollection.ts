@@ -12,16 +12,40 @@ export interface FirebaseCollectionOptions<T> {
   queryConstraints?: QueryConstraint[];
   pathSegments?: string[];
   filterFn?: (element: T) => boolean;
+  /**
+   * Auch reine Metadaten-Änderungen melden. Nötig, damit `fromCache` nach dem
+   * Abgleich mit dem Server auf `false` wechselt (siehe `useFirestoreQuery`).
+   */
+  includeMetadataChanges?: boolean;
+}
+
+export interface FirebaseCollectionState<T> {
+  records: T[];
+  loading: boolean;
+  /** Ergebnis nur aus dem lokalen Cache, etwa offline (siehe `OfflineListHint`). */
+  fromCache: boolean;
 }
 
 export default function useFirebaseCollection<T>(
   options: FirebaseCollectionOptions<T>
 ) {
+  return useFirebaseCollectionState(options).records;
+}
+
+/**
+ * Wie `useFirebaseCollection`, liefert aber zusätzlich Ladezustand und
+ * `fromCache` — für Listen, die offline kennzeichnen, dass sie unvollständig
+ * sein können.
+ */
+export function useFirebaseCollectionState<T>(
+  options: FirebaseCollectionOptions<T>
+): FirebaseCollectionState<T> {
   const {
     collectionName,
     queryConstraints = [],
     pathSegments = [],
     filterFn,
+    includeMetadataChanges = false,
   } = options;
 
   // Ohne angemeldeten Firebase-Benutzer ist `request.auth` null und jede Regel
@@ -76,12 +100,14 @@ export default function useFirebaseCollection<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathKey, constraintsKey, hasFirebaseUser]);
 
-  const { value, loading, error, records } = useFirestoreQuery<T>(
+  const { loading, records, fromCache } = useFirestoreQuery<T>(
     memoizedQuery,
-    filterFn
+    filterFn,
+    { includeMetadataChanges }
   );
 
-  // To match the previous hook's behavior, we are only returning the records.
-  // You could also return `loading` and `error` from here if needed.
-  return records;
+  return useMemo(
+    () => ({ records, loading, fromCache }),
+    [records, loading, fromCache]
+  );
 }

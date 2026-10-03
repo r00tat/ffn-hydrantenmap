@@ -960,7 +960,9 @@
     "offlinePageText": "Diese Seite wurde auf dem Gerät nicht vorgehalten und lässt sich ohne Verbindung zum Server nicht laden. Die Karte, die Einsatzliste, das Einsatztagebuch und die Atemschutzseiten funktionieren offline weiter.",
     "offlinePageToMap": "Zur Karte",
     "offlinePageRetry": "Erneut versuchen",
-    "offlineAuthHint": "Angemeldet mit den zuletzt am Server bestätigten Rechten dieses Geräts. Sie werden beim nächsten Verbindungsaufbau erneut geprüft."
+    "offlineAuthHint": "Angemeldet mit den zuletzt am Server bestätigten Rechten dieses Geräts. Sie werden beim nächsten Verbindungsaufbau erneut geprüft.",
+    "offlineListEmpty": "Offline – keine Einträge auf diesem Gerät. Die Liste kann unvollständig sein, weil sie hier noch nie online geladen wurde.",
+    "offlineListIncomplete": "Offline – evtl. unvollständig"
   },
   "einsatzDetails": {
     "notFound": "Einsatz nicht gefunden",
@@ -988,7 +990,8 @@
       "einsatzorte": "Einsatzorte",
       "besatzung": "Besatzung",
       "tagebuch": "Einsatztagebuch",
-      "kostenersatz": "Kostenersatz"
+      "kostenersatz": "Kostenersatz",
+      "offline": "Offline-Karte"
     }
   },
   "crew": {
@@ -3777,5 +3780,34 @@
     "noGroup": "Keine Gruppe zur Auswahl.",
     "unvollstaendig": "Ohne diese Angaben lässt sich kein Beleg erstellen: {felder}.",
     "zuDenStammdaten": "Zu den Stammdaten"
+  },
+  "offlineMap": {
+    "title": "Karte für offline vorbereiten",
+    "description": "Lädt Kartenkacheln von basemap.at (Zoom 13–18) für das Gebiet um den Einsatzort auf dieses Gerät. OpenStreetMap und OpenTopoMap untersagen das Vorladen und stehen offline nur so weit zur Verfügung, wie die Karte zuvor angesehen wurde.",
+    "centerFirecall": "Mittelpunkt: Einsatzort",
+    "centerDevice": "Mittelpunkt: Standort dieses Geräts",
+    "noCenter": "Kein Einsatzort eingetragen und kein Standort bekannt.",
+    "useLocation": "Standort verwenden",
+    "radius": "Umkreis",
+    "radiusMeters": "{meters} m",
+    "radiusKm": "{km} km",
+    "layer": {
+      "basemap_hdpi": "Basemap",
+      "basemap_ortofoto": "Orthofoto",
+      "basemap_grey": "Basemap grau",
+      "adressen": "Adressen"
+    },
+    "estimate": "{count} Kacheln, rund {size} MB",
+    "tooLarge": "Zu viele Kacheln (höchstens {max}). Bitte den Umkreis verkleinern oder weniger Ebenen wählen.",
+    "start": "Für offline vorbereiten",
+    "cancel": "Abbrechen",
+    "offline": "Nur mit Internetverbindung möglich.",
+    "progress": "{done} von {total} Kacheln · {size} MB",
+    "done": "Fertig: {loaded} geladen, {skipped} schon vorhanden, {failed} fehlgeschlagen ({size} MB).",
+    "aborted": "Vorbereitung abgebrochen: {loaded} Kacheln geladen ({size} MB).",
+    "quota": "Nicht genug Speicherplatz auf dem Gerät. Der Kachelvorrat wurde geleert – bitte ein kleineres Gebiet wählen.",
+    "failed": "Die Kartenkacheln konnten nicht geladen werden.",
+    "stored": "{count} Kacheln auf diesem Gerät",
+    "clear": "Löschen"
   }
 }

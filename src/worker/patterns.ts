@@ -4,10 +4,13 @@ import {
   CacheFirst,
   ExpirationPlugin,
   NetworkOnly,
+  registerQuotaErrorCallback,
   RouteHandler,
   RuntimeCaching,
   StaleWhileRevalidate,
+  type StrategyHandler,
 } from 'serwist';
+import { OFFLINE_TILE_CACHE } from '../common/offlineTiles';
 import { handleAppShellNavigation, isAppShellNavigation } from './appShell';
 
 const oneDayCachePlugin = new ExpirationPlugin({
@@ -41,6 +44,66 @@ const oneDayCachePlugin = new ExpirationPlugin({
  */
 export const isWorkerBootstrap = (url: URL): boolean =>
   url.pathname.startsWith('/_next/static/chunks/turbopack-worker-');
+
+/**
+ * Eine vorgeladene Kachel aus dem Cache `offline-tiles` (Knopf „Für offline
+ * vorbereiten", `src/lib/offlineTileDownload.ts`).
+ *
+ * `ignoreVary`, weil basemap.at mit `Vary: Origin` antwortet: Die Seite lädt
+ * per CORS-Abruf **mit** `Origin`-Header vor, Leaflet fragt später über ein
+ * `<img>` **ohne** — ohne `ignoreVary` träfe der Cache nie, und zwar ohne
+ * dass irgendwo ein Fehler auftaucht.
+ *
+ * `caches.match` mit `cacheName` statt `caches.open(...)`: legt den Cache
+ * nicht bei jeder Kachel leer an, solange nie vorbereitet wurde.
+ */
+export async function matchOfflineTile(
+  request: Request,
+  storage: CacheStorage | undefined = typeof caches === 'undefined'
+    ? undefined
+    : caches,
+): Promise<Response | undefined> {
+  if (!storage) return undefined;
+  try {
+    return (
+      (await storage.match(request, {
+        cacheName: OFFLINE_TILE_CACHE,
+        ignoreVary: true,
+      })) ?? undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `CacheFirst`, das zuerst den Vorrat der Offline-Vorbereitung fragt.
+ *
+ * Der Vorrat ist ein eigener Cache und nicht `basemap`: Dort hält
+ * `oneDayCachePlugin` 64 Einträge einen Tag lang — ein paar tausend
+ * vorgeladene Kacheln wären nach wenigen Minuten Kartenbenutzung wieder
+ * verdrängt.
+ */
+export class OfflineTilesFirst extends CacheFirst {
+  async _handle(request: Request, handler: StrategyHandler): Promise<Response> {
+    const offline = await matchOfflineTile(request);
+    if (offline) return offline;
+    return super._handle(request, handler);
+  }
+}
+
+/**
+ * `purgeOnQuotaError` für den Kachelvorrat. Der Cache wird von der Seite
+ * geschrieben und hat deshalb keinen `ExpirationPlugin`, der das selbst
+ * täte: Läuft das Kontingent voll, wird er als Erstes geopfert — vor
+ * App-Shell, Firestore-Cache und Warteschlangen im selben Kontingent.
+ * Aufgerufen in `index.ts`.
+ */
+export function registerOfflineTilePurge(): void {
+  registerQuotaErrorCallback(async () => {
+    await caches.delete(OFFLINE_TILE_CACHE);
+  });
+}
 
 /**
  * Eigene Caching-Regeln. Sie werden in `index.ts` **vor** Serwists
@@ -224,9 +287,11 @@ export const cachePatterns: RuntimeCaching[] = [
     }),
   },
 
+  // basemap.at: vorgeladene Kacheln zuerst (siehe `OfflineTilesFirst`), sonst
+  // der kurzlebige Cache der laufenden Kartenbenutzung.
   {
     matcher: /^https:\/\/mapsneu\.wien\.gv\.at\/basemap\//i,
-    handler: new CacheFirst({
+    handler: new OfflineTilesFirst({
       cacheName: 'basemap',
       plugins: [oneDayCachePlugin],
     }),

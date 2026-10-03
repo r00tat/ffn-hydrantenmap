@@ -45,6 +45,7 @@ import {
   vorgabeGeraetesatz,
 } from '../../common/atemschutzUeberwachung';
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
+import OfflineListHint from '../site/OfflineListHint';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -185,7 +186,7 @@ export default function UeberwachungPage() {
   const groupId = firecall?.group;
   const { flaschen, activeGeraete, feuerwehren } =
     useAtemschutzGeraete(groupId);
-  const { trupps } = useAtemschutzEinsatzdaten(firecallId);
+  const { trupps, fromCache } = useAtemschutzEinsatzdaten(firecallId);
   // Für den Sprach-Assistenten: Ohne die Elemente liefen dort `updateItem`,
   // `deleteItem` und `answerQuestion` stillschweigend ins Leere.
   const firecallItems = useFirecallItems();
@@ -811,6 +812,13 @@ export default function UeberwachungPage() {
             `ueberwachung.pushHinweis.${PUSH_HINWEIS[pushErlaubnis]}` as 'ueberwachung.pushHinweis.offen',
           )}
         </Alert>
+      )}
+
+      {hatEinsatz && (
+        <OfflineListHint
+          fromCache={fromCache}
+          empty={trupps.protokoll.length === 0}
+        />
       )}
 
       <Snackbar

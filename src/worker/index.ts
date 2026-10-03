@@ -19,7 +19,11 @@ import {
   warmAppShell,
 } from './appShell';
 import { parseFirebaseConfig } from './firebaseConfig';
-import { isWorkerBootstrap, runtimeCaching } from './patterns';
+import {
+  isWorkerBootstrap,
+  registerOfflineTilePurge,
+  runtimeCaching,
+} from './patterns';
 
 // This declares the value of `injectionPoint` to TypeScript.
 // `injectionPoint` is the string that will be replaced by the
@@ -79,6 +83,8 @@ try {
   });
 
   serwist.addEventListeners();
+  // Kachelvorrat der Offline-Vorbereitung bei vollem Kontingent opfern.
+  registerOfflineTilePurge();
 } catch (err) {
   console.error('[sw] Serwist konnte nicht eingerichtet werden', err);
 }

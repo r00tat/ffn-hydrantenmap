@@ -166,3 +166,27 @@ HQ30 | HQ100 | HQ300` sowie `APSFR`.
 für die gibt es nur den Kachel-Cache. Deshalb bleibt „Hochwasser
 Oberflächenwasser" an `tiles.lfrz.gv.at` gebunden, obwohl der Dienst keine
 Capabilities kennt.
+
+## Offline vorladen
+
+Der Knopf „Für offline vorbereiten" (siehe
+[offline-modus.md](offline-modus.md#kartenkacheln-vorladen-offlinemappreparation))
+lädt Kacheln eines Gebiets massenhaft vor. Das ist nur bei Diensten zulässig,
+deren Bedingungen es nicht untersagen. Die Auswahl steht in
+[src/common/offlineTiles.ts](../src/common/offlineTiles.ts):
+
+| Dienst | Vorladen | Begründung |
+| --- | --- | --- |
+| basemap.at (`basemap_hdpi`, `basemap_ortofoto`, `basemap_grey`, `adressen`) | ja | Offene Verwaltungsdaten unter CC BY 4.0, statischer Kachel-Cache, CORS offen (`Access-Control-Allow-Origin: *`). Begrenzt auf Zoom 13–18, 3 km Umkreis und 6000 Kacheln je Vorbereitung, vier parallele Abrufe. |
+| OpenStreetMap | **nein** | Die [Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/) der OSMF verbietet Bulk-Download und Prefetching ausdrücklich. |
+| OpenTopoMap | **nein** | Ehrenamtlich betriebene Server; gleiche Linie wie OSM. |
+| Land Burgenland (WMS) | nein | Rendert jede Kachel neu; keine Aussage zum Vorladen. |
+| WISA-Hochwasser | nein | Keine Aussage zum Vorladen; die Adressen hängen an Leaflets BBOX-Formatierung und ließen sich nicht verlässlich nachbauen. |
+
+Die URL-Vorlagen in `offlineTiles.ts` müssen **exakt** denen in `tiles.ts`
+entsprechen, sonst trifft der Cache nie — ein Test vergleicht beide. Wer eine
+basemap.at-Adresse in `tiles.ts` ändert, ändert sie dort mit.
+
+Gemessene Kachelgrößen bei Neusiedl am See (Zoom 13–18): Basemap hidpi rund
+50 KB, Orthofoto rund 20 KB, Adressen rund 15 KB. Daraus schätzt die Oberfläche
+die Größe vor dem Laden; gezählt wird beim Laden die tatsächliche.

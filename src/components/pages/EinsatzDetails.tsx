@@ -30,6 +30,7 @@ import useVehicles from '../../hooks/useVehicles';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import { useAuditLog } from '../../hooks/useAuditLog';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
+import OfflineMapPreparation from '../Map/OfflineMapPreparation';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
 import { isGroupAdmin } from '../../common/groupPermissions';
@@ -537,6 +538,23 @@ export default function EinsatzDetails() {
           <KostenersatzList firecallId={firecall.id} hideTitle />
         </EinsatzDetailSection>
       )}
+
+      {/* Kartenkacheln um den Einsatzort für den Offline-Fall vorladen
+          (docs/offline-modus.md). Ohne Einsatzort gilt der Standort. */}
+      <EinsatzDetailSection
+        sectionId="offline"
+        title={t('sections.offline')}
+        expanded={openSections['offline'] === true}
+        onToggle={toggleSection}
+      >
+        <OfflineMapPreparation
+          center={
+            typeof firecall.lat === 'number' && typeof firecall.lng === 'number'
+              ? { lat: firecall.lat, lng: firecall.lng }
+              : undefined
+          }
+        />
+      </EinsatzDetailSection>
 
       {/* Dialogs */}
       {shareDialogOpen && firecall.id && (

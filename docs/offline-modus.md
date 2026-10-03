@@ -182,3 +182,76 @@ ohne Benutzer: Der Zwischenspeicher greift nicht (er verlangt einen
 Firebase-Benutzer mit derselben UID), und der Firestore-Cache des Benutzers ist
 nicht erreichbar. Der Kaltstart ohne Netz funktioniert unter Android deshalb
 erst, wenn die WebView ihre Firebase-Anmeldung selbst hält.
+
+## Daten für den Offline-Fall vorbereiten
+
+### Firestore-Cache vorwärmen (`src/lib/firestoreWarmup.ts`)
+
+Der persistente Cache beantwortet offline jede Abfrage, aber nur mit
+Dokumenten, die schon einmal geladen wurden. Wer den Einsatz auf der Karte
+öffnet und dann ohne Netz auf die Atemschutz-Seite wechselt, sähe dort sonst
+eine leere Liste. `useFirestoreWarmup` (in `AppProviders` neben
+`useAppShellWarmup`) liest deshalb drei Sekunden nach dem Öffnen eines
+Einsatzes einmal vom Server:
+
+- **Einsatz:** das Einsatz-Dokument und die Untersammlungen `item` (Elemente,
+  Einsatztagebuch, Fahrzeuge), `layer`, `crew` (Besatzung), `location`,
+  `mapLayer`, `atemschutzTrupp`, `atemschutzAusgabe`. Der Verlauf (`history`)
+  fehlt bewusst — groß und offline nicht gefragt.
+- **Gruppe des Einsatzes:** Atemschutz-Gerätebestand, Fahrzeuge und Personen
+  des Fahrtenbuchs, Stammdaten (`groupConfig/stammdaten`).
+- **Gruppen des Benutzers:** die Einsatzliste der letzten 28 Tage, mit
+  denselben Bedingungen wie die Einsatzliste, damit derselbe Index trägt.
+- **Umgebung:** Hydranten-Cluster im Umkreis von 3 km um den Einsatzort.
+
+Ganze Sammlungen ohne Filter genügen: Offline wertet das SDK jede Abfrage
+lokal gegen den Cache aus, die Abfragen der Seiten müssen also nicht wörtlich
+vorweggenommen werden. Es sind einmalige `getDocs`/`getDoc`, keine Listener —
+bestehende Listener bleiben unberührt. Jede Abfrage steht für sich: Eine
+verweigerte (Fahrtenbuch-Sammlungen liest nur, wer dort Mitglied ist) bricht
+die anderen nicht ab. `warmOnce` sorgt dafür, dass je Einsatz bzw. Gruppenstand
+nur einmal im Seitenleben gelesen wird; scheitert alles, darf es beim nächsten
+Anlass erneut laufen. Offline wird nicht vorgewärmt.
+
+### Kartenkacheln vorladen (`OfflineMapPreparation`)
+
+Der Knopf „Für offline vorbereiten" steht auf der Einsatz-Detailseite
+(Abschnitt „Offline-Karte", Mittelpunkt ist der Einsatzort) und im Profil
+(Mittelpunkt ist der Standort des Geräts). Er lädt die Kacheln eines Quadrats
+um den Mittelpunkt (Umkreis 500 m bis 3 km, Zoom 13–18, höchstens 6000
+Kacheln) in den eigenen Cache `offline-tiles`, mit Fortschritt, Abbrechen und
+Größenangabe. Muster ist das Vorladen des Höhenmodells.
+
+- **Nur basemap.at.** OpenStreetMap und OpenTopoMap untersagen das Vorladen;
+  die Begründung je Dienst steht in [kartenlayer.md](kartenlayer.md#offline-vorladen).
+- **Die Seite schreibt, der Service Worker liest.** So sind Fortschritt und
+  Abbruch unmittelbar. `OfflineTilesFirst` in `src/worker/patterns.ts` fragt
+  bei basemap.at zuerst `offline-tiles` und fällt sonst auf den kurzlebigen
+  Cache `basemap` zurück — dort hält `oneDayCachePlugin` nur 64 Einträge,
+  vorgeladene Kacheln wären darin nach Minuten verdrängt.
+- **`ignoreVary`:** basemap.at antwortet mit `Vary: Origin`. Vorgeladen wird
+  per CORS (mit `Origin`), Leaflet fragt per `<img>` (ohne) — ohne
+  `ignoreVary` träfe der Cache nie.
+- **Kontingent:** Läuft beim Vorladen das Kontingent voll, wird der
+  Kachelvorrat geleert und gemeldet; im Service Worker übernimmt
+  `registerOfflineTilePurge` dasselbe als `purgeOnQuotaError`. Der Vorrat ist
+  das Erste, was geopfert wird — vor App-Shell, Firestore-Cache und
+  Warteschlangen im selben Kontingent.
+- Der Vorrat altert nicht von selbst; er wird mit „Löschen" geleert oder bei
+  der nächsten Vorbereitung ergänzt (vorhandene Kacheln werden übersprungen).
+
+### Leere Listen offline kennzeichnen (`OfflineListHint`)
+
+Eine nie geladene Abfrage liefert offline eine leere Liste statt eines
+Fehlers. `OfflineListHint` zeigt bei einer leeren Liste aus dem Cache
+„Offline – keine Einträge auf diesem Gerät …", bei einer gefüllten einen
+knappen Chip „Offline – evtl. unvollständig". Eingebaut in Einsatzliste,
+Einsatztagebuch, Atemschutzsammelplatz und Atemschutzüberwachung.
+
+Die Quelle ist `snapshot.metadata.fromCache`, durchgereicht über
+`useFirestoreQuery` bzw. `useFirebaseCollectionState`. Diese Listen
+abonnieren mit `includeMetadataChanges` — ohne meldet der Listener den
+Wechsel vom Cache- zum Server-Stand nicht, wenn sich kein Dokument ändert,
+und `fromCache` bliebe nach dem ersten Cache-Ergebnis stehen. Angezeigt wird
+nur im Offline-Zustand des Verbindungsstatus: Online ist ein Cache-Ergebnis
+der kurze Moment vor der Antwort des Servers.
