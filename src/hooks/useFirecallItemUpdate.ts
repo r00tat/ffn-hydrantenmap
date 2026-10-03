@@ -7,7 +7,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { commitBatch, setDoc } from '../lib/firestoreClient';
+import { commitBatchLocal, setDocLocal } from '../lib/firestoreClient';
 import { useCallback } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import {
@@ -63,7 +63,8 @@ export default function useFirecallItemUpdate() {
       );
 
       try {
-        await setDoc(
+        // Lokal: wartet nicht auf den Server, siehe `setDocLocal`.
+        setDocLocal(
           doc(
             firestore,
             FIRECALL_COLLECTION_ID,
@@ -79,8 +80,11 @@ export default function useFirecallItemUpdate() {
         // gespeichert werden: an den Optionen selbst, am Routing-Profil, an den
         // Punkten und an der Dimension. Alle können sich mit diesem
         // Schreibvorgang geändert haben.
+        // Nicht abwarten: Routing und Höhen fragen Dienste im Netz ab, und
+        // offline hinge sonst das Speichern an deren Zeitüberschreitung. Die
+        // Funktion wirft nicht.
         if (isStreetRoutingItem(item.type) && !item.deleted) {
-          await ensureConnectionDerived(firecallId, newData);
+          void ensureConnectionDerived(firecallId, newData);
         }
 
         // When a layer is deleted, cascade to all items in that layer
@@ -100,7 +104,7 @@ export default function useFirecallItemUpdate() {
             snapshot.docs.forEach((d) => {
               batch.update(d.ref, { deleted: true, updatedAt: now, updatedBy: email });
             });
-            await commitBatch(batch);
+            commitBatchLocal(batch, `Ebene ${item.id} löschen`);
           }
         }
 
@@ -137,7 +141,7 @@ export default function useFirecallItemUpdate() {
                 }
               }
               if (hasUpdates) {
-                await commitBatch(batch);
+                commitBatchLocal(batch, `Ebene ${item.id} neu berechnen`);
               }
             }
           }

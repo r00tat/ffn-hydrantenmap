@@ -4,7 +4,7 @@ import {
   collection,
   doc,
 } from 'firebase/firestore';
-import { deleteDoc, setDoc, updateDoc } from '../lib/firestoreClient';
+import { deleteDocLocal, setDocLocal, updateDocLocal } from '../lib/firestoreClient';
 import { useCallback, useMemo } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import {
@@ -122,7 +122,7 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
         FIRECALL_LOCATIONS_COLLECTION_ID,
         locationId
       );
-      await setDoc(docRef, newData);
+      setDocLocal(docRef, newData);
 
       logChange({
         action: 'create',
@@ -145,7 +145,7 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
         updatedBy: email || '',
       };
 
-      await updateDoc(
+      updateDocLocal(
         doc(
           firestore,
           FIRECALL_COLLECTION_ID,
@@ -170,7 +170,7 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
   const deleteLocation = useCallback(
     async (id: string): Promise<void> => {
       const locationToDelete = locations.find((loc) => loc.id === id);
-      await updateDoc(
+      updateDocLocal(
         doc(
           firestore,
           FIRECALL_COLLECTION_ID,

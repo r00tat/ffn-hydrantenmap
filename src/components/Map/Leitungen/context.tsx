@@ -2,7 +2,7 @@ import { collection } from 'firebase/firestore';
 import React, { FC, ReactNode, useCallback, useContext, useState } from 'react';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../../hooks/useFirecall';
-import { addDoc } from '../../../lib/firestoreClient';
+import { addDocLocal } from '../../../lib/firestoreClient';
 import { firestore } from '../../firebase/firebase';
 import {
   FIRECALL_COLLECTION_ID,
@@ -67,7 +67,7 @@ export const useLeitungsProvider = (): Leitungen => {
           destLat: positions[positions.length - 1].lat,
           destLng: positions[positions.length - 1].lng,
         };
-        const docRef = await addDoc(
+        const docRef = addDocLocal(
           collection(
             firestore,
             FIRECALL_COLLECTION_ID,
@@ -85,7 +85,7 @@ export const useLeitungsProvider = (): Leitungen => {
         // Eine neu gezeichnete Leitung bekommt Straßenverlauf und
         // Höhenprofil erst hier: Vorher gibt es keine Dokument-ID, unter der
         // sie gespeichert werden könnten.
-        await ensureConnectionDerived(firecallId, {
+        void ensureConnectionDerived(firecallId, {
           ...newItem,
           id: docRef.id,
         });

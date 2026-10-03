@@ -1,5 +1,5 @@
 import { collection } from 'firebase/firestore';
-import { addDoc } from '../lib/firestoreClient';
+import { addDocLocal } from '../lib/firestoreClient';
 import { useCallback } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import {
@@ -55,7 +55,11 @@ export default function useFirecallItemAdd() {
       );
 
       try {
-        const docRef = await addDoc(
+        // Lokal: Die ID entsteht auf dem Gerät, der Aufruf wartet nicht auf
+        // den Server. Eine Ablehnung beim Synchronisieren landet in der
+        // Fehlerliste (`syncErrors.ts`); hier kommen nur Fehler beim Prüfen
+        // der Daten an.
+        const docRef = addDocLocal(
           collection(
             firestore,
             FIRECALL_COLLECTION_ID,

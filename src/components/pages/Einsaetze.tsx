@@ -25,7 +25,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, where } from 'firebase/firestore';
 import { useTranslations } from 'next-intl';
-import { setDoc } from '../../lib/firestoreClient';
+import { setDocLocal } from '../../lib/firestoreClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -53,7 +53,7 @@ function useFirecallUpdate() {
       console.info(
         `update of einsatz ${einsatz.id}: ${JSON.stringify(einsatz)}`
       );
-      await setDoc(
+      setDocLocal(
         doc(firestore, FIRECALL_COLLECTION_ID, '' + einsatz.id),
         { ...einsatz, updatedAt: new Date().toISOString(), updatedBy: email },
         { merge: true }

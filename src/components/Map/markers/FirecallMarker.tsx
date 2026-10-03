@@ -1,5 +1,5 @@
 import { doc } from 'firebase/firestore';
-import { setDoc } from '../../../lib/firestoreClient';
+import { setDocLocal } from '../../../lib/firestoreClient';
 import L, { LeafletEventHandlerFnMap } from 'leaflet';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
@@ -35,7 +35,7 @@ export interface p extends LeafletEventHandlerFnMap {}
 function onDragEnd(firecall: Firecall, event: L.DragEndEvent, email?: string) {
   const newPos = (event.target as L.Marker)?.getLatLng();
   if (newPos) {
-    setDoc(
+    setDocLocal(
       doc(firestore, FIRECALL_COLLECTION_ID, firecall?.id || 'unknown'),
       {
         lat: newPos.lat,

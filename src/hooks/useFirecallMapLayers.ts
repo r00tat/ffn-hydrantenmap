@@ -11,7 +11,7 @@ import {
 import { firestore } from '../components/firebase/firebase';
 import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
 import { useSnackbar } from '../components/providers/SnackbarProvider';
-import { addDoc, deleteDoc, setDoc } from '../lib/firestoreClient';
+import { addDocLocal, deleteDocLocal, setDocLocal } from '../lib/firestoreClient';
 import { useAuditLog } from './useAuditLog';
 import useFirebaseCollection from './useFirebaseCollection';
 import useFirebaseLogin from './useFirebaseLogin';
@@ -94,7 +94,7 @@ export function useFirecallMapLayerActions(): MapLayerActions {
         creator: email,
       };
       try {
-        const docRef = await addDoc(mapLayerCollection(), data);
+        const docRef = addDocLocal(mapLayerCollection(), data);
         logChange({
           action: 'create',
           elementType: 'mapLayer',
@@ -121,7 +121,7 @@ export function useFirecallMapLayerActions(): MapLayerActions {
         updatedBy: email,
       };
       try {
-        await setDoc(doc(mapLayerCollection(), layer.id), data);
+        setDocLocal(doc(mapLayerCollection(), layer.id), data);
         logChange({
           action: 'update',
           elementType: 'mapLayer',
@@ -142,7 +142,7 @@ export function useFirecallMapLayerActions(): MapLayerActions {
     async (layer: FirecallMapLayer) => {
       if (!layer.id) return;
       try {
-        await deleteDoc(doc(mapLayerCollection(), layer.id));
+        deleteDocLocal(doc(mapLayerCollection(), layer.id));
         logChange({
           action: 'delete',
           elementType: 'mapLayer',

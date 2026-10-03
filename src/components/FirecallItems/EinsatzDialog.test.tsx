@@ -8,14 +8,19 @@ vi.mock('server-only', () => ({}));
 
 // --- Mocks for module-level dependencies -------------------------------------
 
-const addDocMock = vi.fn(
-  async (..._args: unknown[]) => ({ id: 'new-firecall-id' }),
-);
-const setDocMock = vi.fn(async (..._args: unknown[]) => undefined);
+// Lokale Schreibhelfer kehren sofort zurück. Die wartenden Varianten erfüllen
+// sich nie — so verhält sich Firestore offline. Der Dialog darf sie nicht
+// benutzen, sonst hinge er.
+const addDocMock = vi.fn((..._args: unknown[]) => ({ id: 'new-firecall-id' }));
+const setDocMock = vi.fn((..._args: unknown[]) => undefined);
 vi.mock('../../lib/firestoreClient', () => ({
-  addDoc: (...args: unknown[]) => addDocMock(...args),
-  setDoc: (...args: unknown[]) => setDocMock(...args),
+  addDocLocal: (...args: unknown[]) => addDocMock(...args),
+  setDocLocal: (...args: unknown[]) => setDocMock(...args),
+  addDoc: () => new Promise<never>(() => {}),
+  setDoc: () => new Promise<never>(() => {}),
 }));
+
+const selectFirecallMock = vi.fn();
 
 vi.mock('firebase/firestore', () => ({
   arrayRemove: vi.fn(),
@@ -58,7 +63,7 @@ vi.mock('../../hooks/useFirebaseLogin', () => ({
 }));
 
 vi.mock('../../hooks/useFirecall', () => ({
-  useFirecallSelect: () => vi.fn(),
+  useFirecallSelect: () => selectFirecallMock,
 }));
 
 vi.mock('../inputs/FileUploader', () => ({ default: () => null }));
@@ -83,7 +88,7 @@ const einsatzFromAlarm = {
 describe('EinsatzDialog duplicate check', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    addDocMock.mockResolvedValue({ id: 'new-firecall-id' });
+    addDocMock.mockReturnValue({ id: 'new-firecall-id' });
     getBlaulichtSmsAlarmsMock.mockResolvedValue([]);
     getFirecallsByAlarmIdsMock.mockResolvedValue({});
   });
@@ -180,5 +185,49 @@ describe('EinsatzDialog duplicate check', () => {
       expect.stringContaining('Prüfung'),
       'warning',
     );
+  });
+});
+
+describe('EinsatzDialog offline', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    addDocMock.mockReturnValue({ id: 'local-firecall-id' });
+    getBlaulichtSmsAlarmsMock.mockResolvedValue([]);
+  });
+
+  it('closes and selects the new firecall although the server never confirms', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <EinsatzDialog
+        einsatz={{ name: 'Offline-Einsatz', group: 'ffnd', deleted: false }}
+        onClose={onClose}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: /hinzufügen|speichern/i }),
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(selectFirecallMock).toHaveBeenCalledWith('local-firecall-id');
+  });
+
+  it('closes after editing an existing firecall without waiting for the server', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <EinsatzDialog
+        einsatz={{ id: 'fc-1', name: 'Bestand', group: 'ffnd', deleted: false }}
+        onClose={onClose}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: /aktualisieren|speichern/i }),
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(setDocMock).toHaveBeenCalledTimes(1);
   });
 });

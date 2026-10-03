@@ -37,7 +37,7 @@ import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useOwnFleet from '../../hooks/useOwnFleet';
 import { sortVehiclesOwnFirst } from '../../common/vehicleGroups';
 import useVehicles from '../../hooks/useVehicles';
-import { updateDoc } from '../../lib/firestoreClient';
+import { updateDocLocal } from '../../lib/firestoreClient';
 import { firestore } from '../firebase/firebase';
 import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import AtemschutzHeader from './AtemschutzHeader';
@@ -170,7 +170,7 @@ export default function AtemschutzPage() {
   const handleSaveLeitung = useCallback(
     async (leiter: string, fuellpersonal: string[]) => {
       if (!firecallId || firecallId === 'unknown') return;
-      await updateDoc(doc(firestore, FIRECALL_COLLECTION_ID, firecallId), {
+      updateDocLocal(doc(firestore, FIRECALL_COLLECTION_ID, firecallId), {
         asspLeiter: leiter,
         asspFuellpersonal: fuellpersonal,
       });
@@ -270,8 +270,9 @@ export default function AtemschutzPage() {
         await schreibeTagebuch({ ...trupp, ...patch }, 'rueckkehr');
       }
       // Auch ein am Sammelplatz zugeteilter Trupp braucht die Terminplanung —
-      // sie stellt fest, dass für ihn (noch) nichts fällig ist.
-      await planeUeberwachungWarnung(firecallId, trupp.id).catch((err) => {
+      // sie stellt fest, dass für ihn (noch) nichts fällig ist. Nicht
+      // abgewartet: Eine Server Action hängt offline, der Dialog soll es nicht.
+      void planeUeberwachungWarnung(firecallId, trupp.id).catch((err) => {
         console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
       });
     },

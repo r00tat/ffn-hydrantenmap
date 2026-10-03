@@ -1,7 +1,7 @@
 'use client';
 
 import { doc } from 'firebase/firestore';
-import { setDoc } from '../../../../../lib/firestoreClient';
+import { setDocLocal } from '../../../../../lib/firestoreClient';
 import { firestore } from '../../../../firebase/firebase';
 import {
   FIRECALL_COLLECTION_ID,
@@ -171,17 +171,22 @@ export async function ensureConnectionElevation(
         };
   }
 
-  await setDoc(
-    doc(
-      firestore,
-      FIRECALL_COLLECTION_ID,
-      firecallId,
-      FIRECALL_ITEMS_COLLECTION_ID,
-      item.id
-    ),
-    update,
-    { merge: true }
-  ).catch((err) => console.error('unable to save elevation profile', err));
+  try {
+    // Lokal: wartet nicht auf den Server, siehe `setDocLocal`.
+    setDocLocal(
+      doc(
+        firestore,
+        FIRECALL_COLLECTION_ID,
+        firecallId,
+        FIRECALL_ITEMS_COLLECTION_ID,
+        item.id
+      ),
+      update,
+      { merge: true }
+    );
+  } catch (err) {
+    console.error('unable to save elevation profile', err);
+  }
 
   return update;
 }

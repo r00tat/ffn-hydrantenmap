@@ -21,7 +21,7 @@ import {
   doc,
 } from 'firebase/firestore';
 import { useFormatter, useTranslations } from 'next-intl';
-import { addDoc, setDoc } from '../../lib/firestoreClient';
+import { addDocLocal, setDocLocal } from '../../lib/firestoreClient';
 import { StorageReference } from 'firebase/storage';
 import { useCallback, useEffect, useState } from 'react';
 import { GeoPositionObject } from '../../common/geo';
@@ -215,7 +215,8 @@ export default function EinsatzDialog({
       }));
       if (einsatz.id) {
         try {
-          await setDoc(
+          // Lokal: Ablehnungen beim Synchronisieren meldet die Fehlerliste.
+          setDocLocal(
             doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
             { attachments: arrayUnion(...newUrls) },
             { merge: true }
@@ -246,8 +247,11 @@ export default function EinsatzDialog({
       }));
     };
 
+  // Schreibt lokal und wartet nicht auf den Server: Offline kehrte ein
+  // `await addDoc` nie zurück, der Dialog bliebe auf „Speichern…" stehen und
+  // der neue Einsatz würde nie ausgewählt. Die ID entsteht auf dem Gerät.
   const saveEinsatz = useCallback(
-    async (fc: Firecall) => {
+    (fc: Firecall) => {
       if (fc.id) {
         // update
         const updatePayload = stripNullish({
@@ -255,7 +259,7 @@ export default function EinsatzDialog({
           updatedAt: new Date().toISOString(),
           updatedBy: email,
         });
-        await setDoc(
+        setDocLocal(
           doc(firestore, FIRECALL_COLLECTION_ID, fc.id),
           updatePayload,
           { merge: true }
@@ -267,7 +271,7 @@ export default function EinsatzDialog({
           lat: position.lat,
           lng: position.lng,
         });
-        const newDoc = await addDoc(
+        const newDoc = addDocLocal(
           collection(firestore, FIRECALL_COLLECTION_ID),
           firecallData
         );
@@ -285,7 +289,7 @@ export default function EinsatzDialog({
     async (fc: Firecall) => {
       setSaving(true);
       try {
-        await saveEinsatz(fc);
+        saveEinsatz(fc);
         setOpen(false);
         onClose(fc);
       } catch (err) {
@@ -501,7 +505,7 @@ export default function EinsatzDialog({
                     ),
                   }));
                   if (einsatz.id) {
-                    await setDoc(
+                    setDocLocal(
                       doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
                       { attachments: arrayRemove(deletedUrl) },
                       { merge: true }

@@ -27,7 +27,7 @@ import React, {
 import { StorageReference } from 'firebase/storage';
 import { arrayUnion, doc, where } from 'firebase/firestore';
 import { useTranslations } from 'next-intl';
-import { setDoc } from '../../lib/firestoreClient';
+import { setDocLocal } from '../../lib/firestoreClient';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
@@ -186,7 +186,7 @@ export default function FirecallItemDialog({
     async (refs: StorageReference[]) => {
       try {
         const uris = refs.map((r) => r.toString());
-        await setDoc(
+        setDocLocal(
           doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
           { attachments: arrayUnion(...uris) },
           { merge: true },

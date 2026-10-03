@@ -18,7 +18,7 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
-import { setDoc } from '../../lib/firestoreClient';
+import { setDocLocal } from '../../lib/firestoreClient';
 import { StorageReference } from 'firebase/storage';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -140,7 +140,7 @@ export default function EinsatzDetails() {
 
   const updateFirecall = useCallback(
     async (fc: Firecall) => {
-      await setDoc(
+      setDocLocal(
         doc(firestore, FIRECALL_COLLECTION_ID, '' + fc.id),
         { ...fc, updatedAt: new Date().toISOString(), updatedBy: email },
         { merge: true }
@@ -175,7 +175,7 @@ export default function EinsatzDetails() {
       );
       if (firecallId && firecallId !== 'unknown') {
         try {
-          await setDoc(
+          setDocLocal(
             doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
             { attachments: arrayUnion(...newUrls) },
             { merge: true }
@@ -214,7 +214,7 @@ export default function EinsatzDetails() {
           : prev
       );
       if (firecallId && firecallId !== 'unknown') {
-        await setDoc(
+        setDocLocal(
           doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
           { attachments: arrayRemove(deletedUrl) },
           { merge: true }

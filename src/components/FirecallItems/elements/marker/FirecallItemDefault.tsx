@@ -1,5 +1,5 @@
 import { doc } from 'firebase/firestore';
-import { setDoc } from '../../../../lib/firestoreClient';
+import { setDocLocal } from '../../../../lib/firestoreClient';
 import L from 'leaflet';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { defaultPosition } from '../../../../hooks/constants';
@@ -55,7 +55,7 @@ async function updateFircallItemPos(
       lng: newPos.lng,
     };
 
-    await setDoc(
+    setDocLocal(
       doc(
         firestore,
         FIRECALL_COLLECTION_ID,
@@ -93,7 +93,7 @@ async function updateFirecallItemRotation(
   // liefert. Gespeichert wird auf ganze Grad gerundet.
   const newRotation = String(Math.round(rotation) % 360);
 
-  await setDoc(
+  setDocLocal(
     doc(
       firestore,
       FIRECALL_COLLECTION_ID,
