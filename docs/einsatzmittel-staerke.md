@@ -131,8 +131,9 @@ Erkennungsmerkmal eines eigenen Fahrzeugs ist der **Name**: Eigen sind die
 vorgefertigten Fahrzeuge — dieselbe Liste der Kostenersatz-Fahrzeuge, aus der
 die Chip-Leiste Fahrzeuge anlegt (`useKostenersatzVehicles`). Die
 Feuerwehrangabe allein trägt nicht, weil sie im Fahrzeugdialog leer vorbelegt
-ist: Ein von Hand angelegter Rettungswagen hat ebenso keine wie viele
-gewachsene Einträge der eigenen Wehr.
+ist: Kommen mehrere Feuerwehren zum Einsatz, wird sie bei den fremden
+Fahrzeugen leicht vergessen. Ein solches Fahrzeug hat dann ebenso keine wie
+viele gewachsene Einträge der eigenen Wehr — erst der Name trennt die beiden.
 
 Die Regel in der Reihenfolge, in der sie geprüft wird (`isOwnVehicle()`):
 
