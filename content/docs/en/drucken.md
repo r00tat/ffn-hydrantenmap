@@ -10,7 +10,7 @@ The print function generates a comprehensive operation report that summarises al
 - Resource details: type, name, details, position (grouped by layer)
 - Operation sites with status, addresses, times and vehicles
 - Measurements (spectrum/radiation data) if available
-- Operation log entries
+- Operation log entries (compact: no., time, from/to and the entry with bold title, description and done note)
 - Business log entries
 - Print-optimised CSS layout with page breaks
 

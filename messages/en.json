@@ -742,9 +742,58 @@
       "abruecken": "Departed at",
       "gps": "GPS position",
       "coordinates": "Coordinates",
-      "plainName": "Name"
+      "plainName": "Name",
+      "numberShort": "No.",
+      "time": "Time",
+      "fromTo": "From / To",
+      "entry": "Entry"
     },
-    "mapImageAlt": "Operations map"
+    "mapImageAlt": "Operations map",
+    "doneAt": "✓ done {time}"
+  },
+  "sybos": {
+    "title": "Transfer to Sybos",
+    "intro": "All details of the operation, ready to be copied into the Sybos operation report. Each field can be copied on its own.",
+    "copy": "Copy",
+    "copyAll": "Copy all",
+    "copied": "Copied to clipboard",
+    "copyFailed": "Copying failed — please select the text and copy it manually.",
+    "empty": "No data available.",
+    "sectionBasis": "Basic data",
+    "sectionAblauf": "Course of operation",
+    "sectionKraefte": "Forces and equipment",
+    "sectionNotizen": "Other notes",
+    "sectionTagebuch": "Operation diary",
+    "basis": {
+      "name": "Operation",
+      "fw": "Fire brigade",
+      "beginn": "Start",
+      "alarmierung": "Alarm",
+      "eintreffen": "Arrival",
+      "ende": "End",
+      "dauer": "Duration",
+      "einsatzort": "Location",
+      "beschreibung": "Description"
+    },
+    "ablaufHint": "Summary of the operation by Gemini, split into the two Sybos fields. The texts are stored with the operation and can be edited.",
+    "generate": "Create with AI",
+    "regenerate": "Recreate",
+    "generating": "Creating...",
+    "generateFailed": "The summary could not be created. Please try again later.",
+    "saveFailed": "The text could not be saved.",
+    "aiReview": "AI-generated text — please check for accuracy before transferring.",
+    "summaryPlaceholder": "Not created yet",
+    "einsatzablauf": "Course of operation",
+    "taetigkeit": "Activities / remarks",
+    "eigeneKraefte": "Own vehicles and units",
+    "mannschaft": "Crew",
+    "sonstigeKraefte": "Other forces",
+    "material": "Equipment used",
+    "einsatzorte": "Operation sites",
+    "geschaeftsbuch": "Business log",
+    "summeEigene": "Own: {units} units, {persons} persons",
+    "summeFremde": "Other: {units} units, {persons} persons",
+    "summeAts": "{count} BA wearers"
   },
   "passkey": {
     "or": "or",
@@ -1062,7 +1111,8 @@
     "users": "Users",
     "connectedApps": "Connected applications",
     "adminMcp": "MCP access",
-    "fuellprotokoll": "Filling log"
+    "fuellprotokoll": "Filling log",
+    "sybos": "Sybos transfer"
   },
   "fahrtenbuch": {
     "title": "Trip log",
@@ -2725,7 +2775,8 @@
     "wetter": "Weather",
     "drucken": "Printing",
     "admin": "Administration",
-    "mcp": "MCP / Claude"
+    "mcp": "MCP / Claude",
+    "sybos": "Sybos transfer"
   },
   "users": {
     "title": "Users",

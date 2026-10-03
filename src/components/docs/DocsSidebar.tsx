@@ -32,6 +32,7 @@ const docPages = [
   { key: 'geschaeftsbuch', href: '/docs/geschaeftsbuch' },
   { key: 'wetter', href: '/docs/wetter' },
   { key: 'drucken', href: '/docs/drucken' },
+  { key: 'sybos', href: '/docs/sybos' },
   { key: 'admin', href: '/docs/admin' },
 ] as const;
 

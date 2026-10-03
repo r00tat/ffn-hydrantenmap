@@ -742,9 +742,58 @@
       "abruecken": "Abrücken",
       "gps": "GPS Position",
       "coordinates": "Koordinaten",
-      "plainName": "Name"
+      "plainName": "Name",
+      "numberShort": "Nr.",
+      "time": "Zeit",
+      "fromTo": "Von / An",
+      "entry": "Eintrag"
     },
-    "mapImageAlt": "Einsatzkarte"
+    "mapImageAlt": "Einsatzkarte",
+    "doneAt": "✓ erledigt {time}"
+  },
+  "sybos": {
+    "title": "Übertrag nach Sybos",
+    "intro": "Alle Angaben des Einsatzes zum Abschreiben in die Einsatzdokumentation von Sybos. Jedes Feld lässt sich einzeln kopieren.",
+    "copy": "Kopieren",
+    "copyAll": "Alles kopieren",
+    "copied": "In die Zwischenablage kopiert",
+    "copyFailed": "Kopieren nicht möglich — bitte den Text markieren und manuell kopieren.",
+    "empty": "Keine Angaben vorhanden.",
+    "sectionBasis": "Basisdaten",
+    "sectionAblauf": "Einsatzablauf",
+    "sectionKraefte": "Kräfte und Material",
+    "sectionNotizen": "Sonstige Notizen",
+    "sectionTagebuch": "Einsatztagebuch",
+    "basis": {
+      "name": "Einsatz",
+      "fw": "Feuerwehr",
+      "beginn": "Einsatzbeginn",
+      "alarmierung": "Alarmierung",
+      "eintreffen": "Eintreffen",
+      "ende": "Einsatzende",
+      "dauer": "Einsatzdauer",
+      "einsatzort": "Einsatzort",
+      "beschreibung": "Beschreibung"
+    },
+    "ablaufHint": "Zusammenfassung des Einsatzes durch Gemini, aufgeteilt auf die beiden Sybos-Felder. Die Texte werden am Einsatz gespeichert und können bearbeitet werden.",
+    "generate": "Mit KI erstellen",
+    "regenerate": "Neu erstellen",
+    "generating": "Wird erstellt...",
+    "generateFailed": "Die Zusammenfassung konnte nicht erstellt werden. Bitte später erneut versuchen.",
+    "saveFailed": "Der Text konnte nicht gespeichert werden.",
+    "aiReview": "KI-generierter Text — bitte vor dem Übertrag auf Richtigkeit prüfen.",
+    "summaryPlaceholder": "Noch nicht erstellt",
+    "einsatzablauf": "Einsatzablauf",
+    "taetigkeit": "Tätigkeit / Bemerkungen",
+    "eigeneKraefte": "Eigene Fahrzeuge und Einheiten",
+    "mannschaft": "Mannschaft",
+    "sonstigeKraefte": "Sonstige Kräfte",
+    "material": "Eingesetztes Material",
+    "einsatzorte": "Einsatzorte",
+    "geschaeftsbuch": "Geschäftsbuch",
+    "summeEigene": "Eigene: {units} Einsatzmittel, {persons} Personen",
+    "summeFremde": "Sonstige: {units} Einsatzmittel, {persons} Personen",
+    "summeAts": "{count} ATS"
   },
   "passkey": {
     "or": "oder",
@@ -1062,7 +1111,8 @@
     "users": "Users",
     "connectedApps": "Verbundene Anwendungen",
     "adminMcp": "MCP-Zugänge",
-    "fuellprotokoll": "Füllprotokoll"
+    "fuellprotokoll": "Füllprotokoll",
+    "sybos": "Sybos-Übertrag"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -2725,7 +2775,8 @@
     "wetter": "Wetter",
     "drucken": "Drucken",
     "admin": "Administration",
-    "mcp": "MCP / Claude"
+    "mcp": "MCP / Claude",
+    "sybos": "Sybos-Übertrag"
   },
   "users": {
     "title": "Benutzer",

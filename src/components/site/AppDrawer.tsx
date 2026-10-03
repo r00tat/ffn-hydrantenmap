@@ -40,6 +40,7 @@ import UserIcon from '@mui/icons-material/Person';
 import PinIcon from '@mui/icons-material/Pin';
 import PlaceIcon from '@mui/icons-material/Place';
 import PrintIcon from '@mui/icons-material/Print';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import PropaneTankIcon from '@mui/icons-material/PropaneTank';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SensorsIcon from '@mui/icons-material/Sensors';
@@ -307,6 +308,14 @@ export default function AppDrawer({
           icon: <PrintIcon />,
           href: '/print',
           einsatzSection: 'print',
+        },
+        {
+          // Neben „Drucken": dieselbe Gesamtsicht auf den Einsatz, aber als
+          // Felder zum Abschreiben in die Einsatzdokumentation von Sybos.
+          text: t('sybos'),
+          icon: <AssignmentTurnedInIcon />,
+          href: '/sybos',
+          einsatzSection: 'sybos',
         },
       ],
     },

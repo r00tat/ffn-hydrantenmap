@@ -621,6 +621,13 @@ export interface Firecall {
   asspFuellpersonal?: string[];
   attachments?: string[];
   /**
+   * Die beiden Freitextfelder des Sybos-Einsatzberichts, von Gemini erstellt
+   * und von Hand korrigierbar. Am Einsatz gespeichert, damit sie nicht bei
+   * jedem Öffnen der Seite neu erzeugt werden (siehe docs/sybos-uebertrag.md).
+   */
+  sybosEinsatzablauf?: string;
+  sybosTaetigkeit?: string;
+  /**
    * Ordner dieses Einsatzes im Google Drive der Gruppe. Wird beim ersten
    * Foto-Upload gesetzt; bleibt die Wahrheit auch dann, wenn der Ordner in
    * Drive später umbenannt wird.

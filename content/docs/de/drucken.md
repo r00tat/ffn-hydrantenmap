@@ -10,7 +10,7 @@ Die Druckfunktion erstellt einen umfassenden Einsatzbericht, der alle relevanten
 - Einsatzmittel-Details: Typ, Name, Details, Position (nach Ebenen gruppiert)
 - Einsatzorte mit Status, Adressen, Zeiten und Fahrzeugen
 - Messwerte (Spektrum/Strahlungsdaten) falls vorhanden
-- Einsatztagebuch-Einträge
+- Einsatztagebuch-Einträge (kompakt: Nr., Zeit, Von/An und der Eintrag mit fettem Titel, Beschreibung und Erledigt-Vermerk)
 - Geschäftsbuch-Einträge
 - Druckoptimiertes CSS-Layout mit Seitenumbrüchen
 
