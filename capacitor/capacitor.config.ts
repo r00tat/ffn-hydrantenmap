@@ -39,6 +39,13 @@ const config: CapacitorConfig = {
     ],
   },
   plugins: {
+    // Ohne eigenes Symbol nimmt Android das bunte Launcher-Icon, das in der
+    // Statusleiste als weisses Quadrat erscheint. Dasselbe einfarbige Symbol
+    // wie die Radiacode-Meldung (RadiacodeForegroundService).
+    LocalNotifications: {
+      smallIcon: 'ic_stat_einsatzkarte',
+      iconColor: '#d32f2f',
+    },
     FirebaseAuthentication: {
       skipNativeAuth: true,
       providers: ['google.com'],

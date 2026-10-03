@@ -20,6 +20,7 @@ import {
   useMangelFehlerText,
   type MangelEingabe,
 } from './mangelErfassung';
+import OnlineOnly from '../site/OnlineOnly';
 
 export interface AusruestungMangelDialogProps {
   open: boolean;
@@ -76,13 +77,15 @@ export default function AusruestungMangelDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{tCommon('cancel')}</Button>
-        <Button
-          variant="contained"
-          disabled={busy || !hatMangelEingabe(eingabe)}
-          onClick={handleSave}
-        >
-          {tCommon('save')}
-        </Button>
+        <OnlineOnly>
+          <Button
+            variant="contained"
+            disabled={busy || !hatMangelEingabe(eingabe)}
+            onClick={handleSave}
+          >
+            {tCommon('save')}
+          </Button>
+        </OnlineOnly>
       </DialogActions>
     </Dialog>
   );

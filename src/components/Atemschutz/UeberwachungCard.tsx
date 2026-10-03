@@ -37,6 +37,7 @@ import {
   type Dringlichkeit,
 } from '../../common/atemschutzUeberwachung';
 import DruckVerlaufChart from './DruckVerlaufChart';
+import PendingSyncIcon from '../site/PendingSyncIcon';
 import { ASSP_EINHEIT, istEinheitName, zuordnungKey } from './einheiten';
 
 export interface UeberwachungCardProps {
@@ -59,6 +60,11 @@ export interface UeberwachungCardProps {
   onErneutEinsatz: () => void;
   /** Zurückgekehrter Trupp geht zurück an den Sammelplatz. */
   onAnSammelplatz: () => void;
+  /**
+   * Änderungen am Trupp (z. B. die letzte Druckabfrage) liegen erst auf dem
+   * Gerät — `snapshot.metadata.hasPendingWrites`.
+   */
+  pendingSync?: boolean;
 }
 
 /** Eine Zeile des Druckverlaufs: Uhrzeit, Druck, wofür der Wert steht. */
@@ -91,6 +97,7 @@ export default function UeberwachungCard({
   onRueckkehr,
   onErneutEinsatz,
   onAnSammelplatz,
+  pendingSync = false,
 }: UeberwachungCardProps) {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
@@ -504,6 +511,7 @@ export default function UeberwachungCard({
             <Divider sx={{ my: 1.5 }} />
             <Typography variant="caption" color="text.secondary">
               {t('ueberwachung.druckverlauf')}
+              {pendingSync && <PendingSyncIcon />}
             </Typography>
             {/* Eine Zeile je Wert und keine Kette mit Pfeilen: Am
                 Einsatzort wird das im Vorbeigehen gelesen, und drei

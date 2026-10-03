@@ -26,6 +26,7 @@ import {
 } from '../../common/atemschutz';
 import { isFirecallGuest } from '../../common/firecallGuest';
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
+import OfflineListHint from '../site/OfflineListHint';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
@@ -37,7 +38,7 @@ import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useOwnFleet from '../../hooks/useOwnFleet';
 import { sortVehiclesOwnFirst } from '../../common/vehicleGroups';
 import useVehicles from '../../hooks/useVehicles';
-import { updateDoc } from '../../lib/firestoreClient';
+import { updateDocLocal } from '../../lib/firestoreClient';
 import { firestore } from '../firebase/firebase';
 import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import AtemschutzHeader from './AtemschutzHeader';
@@ -62,7 +63,7 @@ import { buildFuellungDocument } from './fuellungErfassung';
 import AusruestungTab from './AusruestungTab';
 import FuellprotokollTab from './FuellprotokollTab';
 import TruppsTab from './TruppsTab';
-import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
+import { planWarningOrQueue } from './ueberwachungWarnungQueue';
 import useTruppTagebuch from './useTruppTagebuch';
 
 export default function AtemschutzPage() {
@@ -102,7 +103,8 @@ export default function AtemschutzPage() {
   const groupId = firecall?.group;
   const { flaschen, activeGeraete, fuellstationen, feuerwehren } =
     useAtemschutzGeraete(groupId);
-  const { trupps, ausgabeByGeraet } = useAtemschutzEinsatzdaten(firecallId);
+  const { trupps, ausgabeByGeraet, fromCache } =
+    useAtemschutzEinsatzdaten(firecallId);
   // Das Füllprotokoll liegt unter der Gruppe; hier wird es auf diesen Einsatz
   // eingeschränkt.
   const { fuellungen, flaschenGesamt } = useAtemschutzFuellungen(groupId, {
@@ -170,7 +172,7 @@ export default function AtemschutzPage() {
   const handleSaveLeitung = useCallback(
     async (leiter: string, fuellpersonal: string[]) => {
       if (!firecallId || firecallId === 'unknown') return;
-      await updateDoc(doc(firestore, FIRECALL_COLLECTION_ID, firecallId), {
+      updateDocLocal(doc(firestore, FIRECALL_COLLECTION_ID, firecallId), {
         asspLeiter: leiter,
         asspFuellpersonal: fuellpersonal,
       });
@@ -270,8 +272,10 @@ export default function AtemschutzPage() {
         await schreibeTagebuch({ ...trupp, ...patch }, 'rueckkehr');
       }
       // Auch ein am Sammelplatz zugeteilter Trupp braucht die Terminplanung —
-      // sie stellt fest, dass für ihn (noch) nichts fällig ist.
-      await planeUeberwachungWarnung(firecallId, trupp.id).catch((err) => {
+      // sie stellt fest, dass für ihn (noch) nichts fällig ist. Nicht
+      // abgewartet: Eine Server Action hängt offline, der Dialog soll es nicht.
+      // Offline reiht `planWarningOrQueue` die Planung zum Nachholen ein.
+      void planWarningOrQueue(firecallId, trupp.id).catch((err) => {
         console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
       });
     },
@@ -410,6 +414,14 @@ export default function AtemschutzPage() {
           />
         ))}
 
+      {(tab === 'trupps' || tab === 'ausruestung') && (
+        <OfflineListHint
+          fromCache={fromCache}
+          // Im Ausrüstungsreiter zeigt die Liste den Gerätebestand; dass
+          // nichts ausgegeben ist, ist dort kein leerer Reiter.
+          empty={tab === 'trupps' && trupps.protokoll.length === 0}
+        />
+      )}
       {tab === 'trupps' && (
         <TruppsTab
           trupps={trupps}

@@ -27,7 +27,8 @@ import useFirecallLocations from '../../../hooks/useFirecallLocations';
 import useFirecallWriteAccess from '../../../hooks/useFirecallWriteAccess';
 import { useFirecallKostenersatz } from '../../../hooks/useKostenersatz';
 import useVehicles from '../../../hooks/useVehicles';
-import { setDoc } from '../../../lib/firestoreClient';
+import { setDocLocal } from '../../../lib/firestoreClient';
+import OnlineOnly from '../../site/OnlineOnly';
 import { firestore } from '../../firebase/firebase';
 import { downloadText } from '../../firebase/download';
 import {
@@ -382,10 +383,13 @@ export default function SybosPage() {
   const [generating, setGenerating] = useState(false);
 
   const saveSummary = useCallback(
-    async (fields: { sybosEinsatzablauf?: string; sybosTaetigkeit?: string }) => {
+    (fields: { sybosEinsatzablauf?: string; sybosTaetigkeit?: string }) => {
       if (!firecall.id || !canWrite) return;
+      // Lokal schreiben: Offline landet der Text sofort im Cache und wird
+      // nach dem Reconnect übertragen; eine Ablehnung des Servers meldet der
+      // Verbindungs-Chip (syncErrors), nicht dieser Dialog.
       try {
-        await setDoc(
+        setDocLocal(
           doc(firestore, FIRECALL_COLLECTION_ID, firecall.id),
           {
             ...fields,
@@ -458,7 +462,7 @@ export default function SybosPage() {
       );
       setEinsatzablauf(summary.einsatzablauf);
       setTaetigkeit(summary.taetigkeit);
-      await saveSummary({
+      saveSummary({
         sybosEinsatzablauf: summary.einsatzablauf,
         sybosTaetigkeit: summary.taetigkeit,
       });
@@ -549,16 +553,18 @@ export default function SybosPage() {
           // Ergebnis nicht speichern, der Aufruf kostete nur Kontingent.
           action={
             canWrite && (
-              <Button
-                variant="contained"
-                startIcon={
-                  generating ? <CircularProgress size={20} color="inherit" /> : <AutoAwesomeIcon />
-                }
-                onClick={generate}
-                disabled={generating}
-              >
-                {generating ? t('generating') : hasSummary ? t('regenerate') : t('generate')}
-              </Button>
+              <OnlineOnly>
+                <Button
+                  variant="contained"
+                  startIcon={
+                    generating ? <CircularProgress size={20} color="inherit" /> : <AutoAwesomeIcon />
+                  }
+                  onClick={generate}
+                  disabled={generating}
+                >
+                  {generating ? t('generating') : hasSummary ? t('regenerate') : t('generate')}
+                </Button>
+              </OnlineOnly>
             )
           }
         >

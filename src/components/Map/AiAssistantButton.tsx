@@ -19,6 +19,7 @@ import { FirecallItem } from '../firebase/firestore';
 import type { AiAssistantResult } from '../../hooks/aiAssistant/types';
 import AiActionToast, { AiToastState } from './AiActionToast';
 import AiMemoryNotes from './AiMemoryNotes';
+import { useOnlineOnly } from '../site/OnlineOnly';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { speakMessage } from '../../common/speech';
 import { LatencyRun, startLatencyRun } from '../../hooks/aiAssistant/latency';
@@ -67,6 +68,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
   const { processAudio, processText, undoLastAction, processingStatus } = useAiAssistant(firecallItems);
   const { confirmAllDrafts, discardAllDrafts } = useHoseLineDraft();
+  const { offline, hint: offlineHint } = useOnlineOnly();
 
   const [toast, setToast] = useState<AiToastState>({
     open: false,
@@ -285,6 +287,9 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         : null;
 
   const isOpen = live.isActive || isRecording;
+  // Der Assistent braucht den Server (Gemini). Offline erkennbar deaktiviert —
+  // ein laufendes Gespräch bzw. eine Aufnahme bleibt aber beendbar.
+  const aiOffline = offline && !isOpen;
 
   return (
     <>
@@ -338,7 +343,9 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         )}
         <Tooltip
           title={
-            live.isActive
+            aiOffline
+              ? offlineHint
+              : live.isActive
               ? 'Gespräch beenden'
               : isRecording
                 ? 'Klicken zum Stoppen'
@@ -351,7 +358,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
               aria-label="AI assistant"
               size="small"
               onClick={handleClick}
-              disabled={isProcessing}
+              disabled={isProcessing || aiOffline}
               sx={{
                 animation: isOpen ? 'pulse 1s infinite' : 'none',
                 '@keyframes pulse': {

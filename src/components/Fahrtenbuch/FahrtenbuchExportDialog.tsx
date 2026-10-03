@@ -19,6 +19,7 @@ import { useState } from 'react';
 import type { FahrtenbuchVehicle } from '../../common/fahrtenbuch';
 import { downloadBlob } from '../firebase/download';
 import { exportFahrtenbuchPdf } from './fahrtenbuchExportActions';
+import OnlineOnly from '../site/OnlineOnly';
 
 /**
  * Die Fehlerschlüssel, die `exportFahrtenbuchPdf` melden kann. Alles andere
@@ -246,9 +247,11 @@ export default function FahrtenbuchExportDialog({
         <Button onClick={onClose} disabled={busy}>
           {t('cancel')}
         </Button>
-        <Button variant="contained" onClick={run} disabled={!canExport}>
-          {t('export.run')}
-        </Button>
+        <OnlineOnly>
+          <Button variant="contained" onClick={run} disabled={!canExport}>
+            {t('export.run')}
+          </Button>
+        </OnlineOnly>
       </DialogActions>
     </Dialog>
   );

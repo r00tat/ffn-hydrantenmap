@@ -14,12 +14,14 @@ vi.mock('../useFirecall', () => ({
 
 const mockCommitInBatches = vi.fn();
 
+// Lokale Helfer kehren sofort zurück; die wartenden erfüllen sich nie (wie
+// offline) und dürfen deshalb nicht benutzt werden.
 vi.mock('../../lib/firestoreClient', () => ({
-  addDoc: vi.fn(() => Promise.resolve({ id: 'h1' })),
-  commitInBatches: (...args: never[]) =>
-    (mockCommitInBatches as unknown as (...a: never[]) => Promise<void>)(
-      ...args
-    ),
+  addDocLocal: vi.fn(() => ({ id: 'h1' })),
+  commitInBatchesLocal: (...args: never[]) =>
+    (mockCommitInBatches as unknown as (...a: never[]) => void)(...args),
+  addDoc: () => new Promise<never>(() => {}),
+  commitInBatches: () => new Promise<never>(() => {}),
 }));
 
 vi.mock('firebase/firestore', () => ({
@@ -46,7 +48,7 @@ function writtenOperations(): Op[] {
 describe('useSaveHistory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCommitInBatches.mockResolvedValue(undefined);
+    mockCommitInBatches.mockReturnValue(undefined);
 
     vi.mocked(getDocs).mockImplementation((col: unknown) => {
       const path = (col as { path?: string }).path ?? '';

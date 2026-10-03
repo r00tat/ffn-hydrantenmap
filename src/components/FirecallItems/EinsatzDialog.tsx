@@ -21,13 +21,14 @@ import {
   doc,
 } from 'firebase/firestore';
 import { useFormatter, useTranslations } from 'next-intl';
-import { addDoc, setDoc } from '../../lib/firestoreClient';
+import { addDocLocal, setDocLocal } from '../../lib/firestoreClient';
 import { StorageReference } from 'firebase/storage';
 import { useCallback, useEffect, useState } from 'react';
 import { GeoPositionObject } from '../../common/geo';
 import { parseTimestamp } from '../../common/time-format';
 import { defaultPosition } from '../../hooks/constants';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useOnline from '../../hooks/useOnline';
 import { useFirecallSelect } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
@@ -35,6 +36,7 @@ import { useSnackbar } from '../providers/SnackbarProvider';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import AttachmentGallery from '../inputs/AttachmentGallery';
 import FileUploader from '../inputs/FileUploader';
+import Alert from '@mui/material/Alert';
 import {
   getBlaulichtSmsAlarms,
   getFirecallsByAlarmIds,
@@ -42,6 +44,7 @@ import {
 } from '../../app/blaulicht-sms/actions';
 import { getGroupsWithBlaulichtsmsConfig } from '../../app/blaulicht-sms/credentialsActions';
 import { stripNullish } from '../../common/stripNullish';
+import { withTimeout } from '../../lib/withTimeout';
 import {
   buildFirecallFromAlarm,
   buildNewFirecallPayload,
@@ -53,6 +56,9 @@ import {
   type ExistingFirecall,
 } from './duplicateFirecallCheck';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+
+/** Höchstwartezeit der Duplikatsprüfung, danach wird trotzdem gespeichert. */
+export const DUPLICATE_CHECK_TIMEOUT_MS = 8_000;
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -77,6 +83,10 @@ export default function EinsatzDialog({
   const format = useFormatter();
 
   const isNewEinsatz = !einsatzDefault;
+  // Offline gehen Blaulicht-SMS-Import und Duplikatsprüfung nicht: Beide sind
+  // Server Actions. Sie werden mit Hinweis übersprungen, der Einsatz lässt
+  // sich trotzdem anlegen — er entsteht lokal und wird später übertragen.
+  const online = useOnline();
 
   const [configuredGroups, setConfiguredGroups] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>(einsatz.group ?? '');
@@ -99,13 +109,16 @@ export default function EinsatzDialog({
 
   // Load which groups have BlaulichtSMS credentials (once on dialog mount).
   // The server filters this list by the caller's group membership.
+  // Offline nicht: Die Server Action hinge, bis der Ping die Verbindung
+  // zurückmeldet — dann lädt der Effekt nach.
   useEffect(() => {
+    if (!online) return;
     getGroupsWithBlaulichtsmsConfig()
       .then(setConfiguredGroups)
       .catch((err) =>
         console.error('Failed to load BlaulichtSMS configured groups:', err)
       );
-  }, []);
+  }, [online]);
 
   // For new Einsätze: default the group to the first one the user is a
   // member of as soon as `myGroups` is available. Avoids a hardcoded
@@ -215,7 +228,8 @@ export default function EinsatzDialog({
       }));
       if (einsatz.id) {
         try {
-          await setDoc(
+          // Lokal: Ablehnungen beim Synchronisieren meldet die Fehlerliste.
+          setDocLocal(
             doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
             { attachments: arrayUnion(...newUrls) },
             { merge: true }
@@ -246,8 +260,11 @@ export default function EinsatzDialog({
       }));
     };
 
+  // Schreibt lokal und wartet nicht auf den Server: Offline kehrte ein
+  // `await addDoc` nie zurück, der Dialog bliebe auf „Speichern…" stehen und
+  // der neue Einsatz würde nie ausgewählt. Die ID entsteht auf dem Gerät.
   const saveEinsatz = useCallback(
-    async (fc: Firecall) => {
+    (fc: Firecall) => {
       if (fc.id) {
         // update
         const updatePayload = stripNullish({
@@ -255,7 +272,7 @@ export default function EinsatzDialog({
           updatedAt: new Date().toISOString(),
           updatedBy: email,
         });
-        await setDoc(
+        setDocLocal(
           doc(firestore, FIRECALL_COLLECTION_ID, fc.id),
           updatePayload,
           { merge: true }
@@ -267,7 +284,7 @@ export default function EinsatzDialog({
           lat: position.lat,
           lng: position.lng,
         });
-        const newDoc = await addDoc(
+        const newDoc = addDocLocal(
           collection(firestore, FIRECALL_COLLECTION_ID),
           firecallData
         );
@@ -285,7 +302,7 @@ export default function EinsatzDialog({
     async (fc: Firecall) => {
       setSaving(true);
       try {
-        await saveEinsatz(fc);
+        saveEinsatz(fc);
         setOpen(false);
         onClose(fc);
       } catch (err) {
@@ -307,10 +324,25 @@ export default function EinsatzDialog({
       return;
     }
 
+    // Offline gibt es keine Duplikatsprüfung (Server Action). Im Einsatz geht
+    // das Anlegen vor — mit Hinweis, statt auf eine Zeitüberschreitung zu
+    // warten.
+    if (!online) {
+      showSnackbar(t('einsatzDialog.offlineDuplicateCheckSkipped'), 'info');
+      await persistAndClose(einsatz);
+      return;
+    }
+
     setSaving(true);
     let existing: ExistingFirecall[];
     try {
-      const firecallsByAlarmId = await getFirecallsByAlarmIds(selectedAlarmIds);
+      // Der Verbindungsstatus kann bis zu einem Ping-Intervall alt sein; im
+      // Funkloch hinge die Server Action sonst, bis der Browser aufgibt.
+      const firecallsByAlarmId = await withTimeout(
+        getFirecallsByAlarmIds(selectedAlarmIds),
+        DUPLICATE_CHECK_TIMEOUT_MS,
+        'getFirecallsByAlarmIds',
+      );
       existing = findExistingFirecallsForAlarms(
         selectedAlarmIds,
         firecallsByAlarmId,
@@ -333,7 +365,7 @@ export default function EinsatzDialog({
     }
 
     await persistAndClose(einsatz);
-  }, [selectedAlarmIds, einsatz, persistAndClose, showSnackbar, t]);
+  }, [selectedAlarmIds, einsatz, online, persistAndClose, showSnackbar, t]);
 
   const handleChange = (event: SelectChangeEvent) => {
     const newGroup = event.target.value;
@@ -346,6 +378,11 @@ export default function EinsatzDialog({
       <DialogTitle>{t('einsatzDialog.title')}</DialogTitle>
       <DialogContent>
         <DialogContentText>{t('einsatzDialog.subtitleNew')}</DialogContentText>
+        {!online && isNewEinsatz && (
+          <Alert severity="info" sx={{ my: 1 }}>
+            {t('einsatzDialog.offlineAlarmsSkipped')}
+          </Alert>
+        )}
         {alarmsLoading && (
           <DialogContentText
             sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 1 }}
@@ -487,7 +524,13 @@ export default function EinsatzDialog({
             <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
               {t('firecall.fields.attachments')}
             </Typography>
-            <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+            <FileUploader
+              onFileUploadComplete={handleFileUploadComplete}
+              offlineTarget={{
+                docPath: `${FIRECALL_COLLECTION_ID}/${einsatz.id}`,
+                field: 'attachments',
+              }}
+            />
             <Box sx={{ mt: 1 }}>
               <AttachmentGallery
                 urls={einsatz.attachments ?? []}
@@ -501,7 +544,7 @@ export default function EinsatzDialog({
                     ),
                   }));
                   if (einsatz.id) {
-                    await setDoc(
+                    setDocLocal(
                       doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
                       { attachments: arrayRemove(deletedUrl) },
                       { merge: true }

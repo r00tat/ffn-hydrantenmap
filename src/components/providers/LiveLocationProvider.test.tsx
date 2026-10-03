@@ -24,7 +24,7 @@ const setDocMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const deleteDocMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 
 vi.mock('../../lib/firestoreClient', () => ({
-  setDoc: setDocMock,
+  setDocLocal: setDocMock,
   deleteDoc: deleteDocMock,
 }));
 

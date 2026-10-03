@@ -18,6 +18,7 @@ Willkommen zur Dokumentation der Einsatzkarte. Hier findest du Anleitungen zu al
 - **Fahrzeuge** [Fahrzeuge hinzufügen, Zeitstempel verwalten, Besatzungsstärke, Karten-Positionierung](/docs/fahrzeuge)
 - **Einsatzmittel** [Übersicht aller Ressourcen mit Stärketabelle und Ebenen-Gruppierung](/docs/einsatzmittel)
 - **Einsatzorte** [Einsatzstellen verwalten, Status-Tracking, Fahrzeug-Zuordnung, E-Mail-Import](/docs/einsatzorte)
+- **Offline-Modus** [Ohne Internet weiterarbeiten, Verbindungsstatus, Synchronisation, Karte für offline vorbereiten, Atemschutz-Warnungen offline](/docs/offline)
 
 ## Kommunikation und KI
 

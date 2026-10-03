@@ -14,9 +14,9 @@ vi.mock('firebase/firestore', () => ({
   })),
 }));
 
-const setDoc = vi.fn(() => Promise.resolve());
+const setDoc = vi.fn(() => undefined);
 vi.mock('../../../../lib/firestoreClient', () => ({
-  setDoc: (...args: unknown[]) => setDoc(...(args as [])),
+  setDocLocal: (...args: unknown[]) => setDoc(...(args as [])),
 }));
 
 const computeStreetRoutedPositions = vi.fn();

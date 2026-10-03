@@ -18,6 +18,7 @@ Welcome to the operations map documentation. Here you will find guides for every
 - **Vehicles** [Add vehicles, manage timestamps, crew strength, map positioning](/docs/fahrzeuge)
 - **Resources** [Overview of all resources with strength table and layer grouping](/docs/einsatzmittel)
 - **Operation sites** [Manage operation sites, status tracking, vehicle assignment, email import](/docs/einsatzorte)
+- **Offline mode** [Keep working without internet, connection status, sync, prepare the map for offline use, breathing apparatus warnings offline](/docs/offline)
 
 ## Communication and AI
 

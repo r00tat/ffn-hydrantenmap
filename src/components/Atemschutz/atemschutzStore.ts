@@ -19,12 +19,26 @@ import {
   type TagebuchEreignis,
   type UeberwachungPatch,
 } from '../../common/atemschutz';
-import { addDoc, deleteDoc, updateDoc } from '../../lib/firestoreClient';
+import {
+  addDocLocal,
+  deleteDocLocal,
+  updateDocLocal,
+} from '../../lib/firestoreClient';
 import { firestore } from '../firebase/firebase';
 import {
   FIRECALL_COLLECTION_ID,
   GROUP_COLLECTION_ID,
 } from '../firebase/firestore';
+
+/*
+ * Alle Schreibvorgänge hier gehen **lokal** (`addDocLocal` & Co.): Sie stehen
+ * sofort im Firestore-Cache, und die Funktionen kehren zurück, ohne auf den
+ * Server zu warten. Am Sammelplatz und bei der Atemschutzüberwachung darf
+ * kein Dialog an einer fehlenden Verbindung hängen. Die Signaturen bleiben
+ * `async`, damit die Aufrufer unverändert `await` schreiben können — das
+ * Versprechen erfüllt sich sofort. Ablehnungen beim Synchronisieren meldet die
+ * Fehlerliste (`syncErrors.ts`).
+ */
 
 /** Wer geschrieben hat und wann — dieselben vier Felder wie überall sonst. */
 export interface AtemschutzActor {
@@ -87,7 +101,7 @@ export async function addFuellung(
   data: NeueFuellung,
   actor: AtemschutzActor,
 ): Promise<string> {
-  const ref = await addDoc(fuellungCollection(groupId), {
+  const ref = addDocLocal(fuellungCollection(groupId), {
     ...data,
     ...created(actor),
   });
@@ -100,7 +114,7 @@ export async function updateFuellung(
   patch: Partial<NeueFuellung>,
   actor: AtemschutzActor,
 ): Promise<void> {
-  await updateDoc(doc(fuellungCollection(groupId), fuellungId), {
+  updateDocLocal(doc(fuellungCollection(groupId), fuellungId), {
     ...patch,
     ...touched(actor),
   });
@@ -110,7 +124,7 @@ export async function deleteFuellung(
   groupId: string,
   fuellungId: string,
 ): Promise<void> {
-  await deleteDoc(doc(fuellungCollection(groupId), fuellungId));
+  deleteDocLocal(doc(fuellungCollection(groupId), fuellungId));
 }
 
 export type NeuerTrupp = Omit<
@@ -123,7 +137,7 @@ export async function addTrupp(
   data: NeuerTrupp,
   actor: AtemschutzActor,
 ): Promise<string> {
-  const ref = await addDoc(truppCollection(firecallId), {
+  const ref = addDocLocal(truppCollection(firecallId), {
     ...data,
     ...created(actor),
   });
@@ -136,7 +150,7 @@ export async function updateTrupp(
   patch: Partial<AtemschutzTrupp>,
   actor: AtemschutzActor,
 ): Promise<void> {
-  await updateDoc(doc(truppCollection(firecallId), truppId), {
+  updateDocLocal(doc(truppCollection(firecallId), truppId), {
     ...patch,
     ...touched(actor),
   });
@@ -146,7 +160,7 @@ export async function deleteTrupp(
   firecallId: string,
   truppId: string,
 ): Promise<void> {
-  await deleteDoc(doc(truppCollection(firecallId), truppId));
+  deleteDocLocal(doc(truppCollection(firecallId), truppId));
 }
 
 export type NeueAusgabe = Omit<
@@ -159,7 +173,7 @@ export async function addAusgabe(
   data: NeueAusgabe,
   actor: AtemschutzActor,
 ): Promise<string> {
-  const ref = await addDoc(ausgabeCollection(firecallId), {
+  const ref = addDocLocal(ausgabeCollection(firecallId), {
     ...data,
     ...created(actor),
   });
@@ -172,7 +186,7 @@ export async function updateAusgabe(
   patch: Partial<NeueAusgabe>,
   actor: AtemschutzActor,
 ): Promise<void> {
-  await updateDoc(doc(ausgabeCollection(firecallId), ausgabeId), {
+  updateDocLocal(doc(ausgabeCollection(firecallId), ausgabeId), {
     ...patch,
     ...touched(actor),
   });
@@ -198,7 +212,7 @@ export async function addDruckabfrage(
   abfrage: Druckabfrage,
   actor: AtemschutzActor,
 ): Promise<void> {
-  await updateDoc(doc(truppCollection(firecallId), trupp.id as string), {
+  updateDocLocal(doc(truppCollection(firecallId), trupp.id as string), {
     abfragen: arrayUnion(abfrage),
     ueberwachungUids: mitUeberwachungsUid(
       trupp.ueberwachungUids,
@@ -221,7 +235,7 @@ export async function updateUeberwachung(
   patch: UeberwachungPatch,
   actor: AtemschutzActor,
 ): Promise<void> {
-  await updateDoc(doc(truppCollection(firecallId), truppId), {
+  updateDocLocal(doc(truppCollection(firecallId), truppId), {
     ...patch,
     ...touched(actor),
   });
@@ -241,7 +255,7 @@ export async function vermerkeTagebuch(
   ereignis: TagebuchEreignis,
   actor: AtemschutzActor,
 ): Promise<void> {
-  await updateDoc(doc(truppCollection(firecallId), truppId), {
+  updateDocLocal(doc(truppCollection(firecallId), truppId), {
     ...tagebuchVermerk(ereignis, actor.now),
     ...touched(actor),
   });

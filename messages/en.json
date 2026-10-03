@@ -638,7 +638,14 @@
         "rueckzug": "{trupp}: withdrawal time reached",
         "rueckzugVoraus": "{trupp}: withdraw in {minuten} min",
         "body": "{einsatz} · estimated {druck} bar · withdraw {zeit}",
-        "zeile": "{titel} · est. {druck} bar · withdraw {zeit}"
+        "zeile": "{titel} · est. {druck} bar · withdraw {zeit}",
+        "kanalName": "Breathing apparatus warnings",
+        "kanalBeschreibung": "Warnings from breathing apparatus monitoring: one-third marks and withdrawal, even with the screen locked and without a network."
+      },
+      "wakeLockAktiv": "The screen stays on while a team is under breathing apparatus.",
+      "exakteAlarme": {
+        "hinweis": "Warnings may be delayed by several minutes while the app is not allowed to set exact alarms. You can allow this under “Alarms & reminders”.",
+        "erlauben": "Allow exact alarms"
       }
     }
   },
@@ -935,9 +942,35 @@
     "reload": "Reload"
   },
   "networkStatus": {
-    "offlineTitle": "No connection",
-    "offline": "The device is offline. Changes are cached and will be synced once the connection is restored.",
-    "synced": "Changes have been synced"
+    "offlineMode": "Offline mode",
+    "offlinePending": "Offline mode · {count, plural, one {# change} other {# changes}} pending",
+    "offlineHint": "No connection to the server. Changes are stored on the device and transferred once the connection is back. Tap to check the connection again.",
+    "syncing": "{count, plural, one {# change is} other {# changes are}} being transferred…",
+    "syncingHint": "The connection is back. Changes made offline are being transferred to the server.",
+    "synced": "Changes have been synced",
+    "syncErrors": "{count, plural, one {# change} other {# changes}} not transferred",
+    "syncErrorsHint": "The server rejected changes. Tap for details.",
+    "syncErrorsTitle": "Changes not transferred",
+    "syncErrorsIntro": "These changes were stored on the device, but the server rejected them during synchronisation. They are therefore no longer visible.",
+    "syncErrorsEmpty": "No rejected changes.",
+    "syncErrorKind": "{kind, select, add {Create} set {Save} update {Update} delete {Delete} batch {Batch change} action {Deferred server action} upload {File upload} other {Write}}",
+    "syncErrorCode": "Error code: {code}",
+    "syncErrorRetry": "Try again",
+    "syncErrorDiscard": "Discard",
+    "syncErrorsDiscardAll": "Discard all",
+    "pendingWrite": "Not transferred yet – only stored on this device",
+    "onlineOnly": "Only available with an internet connection",
+    "pendingUpload": "{name} – waiting for upload",
+    "pendingUploadHint": "Saved offline. The file will be uploaded as soon as the connection is back.",
+    "discardPendingUpload": "Discard pending upload",
+    "uploadQueued": "{count, plural, one {# file} other {# files}} will be uploaded as soon as the connection is back.",
+    "offlinePageTitle": "Offline – page not available",
+    "offlinePageText": "This page was not stored on this device and cannot be loaded without a connection to the server. The map, the incident list, the operational diary and the breathing apparatus pages keep working offline.",
+    "offlinePageToMap": "Go to map",
+    "offlinePageRetry": "Try again",
+    "offlineAuthHint": "Signed in with the permissions this device last confirmed with the server. They will be checked again once the connection is back.",
+    "offlineListEmpty": "Offline – no entries on this device. The list may be incomplete because it has never been loaded here while online.",
+    "offlineListIncomplete": "Offline – possibly incomplete"
   },
   "einsatzDetails": {
     "notFound": "Operation not found",
@@ -965,7 +998,8 @@
       "einsatzorte": "Operation sites",
       "besatzung": "Crew",
       "tagebuch": "Operation log",
-      "kostenersatz": "Cost recovery"
+      "kostenersatz": "Cost recovery",
+      "offline": "Offline map"
     }
   },
   "crew": {
@@ -1872,7 +1906,9 @@
     "duplicateTitle": "Operation already exists",
     "duplicateText": "The operation “{names}” already exists for this alarm. Creating a second operation splits crew, diary and cost recovery across two operations. Create a new operation anyway?",
     "duplicateConfirm": "Create anyway",
-    "duplicateCheckFailed": "Could not check for existing operations. Please check your connection."
+    "duplicateCheckFailed": "Could not check for existing operations. Please check your connection.",
+    "offlineAlarmsSkipped": "Offline: BlaulichtSMS alarms cannot be loaded. You can still create the operation.",
+    "offlineDuplicateCheckSkipped": "Offline: check for existing operations skipped."
   },
   "firecallItem": {
     "uploadTitle": "Upload file to the operation",
@@ -2834,6 +2870,7 @@
     "fahrzeuge": "Vehicles",
     "einsatzmittel": "Resources",
     "einsatzorte": "Operation sites",
+    "offline": "Offline mode",
     "ebenen": "Layers",
     "chat": "Chat",
     "ki": "AI assistant",
@@ -3752,5 +3789,34 @@
     "noGroup": "No group available.",
     "unvollstaendig": "Without these entries no document can be created: {felder}.",
     "zuDenStammdaten": "Go to master data"
+  },
+  "offlineMap": {
+    "title": "Prepare map for offline use",
+    "description": "Downloads map tiles from basemap.at (zoom 13–18) for the area around the incident location to this device. OpenStreetMap and OpenTopoMap prohibit bulk downloading and are only available offline as far as the map was viewed before.",
+    "centerFirecall": "Centre: incident location",
+    "centerDevice": "Centre: this device's location",
+    "noCenter": "No incident location set and no device location known.",
+    "useLocation": "Use location",
+    "radius": "Radius",
+    "radiusMeters": "{meters} m",
+    "radiusKm": "{km} km",
+    "layer": {
+      "basemap_hdpi": "Basemap",
+      "basemap_ortofoto": "Orthophoto",
+      "basemap_grey": "Basemap grey",
+      "adressen": "Addresses"
+    },
+    "estimate": "{count} tiles, about {size} MB",
+    "tooLarge": "Too many tiles (at most {max}). Please reduce the radius or select fewer layers.",
+    "start": "Prepare for offline use",
+    "cancel": "Cancel",
+    "offline": "Requires an internet connection.",
+    "progress": "{done} of {total} tiles · {size} MB",
+    "done": "Done: {loaded} downloaded, {skipped} already present, {failed} failed ({size} MB).",
+    "aborted": "Preparation cancelled: {loaded} tiles downloaded ({size} MB).",
+    "quota": "Not enough storage on the device. The tile store was cleared – please choose a smaller area.",
+    "failed": "The map tiles could not be downloaded.",
+    "stored": "{count} tiles on this device",
+    "clear": "Delete"
   }
 }

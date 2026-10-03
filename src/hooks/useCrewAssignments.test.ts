@@ -24,10 +24,11 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn((col: unknown) => col),
 }));
 
+// Lokale Helfer kehren sofort zurück, ohne Server-Bestätigung.
 vi.mock('../lib/firestoreClient', () => ({
-  addDoc: vi.fn(() => Promise.resolve({ id: 'new-doc-id' })),
-  updateDoc: vi.fn(() => Promise.resolve()),
-  deleteDoc: vi.fn(() => Promise.resolve()),
+  addDocLocal: vi.fn(() => ({ id: 'new-doc-id' })),
+  updateDocLocal: vi.fn(() => undefined),
+  deleteDocLocal: vi.fn(() => undefined),
 }));
 
 // Mock the hooks that useCrewAssignments depends on
@@ -48,14 +49,14 @@ import useCrewAssignments, {
   type BlaulichtSmsRecipient,
 } from './useCrewAssignments';
 import {
-  addDoc,
-  updateDoc,
-  deleteDoc,
+  addDocLocal,
+  updateDocLocal,
+  deleteDocLocal,
 } from '../lib/firestoreClient';
 
-const mockAddDoc = addDoc as unknown as ReturnType<typeof vi.fn>;
-const mockUpdateDoc = updateDoc as unknown as ReturnType<typeof vi.fn>;
-const mockDeleteDoc = deleteDoc as unknown as ReturnType<typeof vi.fn>;
+const mockAddDoc = addDocLocal as unknown as ReturnType<typeof vi.fn>;
+const mockUpdateDoc = updateDocLocal as unknown as ReturnType<typeof vi.fn>;
+const mockDeleteDoc = deleteDocLocal as unknown as ReturnType<typeof vi.fn>;
 
 describe('useCrewAssignments', () => {
   beforeEach(() => {

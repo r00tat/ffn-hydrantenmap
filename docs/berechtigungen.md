@@ -108,3 +108,61 @@ Berechtigungsgruppe und keine Feuerwehr. Dieselbe Sperre steht als
   und `fahrtenbuchGeraetemeister` für diese Gruppe. Ohne das bliebe eine
   schlafende Rolle stehen, die beim Wiedereintritt unbemerkt wieder wirksam
   würde.
+
+## Zwischenspeicher der Anmeldung für den Kaltstart ohne Netz
+
+Die Rechte der Oberfläche (`isAuthorized`, `isAdmin`, `groups`, `groupAdmin`,
+`fahrtenbuchGeraetemeister`, `firecall`) kommen aus der NextAuth-Sitzung und
+aus `getMyGroupsFromServer` — beides braucht den Server. Ohne Netz zeigte die
+App nach einem Neustart deshalb den Login-Bildschirm, obwohl Firebase Auth den
+Benutzer aus IndexedDB kennt und Firestore die Daten im Cache hat.
+[`offlineAuthCache.ts`](../src/hooks/auth/offlineAuthCache.ts) hält die
+zuletzt **am Server bestätigten** Rechte deshalb in localStorage, und
+`useFirebaseLoginObserver` nimmt sie, wenn der Server nicht antwortet.
+
+**Warum das vertretbar ist:** Der Zwischenspeicher öffnet nur die Oberfläche.
+Keine Entscheidungsstelle oben liest ihn: Die Server-Guards prüfen die Sitzung,
+die Firestore-Regeln das ID-Token. Offline erfasste Schreibvorgänge prüft der
+Server beim Synchronisieren nach den Regeln, die dann gelten; was abgelehnt
+wird, erscheint in der Fehlerliste (siehe [offline-modus.md](offline-modus.md)).
+Wer am Gerät localStorage von Hand ändert, sieht also Menüs, aber keine Daten,
+die ihm Firestore nicht ohnehin aus dem Cache dieses Geräts gibt — und die
+liegen dort nur, weil er sie vorher lesen durfte.
+
+Die Grenzen, und warum sie so gezogen sind:
+
+- **Nur am Server bestätigte Rechte werden gespeichert:** geschrieben wird erst,
+  wenn die NextAuth-Sitzung zu genau diesem Firebase-Benutzer
+  (`session.user.id === uid`) geantwortet hat. Aus dem Zwischenspeicher selbst
+  wird nie zurückgeschrieben, sonst verlängerte sich die Frist offline von
+  selbst.
+- **Gelesen nur ohne Server:** wenn die App schon weiß, dass sie offline ist,
+  sonst erst nach acht Sekunden ohne Antwort oder beim Fehlschlag der Anmeldung.
+  Antwortet der Server später doch noch oder kommt die Verbindung zurück
+  (`onReconnect`), gilt wieder seine Prüfung.
+- **90 Tage ab der letzten Bestätigung.** Viele Mitglieder öffnen die App nur
+  im Einsatz, oft wochenlang nicht. Eine kurze Frist (anfangs 72 h) hätte
+  genau sie beim Kaltstart ohne Netz vor den Login-Bildschirm gestellt — dort,
+  wo es am meisten stört. Die lange Frist kostet wenig: Ein Gerät, dem die
+  Freigabe entzogen wurde, sieht offline nur, was ohnehin schon in seinem
+  Cache liegt, seine Schreibvorgänge scheitern beim Synchronisieren an den
+  Regeln, und beim ersten Start mit Netz ist der Eintrag weg. Ein Zeitstempel aus der Zukunft gilt als ungültig, eine
+  verstellte Uhr verlängert also nichts. Ein **Einsatz-Gast** behält höchstens
+  bis zum Ende seines Gastzugangs (`firecallExpiresAt`).
+- **An die Firebase-UID gebunden.** Meldet sich am selben Gerät jemand anderer
+  an, erbt er nichts. Die vorläufige Anzeige beim Kaltstart (Browser meldet
+  `navigator.onLine === false`, Firebase Auth hat den Benutzer noch nicht
+  geladen) verschwindet wieder, wenn danach kein oder ein anderer Benutzer
+  kommt; `hasFirebaseUser` bleibt bis dahin false, Listener laufen also nicht.
+- **Eine nicht freigegebene Anmeldung löscht den Eintrag** — entzieht ein Admin
+  die Freigabe und war das Gerät seither einmal online, hilft auch der
+  Kaltstart ohne Netz nicht mehr.
+- **Beim Abmelden gelöscht.**
+
+Ein abgelaufenes ID-Token blockiert offline nichts: Firestore reiht
+Schreibvorgänge lokal ein und holt sich das Token erst zum Übertragen; die
+lokalen Schreibhelfer gehen bewusst nicht über `withFreshAuth`
+([offline-modus.md](offline-modus.md)). Die Anmeldeschritte, die den Server
+brauchen (`getIdToken` bei abgelaufenem Token, `firebaseTokenLogin`,
+`getMyGroupsFromServer`), sind mit einer Zeitgrenze versehen oder werden vom
+Rückfall überholt, damit die App nicht im Ladezustand hängt.

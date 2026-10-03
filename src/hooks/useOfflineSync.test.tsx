@@ -12,12 +12,26 @@ import {
 } from 'vitest';
 import deMessages from '../../messages/de.json';
 
-const { showSnackbarMock, waitForPendingWritesMock, getPendingWriteCountMock } =
-  vi.hoisted(() => ({
-    showSnackbarMock: vi.fn(),
-    waitForPendingWritesMock: vi.fn(() => Promise.resolve()),
-    getPendingWriteCountMock: vi.fn(() => 0),
-  }));
+const {
+  showSnackbarMock,
+  waitForPendingWritesMock,
+  getPendingWriteCountMock,
+  connectivity,
+} = vi.hoisted(() => ({
+  showSnackbarMock: vi.fn(),
+  waitForPendingWritesMock: vi.fn(() => Promise.resolve()),
+  getPendingWriteCountMock: vi.fn(() => 0),
+  connectivity: { reachable: true },
+}));
+
+vi.mock('./useConnectivity', () => ({
+  default: () => ({
+    reachable: connectivity.reachable,
+    status: connectivity.reachable ? 'online' : 'offline',
+    lastCheck: null,
+    pendingWrites: 0,
+  }),
+}));
 
 vi.mock('../components/firebase/firebase', () => ({
   default: {},
@@ -36,11 +50,8 @@ vi.mock('../lib/pendingWrites', () => ({
   getPendingWriteCount: getPendingWriteCountMock,
 }));
 
-function setNavigatorOnLine(value: boolean) {
-  Object.defineProperty(window.navigator, 'onLine', {
-    configurable: true,
-    value,
-  });
+function setReachable(value: boolean) {
+  connectivity.reachable = value;
 }
 
 import useOfflineSync from './useOfflineSync';
@@ -55,7 +66,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 describe('useOfflineSync', () => {
   beforeEach(() => {
-    setNavigatorOnLine(true);
+    setReachable(true);
     showSnackbarMock.mockClear();
     waitForPendingWritesMock.mockClear();
     waitForPendingWritesMock.mockResolvedValue(undefined);
@@ -63,7 +74,19 @@ describe('useOfflineSync', () => {
   });
 
   afterEach(() => {
-    setNavigatorOnLine(true);
+    setReachable(true);
+  });
+
+  it('reagiert auf den Verbindungsstatus, nicht auf navigator.onLine', () => {
+    // WLAN ohne Internet: navigator.onLine bleibt true, der Ping scheitert.
+    setReachable(false);
+    getPendingWriteCountMock.mockReturnValue(1);
+    const { rerender } = renderHook(() => useOfflineSync(), { wrapper });
+    expect(waitForPendingWritesMock).not.toHaveBeenCalled();
+
+    setReachable(true);
+    rerender();
+    expect(waitForPendingWritesMock).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing while staying online', () => {
@@ -73,11 +96,11 @@ describe('useOfflineSync', () => {
   });
 
   it('shows a confirmation after reconnecting when writes were pending', async () => {
-    setNavigatorOnLine(false);
+    setReachable(false);
     getPendingWriteCountMock.mockReturnValue(2);
     const { rerender } = renderHook(() => useOfflineSync(), { wrapper });
 
-    setNavigatorOnLine(true);
+    setReachable(true);
     rerender();
 
     expect(waitForPendingWritesMock).toHaveBeenCalledTimes(1);
@@ -90,11 +113,11 @@ describe('useOfflineSync', () => {
   });
 
   it('does not show a confirmation when no writes were pending', () => {
-    setNavigatorOnLine(false);
+    setReachable(false);
     getPendingWriteCountMock.mockReturnValue(0);
     const { rerender } = renderHook(() => useOfflineSync(), { wrapper });
 
-    setNavigatorOnLine(true);
+    setReachable(true);
     rerender();
 
     expect(waitForPendingWritesMock).not.toHaveBeenCalled();

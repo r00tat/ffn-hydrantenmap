@@ -12,7 +12,10 @@ const storageUrl = (path: string) =>
 
 let cachePatterns: RuntimeCaching[];
 let isWorkerBootstrap: (url: URL) => boolean;
-let runtimeCaching: (defaults: RuntimeCaching[]) => RuntimeCaching[];
+let runtimeCaching: (
+  defaults: RuntimeCaching[],
+  options?: { appShellCacheName?: string },
+) => RuntimeCaching[];
 let defaultCache: RuntimeCaching[];
 
 beforeAll(async () => {
@@ -169,6 +172,66 @@ describe('cachePatterns', () => {
     });
   });
 
+  describe('vorgeladene Kartenkacheln (Für offline vorbereiten)', () => {
+    const tile =
+      'https://mapsneu.wien.gv.at/basemap/bmaphidpi/normal/google3857/16/22795/35833.jpeg';
+
+    it('basemap.at fragt zuerst den Vorrat, dann den Basemap-Cache', async () => {
+      const { OfflineTilesFirst } = await import('./patterns');
+      const rule = ownRuleFor(tile);
+      expect(rule?.handler).toBeInstanceOf(OfflineTilesFirst);
+      expect(cacheNameOf(rule!)).toBe('basemap');
+    });
+
+    it('erfasst jede vorladbare Quelle mit derselben Regel wie die Vorschau', async () => {
+      const { OfflineTilesFirst } = await import('./patterns');
+      const { OFFLINE_TILE_SOURCES, tileUrl } = await import(
+        '../common/offlineTiles'
+      );
+      for (const source of OFFLINE_TILE_SOURCES) {
+        const href = tileUrl(source, { z: 16, x: 35833, y: 22795 });
+        expect(ownRuleFor(href)?.handler).toBeInstanceOf(OfflineTilesFirst);
+      }
+    });
+
+    it('findet die Kachel im eigenen Cache trotz Vary: Origin', async () => {
+      const { matchOfflineTile } = await import('./patterns');
+      const { OFFLINE_TILE_CACHE } = await import('../common/offlineTiles');
+      const response = new Response('x');
+      const match = vi.fn(async () => response);
+      const result = await matchOfflineTile(new Request(tile), {
+        match,
+      } as unknown as CacheStorage);
+      expect(result).toBe(response);
+      expect(match).toHaveBeenCalledWith(expect.any(Request), {
+        cacheName: OFFLINE_TILE_CACHE,
+        ignoreVary: true,
+      });
+    });
+
+    it('ohne Vorrat oder bei einem Fehler gibt es keinen Treffer', async () => {
+      const { matchOfflineTile } = await import('./patterns');
+      expect(
+        await matchOfflineTile(new Request(tile), {
+          match: async () => undefined,
+        } as unknown as CacheStorage),
+      ).toBeUndefined();
+      expect(
+        await matchOfflineTile(new Request(tile), {
+          match: async () => {
+            throw new Error('kaputt');
+          },
+        } as unknown as CacheStorage),
+      ).toBeUndefined();
+    });
+
+    it('OSM-Kacheln kommen nie aus dem Vorrat', async () => {
+      const { OfflineTilesFirst } = await import('./patterns');
+      const rule = ownRuleFor('https://a.tile.openstreetmap.org/12/1/1.png');
+      expect(rule?.handler).not.toBeInstanceOf(OfflineTilesFirst);
+    });
+  });
+
   describe('Höhenmodell', () => {
     const tile = storageUrl('terrain/v1/detail/CRS3035RES1000mN2783000E4831000.png');
     const index = storageUrl('terrain/v1/index.json');
@@ -300,5 +363,85 @@ describe('Firebase-Auth-Handler', () => {
         NetworkOnly,
       );
     }
+  });
+});
+
+describe('Erreichbarkeitsprüfung /api/ping', () => {
+  it('geht immer ans Netz', () => {
+    for (const path of ['/api/ping', '/api/ping?t=123']) {
+      expect(ownRuleFor(`${APP_ORIGIN}${path}`)?.handler).toBeInstanceOf(
+        NetworkOnly,
+      );
+    }
+  });
+
+  it('steht ganz vorne, damit keine andere Regel sie beantwortet', () => {
+    // Eine Antwort aus einem Cache meldete „online", obwohl der Server nicht
+    // erreichbar ist — genau das soll der Ping aufdecken.
+    expect(cachePatterns.indexOf(ownRuleFor(`${APP_ORIGIN}/api/ping`)!)).toBe(0);
+  });
+
+  it('greift nicht auf ähnlich benannte Pfade oder fremde Origins über', () => {
+    expect(ownRuleFor(`${APP_ORIGIN}/api/pingback`)).toBeUndefined();
+    expect(ownRuleFor('https://example.com/api/ping')).toBeUndefined();
+  });
+});
+
+describe('Drive-Dateien eines Einsatzes', () => {
+  it('geht immer ans Netz und landet nicht im API-Cache', () => {
+    // Fotos und Videos aus dem Shared Drive: groß, hinter der Anmeldung und
+    // auf einem geteilten Gerät nicht für den nächsten Benutzer gedacht.
+    for (const path of [
+      '/api/einsatz/fc1/drive/abc/download',
+      '/api/einsatz/fc1/drive/abc/thumbnail',
+    ]) {
+      expect(ownRuleFor(`${APP_ORIGIN}${path}`)?.handler).toBeInstanceOf(
+        NetworkOnly,
+      );
+    }
+  });
+
+  it('greift nicht auf andere Einsatz-Routen oder fremde Origins über', () => {
+    expect(ownRuleFor(`${APP_ORIGIN}/api/einsatz/fc1/export`)).toBeUndefined();
+    expect(
+      ownRuleFor('https://example.com/api/einsatz/fc1/drive/abc/download'),
+    ).toBeUndefined();
+  });
+});
+
+describe('App-Shell für Navigationen', () => {
+  const navigate = (path: string) => ({
+    url: new URL(`${APP_ORIGIN}${path}`),
+    sameOrigin: true,
+    request: { url: `${APP_ORIGIN}${path}`, method: 'GET', mode: 'navigate' },
+  });
+
+  /** Wie `ruleFor`, aber mit einer Navigation samt `request`. */
+  function navigationRule(list: RuntimeCaching[], path: string) {
+    const options = navigate(path);
+    return list.find((entry) => {
+      const matcher = entry.matcher as RegExp | ((o: unknown) => unknown);
+      if (matcher instanceof RegExp) return matcher.test(options.url.href);
+      return matcher(options);
+    });
+  }
+
+  it('fehlt ohne Cache-Namen, damit die Regelliste sonst gleich bleibt', () => {
+    expect(runtimeCaching(defaultCache)).toHaveLength(
+      cachePatterns.length + defaultCache.length,
+    );
+  });
+
+  it('steht hinter den eigenen Regeln und vor Serwists Standard', async () => {
+    const { runtimeCaching: withShell } = await import('./patterns');
+    const list = withShell(defaultCache, { appShellCacheName: 'app-shell-test' });
+    expect(list).toHaveLength(cachePatterns.length + 1 + defaultCache.length);
+
+    const shell = list[cachePatterns.length];
+    expect(navigationRule(list, '/')).toBe(shell);
+    expect(navigationRule(list, '/einsatz/AAAAAAAAAAAAAAAAAAAA/tagebuch')).toBe(shell);
+    // Die Gastseite und der Auth-Handler bleiben bei ihren NetworkOnly-Regeln.
+    expect(navigationRule(list, '/fahrtenbuch/teilen/abc')).not.toBe(shell);
+    expect(navigationRule(list, '/__/auth/handler')).not.toBe(shell);
   });
 });

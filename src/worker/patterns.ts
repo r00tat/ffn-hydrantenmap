@@ -4,10 +4,18 @@ import {
   CacheFirst,
   ExpirationPlugin,
   NetworkOnly,
+  registerQuotaErrorCallback,
   RouteHandler,
   RuntimeCaching,
   StaleWhileRevalidate,
+  type StrategyHandler,
 } from 'serwist';
+import { OFFLINE_TILE_CACHE, isOfflineTileUrl } from '../common/offlineTiles';
+import {
+  handleAppShellNavigation,
+  isAppShellNavigation,
+  matchInPrecache,
+} from './appShell';
 
 const oneDayCachePlugin = new ExpirationPlugin({
   maxEntries: 64,
@@ -42,6 +50,66 @@ export const isWorkerBootstrap = (url: URL): boolean =>
   url.pathname.startsWith('/_next/static/chunks/turbopack-worker-');
 
 /**
+ * Eine vorgeladene Kachel aus dem Cache `offline-tiles` (Knopf „Für offline
+ * vorbereiten", `src/lib/offlineTileDownload.ts`).
+ *
+ * `ignoreVary`, weil basemap.at mit `Vary: Origin` antwortet: Die Seite lädt
+ * per CORS-Abruf **mit** `Origin`-Header vor, Leaflet fragt später über ein
+ * `<img>` **ohne** — ohne `ignoreVary` träfe der Cache nie, und zwar ohne
+ * dass irgendwo ein Fehler auftaucht.
+ *
+ * `caches.match` mit `cacheName` statt `caches.open(...)`: legt den Cache
+ * nicht bei jeder Kachel leer an, solange nie vorbereitet wurde.
+ */
+export async function matchOfflineTile(
+  request: Request,
+  storage: CacheStorage | undefined = typeof caches === 'undefined'
+    ? undefined
+    : caches,
+): Promise<Response | undefined> {
+  if (!storage) return undefined;
+  try {
+    return (
+      (await storage.match(request, {
+        cacheName: OFFLINE_TILE_CACHE,
+        ignoreVary: true,
+      })) ?? undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `CacheFirst`, das zuerst den Vorrat der Offline-Vorbereitung fragt.
+ *
+ * Der Vorrat ist ein eigener Cache und nicht `basemap`: Dort hält
+ * `oneDayCachePlugin` 64 Einträge einen Tag lang — ein paar tausend
+ * vorgeladene Kacheln wären nach wenigen Minuten Kartenbenutzung wieder
+ * verdrängt.
+ */
+export class OfflineTilesFirst extends CacheFirst {
+  async _handle(request: Request, handler: StrategyHandler): Promise<Response> {
+    const offline = await matchOfflineTile(request);
+    if (offline) return offline;
+    return super._handle(request, handler);
+  }
+}
+
+/**
+ * `purgeOnQuotaError` für den Kachelvorrat. Der Cache wird von der Seite
+ * geschrieben und hat deshalb keinen `ExpirationPlugin`, der das selbst
+ * täte: Läuft das Kontingent voll, wird er als Erstes geopfert — vor
+ * App-Shell, Firestore-Cache und Warteschlangen im selben Kontingent.
+ * Aufgerufen in `index.ts`.
+ */
+export function registerOfflineTilePurge(): void {
+  registerQuotaErrorCallback(async () => {
+    await caches.delete(OFFLINE_TILE_CACHE);
+  });
+}
+
+/**
  * Eigene Caching-Regeln. Sie werden in `index.ts` **vor** Serwists
  * `defaultCache` eingehängt und gewinnen damit jeden Konflikt — die erste
  * passende Regel entscheidet.
@@ -63,6 +131,22 @@ export const isWorkerBootstrap = (url: URL): boolean =>
  *   kein Regex.
  */
 export const cachePatterns: RuntimeCaching[] = [
+  // Erreichbarkeitsprüfung des Verbindungsstatus (`src/lib/connectivity.ts`).
+  //
+  // Der Ping soll herausfinden, ob der **Server** erreichbar ist — nicht, ob
+  // irgendein Cache eine Antwort hat. Serwists `defaultCache` beantwortet
+  // `/api/*` mit NetworkFirst: ohne Netz käme die letzte 204 aus dem Cache, und
+  // die App hielte sich im WLAN ohne Internet für online. `NetworkOnly` lässt
+  // den Abruf stattdessen scheitern, und genau das ist das Signal.
+  //
+  // Ganz vorne, weil die erste passende Regel entscheidet; exakter Pfad, damit
+  // nichts Ähnliches (`/api/pingback`) mitgenommen wird.
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname === '/api/ping',
+    handler: new NetworkOnly(),
+  },
+
   // Der Firebase-Auth-Handler unter `/__/auth/*` liegt nur scheinbar bei uns:
   // `next.config.js` spiegelt ihn per Rewrite von der Firebase-Hosting-Domain
   // hierher, damit der Google-Login same-origin ablaufen kann (siehe
@@ -75,7 +159,8 @@ export const cachePatterns: RuntimeCaching[] = [
   // erneut und der Ablauf bliebe stehen, ohne dass irgendwo ein Fehler
   // auftaucht.
   //
-  // Diese Regel steht deshalb ganz vorne: Die erste passende entscheidet.
+  // Diese Regel steht deshalb vorne (nur der Ping davor): Die erste passende
+  // entscheidet.
   {
     matcher: ({ sameOrigin, url }) =>
       sameOrigin && url.pathname.startsWith('/__/auth/'),
@@ -100,6 +185,17 @@ export const cachePatterns: RuntimeCaching[] = [
       (url.pathname.startsWith('/api/mcp') ||
         url.pathname.startsWith('/api/oauth/') ||
         url.pathname.startsWith('/.well-known/')),
+    handler: new NetworkOnly(),
+  },
+
+  // Drive-Dateien eines Einsatzes (Sybos-Übertrag): Fotos und Videos aus dem
+  // Shared Drive, über den Server und hinter der Anmeldung. Ohne diese Regel
+  // fiele die Anfrage unter Serwists `apis`-Regel (NetworkFirst) und landete
+  // im Cache — groß, und auf einem geteilten Gerät auch für den nächsten
+  // Benutzer abrufbar.
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && /^\/api\/einsatz\/[^/]+\/drive\//.test(url.pathname),
     handler: new NetworkOnly(),
   },
 
@@ -206,9 +302,12 @@ export const cachePatterns: RuntimeCaching[] = [
     }),
   },
 
+  // basemap.at: vorgeladene Kacheln zuerst (siehe `OfflineTilesFirst`), sonst
+  // der kurzlebige Cache der laufenden Kartenbenutzung. Derselbe Matcher wie
+  // beim Vorladen (`isOfflineTileUrl`), damit beide nicht auseinanderlaufen.
   {
-    matcher: /^https:\/\/mapsneu\.wien\.gv\.at\/basemap\//i,
-    handler: new CacheFirst({
+    matcher: ({ url }) => isOfflineTileUrl(url),
+    handler: new OfflineTilesFirst({
       cacheName: 'basemap',
       plugins: [oneDayCachePlugin],
     }),
@@ -284,11 +383,42 @@ function resilient(entry: RuntimeCaching): RuntimeCaching {
 }
 
 /**
+ * Navigationen auf eigene Seiten: Netz mit Zeitgrenze, sonst die App-Shell
+ * (Kaltstart ohne Netz, siehe `appShell.ts`).
+ *
+ * Steht **hinter** `cachePatterns`, damit deren `NetworkOnly`-Regeln für die
+ * Gastseite und den Auth-Handler weiter zuerst greifen, und **vor**
+ * `defaultCache`, dessen Auffangregel `others` Navigationen sonst ohne
+ * Zeitgrenze und nur einen Tag lang hielte.
+ */
+export function appShellRoute(cacheName: string): RuntimeCaching {
+  return {
+    matcher: ({ request, url, sameOrigin }) =>
+      isAppShellNavigation({ request, url, sameOrigin }),
+    handler: {
+      handle: ({ request }) =>
+        handleAppShellNavigation(request, {
+          openCache: () => caches.open(cacheName),
+          fetchFn: (r) => fetch(r),
+          matchPrecache: (r) => matchInPrecache(r, caches),
+        }),
+    },
+  };
+}
+
+/**
  * Die vollständige Regelliste des Service Workers.
  *
  * Eigene Regeln zuerst — die erste passende entscheidet. Jede Regel ist
- * gegen Fehler abgesichert, siehe `resilient`.
+ * gegen Fehler abgesichert, siehe `resilient`. Mit `appShellCacheName` kommt
+ * die App-Shell-Regel für Navigationen dazu.
  */
-export function runtimeCaching(defaults: RuntimeCaching[]): RuntimeCaching[] {
-  return [...cachePatterns, ...defaults].map(resilient);
+export function runtimeCaching(
+  defaults: RuntimeCaching[],
+  options: { appShellCacheName?: string } = {},
+): RuntimeCaching[] {
+  const shell = options.appShellCacheName
+    ? [appShellRoute(options.appShellCacheName)]
+    : [];
+  return [...cachePatterns, ...shell, ...defaults].map(resilient);
 }

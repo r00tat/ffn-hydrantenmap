@@ -638,7 +638,14 @@
         "rueckzug": "{trupp}: Rückzugszeitpunkt erreicht",
         "rueckzugVoraus": "{trupp}: Rückzug in {minuten} min",
         "body": "{einsatz} · vermutet {druck} bar · Rückzug {zeit}",
-        "zeile": "{titel} · vermutet {druck} bar · Rückzug {zeit}"
+        "zeile": "{titel} · vermutet {druck} bar · Rückzug {zeit}",
+        "kanalName": "Atemschutzwarnungen",
+        "kanalBeschreibung": "Warnungen der Atemschutzüberwachung: Drittelmarken und Rückzug, auch bei gesperrtem Bildschirm und ohne Netz."
+      },
+      "wakeLockAktiv": "Der Bildschirm bleibt eingeschaltet, solange ein Trupp unter Atemschutz ist.",
+      "exakteAlarme": {
+        "hinweis": "Warnungen können sich um einige Minuten verspäten, solange die App keine exakten Alarme auslösen darf. Erlauben lässt sich das unter „Alarme & Erinnerungen“.",
+        "erlauben": "Exakte Alarme erlauben"
       }
     }
   },
@@ -935,9 +942,35 @@
     "reload": "Neu laden"
   },
   "networkStatus": {
-    "offlineTitle": "Keine Verbindung",
-    "offline": "Das Gerät ist offline. Änderungen werden zwischengespeichert und synchronisiert, sobald die Verbindung wiederhergestellt ist.",
-    "synced": "Änderungen wurden synchronisiert"
+    "offlineMode": "Offline-Modus",
+    "offlinePending": "Offline-Modus · {count, plural, one {# Änderung} other {# Änderungen}} ausstehend",
+    "offlineHint": "Keine Verbindung zum Server. Änderungen werden auf dem Gerät gespeichert und übertragen, sobald die Verbindung wieder steht. Antippen, um die Verbindung erneut zu prüfen.",
+    "syncing": "{count, plural, one {# Änderung wird} other {# Änderungen werden}} übertragen…",
+    "syncingHint": "Die Verbindung steht wieder. Offline erfasste Änderungen werden gerade an den Server übertragen.",
+    "synced": "Änderungen wurden synchronisiert",
+    "syncErrors": "{count, plural, one {# Änderung} other {# Änderungen}} nicht übertragen",
+    "syncErrorsHint": "Der Server hat Änderungen abgelehnt. Antippen für Einzelheiten.",
+    "syncErrorsTitle": "Nicht übertragene Änderungen",
+    "syncErrorsIntro": "Diese Änderungen wurden auf dem Gerät gespeichert, der Server hat sie beim Synchronisieren aber abgelehnt. Sie sind deshalb nicht mehr sichtbar.",
+    "syncErrorsEmpty": "Keine abgelehnten Änderungen.",
+    "syncErrorKind": "{kind, select, add {Anlegen} set {Speichern} update {Ändern} delete {Löschen} batch {Sammeländerung} action {Nachgeholte Serveraktion} upload {Datei hochladen} other {Schreiben}}",
+    "syncErrorCode": "Fehlercode: {code}",
+    "syncErrorRetry": "Erneut versuchen",
+    "syncErrorDiscard": "Verwerfen",
+    "syncErrorsDiscardAll": "Alle verwerfen",
+    "pendingWrite": "Noch nicht übertragen – liegt erst auf diesem Gerät",
+    "onlineOnly": "Nur mit Internetverbindung verfügbar",
+    "pendingUpload": "{name} – wartet auf Upload",
+    "pendingUploadHint": "Offline gespeichert. Die Datei wird hochgeladen, sobald die Verbindung wieder steht.",
+    "discardPendingUpload": "Wartenden Upload verwerfen",
+    "uploadQueued": "{count, plural, one {# Datei wird} other {# Dateien werden}} hochgeladen, sobald die Verbindung wieder steht.",
+    "offlinePageTitle": "Offline – Seite nicht verfügbar",
+    "offlinePageText": "Diese Seite wurde auf dem Gerät nicht vorgehalten und lässt sich ohne Verbindung zum Server nicht laden. Die Karte, die Einsatzliste, das Einsatztagebuch und die Atemschutzseiten funktionieren offline weiter.",
+    "offlinePageToMap": "Zur Karte",
+    "offlinePageRetry": "Erneut versuchen",
+    "offlineAuthHint": "Angemeldet mit den zuletzt am Server bestätigten Rechten dieses Geräts. Sie werden beim nächsten Verbindungsaufbau erneut geprüft.",
+    "offlineListEmpty": "Offline – keine Einträge auf diesem Gerät. Die Liste kann unvollständig sein, weil sie hier noch nie online geladen wurde.",
+    "offlineListIncomplete": "Offline – evtl. unvollständig"
   },
   "einsatzDetails": {
     "notFound": "Einsatz nicht gefunden",
@@ -965,7 +998,8 @@
       "einsatzorte": "Einsatzorte",
       "besatzung": "Besatzung",
       "tagebuch": "Einsatztagebuch",
-      "kostenersatz": "Kostenersatz"
+      "kostenersatz": "Kostenersatz",
+      "offline": "Offline-Karte"
     }
   },
   "crew": {
@@ -1872,7 +1906,9 @@
     "duplicateTitle": "Einsatz existiert bereits",
     "duplicateText": "Für diesen Alarm existiert bereits der Einsatz „{names}“. Wenn du einen zweiten Einsatz anlegst, werden Mannschaft, Einsatztagebuch und Kostenersatz auf zwei Einsätze aufgeteilt. Trotzdem einen neuen Einsatz anlegen?",
     "duplicateConfirm": "Trotzdem anlegen",
-    "duplicateCheckFailed": "Prüfung auf bestehende Einsätze fehlgeschlagen. Bitte Verbindung prüfen."
+    "duplicateCheckFailed": "Prüfung auf bestehende Einsätze fehlgeschlagen. Bitte Verbindung prüfen.",
+    "offlineAlarmsSkipped": "Offline: Blaulicht-SMS-Alarme können nicht geladen werden. Der Einsatz lässt sich trotzdem anlegen.",
+    "offlineDuplicateCheckSkipped": "Offline: Prüfung auf bestehende Einsätze übersprungen."
   },
   "firecallItem": {
     "uploadTitle": "Datei zum Einsatz hochladen",
@@ -2834,6 +2870,7 @@
     "fahrzeuge": "Fahrzeuge",
     "einsatzmittel": "Einsatzmittel",
     "einsatzorte": "Einsatzorte",
+    "offline": "Offline-Modus",
     "ebenen": "Ebenen",
     "chat": "Chat",
     "ki": "KI-Assistent",
@@ -3752,5 +3789,34 @@
     "noGroup": "Keine Gruppe zur Auswahl.",
     "unvollstaendig": "Ohne diese Angaben lässt sich kein Beleg erstellen: {felder}.",
     "zuDenStammdaten": "Zu den Stammdaten"
+  },
+  "offlineMap": {
+    "title": "Karte für offline vorbereiten",
+    "description": "Lädt Kartenkacheln von basemap.at (Zoom 13–18) für das Gebiet um den Einsatzort auf dieses Gerät. OpenStreetMap und OpenTopoMap untersagen das Vorladen und stehen offline nur so weit zur Verfügung, wie die Karte zuvor angesehen wurde.",
+    "centerFirecall": "Mittelpunkt: Einsatzort",
+    "centerDevice": "Mittelpunkt: Standort dieses Geräts",
+    "noCenter": "Kein Einsatzort eingetragen und kein Standort bekannt.",
+    "useLocation": "Standort verwenden",
+    "radius": "Umkreis",
+    "radiusMeters": "{meters} m",
+    "radiusKm": "{km} km",
+    "layer": {
+      "basemap_hdpi": "Basemap",
+      "basemap_ortofoto": "Orthofoto",
+      "basemap_grey": "Basemap grau",
+      "adressen": "Adressen"
+    },
+    "estimate": "{count} Kacheln, rund {size} MB",
+    "tooLarge": "Zu viele Kacheln (höchstens {max}). Bitte den Umkreis verkleinern oder weniger Ebenen wählen.",
+    "start": "Für offline vorbereiten",
+    "cancel": "Abbrechen",
+    "offline": "Nur mit Internetverbindung möglich.",
+    "progress": "{done} von {total} Kacheln · {size} MB",
+    "done": "Fertig: {loaded} geladen, {skipped} schon vorhanden, {failed} fehlgeschlagen ({size} MB).",
+    "aborted": "Vorbereitung abgebrochen: {loaded} Kacheln geladen ({size} MB).",
+    "quota": "Nicht genug Speicherplatz auf dem Gerät. Der Kachelvorrat wurde geleert – bitte ein kleineres Gebiet wählen.",
+    "failed": "Die Kartenkacheln konnten nicht geladen werden.",
+    "stored": "{count} Kacheln auf diesem Gerät",
+    "clear": "Löschen"
   }
 }

@@ -36,6 +36,7 @@ import {
   renderFuellungRechnungPdf,
   setFuellungRechnungBezahlt,
 } from './rechnungActions';
+import OnlineOnly from '../site/OnlineOnly';
 
 const STATUS_LABEL = {
   draft: 'rechnung.status.draft',
@@ -202,9 +203,11 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
       </Typography>
 
       <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }}>
-        <Button variant="outlined" onClick={handlePdf} disabled={laeuft}>
-          {t('rechnung.pdf')}
-        </Button>
+        <OnlineOnly>
+          <Button variant="outlined" onClick={handlePdf} disabled={laeuft}>
+            {t('rechnung.pdf')}
+          </Button>
+        </OnlineOnly>
         {rechnung.status === 'draft' && (
           <Button
             variant="outlined"
@@ -216,19 +219,25 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
           </Button>
         )}
         {rechnung.status === 'draft' && (
-          <Button variant="contained" onClick={() => setMailOffen(true)} disabled={laeuft}>
-            {t('rechnung.send')}
-          </Button>
+          <OnlineOnly>
+            <Button variant="contained" onClick={() => setMailOffen(true)} disabled={laeuft}>
+              {t('rechnung.send')}
+            </Button>
+          </OnlineOnly>
         )}
         {rechnung.status === 'sent' && (
-          <Button variant="contained" onClick={handleBezahlt} disabled={laeuft}>
-            {t('rechnung.bezahlt')}
-          </Button>
+          <OnlineOnly>
+            <Button variant="contained" onClick={handleBezahlt} disabled={laeuft}>
+              {t('rechnung.bezahlt')}
+            </Button>
+          </OnlineOnly>
         )}
         {rechnung.status !== 'cancelled' && (
-          <Button color="error" onClick={() => setStornoOffen(true)} disabled={laeuft}>
-            {t('rechnung.storno')}
-          </Button>
+          <OnlineOnly>
+            <Button color="error" onClick={() => setStornoOffen(true)} disabled={laeuft}>
+              {t('rechnung.storno')}
+            </Button>
+          </OnlineOnly>
         )}
       </Stack>
 

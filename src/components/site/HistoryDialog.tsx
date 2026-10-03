@@ -16,7 +16,7 @@ import { formatTimestamp } from '../../common/time-format';
 import AutoSnapshotIntervalSelect from '../inputs/AutoSnapshotIntervalSelect';
 import useFirecall from '../../hooks/useFirecall';
 import { doc } from 'firebase/firestore';
-import { setDoc } from '../../lib/firestoreClient';
+import { setDocLocal } from '../../lib/firestoreClient';
 import { firestore } from '../firebase/firebase';
 
 interface HistoryDialogOptions {
@@ -49,7 +49,7 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
           value={firecall.autoSnapshotInterval}
           onChange={async (value) => {
             if (firecall.id) {
-              await setDoc(
+              setDocLocal(
                 doc(firestore, FIRECALL_COLLECTION_ID, firecall.id),
                 { autoSnapshotInterval: value },
                 { merge: true }

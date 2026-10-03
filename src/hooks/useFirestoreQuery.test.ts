@@ -82,4 +82,36 @@ describe('useFirestoreQuery', () => {
     expect(onSnapshotMock).toHaveBeenCalledTimes(2);
     expect(unsubscribeMock).toHaveBeenCalledTimes(1);
   });
+
+  it('reports fromCache from the snapshot metadata', () => {
+    onSnapshotMock.mockImplementation((_q, next) => {
+      next({ ...snapshot, metadata: { fromCache: true } });
+      return unsubscribeMock;
+    });
+    const { result } = renderHook(() => useFirestoreQuery<Layer>(query));
+    expect(result.current.fromCache).toBe(true);
+  });
+
+  it('subscribes with includeMetadataChanges only when asked', () => {
+    onSnapshotMock.mockImplementation((...args: unknown[]) => {
+      const next = args.find((a) => typeof a === 'function') as (
+        s: unknown
+      ) => void;
+      next({ ...snapshot, metadata: { fromCache: false } });
+      return unsubscribeMock;
+    });
+    renderHook(() =>
+      useFirestoreQuery<Layer>(query, undefined, {
+        includeMetadataChanges: true,
+      })
+    );
+    expect(onSnapshotMock.mock.calls[0][1]).toEqual({
+      includeMetadataChanges: true,
+    });
+
+    onSnapshotMock.mockClear();
+    const { result } = renderHook(() => useFirestoreQuery<Layer>(query));
+    expect(typeof onSnapshotMock.mock.calls[0][1]).toBe('function');
+    expect(result.current.fromCache).toBe(false);
+  });
 });

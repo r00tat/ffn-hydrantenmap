@@ -775,6 +775,73 @@ Katalog: Aufrufer ist der Zeitplan und nicht ein Browser mit Sprache — dieselb
 Vereinfachung wie beim Wochenbericht. Der Service Worker hat keinen
 Übersetzungskatalog und würde einen Schlüssel anzeigen.
 
+### Offline warnt das Gerät selbst
+
+Ohne Netz fallen die ersten beiden Wege aus: Die Aufgabe in Cloud Tasks
+entsteht nicht (die Planung ist eine Server Action), und selbst eine schon
+geplante erreicht das Gerät nicht, weil FCM das Netz braucht. Übrig bleibt die
+offene Seite — und die bekommt dafür vier Ergänzungen (Überblick in
+[offline-modus.md](offline-modus.md#atemschutzüberwachung-offline)):
+
+- **Ein Wecker auf den nächsten Termin**
+  ([localWarningSchedule.ts](../src/components/Atemschutz/localWarningSchedule.ts)).
+  Der Sekundentakt der Seite ist ein `setInterval`, und den drosselt der
+  Browser im Hintergrund auf einmal je Minute — eine Rückzugswarnung mit einer
+  Minute Vorlauf käme dann womöglich erst zum Zeitpunkt selbst. Ein einzelner
+  `setTimeout` auf genau den Termin trifft ihn. Gerechnet wird mit
+  `naechsteWarnung` wie am Server, mit zwei Abweichungen: Was dieses Gerät
+  schon gezeigt hat, gilt als verschickt (offline vermerkt der Server nichts),
+  und vergangene Termine werden übersprungen. Letzteres ist nötig, weil
+  `naechsteWarnung` nur nach der Buchführung filtert: Eine durch eine
+  Druckabfrage erledigte Drittelmarke käme sonst weiter als „nächster Termin"
+  heraus, und der Wecker liefe sofort und immer wieder an. Fällige Warnungen
+  meldet ohnehin der Sekundentakt.
+- **Der Bildschirm bleibt an** (Screen Wake Lock, [useWakeLock.ts](../src/hooks/useWakeLock.ts)),
+  solange ein Trupp im Einsatz ist. Eine Warnung aus der Seite sieht nur, wer
+  einen eingeschalteten Bildschirm hat. Der Browser gibt die Sperre beim
+  Verbergen der Seite selbst frei; sie wird bei jeder Rückkehr
+  (`visibilitychange`) neu angefordert. Eine kleine Zeile auf der Seite sagt,
+  dass sie gilt. Ohne API (Android-WebView, ältere Browser) bleibt alles wie
+  vorher.
+- **In der App ein Termin beim Betriebssystem**
+  ([nativeLocalNotifications.ts](../src/lib/nativeLocalNotifications.ts)): je
+  Trupp der nächste Termin als geplante lokale Benachrichtigung, die auch bei
+  gesperrtem Bildschirm und geschlossener App auslöst. Die Kennung hängt am
+  Trupp (`asue-<truppId>`) wie der `tag` des Pushs, eine neue Planung ersetzt
+  also die alte. Termine bleiben beim Verlassen der Seite stehen — gerade dann
+  sollen sie ankommen; storniert wird, wenn der Trupp aus dem Einsatz ist oder
+  den Rückzug angetreten hat. Grundlage ist `@capacitor/local-notifications`.
+  Weil die App ihre Seiten vom Server lädt, bekommt auch eine ältere
+  installierte App ohne das Plugin diesen Code — dort ist der Baustein über
+  `Capacitor.isPluginAvailable` ein No-op. Drei Einzelheiten:
+  - **Eigener Kanal** `atemschutz-warnung` mit höchster Wichtigkeit und voller
+    Sichtbarkeit auf dem Sperrbildschirm. Android behält Ton und Wichtigkeit
+    je Kanal-Kennung; die Kennung darf sich deshalb nie ändern, ein neuer Name
+    wäre ein zweiter Kanal neben dem alten.
+  - **Exakte Alarme nur mit Erlaubnis.** Ohne „Alarme & Erinnerungen"
+    (Android 12+) bündelt Android geplante Meldungen im Ruhezustand, eine
+    Rückzugswarnung kann sich um Minuten verspäten. Das Plugin öffnet bei
+    `isExactNotification: true` ohne Erlaubnis bei **jedem** `schedule()` die
+    Systemeinstellungen — der Abgleich läuft im Sekundentakt. Deshalb wird ohne
+    Erlaubnis unscharf geplant, und die Seite bietet die Erlaubnis als Knopf an
+    ([ExactAlarmHint.tsx](../src/components/Atemschutz/ExactAlarmHint.tsx)),
+    erst wenn Benachrichtigungen überhaupt erlaubt sind. Die Erlaubnis ist Teil
+    der Signatur eines Termins: Wird sie erteilt, wird alles exakt neu geplant.
+    Android meldet die Änderung der WebView nicht; nachgelesen wird bei der
+    Rückkehr in die App (`visibilitychange`).
+  - **Ein Tipp** auf die Meldung führt über `extra.url` zur Überwachungsseite
+    ([NativeNotificationTaps.tsx](../src/components/providers/NativeNotificationTaps.tsx)).
+    Angenommen werden nur Pfade der eigenen App (`/…`, nicht `//…`).
+- **Nachplanen beim Reconnect**
+  ([useReplanWarningsOnReconnect.ts](../src/components/Atemschutz/useReplanWarningsOnReconnect.ts)):
+  für **alle** Trupps im Einsatz, nicht nur die offline geänderten (die liegen
+  schon in der Warteschlange). Ein Trupp, der vor dem Funkloch abmarschiert
+  ist oder den ein anderes Gerät angelegt hat, wartete sonst bis zum
+  Netz-Zeitplan. Die Planung ist idempotent, ein Aufruf zu viel kostet nichts.
+
+Doppelt erscheint dabei nichts: Benachrichtigung aus der Seite und Push tragen
+denselben `tag`, und die Seite vermerkt weiterhin nichts am Dokument.
+
 ## Der Service Worker unterscheidet die Nutzlast
 
 Der Worker hat bisher **jede** Data-Message als Chat-Nachricht angezeigt. Eine

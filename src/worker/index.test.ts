@@ -96,3 +96,23 @@ describe('service worker: Build-ID', () => {
     expect(code).toMatch(/process\.env\.NEXT_PUBLIC_BUILD_ID/);
   });
 });
+
+describe('service worker: App-Shell', () => {
+  it('hängt die App-Shell-Regel mit einem Cache je Build ein', () => {
+    expect(code).toMatch(
+      /appShellCacheName\(process\.env\.NEXT_PUBLIC_BUILD_ID\)/,
+    );
+    expect(code).toMatch(/runtimeCaching\(defaultCache,\s*\{\s*appShellCacheName/);
+  });
+
+  it('räumt beim Aktivieren die App-Shell früherer Builds weg', () => {
+    expect(code).toMatch(
+      /addEventListener\('activate'[\s\S]*cleanupOldAppShellCaches\(appShellCache/,
+    );
+  });
+
+  it('wärmt die App-Shell auf Bitte der Seite vor', () => {
+    expect(code).toMatch(/APP_SHELL_WARM_REQUEST/);
+    expect(code).toMatch(/warmAppShell\(/);
+  });
+});

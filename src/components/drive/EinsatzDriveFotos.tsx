@@ -10,6 +10,7 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import type { FirecallDriveState } from '../../common/drive';
+import useOnline from '../../hooks/useOnline';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import DriveFileUploader from './DriveFileUploader';
@@ -49,6 +50,9 @@ export default function EinsatzDriveFotos({
   const canWrite = useFirecallWriteAccess();
   const [state, setState] = useState<FirecallDriveState>();
   const [error, setError] = useState<string>();
+  // Der Zustand kommt aus einer Server Action. Offline wird er nicht geladen
+  // (sie hinge nur), sondern nach dem Reconnect.
+  const online = useOnline();
 
   const apply = useCallback(({ state, error }: DriveStateResult) => {
     setState(state);
@@ -60,6 +64,7 @@ export default function EinsatzDriveFotos({
   }, [apply, firecallId]);
 
   useEffect(() => {
+    if (!online) return;
     let active = true;
     (async () => {
       const result = await loadDriveState(firecallId);
@@ -69,8 +74,13 @@ export default function EinsatzDriveFotos({
     return () => {
       active = false;
     };
-  }, [apply, firecallId]);
+  }, [apply, firecallId, online]);
 
+  // Offline und noch nichts geladen: Die Drive-Fotos gibt es nur online, der
+  // Abschnitt bleibt bis dahin weg statt endlos zu laden.
+  if (!online && !state) {
+    return null;
+  }
   if (error) {
     return <Alert severity="error">{t('loadFailed', { message: error })}</Alert>;
   }

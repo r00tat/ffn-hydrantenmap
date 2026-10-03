@@ -8,7 +8,7 @@ import {
   query,
   Query,
 } from 'firebase/firestore';
-import { addDoc, deleteDoc, updateDoc } from '../lib/firestoreClient';
+import { addDocLocal, deleteDocLocal, updateDocLocal } from '../lib/firestoreClient';
 import { firestore } from '../components/firebase/firebase';
 import {
   CrewAssignment,
@@ -83,37 +83,31 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
 
       // Erst die Zuteilungen auf den behaltenen Eintrag holen, dann die
       // Duplikate löschen — so geht auch bei einem Abbruch nichts verloren.
-      if (plan.updates.length > 0) {
-        await Promise.all(
-          plan.updates.map(({ id, changes }) =>
-            updateDoc(crewDoc(id), {
-              ...changes,
-              updatedAt: now,
-              updatedBy: email || '',
-            })
-          )
-        );
+      // Lokal geschrieben: Firestore hält die Reihenfolge der Schreibvorgänge
+      // ein, auch wenn sie erst beim Reconnect zum Server gehen.
+      for (const { id, changes } of plan.updates) {
+        updateDocLocal(crewDoc(id), {
+          ...changes,
+          updatedAt: now,
+          updatedBy: email || '',
+        });
       }
-      if (plan.deleteIds.length > 0) {
-        await Promise.all(plan.deleteIds.map((id) => deleteDoc(crewDoc(id))));
+      for (const id of plan.deleteIds) {
+        deleteDocLocal(crewDoc(id));
       }
 
-      if (plan.create.length === 0) return;
-
-      await Promise.all(
-        plan.create.map((r) =>
-          addDoc(crewCollectionRef, {
-            recipientId: r.id,
-            name: r.name,
-            vehicleId: null,
-            vehicleName: '',
-            funktion: 'Feuerwehrmann' as CrewFunktion,
-            source: 'alarm' as const,
-            updatedAt: now,
-            updatedBy: email || '',
-          })
-        )
-      );
+      for (const r of plan.create) {
+        addDocLocal(crewCollectionRef, {
+          recipientId: r.id,
+          name: r.name,
+          vehicleId: null,
+          vehicleName: '',
+          funktion: 'Feuerwehrmann' as CrewFunktion,
+          source: 'alarm' as const,
+          updatedAt: now,
+          updatedBy: email || '',
+        });
+      }
     },
     [crewCollectionRef, email, firecallId]
   );
@@ -132,7 +126,7 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
         FIRECALL_CREW_COLLECTION_ID,
         assignmentId
       );
-      await updateDoc(docRef, {
+      updateDocLocal(docRef, {
         vehicleId,
         vehicleName,
         updatedAt: new Date().toISOString(),
@@ -152,7 +146,7 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
         FIRECALL_CREW_COLLECTION_ID,
         assignmentId
       );
-      await updateDoc(docRef, {
+      updateDocLocal(docRef, {
         funktion,
         updatedAt: new Date().toISOString(),
         updatedBy: email || '',
@@ -164,7 +158,7 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
   const addManualPerson = useCallback(
     async (name: string) => {
       if (!crewCollectionRef || !name.trim()) return;
-      await addDoc(crewCollectionRef, {
+      addDocLocal(crewCollectionRef, {
         recipientId: `manual-${Date.now()}`,
         name: name.trim(),
         vehicleId: null,
@@ -190,7 +184,7 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
         return;
       }
 
-      await addDoc(crewCollectionRef, {
+      addDocLocal(crewCollectionRef, {
         recipientId: recipient.id,
         name: recipient.name,
         vehicleId: null,
@@ -214,7 +208,7 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
         FIRECALL_CREW_COLLECTION_ID,
         assignmentId
       );
-      await deleteDoc(docRef);
+      deleteDocLocal(docRef);
     },
     [firecallId]
   );

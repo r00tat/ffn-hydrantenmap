@@ -17,7 +17,21 @@ export type UseFirestoreQueryResult<T> = {
 
   /** array of elements returned by snapshot and filtered by optional filter function. */
   records: Array<T>;
+
+  /**
+   * Stammt das Ergebnis nur aus dem lokalen Cache (`snapshot.metadata.fromCache`)?
+   * Offline liefert eine nie geladene Abfrage eine leere Liste statt eines
+   * Fehlers — dieses Feld unterscheidet „leer" von „unbekannt". Verlässlich
+   * nur mit `includeMetadataChanges`: ohne meldet der Listener den Wechsel
+   * vom Cache- zum Server-Stand nicht, wenn sich kein Dokument ändert.
+   */
+  fromCache: boolean;
 };
+
+export interface UseFirestoreQueryOptions {
+  /** Auch reine Metadaten-Änderungen melden (für `fromCache`). */
+  includeMetadataChanges?: boolean;
+}
 
 /** Stabiles leeres Ergebnis, damit ein noch leerer Listener keine Renders auslöst. */
 const EMPTY_RECORDS: Array<never> = [];
@@ -39,8 +53,10 @@ const EMPTY_RECORDS: Array<never> = [];
  */
 export const useFirestoreQuery = <T>(
   query: Query<T> | null,
-  filterFn?: (element: T) => boolean
+  filterFn?: (element: T) => boolean,
+  options: UseFirestoreQueryOptions = {}
 ): UseFirestoreQueryResult<T> => {
+  const includeMetadataChanges = options.includeMetadataChanges === true;
   const [value, setValue] = useState<QuerySnapshot<T> | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | undefined>(undefined);
@@ -58,21 +74,24 @@ export const useFirestoreQuery = <T>(
     (async () => {
       setLoading(true);
     })();
-    const unsubscribe = onSnapshot(
-      query,
-      (snapshot) => {
-        setValue(snapshot as QuerySnapshot<T>);
-        setLoading(false);
-      },
-      (err: Error) => {
-        console.error('Error in useFirestoreQuery:', err);
-        setError(err);
-        setLoading(false);
-      }
-    );
+    const next = (snapshot: QuerySnapshot<T>) => {
+      setValue(snapshot);
+      setLoading(false);
+    };
+    const onError = (err: Error) => {
+      console.error('Error in useFirestoreQuery:', err);
+      setError(err);
+      setLoading(false);
+    };
+    // Die Optionen nur, wenn sie gebraucht werden: Metadaten-Änderungen
+    // (etwa `hasPendingWrites`) lösen sonst bei jedem Schreibvorgang einen
+    // zusätzlichen Render der ganzen Liste aus.
+    const unsubscribe = includeMetadataChanges
+      ? onSnapshot(query, { includeMetadataChanges: true }, next, onError)
+      : onSnapshot(query, next, onError);
 
     return () => unsubscribe();
-  }, [query]);
+  }, [query, includeMetadataChanges]);
 
   const records = useMemo(() => {
     if (!value) {
@@ -85,5 +104,7 @@ export const useFirestoreQuery = <T>(
     return filterFn ? newRecords.filter(filterFn) : newRecords;
   }, [value, filterFn]);
 
-  return { value, loading, error, records };
+  const fromCache = value?.metadata?.fromCache === true;
+
+  return { value, loading, error, records, fromCache };
 };

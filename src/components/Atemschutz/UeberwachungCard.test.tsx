@@ -51,6 +51,7 @@ interface RenderOptionen {
   istAktuell?: boolean;
   onErneutEinsatz?: () => void;
   onAnSammelplatz?: () => void;
+  pendingSync?: boolean;
 }
 
 function render(
@@ -61,6 +62,7 @@ function render(
     istAktuell = true,
     onErneutEinsatz = vi.fn(),
     onAnSammelplatz = vi.fn(),
+    pendingSync,
   }: RenderOptionen = {},
 ) {
   renderWithIntl(
@@ -79,6 +81,7 @@ function render(
       onRueckkehr={vi.fn()}
       onErneutEinsatz={onErneutEinsatz}
       onAnSammelplatz={onAnSammelplatz}
+      pendingSync={pendingSync}
     />,
   );
 }
@@ -444,5 +447,16 @@ describe('UeberwachungCard: Ankunft und Rückzug sind Ereignisse', () => {
       { jetzt: nachAbmarsch(10) },
     );
     expect(screen.queryByText('Keine Ankunftsmeldung')).toBeNull();
+  });
+
+  it('kennzeichnet eine Druckabfrage, die erst auf dem Gerät liegt', () => {
+    const pending = /Noch nicht übertragen/;
+    render(trupp({ abfragen: [abfrage(5, 250)] }), { pendingSync: true });
+    expect(screen.getByRole('img', { name: pending })).toBeInTheDocument();
+  });
+
+  it('zeigt ohne offene Änderung kein Synchronisations-Symbol', () => {
+    render(trupp({ abfragen: [abfrage(5, 250)] }));
+    expect(screen.queryByRole('img', { name: /Noch nicht übertragen/ })).toBeNull();
   });
 });

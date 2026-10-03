@@ -36,6 +36,16 @@ vi.mock('../../hooks/useMapEditor', () => ({
   }),
 }));
 
+let connectivityStatus: 'online' | 'offline' | 'syncing' = 'online';
+vi.mock('../../hooks/useConnectivity', () => ({
+  default: () => ({
+    reachable: connectivityStatus !== 'offline',
+    status: connectivityStatus,
+    lastCheck: null,
+    pendingWrites: 0,
+  }),
+}));
+
 function renderHeader() {
   return render(<HeaderBar isDrawerOpen={false} setIsDrawerOpen={vi.fn()} />);
 }
@@ -43,6 +53,18 @@ function renderHeader() {
 describe('HeaderBar', () => {
   beforeEach(() => {
     firecall = undefined;
+    connectivityStatus = 'online';
+  });
+
+  it('zeigt den Offline-Modus als Chip in der Kopfzeile', () => {
+    connectivityStatus = 'offline';
+    renderHeader();
+    expect(screen.getByText('Offline-Modus')).toBeInTheDocument();
+  });
+
+  it('zeigt online keinen Verbindungs-Chip', () => {
+    renderHeader();
+    expect(screen.queryByText('Offline-Modus')).not.toBeInTheDocument();
   });
 
   it('führt über Logo und App-Titel zur Karte des Einsatzes', () => {

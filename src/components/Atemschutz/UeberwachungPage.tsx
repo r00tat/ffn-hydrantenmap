@@ -21,6 +21,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import {
+  ATEMSCHUTZ_TRUPP_COLLECTION_ID,
   buildDruckabfrage,
   canTransition,
   entsendePatch,
@@ -44,6 +45,7 @@ import {
   vorgabeGeraetesatz,
 } from '../../common/atemschutzUeberwachung';
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
+import OfflineListHint from '../site/OfflineListHint';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -51,6 +53,9 @@ import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useOwnFleet from '../../hooks/useOwnFleet';
 import { sortVehiclesOwnFirst } from '../../common/vehicleGroups';
+import usePendingDocIds from '../../hooks/usePendingDocIds';
+import ExactAlarmHint from './ExactAlarmHint';
+import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import useNotificationPermission, {
   pruefeNotificationErlaubnis,
   type NotificationErlaubnis,
@@ -86,11 +91,13 @@ import {
   truppPasstZuEinheit,
   type EinheitTab,
 } from './einheiten';
-import { planeUeberwachungWarnung } from './ueberwachungTaskAction';
+import { planWarningOrQueue } from './ueberwachungWarnungQueue';
 import useTruppTagebuch from './useTruppTagebuch';
 import AiAssistantButton from '../Map/AiAssistantButton';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import useUeberwachungHinweise from './useUeberwachungHinweise';
+import useReplanWarningsOnReconnect from './useReplanWarningsOnReconnect';
+import useWakeLock from '../../hooks/useWakeLock';
 
 /**
  * Die **eigene** Einheit des Geräts steht im `localStorage` — nicht am
@@ -168,6 +175,13 @@ export default function UeberwachungPage() {
   // Ohne Einsatz kein Schreiben: `firecallId` ist dann die Platzhalter-ID
   // `unknown`, und jeder Schreibvorgang darauf endet in permission-denied.
   const canWrite = useFirecallWriteAccess() && hatEinsatz;
+  // Trupps, deren letzte Änderung (etwa eine Druckabfrage) erst auf dem Gerät
+  // liegt — für das Synchronisations-Symbol an der Karte.
+  const pendingTruppIds = usePendingDocIds(
+    hatEinsatz
+      ? [FIRECALL_COLLECTION_ID, firecallId, ATEMSCHUTZ_TRUPP_COLLECTION_ID]
+      : null,
+  );
   const { uid, displayName, email } = useFirebaseLogin();
   const jetzt = useTicker();
   const registerMessaging = useRegisterMessaging();
@@ -175,7 +189,7 @@ export default function UeberwachungPage() {
   const groupId = firecall?.group;
   const { flaschen, activeGeraete, feuerwehren } =
     useAtemschutzGeraete(groupId);
-  const { trupps } = useAtemschutzEinsatzdaten(firecallId);
+  const { trupps, fromCache } = useAtemschutzEinsatzdaten(firecallId);
   // Für den Sprach-Assistenten: Ohne die Elemente liefen dort `updateItem`,
   // `deleteItem` und `answerQuestion` stillschweigend ins Leere.
   const firecallItems = useFirecallItems();
@@ -346,6 +360,22 @@ export default function UeberwachungPage() {
     vorgabe,
   });
 
+  // Offline kommt kein Push: Solange ein Trupp unter Atemschutz ist, bleibt
+  // der Bildschirm an, damit die Warnung aus der Seite gesehen wird.
+  const screenAwake = useWakeLock(hatEinsatz && trupps.imEinsatz.length > 0);
+
+  // Beim Reconnect die Serverwarnung aller Trupps im Einsatz nachplanen — auch
+  // derer, die ein anderes Gerät angelegt hat.
+  const activeTruppIds = useMemo(
+    () =>
+      trupps.imEinsatz.flatMap((tr) => (tr.id ? [tr.id] : [])),
+    [trupps.imEinsatz],
+  );
+  useReplanWarningsOnReconnect(
+    hatEinsatz ? firecallId : undefined,
+    activeTruppIds,
+  );
+
   const [dialog, setDialog] = useState<Dialog>();
   // Nur die einmalige Bestätigung nach dem Einschalten — kein Dauerzustand.
   const [pushBestaetigung, setPushBestaetigung] = useState(false);
@@ -443,11 +473,15 @@ export default function UeberwachungPage() {
    * Nach jedem Schreibvorgang, der die Fristen verschiebt — der Client schreibt
    * direkt in Firestore, der Server bekommt das sonst nicht mit. Fehler bleiben
    * im Log: Der Zeitplan ist das Netz darunter, und diese Seite warnt selbst.
+   *
+   * Nicht abgewartet: Eine Server Action braucht den Server, und offline hinge
+   * sonst jeder Dialog (Druckabfrage, Übernahme, Auftrag) an ihr, obwohl die
+   * Daten längst lokal gespeichert sind.
    */
   const planeWarnung = useCallback(
     async (truppId?: string) => {
       if (!truppId || !hatEinsatz) return;
-      await planeUeberwachungWarnung(firecallId, truppId).catch((err) => {
+      void planWarningOrQueue(firecallId, truppId).catch((err) => {
         console.warn('Terminplanung der Atemschutzwarnung fehlgeschlagen', err);
       });
     },
@@ -508,7 +542,7 @@ export default function UeberwachungPage() {
       // Wer hier einen Trupp erfasst, überwacht ihn ab sofort — und braucht
       // damit die Warnungen. Ohne diesen Aufruf gäbe es für einen Trupp, der
       // nie über eine Übernahme lief, weder Erlaubnis noch Push-Token.
-      await registerMessaging().catch((err) => {
+      void registerMessaging().catch((err) => {
         console.warn('Push-Registrierung fehlgeschlagen', err);
       });
     },
@@ -540,7 +574,7 @@ export default function UeberwachungPage() {
       // Erst hier den Push-Token holen und nicht beim Laden der Seite: Der
       // Browser fragt dabei nach der Erlaubnis für Benachrichtigungen, und
       // diese Frage soll zu einer Handlung gehören, die sie erklärt.
-      await registerMessaging().catch((err) => {
+      void registerMessaging().catch((err) => {
         console.warn('Push-Registrierung fehlgeschlagen', err);
       });
       // Ein anderer Gerätesatz heißt eine andere rechnerische Einsatzdauer und
@@ -611,7 +645,7 @@ export default function UeberwachungPage() {
       // Erst hier den Push-Token holen: Der Browser fragt dabei nach der
       // Erlaubnis, und die Frage soll zu einer Handlung gehören, die sie
       // erklärt.
-      await registerMessaging().catch((err) => {
+      void registerMessaging().catch((err) => {
         console.warn('Push-Registrierung fehlgeschlagen', err);
       });
       // Ab hier laufen die Fristen — vorher gab es keine.
@@ -711,6 +745,7 @@ export default function UeberwachungPage() {
       }
       onBereitZumAbmarsch={() => void handleBereitZumAbmarsch(trupp)}
       onAnSammelplatz={() => void handleAnSammelplatz(trupp)}
+      pendingSync={!!trupp.id && pendingTruppIds.has(trupp.id)}
     />
   );
 
@@ -796,6 +831,28 @@ export default function UeberwachungPage() {
             `ueberwachung.pushHinweis.${PUSH_HINWEIS[pushErlaubnis]}` as 'ueberwachung.pushHinweis.offen',
           )}
         </Alert>
+      )}
+
+      {/* Erst wenn Benachrichtigungen erlaubt sind, lohnt die Frage nach der
+          Pünktlichkeit; sonst kommt ohnehin keine an. */}
+      {canWrite && pushErlaubnis === 'granted' && <ExactAlarmHint />}
+
+      {screenAwake && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          component="div"
+          sx={{ mb: 1 }}
+        >
+          {t('ueberwachung.wakeLockAktiv')}
+        </Typography>
+      )}
+
+      {hatEinsatz && (
+        <OfflineListHint
+          fromCache={fromCache}
+          empty={trupps.protokoll.length === 0}
+        />
       )}
 
       <Snackbar

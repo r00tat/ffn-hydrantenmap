@@ -50,6 +50,7 @@ import {
 import FuellprotokollTab from './FuellprotokollTab';
 import FuellungImportDialog from './FuellungImportDialog';
 import { buildFuellungDocument } from './fuellungErfassung';
+import OnlineOnly from '../site/OnlineOnly';
 
 /** Werte des Einsatz-Filters, die keine Einsatz-ID sind. */
 const FILTER_ALLE = 'alle';
@@ -424,14 +425,16 @@ export default function FuellprotokollPage() {
       {/* Ausdruck und Export beziehen sich auf genau das, was die Filter
           darüber übrig lassen — deshalb stehen sie direkt darunter. */}
       <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', rowGap: 1 }}>
-        <Button
-          size="small"
-          startIcon={<PrintIcon />}
-          disabled={busy || !groupId}
-          onClick={handlePdf}
-        >
-          {t('export.pdf')}
-        </Button>
+        <OnlineOnly>
+          <Button
+            size="small"
+            startIcon={<PrintIcon />}
+            disabled={busy || !groupId}
+            onClick={handlePdf}
+          >
+            {t('export.pdf')}
+          </Button>
+        </OnlineOnly>
         <Button
           size="small"
           startIcon={<TableViewIcon />}

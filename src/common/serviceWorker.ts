@@ -64,6 +64,14 @@ export async function unregisterLegacyServiceWorker(
 export const SW_BUILD_ID_REQUEST = 'sw-build-id';
 
 /**
+ * Nachricht, mit der die Seite den Service Worker bittet, Seiten in die
+ * App-Shell zu laden (Kaltstart ohne Netz, `src/worker/appShell.ts`).
+ * `{ type, urls }`; die Antwort `{ cached, failed }` kommt über den
+ * mitgeschickten `MessagePort`.
+ */
+export const APP_SHELL_WARM_REQUEST = 'app-shell-warm';
+
+/**
  * Fragt `worker` nach der Build-ID, aus der er gebaut wurde. Antwortet er nicht
  * innerhalb von `timeoutMs` — etwa ein Worker aus einem Build vor dieser
  * Nachricht —, ist das Ergebnis `undefined`.

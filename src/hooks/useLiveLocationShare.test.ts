@@ -7,15 +7,21 @@ vi.mock('../components/firebase/firebase', () => ({
   firestore: { type: 'mock-firestore' },
 }));
 
+// Lokal schreiben: kehrt sofort zurück, das Server-Versprechen zählt
+// firestoreClient selbst.
 const setDocMock = vi.hoisted(() =>
-  vi.fn((_ref: unknown, _data?: unknown) => Promise.resolve()),
+  vi.fn((_ref: unknown, _data?: unknown) => undefined),
 );
+const connectivity = vi.hoisted(() => ({ offline: false }));
+vi.mock('../lib/connectivity', () => ({
+  isOffline: () => connectivity.offline,
+}));
 const deleteDocMock = vi.hoisted(() =>
   vi.fn((_ref: unknown) => Promise.resolve()),
 );
 
 vi.mock('../lib/firestoreClient', () => ({
-  setDoc: setDocMock,
+  setDocLocal: setDocMock,
   deleteDoc: deleteDocMock,
 }));
 
@@ -112,6 +118,7 @@ describe('useLiveLocationShare document identity', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    connectivity.offline = false;
   });
 
   it('writes to livelocation/{uid}_{deviceId}', async () => {
@@ -155,6 +162,27 @@ describe('useLiveLocationShare document identity', () => {
     );
     expect(deleted).toContain('call/fc-A/livelocation/uid-1_devaaaaaaaaa');
     expect(deleted).toContain('call/fc-A/livelocation/uid-1');
+  });
+
+  // Offline sieht die Position ohnehin niemand. Jeder Schreibvorgang bliebe
+  // als ausstehend liegen und ginge beim Reconnect veraltet hinaus.
+  it('writes nothing while offline and sends on the next call once online', async () => {
+    connectivity.offline = true;
+    const { result } = renderHook(() => useLiveLocationShare(identity, settings));
+    await result.current.maybeSend(pos, undefined);
+    await result.current.maybeSend(pos, undefined);
+    expect(setDocMock).not.toHaveBeenCalled();
+
+    connectivity.offline = false;
+    await result.current.maybeSend(pos, undefined);
+    expect(setDocMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('throttles right after a write without waiting for the server', async () => {
+    const { result } = renderHook(() => useLiveLocationShare(identity, settings));
+    await result.current.maybeSend(pos, undefined);
+    await result.current.maybeSend(pos, undefined);
+    expect(setDocMock).toHaveBeenCalledTimes(1);
   });
 
   it('writes nothing without an identity', async () => {

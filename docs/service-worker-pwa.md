@@ -95,6 +95,53 @@ einen Rückfall aufs Netz. Dazu kommen in [index.ts](../src/worker/index.ts):
   seine Caches und meldet sich ab. Ohne ihn bleibt einem Benutzer nur „Website-Daten
   löschen" — in einer installierten PWA am Telefon praktisch unauffindbar.
 
+## App-Shell: Seiten für den Kaltstart ohne Netz
+
+Navigationen auf eigene Seiten beantwortet nicht mehr Serwists `defaultCache`,
+sondern die Regel aus `appShellRoute` ([patterns.ts](../src/worker/patterns.ts),
+Logik in [appShell.ts](../src/worker/appShell.ts)). Navigationen tragen keinen
+`Content-Type: text/html` im Request, fielen in `defaultCache` also in die
+Auffangregel `others`: NetworkFirst **ohne** Zeitgrenze, 32 Einträge, ein Tag.
+Im WLAN ohne Internet hing damit jede Navigation, bis der Browser aufgab, und
+nach einem Tag ohne Besuch war die Seite weg.
+
+- **Ein Cache je Build** (`app-shell-<NEXT_PUBLIC_BUILD_ID>`). Das HTML
+  verweist auf die Chunks seines Builds, und die räumt der neue Worker aus dem
+  Precache. Beim `activate` löscht der Worker deshalb die App-Shell früherer
+  Builds; `useAppShellWarmup` wärmt nach dem `controllerchange` neu vor.
+- **Netz zuerst, acht Sekunden.** Danach, bei einem Netzfehler oder einer
+  5xx-Antwort, der Cache: erst die eigene Seite, dann der Precache dieses
+  Builds, dann eine **Vorlage**, dann `/offline`, zuletzt eine eingebaute
+  HTML-Seite. Bewusst nicht die übrigen Caches: Die Auffangregel `others` hält
+  HTML früherer Builds, dessen Chunks offline fehlen — eine weiße Seite wäre
+  schlechter als `/offline`. Gespeichert wird nur eine `200` ohne Umleitung
+  mit `text/html`.
+- **Vorlage für Einsatzseiten.** Ein offline angelegter Einsatz hat seine ID
+  auf dem Gerät bekommen; seine Seiten hat nie jemand abgerufen. Die Seite
+  desselben Abschnitts eines anderen Einsatzes dient als Vorlage, und die
+  Einsatz-ID darin wird ersetzt — sie steht im Pfad, in Links und in den
+  RSC-Daten des HTML (`"firecallId","…"`). Ohne Ersetzen hydrierte die Seite
+  mit dem falschen Einsatz. Nur IDs ab 15 Zeichen: Firestore vergibt 20
+  zufällige Zeichen, die sonst nirgends im HTML stehen.
+- **Vorwärmen statt Precache.** Die Einsatzpfade sind dynamisch, der Worker
+  kennt sie beim Installieren nicht. Die angemeldete Seite schickt deshalb
+  online, zehn Sekunden nach dem Start und je Einsatz einmal,
+  `{ type: APP_SHELL_WARM_REQUEST, urls }` (`useAppShellWarmup`,
+  [appShellWarmup.ts](../src/lib/appShellWarmup.ts)); der Worker ruft die
+  Seiten der Reihe nach ab. Ein Eintrag in `additionalPrecacheEntries` hätte
+  zudem die Installation des Workers an den Abruf einer dynamischen Seite
+  gehängt — scheitert der, gibt es gar keinen Worker.
+- **RSC-Payloads werden nicht vorgehalten.** Ihr Cache-Schlüssel trägt `_rsc`,
+  einen Hash über den Router-Zustand, der sich nicht vorhersagen lässt.
+  Scheitert der RSC-Abruf, navigiert Next.js selbst hart („Falling back to
+  browser navigation"), und diese Navigation beantwortet die App-Shell.
+- Die Regel steht **hinter** `cachePatterns` (die `NetworkOnly`-Regeln für den
+  Ping `/api/ping`, die Gastseite und den Auth-Handler greifen weiter zuerst;
+  der Ping darf nie aus einem Cache kommen, sonst täuschte er offline „online"
+  vor, siehe [offline-modus.md](offline-modus.md#verbindungsstatus-erkennen)) und ist wie jede
+  andere in `resilient` eingepackt. Sie wirft selbst nie: Am Ende steht die
+  eingebaute Seite.
+
 ## „Neue Version verfügbar" nur bei einem anderen Build
 
 Der Worker läuft mit `skipWaiting` und `clientsClaim`; die Meldung in

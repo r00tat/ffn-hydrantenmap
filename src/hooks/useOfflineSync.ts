@@ -6,11 +6,14 @@ import { useEffect, useRef } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import { useSnackbar } from '../components/providers/SnackbarProvider';
 import { getPendingWriteCount } from '../lib/pendingWrites';
-import useOnline from './useOnline';
+import useConnectivity from './useConnectivity';
 
 /**
  * Shows a confirmation once changes that were made while offline have been
  * synced to the backend.
+ *
+ * Reacts to the connectivity store (`src/lib/connectivity.ts`), so "offline"
+ * also covers a Wi-Fi without internet, not just `navigator.onLine === false`.
  *
  * On an offline → online transition, if there are still pending Firestore
  * writes, it waits for them to be acknowledged by the backend
@@ -18,7 +21,7 @@ import useOnline from './useOnline';
  * pending, no message is shown to avoid noise on every reconnect.
  */
 export default function useOfflineSync(): void {
-  const online = useOnline();
+  const online = useConnectivity().reachable;
   const showSnackbar = useSnackbar();
   const t = useTranslations('networkStatus');
   const wasOnline = useRef(online);

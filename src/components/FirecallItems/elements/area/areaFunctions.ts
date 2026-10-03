@@ -1,5 +1,5 @@
 import { doc } from 'firebase/firestore';
-import { setDoc } from '../../../../lib/firestoreClient';
+import { setDocLocal } from '../../../../lib/firestoreClient';
 import L from 'leaflet';
 import { LatLngPosition } from '../../../../common/geo';
 
@@ -53,7 +53,7 @@ const updateConnectionInFirestore = async (
       positions: JSON.stringify(positions),
       distance: Math.round(calculateDistance(positions)),
     };
-    await setDoc(
+    setDocLocal(
       doc(
         firestore,
         FIRECALL_COLLECTION_ID,

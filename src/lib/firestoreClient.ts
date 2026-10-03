@@ -5,6 +5,7 @@ import {
   updateDoc as fsUpdateDoc,
   addDoc as fsAddDoc,
   deleteDoc as fsDeleteDoc,
+  doc,
   writeBatch,
   type DocumentReference,
   type CollectionReference,
@@ -16,8 +17,11 @@ import {
   type PartialWithFieldValue,
   type WriteBatch,
 } from 'firebase/firestore';
+import { ensureFreshAuth, isAuthError } from '../hooks/auth/ensureFreshAuth';
 import { withFreshAuth } from '../hooks/auth/withFreshAuth';
+import { isOffline } from './connectivity';
 import { trackPendingWrite } from './pendingWrites';
+import { recordSyncError, type SyncWriteKind } from './syncErrors';
 
 /**
  * Central Firestore write client. All mutation calls are routed through
@@ -33,6 +37,13 @@ import { trackPendingWrite } from './pendingWrites';
  *
  * For composite read-modify-write operations, wrap the whole block manually
  * with `withFreshAuth(() => { ... })`.
+ *
+ * **Lokal schreiben:** `setDoc` & Co. kehren erst mit der Bestätigung des
+ * Servers zurück — offline also nie. Wer nicht auf den Server warten muss
+ * (Dialoge, Eingaben), nimmt `addDocLocal` / `setDocLocal` / `updateDocLocal` /
+ * `deleteDocLocal` / `commitBatchLocal`: Sie setzen den Schreibvorgang sofort
+ * ab, er steht damit im lokalen Cache, und kehren gleich zurück. Siehe
+ * `docs/offline-modus.md`.
  *
  * The `updateDoc` field-path overload (`updateDoc(ref, 'field', value, ...)`)
  * is intentionally not re-exported. No call site in this codebase uses it.
@@ -124,5 +135,140 @@ export async function commitInBatches(
       batch.set(ref, data);
     }
     await commitBatch(batch);
+  }
+}
+
+// --- Lokale Schreibvorgänge -------------------------------------------------
+
+/**
+ * Setzt einen Schreibvorgang ab, ohne auf den Server zu warten.
+ *
+ * `op` wird **synchron** aufgerufen: Das SDK reiht den Schreibvorgang damit
+ * sofort in seine Warteschlange und den lokalen Cache ein — auch offline und
+ * auch über ein Neuladen hinweg. Bewusst *nicht* über `withFreshAuth`: Das
+ * wartet vorher auf `ensureFreshAuth`, und ein ablaufendes Token heißt dort
+ * `getIdToken(true)` und eine Server Action, offline also Warten aufs Netz.
+ * Bis dahin stünde der Schreibvorgang nicht einmal im Cache.
+ *
+ * Firestore holt sich sein Token selbst. Erst wenn der Server mit einem
+ * Auth-Fehler ablehnt und das Gerät online ist, wird die Anmeldung erneuert
+ * und der Schreibvorgang genau einmal wiederholt. Jede verbleibende Ablehnung
+ * landet in `syncErrors.ts` — mit einer Wiederholung, die denselben Vorgang
+ * erneut absetzt.
+ *
+ * Fehler bei der Prüfung der Daten (z. B. ein `undefined`-Feld) wirft das SDK
+ * synchron; sie kommen beim Aufrufer an.
+ */
+function startLocalWrite(
+  kind: SyncWriteKind,
+  path: string,
+  op: () => Promise<unknown>,
+  repeatable = true,
+): void {
+  const first = op();
+  const confirmed = (async () => {
+    try {
+      await first;
+    } catch (err) {
+      if (!repeatable || !isAuthError(err) || isOffline()) throw err;
+      const refreshed = await ensureFreshAuth(true);
+      if (!refreshed) throw err;
+      await op();
+    }
+  })();
+  trackPendingWrite(confirmed).catch((error: unknown) => {
+    recordSyncError({
+      kind,
+      path,
+      error,
+      retry: repeatable ? () => startLocalWrite(kind, path, op) : undefined,
+    });
+  });
+}
+
+function refPath(reference: { path?: string } | undefined): string {
+  return reference?.path ?? '?';
+}
+
+/**
+ * Legt ein Dokument an und gibt die auf dem Gerät erzeugte Referenz sofort
+ * zurück — ohne auf die Bestätigung des Servers zu warten.
+ */
+export function addDocLocal<AppModelType, DbModelType extends DocumentData>(
+  reference: CollectionReference<AppModelType, DbModelType>,
+  data: WithFieldValue<AppModelType>,
+): DocumentReference<AppModelType, DbModelType> {
+  const ref = doc(reference);
+  startLocalWrite('add', refPath(ref), () => fsSetDoc(ref, data));
+  return ref;
+}
+
+export function setDocLocal<AppModelType, DbModelType extends DocumentData>(
+  reference: DocumentReference<AppModelType, DbModelType>,
+  data: WithFieldValue<AppModelType>,
+): void;
+export function setDocLocal<AppModelType, DbModelType extends DocumentData>(
+  reference: DocumentReference<AppModelType, DbModelType>,
+  data: PartialWithFieldValue<AppModelType>,
+  options: SetOptions,
+): void;
+export function setDocLocal(
+  reference: DocumentReference<unknown, DocumentData>,
+  data: unknown,
+  options?: SetOptions,
+): void {
+  startLocalWrite('set', refPath(reference), () =>
+    options === undefined
+      ? fsSetDoc(reference as DocumentReference<unknown>, data as WithFieldValue<unknown>)
+      : fsSetDoc(
+          reference as DocumentReference<unknown>,
+          data as PartialWithFieldValue<unknown>,
+          options,
+        ),
+  );
+}
+
+export function updateDocLocal<AppModelType, DbModelType extends DocumentData>(
+  reference: DocumentReference<AppModelType, DbModelType>,
+  data: UpdateData<DbModelType>,
+): void {
+  startLocalWrite('update', refPath(reference), () => fsUpdateDoc(reference, data));
+}
+
+export function deleteDocLocal<AppModelType, DbModelType extends DocumentData>(
+  reference: DocumentReference<AppModelType, DbModelType>,
+): void {
+  startLocalWrite('delete', refPath(reference), () => fsDeleteDoc(reference));
+}
+
+/**
+ * Committet einen Batch lokal. Ein `WriteBatch` lässt sich nur einmal
+ * committen — deshalb gibt es hier weder die Wiederholung nach einem
+ * Auth-Fehler noch „Erneut versuchen" in der Fehlerliste. `description`
+ * erscheint dort anstelle eines Pfads.
+ */
+export function commitBatchLocal(batch: WriteBatch, description = 'batch'): void {
+  startLocalWrite('batch', description, () => batch.commit(), false);
+}
+
+/**
+ * Wie `commitInBatches`, aber lokal: Jede Teilmenge geht durch
+ * `commitBatchLocal`, der Aufruf kehrt sofort zurück.
+ */
+export function commitInBatchesLocal(
+  firestore: Firestore,
+  operations: {
+    ref: DocumentReference;
+    data: DocumentData;
+  }[],
+  description = 'batch',
+): void {
+  const BATCH_LIMIT = 499;
+  for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(firestore);
+    for (const { ref, data } of operations.slice(i, i + BATCH_LIMIT)) {
+      batch.set(ref, data);
+    }
+    commitBatchLocal(batch, description);
   }
 }

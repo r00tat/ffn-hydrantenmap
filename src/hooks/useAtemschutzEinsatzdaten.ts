@@ -11,13 +11,15 @@ import {
   type TruppGruppen,
 } from '../common/atemschutz';
 import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
-import useFirebaseCollection from './useFirebaseCollection';
+import { useFirebaseCollectionState } from './useFirebaseCollection';
 
 export interface UseAtemschutzEinsatzdatenResult {
   trupps: TruppGruppen;
   ausgaben: AtemschutzAusgabe[];
   /** Zustand je Gerät, für den Ausrüstungsreiter. */
   ausgabeByGeraet: Map<string, AtemschutzAusgabe>;
+  /** Trupps oder Ausgaben stammen nur aus dem lokalen Cache (Offline-Hinweis). */
+  fromCache: boolean;
 }
 
 /**
@@ -36,16 +38,23 @@ export default function useAtemschutzEinsatzdaten(
   // Einsatz gewählt ist — darauf zu abonnieren liefe in permission-denied.
   const id = firecallId && firecallId !== 'unknown' ? firecallId : '';
 
-  const trupps = useFirebaseCollection<AtemschutzTrupp>({
+  // `includeMetadataChanges`, damit `fromCache` nach dem Abgleich mit dem
+  // Server zurückfällt (siehe OfflineListHint).
+  const truppState = useFirebaseCollectionState<AtemschutzTrupp>({
     collectionName: id ? FIRECALL_COLLECTION_ID : '',
     pathSegments: id ? [id, ATEMSCHUTZ_TRUPP_COLLECTION_ID] : [],
     queryConstraints: [orderBy('bereitSeit', 'desc')],
+    includeMetadataChanges: true,
   });
 
-  const ausgaben = useFirebaseCollection<AtemschutzAusgabe>({
+  const ausgabeState = useFirebaseCollectionState<AtemschutzAusgabe>({
     collectionName: id ? FIRECALL_COLLECTION_ID : '',
     pathSegments: id ? [id, ATEMSCHUTZ_AUSGABE_COLLECTION_ID] : [],
+    includeMetadataChanges: true,
   });
+  const trupps = truppState.records;
+  const ausgaben = ausgabeState.records;
+  const fromCache = truppState.fromCache || ausgabeState.fromCache;
 
   return useMemo(() => {
     const t = id ? (trupps ?? []) : [];
@@ -54,6 +63,7 @@ export default function useAtemschutzEinsatzdaten(
       trupps: gruppiereTrupps(t),
       ausgaben: a,
       ausgabeByGeraet: new Map(a.map((x) => [x.geraetId, x])),
+      fromCache: !!id && fromCache,
     };
-  }, [id, trupps, ausgaben]);
+  }, [id, trupps, ausgaben, fromCache]);
 }

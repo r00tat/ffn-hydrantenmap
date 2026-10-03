@@ -11,6 +11,8 @@ import { usePathname } from 'next/navigation';
 import React, { Suspense } from 'react';
 import About from '../../app/about/page';
 import { isPublicRoute } from '../../common/publicRoutes';
+import useAppShellWarmup from '../../hooks/useAppShellWarmup';
+import useFirestoreWarmup from '../../hooks/useFirestoreWarmup';
 import useFirebaseAppCheck from '../../hooks/useFirebaseAppCheck';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useGlobalErrorReporter from '../../hooks/useGlobalErrorReporter';
@@ -23,13 +25,14 @@ import FirebaseUserProvider from '../firebase/FirebaseUserProvider';
 import DynamicLogin from '../pages/LoginUi';
 import AppDrawer from '../site/AppDrawer';
 import HeaderBar from '../site/HeaderBar';
-import OfflineWarning from '../site/OfflineWarning';
 import CapacitorBackButton from './CapacitorBackButton';
+import ConnectivityProvider from './ConnectivityProvider';
 import ErrorBoundary from './ErrorBoundary';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
 import HoseLineDraftProvider from './HoseLineDraftProvider';
 import MapEditorProvider from './MapEditorProvider';
+import NativeNotificationTaps from './NativeNotificationTaps';
 import SnackbarProvider from './SnackbarProvider';
 import { appTheme } from './theme';
 
@@ -65,6 +68,17 @@ interface AppProps {
   children: React.ReactNode;
 }
 
+/**
+ * Bereitet den Offline-Fall vor: hält die App-Shell für den Kaltstart ohne
+ * Netz aktuell und wärmt den Firestore-Cache mit Einsatz- und Gruppendaten
+ * vor.
+ */
+function OfflineWarmup() {
+  useAppShellWarmup();
+  useFirestoreWarmup();
+  return null;
+}
+
 function LogedinApp({ children }: AppProps) {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   return (
@@ -88,6 +102,8 @@ function LogedinApp({ children }: AppProps) {
                           setIsDrawerOpen={setIsDrawerOpen}
                         />
                         <ChatMessageDisplay />
+                        <NativeNotificationTaps />
+                        <OfflineWarmup />
                         <Box
                           className="print-content-root"
                           sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
@@ -178,18 +194,19 @@ export default function AppProviders({ children }: AppProps) {
               <SnackbarProvider>
                 <ServiceWorkerUpdateListener />
                 <CapacitorBackButton />
-                <OfflineWarning />
-                <DebugLoggingProvider>
-                  <div className={`${styles.container} print-content-root`}>
-                    <CssBaseline enableColorScheme />
-                    <OneTapLoginUnlessPublic />
-                    <SettingsRedirectDialogProvider>
-                      <PermissionOnboardingProvider>
-                        <AuthorizationApp>{children}</AuthorizationApp>
-                      </PermissionOnboardingProvider>
-                    </SettingsRedirectDialogProvider>
-                  </div>
-                </DebugLoggingProvider>
+                <ConnectivityProvider>
+                  <DebugLoggingProvider>
+                    <div className={`${styles.container} print-content-root`}>
+                      <CssBaseline enableColorScheme />
+                      <OneTapLoginUnlessPublic />
+                      <SettingsRedirectDialogProvider>
+                        <PermissionOnboardingProvider>
+                          <AuthorizationApp>{children}</AuthorizationApp>
+                        </PermissionOnboardingProvider>
+                      </SettingsRedirectDialogProvider>
+                    </div>
+                  </DebugLoggingProvider>
+                </ConnectivityProvider>
               </SnackbarProvider>
             </FirebaseUserProvider>
           </SessionProvider>

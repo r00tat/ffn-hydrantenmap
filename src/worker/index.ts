@@ -9,9 +9,21 @@ import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
 import { disableNavigationPreload, Serwist } from 'serwist';
 import { isAtemschutzPush, pushTag } from '../common/atemschutzPush';
 import { ChatMessage } from '../common/chat';
-import { SW_BUILD_ID_REQUEST } from '../common/serviceWorker';
+import {
+  APP_SHELL_WARM_REQUEST,
+  SW_BUILD_ID_REQUEST,
+} from '../common/serviceWorker';
+import {
+  appShellCacheName,
+  cleanupOldAppShellCaches,
+  warmAppShell,
+} from './appShell';
 import { parseFirebaseConfig } from './firebaseConfig';
-import { isWorkerBootstrap, runtimeCaching } from './patterns';
+import {
+  isWorkerBootstrap,
+  registerOfflineTilePurge,
+  runtimeCaching,
+} from './patterns';
 
 // This declares the value of `injectionPoint` to TypeScript.
 // `injectionPoint` is the string that will be replaced by the
@@ -56,15 +68,23 @@ self.addEventListener('fetch', (ev) => {
 // (#663). Deshalb ist hier alles gefangen, was fehlschlagen kann — lieber ein
 // Worker ohne Caching-Regeln als gar keiner, denn ohne Regel holt der Browser
 // die Antworten selbst.
+// App-Shell für den Kaltstart ohne Netz, ein Cache je Build (appShell.ts).
+// Die Build-ID setzt esbuild ein (`serviceWorkerDefine`).
+const appShellCache = appShellCacheName(process.env.NEXT_PUBLIC_BUILD_ID);
+
 try {
   const serwist = new Serwist({
     precacheEntries: self.__SW_MANIFEST,
     skipWaiting: true,
     clientsClaim: true,
-    runtimeCaching: runtimeCaching(defaultCache),
+    runtimeCaching: runtimeCaching(defaultCache, {
+      appShellCacheName: appShellCache,
+    }),
   });
 
   serwist.addEventListeners();
+  // Kachelvorrat der Offline-Vorbereitung bei vollem Kontingent opfern.
+  registerOfflineTilePurge();
 } catch (err) {
   console.error('[sw] Serwist konnte nicht eingerichtet werden', err);
 }
@@ -96,6 +116,41 @@ addEventListener('message', (event) => {
   const data = message.data as { type?: string } | undefined;
   if (data?.type !== SW_BUILD_ID_REQUEST) return;
   message.ports[0]?.postMessage({ buildId });
+});
+
+// Das HTML eines früheren Builds verweist auf Chunks, die der Precache dieses
+// Builds nicht mehr hält — offline wäre es kaputt. Die Seite wärmt die neue
+// App-Shell nach dem Wechsel selbst wieder vor (`useAppShellWarmup`).
+self.addEventListener('activate', (ev) => {
+  const event = ev as ExtendableEvent;
+  event.waitUntil(
+    cleanupOldAppShellCaches(appShellCache, caches).catch((err) => {
+      console.warn('[sw] alte App-Shell nicht gelöscht', err);
+    })
+  );
+});
+
+// Vorwärmen der App-Shell auf Bitte der Seite. Die Einsatzpfade sind
+// dynamisch; erst die angemeldete Seite kennt den aktuellen Einsatz.
+addEventListener('message', (event) => {
+  const extendable = event as unknown as ExtendableMessageEvent;
+  const data = extendable.data as { type?: string; urls?: unknown } | undefined;
+  if (data?.type !== APP_SHELL_WARM_REQUEST) return;
+  const urls = Array.isArray(data.urls)
+    ? data.urls.filter((u): u is string => typeof u === 'string')
+    : [];
+  extendable.waitUntil(
+    warmAppShell(urls, {
+      openCache: () => caches.open(appShellCache),
+      fetchFn: (request) => fetch(request),
+      origin: self.location.origin,
+    })
+      .then((result) => extendable.ports[0]?.postMessage(result))
+      .catch((err) => {
+        console.warn('[sw] App-Shell nicht vorgewärmt', err);
+        extendable.ports[0]?.postMessage({ cached: 0, failed: urls });
+      })
+  );
 });
 
 /**

@@ -1,74 +1,34 @@
 // @vitest-environment jsdom
-import { renderHook, act } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-function setNavigatorOnLine(value: boolean) {
-  Object.defineProperty(window.navigator, 'onLine', {
-    configurable: true,
-    value,
-  });
-}
-
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { checkConnectivityNow } from '../lib/connectivity';
 import useOnline from './useOnline';
 
+const fetchMock = vi.fn();
+
+beforeEach(async () => {
+  vi.stubGlobal('fetch', fetchMock);
+  fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+  await checkConnectivityNow();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('useOnline', () => {
-  beforeEach(() => {
-    setNavigatorOnLine(true);
-  });
-
-  afterEach(() => {
-    setNavigatorOnLine(true);
-  });
-
-  it('returns the initial navigator.onLine value on mount', () => {
-    setNavigatorOnLine(false);
+  it('meldet true, solange der Server erreichbar ist', () => {
     const { result } = renderHook(() => useOnline());
+    expect(result.current).toBe(true);
+  });
+
+  it('meldet false, wenn der Ping scheitert — auch bei navigator.onLine === true', async () => {
+    const { result } = renderHook(() => useOnline());
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await act(async () => {
+      await checkConnectivityNow();
+    });
+    expect(navigator.onLine).toBe(true);
     expect(result.current).toBe(false);
-  });
-
-  it('reports true while online', () => {
-    const { result } = renderHook(() => useOnline());
-    expect(result.current).toBe(true);
-  });
-
-  it('switches to false when the window goes offline', () => {
-    const { result } = renderHook(() => useOnline());
-    expect(result.current).toBe(true);
-
-    act(() => {
-      setNavigatorOnLine(false);
-      window.dispatchEvent(new Event('offline'));
-    });
-
-    expect(result.current).toBe(false);
-  });
-
-  it('switches back to true when the window comes online again', () => {
-    const { result } = renderHook(() => useOnline());
-
-    act(() => {
-      setNavigatorOnLine(false);
-      window.dispatchEvent(new Event('offline'));
-    });
-    expect(result.current).toBe(false);
-
-    act(() => {
-      setNavigatorOnLine(true);
-      window.dispatchEvent(new Event('online'));
-    });
-    expect(result.current).toBe(true);
-  });
-
-  it('removes its event listeners on unmount', () => {
-    const { result, unmount } = renderHook(() => useOnline());
-    unmount();
-
-    act(() => {
-      setNavigatorOnLine(false);
-      window.dispatchEvent(new Event('offline'));
-    });
-
-    // After unmount the state must not update anymore.
-    expect(result.current).toBe(true);
   });
 });

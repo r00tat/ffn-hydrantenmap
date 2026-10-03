@@ -25,12 +25,13 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, where } from 'firebase/firestore';
 import { useTranslations } from 'next-intl';
-import { setDoc } from '../../lib/firestoreClient';
+import { setDocLocal } from '../../lib/firestoreClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
-import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
+import OfflineListHint from '../site/OfflineListHint';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
@@ -53,7 +54,7 @@ function useFirecallUpdate() {
       console.info(
         `update of einsatz ${einsatz.id}: ${JSON.stringify(einsatz)}`
       );
-      await setDoc(
+      setDocLocal(
         doc(firestore, FIRECALL_COLLECTION_ID, '' + einsatz.id),
         { ...einsatz, updatedAt: new Date().toISOString(), updatedBy: email },
         { merge: true }
@@ -271,7 +272,10 @@ export default function Einsaetze() {
 
   // const columns = useGridColumns();
   const firecallId = useFirecallId();
-  const einsaetze = useFirebaseCollection<Firecall>({
+  const { records: einsaetze, fromCache } = useFirebaseCollectionState<Firecall>({
+    // Für den Offline-Hinweis: meldet auch den Wechsel vom Cache- zum
+    // Server-Stand (siehe OfflineListHint).
+    includeMetadataChanges: true,
     collectionName: FIRECALL_COLLECTION_ID,
     // pathSegments: [firecallId || 'unknown', FIRECALL_ITEMS_COLLECTION_ID],
     queryConstraints: [
@@ -321,6 +325,12 @@ export default function Einsaetze() {
                 ))}
               </Select>
             </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <OfflineListHint
+              fromCache={fromCache}
+              empty={einsaetze.length === 0}
+            />
           </Grid>
           {einsaetze.map((einsatz) => (
             <EinsatzCard

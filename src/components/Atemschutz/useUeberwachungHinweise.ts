@@ -1,14 +1,34 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
 import type {
   AtemschutzTrupp,
   Geraetesatz,
   WarnungKey,
 } from '../../common/atemschutz';
-import { istVorwarnung } from '../../common/atemschutzUeberwachung';
+import {
+  berechneStand,
+  istVorwarnung,
+} from '../../common/atemschutzUeberwachung';
+import {
+  isNativeLocalNotificationsAvailable,
+  syncNativeNotifications,
+  type NativeScheduledNotification,
+} from '../../lib/nativeLocalNotifications';
+
+/**
+ * Eigener Android-Kanal für die Warnungen: höchste Wichtigkeit, sichtbar auf
+ * dem Sperrbildschirm, und in den Einstellungen getrennt von anderen Meldungen
+ * der App (Radiacode). Die Kennung nie ändern — Android behält Ton und
+ * Wichtigkeit je Kennung, ein neuer Name wäre ein zweiter Kanal.
+ */
+const NATIVE_CHANNEL_ID = 'atemschutz-warnung';
 import { useSnackbar } from '../providers/SnackbarProvider';
+import {
+  earliestLocalWarning,
+  nextLocalWarnings,
+} from './localWarningSchedule';
 import { buildUeberwachungPush } from './ueberwachungPushModel';
 import {
   dringlichsterHinweis,
@@ -42,6 +62,16 @@ interface Meldung {
  * Snackbar, die stehen bleibt, verdeckt am Telefon die Karte darunter, und genau
  * die trägt die Zahlen.
  */
+/**
+ * Zuschlag auf den Termin des Weckers: `faelligeWarnungen` vergleicht mit
+ * `>=`, und ein Zeitgeber, der eine Millisekunde zu früh anläuft, fände nichts
+ * und plante denselben Termin erneut.
+ */
+const WAKE_SLACK_MS = 500;
+
+/** `setTimeout` läuft über 2^31-1 ms sofort an — und ein Termin liegt nie so weit. */
+const MAX_TIMER_MS = 2_147_000_000;
+
 const SNACKBAR_MS: Record<WarnungKey, number> = {
   drittel: 6000,
   zweiDrittel: 6000,
@@ -115,6 +145,15 @@ async function zeige(meldung: Meldung): Promise<void> {
  * Was schon gezeigt wurde, steht in einem Ref und nicht am Dokument: Die
  * Buchführung dort gehört dem Serverlauf, und ein Vermerk aus dem Browser
  * unterdrückte den Push an alle anderen Geräte.
+ *
+ * **Offline plant die Seite den nächsten Termin selbst** (siehe
+ * `localWarningSchedule.ts`): ein Zeitgeber auf genau den nächsten Termin, der
+ * die Prüfung auslöst, auch wenn der Sekundentakt im Hintergrund gedrosselt
+ * ist; und in der App — sofern das Plugin `@capacitor/local-notifications`
+ * vorhanden ist — je Trupp eine beim Betriebssystem hinterlegte
+ * Benachrichtigung, die auch den gesperrten Bildschirm erreicht. Doppelt
+ * erscheint nichts: Die Benachrichtigung aus der Seite trägt denselben `tag`
+ * wie der Push des Servers, die native dieselbe Kennung je Trupp.
  */
 export default function useUeberwachungHinweise({
   firecallId,
@@ -127,9 +166,17 @@ export default function useUeberwachungHinweise({
   const format = useFormatter();
   const showSnackbar = useSnackbar();
   const gemeldet = useRef(new Set<string>());
+  // Vom Wecker gesetzt: Läuft der Termin an, prüft die Seite mit dieser Zeit,
+  // auch wenn `jetzt` (der Sekundentakt) im Hintergrund stehen geblieben ist.
+  const [wokenAt, setWokenAt] = useState<Date>();
+  const checkTime =
+    wokenAt && wokenAt.getTime() > jetzt.getTime() ? wokenAt : jetzt;
+  const wakeTimer = useRef<{ key: string; handle: ReturnType<typeof setTimeout> }>(
+    undefined,
+  );
 
   useEffect(() => {
-    const hinweise = neueHinweise(trupps, jetzt, {
+    const hinweise = neueHinweise(trupps, checkTime, {
       vorgabe,
       gemeldet: gemeldet.current,
     });
@@ -183,10 +230,86 @@ export default function useUeberwachungHinweise({
     firecallId,
     firecallName,
     format,
-    jetzt,
+    checkTime,
     showSnackbar,
     t,
     trupps,
     vorgabe,
   ]);
+
+  // Der Wecker auf den nächsten Termin. Nach der Prüfung oben deklariert, damit
+  // er sieht, was sie gerade als gemeldet vermerkt hat. Bleibt der Termin
+  // derselbe, bleibt auch der Zeitgeber stehen — sonst würde er mit jedem
+  // Sekundentakt neu gestellt.
+  useEffect(() => {
+    const plan = earliestLocalWarning(
+      nextLocalWarnings(trupps, checkTime, {
+        vorgabe,
+        gemeldet: gemeldet.current,
+      }),
+    );
+    const key = plan ? `${plan.id}@${plan.at.getTime()}` : '';
+    if (wakeTimer.current?.key === key) return;
+    if (wakeTimer.current) clearTimeout(wakeTimer.current.handle);
+    wakeTimer.current = undefined;
+    if (!plan) return;
+    const delay = Math.min(
+      MAX_TIMER_MS,
+      Math.max(0, plan.at.getTime() - Date.now()) + WAKE_SLACK_MS,
+    );
+    const handle = setTimeout(() => {
+      wakeTimer.current = undefined;
+      setWokenAt(new Date());
+    }, delay);
+    wakeTimer.current = { key, handle };
+  }, [checkTime, trupps, vorgabe]);
+
+  useEffect(() => {
+    const ref = wakeTimer;
+    return () => {
+      if (ref.current) clearTimeout(ref.current.handle);
+      ref.current = undefined;
+    };
+  }, []);
+
+  // In der App: je Trupp den nächsten Termin beim Betriebssystem hinterlegen.
+  // Der Abgleich plant nur Geändertes neu; was wegfällt (Trupp zurück,
+  // Rückzug angetreten), wird storniert. Beim Verlassen der Seite bleiben die
+  // Termine bewusst stehen — gerade dann sollen sie ankommen.
+  useEffect(() => {
+    if (!isNativeLocalNotificationsAvailable()) return;
+    const formatClock = (iso: string) =>
+      format.dateTime(new Date(iso), { hour: '2-digit', minute: '2-digit' });
+    const items: NativeScheduledNotification[] = [];
+    for (const plan of nextLocalWarnings(trupps, checkTime, {
+      vorgabe,
+      gemeldet: gemeldet.current,
+    })) {
+      const trupp = trupps.find((tr) => tr.id === plan.truppId);
+      if (!trupp) continue;
+      const truppStatus = berechneStand(trupp, plan.at, { vorgabe });
+      if (!truppStatus) continue;
+      const push = buildUeberwachungPush({
+        firecallId,
+        firecallName,
+        trupp,
+        stand: truppStatus,
+        warnung: { key: plan.key, faelligSeit: plan.at.toISOString() },
+        t,
+        uhrzeit: formatClock,
+      });
+      items.push({
+        key: push.tag,
+        at: plan.at,
+        title: push.title,
+        body: push.body,
+        url: push.data.url,
+      });
+    }
+    void syncNativeNotifications(`asue-${firecallId}`, items, {
+      id: NATIVE_CHANNEL_ID,
+      name: t('push.kanalName'),
+      description: t('push.kanalBeschreibung'),
+    });
+  }, [firecallId, firecallName, format, checkTime, t, trupps, vorgabe]);
 }

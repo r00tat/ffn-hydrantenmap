@@ -16,7 +16,7 @@ import {
   type DocumentData,
   type DocumentReference,
 } from 'firebase/firestore';
-import { addDoc, commitInBatches } from '../../lib/firestoreClient';
+import { addDocLocal, commitInBatchesLocal } from '../../lib/firestoreClient';
 import { formatTimestamp } from '../../common/time-format';
 import { useFirecallId } from '../useFirecall';
 
@@ -86,7 +86,9 @@ export const useSaveHistory = () => {
           FIRECALL_HISTORY_COLLECTION_ID
         );
 
-        const newHistoryDoc = await addDoc(historyCollection, {
+        // Lokal: Die ID entsteht auf dem Gerät, und offline hinge der
+        // Verlaufsstand sonst bis zum Reconnect auf „wird gespeichert".
+        const newHistoryDoc = addDocLocal(historyCollection, {
           description:
             description || `Einsatz Status um ${formatTimestamp(new Date())}`,
           createdAt: new Date().toISOString(),
@@ -144,7 +146,11 @@ export const useSaveHistory = () => {
         // Ein Batch fasst 500 Schreibvorgänge. Mit den Strichen einer
         // Zeichnung wird die Grenze schnell erreicht, deshalb wird
         // aufgeteilt statt in einem einzigen Batch zu schreiben.
-        await commitInBatches(firestore, perCollection.flat());
+        commitInBatchesLocal(
+          firestore,
+          perCollection.flat(),
+          `Verlauf ${newHistoryDoc.id}`,
+        );
         console.info(`history ${newHistoryDoc.id} commited.`);
       } catch (err) {
         console.error(`failed to save history: ${err}`, err);

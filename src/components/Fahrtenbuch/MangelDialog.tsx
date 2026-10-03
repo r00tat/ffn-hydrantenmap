@@ -34,6 +34,7 @@ import {
 import { mangelStatusColor } from './mangelStatus';
 import { uploadMangelImage } from './uploadMangelImage';
 import { vehicleSelectItems } from './vehicleSelectItems';
+import OnlineOnly from '../site/OnlineOnly';
 
 export interface MangelDialogProps {
   open: boolean;
@@ -362,9 +363,11 @@ export default function MangelDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{tFahrtenbuch('cancel')}</Button>
-        <Button variant="contained" onClick={save} disabled={!canSave}>
-          {tFahrtenbuch('save')}
-        </Button>
+        <OnlineOnly>
+          <Button variant="contained" onClick={save} disabled={!canSave}>
+            {tFahrtenbuch('save')}
+          </Button>
+        </OnlineOnly>
       </DialogActions>
     </Dialog>
   );

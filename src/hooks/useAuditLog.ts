@@ -1,7 +1,7 @@
 'use client';
 
 import { collection, orderBy } from 'firebase/firestore';
-import { addDoc } from '../lib/firestoreClient';
+import { addDocLocal } from '../lib/firestoreClient';
 import { useCallback, useMemo } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import {
@@ -33,15 +33,19 @@ export function useAuditLog() {
         user: email,
       };
 
-      addDoc(
-        collection(
-          firestore,
-          FIRECALL_COLLECTION_ID,
-          targetFirecallId,
-          FIRECALL_AUDITLOG_COLLECTION_ID
-        ),
-        logEntry
-      ).catch((err) => console.error('Failed to write audit log:', err));
+      try {
+        addDocLocal(
+          collection(
+            firestore,
+            FIRECALL_COLLECTION_ID,
+            targetFirecallId,
+            FIRECALL_AUDITLOG_COLLECTION_ID
+          ),
+          logEntry
+        );
+      } catch (err) {
+        console.error('Failed to write audit log:', err);
+      }
     },
     [contextFirecallId, email]
   );
@@ -60,19 +64,23 @@ export function logAuditChange(
 ) {
   if (!firecallId || firecallId === 'unknown' || !user) return;
 
-  addDoc(
-    collection(
-      firestore,
-      FIRECALL_COLLECTION_ID,
-      firecallId,
-      FIRECALL_AUDITLOG_COLLECTION_ID
-    ),
-    {
-      ...entry,
-      timestamp: new Date().toISOString(),
-      user,
-    }
-  ).catch((err) => console.error('Failed to write audit log:', err));
+  try {
+    addDocLocal(
+      collection(
+        firestore,
+        FIRECALL_COLLECTION_ID,
+        firecallId,
+        FIRECALL_AUDITLOG_COLLECTION_ID
+      ),
+      {
+        ...entry,
+        timestamp: new Date().toISOString(),
+        user,
+      }
+    );
+  } catch (err) {
+    console.error('Failed to write audit log:', err);
+  }
 }
 
 export function useAuditLogEntries(): AuditLogEntry[] {
