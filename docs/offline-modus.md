@@ -385,8 +385,10 @@ Bausteine. Hintergrund in
   angefordert, weil der Browser sie beim Verbergen freigibt.
 - **Native Benachrichtigung in der App** (`src/lib/nativeLocalNotifications.ts`):
   je Trupp der nächste Termin beim Betriebssystem hinterlegt, damit er den
-  gesperrten Bildschirm erreicht — nur, wenn `@capacitor/local-notifications`
-  installiert ist (Laufzeitprüfung, bis dahin ein No-op).
+  gesperrten Bildschirm erreicht (`@capacitor/local-notifications`; eine
+  ältere App ohne das Plugin übergeht das per Laufzeitprüfung). Pünktlich auf
+  die Minute nur mit der Erlaubnis für exakte Alarme, siehe
+  [atemschutzueberwachung.md](atemschutzueberwachung.md#offline-warnt-das-gerät-selbst).
 - **Nachplanen beim Reconnect** (`useReplanWarningsOnReconnect`): für alle
   Trupps im Einsatz, über `planWarningOrQueue` und damit die Warteschlange —
   erst nachdem Firestore die offline geschriebenen Änderungen übertragen hat
@@ -424,9 +426,10 @@ Bausteine. Hintergrund in
   (`useKostenersatzMutations`, Mailvorlagen), die Token-Verwaltung und der
   Backup-Import. Das sind Arbeiten nach dem Einsatz oder am Schreibtisch.
 - **Atemschutzwarnungen offline** kommen nur von dem Gerät, auf dem die
-  Überwachungsseite offen ist. In der Android-App erreichen sie den
-  gesperrten Bildschirm erst, wenn `@capacitor/local-notifications`
-  installiert ist; die Screen Wake Lock API fehlt in der WebView vermutlich.
+  Überwachungsseite offen ist (oder zuletzt offen war: In der Android-App
+  bleiben die beim Betriebssystem hinterlegten Termine stehen). Ohne die
+  Erlaubnis für exakte Alarme können sie sich dort um Minuten verspäten; die
+  Screen Wake Lock API fehlt in der WebView vermutlich.
 - **Android-Kaltstart ohne Netz** geht noch nicht (siehe oben): Die WebView
   kommt nach einem Prozessstart ohne Firebase-Benutzer hoch.
 - **Client-Navigation im WLAN ohne Internet** (`router.push`) hat im Service

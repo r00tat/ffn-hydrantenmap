@@ -638,9 +638,15 @@
         "rueckzug": "{trupp}: Rückzugszeitpunkt erreicht",
         "rueckzugVoraus": "{trupp}: Rückzug in {minuten} min",
         "body": "{einsatz} · vermutet {druck} bar · Rückzug {zeit}",
-        "zeile": "{titel} · vermutet {druck} bar · Rückzug {zeit}"
+        "zeile": "{titel} · vermutet {druck} bar · Rückzug {zeit}",
+        "kanalName": "Atemschutzwarnungen",
+        "kanalBeschreibung": "Warnungen der Atemschutzüberwachung: Drittelmarken und Rückzug, auch bei gesperrtem Bildschirm und ohne Netz."
       },
-      "wakeLockAktiv": "Der Bildschirm bleibt eingeschaltet, solange ein Trupp unter Atemschutz ist."
+      "wakeLockAktiv": "Der Bildschirm bleibt eingeschaltet, solange ein Trupp unter Atemschutz ist.",
+      "exakteAlarme": {
+        "hinweis": "Warnungen können sich um einige Minuten verspäten, solange die App keine exakten Alarme auslösen darf. Erlauben lässt sich das unter „Alarme & Erinnerungen“.",
+        "erlauben": "Exakte Alarme erlauben"
+      }
     }
   },
   "common": {

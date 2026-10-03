@@ -54,6 +54,7 @@ import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useOwnFleet from '../../hooks/useOwnFleet';
 import { sortVehiclesOwnFirst } from '../../common/vehicleGroups';
 import usePendingDocIds from '../../hooks/usePendingDocIds';
+import ExactAlarmHint from './ExactAlarmHint';
 import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import useNotificationPermission, {
   pruefeNotificationErlaubnis,
@@ -831,6 +832,10 @@ export default function UeberwachungPage() {
           )}
         </Alert>
       )}
+
+      {/* Erst wenn Benachrichtigungen erlaubt sind, lohnt die Frage nach der
+          Pünktlichkeit; sonst kommt ohnehin keine an. */}
+      {canWrite && pushErlaubnis === 'granted' && <ExactAlarmHint />}
 
       {screenAwake && (
         <Typography

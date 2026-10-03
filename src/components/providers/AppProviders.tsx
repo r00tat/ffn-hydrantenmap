@@ -32,6 +32,7 @@ import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
 import HoseLineDraftProvider from './HoseLineDraftProvider';
 import MapEditorProvider from './MapEditorProvider';
+import NativeNotificationTaps from './NativeNotificationTaps';
 import SnackbarProvider from './SnackbarProvider';
 import { appTheme } from './theme';
 
@@ -101,6 +102,7 @@ function LogedinApp({ children }: AppProps) {
                           setIsDrawerOpen={setIsDrawerOpen}
                         />
                         <ChatMessageDisplay />
+                        <NativeNotificationTaps />
                         <OfflineWarmup />
                         <Box
                           className="print-content-root"

@@ -16,6 +16,14 @@ import {
   syncNativeNotifications,
   type NativeScheduledNotification,
 } from '../../lib/nativeLocalNotifications';
+
+/**
+ * Eigener Android-Kanal für die Warnungen: höchste Wichtigkeit, sichtbar auf
+ * dem Sperrbildschirm, und in den Einstellungen getrennt von anderen Meldungen
+ * der App (Radiacode). Die Kennung nie ändern — Android behält Ton und
+ * Wichtigkeit je Kennung, ein neuer Name wäre ein zweiter Kanal.
+ */
+const NATIVE_CHANNEL_ID = 'atemschutz-warnung';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import {
   earliestLocalWarning,
@@ -298,6 +306,10 @@ export default function useUeberwachungHinweise({
         url: push.data.url,
       });
     }
-    void syncNativeNotifications(`asue-${firecallId}`, items);
+    void syncNativeNotifications(`asue-${firecallId}`, items, {
+      id: NATIVE_CHANNEL_ID,
+      name: t('push.kanalName'),
+      description: t('push.kanalBeschreibung'),
+    });
   }, [firecallId, firecallName, format, checkTime, t, trupps, vorgabe]);
 }

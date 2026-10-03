@@ -99,6 +99,7 @@ Without a connection no push messages arrive from the server. The open monitorin
 - Keep the **monitoring page open** on the device where the pressure readings are recorded
 - While a team is deployed, the app keeps the screen on (where the browser supports it); a note on the page shows this
 - After reconnecting, the server warnings are re-planned for all deployed teams
+- **In the Android app** warnings also arrive with the screen locked and with the app closed. If the monitoring page shows the note about exact alarms, tap **Allow exact alarms** and turn on “Alarms & reminders” – otherwise warnings may be delayed by several minutes. Tapping a warning opens the monitoring page.
 
 :::warning
 Other devices only see the pressure readings after reconnecting. When offline, always monitor a team on the device where you record the readings.

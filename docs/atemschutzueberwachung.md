@@ -810,9 +810,28 @@ offene Seite — und die bekommt dafür vier Ergänzungen (Überblick in
   Trupp (`asue-<truppId>`) wie der `tag` des Pushs, eine neue Planung ersetzt
   also die alte. Termine bleiben beim Verlassen der Seite stehen — gerade dann
   sollen sie ankommen; storniert wird, wenn der Trupp aus dem Einsatz ist oder
-  den Rückzug angetreten hat. Das Plugin `@capacitor/local-notifications` ist
-  noch **nicht** installiert; bis dahin ist der Baustein über
-  `Capacitor.isPluginAvailable` ein No-op.
+  den Rückzug angetreten hat. Grundlage ist `@capacitor/local-notifications`.
+  Weil die App ihre Seiten vom Server lädt, bekommt auch eine ältere
+  installierte App ohne das Plugin diesen Code — dort ist der Baustein über
+  `Capacitor.isPluginAvailable` ein No-op. Drei Einzelheiten:
+  - **Eigener Kanal** `atemschutz-warnung` mit höchster Wichtigkeit und voller
+    Sichtbarkeit auf dem Sperrbildschirm. Android behält Ton und Wichtigkeit
+    je Kanal-Kennung; die Kennung darf sich deshalb nie ändern, ein neuer Name
+    wäre ein zweiter Kanal neben dem alten.
+  - **Exakte Alarme nur mit Erlaubnis.** Ohne „Alarme & Erinnerungen"
+    (Android 12+) bündelt Android geplante Meldungen im Ruhezustand, eine
+    Rückzugswarnung kann sich um Minuten verspäten. Das Plugin öffnet bei
+    `isExactNotification: true` ohne Erlaubnis bei **jedem** `schedule()` die
+    Systemeinstellungen — der Abgleich läuft im Sekundentakt. Deshalb wird ohne
+    Erlaubnis unscharf geplant, und die Seite bietet die Erlaubnis als Knopf an
+    ([ExactAlarmHint.tsx](../src/components/Atemschutz/ExactAlarmHint.tsx)),
+    erst wenn Benachrichtigungen überhaupt erlaubt sind. Die Erlaubnis ist Teil
+    der Signatur eines Termins: Wird sie erteilt, wird alles exakt neu geplant.
+    Android meldet die Änderung der WebView nicht; nachgelesen wird bei der
+    Rückkehr in die App (`visibilitychange`).
+  - **Ein Tipp** auf die Meldung führt über `extra.url` zur Überwachungsseite
+    ([NativeNotificationTaps.tsx](../src/components/providers/NativeNotificationTaps.tsx)).
+    Angenommen werden nur Pfade der eigenen App (`/…`, nicht `//…`).
 - **Nachplanen beim Reconnect**
   ([useReplanWarningsOnReconnect.ts](../src/components/Atemschutz/useReplanWarningsOnReconnect.ts)):
   für **alle** Trupps im Einsatz, nicht nur die offline geänderten (die liegen

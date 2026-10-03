@@ -99,6 +99,7 @@ Ohne Verbindung kommen keine Push-Nachrichten vom Server. Die geöffnete Überwa
 - Lass die **Überwachungsseite geöffnet** auf dem Gerät, auf dem die Druckabfragen erfasst werden
 - Solange ein Trupp im Einsatz ist, hält die App den Bildschirm an (wo der Browser das unterstützt); ein Hinweis auf der Seite zeigt das an
 - Nach dem Reconnect werden die Warnungen am Server für alle Trupps im Einsatz neu geplant
+- **In der Android-App** kommen die Warnungen auch bei gesperrtem Bildschirm und wenn die App geschlossen ist. Erscheint auf der Überwachungsseite der Hinweis zu exakten Alarmen, tippe auf **Exakte Alarme erlauben** und schalte „Alarme & Erinnerungen“ ein – sonst können sich Warnungen um einige Minuten verspäten. Ein Tipp auf die Warnung öffnet die Überwachungsseite.
 
 :::warning
 Andere Geräte sehen die Druckabfragen erst nach dem Reconnect. Überwache einen Trupp offline immer auf dem Gerät, auf dem du die Werte erfasst.

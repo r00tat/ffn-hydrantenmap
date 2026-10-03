@@ -638,9 +638,15 @@
         "rueckzug": "{trupp}: withdrawal time reached",
         "rueckzugVoraus": "{trupp}: withdraw in {minuten} min",
         "body": "{einsatz} · estimated {druck} bar · withdraw {zeit}",
-        "zeile": "{titel} · est. {druck} bar · withdraw {zeit}"
+        "zeile": "{titel} · est. {druck} bar · withdraw {zeit}",
+        "kanalName": "Breathing apparatus warnings",
+        "kanalBeschreibung": "Warnings from breathing apparatus monitoring: one-third marks and withdrawal, even with the screen locked and without a network."
       },
-      "wakeLockAktiv": "The screen stays on while a team is under breathing apparatus."
+      "wakeLockAktiv": "The screen stays on while a team is under breathing apparatus.",
+      "exakteAlarme": {
+        "hinweis": "Warnings may be delayed by several minutes while the app is not allowed to set exact alarms. You can allow this under “Alarms & reminders”.",
+        "erlauben": "Allow exact alarms"
+      }
     }
   },
   "common": {

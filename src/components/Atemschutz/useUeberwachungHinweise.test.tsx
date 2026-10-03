@@ -180,11 +180,19 @@ describe('useUeberwachungHinweise — lokaler Termin', () => {
     renderWithIntl(<Probe trupps={[trupp()]} jetzt={nachAbmarsch(1)} />);
 
     expect(native.sync).toHaveBeenCalled();
-    const [group, items] = native.sync.mock.calls.at(-1) as unknown as [
+    const [group, items, channel] = native.sync.mock.calls.at(-1) as unknown as [
       string,
       Array<{ key: string; at: Date; title: string; url?: string }>,
+      { id: string; name: string; description?: string },
     ];
     expect(group).toBe('asue-f1');
+    // Ein eigener Kanal: Ton und Wichtigkeit der Warnungen lassen sich in den
+    // Android-Einstellungen getrennt von anderen Meldungen der App einstellen.
+    expect(channel).toEqual({
+      id: 'atemschutz-warnung',
+      name: 'Atemschutzwarnungen',
+      description: expect.stringContaining('Atemschutzüberwachung'),
+    });
     expect(items).toHaveLength(1);
     expect(items[0].key).toBe('asue-t1');
     const minuten =
