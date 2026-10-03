@@ -50,24 +50,24 @@ export function nextLocalWarningFor(
   if (!truppId) return undefined;
   const { gemeldet, ...warnOpts } = opts;
 
-  const erledigt: Partial<Record<WarnungKey, string>> = {
+  const handled: Partial<Record<WarnungKey, string>> = {
     ...(trupp.warnungen ?? {}),
   };
   if (gemeldet) {
     for (const key of ['drittel', 'zweiDrittel', 'rueckzug'] as const) {
-      if (gemeldet.has(hinweisId(truppId, key))) erledigt[key] = 'lokal';
+      if (gemeldet.has(hinweisId(truppId, key))) handled[key] = 'lokal';
     }
   }
 
   // Höchstens drei Warnungen — nach drei übersprungenen bleibt keine mehr.
   for (let i = 0; i <= MAX_SKIPS; i++) {
-    const plan = naechsteWarnung({ ...trupp, warnungen: erledigt }, jetzt, warnOpts);
+    const plan = naechsteWarnung({ ...trupp, warnungen: handled }, jetzt, warnOpts);
     if (!plan) return undefined;
     const at = new Date(plan.faelligAb);
     if (at.getTime() > jetzt.getTime()) {
       return { id: hinweisId(truppId, plan.key), truppId, key: plan.key, at };
     }
-    erledigt[plan.key] = 'vergangen';
+    handled[plan.key] = 'vergangen';
   }
   return undefined;
 }

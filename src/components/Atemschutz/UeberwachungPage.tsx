@@ -361,18 +361,18 @@ export default function UeberwachungPage() {
 
   // Offline kommt kein Push: Solange ein Trupp unter Atemschutz ist, bleibt
   // der Bildschirm an, damit die Warnung aus der Seite gesehen wird.
-  const bildschirmAn = useWakeLock(hatEinsatz && trupps.imEinsatz.length > 0);
+  const screenAwake = useWakeLock(hatEinsatz && trupps.imEinsatz.length > 0);
 
   // Beim Reconnect die Serverwarnung aller Trupps im Einsatz nachplanen — auch
   // derer, die ein anderes Gerät angelegt hat.
-  const aktiveTruppIds = useMemo(
+  const activeTruppIds = useMemo(
     () =>
       trupps.imEinsatz.flatMap((tr) => (tr.id ? [tr.id] : [])),
     [trupps.imEinsatz],
   );
   useReplanWarningsOnReconnect(
     hatEinsatz ? firecallId : undefined,
-    aktiveTruppIds,
+    activeTruppIds,
   );
 
   const [dialog, setDialog] = useState<Dialog>();
@@ -832,7 +832,7 @@ export default function UeberwachungPage() {
         </Alert>
       )}
 
-      {bildschirmAn && (
+      {screenAwake && (
         <Typography
           variant="caption"
           color="text.secondary"

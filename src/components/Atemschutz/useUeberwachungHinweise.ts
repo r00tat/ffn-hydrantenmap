@@ -160,15 +160,15 @@ export default function useUeberwachungHinweise({
   const gemeldet = useRef(new Set<string>());
   // Vom Wecker gesetzt: Läuft der Termin an, prüft die Seite mit dieser Zeit,
   // auch wenn `jetzt` (der Sekundentakt) im Hintergrund stehen geblieben ist.
-  const [geweckt, setGeweckt] = useState<Date>();
-  const pruefZeit =
-    geweckt && geweckt.getTime() > jetzt.getTime() ? geweckt : jetzt;
-  const wecker = useRef<{ key: string; handle: ReturnType<typeof setTimeout> }>(
+  const [wokenAt, setWokenAt] = useState<Date>();
+  const checkTime =
+    wokenAt && wokenAt.getTime() > jetzt.getTime() ? wokenAt : jetzt;
+  const wakeTimer = useRef<{ key: string; handle: ReturnType<typeof setTimeout> }>(
     undefined,
   );
 
   useEffect(() => {
-    const hinweise = neueHinweise(trupps, pruefZeit, {
+    const hinweise = neueHinweise(trupps, checkTime, {
       vorgabe,
       gemeldet: gemeldet.current,
     });
@@ -222,7 +222,7 @@ export default function useUeberwachungHinweise({
     firecallId,
     firecallName,
     format,
-    pruefZeit,
+    checkTime,
     showSnackbar,
     t,
     trupps,
@@ -235,29 +235,29 @@ export default function useUeberwachungHinweise({
   // Sekundentakt neu gestellt.
   useEffect(() => {
     const plan = earliestLocalWarning(
-      nextLocalWarnings(trupps, pruefZeit, {
+      nextLocalWarnings(trupps, checkTime, {
         vorgabe,
         gemeldet: gemeldet.current,
       }),
     );
     const key = plan ? `${plan.id}@${plan.at.getTime()}` : '';
-    if (wecker.current?.key === key) return;
-    if (wecker.current) clearTimeout(wecker.current.handle);
-    wecker.current = undefined;
+    if (wakeTimer.current?.key === key) return;
+    if (wakeTimer.current) clearTimeout(wakeTimer.current.handle);
+    wakeTimer.current = undefined;
     if (!plan) return;
     const delay = Math.min(
       MAX_TIMER_MS,
       Math.max(0, plan.at.getTime() - Date.now()) + WAKE_SLACK_MS,
     );
     const handle = setTimeout(() => {
-      wecker.current = undefined;
-      setGeweckt(new Date());
+      wakeTimer.current = undefined;
+      setWokenAt(new Date());
     }, delay);
-    wecker.current = { key, handle };
-  }, [pruefZeit, trupps, vorgabe]);
+    wakeTimer.current = { key, handle };
+  }, [checkTime, trupps, vorgabe]);
 
   useEffect(() => {
-    const ref = wecker;
+    const ref = wakeTimer;
     return () => {
       if (ref.current) clearTimeout(ref.current.handle);
       ref.current = undefined;
@@ -270,25 +270,25 @@ export default function useUeberwachungHinweise({
   // Termine bewusst stehen — gerade dann sollen sie ankommen.
   useEffect(() => {
     if (!isNativeLocalNotificationsAvailable()) return;
-    const uhrzeit = (iso: string) =>
+    const formatClock = (iso: string) =>
       format.dateTime(new Date(iso), { hour: '2-digit', minute: '2-digit' });
     const items: NativeScheduledNotification[] = [];
-    for (const plan of nextLocalWarnings(trupps, pruefZeit, {
+    for (const plan of nextLocalWarnings(trupps, checkTime, {
       vorgabe,
       gemeldet: gemeldet.current,
     })) {
       const trupp = trupps.find((tr) => tr.id === plan.truppId);
       if (!trupp) continue;
-      const stand = berechneStand(trupp, plan.at, { vorgabe });
-      if (!stand) continue;
+      const truppStatus = berechneStand(trupp, plan.at, { vorgabe });
+      if (!truppStatus) continue;
       const push = buildUeberwachungPush({
         firecallId,
         firecallName,
         trupp,
-        stand,
+        stand: truppStatus,
         warnung: { key: plan.key, faelligSeit: plan.at.toISOString() },
         t,
-        uhrzeit,
+        uhrzeit: formatClock,
       });
       items.push({
         key: push.tag,
@@ -299,5 +299,5 @@ export default function useUeberwachungHinweise({
       });
     }
     void syncNativeNotifications(`asue-${firecallId}`, items);
-  }, [firecallId, firecallName, format, pruefZeit, t, trupps, vorgabe]);
+  }, [firecallId, firecallName, format, checkTime, t, trupps, vorgabe]);
 }
