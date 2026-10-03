@@ -793,7 +793,21 @@
     "geschaeftsbuch": "Business log",
     "summeEigene": "Own: {units} units, {persons} persons",
     "summeFremde": "Other: {units} units, {persons} persons",
-    "summeAts": "{count} BA wearers"
+    "summeAts": "{count} BA wearers",
+    "cols": {
+      "name": "Name",
+      "fw": "Organisation",
+      "type": "Kind",
+      "persons": "Persons",
+      "ats": "BA",
+      "alarmierung": "Alarm",
+      "eintreffen": "Arrival",
+      "abruecken": "Departure",
+      "funktion": "Role",
+      "vehicle": "Vehicle",
+      "material": "Item",
+      "count": "Count"
+    }
   },
   "passkey": {
     "or": "or",

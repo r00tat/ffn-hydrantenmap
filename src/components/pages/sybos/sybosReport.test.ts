@@ -18,9 +18,11 @@ import {
   buildMaterialText,
   buildNotizenText,
   buildTagebuchText,
+  countMaterial,
   formatDauer,
   formatSybosTime,
   parseSybosSummary,
+  sortCrew,
 } from './sybosReport';
 
 const firecall: Firecall = {
@@ -202,15 +204,47 @@ describe('buildKraefte', () => {
       ats: 2,
     });
   });
+
+  it('liefert die Zeilen alphabetisch nach Name, Zahlen natürlich sortiert', () => {
+    const kraefte = buildKraefte(
+      [
+        { ...tlf, id: 'a', name: 'TLFA 4000' },
+        { ...tlf, id: 'b', name: 'KDOF' },
+        { ...tlf, id: 'c', name: 'RLF 10' },
+        { ...tlf, id: 'd', name: 'RLF 2' },
+        { ...rtw, id: 'e', name: 'RTW' },
+        { ...rtw, id: 'f', name: 'NEF' },
+      ],
+      []
+    );
+    expect(kraefte.eigeneRows.map((r) => r.name)).toEqual([
+      'KDOF',
+      'RLF 2',
+      'RLF 10',
+      'TLFA 4000',
+    ]);
+    expect(kraefte.fremdeRows.map((r) => r.name)).toEqual(['NEF', 'RTW']);
+    expect(kraefte.eigene.split('\n')[0]).toMatch(/^KDOF/);
+  });
+});
+
+describe('sortCrew', () => {
+  it('sortiert die Mannschaft alphabetisch nach Name', () => {
+    expect(sortCrew(crew).map((c) => c.name)).toEqual([
+      'Erika Beispiel',
+      'Hans Probe',
+      'Max Muster',
+    ]);
+  });
 });
 
 describe('buildMannschaftText', () => {
-  it('listet die Mannschaft nach Fahrzeug mit Funktion', () => {
+  it('listet die Mannschaft alphabetisch mit Funktion und Fahrzeug', () => {
     const text = buildMannschaftText(crew);
     expect(text.split('\n')).toEqual([
       'Erika Beispiel – Gruppenkommandant (TLFA 4000)',
-      'Max Muster – Maschinist (TLFA 4000)',
       'Hans Probe – Feuerwehrmann',
+      'Max Muster – Maschinist (TLFA 4000)',
     ]);
   });
 
@@ -219,10 +253,24 @@ describe('buildMannschaftText', () => {
   });
 });
 
+describe('countMaterial', () => {
+  it('zählt Material nach Bezeichnung, alphabetisch, ohne Einsatzmittel', () => {
+    expect(
+      countMaterial(
+        [tlf, marker, rohr, { ...rohr, id: 'r2' }],
+        (item) => (item.type === 'rohr' ? 'Rohr' : 'Marker')
+      )
+    ).toEqual([
+      { label: 'C-Rohr', count: 2 },
+      { label: 'Marker: Ölbindemittel', count: 1 },
+    ]);
+  });
+});
+
 describe('buildMaterialText', () => {
-  it('zählt Material nach Bezeichnung und lässt Einsatzmittel weg', () => {
+  it('schreibt das Material alphabetisch mit Anzahl', () => {
     const text = buildMaterialText(
-      [tlf, rohr, { ...rohr, id: 'r2' }, marker],
+      [tlf, marker, rohr, { ...rohr, id: 'r2' }],
       (item) => (item.type === 'rohr' ? 'Rohr' : 'Marker')
     );
     expect(text.split('\n')).toEqual([

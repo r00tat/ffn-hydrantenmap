@@ -170,7 +170,20 @@ function kraftZeile(row: StrengthRow): string {
     .join(' – ');
 }
 
+/**
+ * Alphabetisch, Zahlen natürlich: „RLF 2" vor „RLF 10". Die Listen werden in
+ * Sybos von Hand oder per Browser-Erweiterung abgehakt, und dort stehen sie
+ * ebenfalls alphabetisch — in derselben Reihenfolge geht das ohne Suchen.
+ */
+export function compareAlphabetically(a: string, b: string): number {
+  return a.localeCompare(b, 'de', { numeric: true, sensitivity: 'base' });
+}
+
 export interface Kraefte {
+  /** Eigene Fahrzeuge und taktische Einheiten, alphabetisch nach Name. */
+  eigeneRows: StrengthRow[];
+  /** Fremde Organisationen, alphabetisch nach Name. */
+  fremdeRows: StrengthRow[];
   /** Eigene Fahrzeuge und taktische Einheiten, eine Zeile je Einsatzmittel. */
   eigene: string;
   /** Fremde Organisationen: Rettung, Polizei, Nachbarwehren. */
@@ -195,9 +208,15 @@ export function buildKraefte(
   crewAssignments: CrewAssignment[]
 ): Kraefte {
   const { eigene, fremde } = calculateStrength(items, crewAssignments);
+  const byName = (a: StrengthRow, b: StrengthRow) =>
+    compareAlphabetically(a.name, b.name);
+  const eigeneRows = [...eigene.rows].sort(byName);
+  const fremdeRows = [...fremde.rows].sort(byName);
   return {
-    eigene: eigene.rows.map(kraftZeile).join('\n'),
-    fremde: fremde.rows.map(kraftZeile).join('\n'),
+    eigeneRows,
+    fremdeRows,
+    eigene: eigeneRows.map(kraftZeile).join('\n'),
+    fremde: fremdeRows.map(kraftZeile).join('\n'),
     summe: {
       eigeneEinheiten: eigene.totalUnits,
       eigenePersonen: eigene.totalMann,
@@ -208,14 +227,13 @@ export function buildKraefte(
   };
 }
 
-/** Die namentlich erfasste Mannschaft, nach Fahrzeug, ohne Fahrzeug zuletzt. */
+/** Die namentlich erfasste Mannschaft, alphabetisch nach Name. */
+export function sortCrew(crew: CrewAssignment[]): CrewAssignment[] {
+  return [...crew].sort((a, b) => compareAlphabetically(a.name, b.name));
+}
+
 export function buildMannschaftText(crew: CrewAssignment[]): string {
-  return [...crew]
-    .sort((a, b) => {
-      const av = a.vehicleName || '￿';
-      const bv = b.vehicleName || '￿';
-      return av.localeCompare(bv, 'de') || a.name.localeCompare(b.name, 'de');
-    })
+  return sortCrew(crew)
     .map(
       (c) =>
         `${c.name} – ${c.funktion}${c.vehicleName ? ` (${c.vehicleName})` : ''}`
@@ -232,10 +250,15 @@ export function buildMannschaftText(crew: CrewAssignment[]): string {
  * `typeLabel` liefert die Typbezeichnung eines Elements; sie kommt von außen,
  * weil sie an den Element-Klassen hängt, die React mitbringen.
  */
-export function buildMaterialText(
+export interface MaterialCount {
+  label: string;
+  count: number;
+}
+
+export function countMaterial(
   items: FirecallItem[],
   typeLabel: (item: FirecallItem) => string
-): string {
+): MaterialCount[] {
   const counts = new Map<string, number>();
   for (const item of items) {
     if (
@@ -253,8 +276,16 @@ export function buildMaterialText(
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'de'))
-    .map(([label, count]) => `${count}× ${label}`)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => compareAlphabetically(a.label, b.label));
+}
+
+export function buildMaterialText(
+  items: FirecallItem[],
+  typeLabel: (item: FirecallItem) => string
+): string {
+  return countMaterial(items, typeLabel)
+    .map(({ label, count }) => `${count}× ${label}`)
     .join('\n');
 }
 

@@ -793,7 +793,21 @@
     "geschaeftsbuch": "Geschäftsbuch",
     "summeEigene": "Eigene: {units} Einsatzmittel, {persons} Personen",
     "summeFremde": "Sonstige: {units} Einsatzmittel, {persons} Personen",
-    "summeAts": "{count} ATS"
+    "summeAts": "{count} ATS",
+    "cols": {
+      "name": "Name",
+      "fw": "Organisation",
+      "type": "Art",
+      "persons": "Personen",
+      "ats": "ATS",
+      "alarmierung": "Alarmierung",
+      "eintreffen": "Eintreffen",
+      "abruecken": "Abrücken",
+      "funktion": "Funktion",
+      "vehicle": "Fahrzeug",
+      "material": "Bezeichnung",
+      "count": "Anzahl"
+    }
   },
   "passkey": {
     "or": "oder",

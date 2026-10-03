@@ -26,6 +26,7 @@ import { setDoc } from '../../../lib/firestoreClient';
 import { firestore } from '../../firebase/firebase';
 import { FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
+import DynamicMap from '../../Map/PositionedMap';
 import { useSnackbar } from '../../providers/SnackbarProvider';
 import DiaryTable from '../DiaryTable';
 import { useDiaries } from '../EinsatzTagebuch';
@@ -36,11 +37,26 @@ import {
   buildGeschaeftsbuchText,
   buildKraefte,
   buildMannschaftText,
-  buildMaterialText,
+  countMaterial,
   buildNotizenText,
   buildTagebuchText,
+  sortCrew,
 } from './sybosReport';
 import { generateSybosSummary } from './sybosSummary';
+import { CrewTable, MaterialTable, StrengthRowsTable } from './SybosTables';
+
+const overviewMapSx = {
+  height: { xs: 350, md: 500 },
+  display: 'flex',
+  overflow: 'hidden',
+  '& .map-area, & .map-area .leaflet-container': {
+    width: '100%',
+    height: '100%',
+  },
+  '& .map-sidebar': {
+    display: 'none',
+  },
+};
 
 function useCopy() {
   const t = useTranslations('sybos');
@@ -192,9 +208,14 @@ export default function SybosPage() {
     [firecallItems, crewAssignments],
   );
   const mannschaft = useMemo(() => buildMannschaftText(crewAssignments), [crewAssignments]);
-  const material = useMemo(
-    () => buildMaterialText(firecallItems, (item) => getItemInstance(item).markerName()),
+  const crewSorted = useMemo(() => sortCrew(crewAssignments), [crewAssignments]);
+  const materialCounts = useMemo(
+    () => countMaterial(firecallItems, (item) => getItemInstance(item).markerName()),
     [firecallItems],
+  );
+  const material = useMemo(
+    () => materialCounts.map(({ label, count }) => `${count}× ${label}`).join('\n'),
+    [materialCounts],
   );
   const notizen = useMemo(() => buildNotizenText(locations), [locations]);
   const tagebuch = useMemo(() => buildTagebuchText(diaries), [diaries]);
@@ -307,6 +328,12 @@ export default function SybosPage() {
       </Typography>
 
       <Stack spacing={2}>
+        {/* Übersichtskarte wie auf der Druckseite — zum Nachsehen, nicht zum
+            Kopieren. Ohne Seitenleiste und in voller Breite. */}
+        <Paper variant="outlined" sx={overviewMapSx}>
+          <DynamicMap />
+        </Paper>
+
         {/* 1. Basisdaten */}
         <Section title={t('sectionBasis')}>
           {basis.length === 0 && <Typography color="text.secondary">{t('empty')}</Typography>}
@@ -399,10 +426,10 @@ export default function SybosPage() {
             )}
             {kraefte.summe.ats > 0 && <Chip label={t('summeAts', { count: kraefte.summe.ats })} />}
           </Box>
-          <CopyField label={t('eigeneKraefte')} value={kraefte.eigene} multiline />
-          <CopyField label={t('mannschaft')} value={mannschaft} multiline />
-          <CopyField label={t('sonstigeKraefte')} value={kraefte.fremde} multiline />
-          <CopyField label={t('material')} value={material} multiline />
+          <StrengthRowsTable title={t('eigeneKraefte')} rows={kraefte.eigeneRows} />
+          <CrewTable title={t('mannschaft')} crew={crewSorted} />
+          <StrengthRowsTable title={t('sonstigeKraefte')} rows={kraefte.fremdeRows} />
+          <MaterialTable title={t('material')} material={materialCounts} />
         </Section>
 
         {/* 4. Sonstige Notizen */}
