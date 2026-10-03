@@ -62,6 +62,7 @@ vi.mock('./auth/ensureFreshAuth', () => ({
 }));
 
 import useFirebaseLoginObserver, {
+  LOGIN_RETRY_MS,
   OFFLINE_LOGIN_TIMEOUT_MS,
 } from './useFirebaseLoginObserver';
 
@@ -255,6 +256,65 @@ describe('useFirebaseLoginObserver: Kaltstart ohne Netz', () => {
 
     expect(mocks.firebaseTokenLogin).toHaveBeenCalled();
     expect(result.current.offlineAuth).toBe(false);
+    (auth as { currentUser: unknown }).currentUser = null;
+  });
+
+  it('setzt die Rechte eines anderen Benutzers aus der vorläufigen Anzeige zurück', async () => {
+    saveOfflineAuth({ ...cachedLogin, uid: 'someone-else' });
+    Object.defineProperty(window.navigator, 'onLine', {
+      configurable: true,
+      value: false,
+    });
+    try {
+      mocks.offline = true;
+      const { result } = renderHook(() => useFirebaseLoginObserver());
+      // Vorläufig gilt der Zwischenspeicher (ohne UID geladen).
+      expect(result.current.isAuthorized).toBe(true);
+
+      await act(async () => {
+        await mocks.authCallback?.(offlineUser('reject'));
+      });
+
+      expect(result.current.isAuthorized).toBe(false);
+      expect(result.current.groups).toEqual([]);
+      expect(result.current.groupAdmin).toBeUndefined();
+      expect(result.current.myGroups).toEqual([]);
+      expect(result.current.offlineAuth).toBe(false);
+    } finally {
+      Object.defineProperty(window.navigator, 'onLine', {
+        configurable: true,
+        value: true,
+      });
+    }
+  });
+
+  it('wiederholt eine gescheiterte Anmeldung bei erreichbarem Server von selbst', async () => {
+    vi.useFakeTimers();
+    saveOfflineAuth(cachedLogin);
+    const { result } = renderHook(() => useFirebaseLoginObserver());
+    const { auth } = await import('../components/firebase/firebase');
+    const user = offlineUser('reject');
+    (auth as { currentUser: unknown }).currentUser = user;
+
+    await act(async () => {
+      await mocks.authCallback?.(user);
+    });
+    expect(result.current.offlineAuth).toBe(true);
+    expect(result.current.authSource).toBe('offlineCache');
+
+    // Der nächste Versuch gelingt.
+    const good = onlineUser();
+    user.getIdToken.mockImplementation(good.getIdToken as never);
+    user.getIdTokenResult.mockImplementation(good.getIdTokenResult as never);
+    mocks.getMyGroupsFromServer.mockResolvedValue([]);
+    mocks.firebaseTokenLogin.mockResolvedValue({});
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOGIN_RETRY_MS);
+    });
+
+    expect(result.current.offlineAuth).toBe(false);
+    expect(result.current.authSource).toBe('server');
     (auth as { currentUser: unknown }).currentUser = null;
   });
 });

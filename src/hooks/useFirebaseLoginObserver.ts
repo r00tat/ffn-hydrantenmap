@@ -52,6 +52,13 @@ function nonNull(value: any) {
 export const OFFLINE_LOGIN_TIMEOUT_MS = 8_000;
 /** Höchstwartezeit für `getMyGroupsFromServer`, danach gilt der Zwischenspeicher. */
 export const SERVER_GROUPS_TIMEOUT_MS = 8_000;
+/**
+ * Scheitert die Anmeldung am Server, obwohl er erreichbar ist (etwa ein
+ * vorübergehender Fehler beim Token-Refresh), wird sie nach dieser Zeit
+ * wiederholt. Ohne Wechsel auf „nicht erreichbar" gäbe es sonst keinen
+ * Auslöser bis zum Neuladen.
+ */
+export const LOGIN_RETRY_MS = 30_000;
 
 /** Rechte aus dem Zwischenspeicher als Teil des Anmeldezustands. */
 function offlineAuthState(cached: OfflineAuthSnapshot): Partial<LoginData> {
@@ -69,6 +76,7 @@ function offlineAuthState(cached: OfflineAuthSnapshot): Partial<LoginData> {
     photoURL: cached.photoURL,
     uid: cached.uid,
     offlineAuth: true,
+    authSource: 'offlineCache',
   };
 }
 
@@ -101,6 +109,8 @@ function getInitialLoginStatus(): LoginData {
     // Zeitpunkt noch keinen Benutzer. Erst onAuthStateChanged setzt das Flag.
     return {
       ...cachedAuth,
+      // Stammt aus einem früheren Lauf — die Anmeldung dieses Laufs steht aus.
+      authSource: undefined,
       hasFirebaseUser: false,
       isRefreshing: true,
       isAuthLoading: false,
@@ -279,8 +289,14 @@ export default function useFirebaseLoginObserver(): LoginStatus {
    * `OFFLINE_LOGIN_TIMEOUT_MS` oder beim Fehlschlag. Antwortet der Server doch
    * noch, übernimmt er.
    */
+  const loginRetryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+  useEffect(() => () => clearTimeout(loginRetryTimerRef.current), []);
+
   const completeLogin = useCallback(
     async (user: User) => {
+      clearTimeout(loginRetryTimerRef.current);
       const cached = loadOfflineAuth(user.uid);
       let settled = false;
       let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
@@ -308,7 +324,12 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         settled = true;
         clearTimeout(fallbackTimer);
         authSourceRef.current = 'server';
-        setLoginStatus((prev) => ({ ...prev, ...authData, offlineAuth: false }));
+        setLoginStatus((prev) => ({
+          ...prev,
+          ...authData,
+          offlineAuth: false,
+          authSource: 'server',
+        }));
         await refreshRef.current(user.uid);
         setLoginStatus((prev) => ({ ...prev, loginStep: 'done' }));
         console.info(`login completed for ${user.email}`);
@@ -318,11 +339,44 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         console.warn('login at the server failed', err);
         if (cached) {
           applyOfflineAuth(user, cached);
+          // Der Server ist erreichbar, die Anmeldung trotzdem gescheitert: Ein
+          // Reconnect kommt dann nie, also selbst noch einmal versuchen.
+          if (!isOffline()) {
+            loginRetryTimerRef.current = setTimeout(() => {
+              if (
+                authSourceRef.current === 'offlineCache' &&
+                auth.currentUser?.uid === user.uid &&
+                !isOffline()
+              ) {
+                void completeLoginRef.current(user);
+              }
+            }, LOGIN_RETRY_MS);
+          }
         } else {
+          authSourceRef.current = null;
+          const provisional = loadOfflineAuth();
+          if (provisional && provisional.uid !== user.uid) setMyGroups([]);
           // Ohne Zwischenspeicher bleibt es beim Login-Bildschirm, aber nicht
           // bei einem endlosen Ladezustand.
           setLoginStatus((prev) => ({
             ...prev,
+            // Die vorläufige Anzeige kann einem anderen Benutzer gehören
+            // (Zwischenspeicher ohne UID beim Kaltstart) — dessen Rechte
+            // dürfen nicht stehen bleiben.
+            ...(prev.offlineAuth || prev.uid !== user.uid
+              ? {
+                  isAuthorized: false,
+                  isAdmin: false,
+                  groups: [],
+                  groupAdmin: undefined,
+                  fahrtenbuchGeraetemeister: undefined,
+                  firecall: undefined,
+                  firecallWrite: undefined,
+                  myGroups: [],
+                  offlineAuth: false,
+                }
+              : {}),
+            authSource: undefined,
             isSignedIn: true,
             isAuthLoading: false,
             hasFirebaseUser: true,
@@ -376,6 +430,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
                   offlineAuth: false,
                 }
               : {}),
+            authSource: undefined,
             isSignedIn: false,
             isAuthLoading: false,
             hasFirebaseUser: false,

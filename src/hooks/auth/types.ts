@@ -50,6 +50,13 @@ export interface LoginData {
    * die Oberfläche; Firestore prüft beim Synchronisieren selbst.
    */
   offlineAuth?: boolean;
+  /**
+   * Woher die aktuellen Rechte stammen: `server` erst, wenn die Anmeldung am
+   * Server in diesem Lauf gelungen ist; `offlineCache` aus dem Zwischenspeicher.
+   * Fehlt, solange keins von beiden feststeht. Die Offline-Warteschlange
+   * arbeitet erst bei `server` ab.
+   */
+  authSource?: 'server' | 'offlineCache';
   loginStep: LoginStep;
 }
 
