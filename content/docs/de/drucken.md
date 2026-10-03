@@ -6,12 +6,16 @@ Die Druckfunktion erstellt einen umfassenden Einsatzbericht, der alle relevanten
 
 - Einsatz-Kopfdaten: Name, Datum, Feuerwehr, Beschreibung
 - Einsatzkarte als eingebettete Karte
+- Alarmierungstext aus BlaulichtSMS sowie Einsatzablauf und Tätigkeit, sofern sie auf der Sybos-Seite erstellt wurden
 - Einsatzmittel-Zusammenfassung: Erste Alarmierung, Erstes Eintreffen, Letztes Abrücken
+- Namentliche Mannschaft und Fahrten aus dem Fahrtenbuch
 - Einsatzmittel-Details: Typ, Name, Details, Position (nach Ebenen gruppiert)
 - Einsatzorte mit Status, Adressen, Zeiten und Fahrzeugen
+- Atemschutz: Sammelplatz-Leitung, Trupps, Geräte der Trupps, Ausgabe am Sammelplatz und je Trupp das Protokoll mit allen Druckabfragen und der Druckkurve
 - Messwerte (Spektrum/Strahlungsdaten) falls vorhanden
-- Einsatztagebuch-Einträge
+- Einsatztagebuch-Einträge (kompakt: Nr., Zeit, Von/An und der Eintrag mit fettem Titel, Beschreibung und Erledigt-Vermerk)
 - Geschäftsbuch-Einträge
+- Anhänge am Einsatz und an den Elementen (Bilder werden abgedruckt)
 - Druckoptimiertes CSS-Layout mit Seitenumbrüchen
 
 ## Anleitung
@@ -23,7 +27,7 @@ Die Druckfunktion erstellt einen umfassenden Einsatzbericht, der alle relevanten
 
 ### Bericht überprüfen
 
-1. Alle Abschnitte durchsehen: Kopfdaten, Karte, Einsatzmittel, Einsatzorte, Messwerte, Tagebuch, Geschäftsbuch
+1. Alle Abschnitte durchsehen: Kopfdaten, Karte, Einsatzablauf, Einsatzmittel, Mannschaft, Einsatzorte, Atemschutz, Messwerte, Tagebuch, Geschäftsbuch, Anhänge
 
 ### Messwerte ein/ausblenden
 

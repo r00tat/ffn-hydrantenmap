@@ -43,6 +43,12 @@ import { useDiaries } from '../pages/EinsatzTagebuch';
 import { useGeschaeftsbuchEintraege } from '../pages/Geschaeftsbuch';
 import EinsatzTagebuchPrint from '../pages/EinsatzTagebuchPrint';
 import GeschaeftsbuchPrint from '../pages/GeschaeftsbuchPrint';
+import {
+  PrintAtemschutz,
+  PrintEinsatzablauf,
+  PrintMannschaft,
+} from '../pages/PrintEinsatzExtras';
+import { collectAttachments } from '../pages/sybos/sybosExtras';
 import dynamic from 'next/dynamic';
 
 const SpectrumChart = dynamic(() => import('./SpectrumChart'), {
@@ -112,6 +118,12 @@ export default function PrintPage() {
         (item): item is Spectrum => item.type === 'spectrum'
       ),
     [firecallItems]
+  );
+
+  // Anhänge am Einsatz und an den Elementen, wie auf der Sybos-Seite.
+  const attachments = useMemo(
+    () => collectAttachments(firecall, firecallItems),
+    [firecall, firecallItems]
   );
 
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -307,6 +319,9 @@ export default function PrintPage() {
       {/* 2. Einsatzkarte */}
       <DynamicMap />
 
+      {/* Alarmierungstext und Einsatzablauf */}
+      <PrintEinsatzablauf />
+
       {/* 3. Einsatzmittel-Zusammenfassung */}
       {displayItems.length > 0 && (
         <Box sx={{ p: 2 }}>
@@ -332,6 +347,9 @@ export default function PrintPage() {
           )}
         </Box>
       )}
+
+      {/* Mannschaft und Fahrten */}
+      <PrintMannschaft />
 
       {/* 4. Einsatzmittel pro Layer (detailed) */}
       {Object.keys(groupedByLayer).length > 0 && (
@@ -446,6 +464,9 @@ export default function PrintPage() {
         </Box>
       )}
 
+      {/* Atemschutz */}
+      <PrintAtemschutz />
+
       {/* 6. Messungen (Spectrum) */}
       {spectra.length > 0 && (
         <Box sx={{ p: 2 }}>
@@ -507,13 +528,13 @@ export default function PrintPage() {
       {eintraege.length > 0 && <GeschaeftsbuchPrint />}
 
       {/* 9. Anhänge */}
-      {firecall.attachments && firecall.attachments.length > 0 && (
+      {attachments.length > 0 && (
         <Box sx={{ p: 2 }}>
           <Typography variant="h4" className="print-section">
             {t('sectionAttachments')}
           </Typography>
-          {firecall.attachments.map((url) => (
-            <PrintAttachment key={url} url={url} />
+          {attachments.map((a) => (
+            <PrintAttachment key={`${a.source}|${a.url}`} url={a.url} source={a.source} />
           ))}
         </Box>
       )}
@@ -523,7 +544,7 @@ export default function PrintPage() {
 
 const printStorage = getStorage(app);
 
-function PrintAttachment({ url }: { url: string }) {
+function PrintAttachment({ url, source }: { url: string; source?: string }) {
   const [downloadUrl, setDownloadUrl] = useState<string>();
   const [isImage, setIsImage] = useState(false);
   const [fileName, setFileName] = useState<string>('');
@@ -541,11 +562,13 @@ function PrintAttachment({ url }: { url: string }) {
 
   if (!downloadUrl) return null;
 
+  const label = source ? `${fileName} (${source})` : fileName;
+
   if (isImage) {
     return (
       <Box sx={{ mb: 2 }}>
         <Typography variant="caption" sx={{ display: "block", mb: 0.5 }}>
-          {fileName}
+          {label}
         </Typography>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -559,7 +582,7 @@ function PrintAttachment({ url }: { url: string }) {
 
   return (
     <Typography sx={{ mb: 1 }}>
-      {fileName}
+      {label}
     </Typography>
   );
 }

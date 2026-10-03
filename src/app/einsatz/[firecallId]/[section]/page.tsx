@@ -14,6 +14,7 @@ const SECTIONS: Record<
   einsatzorte: () => import('../../../../components/pages/EinsatzorteWrapper'),
   chat: () => import('../../../../components/pages/Chat'),
   print: () => import('../../../../components/pages/PrintWrapper'),
+  sybos: () => import('../../../../components/pages/SybosWrapper'),
   details: () => import('../../../../components/pages/EinsatzDetails'),
   fahrtenbuch: () =>
     import('../../../../components/Fahrtenbuch/EinsatzFahrtenbuchSection'),
