@@ -145,3 +145,40 @@ offline noch beenden lässt.
 Der `EinsatzDialog` überspringt offline den Blaulicht-SMS-Import (mit Hinweis im
 Dialog) und die Duplikatsprüfung (mit Hinweis beim Speichern). Der Einsatz
 entsteht trotzdem — im Einsatz geht das Anlegen vor.
+
+## Kaltstart ohne Netz
+
+Damit die App nach einem Neustart im Flugmodus ohne Login-Bildschirm aufgeht,
+müssen drei Dinge offline vorhanden sein:
+
+1. **Die Seite selbst.** Der Service Worker hält eine App-Shell je Build vor,
+   die nach der Anmeldung vorgewärmt wird (Kernseiten und die Abschnitte des
+   aktuellen Einsatzes), und baut die Seiten eines offline angelegten Einsatzes
+   aus denen eines anderen. Für alles andere gibt es die Rückfallseite
+   `/offline`. Details: [service-worker-pwa.md](service-worker-pwa.md).
+2. **Der Firebase-Benutzer.** Firebase Auth lädt ihn aus IndexedDB, auch mit
+   abgelaufenem ID-Token; ein Netzfehler beim Neuladen des Profils behält ihn.
+   Firestore liest damit aus dem Cache dieses Benutzers und reiht
+   Schreibvorgänge ein.
+3. **Die Rechte der Oberfläche.** Die kommen sonst vom Server. Der
+   Zwischenspeicher der letzten Anmeldung (`offlineAuthCache.ts`, 72 h, an die
+   UID gebunden) springt ein, wenn die Anmeldung am Server scheitert, nach acht
+   Sekunden nicht antwortet oder die App schon weiß, dass sie offline ist.
+   `getMyGroupsFromServer` hat dieselbe Zeitgrenze. Beim Reconnect wird die
+   Anmeldung am Server nachgeholt. Der Status-Chip nennt im Tooltip, dass die
+   Rechte aus dem Zwischenspeicher stammen. Sicherheitsüberlegung:
+   [berechtigungen.md](berechtigungen.md).
+
+### Android-App
+
+Die Capacitor-App lädt ihre Seiten **vom Server** (`server.url` in
+`capacitor/capacitor.config.ts`, `webDir: 'empty'`), nicht aus dem APK. Die
+WebView registriert denselben Service Worker; die App-Shell wirkt dort also
+genauso. Offen ist die Anmeldung: Laut `useFirebaseSessionRecovery` kommt die
+WebView nach einem Prozessstart **ohne** Firebase-Benutzer hoch, und die
+Wiederherstellung tauscht das native ID-Token über eine Server Action
+(`exchangeNativeIdTokenForFirebaseToken`). Ohne Netz bleibt die WebView damit
+ohne Benutzer: Der Zwischenspeicher greift nicht (er verlangt einen
+Firebase-Benutzer mit derselben UID), und der Firestore-Cache des Benutzers ist
+nicht erreichbar. Der Kaltstart ohne Netz funktioniert unter Android deshalb
+erst, wenn die WebView ihre Firebase-Anmeldung selbst hält.

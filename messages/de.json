@@ -955,7 +955,12 @@
     "onlineOnly": "Nur mit Internetverbindung verfügbar",
     "pendingUpload": "{name} – wartet auf Upload",
     "pendingUploadHint": "Offline gespeichert. Die Datei wird hochgeladen, sobald die Verbindung wieder steht.",
-    "uploadQueued": "{count, plural, one {# Datei wird} other {# Dateien werden}} hochgeladen, sobald die Verbindung wieder steht."
+    "uploadQueued": "{count, plural, one {# Datei wird} other {# Dateien werden}} hochgeladen, sobald die Verbindung wieder steht.",
+    "offlinePageTitle": "Offline – Seite nicht verfügbar",
+    "offlinePageText": "Diese Seite wurde auf dem Gerät nicht vorgehalten und lässt sich ohne Verbindung zum Server nicht laden. Die Karte, die Einsatzliste, das Einsatztagebuch und die Atemschutzseiten funktionieren offline weiter.",
+    "offlinePageToMap": "Zur Karte",
+    "offlinePageRetry": "Erneut versuchen",
+    "offlineAuthHint": "Angemeldet mit den zuletzt am Server bestätigten Rechten dieses Geräts. Sie werden beim nächsten Verbindungsaufbau erneut geprüft."
   },
   "einsatzDetails": {
     "notFound": "Einsatz nicht gefunden",

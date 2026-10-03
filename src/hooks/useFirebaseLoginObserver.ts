@@ -12,6 +12,8 @@ import { Group } from '../app/groups/groupTypes';
 import { uniqueArray } from '../common/arrayUtils';
 import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
+import { isOffline, onReconnect } from '../lib/connectivity';
+import { withTimeout } from '../lib/withTimeout';
 import { AuthState, LoginData, LoginStatus } from './auth/types';
 import {
   refreshTokenUntilClaimsMatch,
@@ -27,6 +29,12 @@ import {
   clearSessionRecoverySuppression,
   suppressSessionRecovery,
 } from './auth/recoverySuppression';
+import {
+  OfflineAuthSnapshot,
+  clearOfflineAuth,
+  loadOfflineAuth,
+  saveOfflineAuth,
+} from './auth/offlineAuthCache';
 
 // Re-export types for backward compatibility
 export type { LoginData, LoginStatus, LoginStep } from './auth/types';
@@ -35,7 +43,57 @@ function nonNull(value: any) {
   return value !== null ? value : undefined;
 }
 
+/**
+ * So lange darf die Anmeldung am Server dauern, bevor die App auf den
+ * Zwischenspeicher der letzten Anmeldung umschaltet. Gilt nur, wenn es einen
+ * gibt; ohne ihn wird wie bisher abgewartet. Die Anmeldung läuft danach weiter
+ * und übernimmt, sobald sie doch noch antwortet.
+ */
+export const OFFLINE_LOGIN_TIMEOUT_MS = 8_000;
+/** Höchstwartezeit für `getMyGroupsFromServer`, danach gilt der Zwischenspeicher. */
+export const SERVER_GROUPS_TIMEOUT_MS = 8_000;
+
+/** Rechte aus dem Zwischenspeicher als Teil des Anmeldezustands. */
+function offlineAuthState(cached: OfflineAuthSnapshot): Partial<LoginData> {
+  return {
+    isSignedIn: true,
+    isAuthorized: cached.isAuthorized,
+    isAdmin: cached.isAdmin,
+    groups: cached.groups,
+    groupAdmin: cached.groupAdmin,
+    fahrtenbuchGeraetemeister: cached.fahrtenbuchGeraetemeister,
+    firecall: cached.firecall,
+    firecallWrite: cached.firecallWrite,
+    email: cached.email,
+    displayName: cached.displayName,
+    photoURL: cached.photoURL,
+    uid: cached.uid,
+    offlineAuth: true,
+  };
+}
+
 function getInitialLoginStatus(): LoginData {
+  // Kaltstart ohne Netz: Der Browser meldet selbst „offline", also wird der
+  // Server ohnehin nicht antworten. Statt den Login-Bildschirm aufblitzen zu
+  // lassen, bis Firebase Auth den Benutzer aus IndexedDB geladen hat, gilt
+  // vorläufig der Zwischenspeicher. `hasFirebaseUser` bleibt false, bis
+  // `onAuthStateChanged` denselben Benutzer bestätigt (siehe dort).
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    const offline = loadOfflineAuth();
+    if (offline) {
+      return {
+        ...offlineAuthState(offline),
+        isAuthorized: offline.isAuthorized,
+        isAdmin: offline.isAdmin,
+        isSignedIn: true,
+        isAuthLoading: false,
+        hasFirebaseUser: false,
+        isRefreshing: true,
+        myGroups: offline.myGroups,
+        loginStep: 'done',
+      };
+    }
+  }
   const cachedAuth = loadAuthFromSessionStorage();
   if (cachedAuth) {
     // `hasFirebaseUser` bewusst hart auf false: der Cache lässt die App sofort
@@ -65,10 +123,16 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
   const [loginStatus, setLoginStatus] = useState<LoginData>(getInitialLoginStatus);
   const [uid, setUid] = useState<string>();
-  const [myGroups, setMyGroups] = useState<Group[]>([]);
+  const [myGroups, setMyGroups] = useState<Group[]>(
+    () => getInitialLoginStatus().myGroups ?? []
+  );
   const [needsReLogin, setNeedsReLogin] = useState(false);
   const [credentialsRefreshed, setCredentialsRefreshed] = useState(false);
   const lastKnownAuthRef = useRef<AuthState | null>(null);
+  // Track when the last server login happened to avoid unnecessary refreshes
+  const lastRefreshRef = useRef<number>(0);
+  /** Woher die aktuellen Rechte stammen: Server oder Zwischenspeicher. */
+  const authSourceRef = useRef<'server' | 'offlineCache' | null>(null);
   const sessionStatusRef = useRef(sessionStatus);
   useEffect(() => {
     sessionStatusRef.current = sessionStatus;
@@ -119,9 +183,15 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     if (!effectiveUid) return;
 
     try {
-      const groups = await getMyGroupsFromServer().catch((err) => {
+      // Mit Zeitgrenze: Im WLAN ohne Internet hinge die Server Action, bis der
+      // Browser aufgibt. Ohne Antwort gelten die zuletzt bekannten Gruppen.
+      const groups = await withTimeout(
+        getMyGroupsFromServer(),
+        SERVER_GROUPS_TIMEOUT_MS,
+        'getMyGroupsFromServer'
+      ).catch((err) => {
         console.error('getMyGroupsFromServer failed:', err);
-        return [] as Group[];
+        return loadOfflineAuth(effectiveUid)?.myGroups ?? ([] as Group[]);
       });
       setMyGroups(groups);
 
@@ -141,6 +211,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           groups: session.user.groups,
           firecall: session.user.firecall,
           firecallWrite: session.user.firecallWrite,
+          // Auch die Rollen, die nur in der Sitzung stehen: Antwortet die
+          // Sitzung später nicht mehr (offline), bleiben sie so erhalten.
+          groupAdmin: session.user.groupAdmin,
+          fahrtenbuchGeraetemeister: session.user.fahrtenbuchGeraetemeister,
           isRefreshing: false,
         }));
       } else {
@@ -166,6 +240,110 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     serverLoginRef.current = serverLogin;
   }, [serverLogin]);
 
+  /**
+   * Rechte aus dem Zwischenspeicher übernehmen, weil der Server nicht
+   * antwortet. `hasFirebaseUser` ist hier echt: Firebase Auth hat den
+   * Benutzer aus IndexedDB geladen, auch wenn sein ID-Token abgelaufen ist.
+   * Firestore liest dann aus dem Cache und reiht Schreibvorgänge ein.
+   */
+  const applyOfflineAuth = useCallback(
+    (user: User, cached: OfflineAuthSnapshot) => {
+      console.info(
+        `server not reachable, using the cached login from ${new Date(cached.savedAt).toISOString()}`
+      );
+      authSourceRef.current = 'offlineCache';
+      setMyGroups(cached.myGroups);
+      setLoginStatus((prev) => ({
+        ...prev,
+        ...offlineAuthState(cached),
+        isAuthLoading: false,
+        hasFirebaseUser: true,
+        user,
+        email: nonNull(user.email) ?? cached.email,
+        displayName: nonNull(user.displayName) ?? cached.displayName,
+        photoURL: nonNull(user.photoURL) ?? cached.photoURL,
+        uid: user.uid,
+        isRefreshing: false,
+        loginStep: 'done',
+      }));
+    },
+    []
+  );
+
+  /**
+   * Anmeldung am Server: ID-Token, NextAuth-Sitzung, Claims.
+   *
+   * Offline scheitert das (abgelaufenes Token ohne Netz) oder hängt (WLAN ohne
+   * Internet). Gibt es einen Zwischenspeicher für diesen Benutzer, gilt er —
+   * sofort, wenn die App schon weiß, dass sie offline ist, sonst nach
+   * `OFFLINE_LOGIN_TIMEOUT_MS` oder beim Fehlschlag. Antwortet der Server doch
+   * noch, übernimmt er.
+   */
+  const completeLogin = useCallback(
+    async (user: User) => {
+      const cached = loadOfflineAuth(user.uid);
+      let settled = false;
+      let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+      if (cached && isOffline()) {
+        applyOfflineAuth(user, cached);
+      } else {
+        setLoginStatus((prev) => ({ ...prev, loginStep: 'authenticating' }));
+        if (cached) {
+          fallbackTimer = setTimeout(() => {
+            if (!settled) applyOfflineAuth(user, cached);
+          }, OFFLINE_LOGIN_TIMEOUT_MS);
+        }
+      }
+
+      try {
+        const authData = await serverLoginSteps(user, {
+          hasValidSession: () => sessionStatusRef.current === 'authenticated',
+          serverLogin: () => serverLoginRef.current(),
+          markServerLogin: () => {
+            lastRefreshRef.current = Date.now();
+          },
+          setLoginStep: (loginStep) =>
+            setLoginStatus((prev) => ({ ...prev, loginStep })),
+        });
+        settled = true;
+        clearTimeout(fallbackTimer);
+        authSourceRef.current = 'server';
+        setLoginStatus((prev) => ({ ...prev, ...authData, offlineAuth: false }));
+        await refreshRef.current(user.uid);
+        setLoginStatus((prev) => ({ ...prev, loginStep: 'done' }));
+        console.info(`login completed for ${user.email}`);
+      } catch (err) {
+        settled = true;
+        clearTimeout(fallbackTimer);
+        console.warn('login at the server failed', err);
+        if (cached) {
+          applyOfflineAuth(user, cached);
+        } else {
+          // Ohne Zwischenspeicher bleibt es beim Login-Bildschirm, aber nicht
+          // bei einem endlosen Ladezustand.
+          setLoginStatus((prev) => ({
+            ...prev,
+            isSignedIn: true,
+            isAuthLoading: false,
+            hasFirebaseUser: true,
+            user,
+            uid: user.uid,
+            email: nonNull(user.email),
+            displayName: nonNull(user.displayName),
+            photoURL: nonNull(user.photoURL),
+            isRefreshing: false,
+            loginStep: 'done',
+          }));
+        }
+      }
+    },
+    [applyOfflineAuth]
+  );
+  const completeLoginRef = useRef(completeLogin);
+  useEffect(() => {
+    completeLoginRef.current = completeLogin;
+  }, [completeLogin]);
+
   // Firebase Auth state listener
   useEffect(() => {
     const unregisterAuthObserver = auth.onAuthStateChanged(
@@ -177,52 +355,27 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           // Eine Anmeldung hebt die Sperre auf, die das Abmelden gesetzt hat —
           // sie kennt keinen Zeitablauf, nur diesen einen Weg zurueck.
           clearSessionRecoverySuppression();
-          setLoginStatus((prev) => ({ ...prev, loginStep: 'authenticating' }));
-          const token = await user.getIdToken();
-          if (token) {
-            const hasValidSession = sessionStatusRef.current === 'authenticated';
-
-            if (!hasValidSession) {
-              setLoginStatus((prev) => ({ ...prev, loginStep: 'verifying' }));
-              await serverLoginRef.current();
-              lastRefreshRef.current = Date.now();
-              // Force-refresh token only on fresh login
-              await user.getIdToken(true);
-            }
-          }
-
-          const tokenResult = await user.getIdTokenResult();
-          const idToken = await user.getIdToken();
-
-          const authData: Partial<LoginData> = {
-            isSignedIn: true,
-            isAuthLoading: false,
-            hasFirebaseUser: true,
-            user,
-            email: nonNull(u?.email),
-            displayName: nonNull(u?.displayName),
-            uid: nonNull(u?.uid),
-            photoURL: nonNull(u?.photoURL),
-            expiration: tokenResult?.expirationTime,
-            idToken,
-            groups: (tokenResult?.claims?.groups as string[]) || [],
-            isAdmin: (tokenResult?.claims?.isAdmin as boolean) || false,
-            isAuthorized: (tokenResult?.claims?.authorized as boolean) || false,
-            isRefreshing: true,
-            loginStep: 'loading_permissions',
-            firecall: tokenResult?.claims?.firecall as string | undefined,
-            firecallWrite: tokenResult?.claims?.firecallWrite as
-              | boolean
-              | undefined,
-          };
-
-          setLoginStatus((prev) => ({ ...prev, ...authData }));
-          await refreshRef.current(user.uid);
-          setLoginStatus((prev) => ({ ...prev, loginStep: 'done' }));
-          console.info(`login completed for ${user.email}`);
+          await completeLoginRef.current(user);
         } else {
+          // Eine vorläufig aus dem Zwischenspeicher übernommene Anzeige
+          // (Kaltstart, siehe getInitialLoginStatus) muss weg. Den Speicher
+          // selbst lässt das stehen: Er gilt nur für einen Firebase-Benutzer
+          // mit derselben UID, und unter Android kommt die WebView anfangs
+          // ohne Benutzer hoch, bis die Sitzungs-Wiederherstellung greift.
+          // Gelöscht wird er beim Abmelden.
+          authSourceRef.current = null;
           setLoginStatus((prev) => ({
             ...prev,
+            ...(prev.offlineAuth
+              ? {
+                  isAuthorized: false,
+                  isAdmin: false,
+                  groups: [],
+                  groupAdmin: undefined,
+                  fahrtenbuchGeraetemeister: undefined,
+                  offlineAuth: false,
+                }
+              : {}),
             isSignedIn: false,
             isAuthLoading: false,
             hasFirebaseUser: false,
@@ -235,13 +388,66 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     return () => unregisterAuthObserver();
   }, []);
 
+  // Zurück online, aber die Rechte stammen aus dem Zwischenspeicher: die
+  // Anmeldung am Server nachholen, damit wieder dessen Prüfung gilt.
+  useEffect(
+    () =>
+      onReconnect(() => {
+        const user = auth.currentUser;
+        if (user && authSourceRef.current === 'offlineCache') {
+          void completeLoginRef.current(user);
+        }
+      }),
+    []
+  );
+
   // Save to session storage when auth changes
   useEffect(() => {
     saveAuthToSessionStorage(loginStatus);
   }, [loginStatus]);
 
-  // Track when the last server login happened to avoid unnecessary refreshes
-  const lastRefreshRef = useRef<number>(0);
+  // Zwischenspeicher für den Kaltstart ohne Netz erneuern — nur, wenn der
+  // Server die Anmeldung gerade bestätigt hat: die NextAuth-Sitzung gehört zu
+  // genau diesem Firebase-Benutzer. Aus dem Zwischenspeicher selbst wird nie
+  // zurückgeschrieben, sonst verlängerte sich die Frist offline von selbst.
+  const sessionUser = hasSessionAuth ? session.user : undefined;
+  useEffect(() => {
+    if (!sessionUser || loginStatus.offlineAuth) return;
+    if (!loginStatus.hasFirebaseUser || loginStatus.isRefreshing) return;
+    if (!loginStatus.uid || sessionUser.id !== loginStatus.uid) return;
+    saveOfflineAuth({
+      uid: loginStatus.uid,
+      email: loginStatus.email,
+      displayName: loginStatus.displayName,
+      photoURL: loginStatus.photoURL,
+      isAuthorized: !!derivedIsAuthorized,
+      isAdmin: !!derivedIsAdmin,
+      groups: derivedGroups ?? [],
+      groupAdmin: derivedGroupAdmin,
+      fahrtenbuchGeraetemeister: derivedGeraetemeister,
+      firecall: derivedFirecall,
+      firecallWrite: derivedFirecallWrite,
+      expiresAt: sessionUser.firecallExpiresAt,
+      myGroups,
+    });
+  }, [
+    sessionUser,
+    loginStatus.offlineAuth,
+    loginStatus.hasFirebaseUser,
+    loginStatus.isRefreshing,
+    loginStatus.uid,
+    loginStatus.email,
+    loginStatus.displayName,
+    loginStatus.photoURL,
+    derivedIsAuthorized,
+    derivedIsAdmin,
+    derivedGroups,
+    derivedGroupAdmin,
+    derivedGeraetemeister,
+    derivedFirecall,
+    derivedFirecallWrite,
+    myGroups,
+  ]);
 
   // Periodic session refresh (every 30 minutes)
   useEffect(() => {
@@ -309,6 +515,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     // da ist, fuer einen Ausfall und meldet den Benutzer wieder an.
     suppressSessionRecovery();
     clearAuthFromSessionStorage();
+    // Nach dem Abmelden darf auch ein Kaltstart ohne Netz niemanden mehr
+    // hereinlassen.
+    clearOfflineAuth();
     // redirect: false — NextAuth server otherwise falls back to NEXTAUTH_URL
     // when the callbackUrl origin doesn't match (Capacitor WebView, dev
     // tunnels), which sends users to localhost.
@@ -440,6 +649,55 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 }
 
 // Helper functions to reduce complexity in the main hook
+
+interface ServerLoginDeps {
+  hasValidSession: () => boolean;
+  serverLogin: () => Promise<void>;
+  markServerLogin: () => void;
+  setLoginStep: (step: LoginData['loginStep']) => void;
+}
+
+/**
+ * ID-Token holen, falls nötig die NextAuth-Sitzung anlegen und die Claims
+ * lesen. Braucht ein abgelaufenes Token oder eine fehlende Sitzung den Server,
+ * scheitert oder hängt das offline — der Aufrufer fängt beides ab.
+ */
+async function serverLoginSteps(
+  user: User,
+  deps: ServerLoginDeps
+): Promise<Partial<LoginData>> {
+  const token = await user.getIdToken();
+  if (token && !deps.hasValidSession()) {
+    deps.setLoginStep('verifying');
+    await deps.serverLogin();
+    deps.markServerLogin();
+    // Force-refresh token only on fresh login
+    await user.getIdToken(true);
+  }
+
+  const tokenResult = await user.getIdTokenResult();
+  const idToken = await user.getIdToken();
+
+  return {
+    isSignedIn: true,
+    isAuthLoading: false,
+    hasFirebaseUser: true,
+    user,
+    email: nonNull(user.email),
+    displayName: nonNull(user.displayName),
+    uid: nonNull(user.uid),
+    photoURL: nonNull(user.photoURL),
+    expiration: tokenResult?.expirationTime,
+    idToken,
+    groups: (tokenResult?.claims?.groups as string[]) || [],
+    isAdmin: (tokenResult?.claims?.isAdmin as boolean) || false,
+    isAuthorized: (tokenResult?.claims?.authorized as boolean) || false,
+    isRefreshing: true,
+    loginStep: 'loading_permissions',
+    firecall: tokenResult?.claims?.firecall as string | undefined,
+    firecallWrite: tokenResult?.claims?.firecallWrite as boolean | undefined,
+  };
+}
 
 async function handleSessionBasedRefresh(
   session: any,

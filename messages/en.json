@@ -955,7 +955,12 @@
     "onlineOnly": "Only available with an internet connection",
     "pendingUpload": "{name} – waiting for upload",
     "pendingUploadHint": "Saved offline. The file will be uploaded as soon as the connection is back.",
-    "uploadQueued": "{count, plural, one {# file} other {# files}} will be uploaded as soon as the connection is back."
+    "uploadQueued": "{count, plural, one {# file} other {# files}} will be uploaded as soon as the connection is back.",
+    "offlinePageTitle": "Offline – page not available",
+    "offlinePageText": "This page was not stored on this device and cannot be loaded without a connection to the server. The map, the incident list, the operational diary and the breathing apparatus pages keep working offline.",
+    "offlinePageToMap": "Go to map",
+    "offlinePageRetry": "Try again",
+    "offlineAuthHint": "Signed in with the permissions this device last confirmed with the server. They will be checked again once the connection is back."
   },
   "einsatzDetails": {
     "notFound": "Operation not found",

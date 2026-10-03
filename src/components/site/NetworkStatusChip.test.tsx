@@ -6,7 +6,8 @@ import { clearSyncErrors, recordSyncError } from '../../lib/syncErrors';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import NetworkStatusChip, { SYNCING_DISPLAY_DELAY_MS } from './NetworkStatusChip';
 
-const { state, checkMock } = vi.hoisted(() => ({
+const { state, checkMock, login } = vi.hoisted(() => ({
+  login: { offlineAuth: false },
   state: {
     current: {
       reachable: true,
@@ -20,6 +21,10 @@ const { state, checkMock } = vi.hoisted(() => ({
 
 vi.mock('../../hooks/useConnectivity', () => ({
   default: () => state.current,
+}));
+
+vi.mock('../../hooks/useFirebaseLogin', () => ({
+  default: () => login,
 }));
 
 vi.mock('../../lib/connectivity', () => ({
@@ -55,6 +60,20 @@ describe('NetworkStatusChip', () => {
     setState({ reachable: false, status: 'offline' });
     renderWithIntl(<NetworkStatusChip />);
     expect(screen.getByText('Offline-Modus')).toBeInTheDocument();
+  });
+
+  it('weist offline auf die zwischengespeicherte Anmeldung hin', async () => {
+    login.offlineAuth = true;
+    setState({ reachable: false, status: 'offline' });
+    renderWithIntl(<NetworkStatusChip />);
+    fireEvent.mouseOver(screen.getByText('Offline-Modus'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(
+      screen.getByRole('tooltip').textContent,
+    ).toContain('zuletzt am Server bestätigten Rechten');
+    login.offlineAuth = false;
   });
 
   it('nennt offline die Zahl ausstehender Änderungen', () => {

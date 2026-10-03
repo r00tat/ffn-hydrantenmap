@@ -11,6 +11,7 @@ import { usePathname } from 'next/navigation';
 import React, { Suspense } from 'react';
 import About from '../../app/about/page';
 import { isPublicRoute } from '../../common/publicRoutes';
+import useAppShellWarmup from '../../hooks/useAppShellWarmup';
 import useFirebaseAppCheck from '../../hooks/useFirebaseAppCheck';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useGlobalErrorReporter from '../../hooks/useGlobalErrorReporter';
@@ -65,6 +66,12 @@ interface AppProps {
   children: React.ReactNode;
 }
 
+/** Hält die App-Shell für den Kaltstart ohne Netz aktuell. */
+function AppShellWarmup() {
+  useAppShellWarmup();
+  return null;
+}
+
 function LogedinApp({ children }: AppProps) {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   return (
@@ -88,6 +95,7 @@ function LogedinApp({ children }: AppProps) {
                           setIsDrawerOpen={setIsDrawerOpen}
                         />
                         <ChatMessageDisplay />
+                        <AppShellWarmup />
                         <Box
                           className="print-content-root"
                           sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}

@@ -12,7 +12,10 @@ const storageUrl = (path: string) =>
 
 let cachePatterns: RuntimeCaching[];
 let isWorkerBootstrap: (url: URL) => boolean;
-let runtimeCaching: (defaults: RuntimeCaching[]) => RuntimeCaching[];
+let runtimeCaching: (
+  defaults: RuntimeCaching[],
+  options?: { appShellCacheName?: string },
+) => RuntimeCaching[];
 let defaultCache: RuntimeCaching[];
 
 beforeAll(async () => {
@@ -321,5 +324,42 @@ describe('Erreichbarkeitsprüfung /api/ping', () => {
   it('greift nicht auf ähnlich benannte Pfade oder fremde Origins über', () => {
     expect(ownRuleFor(`${APP_ORIGIN}/api/pingback`)).toBeUndefined();
     expect(ownRuleFor('https://example.com/api/ping')).toBeUndefined();
+  });
+});
+
+describe('App-Shell für Navigationen', () => {
+  const navigate = (path: string) => ({
+    url: new URL(`${APP_ORIGIN}${path}`),
+    sameOrigin: true,
+    request: { url: `${APP_ORIGIN}${path}`, method: 'GET', mode: 'navigate' },
+  });
+
+  /** Wie `ruleFor`, aber mit einer Navigation samt `request`. */
+  function navigationRule(list: RuntimeCaching[], path: string) {
+    const options = navigate(path);
+    return list.find((entry) => {
+      const matcher = entry.matcher as RegExp | ((o: unknown) => unknown);
+      if (matcher instanceof RegExp) return matcher.test(options.url.href);
+      return matcher(options);
+    });
+  }
+
+  it('fehlt ohne Cache-Namen, damit die Regelliste sonst gleich bleibt', () => {
+    expect(runtimeCaching(defaultCache)).toHaveLength(
+      cachePatterns.length + defaultCache.length,
+    );
+  });
+
+  it('steht hinter den eigenen Regeln und vor Serwists Standard', async () => {
+    const { runtimeCaching: withShell } = await import('./patterns');
+    const list = withShell(defaultCache, { appShellCacheName: 'app-shell-test' });
+    expect(list).toHaveLength(cachePatterns.length + 1 + defaultCache.length);
+
+    const shell = list[cachePatterns.length];
+    expect(navigationRule(list, '/')).toBe(shell);
+    expect(navigationRule(list, '/einsatz/AAAAAAAAAAAAAAAAAAAA/tagebuch')).toBe(shell);
+    // Die Gastseite und der Auth-Handler bleiben bei ihren NetworkOnly-Regeln.
+    expect(navigationRule(list, '/fahrtenbuch/teilen/abc')).not.toBe(shell);
+    expect(navigationRule(list, '/__/auth/handler')).not.toBe(shell);
   });
 });

@@ -44,6 +44,12 @@ export interface LoginData {
   firecall?: string;
   /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
   firecallWrite?: boolean;
+  /**
+   * Die Rechte stammen aus dem Zwischenspeicher der letzten Anmeldung
+   * (`offlineAuthCache.ts`), weil der Server nicht antwortet. Sie öffnen nur
+   * die Oberfläche; Firestore prüft beim Synchronisieren selbst.
+   */
+  offlineAuth?: boolean;
   loginStep: LoginStep;
 }
 

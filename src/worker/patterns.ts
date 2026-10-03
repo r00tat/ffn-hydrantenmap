@@ -8,6 +8,7 @@ import {
   RuntimeCaching,
   StaleWhileRevalidate,
 } from 'serwist';
+import { handleAppShellNavigation, isAppShellNavigation } from './appShell';
 
 const oneDayCachePlugin = new ExpirationPlugin({
   maxEntries: 64,
@@ -301,11 +302,42 @@ function resilient(entry: RuntimeCaching): RuntimeCaching {
 }
 
 /**
+ * Navigationen auf eigene Seiten: Netz mit Zeitgrenze, sonst die App-Shell
+ * (Kaltstart ohne Netz, siehe `appShell.ts`).
+ *
+ * Steht **hinter** `cachePatterns`, damit deren `NetworkOnly`-Regeln für die
+ * Gastseite und den Auth-Handler weiter zuerst greifen, und **vor**
+ * `defaultCache`, dessen Auffangregel `others` Navigationen sonst ohne
+ * Zeitgrenze und nur einen Tag lang hielte.
+ */
+export function appShellRoute(cacheName: string): RuntimeCaching {
+  return {
+    matcher: ({ request, url, sameOrigin }) =>
+      isAppShellNavigation({ request, url, sameOrigin }),
+    handler: {
+      handle: ({ request }) =>
+        handleAppShellNavigation(request, {
+          openCache: () => caches.open(cacheName),
+          fetchFn: (r) => fetch(r),
+          matchAnyCache: (r) => caches.match(r, { ignoreVary: true }),
+        }),
+    },
+  };
+}
+
+/**
  * Die vollständige Regelliste des Service Workers.
  *
  * Eigene Regeln zuerst — die erste passende entscheidet. Jede Regel ist
- * gegen Fehler abgesichert, siehe `resilient`.
+ * gegen Fehler abgesichert, siehe `resilient`. Mit `appShellCacheName` kommt
+ * die App-Shell-Regel für Navigationen dazu.
  */
-export function runtimeCaching(defaults: RuntimeCaching[]): RuntimeCaching[] {
-  return [...cachePatterns, ...defaults].map(resilient);
+export function runtimeCaching(
+  defaults: RuntimeCaching[],
+  options: { appShellCacheName?: string } = {},
+): RuntimeCaching[] {
+  const shell = options.appShellCacheName
+    ? [appShellRoute(options.appShellCacheName)]
+    : [];
+  return [...cachePatterns, ...shell, ...defaults].map(resilient);
 }

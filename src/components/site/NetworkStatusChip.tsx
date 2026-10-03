@@ -7,6 +7,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import useConnectivity from '../../hooks/useConnectivity';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { checkConnectivityNow } from '../../lib/connectivity';
 import SyncErrorsChip from './SyncErrorsChip';
 
@@ -58,6 +59,7 @@ export default function NetworkStatusChip() {
 function ConnectivityChip() {
   const t = useTranslations('networkStatus');
   const { status, pendingWrites } = useConnectivity();
+  const { offlineAuth } = useFirebaseLogin();
   const showSyncing = useDelayedFlag(
     status === 'syncing',
     SYNCING_DISPLAY_DELAY_MS,
@@ -69,7 +71,13 @@ function ConnectivityChip() {
         ? t('offlinePending', { count: pendingWrites })
         : t('offlineMode');
     return (
-      <Tooltip title={t('offlineHint')}>
+      <Tooltip
+        title={
+          offlineAuth
+            ? `${t('offlineHint')} ${t('offlineAuthHint')}`
+            : t('offlineHint')
+        }
+      >
         <Chip
           icon={<WifiOffIcon />}
           label={label}
