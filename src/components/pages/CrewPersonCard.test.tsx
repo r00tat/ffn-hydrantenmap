@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
+import { renderWithIntl as render } from '../../test-utils/intlRender';
 import '@testing-library/jest-dom/vitest';
 import { CrewAssignment, Fzg } from '../firebase/firestore';
 
@@ -121,5 +122,31 @@ describe('CrewPersonCard', () => {
     });
     fireEvent.click(option);
     expect(onVehicleChange).toHaveBeenCalledWith(null, '');
+  });
+
+  it('reiht im Auswahlfeld die eigenen Fahrzeuge vor die fremden', () => {
+    render(
+      <CrewPersonCard
+        {...defaultProps}
+        vehicles={[
+          { id: 'w1', name: 'TLFA Weiden', fw: 'Weiden am See', type: 'vehicle' } as Fzg,
+          ...mockVehicles,
+        ]}
+        showVehicleSelect
+      />,
+    );
+    const vehicleSelect = screen.getByTestId('vehicle-select');
+    fireEvent.mouseDown(vehicleSelect.querySelector('[role="combobox"]')!);
+    const listbox = screen.getByRole('listbox');
+    expect(
+      Array.from(listbox.children).map((el) => el.textContent?.trim()),
+    ).toEqual([
+      '-- Nicht zugeordnet --',
+      'Neusiedl am See',
+      'KDTFA',
+      'TLFA 4000',
+      'Weiden am See',
+      'TLFA Weiden',
+    ]);
   });
 });

@@ -866,7 +866,9 @@
     "removeVehicleConfirm": "{name} wirklich aus dem Einsatz entfernen?",
     "removeVehicleConfirmWithCrew": "{name} wirklich aus dem Einsatz entfernen? {count, plural, one {Die zugeordnete Person wird} other {Die # zugeordneten Personen werden}} wieder auf \"Verfügbar\" gesetzt.",
     "available": "Verfügbar",
-    "noCrewVehicle": "Keine Personenzuordnung"
+    "noCrewVehicle": "Keine Personenzuordnung",
+    "noFireDepartment": "Ohne Feuerwehr",
+    "fwGroupSummary": "{vehicles, plural, one {# Fahrzeug} other {# Fahrzeuge}} · {persons, plural, =0 {keine Person} one {# Person} other {# Personen}}"
   },
   "einsatzorte": {
     "placeholderNew": "Neue Adresse...",

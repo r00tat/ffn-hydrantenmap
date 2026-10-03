@@ -14,12 +14,17 @@ import {
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useDraggable } from '@dnd-kit/core';
+import { useTranslations } from 'next-intl';
 import {
   CrewAssignment,
   CrewFunktion,
   CREW_FUNKTIONEN,
   Fzg,
 } from '../firebase/firestore';
+import { getDefaultVehicles } from '../../common/defaultKostenersatzRates';
+import { OwnFleet, ownFleet } from '../../common/vehicleGroups';
+import { DEFAULT_EINSATZ_FW } from '../FirecallItems/einsatzDefaults';
+import { vehicleSelectItems } from '../FirecallItems/vehicleSelectItems';
 
 export interface CrewPersonCardProps {
   assignment: CrewAssignment;
@@ -28,9 +33,16 @@ export interface CrewPersonCardProps {
   onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
   onRemove?: () => void;
   showVehicleSelect?: boolean;
+  /** Eigene Feuerwehr; ihre Fahrzeuge stehen im Auswahlfeld vorne. */
+  fleet?: OwnFleet;
   /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
   readOnly?: boolean;
 }
+
+const DEFAULT_FLEET = ownFleet(
+  DEFAULT_EINSATZ_FW,
+  getDefaultVehicles().map((v) => v.name),
+);
 
 export default function CrewPersonCard({
   assignment,
@@ -39,8 +51,10 @@ export default function CrewPersonCard({
   onVehicleChange,
   onRemove,
   showVehicleSelect = false,
+  fleet = DEFAULT_FLEET,
   readOnly = false,
 }: CrewPersonCardProps) {
+  const t = useTranslations('crew');
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: assignment.id || assignment.recipientId,
     disabled: readOnly,
@@ -125,11 +139,7 @@ export default function CrewPersonCard({
             readOnly={readOnly}
           >
             <MenuItem value="">-- Nicht zugeordnet --</MenuItem>
-            {vehicles.map((v) => (
-              <MenuItem key={v.id} value={v.id}>
-                {v.name}
-              </MenuItem>
-            ))}
+            {vehicleSelectItems(vehicles, fleet, t('noFireDepartment'))}
           </Select>
         </FormControl>
       )}
