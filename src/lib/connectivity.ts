@@ -113,10 +113,6 @@ export function getConnectivityState(): ConnectivityState {
   return state;
 }
 
-export function getConnectivityStatus(): ConnectivityStatus {
-  return state.status;
-}
-
 export function isOffline(): boolean {
   return !state.reachable;
 }

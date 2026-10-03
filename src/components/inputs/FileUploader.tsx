@@ -1,3 +1,4 @@
+import CancelIcon from '@mui/icons-material/Cancel';
 import CloudQueueIcon from '@mui/icons-material/CloudQueue';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import Box from '@mui/material/Box';
@@ -18,6 +19,7 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { checkConnectivityNow } from '../../lib/connectivity';
+import { removeQueued } from '../../lib/offlineQueue';
 import {
   queueUpload,
   usePendingUploads,
@@ -252,6 +254,12 @@ export default function FileUploader({
                 variant="outlined"
                 icon={<CloudQueueIcon />}
                 label={t('pendingUpload', { name: p.fileName })}
+                onDelete={() => {
+                  void removeQueued(p.id);
+                }}
+                deleteIcon={
+                  <CancelIcon aria-label={t('discardPendingUpload')} />
+                }
               />
             </Tooltip>
           ))}

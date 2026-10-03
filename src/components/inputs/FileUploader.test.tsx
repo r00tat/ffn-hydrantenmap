@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   queueUpload: vi.fn(async (..._args: unknown[]) => ({})),
   pending: [] as { id: string; fileName: string; storagePath: string }[],
   showSnackbar: vi.fn(),
+  removeQueued: vi.fn(async (_id: string) => {}),
 }));
 
 vi.mock('firebase/storage', () => ({
@@ -26,6 +27,9 @@ vi.mock('../../lib/connectivity', () => ({
 vi.mock('../../lib/uploadQueue', () => ({
   queueUpload: mocks.queueUpload,
   usePendingUploads: () => mocks.pending,
+}));
+vi.mock('../../lib/offlineQueue', () => ({
+  removeQueued: mocks.removeQueued,
 }));
 vi.mock('../providers/SnackbarProvider', () => ({
   useSnackbar: () => mocks.showSnackbar,
@@ -78,6 +82,13 @@ describe('FileUploader offline', () => {
     mocks.pending = [{ id: 'p1', fileName: 'foto.jpg', storagePath: 'p1' }];
     render(<FileUploader onFileUploadComplete={vi.fn()} offlineTarget={target} />);
     expect(screen.getByText('foto.jpg – wartet auf Upload')).toBeInTheDocument();
+  });
+
+  it('verwirft einen wartenden Upload auf Wunsch', async () => {
+    mocks.pending = [{ id: 'p1', fileName: 'foto.jpg', storagePath: 'p1' }];
+    render(<FileUploader onFileUploadComplete={vi.fn()} offlineTarget={target} />);
+    await userEvent.click(screen.getByLabelText('Wartenden Upload verwerfen'));
+    expect(mocks.removeQueued).toHaveBeenCalledWith('p1');
   });
 
   it('ist offline ohne Ziel deaktiviert', () => {

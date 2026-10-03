@@ -5,9 +5,15 @@ import { getStorage, ref, uploadBytesResumable } from 'firebase/storage';
 import app, { firestore } from '../components/firebase/firebase';
 // Registriert beim Import den Handler der Terminplanung der Atemschutzwarnung.
 import '../components/Atemschutz/ueberwachungWarnungQueue';
+import { ensureFreshAuth } from '../hooks/auth/ensureFreshAuth';
 import { updateDocLocal } from './firestoreClient';
-import { startOfflineQueue } from './offlineQueue';
+import { waitForFirestoreSync } from './firestoreSync';
+import { setQueuePreparation, startOfflineQueue } from './offlineQueue';
 import { createUploadHandler, registerUploadHandler } from './uploadQueue';
+import { withTimeout } from './withTimeout';
+
+/** Höchstwartezeit, bis Token und Sitzung vor einem Durchlauf aufgefrischt sind. */
+export const QUEUE_AUTH_TIMEOUT_MS = 15_000;
 
 /**
  * Registriert die Handler der Warteschlange app-weit und startet sie.
@@ -18,10 +24,27 @@ import { createUploadHandler, registerUploadHandler } from './uploadQueue';
  */
 let registered = false;
 
+/**
+ * Vor jedem Durchlauf: Erst müssen die offline geschriebenen
+ * Firestore-Änderungen beim Server sein — die nachgeholte Terminplanung liest
+ * den Trupp per Admin SDK und sähe sonst den alten Stand oder gar keinen. Dann
+ * Token und NextAuth-Sitzung auffrischen; nach langer Funkstille sind beide
+ * abgelaufen, und jeder Eintrag scheiterte an der Anmeldung.
+ */
+export async function prepareQueueRun(): Promise<boolean> {
+  await waitForFirestoreSync();
+  return withTimeout(
+    ensureFreshAuth(),
+    QUEUE_AUTH_TIMEOUT_MS,
+    'ensureFreshAuth',
+  ).catch(() => false);
+}
+
 function registerHandlers(): void {
   if (registered) return;
   registered = true;
   const storage = getStorage(app);
+  setQueuePreparation(prepareQueueRun);
   registerUploadHandler(
     createUploadHandler({
       async upload(storagePath, blob, contentType) {

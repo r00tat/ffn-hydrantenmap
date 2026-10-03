@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { onReconnect } from '../../lib/connectivity';
+import { waitForFirestoreSync } from '../../lib/firestoreSync';
 import { planWarningOrQueue } from './ueberwachungWarnungQueue';
 
 /**
@@ -14,6 +15,10 @@ import { planWarningOrQueue } from './ueberwachungWarnungQueue';
  * oder einer, den ein anderes Gerät angelegt hat, bliebe bis zum Netz-Zeitplan
  * (zehn Minuten) ohne Termin. Die Planung ist idempotent (Aufgabenname als
  * Dublettensperre) — ein Aufruf zu viel kostet nichts.
+ *
+ * Vor der Planung wird auf die Übertragung der offline geschriebenen
+ * Firestore-Änderungen gewartet (mit Zeitgrenze): Die Action liest den Trupp
+ * per Admin SDK und sähe sonst den alten Stand oder gar keinen Trupp.
  *
  * Über `planWarningOrQueue`: Reißt die Verbindung gleich wieder ab, landet der
  * Aufruf in der Warteschlange statt verloren zu gehen.
@@ -31,15 +36,23 @@ export default function useReplanWarningsOnReconnect(
 
   useEffect(() => {
     if (!firecallId) return;
-    return onReconnect(() => {
-      for (const truppId of idsRef.current) {
-        void planWarningOrQueue(firecallId, truppId).catch((err) => {
-          console.warn(
-            'Terminplanung der Atemschutzwarnung nach dem Reconnect fehlgeschlagen',
-            err,
-          );
-        });
-      }
+    let active = true;
+    const unsubscribe = onReconnect(() => {
+      void waitForFirestoreSync().then(() => {
+        if (!active) return;
+        for (const truppId of idsRef.current) {
+          void planWarningOrQueue(firecallId, truppId).catch((err) => {
+            console.warn(
+              'Terminplanung der Atemschutzwarnung nach dem Reconnect fehlgeschlagen',
+              err,
+            );
+          });
+        }
+      });
     });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [firecallId]);
 }

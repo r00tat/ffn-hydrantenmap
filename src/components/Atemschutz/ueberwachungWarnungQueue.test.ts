@@ -17,6 +17,7 @@ import {
   getQueuedEntries,
   processQueue,
   setQueueStorage,
+  setQueueUser,
 } from '../../lib/offlineQueue';
 import { planWarningOrQueue } from './ueberwachungWarnungQueue';
 
@@ -25,6 +26,7 @@ describe('planWarningOrQueue', () => {
     offline.value = false;
     planMock.mockClear();
     setQueueStorage(createMemoryStorage());
+    setQueueUser('u1', true);
   });
 
   it('plant online sofort', async () => {

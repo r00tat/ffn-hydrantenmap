@@ -56,6 +56,12 @@ fälschlich „online" — genau die Lagen, in denen es im Einsatz darauf ankomm
   prüft sofort. Gleichzeitige Prüfungen teilen sich einen Ping.
 - **`syncing`** heißt erreichbar und `getPendingWriteCount() > 0`. Der Store
   hängt direkt am Zähler in `pendingWrites.ts`, nicht am Ping-Takt.
+  Der Zähler lebt nur im Arbeitsspeicher, `persistentLocalCache` hält die
+  Mutationen aber über ein Neuladen hinweg. Sobald Firebase Auth den Benutzer
+  kennt, zählt `trackPersistedPendingWrites` deshalb ein
+  `waitForPendingWrites` als einen Platzhalter mit — sonst zeigte ein offline
+  neu geöffnetes Gerät weder Anzahl noch `syncing`. Das SDK nennt keine
+  Anzahl; der Platzhalter steht für alles aus früheren Läufen.
 - **`onReconnect`** feuert beim Wechsel unerreichbar → erreichbar. Daran
   hängen die Warteschlangen, die Anmeldung am Server und das Nachplanen der
   Atemschutzwarnungen.
@@ -172,13 +178,37 @@ Lesen von `atemschutzGeraet` (`fahrtenbuchMember()`).
   `offlineQueueHandlers.ts` app-weit (über `useOfflineQueue` im
   `ConnectivityProvider`), damit auch abgearbeitet wird, wenn die Seite, die
   eingereiht hat, längst zu ist.
-- **Abarbeiten** beim Start der App (Einträge eines früheren Laufs) und bei
-  jedem Wechsel auf erreichbar (`onReconnect`), der Reihe nach.
+- **Abarbeiten** der Reihe nach: beim Start der App (Einträge eines früheren
+  Laufs) erst nach einem echten Ping — vor dem ersten gilt nur
+  `navigator.onLine` —, bei jedem Wechsel auf erreichbar (`onReconnect`),
+  sobald die Anmeldung am Server bestätigt ist, beim Zurückkehren in den
+  Vordergrund und nach einem Fehlschlag bei erreichbarem Server mit wachsendem
+  Abstand (30 s bis 5 min). Ohne diese Wiederholung bliebe ein gescheiterter
+  Eintrag bei stabiler Verbindung liegen, denn `onReconnect` feuert dann nicht
+  mehr. Ein Aufruf während eines Durchlaufs löst danach einen weiteren aus.
+- **Zeitgrenze je Eintrag** (eine Minute je Action, zehn Minuten je Upload):
+  Ein hängender Upload blockierte sonst jeden späteren Durchlauf.
+- **Vorbereitung vor jedem Durchlauf** (`prepareQueueRun`): erst
+  `waitForPendingWrites` mit Zeitgrenze (`firestoreSync.ts`), denn die
+  nachgeholte Warnungsplanung liest den Trupp per Admin SDK — ohne Warten sähe
+  sie den Stand vor dem Funkloch oder gar keinen Trupp, meldete `nothingDue`
+  und der Eintrag wäre verbraucht. Dann `ensureFreshAuth`: Nach langer
+  Funkstille sind Token und NextAuth-Sitzung abgelaufen. Dasselbe Warten steht
+  vor `useReplanWarningsOnReconnect`.
+- **Je Benutzer:** Jeder Eintrag trägt die UID dessen, der ihn eingereiht hat;
+  abgearbeitet und angezeigt werden nur die des angemeldeten Benutzers. Auf
+  einem geteilten Tablet lädt so nie B die Datei von A mit seinem Token hoch.
+  Die Einträge von A bleiben liegen, bis A sich wieder anmeldet.
+- **Erst nach der Anmeldung am Server:** Abgearbeitet wird erst, wenn Firebase
+  Auth den Benutzer kennt und `authSource === 'server'` ist. Beim
+  Android-Kaltstart hat die WebView anfangs keinen Benutzer, und mit Rechten
+  aus dem Zwischenspeicher scheiterte jeder Versuch an der Anmeldung.
 - **Idempotent:** Ein Eintrag mit demselben Schlüssel ersetzt den vorigen. Die
   Warnungsplanung hat den Schlüssel `planeUeberwachungWarnung:<Einsatz>:<Trupp>` —
   fünf Druckabfragen offline ergeben eine Planung, und die liest den Trupp am
   Server frisch.
-- **Fehler:** Scheitert ein Handler am fehlenden Netz, bleibt der Eintrag liegen
+- **Fehler:** Scheitert ein Handler am fehlenden Netz oder an der Anmeldung
+  (`storage/unauthorized`, `storage/unauthenticated`), bleibt der Eintrag liegen
   und zählt nicht als Versuch. Andere Fehler zählen; nach fünf Versuchen wird der
   Eintrag verworfen und in der Fehlerliste (`syncErrors.ts`, Art `action` bzw.
   `upload`) mit „Erneut versuchen" gemeldet.
@@ -194,7 +224,7 @@ Ziel in die Warteschlange; IndexedDB speichert den Blob direkt. Beim Reconnect
 wird hochgeladen, und **erst danach** kommt die Referenz (`gs://…`) per
 `arrayUnion` ins Dokument. Vorher stünde dort ein Verweis auf eine Datei, die es
 noch nicht gibt. Bis dahin zeigt der Uploader einen Platzhalter „wartet auf
-Upload".
+Upload", der sich verwerfen lässt (`removeQueued`).
 
 Die Referenz schreibt `updateDocLocal`, nicht `setDoc` mit `merge`: Ist das
 Dokument inzwischen gelöscht, soll kein Rumpfdokument entstehen; die Ablehnung
@@ -358,7 +388,9 @@ Bausteine. Hintergrund in
   gesperrten Bildschirm erreicht — nur, wenn `@capacitor/local-notifications`
   installiert ist (Laufzeitprüfung, bis dahin ein No-op).
 - **Nachplanen beim Reconnect** (`useReplanWarningsOnReconnect`): für alle
-  Trupps im Einsatz, über `planWarningOrQueue` und damit die Warteschlange.
+  Trupps im Einsatz, über `planWarningOrQueue` und damit die Warteschlange —
+  erst nachdem Firestore die offline geschriebenen Änderungen übertragen hat
+  (`waitForFirestoreSync`, mit Zeitgrenze).
 
 ## Grenzen
 

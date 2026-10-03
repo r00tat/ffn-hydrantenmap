@@ -13,6 +13,7 @@ import {
   getQueuedEntries,
   processQueue,
   setQueueStorage,
+  setQueueUser,
 } from './offlineQueue';
 import {
   createUploadHandler,
@@ -28,6 +29,7 @@ describe('uploadQueue', () => {
   beforeEach(() => {
     offline.value = true;
     setQueueStorage(createMemoryStorage());
+    setQueueUser('u1', true);
   });
 
   it('legt die Datei samt Ziel in die Warteschlange', async () => {

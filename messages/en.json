@@ -956,6 +956,7 @@
     "onlineOnly": "Only available with an internet connection",
     "pendingUpload": "{name} – waiting for upload",
     "pendingUploadHint": "Saved offline. The file will be uploaded as soon as the connection is back.",
+    "discardPendingUpload": "Discard pending upload",
     "uploadQueued": "{count, plural, one {# file} other {# files}} will be uploaded as soon as the connection is back.",
     "offlinePageTitle": "Offline – page not available",
     "offlinePageText": "This page was not stored on this device and cannot be loaded without a connection to the server. The map, the incident list, the operational diary and the breathing apparatus pages keep working offline.",

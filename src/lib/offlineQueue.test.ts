@@ -34,6 +34,7 @@ beforeEach(async () => {
   recordSyncErrorMock.mockReset();
   queue = await import('./offlineQueue');
   queue.setQueueStorage(queue.createMemoryStorage());
+  queue.setQueueUser('u1', true);
 });
 
 afterEach(() => {
@@ -101,6 +102,7 @@ describe('offlineQueue', () => {
 
   it('arbeitet die Warteschlange beim Reconnect in Reihenfolge ab', async () => {
     connectivityState.offline = true;
+    connectivityState.checkResult = false;
     const calls: unknown[] = [];
     queue.registerQueueHandler('test', async (payload) => {
       calls.push(payload);
@@ -111,6 +113,7 @@ describe('offlineQueue', () => {
     expect(calls).toEqual([]);
 
     connectivityState.offline = false;
+    connectivityState.checkResult = true;
     for (const cb of connectivityState.reconnect) cb();
     await queue.processQueue();
 
@@ -128,15 +131,16 @@ describe('offlineQueue', () => {
       payload: 'x',
       createdAt: 1,
       attempts: 0,
+      uid: 'u1',
     });
     queue.setQueueStorage(storage);
     const handler = vi.fn(async () => undefined);
     queue.registerQueueHandler('test', handler);
 
     const stop = queue.startOfflineQueue();
+    await vi.waitFor(() => expect(handler).toHaveBeenCalledWith('x'));
     await queue.processQueue();
 
-    expect(handler).toHaveBeenCalledWith('x');
     expect(await storage.getAll()).toHaveLength(0);
     stop();
   });
@@ -205,5 +209,201 @@ describe('offlineQueue', () => {
     expect(queue.getQueueSnapshot()).not.toBe(before);
     expect(queue.getQueueSnapshot().map((e) => e.id)).toEqual(['a']);
     unsubscribe();
+  });
+
+  it('stempelt die UID und arbeitet nur Einträge des angemeldeten Benutzers ab', async () => {
+    connectivityState.offline = true;
+    const calls: unknown[] = [];
+    queue.registerQueueHandler('test', async (payload) => {
+      calls.push(payload);
+    });
+    await queue.runOrQueue('test', 'von-a', { key: 'a' });
+    queue.setQueueUser('u2', true);
+    await queue.runOrQueue('test', 'von-b', { key: 'b' });
+
+    // Der Schnappschuss zeigt nur die Einträge von u2.
+    expect(queue.getQueueSnapshot().map((e) => e.id)).toEqual(['b']);
+
+    connectivityState.offline = false;
+    await queue.processQueue();
+
+    expect(calls).toEqual(['von-b']);
+    const rest = await queue.getQueuedEntries();
+    expect(rest).toHaveLength(1);
+    expect(rest[0]).toMatchObject({ id: 'a', uid: 'u1' });
+  });
+
+  it('arbeitet erst ab, wenn die Anmeldung am Server bestätigt ist', async () => {
+    connectivityState.offline = true;
+    const handler = vi.fn(async () => undefined);
+    queue.registerQueueHandler('test', handler);
+    await queue.runOrQueue('test', 1);
+    queue.setQueueUser('u1', false);
+    const stop = queue.startOfflineQueue();
+
+    connectivityState.offline = false;
+    await queue.processQueue();
+    expect(handler).not.toHaveBeenCalled();
+
+    queue.setQueueUser('u1', true);
+    await vi.waitFor(() => expect(handler).toHaveBeenCalledWith(1));
+    stop();
+  });
+
+  it('wertet einen Anmeldefehler nicht als Fehlversuch', async () => {
+    connectivityState.offline = true;
+    queue.registerQueueHandler('test', async () => {
+      throw Object.assign(new Error('unauthorized'), {
+        code: 'storage/unauthorized',
+      });
+    });
+    await queue.runOrQueue('test', 1);
+    connectivityState.offline = false;
+
+    for (let i = 0; i < queue.MAX_QUEUE_ATTEMPTS + 1; i++) {
+      await queue.processQueue();
+    }
+
+    const entries = await queue.getQueuedEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].attempts).toBe(0);
+    expect(recordSyncErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('wiederholt nach einem Fehlschlag bei stabiler Verbindung von selbst', async () => {
+    vi.useFakeTimers();
+    try {
+      connectivityState.offline = true;
+      let fail = true;
+      const handler = vi.fn(async () => {
+        if (fail) throw new Error('quota');
+      });
+      queue.registerQueueHandler('test', handler);
+      await queue.runOrQueue('test', 1);
+      connectivityState.offline = false;
+      // Der Start pingt und arbeitet ab — der erste Versuch scheitert.
+      const stop = queue.startOfflineQueue();
+      await vi.waitFor(async () =>
+        expect((await queue.getQueuedEntries())[0].attempts).toBe(1),
+      );
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      fail = false;
+      await vi.advanceTimersByTimeAsync(queue.RETRY_BASE_MS);
+
+      await vi.waitFor(async () =>
+        expect(await queue.getQueuedEntries()).toHaveLength(0),
+      );
+      expect(handler).toHaveBeenCalledTimes(2);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bricht einen hängenden Handler nach der Zeitgrenze ab', async () => {
+    vi.useFakeTimers();
+    try {
+      connectivityState.offline = true;
+      const calls: unknown[] = [];
+      queue.registerQueueHandler('hang', () => new Promise(() => {}));
+      queue.registerQueueHandler('test', async (payload) => {
+        calls.push(payload);
+      });
+      await queue.runOrQueue('hang', 'h');
+      await queue.runOrQueue('test', 't');
+      connectivityState.offline = false;
+
+      const pass = queue.processQueue();
+      await vi.advanceTimersByTimeAsync(queue.ACTION_TIMEOUT_MS);
+      await pass;
+
+      expect(calls).toEqual(['t']);
+      const entries = await queue.getQueuedEntries();
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({ type: 'hang', attempts: 1 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('arbeitet beim Start erst nach einem erfolgreichen Ping ab', async () => {
+    connectivityState.checkResult = false;
+    const handler = vi.fn(async () => undefined);
+    queue.registerQueueHandler('test', handler);
+    connectivityState.offline = true;
+    await queue.runOrQueue('test', 1);
+    // Vor dem ersten Ping meldet der Store noch „erreichbar".
+    connectivityState.offline = false;
+
+    const stop = queue.startOfflineQueue();
+    await vi.waitFor(() => expect(connectivityState.offline).toBe(true));
+    await queue.processQueue();
+
+    expect(handler).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('wartet vor dem Abarbeiten auf die Vorbereitung und lässt bei false liegen', async () => {
+    connectivityState.offline = true;
+    const order: string[] = [];
+    queue.registerQueueHandler('test', async () => {
+      order.push('handler');
+    });
+    let prepared = false;
+    queue.setQueuePreparation(async () => {
+      order.push('prepare');
+      return prepared;
+    });
+    await queue.runOrQueue('test', 1);
+    connectivityState.offline = false;
+
+    await queue.processQueue();
+    expect(order).toEqual(['prepare']);
+    expect(await queue.getQueuedEntries()).toHaveLength(1);
+
+    prepared = true;
+    await queue.processQueue();
+    expect(order).toEqual(['prepare', 'prepare', 'handler']);
+    expect(await queue.getQueuedEntries()).toHaveLength(0);
+  });
+
+  it('holt einen Aufruf nach, der während eines Durchlaufs kommt', async () => {
+    connectivityState.offline = true;
+    const calls: unknown[] = [];
+    let release: () => void = () => {};
+    queue.registerQueueHandler('slow', async (payload) => {
+      calls.push(payload);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    });
+    queue.registerQueueHandler('test', async (payload) => {
+      calls.push(payload);
+    });
+    await queue.runOrQueue('slow', 's');
+    connectivityState.offline = false;
+
+    const first = queue.processQueue();
+    await vi.waitFor(() => expect(calls).toEqual(['s']));
+    // Während der Durchlauf hängt, kommt ein neuer Eintrag dazu.
+    await queue.enqueue('test', 't');
+    const second = queue.processQueue();
+    release();
+    await first;
+    await second;
+
+    expect(calls).toEqual(['s', 't']);
+    expect(await queue.getQueuedEntries()).toHaveLength(0);
+  });
+
+  it('verwirft einen Eintrag auf Wunsch', async () => {
+    connectivityState.offline = true;
+    await queue.enqueue('test', 1, { key: 'weg' });
+
+    await queue.removeQueued('weg');
+
+    expect(await queue.getQueuedEntries()).toHaveLength(0);
+    expect(queue.getQueueSnapshot()).toHaveLength(0);
   });
 });

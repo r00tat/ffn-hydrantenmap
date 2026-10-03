@@ -54,7 +54,7 @@ afterEach(() => {
 
 describe('connectivity', () => {
   it('geht vor der ersten Prüfung von navigator.onLine aus', () => {
-    expect(connectivity.getConnectivityStatus()).toBe('online');
+    expect(connectivity.getConnectivityState().status).toBe('online');
     expect(connectivity.isOffline()).toBe(false);
     expect(connectivity.getConnectivityState().lastCheck).toBeNull();
   });
@@ -71,7 +71,7 @@ describe('connectivity', () => {
   it('meldet offline, wenn der Ping scheitert (WLAN ohne Internet)', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     await expect(connectivity.checkConnectivityNow()).resolves.toBe(false);
-    expect(connectivity.getConnectivityStatus()).toBe('offline');
+    expect(connectivity.getConnectivityState().status).toBe('offline');
     expect(connectivity.isOffline()).toBe(true);
   });
 
@@ -80,7 +80,7 @@ describe('connectivity', () => {
       new Response('<html>Login</html>', { status: 200 }),
     );
     await expect(connectivity.checkConnectivityNow()).resolves.toBe(false);
-    expect(connectivity.getConnectivityStatus()).toBe('offline');
+    expect(connectivity.getConnectivityState().status).toBe('offline');
   });
 
   it('bricht den Ping nach 5 s ab und meldet offline', async () => {
@@ -95,7 +95,7 @@ describe('connectivity', () => {
     const result = connectivity.checkConnectivityNow();
     await vi.advanceTimersByTimeAsync(connectivity.PING_TIMEOUT_MS);
     await expect(result).resolves.toBe(false);
-    expect(connectivity.getConnectivityStatus()).toBe('offline');
+    expect(connectivity.getConnectivityState().status).toBe('offline');
   });
 
   it('pingt nicht, wenn navigator.onLine false ist', async () => {
@@ -120,19 +120,19 @@ describe('connectivity', () => {
         resolveWrite = resolve;
       }),
     );
-    expect(connectivity.getConnectivityStatus()).toBe('syncing');
+    expect(connectivity.getConnectivityState().status).toBe('syncing');
     expect(connectivity.getConnectivityState().pendingWrites).toBe(1);
 
     resolveWrite();
     await flush();
-    expect(connectivity.getConnectivityStatus()).toBe('online');
+    expect(connectivity.getConnectivityState().status).toBe('online');
   });
 
   it('bleibt offline, auch wenn Schreibvorgänge offen sind', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     await connectivity.checkConnectivityNow();
     pendingWrites.trackPendingWrite(new Promise<void>(() => {}));
-    expect(connectivity.getConnectivityStatus()).toBe('offline');
+    expect(connectivity.getConnectivityState().status).toBe('offline');
     expect(connectivity.getConnectivityState().pendingWrites).toBe(1);
   });
 
