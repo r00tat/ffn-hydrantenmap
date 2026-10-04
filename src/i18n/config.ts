@@ -45,3 +45,6 @@ export function pickLocaleFromAcceptLanguage(
   }
   return DEFAULT_LOCALE;
 }
+
+/** Zeitzone aller Formatierungen, auf dem Server wie im Browser. */
+export const APP_TIME_ZONE = 'Europe/Vienna';

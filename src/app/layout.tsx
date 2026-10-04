@@ -13,12 +13,12 @@ import '@fontsource/roboto/latin-ext-500.css';
 import '@fontsource/roboto/latin-ext-700.css';
 import 'leaflet/dist/leaflet.css';
 import type { Metadata, Viewport } from 'next';
-import { NextIntlClientProvider } from 'next-intl';
-import { getLocale, getMessages } from 'next-intl/server';
+import { getLocale } from 'next-intl/server';
 import React from 'react';
 import { appIconPath, withEnvironmentPrefix } from '../common/appEnvironment';
 import { SERWIST_SW_URL } from '../common/serviceWorker';
 import AppProviders from '../components/providers/AppProviders';
+import IntlClientProvider from '../components/providers/IntlClientProvider';
 import '../styles/globals.css';
 import { appViewport } from './viewportConfig';
 
@@ -82,7 +82,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
-  const messages = await getMessages();
 
   return (
     // suppressHydrationWarning: In der Capacitor-App injiziert Capacitors
@@ -114,9 +113,9 @@ export default async function RootLayout({
           disable={process.env.NODE_ENV !== 'production'}
           options={{ scope: '/' }}
         >
-          <NextIntlClientProvider locale={locale} messages={messages}>
+          <IntlClientProvider locale={locale}>
             <AppProviders>{children}</AppProviders>
-          </NextIntlClientProvider>
+          </IntlClientProvider>
         </SerwistProvider>
       </body>
     </html>
