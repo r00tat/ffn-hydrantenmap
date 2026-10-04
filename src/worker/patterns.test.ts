@@ -435,7 +435,7 @@ describe('App-Shell für Navigationen', () => {
   it('steht hinter den eigenen Regeln und vor Serwists Standard', async () => {
     const { runtimeCaching: withShell } = await import('./patterns');
     const list = withShell(defaultCache, { appShellCacheName: 'app-shell-test' });
-    expect(list).toHaveLength(cachePatterns.length + 1 + defaultCache.length);
+    expect(list).toHaveLength(cachePatterns.length + 2 + defaultCache.length);
 
     const shell = list[cachePatterns.length];
     expect(navigationRule(list, '/')).toBe(shell);
@@ -443,5 +443,31 @@ describe('App-Shell für Navigationen', () => {
     // Die Gastseite und der Auth-Handler bleiben bei ihren NetworkOnly-Regeln.
     expect(navigationRule(list, '/fahrtenbuch/teilen/abc')).not.toBe(shell);
     expect(navigationRule(list, '/__/auth/handler')).not.toBe(shell);
+  });
+
+  it('nimmt RSC-Abrufe eigener Seiten vor Serwists RSC-Cache an sich', async () => {
+    const { runtimeCaching: withShell } = await import('./patterns');
+    const list = withShell(defaultCache, { appShellCacheName: 'app-shell-test' });
+    const rscRule = list[cachePatterns.length + 1];
+
+    const rscOptions = (path: string, prefetch = false) => {
+      const headers = new Headers({ RSC: '1' });
+      if (prefetch) headers.set('Next-Router-Prefetch', '1');
+      return {
+        url: new URL(`${APP_ORIGIN}${path}`),
+        sameOrigin: true,
+        request: new Request(`${APP_ORIGIN}${path}`, { headers }),
+      };
+    };
+    const firstMatch = (options: ReturnType<typeof rscOptions>) =>
+      list.find((entry) => {
+        const matcher = entry.matcher as RegExp | ((o: unknown) => unknown);
+        if (matcher instanceof RegExp) return matcher.test(options.url.href);
+        return matcher(options);
+      });
+
+    expect(firstMatch(rscOptions('/atemschutzueberwachung?_rsc=abc'))).toBe(rscRule);
+    expect(firstMatch(rscOptions('/einsatz/AAAAAAAAAAAAAAAAAAAA/atemschutzueberwachung?_rsc=abc', true))).toBe(rscRule);
+    expect(firstMatch(rscOptions('/api/ping'))).not.toBe(rscRule);
   });
 });

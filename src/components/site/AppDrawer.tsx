@@ -60,7 +60,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import { useTranslations } from 'next-intl';
-import Link from 'next/link';
+import FirecallLink from './FirecallLink';
 import { usePathname } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -207,6 +207,9 @@ export default function AppDrawer({
       text: t('firecalls'),
       icon: <LocalFireDepartmentIcon />,
       href: '/einsaetze',
+      // Im Einsatz als Abschnitt: Die Wahl eines anderen Einsatzes wechselt
+      // dann ohne Neuladen (siehe common/firecallNavigation.ts).
+      einsatzSection: 'einsaetze',
     },
   ];
 
@@ -587,7 +590,7 @@ export default function AppDrawer({
     const selected = active.key === itemKey(item.text, groupText);
 
     return (
-      <Link href={resolvedHref} passHref key={item.text}>
+      <FirecallLink href={resolvedHref} passHref key={item.text}>
         <ListItemButton
           sx={sx}
           selected={selected}
@@ -597,7 +600,7 @@ export default function AppDrawer({
           <ListItemIcon>{item.icon}</ListItemIcon>
           <ListItemText primary={item.text} />
         </ListItemButton>
-      </Link>
+      </FirecallLink>
     );
   };
 

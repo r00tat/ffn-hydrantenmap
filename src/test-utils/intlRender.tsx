@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { ReactElement, ReactNode } from 'react';
 import deMessages from '../../messages/de.json';
 import { appTheme } from '../components/providers/theme';
+import { APP_TIME_ZONE } from '../i18n/config';
 
 /**
  * Das Theme der Tests: das Theme der App (`appTheme`) ohne Animationen. An der
@@ -43,7 +44,7 @@ export const testTheme = createTheme(appTheme, {
  * Europe/Vienna. Jede Zusicherung auf eine über next-intl formatierte Uhrzeit
  * käme sonst je Maschine anders heraus — im Sommer zwei Stunden daneben.
  */
-const TEST_TIME_ZONE = 'Europe/Vienna';
+const TEST_TIME_ZONE = APP_TIME_ZONE;
 
 export function IntlWrapper({ children }: { children: ReactNode }) {
   return (

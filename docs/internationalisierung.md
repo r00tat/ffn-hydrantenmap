@@ -40,6 +40,19 @@ Beim Iterieren über Schlüssel (z.B. Sidebar-Listen) muss das Array `as const` 
 
 Statische Texte unter `/docs/<slug>` liegen in `content/docs/{de,en}/<slug>.md` und werden von `loadDocsContent(slug, locale)` geladen. Fehlt eine englische Übersetzung, wird automatisch die deutsche Version verwendet.
 
+## Kataloge im Bundle, nicht in der Seite
+
+Die Kataloge für Client-Komponenten kommen aus dem JS-Bundle, nicht aus der
+Seite: Das Root-Layout rendert
+[IntlClientProvider](../src/components/providers/IntlClientProvider.tsx), der
+`messages/de.json` und `messages/en.json` statisch importiert. Über den
+`NextIntlClientProvider` des Servers mit `getMessages()` stand der ganze
+Katalog serialisiert in jeder Seite (rund 180 KiB) — für jede vorgewärmte Seite
+der App-Shell aufs Neue. Jetzt lädt ihn der Precache einmal je Build; der
+Preis ist, dass beide Sprachen im Bundle liegen. Server Components übersetzen
+weiter über `getTranslations` und `src/i18n/request.ts`; die Zeitzone steht
+für beide in `APP_TIME_ZONE` (`src/i18n/config.ts`).
+
 ## Neue UI-Strings
 
 1. Beide Locale-Dateien gleichzeitig erweitern (Schlüssel in beiden, Wert übersetzt).

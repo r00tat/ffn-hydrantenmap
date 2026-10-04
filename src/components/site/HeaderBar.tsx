@@ -13,7 +13,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
-import Link from 'next/link';
+import FirecallLink from './FirecallLink';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall from '../../hooks/useFirecall';
@@ -70,7 +70,7 @@ function HeaderBar({
                 sichtbar, wo der Titel fehlt; deshalb trägt der Link ein
                 eigenes Label. */}
             <Tooltip title={t('mapLink')}>
-              <Link
+              <FirecallLink
                 href={firecall?.id ? `/einsatz/${firecall.id}` : '/'}
                 aria-label={t('mapLink')}
                 style={{
@@ -103,7 +103,7 @@ function HeaderBar({
                 >
                   {t('appTitle')}
                 </Typography>
-              </Link>
+              </FirecallLink>
             </Tooltip>
             <Box
               sx={{
@@ -124,12 +124,12 @@ function HeaderBar({
               >
                 {firecall?.id ? (
                   <Tooltip title={t('firecallDetailsTooltip')} describeChild>
-                    <Link
+                    <FirecallLink
                       href={`/einsatz/${firecall.id}/details`}
                       style={{ color: 'inherit', textDecoration: 'none' }}
                     >
                       {firecall.name || ''}
-                    </Link>
+                    </FirecallLink>
                   </Tooltip>
                 ) : (
                   firecall?.name || ''
@@ -210,14 +210,14 @@ function HeaderBar({
               </Tooltip>
             )}
             {!isSignedIn && (
-              <Link href="/login" passHref>
+              <FirecallLink href="/login" passHref>
                 <Button color="inherit">{t('loginButton')}</Button>
-              </Link>
+              </FirecallLink>
             )}
             {isSignedIn && (
-              <Link href="/profile" passHref>
+              <FirecallLink href="/profile" passHref>
                 <Avatar alt={displayName} src={photoURL} />
-              </Link>
+              </FirecallLink>
             )}
           </Toolbar>
         </AppBar>

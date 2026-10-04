@@ -86,7 +86,7 @@ Leere Listen sind offline gekennzeichnet („Offline – keine Einträge auf die
 
 Hast du dich in den letzten 90 Tagen online angemeldet und die App benutzt, öffnet sie auch im Flugmodus ohne Login-Bildschirm. Die Rechte stammen dann aus der letzten Anmeldung; der Tooltip am Status weist darauf hin. Sobald die Verbindung wieder steht, wird die Anmeldung am Server erneut geprüft.
 
-Eine Seite, die auf dem Gerät nicht vorgehalten wurde, zeigt offline „Offline – Seite nicht verfügbar" mit einem Knopf **Zur Karte**.
+Alle Seiten der App lädt das Gerät nach dem Start im Hintergrund vor – auch die des aktuellen Einsatzes, etwa die Atemschutzüberwachung. Offline wechselst du also wie gewohnt zwischen den Seiten. Innerhalb eines Einsatzes – Karte, Einsatztagebuch, Atemschutz und so weiter – und beim Wechsel zu einem anderen Einsatz über die Einsatzliste geht das ohne Neuladen; bei anderen Seiten lädt die Seite dabei einmal neu. Damit das klappt, sollte die App nach der Anmeldung etwa eine Minute online offen gewesen sein. Ausgenommen sind nur Verwaltung, Anmeldung und Seiten zu einzelnen Abrechnungen oder Fahrzeugen; die zeigen offline „Offline – Seite nicht verfügbar" mit einem Knopf **Zur Karte**.
 
 :::warning
 In der Android-App ist der Start ohne Netz noch nicht auf allen Geräten verlässlich. Lass die App während des Einsatzes geöffnet, statt sie zu beenden. Startet sie ohne Daten, meldet sie sich beim nächsten Verbindungsaufbau von selbst wieder an.

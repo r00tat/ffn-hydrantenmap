@@ -1,5 +1,6 @@
 import { getRequestConfig } from 'next-intl/server';
 import { auth } from '../app/auth';
+import { APP_TIME_ZONE } from './config';
 import { resolveLocale } from './getLocale';
 
 /**
@@ -23,6 +24,6 @@ export default getRequestConfig(async () => {
   return {
     locale,
     messages,
-    timeZone: 'Europe/Vienna',
+    timeZone: APP_TIME_ZONE,
   };
 });

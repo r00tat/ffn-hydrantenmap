@@ -2,11 +2,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_SHELL_WARM_REQUEST } from '../common/serviceWorker';
 import {
-  APP_SHELL_FIRECALL_SECTIONS,
+  APP_SHELL_FIRECALL_PATHS,
   APP_SHELL_PAGES,
-  buildAppShellUrls,
-  requestAppShellWarmup,
-} from './appShellWarmup';
+} from '../common/appShellRoutes';
+import { buildAppShellUrls, requestAppShellWarmup } from './appShellWarmup';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -28,15 +27,14 @@ describe('buildAppShellUrls', () => {
     expect(urls).toEqual(APP_SHELL_PAGES);
   });
 
-  it('nimmt die Seiten des aktuellen Einsatzes dazu', () => {
+  it('nimmt die Seiten des aktuellen Einsatzes dazu, und zwar zuerst', () => {
     const urls = buildAppShellUrls('AAAAAAAAAAAAAAAAAAAA');
-    expect(urls).toContain('/einsatz/AAAAAAAAAAAAAAAAAAAA');
-    for (const section of APP_SHELL_FIRECALL_SECTIONS) {
-      expect(urls).toContain(`/einsatz/AAAAAAAAAAAAAAAAAAAA/${section}`);
+    expect(urls[0]).toBe('/einsatz/AAAAAAAAAAAAAAAAAAAA');
+    for (const path of APP_SHELL_FIRECALL_PATHS) {
+      expect(urls).toContain(`/einsatz/AAAAAAAAAAAAAAAAAAAA${path}`);
     }
-    expect(APP_SHELL_FIRECALL_SECTIONS).toEqual(
-      expect.arrayContaining(['tagebuch', 'atemschutz', 'atemschutzueberwachung']),
-    );
+    expect(urls).toContain('/einsatz/AAAAAAAAAAAAAAAAAAAA/atemschutzueberwachung');
+    expect(urls.slice(APP_SHELL_FIRECALL_PATHS.length)).toEqual(APP_SHELL_PAGES);
   });
 
   it('übergeht den Platzhalter-Einsatz', () => {
@@ -48,9 +46,14 @@ describe('requestAppShellWarmup', () => {
   it('schickt die Adressen an den Service Worker und liefert seine Antwort', async () => {
     stubController((msg, [port]) => {
       expect(msg).toEqual({ type: APP_SHELL_WARM_REQUEST, urls: ['/a'] });
-      port.postMessage({ cached: 1, failed: [] });
+      port.postMessage({ cached: 1, present: 0, failed: [], rejected: [] });
     });
-    await expect(requestAppShellWarmup(['/a'])).resolves.toEqual({ cached: 1, failed: [] });
+    await expect(requestAppShellWarmup(['/a'])).resolves.toEqual({
+      cached: 1,
+      present: 0,
+      failed: [],
+      rejected: [],
+    });
   });
 
   it('liefert null ohne Service Worker (Entwicklung)', async () => {

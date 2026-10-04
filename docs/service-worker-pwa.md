@@ -109,10 +109,12 @@ nach einem Tag ohne Besuch war die Seite weg.
   verweist auf die Chunks seines Builds, und die räumt der neue Worker aus dem
   Precache. Beim `activate` löscht der Worker deshalb die App-Shell früherer
   Builds; `useAppShellWarmup` wärmt nach dem `controllerchange` neu vor.
-- **Netz zuerst, acht Sekunden.** Danach, bei einem Netzfehler oder einer
-  5xx-Antwort, der Cache: erst die eigene Seite, dann der Precache dieses
-  Builds, dann eine **Vorlage**, dann `/offline`, zuletzt eine eingebaute
-  HTML-Seite. Bewusst nicht die übrigen Caches: Die Auffangregel `others` hält
+- **Netz zuerst, acht Sekunden** — zwei, wenn das Netz in den letzten 30
+  Sekunden schon ausgefallen ist (`createNetworkHealth`, geteilt mit der
+  RSC-Regel unten). Danach, bei einem Netzfehler oder einer 5xx-Antwort, der
+  Cache: erst die eigene Seite, dann dieselbe ohne Query (`/map?lat=…`), dann
+  der Precache dieses Builds, dann eine **Vorlage**, dann `/offline`, zuletzt
+  eine eingebaute HTML-Seite. Bewusst nicht die übrigen Caches: Die Auffangregel `others` hält
   HTML früherer Builds, dessen Chunks offline fehlen — eine weiße Seite wäre
   schlechter als `/offline`. Gespeichert wird nur eine `200` ohne Umleitung
   mit `text/html`.
@@ -123,24 +125,92 @@ nach einem Tag ohne Besuch war die Seite weg.
   RSC-Daten des HTML (`"firecallId","…"`). Ohne Ersetzen hydrierte die Seite
   mit dem falschen Einsatz. Nur IDs ab 15 Zeichen: Firestore vergibt 20
   zufällige Zeichen, die sonst nirgends im HTML stehen.
+- **Alle Seiten, nicht eine Auswahl.** Wer offline navigiert, soll keinen
+  Unterschied merken. Die Liste steht in
+  [appShellRoutes.ts](../src/common/appShellRoutes.ts); jede Route unter
+  `src/app` steht dort oder unter `APP_SHELL_EXCLUDED_ROUTES` mit Grund, und
+  `appShellRoutes.test.ts` prüft das gegen das Dateisystem. Die Abschnitte
+  unter `/einsatz/<id>/<section>` sind per Typ an `FIRECALL_SECTION_NAMES`
+  gebunden. Vorher stand nur eine Auswahl in der Liste, und neue Seiten
+  fehlten unbemerkt.
 - **Vorwärmen statt Precache.** Die Einsatzpfade sind dynamisch, der Worker
   kennt sie beim Installieren nicht. Die angemeldete Seite schickt deshalb
-  online, zehn Sekunden nach dem Start und je Einsatz einmal,
+  online, zehn Sekunden nach dem Start und je Einsatz,
   `{ type: APP_SHELL_WARM_REQUEST, urls }` (`useAppShellWarmup`,
-  [appShellWarmup.ts](../src/lib/appShellWarmup.ts)); der Worker ruft die
-  Seiten der Reihe nach ab. Ein Eintrag in `additionalPrecacheEntries` hätte
-  zudem die Installation des Workers an den Abruf einer dynamischen Seite
+  [appShellWarmup.ts](../src/lib/appShellWarmup.ts)), die Seiten des
+  Einsatzes zuerst. Ein Eintrag in `additionalPrecacheEntries` hätte zudem
+  die Installation des Workers an den Abruf einer dynamischen Seite
   gehängt — scheitert der, gibt es gar keinen Worker.
-- **RSC-Payloads werden nicht vorgehalten.** Ihr Cache-Schlüssel trägt `_rsc`,
-  einen Hash über den Router-Zustand, der sich nicht vorhersagen lässt.
-  Scheitert der RSC-Abruf, navigiert Next.js selbst hart („Falling back to
-  browser navigation"), und diese Navigation beantwortet die App-Shell.
-- Die Regel steht **hinter** `cachePatterns` (die `NetworkOnly`-Regeln für den
+- **Im Hintergrund, und nur was fehlt.** Der Worker ruft höchstens zwei
+  Seiten gleichzeitig ab und überspringt, was der Cache dieses Builds schon
+  hält. Der erste Lauf nach einem Deploy holt rund hundert Seiten, jeder
+  weitere fast nichts; ein abgebrochener Lauf setzt fort, wo er stand.
+  Aktuell hält eine Seite ohnehin jede Online-Navigation dorthin.
+- **Neue Versuche.** Das Ergebnis trennt `failed` (Netzfehler, Zeitgrenze,
+  5xx) von `rejected` (Umleitung, 4xx). Bei `failed` fragt die Seite erneut:
+  nach 30 Sekunden, dann doppelt so lange, höchstens fünfmal, und bei jedem
+  Reconnect. Vorher galt ein Einsatz nach dem ersten Lauf als erledigt,
+  auch wenn einzelne Seiten gescheitert waren — im Offline-Test fehlte so die
+  Atemschutzüberwachung. `rejected` wird nicht wiederholt.
+- **Kürzen ohne die allgemeinen Seiten.** Höchstens 200 Einträge. Verdrängt
+  werden zuerst die ältesten Einsatzseiten und Adressen mit Query; die Seiten
+  ohne Einsatz gelten für jeden Einsatz und bleiben. Vorher warf die Grenze
+  von 80 die ältesten Einträge hinaus, und das waren genau diese Seiten.
+- **RSC-Abrufe: eigene Regel mit Zeitgrenze.** RSC-Payloads werden nicht
+  vorgehalten: Ihr Cache-Schlüssel trägt `_rsc`, einen Hash über den
+  Router-Zustand, der sich nicht vorhersagen lässt. Scheitert der RSC-Abruf,
+  navigiert Next.js selbst hart („Falling back to browser navigation"), und
+  diese Navigation beantwortet die App-Shell. Vorher lagen RSC-Abrufe bei
+  Serwists `pages-rsc`: `NetworkFirst` **ohne** Zeitgrenze, im WLAN ohne
+  Internet lief der Klick also ins Leere, und der Cache konnte RSC-Daten eines
+  früheren Builds liefern. `appShellRscRoute` gibt jetzt nach der Zeitgrenze
+  ein 503 ohne RSC-Inhalt zurück, worauf Next.js hart navigiert
+  (`fetch-server-response.js`: `!isFlightResponse || !res.ok` →
+  `doMpaNavigation`). `pages-rsc` und `pages-rsc-prefetch` löscht der Worker
+  beim `activate`. Die experimentelle Offline-Behandlung von Next.js
+  (`experimental.useOffline`, wartet bei Netzfehler auf die Verbindung statt
+  hart zu navigieren) ist bewusst aus.
+- Beide Regeln stehen **hinter** `cachePatterns` (die `NetworkOnly`-Regeln für den
   Ping `/api/ping`, die Gastseite und den Auth-Handler greifen weiter zuerst;
   der Ping darf nie aus einem Cache kommen, sonst täuschte er offline „online"
-  vor, siehe [offline-modus.md](offline-modus.md#verbindungsstatus-erkennen)) und ist wie jede
-  andere in `resilient` eingepackt. Sie wirft selbst nie: Am Ende steht die
-  eingebaute Seite.
+  vor, siehe [offline-modus.md](offline-modus.md#verbindungsstatus-erkennen)) und vor
+  `defaultCache`. Sie sind wie jede andere in `resilient` eingepackt, werfen
+  selbst aber nie: Am Ende steht die eingebaute Seite bzw. das 503 — ein Wurf
+  ließe `resilient` aufs Netz ausweichen, und das hinge im WLAN ohne Internet
+  wieder.
+
+## Wechsel zwischen Einsatzseiten ohne Neuladen
+
+Karte und Abschnitte eines Einsatzes unterscheiden sich im Code nicht: Beide
+Routen (`/einsatz/[firecallId]` und `/einsatz/[firecallId]/[section]`)
+rendern [FirecallView](../src/components/pages/FirecallView.tsx), die den
+Abschnitt aus `usePathname()` liest. Die Links in Menü, Kopfzeile und
+Einsatzliste sind [FirecallLink](../src/components/site/FirecallLink.tsx),
+Knöpfe nehmen [useFirecallNavigate](../src/hooks/useFirecallNavigate.ts):
+Sind Ausgangs- und Zielseite Einsatzseiten
+([firecallNavigation.ts](../src/common/firecallNavigation.ts)), gleich welcher
+Einsatz, verhindert das `onClick` die Navigation von `next/link` und ruft
+`history.pushState`. Die Einsatzliste ist dafür im Einsatz ebenfalls ein
+Abschnitt (`/einsatz/<id>/einsaetze`); unter `/einsaetze` bleibt sie für den
+Start ohne Einsatz. Next.js hat `pushState` gepatcht: `usePathname` folgt,
+der interne Verlaufszustand wird in den Eintrag kopiert, und der
+Zurück-Button stellt ihn ohne Neuladen wieder her.
+
+- **Kein Server, kein Cache.** Ein Router-Wechsel fragte den RSC-Payload ab;
+  offline scheiterte der und Next.js lud hart aus der App-Shell — mit
+  Wartezeit und Verlust des Seitenzustands. So bleibt online wie offline
+  alles im Browser; nur ein noch nie geladener Abschnitt holt seinen Chunk,
+  und der liegt im Precache.
+- **`useParams` bleibt beim alten Wert**, er kommt aus dem Router-Baum, und
+  der zeigt nach einem Wechsel weiter den Einsatz, mit dem die Seite geladen
+  wurde. `EinsatzClient` liest die Einsatz-ID deshalb aus der Adresse und
+  nur auf Seiten mit eigener Route (Kostenersatz, Schadstoff — die gehen über
+  den Router) aus `useParams`. Alles darunter bekommt den Einsatz über
+  `useFirecall`. Wer Einsatz oder Abschnitt aus der Adresse braucht, liest
+  `usePathname()`, nie `useParams`.
+- **Die Seiten je Einsatz bleiben im Vorwärmen.** Sie tragen den Kaltstart
+  ohne Netz und das Neuladen auf einem Abschnitt. Ein Einsatz, der nie
+  vorgewärmt wurde, bekommt seine Seite aus der Vorlage (oben).
 
 ## „Neue Version verfügbar" nur bei einem anderen Build
 
