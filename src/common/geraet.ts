@@ -1,0 +1,285 @@
+/**
+ * Geräte und Lagerartikel einer Gruppe — Typen und reine Hilfsfunktionen.
+ *
+ * Bauweise wie `common/atemschutz.ts`: ohne Firestore, damit Client, Server
+ * Actions und Import dieselben Typen teilen. Hintergrund im Design-Dokument
+ * zu Issue #844 (Zuordnung zum Einsatz, Verbrauch, Nachbestellung).
+ *
+ * Die Feldnamen sind persistiert und bleiben deutsch.
+ */
+
+/** Subcollections unter `groups/{groupId}`. */
+export const GERAET_COLLECTION = 'geraet';
+export const GERAET_BESTAND_COLLECTION = 'geraetBestand';
+export const GERAET_BUCHUNG_COLLECTION = 'geraetBuchung';
+
+/** Subcollection unter `call/{firecallId}` — Zuordnung und Verbrauch. */
+export const GERAET_EINSATZ_COLLECTION = 'geraetEinsatz';
+
+/**
+ * Höchste Menge einer Buchung, eines Ist-Werts und eines Verbrauchs. Schützt
+ * den Bestand vor unsinnigen Werten: Eine Menge wie `1e308` würde über die
+ * Summe zu `-Infinity` und danach zu `NaN` — und damit den Gesamtbestand eines
+ * Artikels dauerhaft zerstören. Ein `geraetEinsatz`-Eintrag ist vom Client
+ * geschrieben, die Grenze prüft deshalb auch der Server.
+ */
+export const GERAET_MAX_MENGE = 100_000;
+
+/** Eine gültige Menge: endlich, nicht negativ, höchstens `GERAET_MAX_MENGE`. */
+export function isValidMenge(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= GERAET_MAX_MENGE
+  );
+}
+
+/**
+ * Eine Menge aus einem Eingabefeld, mit Komma oder Punkt. Kommazahlen sind
+ * erlaubt — Ölbindemittel wird in kg oder l gezählt, und ein Bestand von 7,5
+ * muss sich in der Inventur wieder setzen lassen. Leer oder ungültig:
+ * `undefined`.
+ */
+export function parseMenge(text: string): number | undefined {
+  const trimmed = text.trim().replace(',', '.');
+  if (!trimmed) return undefined;
+  const value = Number(trimmed);
+  return isValidMenge(value) ? value : undefined;
+}
+
+/** Die vier Material-Typen des Sybos-Exports. */
+export type GeraetMaterialTyp =
+  | 'Einzelartikel'
+  | 'Massenartikel'
+  | 'Set-Artikel'
+  | 'Set-Komponente';
+
+export const GERAET_MATERIAL_TYPEN: GeraetMaterialTyp[] = [
+  'Einzelartikel',
+  'Massenartikel',
+  'Set-Artikel',
+  'Set-Komponente',
+];
+
+/**
+ * Worin bei der Zuordnung im Einsatz gezählt wird. Sybos kennt daneben „-",
+ * das hier als „nicht gesetzt" gilt.
+ */
+export type GeraetEinheitVerwendungsnachweis = 'stk' | 'h';
+
+export type GeraetLagerortArt = 'fahrzeug' | 'raum' | 'set';
+
+/**
+ * Ein Lagerort, wie ihn der Export beschreibt.
+ *
+ * Bewusst Text und keine Pflicht-Verknüpfung mit den Fahrtenbuch-Fahrzeugen:
+ * Unter „Fahrzeug" stehen in Sybos auch Rollcontainer und Kisten.
+ */
+export interface GeraetLagerort {
+  art: GeraetLagerortArt;
+  /** Bei `fahrzeug`: Fahrzeug-Name aus dem Export, z. B. „SRF". */
+  fahrzeug?: string;
+  /** Bei `fahrzeug`: Laderaum, z. B. „GR 2". */
+  laderaum?: string;
+  /** Bei `raum`: Standort, z. B. „Feuerwehrhaus". */
+  standort?: string;
+  /** Bei `raum`: Raum, z. B. „Lager". */
+  raum?: string;
+  /** „Lagerort-Bemerkung" — kein Teil der Identität des Lagerorts. */
+  bemerkung?: string;
+  /** Optional verknüpftes Fahrtenbuch-Fahrzeug. */
+  vehicleId?: string;
+}
+
+/** Stammdaten: `groups/{groupId}/geraet/{id}`. `id` = Sybos-ID beim Import. */
+export interface Geraet {
+  id: string;
+  /** ID aus Sybos. */
+  externeId?: string;
+  bezeichnung: string;
+  kategorie?: string;
+  klasse1?: string;
+  klasse2?: string;
+  klasse3?: string;
+  materialTyp?: GeraetMaterialTyp;
+  inventarNr?: string;
+  zusatzInventarNr?: string;
+  barcodes?: string[];
+  seriennummer?: string;
+  hersteller?: string;
+  herstellerTyp?: string;
+  baujahr?: number;
+  besitzer?: string;
+  bemerkung?: string;
+  einheitVerwendungsnachweis?: GeraetEinheitVerwendungsnachweis;
+  /**
+   * true → ein Verbrauch im Einsatz bucht vom Bestand ab. Eigenes Flag, weil
+   * „Massenartikel" nicht „Verbrauchsmaterial" heißt (Kupplungsschlüssel).
+   */
+  verbrauchsmaterial: boolean;
+  /** Anzeige, z. B. „Sack", „Stk". */
+  einheit?: string;
+  /** Gegen `bestandGesamt` — je Artikel über alle Lagerorte summiert. */
+  mindestbestand?: number;
+  /**
+   * Summe aller `geraetBestand.anzahl`. Mitgeführt, damit Mindestbestand und
+   * „Nachzubestellen" ohne Aggregation auskommen; nur in Transaktionen
+   * geändert, die auch den Bestand ändern.
+   */
+  bestandGesamt: number;
+  /** Gesetzt beim Unterschreiten, gelöscht beim Wiederauffüllen (ISO). */
+  nachbestellenSeit?: string;
+  /** Kostenersatz-Position, z. B. „12.05". */
+  kostenersatzRateId?: string;
+  /**
+   * Zeitpunkt des letzten Imports (ISO). Buchungen danach heißen: Der
+   * Bestand in der App ist neuer als der in Sybos.
+   */
+  importedAt?: string;
+  active: boolean;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+/** Bestand je Artikel und Lagerort: `groups/{groupId}/geraetBestand/{id}`. */
+export interface GeraetBestand {
+  id: string;
+  geraetId: string;
+  /** Aus `lagerortKey(lagerort)` — Teil der Import-Identität. */
+  lagerortKey: string;
+  lagerort: GeraetLagerort;
+  /** Darf negativ werden: Die Realität geht vor. */
+  anzahl: number;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export type GeraetBuchungArt =
+  | 'verbrauch'
+  | 'zugang'
+  | 'umbuchung'
+  | 'inventur'
+  | 'import'
+  | 'storno';
+
+export const GERAET_BUCHUNG_ARTEN: GeraetBuchungArt[] = [
+  'verbrauch',
+  'zugang',
+  'umbuchung',
+  'inventur',
+  'import',
+  'storno',
+];
+
+/** Protokoll: `groups/{groupId}/geraetBuchung/{id}`. */
+export interface GeraetBuchung {
+  id: string;
+  geraetId: string;
+  bestandId: string;
+  art: GeraetBuchungArt;
+  /** Vorzeichenbehaftet: Verbrauch negativ, Zugang positiv. */
+  menge: number;
+  /** Bei Umbuchung: der Ziel-Lagerort. */
+  zielBestandId?: string;
+  firecallId?: string;
+  /**
+   * Bei Verbrauch/Storno aus dem Einsatz: der `geraetEinsatz`-Eintrag. Über
+   * die Summe aller Buchungen mit dieser ID gleicht der Server den Bestand
+   * idempotent ab (`reconcileVerbrauch`).
+   */
+  einsatzEintragId?: string;
+  bemerkung?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export type GeraetEinsatzArt = 'zugeordnet' | 'verbraucht';
+
+/** Zuordnung/Verbrauch im Einsatz: `call/{firecallId}/geraetEinsatz/{id}`. */
+export interface GeraetEinsatz {
+  id: string;
+  groupId: string;
+  geraetId: string;
+  /** Kopie, damit der Einsatz lesbar bleibt. */
+  geraetName: string;
+  art: GeraetEinsatzArt;
+  /** Bei Verbrauch: der Lagerort, von dem abgebucht wird. */
+  bestandId?: string;
+  /** Stück. */
+  menge?: number;
+  /** Bei `einheitVerwendungsnachweis === 'h'`. */
+  stunden?: number;
+  zeitpunkt: string;
+  bemerkung?: string;
+  /** Der Server hat abgebucht — sonst „noch nicht synchronisiert". */
+  gebucht?: boolean;
+  /**
+   * Stand des Eintrags für den Abgleich (Millisekunden seit 1970), gesetzt bei
+   * jedem Anlegen und Ändern. Der Abgleich am Server bucht erst, wenn er
+   * mindestens diesen Stand liest — sonst sähe er einen Eintrag, dessen
+   * Änderung noch unterwegs ist, und buchte den alten Stand.
+   */
+  syncRev?: number;
+  createdAt: string;
+  createdBy: string;
+}
+
+function normalizePart(value?: string): string {
+  return (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * Der stabile Schlüssel eines Lagerorts, z. B. `fahrzeug|srf|gr 2`.
+ *
+ * Nur die Spalten, die den Ort bestimmen — Bemerkung und Fahrzeugverknüpfung
+ * gehören nicht dazu, sonst wäre der Lagerort nach einer Bemerkung beim
+ * nächsten Import ein anderer. Leere Teile behalten ihren Platz, damit „SRF"
+ * und „SRF · GR 2" nicht zusammenfallen.
+ */
+export function lagerortKey(l: GeraetLagerort): string {
+  switch (l.art) {
+    case 'fahrzeug':
+      return ['fahrzeug', normalizePart(l.fahrzeug), normalizePart(l.laderaum)].join('|');
+    case 'raum':
+      return ['raum', normalizePart(l.standort), normalizePart(l.raum)].join('|');
+    default:
+      return 'set';
+  }
+}
+
+/**
+ * Schlüssel einer Import-Abweichung, wie ihn `importGeraete` in
+ * `acceptDeviations` erwartet. Die Artikel-ID steht vorn: Sie enthält nie
+ * ein `|`, der `lagerortKey` dagegen schon.
+ */
+export function deviationKey(d: { geraetId: string; lagerortKey: string }): string {
+  return `${d.geraetId}|${d.lagerortKey}`;
+}
+
+/** Anzeige eines Lagerorts, z. B. „SRF · GR 2" oder „Feuerwehrhaus · Lager". */
+export function formatLagerort(l: GeraetLagerort): string {
+  const parts =
+    l.art === 'fahrzeug'
+      ? [l.fahrzeug, l.laderaum]
+      : l.art === 'raum'
+        ? [l.standort, l.raum]
+        : ['Set-Artikel'];
+  return parts
+    .map((p) => (p ?? '').trim())
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** Liegt der Gesamtbestand unter dem Mindestbestand? Ohne Mindestbestand nie. */
+export function isBelowMinimum(
+  geraet: Pick<Geraet, 'bestandGesamt' | 'mindestbestand'>,
+): boolean {
+  return (
+    typeof geraet.mindestbestand === 'number' &&
+    Number.isFinite(geraet.mindestbestand) &&
+    geraet.bestandGesamt < geraet.mindestbestand
+  );
+}

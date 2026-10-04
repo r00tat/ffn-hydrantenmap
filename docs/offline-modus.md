@@ -18,7 +18,7 @@ Dokument ist das, was der Cache allein **nicht** leistet.
 | --- | --- |
 | Einsatz anlegen und ändern, Einsatztagebuch, Elemente auf der Karte, Ebenen, Besatzung, Einsatzorte | KI-Assistent und Sprach-Assistent |
 | Atemschutzsammelplatz (Trupps, Ausgabe), Füllprotokoll erfassen | Verrechnung (`runTransaction`), Mail-Versand (Rechnung, Kostenersatz) |
-| Atemschutzüberwachung samt lokaler Warnungen | PDF über den Server, Fahrtenbuch-Fahrten, Mängel samt Bildern |
+| Atemschutzüberwachung samt lokaler Warnungen, Geräte & Material im Einsatz zuordnen und verbrauchen (Abbuchen wird nachgeholt) | PDF über den Server, Fahrtenbuch-Fahrten, Mängel samt Bildern |
 | Anhänge an bestehenden Einsatz/Element (Upload wird nachgeholt) | Einsatz-Fotos im Drive, Blaulicht-SMS-Import und Duplikatsprüfung |
 | Karte, soweit vorgeladen oder schon angesehen (basemap.at) | Straßen-Routing und Höhenprofil einer Leitung (siehe Grenzen) |
 | Kaltstart mit zwischengespeicherter Anmeldung (90 Tage) | Verwaltung (Benutzer, Gruppen, Tokens, MCP), Freigabe-Links, Import/Export |
@@ -164,14 +164,22 @@ Jede Server Action im Client-Pfad gehört deshalb in eine von drei Gruppen:
 
 | Gruppe | Beispiele | Verhalten offline |
 | --- | --- | --- |
-| Nachholen | `planeUeberwachungWarnung`, Anhänge am Einsatz und an Elementen | Warteschlange, beim Reconnect abgearbeitet |
-| Firestore lesen | Atemschutz-Gerätebestand (`useAtemschutzGeraete`) | liest ohnehin aus dem Cache |
+| Nachholen | `planeUeberwachungWarnung`, `syncGeraetVerbrauch` (Verbrauch von Material im Einsatz abbuchen), Anhänge am Einsatz und an Elementen | Warteschlange, beim Reconnect abgearbeitet |
+| Firestore lesen | Atemschutz-Gerätebestand (`useAtemschutzGeraete`), Geräte & Material (`useGeraete`) | liest ohnehin aus dem Cache |
 | Nur online | KI-Assistent, Verrechnung (`runTransaction`), Blaulicht-SMS-Import und Duplikatsprüfung, Mail-Versand, PDF über den Server, Fahrtenbuch, Mängel, Drive-Fotos, Downloads und KI-Zusammenfassung im Sybos-Übertrag, Verwaltung | erkennbar deaktiviert, mit Hinweis |
 
 Der Gerätebestand wurde schon vorher clientseitig gelesen; `atemschutzStammdaten.ts`
 ist `server-only` und dient nur Server Actions (Import, Mangel, Verrechnung), die
 ohnehin nur online laufen. Die Firestore-Regeln erlauben Gruppenmitgliedern das
 Lesen von `atemschutzGeraet` (`fahrtenbuchMember()`).
+
+`syncGeraetVerbrauch` ist bewusst ein **Abgleich**, keine einmalige Buchung: Die
+Action liest den `geraetEinsatz`-Eintrag beim Abarbeiten neu und bucht nur die
+Differenz zu den schon vorhandenen Buchungen dieses Eintrags. Ein doppelt
+abgearbeiteter Eintrag bucht deshalb nichts doppelt, und ein offline geänderter
+oder gelöschter Verbrauch braucht keinen eigenen Storno-Eintrag in der
+Warteschlange — derselbe Typ wird einfach noch einmal eingereiht. Details:
+[geraete-lager.md](geraete-lager.md).
 
 ### Warteschlange (`src/lib/offlineQueue.ts`)
 

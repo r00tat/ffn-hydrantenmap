@@ -2885,7 +2885,8 @@
     "drucken": "Drucken",
     "admin": "Administration",
     "mcp": "MCP / Claude",
-    "sybos": "Sybos-Übertrag"
+    "sybos": "Sybos-Übertrag",
+    "geraete": "Geräte & Material"
   },
   "users": {
     "title": "Benutzer",
@@ -3818,5 +3819,227 @@
     "failed": "Die Kartenkacheln konnten nicht geladen werden.",
     "stored": "{count} Kacheln auf diesem Gerät",
     "clear": "Löschen"
+  },
+  "geraete": {
+    "title": "Geräte & Material",
+    "subtitle": "Artikel und Bestand je Lagerort. Verbrauchsmaterial wird im Einsatz abgebucht; unter dem Mindestbestand steht es unter „Nachzubestellen“.",
+    "loginRequired": "Bitte melde dich an, um Geräte & Material zu sehen.",
+    "group": "Gruppe",
+    "noGroup": "Du bist in keiner Gruppe mit Lager.",
+    "newGeraet": "Neuer Artikel",
+    "tabs": {
+      "list": "Artikel ({count})",
+      "reorder": "Nachzubestellen ({count})"
+    },
+    "filters": {
+      "search": "Suche (Bezeichnung, Inventar-Nr., Barcode)",
+      "klasse1": "Klasse 1",
+      "lagerort": "Lagerort",
+      "all": "Alle",
+      "onlyConsumable": "Nur Verbrauchsmaterial",
+      "onlyBelowMinimum": "Unter Mindestbestand",
+      "showInactive": "Inaktive zeigen"
+    },
+    "list": {
+      "consumable": "Verbrauchsmaterial",
+      "inactive": "inaktiv",
+      "belowMinimum": "unter Mindestbestand",
+      "stock": "{anzahl} {einheit}",
+      "empty": "Keine Artikel gefunden.",
+      "showMore": "Weitere anzeigen ({count})"
+    },
+    "reorder": {
+      "hint": "Artikel, deren Gesamtbestand unter den Mindestbestand gefallen ist. Beim Unterschreiten geht eine Meldung an die Mängel-E-Mail der Gruppe.",
+      "empty": "Nichts nachzubestellen.",
+      "line": "Bestand {anzahl} {einheit} · Mindestbestand {mindestbestand}",
+      "since": "seit {date}"
+    },
+    "fields": {
+      "bezeichnung": "Bezeichnung",
+      "inventarNr": "Inventar-Nr.",
+      "zusatzInventarNr": "Zusatz-Inventar-Nr.",
+      "klasse": "Klasse",
+      "klasse1": "Klasse 1",
+      "materialTyp": "Material-Typ",
+      "hersteller": "Hersteller",
+      "seriennummer": "Seriennummer",
+      "baujahr": "Baujahr",
+      "besitzer": "Besitzer",
+      "kostenersatzRateId": "Kostenersatz-Position",
+      "kostenersatzRateIdHint": "Optional, z. B. 12.05",
+      "bemerkung": "Bemerkung",
+      "verbrauchsmaterial": "Verbrauchsmaterial",
+      "verbrauchsmaterialHint": "Ein Verbrauch im Einsatz bucht vom Bestand ab. Geräte werden im Einsatz nur zugeordnet.",
+      "einheit": "Einheit",
+      "einheitHint": "Anzeige, z. B. Sack, Stk",
+      "mindestbestand": "Mindestbestand",
+      "mindestbestandHint": "Über alle Lagerorte; nur bei Verbrauchsmaterial",
+      "einheitVerwendungsnachweis": "Verwendungsnachweis in",
+      "active": "Aktiv"
+    },
+    "verwendungsnachweis": {
+      "none": "nicht erfasst",
+      "stk": "Stück",
+      "h": "Stunden"
+    },
+    "edit": {
+      "titleNew": "Neuer Artikel",
+      "titleEdit": "Artikel bearbeiten",
+      "importHint": "Dieser Artikel stammt aus Sybos: Bezeichnung, Inventar-Nr., Klasse und Bemerkung überschreibt der nächste Import. Verbrauchsmaterial, Einheit, Mindestbestand und Kostenersatz-Position bleiben.",
+      "deleteConfirm": "Artikel löschen? Hat er Buchungen, wird er nur deaktiviert."
+    },
+    "errors": {
+      "bezeichnungRequired": "Bitte eine Bezeichnung angeben.",
+      "mindestbestandInvalid": "Der Mindestbestand muss eine ganze Zahl ab 0 sein.",
+      "countInvalid": "Bitte eine Zahl ab 0 angeben.",
+      "mengeInvalid": "Bitte eine Menge größer 0 angeben.",
+      "zielRequired": "Bitte einen Ziel-Lagerort wählen.",
+      "lagerortRequired": "Bitte Fahrzeug bzw. Standort angeben.",
+      "lagerortExists": "Diesen Lagerort gibt es für den Artikel schon.",
+      "saveFailed": "Speichern fehlgeschlagen: {error}"
+    },
+    "detail": {
+      "bestandGesamt": "Bestand gesamt",
+      "nachbestellenSeit": "Nachzubestellen seit {date}",
+      "bestand": "Bestand je Lagerort",
+      "newLagerort": "Lagerort",
+      "noBestand": "Noch kein Lagerort erfasst.",
+      "lagerort": "Lagerort",
+      "anzahl": "Anzahl"
+    },
+    "booking": {
+      "title": {
+        "zugang": "Zugang",
+        "umbuchung": "Umbuchung",
+        "inventur": "Inventur"
+      },
+      "at": "{lagerort}: derzeit {anzahl} {einheit}",
+      "noTargets": "Der Artikel hat keinen weiteren Lagerort. Lege zuerst einen an.",
+      "ziel": "Nach Lagerort",
+      "istWert": "Gezählter Bestand",
+      "menge": "Menge",
+      "submit": "Buchen"
+    },
+    "lagerort": {
+      "title": "Neuer Lagerort",
+      "art": "Art",
+      "artRaum": "Raum",
+      "artFahrzeug": "Fahrzeug / Behälter",
+      "fahrzeug": "Fahrzeug",
+      "laderaum": "Laderaum",
+      "standort": "Standort",
+      "raum": "Raum",
+      "bemerkung": "Lagerort-Bemerkung",
+      "anzahl": "Anfangsbestand"
+    },
+    "import": {
+      "open": "Import",
+      "title": "Import aus Sybos",
+      "hint": "Artikelexport aus Sybos (XLSX) wählen — eine Zeile je Artikel und Lagerort. Geräte und Lagerartikel haben dasselbe Format. Artikel, die nicht in der Datei stehen, bleiben unverändert.",
+      "chooseFile": "Datei wählen",
+      "otherFile": "Andere Datei",
+      "button": "Importieren",
+      "previewFailed": "Die Datei konnte nicht gelesen werden: {error}",
+      "fileTooLarge": "Die Datei ist zu groß (höchstens {maxKb} kB).",
+      "importFailed": "Import fehlgeschlagen: {error}",
+      "done": "Import abgeschlossen.",
+      "more": "… und {count} weitere",
+      "counts": {
+        "create": "{count} neu",
+        "update": "{count} geändert",
+        "unchanged": "{count} unverändert",
+        "bestandCreate": "{count} neue Lagerorte",
+        "bestandUpdate": "{count} Bestände aktualisiert",
+        "deviations": "{count} Abweichungen",
+        "inactive": "{count} inaktiv"
+      },
+      "summary": {
+        "created": "Artikel angelegt",
+        "updated": "Artikel aktualisiert",
+        "unchanged": "Artikel unverändert",
+        "bestandCreated": "Lagerorte angelegt",
+        "bestandUpdated": "Bestände aktualisiert",
+        "inactive": "Inaktiv",
+        "deviationsAccepted": "Abweichungen übernommen",
+        "deviationsRejected": "Abweichungen verworfen",
+        "bookings": "Buchungen"
+      },
+      "deviationsTitle": "Abweichungen",
+      "deviationsHint": "Seit dem letzten Import wurde an diesen Lagerorten gebucht. Angehakte Zeilen übernehmen die Zahl aus der Datei als Inventur, alle anderen behalten den Bestand der App.",
+      "acceptAll": "Alle übernehmen",
+      "deviationLine": "{lagerort}: App {current} · Datei {imported}{isNew, select, yes { (neuer Lagerort)} other {}}",
+      "createTitle": "Neue Artikel",
+      "updateTitle": "Geänderte Stammdaten",
+      "bestandUpdateTitle": "Aktualisierte Bestände"
+    }
+  },
+  "geraetEinsatz": {
+    "title": "Geräte & Material",
+    "menuTitle": "Geräte & Material im Einsatz",
+    "intro": "Im Einsatz verwendete Geräte zuordnen und verbrauchtes Material vom Lager abbuchen.",
+    "add": "Erfassen",
+    "noFirecall": "Kein Einsatz gewählt.",
+    "noGroup": "Der Einsatz ist keiner Gruppe zugeordnet – es gibt keinen Gerätebestand.",
+    "readOnly": "Nur Lesezugriff auf diesen Einsatz.",
+    "empty": "Noch keine Geräte oder Materialien erfasst.",
+    "artVerbraucht": "Verbraucht",
+    "artZugeordnet": "Zugeordnet",
+    "notBooked": "noch nicht gebucht",
+    "notBookedHint": "Wird vom Lager abgebucht, sobald der Server den Eintrag abgeglichen hat – offline beim nächsten Verbindungsaufbau.",
+    "pieces": "Stk",
+    "amountPieces": "{count, number} {einheit}",
+    "amountHours": "{count, number} h",
+    "lagerortUnknown": "Lagerort unbekannt",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "cancel": "Abbrechen",
+    "deleteTitle": "Eintrag löschen?",
+    "deleteText": "„{name}“ aus dem Einsatz entfernen?",
+    "deleteTextVerbraucht": "„{name}“ aus dem Einsatz entfernen? Die verbrauchte Menge wird auf den Lagerort zurückgebucht.",
+    "schadstoffLink": "Verbrauchtes Material erfassen",
+    "dialog": {
+      "titleAdd": "Gerät oder Material erfassen",
+      "titleEdit": "Eintrag bearbeiten",
+      "article": "Artikel",
+      "articleHint": "Bezeichnung, Inventar-Nr. oder Barcode",
+      "noOptions": "Kein Artikel gefunden",
+      "noArticles": "Für die Gruppe dieses Einsatzes sind keine Geräte erfasst.",
+      "optionConsumable": "Verbrauchsmaterial · Bestand {bestand, number} {einheit}",
+      "optionDevice": "Gerät",
+      "pieces": "Stk",
+      "scan": "Barcode scannen",
+      "codeNotFound": "Kein Artikel mit dem Code „{code}“ gefunden.",
+      "codeMultiple": "Mehrere Artikel tragen den Code „{code}“ – bitte auswählen.",
+      "consumableInfo": "Verbrauchsmaterial – wird vom gewählten Lagerort abgebucht.",
+      "deviceInfo": "Gerät – wird dem Einsatz zugeordnet, der Bestand bleibt unverändert.",
+      "lagerort": "Lagerort",
+      "lagerortOption": "{lagerort} – Bestand {anzahl, number}",
+      "onFirecallVehicle": "Fahrzeug im Einsatz",
+      "noBestand": "Für diesen Artikel ist kein Lagerort erfasst. Der Verbrauch wird dokumentiert, aber nicht abgebucht.",
+      "menge": "Menge",
+      "mengeUnit": "Menge ({einheit})",
+      "stunden": "Stunden",
+      "bemerkung": "Bemerkung",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "errors": {
+        "noGeraet": "Bitte einen Artikel wählen.",
+        "invalidMenge": "Bitte eine gültige Menge angeben.",
+        "invalidStunden": "Bitte gültige Stunden angeben.",
+        "noBestand": "Bitte einen Lagerort wählen."
+      }
+    },
+    "scanner": {
+      "title": "Barcode scannen",
+      "starting": "Kamera wird gestartet …",
+      "unsupported": "Dieses Gerät bietet keine Kamera an. Bitte den Code von Hand eingeben.",
+      "denied": "Kein Zugriff auf die Kamera. Bitte die Berechtigung erteilen oder den Code von Hand eingeben.",
+      "error": "Die Kamera ließ sich nicht starten.",
+      "hint": "Barcode ins Bild halten — hochkant oder quer ist egal.",
+      "manual": "Code von Hand eingeben",
+      "manualHint": "Barcode, Inventar-Nr. oder Seriennummer – mit Enter übernehmen",
+      "use": "Übernehmen",
+      "close": "Schließen"
+    }
   }
 }

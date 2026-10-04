@@ -51,6 +51,10 @@ vi.mock('../components/Atemschutz/ueberwachungTaskAction', () => ({
     return mocks.plan(...(args as []));
   },
 }));
+// Die Server Action zieht `server-only` nach, das unter Vitest wirft.
+vi.mock('../components/Geraete/geraeteActions', () => ({
+  syncGeraetVerbrauch: vi.fn(),
+}));
 
 type Queue = typeof import('./offlineQueue');
 type Handlers = typeof import('./offlineQueueHandlers');

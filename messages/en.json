@@ -2885,7 +2885,8 @@
     "drucken": "Printing",
     "admin": "Administration",
     "mcp": "MCP / Claude",
-    "sybos": "Sybos transfer"
+    "sybos": "Sybos transfer",
+    "geraete": "Equipment & supplies"
   },
   "users": {
     "title": "Users",
@@ -3818,5 +3819,227 @@
     "failed": "The map tiles could not be downloaded.",
     "stored": "{count} tiles on this device",
     "clear": "Delete"
+  },
+  "geraete": {
+    "title": "Equipment & supplies",
+    "subtitle": "Items and stock per storage location. Consumables are booked out during operations; below the minimum stock they appear under “To reorder”.",
+    "loginRequired": "Please sign in to view equipment & supplies.",
+    "group": "Group",
+    "noGroup": "You are not a member of a group with a store.",
+    "newGeraet": "New item",
+    "tabs": {
+      "list": "Items ({count})",
+      "reorder": "To reorder ({count})"
+    },
+    "filters": {
+      "search": "Search (name, inventory no., barcode)",
+      "klasse1": "Class 1",
+      "lagerort": "Storage location",
+      "all": "All",
+      "onlyConsumable": "Consumables only",
+      "onlyBelowMinimum": "Below minimum stock",
+      "showInactive": "Show inactive"
+    },
+    "list": {
+      "consumable": "Consumable",
+      "inactive": "inactive",
+      "belowMinimum": "below minimum",
+      "stock": "{anzahl} {einheit}",
+      "empty": "No items found.",
+      "showMore": "Show more ({count})"
+    },
+    "reorder": {
+      "hint": "Items whose total stock has dropped below the minimum. When it drops below, a notice goes to the group's defect e-mail.",
+      "empty": "Nothing to reorder.",
+      "line": "Stock {anzahl} {einheit} · minimum {mindestbestand}",
+      "since": "since {date}"
+    },
+    "fields": {
+      "bezeichnung": "Name",
+      "inventarNr": "Inventory no.",
+      "zusatzInventarNr": "Additional inventory no.",
+      "klasse": "Class",
+      "klasse1": "Class 1",
+      "materialTyp": "Material type",
+      "hersteller": "Manufacturer",
+      "seriennummer": "Serial number",
+      "baujahr": "Year of manufacture",
+      "besitzer": "Owner",
+      "kostenersatzRateId": "Cost recovery item",
+      "kostenersatzRateIdHint": "Optional, e.g. 12.05",
+      "bemerkung": "Remark",
+      "verbrauchsmaterial": "Consumable",
+      "verbrauchsmaterialHint": "Consumption during an operation is booked out of stock. Equipment is only assigned.",
+      "einheit": "Unit",
+      "einheitHint": "Display, e.g. bag, pcs",
+      "mindestbestand": "Minimum stock",
+      "mindestbestandHint": "Across all locations; consumables only",
+      "einheitVerwendungsnachweis": "Usage recorded in",
+      "active": "Active"
+    },
+    "verwendungsnachweis": {
+      "none": "not recorded",
+      "stk": "Pieces",
+      "h": "Hours"
+    },
+    "edit": {
+      "titleNew": "New item",
+      "titleEdit": "Edit item",
+      "importHint": "This item comes from Sybos: the next import overwrites name, inventory no., class and remark. Consumable, unit, minimum stock and cost recovery item are kept.",
+      "deleteConfirm": "Delete this item? If it has bookings it is only deactivated."
+    },
+    "errors": {
+      "bezeichnungRequired": "Please enter a name.",
+      "mindestbestandInvalid": "The minimum stock must be a whole number of 0 or more.",
+      "countInvalid": "Please enter a number of 0 or more.",
+      "mengeInvalid": "Please enter a quantity greater than 0.",
+      "zielRequired": "Please choose a target location.",
+      "lagerortRequired": "Please enter a vehicle or site.",
+      "lagerortExists": "This item already has this storage location.",
+      "saveFailed": "Saving failed: {error}"
+    },
+    "detail": {
+      "bestandGesamt": "Total stock",
+      "nachbestellenSeit": "To reorder since {date}",
+      "bestand": "Stock per location",
+      "newLagerort": "Location",
+      "noBestand": "No storage location yet.",
+      "lagerort": "Storage location",
+      "anzahl": "Quantity"
+    },
+    "booking": {
+      "title": {
+        "zugang": "Receipt",
+        "umbuchung": "Transfer",
+        "inventur": "Stocktake"
+      },
+      "at": "{lagerort}: currently {anzahl} {einheit}",
+      "noTargets": "This item has no other storage location. Create one first.",
+      "ziel": "To location",
+      "istWert": "Counted stock",
+      "menge": "Quantity",
+      "submit": "Book"
+    },
+    "lagerort": {
+      "title": "New storage location",
+      "art": "Type",
+      "artRaum": "Room",
+      "artFahrzeug": "Vehicle / container",
+      "fahrzeug": "Vehicle",
+      "laderaum": "Compartment",
+      "standort": "Site",
+      "raum": "Room",
+      "bemerkung": "Location remark",
+      "anzahl": "Initial stock"
+    },
+    "import": {
+      "open": "Import",
+      "title": "Import from Sybos",
+      "hint": "Choose the Sybos item export (XLSX) — one row per item and storage location. Equipment and stock items share the same format. Items not in the file stay unchanged.",
+      "chooseFile": "Choose file",
+      "otherFile": "Other file",
+      "button": "Import",
+      "previewFailed": "The file could not be read: {error}",
+      "fileTooLarge": "The file is too large (at most {maxKb} kB).",
+      "importFailed": "Import failed: {error}",
+      "done": "Import finished.",
+      "more": "… and {count} more",
+      "counts": {
+        "create": "{count} new",
+        "update": "{count} changed",
+        "unchanged": "{count} unchanged",
+        "bestandCreate": "{count} new locations",
+        "bestandUpdate": "{count} stock levels updated",
+        "deviations": "{count} deviations",
+        "inactive": "{count} inactive"
+      },
+      "summary": {
+        "created": "Items created",
+        "updated": "Items updated",
+        "unchanged": "Items unchanged",
+        "bestandCreated": "Locations created",
+        "bestandUpdated": "Stock levels updated",
+        "inactive": "Inactive",
+        "deviationsAccepted": "Deviations accepted",
+        "deviationsRejected": "Deviations discarded",
+        "bookings": "Bookings"
+      },
+      "deviationsTitle": "Deviations",
+      "deviationsHint": "Bookings were made at these locations since the last import. Checked rows take the file's number as a stocktake; all others keep the app's stock.",
+      "acceptAll": "Accept all",
+      "deviationLine": "{lagerort}: app {current} · file {imported}{isNew, select, yes { (new location)} other {}}",
+      "createTitle": "New items",
+      "updateTitle": "Changed master data",
+      "bestandUpdateTitle": "Updated stock levels"
+    }
+  },
+  "geraetEinsatz": {
+    "title": "Equipment & supplies",
+    "menuTitle": "Equipment & supplies used",
+    "intro": "Assign equipment used in this operation and book consumed supplies out of stock.",
+    "add": "Add",
+    "noFirecall": "No operation selected.",
+    "noGroup": "This operation belongs to no group – there is no equipment stock.",
+    "readOnly": "Read-only access to this operation.",
+    "empty": "No equipment or supplies recorded yet.",
+    "artVerbraucht": "Consumed",
+    "artZugeordnet": "Assigned",
+    "notBooked": "not booked yet",
+    "notBookedHint": "Will be booked out of stock once the server has reconciled the entry – when offline, on the next reconnect.",
+    "pieces": "pcs",
+    "amountPieces": "{count, number} {einheit}",
+    "amountHours": "{count, number} h",
+    "lagerortUnknown": "Storage location unknown",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "deleteTitle": "Delete entry?",
+    "deleteText": "Remove “{name}” from this operation?",
+    "deleteTextVerbraucht": "Remove “{name}” from this operation? The consumed quantity is booked back to its storage location.",
+    "schadstoffLink": "Record consumed supplies",
+    "dialog": {
+      "titleAdd": "Record equipment or supplies",
+      "titleEdit": "Edit entry",
+      "article": "Article",
+      "articleHint": "Name, inventory no. or barcode",
+      "noOptions": "No article found",
+      "noArticles": "No equipment is recorded for this operation's group.",
+      "optionConsumable": "Consumable · stock {bestand, number} {einheit}",
+      "optionDevice": "Equipment",
+      "pieces": "pcs",
+      "scan": "Scan barcode",
+      "codeNotFound": "No article with the code “{code}” found.",
+      "codeMultiple": "Several articles carry the code “{code}” – please choose.",
+      "consumableInfo": "Consumable – booked out of the selected storage location.",
+      "deviceInfo": "Equipment – assigned to the operation, stock stays unchanged.",
+      "lagerort": "Storage location",
+      "lagerortOption": "{lagerort} – stock {anzahl, number}",
+      "onFirecallVehicle": "vehicle in this operation",
+      "noBestand": "No storage location is recorded for this article. The consumption is documented but not booked.",
+      "menge": "Quantity",
+      "mengeUnit": "Quantity ({einheit})",
+      "stunden": "Hours",
+      "bemerkung": "Remark",
+      "save": "Save",
+      "cancel": "Cancel",
+      "errors": {
+        "noGeraet": "Please choose an article.",
+        "invalidMenge": "Please enter a valid quantity.",
+        "invalidStunden": "Please enter valid hours.",
+        "noBestand": "Please choose a storage location."
+      }
+    },
+    "scanner": {
+      "title": "Scan barcode",
+      "starting": "Starting camera …",
+      "unsupported": "This device offers no camera. Please enter the code by hand.",
+      "denied": "No access to the camera. Please grant permission or enter the code by hand.",
+      "error": "The camera could not be started.",
+      "hint": "Hold the barcode in view — upright or sideways does not matter.",
+      "manual": "Enter code by hand",
+      "manualHint": "Barcode, inventory no. or serial number – confirm with Enter",
+      "use": "Use",
+      "close": "Close"
+    }
   }
 }

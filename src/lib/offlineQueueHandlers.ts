@@ -5,6 +5,8 @@ import { getStorage, ref, uploadBytesResumable } from 'firebase/storage';
 import app, { firestore } from '../components/firebase/firebase';
 // Registriert beim Import den Handler der Terminplanung der Atemschutzwarnung.
 import '../components/Atemschutz/ueberwachungWarnungQueue';
+// Registriert den Handler des Materialverbrauchs im Einsatz (Abbuchen vom Lager).
+import '../components/Geraete/geraetVerbrauchQueue';
 import { ensureFreshAuth } from '../hooks/auth/ensureFreshAuth';
 import { updateDocLocal } from './firestoreClient';
 import { waitForFirestoreSync } from './firestoreSync';

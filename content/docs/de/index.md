@@ -34,6 +34,7 @@ Willkommen zur Dokumentation der Einsatzkarte. Hier findest du Anleitungen zu al
 ## Verwaltung und Export
 
 - **Fahrtenbuch** [Fahrten je Fahrzeug erfassen, Sammelerfassung für einen Einsatz, QR-Code ohne Anmeldung, PDF-Export](/docs/fahrtenbuch)
+- **Geräte & Material** [Geräte und Lagerartikel aus Sybos, Bestand je Lagerort, Verbrauch im Einsatz, Nachbestellmeldung](/docs/geraete)
 - **Kostenersatz** [Abrechnungen erstellen, Positionen hinzufügen, PDF-Export, E-Mail-Versand, SumUp-Zahlung](/docs/kostenersatz)
 - **Geschäftsbuch** [Ein-/ausgehende Vorgänge dokumentieren, Stabsfunktionen S1-S6, CSV-Export](/docs/geschaeftsbuch)
 - **Drucken** [Einsatzberichte drucken mit Karte, Einsatzmitteln, Tagebuch und Geschäftsbuch](/docs/drucken)

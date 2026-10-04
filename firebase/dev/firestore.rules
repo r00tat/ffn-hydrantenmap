@@ -397,6 +397,31 @@ service cloud.firestore {
         allow read: if fahrtenbuchMember();
         allow create, update, delete: if false;
       }
+
+      // Geräte und Lagerartikel der Gruppe: Stammdaten (`geraet`), Bestand je
+      // Lagerort (`geraetBestand`) und das Buchungsprotokoll (`geraetBuchung`).
+      // Jedes Gruppenmitglied liest — im Einsatz wird daraus ausgewählt und der
+      // Bestand angezeigt. Geschrieben wird ausschließlich über Server Actions
+      // (Admin SDK): `bestandGesamt` am Artikel muss in derselben Transaktion
+      // wie der Bestand und die Buchung geändert werden, und das ließe sich
+      // mit Client-Schreibrechten nicht erzwingen.
+      // Zuordnung und Verbrauch im Einsatz liegen unter
+      // `call/{id}/geraetEinsatz` und fallen unter die generische Regel
+      // `call/{doc}/{subitem=**}` — dort schreibt der Client offline.
+      match /geraet/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow create, update, delete: if false;
+      }
+
+      match /geraetBestand/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow create, update, delete: if false;
+      }
+
+      match /geraetBuchung/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow create, update, delete: if false;
+      }
     }
 
     // Der Token ist die Dokument-ID und damit das gesamte Geheimnis des

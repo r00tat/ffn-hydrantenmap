@@ -9,14 +9,23 @@ Stellen; dieses Dokument nennt sie und begründet die Bauform.
 | --- | --- | --- | --- |
 | **Globaler Admin** | `user/{uid}.isAdmin` | alles, in jeder Gruppe, plus `/admin/*` und die Benutzerverwaltung | ein globaler Admin in `/users` |
 | **Gruppen-Admin** | `user/{uid}.groupAdmin: string[]` | alle administrativen Aufgaben *einer* Gruppe | ein globaler Admin in `/groups` |
-| **Gerätemeister** | `user/{uid}.fahrtenbuchGeraetemeister: string[]` | Fahrtenbuch einer Gruppe: jeden Eintrag korrigieren, Fahrzeuge und Personen pflegen | ein Admin **oder Gruppen-Admin** der Gruppe, im Einstellungen-Tab der Fahrtenbuch-Verwaltung |
-| **Gruppenmitglied** | `user/{uid}.groups: string[]` | Einsätze, Fahrtenbucheinträge und Mängel der Gruppe | ein globaler Admin in `/groups` oder `/users` |
+| **Gerätemeister** | `user/{uid}.fahrtenbuchGeraetemeister: string[]` | Fahrtenbuch einer Gruppe: jeden Eintrag korrigieren, Fahrzeuge und Personen pflegen; Geräte & Material der Gruppe pflegen (Artikel, Bestand, Import) | ein Admin **oder Gruppen-Admin** der Gruppe, im Einstellungen-Tab der Fahrtenbuch-Verwaltung |
+| **Gruppenmitglied** | `user/{uid}.groups: string[]` | Einsätze, Fahrtenbucheinträge und Mängel der Gruppe; Geräte & Material lesen, im Einsatz zuordnen und verbrauchen | ein globaler Admin in `/groups` oder `/users` |
 | **Einsatz-Gast** | `user/{uid}.firecall` | genau ein Einsatz, lesend oder schreibend, mit Ablauf | jedes Gruppenmitglied über den Share-Link |
 
 Der Gruppen-Admin **schließt den Gerätemeister ein**: Er darf alles, was
 gruppenbezogen administrativ ist, und das Fahrtenbuch gehört dazu. Umgekehrt
 gilt das nicht — ein Gerätemeister kommt nicht an Gruppeneinstellungen,
 Share-Links, PDF-Import oder das Löschen von Mängeln.
+
+Der Gerätemeister pflegt auch **Geräte & Material** (`/geraete`): Artikel,
+Zugang, Umbuchung, Inventur und den Sybos-Import. Die Beladung der Fahrzeuge
+gehört zur selben Aufgabe wie die Fahrzeuge selbst; eine eigene Rolle
+„Lagerverwalter" trüge in der Praxis dieselben Personen. Der Guard ist derselbe
+(`actionFahrtenbuchManagerRequired`), obwohl er nach dem Fahrtenbuch heißt.
+Den Verbrauch im Einsatz bucht dagegen jeder mit Zugriff auf den Einsatz ab
+(`actionUserAuthorizedForFirecall`, plus Prüfung, dass der Artikel zur Gruppe
+des Einsatzes gehört). Hintergrund: [geraete-lager.md](geraete-lager.md).
 
 ## Was der Gruppen-Admin bewusst nicht darf
 
@@ -71,7 +80,7 @@ Die Guards für Server Actions kommen alle aus [`src/app/auth.ts`](../src/app/au
 | `actionAdminRequired()` | globaler Admin |
 | `actionGroupAdminRequired(groupId)` | globaler Admin **oder** Gruppen-Admin *mit Mitgliedschaft* |
 | `actionGroupMemberRequired(groupId)` | Mitglied der Gruppe (Fahrtenbuch) |
-| `actionFahrtenbuchManagerRequired(groupId)` | Admin, Gruppen-Admin oder Gerätemeister der Gruppe |
+| `actionFahrtenbuchManagerRequired(groupId)` | Admin, Gruppen-Admin oder Gerätemeister der Gruppe (Fahrtenbuch und Geräte & Material) |
 | `actionUserAuthorizedForFirecall(id)` | Zugriff auf diesen Einsatz (Mitglied oder Gast) |
 
 `actionGroupAdminRequired` liegt als Implementierung in

@@ -1,0 +1,1110 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('server-only', () => ({}));
+
+/**
+ * Ein kleines Firestore im Speicher — gerade so viel, wie die Actions
+ * benutzen: Dokumente, Abfragen mit `==`/`>`, Transaktionen (mit der Regel
+ * „erst lesen, dann schreiben"), Batches und die Sentinels `increment` und
+ * `delete`. Damit prüfen die Tests den Datenstand nach einer Action und
+ * nicht die Reihenfolge einzelner Mock-Aufrufe.
+ */
+const fake = vi.hoisted(() => {
+  type Data = Record<string, unknown>;
+  const docs = new Map<string, Data>();
+  const batchSizes: number[] = [];
+  let autoId = 0;
+
+  const DELETE = { __op: 'delete' };
+  const increment = (n: number) => ({ __op: 'increment', n });
+
+  function isOp(v: unknown, op: string): v is { __op: string; n: number } {
+    return typeof v === 'object' && v !== null && (v as { __op?: string }).__op === op;
+  }
+
+  function apply(base: Data, data: Data): Data {
+    const next: Data = { ...base };
+    for (const [k, v] of Object.entries(data)) {
+      if (v === undefined) throw new Error(`undefined value for ${k}`);
+      if (isOp(v, 'delete')) delete next[k];
+      else if (isOp(v, 'increment')) next[k] = ((next[k] as number) ?? 0) + v.n;
+      else next[k] = structuredClone(v);
+    }
+    return next;
+  }
+
+  type Write =
+    | { kind: 'set'; path: string; data: Data; merge?: boolean }
+    | { kind: 'update'; path: string; data: Data }
+    | { kind: 'create'; path: string; data: Data }
+    | { kind: 'delete'; path: string };
+
+  function commit(writes: Write[]) {
+    for (const w of writes) {
+      if (w.kind === 'update' && !docs.has(w.path)) {
+        throw new Error(`NOT_FOUND ${w.path}`);
+      }
+      if (w.kind === 'create' && docs.has(w.path)) {
+        throw new Error(`ALREADY_EXISTS ${w.path}`);
+      }
+    }
+    for (const w of writes) {
+      if (w.kind === 'delete') docs.delete(w.path);
+      else if (w.kind === 'set' && !w.merge) docs.set(w.path, apply({}, w.data));
+      else docs.set(w.path, apply(docs.get(w.path) ?? {}, w.data));
+    }
+  }
+
+  interface FakeSnap {
+    id: string;
+    exists: boolean;
+    data: () => Data | undefined;
+    ref: FakeDocRef;
+  }
+  interface FakeQuerySnap {
+    docs: FakeSnap[];
+    empty: boolean;
+    size: number;
+    forEach: (fn: (s: FakeSnap) => void) => void;
+  }
+  interface FakeQuery {
+    __query: true;
+    where: (field: string, op: string, value: unknown) => FakeQuery;
+    get: () => Promise<FakeQuerySnap>;
+  }
+  interface FakeDocRef {
+    id: string;
+    path: string;
+    get: () => Promise<FakeSnap>;
+    set: (data: Data, opts?: { merge?: boolean }) => Promise<void>;
+    update: (data: Data) => Promise<void>;
+    delete: () => Promise<void>;
+    collection: (name: string) => FakeCollection;
+  }
+  interface FakeCollection extends FakeQuery {
+    id: string;
+    path: string;
+    doc: (id?: string) => FakeDocRef;
+  }
+
+  function snap(path: string): FakeSnap {
+    const data = docs.get(path);
+    const id = path.split('/').pop()!;
+    return {
+      id,
+      exists: data !== undefined,
+      data: () => (data ? structuredClone(data) : undefined),
+      ref: docRef(path),
+    };
+  }
+
+  type Filter = { field: string; op: string; value: unknown };
+
+  function query(colPath: string, filters: Filter[]): FakeQuery {
+    return {
+      __query: true,
+      where(field: string, op: string, value: unknown) {
+        return query(colPath, [...filters, { field, op, value }]);
+      },
+      async get(): Promise<FakeQuerySnap> {
+        const depth = colPath.split('/').length + 1;
+        const matches: FakeSnap[] = [...docs.keys()]
+          .filter((p) => p.startsWith(`${colPath}/`) && p.split('/').length === depth)
+          .sort()
+          .map((p) => snap(p))
+          .filter((s) =>
+            filters.every(({ field, op, value }) => {
+              const v = (s.data() as Data)[field];
+              if (op === '==') return v === value;
+              if (op === '>') return v !== undefined && (v as string) > (value as string);
+              if (op === '!=') return v !== value;
+              throw new Error(`op ${op} not supported`);
+            }),
+          );
+        return {
+          docs: matches,
+          empty: matches.length === 0,
+          size: matches.length,
+          forEach: (fn: (s: FakeSnap) => void) => matches.forEach(fn),
+        };
+      },
+    };
+  }
+
+  function collectionRef(path: string): FakeCollection {
+    return {
+      id: path.split('/').pop()!,
+      path,
+      doc(id?: string) {
+        return docRef(`${path}/${id ?? `auto${++autoId}`}`);
+      },
+      ...query(path, []),
+    };
+  }
+
+  function docRef(path: string): FakeDocRef {
+    return {
+      id: path.split('/').pop()!,
+      path,
+      get: async () => snap(path),
+      set: async (data, opts) =>
+        commit([{ kind: 'set', path, data, merge: opts?.merge }]),
+      update: async (data) => commit([{ kind: 'update', path, data }]),
+      delete: async () => commit([{ kind: 'delete', path }]),
+      collection: (name) => collectionRef(`${path}/${name}`),
+    };
+  }
+
+  const firestore = {
+    collection: (name: string) => collectionRef(name),
+    batch() {
+      const writes: Write[] = [];
+      return {
+        set: (ref: { path: string }, data: Data, opts?: { merge?: boolean }) => {
+          writes.push({ kind: 'set', path: ref.path, data, merge: opts?.merge });
+        },
+        update: (ref: { path: string }, data: Data) => {
+          writes.push({ kind: 'update', path: ref.path, data });
+        },
+        create: (ref: { path: string }, data: Data) => {
+          writes.push({ kind: 'create', path: ref.path, data });
+        },
+        delete: (ref: { path: string }) => {
+          writes.push({ kind: 'delete', path: ref.path });
+        },
+        commit: async () => {
+          batchSizes.push(writes.length);
+          commit(writes);
+        },
+      };
+    },
+    async runTransaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
+      const writes: Write[] = [];
+      const tx = {
+        async get(target: { get: () => Promise<unknown> }) {
+          if (writes.length > 0) {
+            throw new Error('Firestore transactions require all reads before writes');
+          }
+          return target.get();
+        },
+        set(ref: { path: string }, data: Data, opts?: { merge?: boolean }) {
+          writes.push({ kind: 'set', path: ref.path, data, merge: opts?.merge });
+          return tx;
+        },
+        update(ref: { path: string }, data: Data) {
+          writes.push({ kind: 'update', path: ref.path, data });
+          return tx;
+        },
+        create(ref: { path: string }, data: Data) {
+          writes.push({ kind: 'create', path: ref.path, data });
+          return tx;
+        },
+        delete(ref: { path: string }) {
+          writes.push({ kind: 'delete', path: ref.path });
+          return tx;
+        },
+      };
+      const result = await fn(tx);
+      commit(writes);
+      return result;
+    },
+  };
+
+  return {
+    docs,
+    batchSizes,
+    firestore,
+    FieldValue: { delete: () => DELETE, increment },
+    reset() {
+      docs.clear();
+      batchSizes.length = 0;
+      autoId = 0;
+    },
+    put(path: string, data: Data) {
+      docs.set(path, structuredClone(data));
+    },
+    get(path: string) {
+      return docs.get(path);
+    },
+    list(colPath: string) {
+      const depth = colPath.split('/').length + 1;
+      return [...docs.entries()]
+        .filter(([p]) => p.startsWith(`${colPath}/`) && p.split('/').length === depth)
+        .map(([p, d]) => ({ id: p.split('/').pop()!, ...d }));
+    },
+  };
+});
+
+const { managerGuard, firecallGuard, userGuard, notifyMock } = vi.hoisted(() => ({
+  managerGuard: vi.fn(),
+  firecallGuard: vi.fn(),
+  userGuard: vi.fn(),
+  notifyMock: vi.fn(),
+}));
+
+vi.mock('../../server/firebase/admin', () => ({ firestore: fake.firestore }));
+vi.mock('firebase-admin/firestore', () => ({ FieldValue: fake.FieldValue }));
+vi.mock('../firebase/firestore', () => ({
+  GROUP_COLLECTION_ID: 'groups',
+  FIRECALL_COLLECTION_ID: 'call',
+}));
+vi.mock('../Fahrtenbuch/authGuards', () => ({
+  actionFahrtenbuchManagerRequired: managerGuard,
+}));
+vi.mock('../../app/auth', () => ({
+  actionUserAuthorizedForFirecall: firecallGuard,
+  actionUserRequired: userGuard,
+}));
+vi.mock('./notifyNachbestellung', () => ({ notifyNachbestellung: notifyMock }));
+// Die Tests schicken das Raster als JSON statt als echte XLSX-Datei.
+vi.mock('../../common/xlsx', () => ({
+  readXlsxSheet: (data: Uint8Array) =>
+    JSON.parse(Buffer.from(data).toString('utf-8')) as string[][],
+}));
+
+import { deviationKey, lagerortKey, type GeraetLagerort } from '../../common/geraet';
+import { GERAET_EXPORT_COLUMNS } from '../../common/geraetImport';
+import {
+  bookGeraetBestand,
+  createGeraetBestand,
+  deleteGeraet,
+  importGeraete,
+  previewGeraetImport,
+  saveGeraet,
+  syncGeraetVerbrauch,
+} from './geraeteActions';
+
+const G = 'groups/ffnd';
+const session = { user: { id: 'u1', name: 'Max Mustermann', groups: ['ffnd'] } };
+
+const srf: GeraetLagerort = { art: 'fahrzeug', fahrzeug: 'SRF', laderaum: 'GR 2' };
+const lager: GeraetLagerort = { art: 'raum', standort: 'Feuerwehrhaus', raum: 'Lager' };
+
+function putGeraet(id: string, data: Record<string, unknown> = {}) {
+  fake.put(`${G}/geraet/${id}`, {
+    bezeichnung: 'Bindevlies Economy',
+    verbrauchsmaterial: true,
+    bestandGesamt: 0,
+    active: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    createdBy: 'u0',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    updatedBy: 'u0',
+    ...data,
+  });
+}
+
+function putBestand(id: string, geraetId: string, lagerort: GeraetLagerort, anzahl: number) {
+  fake.put(`${G}/geraetBestand/${id}`, {
+    geraetId,
+    lagerort,
+    lagerortKey: lagerortKey(lagerort),
+    anzahl,
+  });
+}
+
+function buchungen() {
+  return fake.list(`${G}/geraetBuchung`) as unknown as {
+    id: string;
+    art: string;
+    menge: number;
+    bestandId: string;
+    geraetId: string;
+    zielBestandId?: string;
+    einsatzEintragId?: string;
+    firecallId?: string;
+    createdBy: string;
+  }[];
+}
+
+function geraet(id: string) {
+  return fake.get(`${G}/geraet/${id}`) as Record<string, unknown> | undefined;
+}
+
+function bestand(id: string) {
+  return fake.get(`${G}/geraetBestand/${id}`) as Record<string, unknown> | undefined;
+}
+
+function sumOfBestaende(geraetId: string): number {
+  return fake
+    .list(`${G}/geraetBestand`)
+    .filter((b) => (b as { geraetId?: string }).geraetId === geraetId)
+    .reduce((s, b) => s + ((b as { anzahl?: number }).anzahl ?? 0), 0);
+}
+
+beforeEach(() => {
+  fake.reset();
+  vi.clearAllMocks();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  managerGuard.mockResolvedValue(session);
+  userGuard.mockResolvedValue(session);
+  firecallGuard.mockResolvedValue({ id: 'fc1', name: 'Ölspur B50', group: 'ffnd' });
+  notifyMock.mockResolvedValue(true);
+});
+
+describe('Guards der Pflege-Actions', () => {
+  it.each([
+    ['saveGeraet', () => saveGeraet('ffnd', { bezeichnung: 'X' })],
+    ['deleteGeraet', () => deleteGeraet('ffnd', 'g1')],
+    ['createGeraetBestand', () => createGeraetBestand('ffnd', 'g1', srf)],
+    [
+      'bookGeraetBestand',
+      () => bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: 1 }),
+    ],
+    ['previewGeraetImport', () => previewGeraetImport('ffnd', '')],
+    ['importGeraete', () => importGeraete('ffnd', '', [])],
+  ])('%s verlangt Gruppen-Admin oder Gerätemeister', async (_name, call) => {
+    putGeraet('g1');
+    putBestand('b1', 'g1', srf, 1);
+    const before = JSON.stringify([...fake.docs.entries()]);
+    managerGuard.mockRejectedValue(new Error('forbidden'));
+    await expect(call()).rejects.toThrow('forbidden');
+    expect(managerGuard).toHaveBeenCalledWith('ffnd');
+    expect(JSON.stringify([...fake.docs.entries()])).toBe(before);
+  });
+});
+
+describe('saveGeraet', () => {
+  it('legt einen Artikel mit Bestand 0 an und ignoriert berechnete Felder', async () => {
+    const { id } = await saveGeraet('ffnd', {
+      bezeichnung: '  Bindevlies Economy ',
+      verbrauchsmaterial: true,
+      einheit: 'Sack',
+      mindestbestand: 5,
+      bestandGesamt: 999,
+      nachbestellenSeit: '2020-01-01T00:00:00.000Z',
+      importedAt: '2020-01-01T00:00:00.000Z',
+    } as never);
+    const g = geraet(id)!;
+    expect(g).toMatchObject({
+      bezeichnung: 'Bindevlies Economy',
+      verbrauchsmaterial: true,
+      einheit: 'Sack',
+      mindestbestand: 5,
+      bestandGesamt: 0,
+      active: true,
+      createdBy: 'u1',
+      updatedBy: 'u1',
+    });
+    // Ein neuer Artikel mit Mindestbestand 5 und Bestand 0 gehört auf die
+    // Liste — ohne Mail, unterschritten wurde nichts.
+    expect(g.nachbestellenSeit).toEqual(expect.any(String));
+    expect(g.nachbestellenSeit).not.toBe('2020-01-01T00:00:00.000Z');
+    expect(g.importedAt).toBeUndefined();
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it('verlangt beim Anlegen eine Bezeichnung', async () => {
+    await expect(saveGeraet('ffnd', { bezeichnung: '  ' })).rejects.toThrow(
+      /bezeichnung/i,
+    );
+    expect(fake.list(`${G}/geraet`)).toHaveLength(0);
+  });
+
+  it('ändert nur übergebene Felder und löscht geleerte', async () => {
+    putGeraet('g1', { einheit: 'Sack', bemerkung: 'alt', bestandGesamt: 7 });
+    await saveGeraet('ffnd', { id: 'g1', bemerkung: '', kostenersatzRateId: '12.05' });
+    const g = geraet('g1')!;
+    expect(g.bemerkung).toBeUndefined();
+    expect(g.kostenersatzRateId).toBe('12.05');
+    expect(g.einheit).toBe('Sack');
+    expect(g.bestandGesamt).toBe(7);
+    expect(g.updatedBy).toBe('u1');
+    expect(g.createdBy).toBe('u0');
+  });
+
+  it('setzt und löscht die Nachbestellung beim Ändern des Mindestbestands', async () => {
+    putGeraet('g1', { bestandGesamt: 3 });
+    await saveGeraet('ffnd', { id: 'g1', mindestbestand: 5 });
+    expect(geraet('g1')!.nachbestellenSeit).toEqual(expect.any(String));
+    await saveGeraet('ffnd', { id: 'g1', mindestbestand: null } as never);
+    expect(geraet('g1')!.mindestbestand).toBeUndefined();
+    expect(geraet('g1')!.nachbestellenSeit).toBeUndefined();
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it('lehnt einen unbekannten Artikel ab', async () => {
+    await expect(saveGeraet('ffnd', { id: 'fehlt', bezeichnung: 'X' })).rejects.toThrow(
+      /not found/i,
+    );
+    expect(geraet('fehlt')).toBeUndefined();
+  });
+
+  it('lehnt eine ID mit Schrägstrich ab', async () => {
+    await expect(saveGeraet('ffnd', { id: 'a/b', bezeichnung: 'X' })).rejects.toThrow();
+  });
+
+  it('übernimmt nur gültige Werte für Material-Typ, Einheit und Barcodes', async () => {
+    const { id } = await saveGeraet('ffnd', {
+      bezeichnung: 'Filter',
+      materialTyp: 'Quatsch',
+      einheitVerwendungsnachweis: 'h',
+      barcodes: [' 123 ', '', '123', '456'],
+      mindestbestand: -2,
+    } as never);
+    const g = geraet(id)!;
+    expect(g.materialTyp).toBeUndefined();
+    expect(g.einheitVerwendungsnachweis).toBe('h');
+    expect(g.barcodes).toEqual(['123', '456']);
+    expect(g.mindestbestand).toBeUndefined();
+  });
+});
+
+describe('deleteGeraet', () => {
+  it('löscht einen Artikel ohne Buchungen samt Beständen und Import-Buchungen', async () => {
+    putGeraet('g1', { bestandGesamt: 3 });
+    putGeraet('g2');
+    putBestand('b1', 'g1', srf, 3);
+    putBestand('b2', 'g2', srf, 1);
+    fake.put(`${G}/geraetBuchung/k1`, { geraetId: 'g1', bestandId: 'b1', art: 'import', menge: 3 });
+    await expect(deleteGeraet('ffnd', 'g1')).resolves.toEqual({ id: 'g1', deleted: true });
+    expect(geraet('g1')).toBeUndefined();
+    expect(bestand('b1')).toBeUndefined();
+    expect(buchungen()).toHaveLength(0);
+    expect(bestand('b2')).toBeDefined();
+  });
+
+  it('deaktiviert einen Artikel mit Buchungen statt ihn zu löschen', async () => {
+    putGeraet('g1', { bestandGesamt: 2 });
+    putBestand('b1', 'g1', srf, 2);
+    fake.put(`${G}/geraetBuchung/k1`, { geraetId: 'g1', bestandId: 'b1', art: 'verbrauch', menge: -1 });
+    await expect(deleteGeraet('ffnd', 'g1')).resolves.toEqual({ id: 'g1', deleted: false });
+    expect(geraet('g1')!.active).toBe(false);
+    expect(bestand('b1')).toBeDefined();
+  });
+});
+
+describe('createGeraetBestand', () => {
+  it('legt den Lagerort an und bucht die Anfangsmenge als Inventur', async () => {
+    putGeraet('g1', { bestandGesamt: 2 });
+    putBestand('b0', 'g1', lager, 2);
+    const { id } = await createGeraetBestand('ffnd', 'g1', { ...srf, fahrzeug: ' SRF ' }, 4);
+    expect(bestand(id)).toMatchObject({
+      geraetId: 'g1',
+      lagerortKey: 'fahrzeug|srf|gr 2',
+      lagerort: { art: 'fahrzeug', fahrzeug: 'SRF', laderaum: 'GR 2' },
+      anzahl: 4,
+    });
+    expect(geraet('g1')!.bestandGesamt).toBe(6);
+    expect(sumOfBestaende('g1')).toBe(6);
+    expect(buchungen()).toEqual([
+      expect.objectContaining({ art: 'inventur', menge: 4, bestandId: id, geraetId: 'g1', createdBy: 'u1' }),
+    ]);
+  });
+
+  it('bucht nichts bei Anfangsmenge 0', async () => {
+    putGeraet('g1');
+    await createGeraetBestand('ffnd', 'g1', srf);
+    expect(buchungen()).toHaveLength(0);
+  });
+
+  it('lehnt einen doppelten Lagerort desselben Artikels ab', async () => {
+    putGeraet('g1');
+    putBestand('b1', 'g1', srf, 1);
+    await expect(
+      createGeraetBestand('ffnd', 'g1', { art: 'fahrzeug', fahrzeug: 'srf', laderaum: 'GR  2' }),
+    ).rejects.toThrow(/exists/i);
+  });
+
+  it('lehnt einen unbekannten Artikel und einen leeren Lagerort ab', async () => {
+    await expect(createGeraetBestand('ffnd', 'fehlt', srf)).rejects.toThrow(/not found/i);
+    putGeraet('g1');
+    await expect(createGeraetBestand('ffnd', 'g1', { art: 'fahrzeug' })).rejects.toThrow();
+    await expect(createGeraetBestand('ffnd', 'g1', { art: 'quatsch' } as never)).rejects.toThrow();
+  });
+
+  it('lehnt eine unsinnige Anfangsmenge ab', async () => {
+    putGeraet('g1');
+    await expect(createGeraetBestand('ffnd', 'g1', srf, 1e308)).rejects.toThrow(/anzahl/);
+    await expect(createGeraetBestand('ffnd', 'g1', srf, -1)).rejects.toThrow(/anzahl/);
+    expect(fake.list(`${G}/geraetBestand`)).toHaveLength(0);
+  });
+});
+
+describe('bookGeraetBestand', () => {
+  beforeEach(() => {
+    putGeraet('g1', { bestandGesamt: 4, mindestbestand: 5, nachbestellenSeit: '2026-09-01T00:00:00.000Z' });
+    putBestand('b1', 'g1', srf, 1);
+    putBestand('b2', 'g1', lager, 3);
+  });
+
+  it('bucht einen Zugang und löscht die Nachbestellung beim Wiederauffüllen', async () => {
+    await bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b2', menge: 10, bemerkung: 'Lieferung' });
+    expect(bestand('b2')!.anzahl).toBe(13);
+    expect(geraet('g1')!.bestandGesamt).toBe(14);
+    expect(geraet('g1')!.nachbestellenSeit).toBeUndefined();
+    expect(buchungen()).toEqual([
+      expect.objectContaining({ art: 'zugang', menge: 10, bestandId: 'b2', bemerkung: 'Lieferung' }),
+    ]);
+  });
+
+  it('bucht eine Umbuchung ohne Änderung des Gesamtbestands', async () => {
+    await bookGeraetBestand('ffnd', { art: 'umbuchung', bestandId: 'b2', zielBestandId: 'b1', menge: 2 });
+    expect(bestand('b2')!.anzahl).toBe(1);
+    expect(bestand('b1')!.anzahl).toBe(3);
+    expect(geraet('g1')!.bestandGesamt).toBe(4);
+    expect(buchungen()).toEqual([
+      expect.objectContaining({ art: 'umbuchung', menge: -2, bestandId: 'b2', zielBestandId: 'b1' }),
+    ]);
+  });
+
+  it('lehnt eine Umbuchung auf einen Lagerort eines anderen Artikels ab', async () => {
+    putGeraet('g2');
+    putBestand('x1', 'g2', srf, 0);
+    await expect(
+      bookGeraetBestand('ffnd', { art: 'umbuchung', bestandId: 'b2', zielBestandId: 'x1', menge: 1 }),
+    ).rejects.toThrow();
+    await expect(
+      bookGeraetBestand('ffnd', { art: 'umbuchung', bestandId: 'b2', zielBestandId: 'b2', menge: 1 }),
+    ).rejects.toThrow();
+    expect(buchungen()).toHaveLength(0);
+  });
+
+  it('setzt bei der Inventur den Ist-Wert und meldet das Unterschreiten nach dem Commit', async () => {
+    putGeraet('g1', { bestandGesamt: 6, mindestbestand: 5 });
+    putBestand('b2', 'g1', lager, 5);
+    notifyMock.mockImplementation(async () => {
+      // Erst nach dem Commit: Die Mail sieht den neuen Stand.
+      expect(geraet('g1')!.bestandGesamt).toBe(3);
+      return true;
+    });
+    await bookGeraetBestand('ffnd', { art: 'inventur', bestandId: 'b2', istWert: 2 });
+    expect(bestand('b2')!.anzahl).toBe(2);
+    expect(geraet('g1')!.nachbestellenSeit).toEqual(expect.any(String));
+    expect(buchungen()).toEqual([expect.objectContaining({ art: 'inventur', menge: -3 })]);
+    expect(notifyMock).toHaveBeenCalledWith({
+      groupId: 'ffnd',
+      items: [
+        expect.objectContaining({ geraetId: 'g1', bestandGesamt: 3, mindestbestand: 5 }),
+      ],
+    });
+  });
+
+  it('meldet nicht erneut, wenn der Bestand schon darunter lag', async () => {
+    await bookGeraetBestand('ffnd', { art: 'inventur', bestandId: 'b2', istWert: 0 });
+    expect(notifyMock).not.toHaveBeenCalled();
+    expect(geraet('g1')!.nachbestellenSeit).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  it('lehnt unsinnige Mengen ab', async () => {
+    await expect(bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: 0 })).rejects.toThrow();
+    await expect(bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: -1 })).rejects.toThrow();
+    await expect(
+      bookGeraetBestand('ffnd', { art: 'inventur', bestandId: 'b1', istWert: Number.NaN }),
+    ).rejects.toThrow();
+    await expect(
+      bookGeraetBestand('ffnd', { art: 'verbrauch', bestandId: 'b1', menge: 1 } as never),
+    ).rejects.toThrow();
+    await expect(
+      bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: 1e308 }),
+    ).rejects.toThrow();
+    await expect(
+      bookGeraetBestand('ffnd', { art: 'inventur', bestandId: 'b1', istWert: 1e308 }),
+    ).rejects.toThrow();
+    await expect(
+      bookGeraetBestand('ffnd', { art: 'inventur', bestandId: 'b1', istWert: -1 }),
+    ).rejects.toThrow();
+    expect(buchungen()).toHaveLength(0);
+  });
+
+  it('bucht Kommazahlen (Ölbindemittel in kg)', async () => {
+    await bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b2', menge: 2.5 });
+    expect(bestand('b2')!.anzahl).toBe(5.5);
+    await bookGeraetBestand('ffnd', { art: 'inventur', bestandId: 'b2', istWert: 7.5 });
+    expect(bestand('b2')!.anzahl).toBe(7.5);
+    expect(geraet('g1')!.bestandGesamt).toBe(8.5);
+  });
+
+  it('lehnt einen unbekannten Lagerort ab', async () => {
+    await expect(bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'fehlt', menge: 1 })).rejects.toThrow(
+      /not found/i,
+    );
+  });
+});
+
+describe('syncGeraetVerbrauch', () => {
+  const E = 'call/fc1/geraetEinsatz';
+
+  function putEintrag(id: string, data: Record<string, unknown>) {
+    fake.put(`${E}/${id}`, {
+      groupId: 'ffnd',
+      geraetId: 'g1',
+      geraetName: 'Bindevlies Economy',
+      art: 'verbraucht',
+      bestandId: 'b1',
+      menge: 3,
+      zeitpunkt: '2026-10-04T10:00:00.000Z',
+      createdAt: '2026-10-04T10:00:00.000Z',
+      createdBy: 'u2',
+      ...data,
+    });
+  }
+
+  beforeEach(() => {
+    putGeraet('g1', { bestandGesamt: 10, mindestbestand: 5 });
+    putBestand('b1', 'g1', srf, 4);
+    putBestand('b2', 'g1', lager, 6);
+  });
+
+  it('prüft die Einsatzberechtigung mit Schreibrecht und Gruppenmitgliedschaft', async () => {
+    firecallGuard.mockRejectedValue(new Error('not authorized'));
+    putEintrag('e1', {});
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).rejects.toThrow('not authorized');
+    // Ein Gast mit Schreibrecht könnte die Gruppe am Einsatz umschreiben und
+    // im Lager einer fremden Gruppe buchen — darum nur Gruppenmitglieder.
+    expect(firecallGuard).toHaveBeenCalledWith('fc1', {
+      requireWrite: true,
+      requireGroupMember: true,
+    });
+    expect(buchungen()).toHaveLength(0);
+  });
+
+  describe('erwarteter Stand des Eintrags', () => {
+    it('lehnt ab, solange ein gelöschter Eintrag am Server noch steht', async () => {
+      putEintrag('e1', { syncRev: 1 });
+      await syncGeraetVerbrauch('fc1', 'e1', { syncRev: 1 });
+      await expect(syncGeraetVerbrauch('fc1', 'e1', { deleted: true })).rejects.toThrow(
+        /expected state/,
+      );
+      expect(bestand('b1')!.anzahl).toBe(1);
+
+      fake.docs.delete(`${E}/e1`);
+      await syncGeraetVerbrauch('fc1', 'e1', { deleted: true });
+      expect(bestand('b1')!.anzahl).toBe(4);
+    });
+
+    it('lehnt einen älteren Stand ab und bucht die Änderung, sobald sie da ist', async () => {
+      putEintrag('e1', { syncRev: 1 });
+      await syncGeraetVerbrauch('fc1', 'e1', { syncRev: 1 });
+      await expect(syncGeraetVerbrauch('fc1', 'e1', { syncRev: 2 })).rejects.toThrow(
+        /expected state/,
+      );
+      expect(fake.get(`${E}/e1`)!.gebucht).toBe(true);
+
+      putEintrag('e1', { syncRev: 2, menge: 5, gebucht: false });
+      await syncGeraetVerbrauch('fc1', 'e1', { syncRev: 2 });
+      expect(bestand('b1')!.anzahl).toBe(-1);
+      expect(fake.get(`${E}/e1`)!.gebucht).toBe(true);
+    });
+
+    it('lehnt ab, solange ein neuer Eintrag am Server fehlt', async () => {
+      await expect(syncGeraetVerbrauch('fc1', 'e1', { syncRev: 1 })).rejects.toThrow(
+        /expected state/,
+      );
+      expect(buchungen()).toHaveLength(0);
+    });
+
+    it('bucht einen neueren Stand als erwartet (von einem anderen Gerät)', async () => {
+      putEintrag('e1', { syncRev: 9 });
+      await expect(syncGeraetVerbrauch('fc1', 'e1', { syncRev: 5 })).resolves.toEqual({
+        deltas: 1,
+      });
+    });
+
+    it('lehnt eine unbekannte Erwartung ab', async () => {
+      putEintrag('e1', {});
+      await expect(
+        syncGeraetVerbrauch('fc1', 'e1', { syncRev: 'x' } as never),
+      ).rejects.toThrow(/expectation/);
+    });
+  });
+
+  it('bucht bei einem Artikel ohne Verbrauchsmaterial nichts ab', async () => {
+    putGeraet('g1', { bestandGesamt: 10, verbrauchsmaterial: false });
+    putEintrag('e1', {});
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 0 });
+    expect(buchungen()).toHaveLength(0);
+    expect(bestand('b1')!.anzahl).toBe(4);
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it('bucht bei einem deaktivierten Artikel nichts Neues ab', async () => {
+    putGeraet('g1', { bestandGesamt: 10, mindestbestand: 5, active: false });
+    putEintrag('e1', {});
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 0 });
+    expect(bestand('b1')!.anzahl).toBe(4);
+  });
+
+  it('lässt einen gebuchten Verbrauch stehen, wenn der Artikel kein Verbrauchsmaterial mehr ist', async () => {
+    putEintrag('e1', {});
+    await syncGeraetVerbrauch('fc1', 'e1');
+    putGeraet('g1', { bestandGesamt: 7, verbrauchsmaterial: false });
+    // Nur die Bemerkung geändert, der Eintrag bleibt ein Verbrauch.
+    putEintrag('e1', { bemerkung: 'nachgetragen', gebucht: false });
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 0 });
+    expect(bestand('b1')!.anzahl).toBe(1);
+    expect(fake.get(`${E}/e1`)!.gebucht).toBe(true);
+
+    // Erhöhen bucht nichts nach, Löschen storniert weiterhin.
+    putEintrag('e1', { menge: 8 });
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 0 });
+    fake.docs.delete(`${E}/e1`);
+    await syncGeraetVerbrauch('fc1', 'e1');
+    expect(bestand('b1')!.anzahl).toBe(4);
+  });
+
+  it('lehnt eine unsinnige Menge im Eintrag ab', async () => {
+    putEintrag('e1', { menge: 1e308 });
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).rejects.toThrow(/invalid menge/);
+    putEintrag('e2', { menge: -2 });
+    await expect(syncGeraetVerbrauch('fc1', 'e2')).rejects.toThrow(/invalid menge/);
+    expect(buchungen()).toHaveLength(0);
+    expect(bestand('b1')!.anzahl).toBe(4);
+    expect(geraet('g1')!.bestandGesamt).toBe(10);
+  });
+
+  it('bucht den Verbrauch ab und markiert den Eintrag als gebucht', async () => {
+    putEintrag('e1', {});
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 1 });
+    expect(bestand('b1')!.anzahl).toBe(1);
+    expect(geraet('g1')!.bestandGesamt).toBe(7);
+    expect(fake.get(`${E}/e1`)!.gebucht).toBe(true);
+    expect(buchungen()).toEqual([
+      expect.objectContaining({
+        art: 'verbrauch',
+        menge: -3,
+        bestandId: 'b1',
+        geraetId: 'g1',
+        firecallId: 'fc1',
+        einsatzEintragId: 'e1',
+        createdBy: 'u1',
+      }),
+    ]);
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it('ist idempotent — ein zweiter Aufruf bucht nichts', async () => {
+    putEintrag('e1', {});
+    await syncGeraetVerbrauch('fc1', 'e1');
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 0 });
+    expect(buchungen()).toHaveLength(1);
+    expect(bestand('b1')!.anzahl).toBe(1);
+  });
+
+  it('bucht bei geänderter Menge die Differenz nach', async () => {
+    putEintrag('e1', {});
+    await syncGeraetVerbrauch('fc1', 'e1');
+    putEintrag('e1', { menge: 5 });
+    await syncGeraetVerbrauch('fc1', 'e1');
+    expect(bestand('b1')!.anzahl).toBe(-1);
+    expect(geraet('g1')!.bestandGesamt).toBe(5);
+    expect(buchungen().map((b) => [b.art, b.menge])).toEqual([
+      ['verbrauch', -3],
+      ['verbrauch', -2],
+    ]);
+  });
+
+  it('bucht bei geändertem Lagerort um (Storno und Verbrauch)', async () => {
+    putEintrag('e1', {});
+    await syncGeraetVerbrauch('fc1', 'e1');
+    putEintrag('e1', { bestandId: 'b2' });
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 2 });
+    expect(bestand('b1')!.anzahl).toBe(4);
+    expect(bestand('b2')!.anzahl).toBe(3);
+    expect(geraet('g1')!.bestandGesamt).toBe(7);
+    expect(sumOfBestaende('g1')).toBe(7);
+  });
+
+  it('storniert den Verbrauch eines gelöschten Eintrags', async () => {
+    putEintrag('e1', {});
+    await syncGeraetVerbrauch('fc1', 'e1');
+    fake.docs.delete(`${E}/e1`);
+    await syncGeraetVerbrauch('fc1', 'e1');
+    expect(bestand('b1')!.anzahl).toBe(4);
+    expect(geraet('g1')!.bestandGesamt).toBe(10);
+    expect(buchungen().map((b) => [b.art, b.menge])).toEqual([
+      ['verbrauch', -3],
+      ['storno', 3],
+    ]);
+  });
+
+  it('bucht bei einem nur zugeordneten Gerät nichts ab', async () => {
+    putEintrag('e1', { art: 'zugeordnet' });
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 0 });
+    expect(buchungen()).toHaveLength(0);
+    expect(geraet('g1')!.bestandGesamt).toBe(10);
+  });
+
+  it('meldet das Unterschreiten des Mindestbestands genau einmal', async () => {
+    putEintrag('e1', { menge: 6 });
+    await syncGeraetVerbrauch('fc1', 'e1');
+    expect(geraet('g1')!.nachbestellenSeit).toEqual(expect.any(String));
+    expect(notifyMock).toHaveBeenCalledOnce();
+    expect(notifyMock).toHaveBeenCalledWith({
+      groupId: 'ffnd',
+      firecallId: 'fc1',
+      firecallName: 'Ölspur B50',
+      items: [expect.objectContaining({ geraetId: 'g1', bestandGesamt: 4, mindestbestand: 5 })],
+    });
+
+    putEintrag('e2', { menge: 1 });
+    await syncGeraetVerbrauch('fc1', 'e2');
+    expect(notifyMock).toHaveBeenCalledOnce();
+  });
+
+  it('lässt die Buchung stehen, wenn die Mail scheitert', async () => {
+    notifyMock.mockRejectedValue(new Error('gmail down'));
+    putEintrag('e1', { menge: 6 });
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 1 });
+    expect(geraet('g1')!.bestandGesamt).toBe(4);
+  });
+
+  it('lehnt einen Eintrag einer fremden Gruppe ab', async () => {
+    putEintrag('e1', { groupId: 'andere' });
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).rejects.toThrow(/group/i);
+    expect(buchungen()).toHaveLength(0);
+  });
+
+  it('lehnt einen Lagerort eines anderen Artikels ab', async () => {
+    putGeraet('g2');
+    putBestand('x1', 'g2', srf, 5);
+    putEintrag('e1', { bestandId: 'x1' });
+    await expect(syncGeraetVerbrauch('fc1', 'e1')).rejects.toThrow();
+    expect(bestand('x1')!.anzahl).toBe(5);
+  });
+
+  it('lehnt eine ID mit Schrägstrich ab', async () => {
+    await expect(syncGeraetVerbrauch('fc1', '../x')).rejects.toThrow();
+  });
+});
+
+// --- Import -----------------------------------------------------------------
+
+const C = GERAET_EXPORT_COLUMNS;
+const HEADER = [
+  C.externeId,
+  C.bezeichnung,
+  C.inventarNr,
+  C.kategorie,
+  C.materialTyp,
+  C.status,
+  C.bemerkung,
+  C.lagerort,
+  C.fahrzeug,
+  C.laderaum,
+  C.standort,
+  C.raum,
+  C.anzahl,
+];
+
+interface Row {
+  id: string;
+  bezeichnung?: string;
+  inventarNr?: string;
+  kategorie?: string;
+  materialTyp?: string;
+  status?: string;
+  bemerkung?: string;
+  lagerort?: GeraetLagerort;
+  anzahl?: number;
+}
+
+function rowsOf(rows: Row[]): string[][] {
+  return [
+    HEADER,
+    ...rows.map((r) => [
+      r.id,
+      r.bezeichnung ?? `Artikel ${r.id}`,
+      r.inventarNr ?? '',
+      r.kategorie ?? 'Gerät',
+      r.materialTyp ?? 'Massenartikel',
+      r.status ?? 'aktiv',
+      r.bemerkung ?? '',
+      r.lagerort ? { fahrzeug: 'Fahrzeug', raum: 'Raum', set: 'Set-Artikel' }[r.lagerort.art] : '',
+      r.lagerort?.fahrzeug ?? '',
+      r.lagerort?.laderaum ?? '',
+      r.lagerort?.standort ?? '',
+      r.lagerort?.raum ?? '',
+      r.anzahl === undefined ? '' : String(r.anzahl),
+    ]),
+  ];
+}
+
+function file(rows: Row[]): string {
+  return Buffer.from(JSON.stringify(rowsOf(rows))).toString('base64');
+}
+
+describe('previewGeraetImport', () => {
+  it('liefert den Plan und die Meldungen, ohne zu schreiben', async () => {
+    const plan = await previewGeraetImport(
+      'ffnd',
+      file([
+        { id: '100', lagerort: srf, anzahl: 3 },
+        { id: '100', lagerort: lager, anzahl: 2 },
+        { id: '', bezeichnung: 'ohne ID' },
+      ]),
+    );
+    expect(plan.create.map((a) => a.externeId)).toEqual(['100']);
+    expect(plan.bestandCreate).toHaveLength(2);
+    expect(plan.errors).toEqual([expect.stringContaining('keine ID')]);
+    expect(fake.docs.size).toBe(0);
+  });
+
+  it('nimmt auch eine Data-URL an', async () => {
+    const plan = await previewGeraetImport(
+      'ffnd',
+      `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${file([{ id: '1' }])}`,
+    );
+    expect(plan.create).toHaveLength(1);
+  });
+
+  it('lehnt eine zu große Datei ab', async () => {
+    await expect(previewGeraetImport('ffnd', 'A'.repeat(8 * 1024 * 1024))).rejects.toThrow(
+      /too large/i,
+    );
+  });
+
+  it('erkennt Buchungen seit dem letzten Import als Abweichung', async () => {
+    putGeraet('100', { externeId: '100', bezeichnung: 'Artikel 100', bestandGesamt: 2, importedAt: '2026-09-01T00:00:00.000Z' });
+    putBestand('b1', '100', srf, 2);
+    // Die Import-Buchung selbst zählt nicht, der Verbrauch danach schon.
+    fake.put(`${G}/geraetBuchung/k0`, { geraetId: '100', bestandId: 'b1', art: 'import', menge: 3, createdAt: '2026-09-01T00:00:00.000Z' });
+    fake.put(`${G}/geraetBuchung/k1`, { geraetId: '100', bestandId: 'b1', art: 'verbrauch', menge: -1, createdAt: '2026-09-15T00:00:00.000Z' });
+
+    const plan = await previewGeraetImport('ffnd', file([{ id: '100', lagerort: srf, anzahl: 3 }]));
+    expect(plan.deviations).toEqual([
+      expect.objectContaining({ geraetId: '100', bestandId: 'b1', current: 2, imported: 3 }),
+    ]);
+    expect(plan.bestandUpdate).toHaveLength(0);
+  });
+});
+
+describe('importGeraete', () => {
+  it('legt beim Erstimport Artikel, Bestände und Import-Buchungen an', async () => {
+    const summary = await importGeraete(
+      'ffnd',
+      file([
+        { id: '100', bezeichnung: 'Bindevlies Economy', kategorie: 'Verbrauchsmaterial', lagerort: srf, anzahl: 3 },
+        { id: '100', lagerort: lager, anzahl: 7 },
+        { id: '200', bezeichnung: 'Kupplungsschlüssel', status: 'inaktiv' },
+      ]),
+      [],
+    );
+    expect(summary).toMatchObject({ created: 2, bestandCreated: 2, inactive: 1 });
+
+    const g = geraet('100')!;
+    expect(g).toMatchObject({
+      externeId: '100',
+      bezeichnung: 'Bindevlies Economy',
+      verbrauchsmaterial: true,
+      bestandGesamt: 10,
+      active: true,
+      createdBy: 'u1',
+      importedAt: expect.any(String),
+    });
+    expect(geraet('200')).toMatchObject({ active: false, bestandGesamt: 0, verbrauchsmaterial: false });
+    expect(sumOfBestaende('100')).toBe(10);
+    expect(buchungen().map((b) => [b.art, b.menge, b.geraetId])).toEqual(
+      expect.arrayContaining([
+        ['import', 3, '100'],
+        ['import', 7, '100'],
+      ]),
+    );
+  });
+
+  it('übernimmt beim Folgeimport ohne Buchungen Stammdaten und Bestand', async () => {
+    putGeraet('100', {
+      externeId: '100',
+      bezeichnung: 'Alt',
+      bemerkung: 'weg damit',
+      verbrauchsmaterial: true,
+      mindestbestand: 5,
+      bestandGesamt: 3,
+      importedAt: '2026-09-01T00:00:00.000Z',
+    });
+    putBestand('b1', '100', srf, 3);
+
+    const summary = await importGeraete(
+      'ffnd',
+      file([{ id: '100', bezeichnung: 'Neu', lagerort: srf, anzahl: 8 }]),
+      [],
+    );
+    expect(summary).toMatchObject({ updated: 1, bestandUpdated: 1 });
+    const g = geraet('100')!;
+    expect(g.bezeichnung).toBe('Neu');
+    expect(g.bemerkung).toBeUndefined();
+    // Händisch gepflegt — bleibt.
+    expect(g.verbrauchsmaterial).toBe(true);
+    expect(g.mindestbestand).toBe(5);
+    expect(g.bestandGesamt).toBe(8);
+    expect(g.importedAt).not.toBe('2026-09-01T00:00:00.000Z');
+    expect(bestand('b1')!.anzahl).toBe(8);
+    expect(buchungen()).toEqual([expect.objectContaining({ art: 'import', menge: 5, bestandId: 'b1' })]);
+  });
+
+  it('meldet beim Import ein Unterschreiten gesammelt in einer Mail', async () => {
+    putGeraet('100', { externeId: '100', bezeichnung: 'Artikel 100', mindestbestand: 5, bestandGesamt: 6, importedAt: '2026-09-01T00:00:00.000Z' });
+    putBestand('b1', '100', srf, 6);
+    await importGeraete('ffnd', file([{ id: '100', lagerort: srf, anzahl: 2 }]), []);
+    expect(geraet('100')!.nachbestellenSeit).toEqual(expect.any(String));
+    expect(notifyMock).toHaveBeenCalledOnce();
+    expect(notifyMock).toHaveBeenCalledWith({
+      groupId: 'ffnd',
+      items: [expect.objectContaining({ geraetId: '100', bestandGesamt: 2 })],
+    });
+  });
+
+  describe('mit Buchungen seit dem letzten Import', () => {
+    beforeEach(() => {
+      putGeraet('100', { externeId: '100', bezeichnung: 'Artikel 100', bestandGesamt: 2, importedAt: '2026-09-01T00:00:00.000Z' });
+      putBestand('b1', '100', srf, 2);
+      fake.put(`${G}/geraetBuchung/k1`, {
+        geraetId: '100',
+        bestandId: 'b1',
+        art: 'verbrauch',
+        menge: -1,
+        createdAt: '2026-09-15T00:00:00.000Z',
+      });
+    });
+
+    const rows: Row[] = [
+      { id: '100', lagerort: srf, anzahl: 3 },
+      { id: '100', lagerort: lager, anzahl: 4 },
+    ];
+
+    it('überschreibt den Bestand nicht ohne Zustimmung und behält den Importzeitpunkt', async () => {
+      const summary = await importGeraete('ffnd', file(rows), []);
+      expect(summary).toMatchObject({ deviationsAccepted: 0, deviationsRejected: 2 });
+      expect(bestand('b1')!.anzahl).toBe(2);
+      expect(fake.list(`${G}/geraetBestand`)).toHaveLength(1);
+      expect(geraet('100')!.bestandGesamt).toBe(2);
+      // Sonst überschriebe der nächste Import den verworfenen Wert still.
+      expect(geraet('100')!.importedAt).toBe('2026-09-01T00:00:00.000Z');
+    });
+
+    it('übernimmt zugestimmte Abweichungen als Inventur, auch neue Lagerorte', async () => {
+      const summary = await importGeraete('ffnd', file(rows), [
+        deviationKey({ geraetId: '100', lagerortKey: lagerortKey(srf) }),
+        deviationKey({ geraetId: '100', lagerortKey: lagerortKey(lager) }),
+      ]);
+      expect(summary).toMatchObject({ deviationsAccepted: 2, deviationsRejected: 0 });
+      expect(bestand('b1')!.anzahl).toBe(3);
+      const neu = fake
+        .list(`${G}/geraetBestand`)
+        .find((b) => (b as { lagerortKey?: string }).lagerortKey === lagerortKey(lager)) as
+        | Record<string, unknown>
+        | undefined;
+      expect(neu).toMatchObject({ geraetId: '100', anzahl: 4, lagerort: lager });
+      expect(geraet('100')!.bestandGesamt).toBe(7);
+      expect(sumOfBestaende('100')).toBe(7);
+      expect(buchungen().filter((b) => b.art === 'inventur').map((b) => b.menge).sort()).toEqual([1, 4]);
+      expect(geraet('100')!.importedAt).not.toBe('2026-09-01T00:00:00.000Z');
+    });
+  });
+
+  it('schreibt in Batches von höchstens 450 Operationen', async () => {
+    const rows: Row[] = [];
+    for (let i = 1; i <= 300; i++) rows.push({ id: String(i), lagerort: srf, anzahl: 1 });
+    const summary = await importGeraete('ffnd', file(rows), []);
+    expect(summary.created).toBe(300);
+    expect(fake.list(`${G}/geraet`)).toHaveLength(300);
+    expect(fake.list(`${G}/geraetBestand`)).toHaveLength(300);
+    expect(buchungen()).toHaveLength(300);
+    expect(fake.batchSizes.length).toBeGreaterThan(1);
+    expect(Math.max(...fake.batchSizes)).toBeLessThanOrEqual(450);
+  });
+
+  it('lehnt unbrauchbare Zustimmungen ab', async () => {
+    await expect(importGeraete('ffnd', file([{ id: '1' }]), 'x' as never)).rejects.toThrow();
+  });
+});

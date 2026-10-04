@@ -27,6 +27,25 @@ describe('columnIndex', () => {
 });
 
 describe('readXlsxSheet', () => {
+  it('lehnt einen zu großen Teil ab (Zip-Bombe)', () => {
+    const data = xlsx(
+      `<row r="1"><c r="A1" t="inlineStr"><is><t>${'x'.repeat(4096)}</t></is></c></row>`,
+    );
+    expect(() => readXlsxSheet(data, 1, 1024)).toThrow(/zu groß/);
+    expect(readXlsxSheet(data, 1, 64 * 1024)[0][0]).toHaveLength(4096);
+  });
+
+  it('entpackt nur Blatt und sharedStrings, andere Teile bleiben unberührt', () => {
+    const data = zipSync({
+      'xl/worksheets/sheet1.xml': strToU8(
+        '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>ID</t></is></c></row></sheetData></worksheet>',
+      ),
+      // Ein riesiger Anhang, der nicht gebraucht wird, zählt nicht gegen die Grenze.
+      'xl/media/image1.png': new Uint8Array(1024 * 1024),
+    });
+    expect(readXlsxSheet(data, 1, 64 * 1024)).toEqual([['ID']]);
+  });
+
   it('löst Verweise in die sharedStrings-Tabelle auf', () => {
     const data = xlsx(
       `<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>`,

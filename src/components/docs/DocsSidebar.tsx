@@ -29,6 +29,7 @@ const docPages = [
   { key: 'strahlenschutz', href: '/docs/strahlenschutz' },
   { key: 'energiespektrum', href: '/docs/energiespektrum' },
   { key: 'fahrtenbuch', href: '/docs/fahrtenbuch' },
+  { key: 'geraete', href: '/docs/geraete' },
   { key: 'kostenersatz', href: '/docs/kostenersatz' },
   { key: 'geschaeftsbuch', href: '/docs/geschaeftsbuch' },
   { key: 'wetter', href: '/docs/wetter' },
