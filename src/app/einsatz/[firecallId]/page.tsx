@@ -1,5 +1,5 @@
-import DynamicMap from '../../../components/Map/DynamicMap';
+import FirecallView from '../../../components/pages/FirecallView';
 
 export default function EinsatzPage() {
-  return <DynamicMap />;
+  return <FirecallView />;
 }

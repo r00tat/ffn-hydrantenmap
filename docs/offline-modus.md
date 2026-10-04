@@ -456,7 +456,11 @@ Bausteine. Hintergrund in
   Screen Wake Lock API fehlt in der WebView vermutlich.
 - **Android-Kaltstart ohne Netz** ist ungeprüft (siehe oben): Er hängt daran,
   ob die WebView ihren Firebase-Benutzer über einen Prozessstart behält.
-- **Seitenwechsel offline laden die Seite neu.** Der RSC-Abruf einer
-  Client-Navigation scheitert (nach höchstens acht Sekunden, kurz nach einem
-  Ausfall nach zwei), Next.js navigiert hart, und die App-Shell antwortet.
-  Der Zustand der Seite (offene Dialoge, Eingaben) geht dabei verloren.
+- **Seitenwechsel offline laden die Seite neu — außer innerhalb eines
+  Einsatzes.** Karte und Abschnitte unter `/einsatz/<id>[/<abschnitt>]`
+  wechseln per `history.pushState` ohne Server (siehe
+  [service-worker-pwa.md](service-worker-pwa.md#wechsel-innerhalb-eines-einsatzes-ohne-neuladen)).
+  Für alle anderen Seiten scheitert der RSC-Abruf einer Client-Navigation
+  (nach höchstens acht Sekunden, kurz nach einem Ausfall nach zwei), Next.js
+  navigiert hart, und die App-Shell antwortet. Der Zustand der Seite (offene
+  Dialoge, Eingaben) geht dabei verloren.

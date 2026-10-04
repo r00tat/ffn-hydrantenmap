@@ -86,7 +86,7 @@ Empty lists are marked offline ("Offline – no entries on this device"), filled
 
 If you signed in online and used the app within the last 90 days, it opens without the login screen even in airplane mode. Your permissions then come from the last sign-in; the tooltip on the status says so. As soon as the connection is back, the sign-in is checked with the server again.
 
-After starting, the device loads all pages of the app in the background – including those of the current operation, such as breathing apparatus monitoring. Offline you switch between pages as usual; the page reloads once when you do. For this to work, the app should have been open and online for about a minute after signing in. Only administration, sign-in and pages for individual invoices or vehicles are left out; offline they show "Offline – page not available" with a **Go to map** button.
+After starting, the device loads all pages of the app in the background – including those of the current operation, such as breathing apparatus monitoring. Offline you switch between pages as usual. Within an operation – map, operations diary, breathing apparatus and so on – this works without reloading; for other pages the page reloads once when you do. For this to work, the app should have been open and online for about a minute after signing in. Only administration, sign-in and pages for individual invoices or vehicles are left out; offline they show "Offline – page not available" with a **Go to map** button.
 
 :::warning
 In the Android app, starting without network is not yet reliable on every device. Keep the app open during the operation instead of closing it. If it starts without data, it signs in again by itself as soon as the connection is back.
