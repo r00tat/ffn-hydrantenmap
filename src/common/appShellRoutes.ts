@@ -100,6 +100,7 @@ export const FIRECALL_SECTION_NAMES = [
   'hochwasser',
   'atemschutz',
   'atemschutzueberwachung',
+  'einsaetze',
 ] as const;
 
 export type FirecallSectionName = (typeof FIRECALL_SECTION_NAMES)[number];

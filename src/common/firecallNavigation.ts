@@ -4,10 +4,12 @@ import { FIRECALL_SECTION_NAMES, type FirecallSectionName } from './appShellRout
  * Wechsel zwischen den Seiten eines Einsatzes ohne Neuladen.
  *
  * Karte und Abschnitte unter `/einsatz/<id>[/<abschnitt>]` rendern dieselbe
- * Client-Komponente (`FirecallView`), die den Abschnitt aus der Adresse liest.
- * Ein Wechsel innerhalb desselben Einsatzes braucht deshalb keinen Server und
- * keinen Cache: `FirecallLink` setzt nur die Adresse per `history.pushState`.
- * Seiten mit eigener Route (Kostenersatz, Schadstoff) gehen den normalen Weg.
+ * Client-Komponente (`FirecallView`), die den Abschnitt aus der Adresse liest;
+ * `EinsatzClient` liest dort auch die Einsatz-ID. Ein Wechsel zwischen diesen
+ * Seiten braucht deshalb keinen Server und keinen Cache, auch zu einem anderen
+ * Einsatz: `FirecallLink` und `useFirecallNavigate` setzen nur die Adresse per
+ * `history.pushState`. Seiten mit eigener Route (Kostenersatz, Schadstoff)
+ * gehen den normalen Weg.
  */
 
 export interface FirecallSectionPath {
@@ -31,8 +33,9 @@ export function parseFirecallSectionPath(pathname: string): FirecallSectionPath 
 }
 
 /**
- * Ob `href` von `currentPathname` aus ohne Router erreichbar ist: derselbe
- * Einsatz, ein anderer Abschnitt, keine Query und kein Anker.
+ * Ob `href` von `currentPathname` aus ohne Router erreichbar ist: beide sind
+ * Einsatzseiten (gleich welcher Einsatz), das Ziel ist eine andere Seite und
+ * trägt weder Query noch Anker.
  */
 export function canNavigateInPlace(
   currentPathname: string,
@@ -53,7 +56,6 @@ export function canNavigateInPlace(
   return (
     from !== null &&
     to !== null &&
-    from.firecallId === to.firecallId &&
-    from.section !== to.section
+    (from.firecallId !== to.firecallId || from.section !== to.section)
   );
 }

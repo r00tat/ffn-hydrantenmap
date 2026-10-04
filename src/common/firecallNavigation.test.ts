@@ -29,7 +29,7 @@ describe('parseFirecallSectionPath', () => {
 });
 
 describe('canNavigateInPlace', () => {
-  it('wechselt innerhalb desselben Einsatzes ohne Server', () => {
+  it('wechselt zwischen den Abschnitten eines Einsatzes ohne Server', () => {
     expect(canNavigateInPlace(`/einsatz/${ID}`, `/einsatz/${ID}/tagebuch`)).toBe(true);
     expect(canNavigateInPlace(`/einsatz/${ID}/tagebuch`, `/einsatz/${ID}/atemschutz`)).toBe(true);
     expect(canNavigateInPlace(`/einsatz/${ID}/details`, `/einsatz/${ID}`)).toBe(true);
@@ -44,8 +44,14 @@ describe('canNavigateInPlace', () => {
     ).toBe(false);
   });
 
-  it('navigiert normal zu einem anderen Einsatz oder außerhalb', () => {
-    expect(canNavigateInPlace(`/einsatz/${ID}`, '/einsatz/BBBBBBBBBBBBBBBBBBBB/tagebuch')).toBe(false);
+  it('wechselt auch zu einem anderen Einsatz ohne Server', () => {
+    expect(canNavigateInPlace(`/einsatz/${ID}/einsaetze`, '/einsatz/BBBBBBBBBBBBBBBBBBBB')).toBe(true);
+    expect(canNavigateInPlace(`/einsatz/${ID}`, '/einsatz/BBBBBBBBBBBBBBBBBBBB/tagebuch')).toBe(true);
+  });
+
+  it('navigiert normal außerhalb der Einsatzseiten, mit Query oder Anker', () => {
+    expect(canNavigateInPlace(`/einsatz/${ID}`, `/einsatz/${ID}?token=abc`)).toBe(false);
+    expect(canNavigateInPlace(`/einsatz/${ID}`, `/einsatz/${ID}/tagebuch#oben`)).toBe(false);
     expect(canNavigateInPlace(`/einsatz/${ID}`, '/einsaetze')).toBe(false);
     expect(canNavigateInPlace('/einsaetze', `/einsatz/${ID}`)).toBe(false);
     expect(canNavigateInPlace(`/einsatz/${ID}`, `/einsatz/${ID}/kostenersatz`)).toBe(false);

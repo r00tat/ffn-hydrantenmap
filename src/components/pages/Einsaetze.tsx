@@ -26,8 +26,8 @@ import Typography from '@mui/material/Typography';
 import { doc, orderBy, where } from 'firebase/firestore';
 import { useTranslations } from 'next-intl';
 import { setDocLocal } from '../../lib/firestoreClient';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import FirecallLink from '../site/FirecallLink';
+import useFirecallNavigate from '../../hooks/useFirecallNavigate';
 import { useCallback, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
@@ -87,7 +87,7 @@ function EinsatzCard({
   const updateFirecall = useFirecallUpdate();
   const { isAdmin, groups, groupAdmin } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
-  const router = useRouter();
+  const navigate = useFirecallNavigate();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const updateFn = useCallback(
@@ -115,10 +115,10 @@ function EinsatzCard({
       <Card>
         <CardContent>
           <Typography variant="h5" component="div">
-            <Link href={`/einsatz/${einsatz.id}/details`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <FirecallLink href={`/einsatz/${einsatz.id}/details`} style={{ textDecoration: 'none', color: 'inherit' }}>
               {einsatz.name} {einsatz.fw}{' '}
               {firecallId === einsatz.id ? t('einsaetze.active') : ''}
-            </Link>
+            </FirecallLink>
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
             {formatTimestamp(einsatz.date)}
@@ -131,7 +131,7 @@ function EinsatzCard({
               Nachgezogen wird der Zähler beim Öffnen der Einsatzseite. */}
           {!!einsatz.fahrtenbuchEntryCount && (
             <Chip
-              component={Link}
+              component={FirecallLink}
               href={`/einsatz/${einsatz.id}/fahrtenbuch`}
               clickable
               size="small"
@@ -154,7 +154,7 @@ function EinsatzCard({
                 if (setFirecallId) {
                   setFirecallId(einsatz.id);
                 }
-                router.push(`/einsatz/${einsatz.id}`);
+                navigate(`/einsatz/${einsatz.id}`);
               }}
             >
               {t('einsaetze.activateButton')}
@@ -163,7 +163,7 @@ function EinsatzCard({
           <Tooltip title={t('einsaetze.detailsTooltip')}>
             <IconButton
               size="small"
-              component={Link}
+              component={FirecallLink}
               href={`/einsatz/${einsatz.id}/details`}
             >
               <InfoIcon />

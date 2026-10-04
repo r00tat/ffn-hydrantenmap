@@ -207,6 +207,9 @@ export default function AppDrawer({
       text: t('firecalls'),
       icon: <LocalFireDepartmentIcon />,
       href: '/einsaetze',
+      // Im Einsatz als Abschnitt: Die Wahl eines anderen Einsatzes wechselt
+      // dann ohne Neuladen (siehe common/firecallNavigation.ts).
+      einsatzSection: 'einsaetze',
     },
   ];
 

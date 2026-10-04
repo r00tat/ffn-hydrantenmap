@@ -179,16 +179,20 @@ nach einem Tag ohne Besuch war die Seite weg.
   ließe `resilient` aufs Netz ausweichen, und das hinge im WLAN ohne Internet
   wieder.
 
-## Wechsel innerhalb eines Einsatzes ohne Neuladen
+## Wechsel zwischen Einsatzseiten ohne Neuladen
 
 Karte und Abschnitte eines Einsatzes unterscheiden sich im Code nicht: Beide
 Routen (`/einsatz/[firecallId]` und `/einsatz/[firecallId]/[section]`)
 rendern [FirecallView](../src/components/pages/FirecallView.tsx), die den
-Abschnitt aus `usePathname()` liest. Die Links in Menü und Kopfzeile sind
-[FirecallLink](../src/components/site/FirecallLink.tsx): Liegt das Ziel im
-selben Einsatz ([firecallNavigation.ts](../src/common/firecallNavigation.ts)),
-verhindert ihr `onClick` die Navigation von `next/link` und ruft
-`history.pushState`. Next.js hat `pushState` gepatcht: `usePathname` folgt,
+Abschnitt aus `usePathname()` liest. Die Links in Menü, Kopfzeile und
+Einsatzliste sind [FirecallLink](../src/components/site/FirecallLink.tsx),
+Knöpfe nehmen [useFirecallNavigate](../src/hooks/useFirecallNavigate.ts):
+Sind Ausgangs- und Zielseite Einsatzseiten
+([firecallNavigation.ts](../src/common/firecallNavigation.ts)), gleich welcher
+Einsatz, verhindert das `onClick` die Navigation von `next/link` und ruft
+`history.pushState`. Die Einsatzliste ist dafür im Einsatz ebenfalls ein
+Abschnitt (`/einsatz/<id>/einsaetze`); unter `/einsaetze` bleibt sie für den
+Start ohne Einsatz. Next.js hat `pushState` gepatcht: `usePathname` folgt,
 der interne Verlaufszustand wird in den Eintrag kopiert, und der
 Zurück-Button stellt ihn ohne Neuladen wieder her.
 
@@ -197,10 +201,13 @@ Zurück-Button stellt ihn ohne Neuladen wieder her.
   Wartezeit und Verlust des Seitenzustands. So bleibt online wie offline
   alles im Browser; nur ein noch nie geladener Abschnitt holt seinen Chunk,
   und der liegt im Precache.
-- **`useParams` bleibt beim alten Wert**, er kommt aus dem Router-Baum. Das
-  ist unschädlich, solange nur innerhalb *eines* Einsatzes gewechselt wird —
-  ein anderer Einsatz, Kostenersatz und Schadstoff gehen über den Router. Wer
-  im Abschnitt den Abschnitt braucht, liest `usePathname()`.
+- **`useParams` bleibt beim alten Wert**, er kommt aus dem Router-Baum, und
+  der zeigt nach einem Wechsel weiter den Einsatz, mit dem die Seite geladen
+  wurde. `EinsatzClient` liest die Einsatz-ID deshalb aus der Adresse und
+  nur auf Seiten mit eigener Route (Kostenersatz, Schadstoff — die gehen über
+  den Router) aus `useParams`. Alles darunter bekommt den Einsatz über
+  `useFirecall`. Wer Einsatz oder Abschnitt aus der Adresse braucht, liest
+  `usePathname()`, nie `useParams`.
 - **Die Seiten je Einsatz bleiben im Vorwärmen.** Sie tragen den Kaltstart
   ohne Netz und das Neuladen auf einem Abschnitt. Ein Einsatz, der nie
   vorgewärmt wurde, bekommt seine Seite aus der Vorlage (oben).

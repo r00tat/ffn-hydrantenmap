@@ -27,12 +27,14 @@ const SECTIONS: FirecallSectionRegistry = {
   hochwasser: dynamic(() => import('./HochwasserWrapper')),
   atemschutz: dynamic(() => import('./AtemschutzWrapper')),
   atemschutzueberwachung: dynamic(() => import('./UeberwachungWrapper')),
+  einsaetze: dynamic(() => import('./Einsaetze')),
 };
 
 /**
  * Karte oder Abschnitt eines Einsatzes, gewählt nach der Adresse. Beide Routen
  * unter `/einsatz/<id>` rendern diese Komponente; ein Wechsel per
- * `FirecallLink` ändert nur die Adresse, und diese Komponente rendert neu —
+ * `FirecallLink` ändert nur die Adresse — auch zu einem anderen Einsatz —,
+ * und diese Komponente rendert neu
  * ohne Serverabruf (siehe `common/firecallNavigation.ts`).
  */
 export default function FirecallView({

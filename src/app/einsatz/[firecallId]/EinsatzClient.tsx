@@ -1,7 +1,8 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { parseFirecallSectionPath } from '../../../common/firecallNavigation';
 import { useFirecallSelect } from '../../../hooks/useFirecall';
 
 export default function EinsatzClient({
@@ -9,7 +10,12 @@ export default function EinsatzClient({
 }: {
   children: React.ReactNode;
 }) {
-  const { firecallId } = useParams<{ firecallId: string }>();
+  // Die Adresse zuerst: Nach einem Wechsel per pushState (FirecallLink) bleibt
+  // useParams auf dem Einsatz, mit dem die Seite geladen wurde. Seiten mit
+  // eigener Route (Kostenersatz, Schadstoff) erkennt der Parser nicht.
+  const params = useParams<{ firecallId: string }>();
+  const firecallId =
+    parseFirecallSectionPath(usePathname())?.firecallId ?? params.firecallId;
   const setFirecallId = useFirecallSelect();
 
   useEffect(() => {
