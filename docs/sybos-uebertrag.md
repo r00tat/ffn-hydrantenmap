@@ -120,6 +120,39 @@ kopierten Namen und ohne Lagerort.
 An Gemini geht nur Bezeichnung, Menge, Stunden und Art — die Bemerkung nicht, sie
 kann Namen enthalten.
 
+## Übertrag mit der Chrome-Erweiterung
+
+Die Erweiterung (`chrome-extension/`) überträgt zwei Teile dieser Seite selbst.
+
+**Geräte** („Geräte übernehmen" im Abschnitt „Automatisch übernehmen"). Dieselben
+zwei Sybos-Formulare wie bei den Fahrzeugen: Geräteauswahl (`frmGeraetSelect`), dann
+das Material-Formular mit der Anzahl. Zugeordnet wird **über die Sybos-ID, nicht über
+den Namen** — die Zeilen-ID der Auswahl ist die Artikel-ID des Sybos-Exports. Die
+Zusammenfassung je Artikel rechnet `resolveEinsatzGeraeteForSybos`
+(`src/common/geraetSybosTransfer.ts`), damit Seite und Erweiterung gleich zählen:
+
+- Stunden gehen vor Stück; Sybos nimmt nur ganze Zahlen, gerundet wird auf
+  mindestens 1 und die Erweiterung zeigt den ursprünglichen Wert an.
+- Container kommen in einem zweiten Durchgang, weil die Auswahl je Artikeltyp
+  filtert (`frmListeListSelect`: `fuhrp`, `gerae`, `cont`).
+- Von Hand angelegte Artikel ohne Sybos-ID fehlen — es gibt sie in Sybos nicht.
+- Gelesen werden nur die Stammdaten der im Einsatz genannten Artikel, nicht der
+  ganze Bestand. Ein Einsatz-Gast darf sie nicht lesen; dann gilt die Artikel-ID.
+
+**Noch nicht gegen einen Mitschnitt geprüft** sind der Filterwechsel auf Geräte
+bzw. Container und ob die Liste seitenweise kommt. Deshalb ist der Knopf nicht Teil
+von „Material & Mannschaft übernehmen", schaltet den Filter nur um, wenn es die
+Option gibt, meldet eine unvollständige Liste („1 - 50 von 1099") und listet jeden
+nicht gefundenen Artikel auf.
+
+**Einsatzbericht-Text** („Texte eintragen"). Die Detailseite eines Einsatzes ist in
+Sybos schon das Bearbeitungsformular. Die Erweiterung schreibt `sybosEinsatzablauf`
+in „Einsatzablauf" (`ESunfallhergang`) und `sybosTaetigkeit` in „Tätigkeit /
+Bemerkung" (`ESbemerkungIntern`) **ins offene Formular, ohne zu speichern** —
+gespeichert wird mit dem Knopf von Sybos. So lässt sich der Text vorher lesen, und ein
+Senden im Hintergrund samt Neuladen kann keine anderen ungespeicherten Änderungen
+verwerfen. Steht in Sybos schon ein anderer Text, fragt sie vor dem Überschreiben.
+
 ## Zusammenfassung durch Gemini
 
 Der Aufruf läuft im Browser über `firebase/ai` wie die übrigen KI-Abfragen

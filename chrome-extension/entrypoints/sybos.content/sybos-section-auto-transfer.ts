@@ -6,6 +6,7 @@ import {
   type MaterialLineKm,
   type OrchestrateResult,
 } from './sybos-orchestrate';
+import { orchestrateGeraete, type GeraeteResult } from './sybos-geraete';
 import { findEinsatzId, reloadUrlForEinsatz } from './sybos-post';
 import { hasSybosPersonTable } from './sybos-table';
 import { hasSybosVehicleList } from './sybos-vehicle-list';
@@ -72,8 +73,22 @@ export function renderAutoTransferSection(content: HTMLElement): void {
   section.appendChild(personalBtn);
   section.appendChild(personalResult);
 
+  // Not part of the combined button: the Geräte filter of the selection popup
+  // is not verified against a recording yet (see sybos-geraete.ts).
+  const geraeteBtn = el(
+    'button',
+    { className: 'ek-crew-btn' },
+    'Geräte übernehmen'
+  );
+  const geraeteResult = el('div');
+  section.appendChild(geraeteBtn);
+  section.appendChild(geraeteResult);
+
   content.appendChild(section);
 
+  geraeteBtn.addEventListener('click', () =>
+    runGeraete(geraeteBtn, geraeteResult)
+  );
   combinedBtn.addEventListener('click', () =>
     runCombined(combinedBtn, combinedResult)
   );
@@ -360,6 +375,79 @@ function renderMaterialResult(
   if (result.matched.length === 0 && result.notFound.length === 0) {
     resultArea.appendChild(
       el('div', { className: 'ek-crew-result' }, 'Kein Material übernommen')
+    );
+  }
+}
+
+async function runGeraete(
+  btn: HTMLButtonElement,
+  resultArea: HTMLElement
+): Promise<void> {
+  btn.disabled = true;
+  btn.textContent = 'Übertrage...';
+  resultArea.replaceChildren();
+
+  const result = await orchestrateGeraete();
+  renderGeraeteResult(resultArea, result);
+  if (!result.error && result.matched.length > 0) {
+    scheduleReload(resultArea);
+    return;
+  }
+
+  btn.textContent = 'Erneut übernehmen';
+  btn.disabled = false;
+}
+
+function renderGeraeteResult(
+  resultArea: HTMLElement,
+  result: GeraeteResult
+): void {
+  for (const warning of result.warnings) {
+    resultArea.appendChild(
+      el('div', { className: 'ek-crew-result warning' }, `⚠ ${warning}`)
+    );
+  }
+
+  if (result.matched.length > 0) {
+    resultArea.appendChild(
+      el(
+        'div',
+        { className: 'ek-crew-result success' },
+        `✓ ${result.matched.length} übernommen`
+      )
+    );
+    appendNames(
+      resultArea,
+      result.amounts.map((amount) => {
+        if (amount.anzahl === undefined) return `${amount.label} — ohne Anzahl`;
+        const unit = amount.einheit === 'h' ? ' h' : '';
+        const rounded =
+          amount.gerundet !== undefined ? ` (gerundet aus ${amount.gerundet})` : '';
+        return `${amount.label}: ${amount.anzahl}${unit}${rounded}`;
+      })
+    );
+  }
+
+  if (result.notFound.length > 0) {
+    resultArea.appendChild(
+      el(
+        'div',
+        { className: 'ek-crew-result warning' },
+        `⚠ ${result.notFound.length} nicht gefunden`
+      )
+    );
+    appendNames(resultArea, result.notFound);
+  }
+
+  // An error after a partial run (Geräte saved, Container failed) still shows
+  // what made it in above.
+  if (result.error) {
+    resultArea.appendChild(
+      el('div', { className: 'ek-crew-result warning' }, `✗ ${result.error}`)
+    );
+  } else if (result.matched.length === 0 && result.notFound.length === 0) {
+    resultArea.appendChild(
+      el('div', { className: 'ek-crew-result' }, 'Keine Geräte übernommen')
     );
   }
 }
