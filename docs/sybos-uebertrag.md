@@ -133,17 +133,23 @@ Zusammenfassung je Artikel rechnet `resolveEinsatzGeraeteForSybos`
 
 - Stunden gehen vor Stück; Sybos nimmt nur ganze Zahlen, gerundet wird auf
   mindestens 1 und die Erweiterung zeigt den ursprünglichen Wert an.
-- Container kommen in einem zweiten Durchgang, weil die Auswahl je Artikeltyp
-  filtert (`frmListeListSelect`: `fuhrp`, `gerae`, `cont`).
+- Die Geräteauswahl zeigt **eine Liste je Artikeltyp** („Listenauswahl": Gerät,
+  Container, Bekleidung … zwölf insgesamt). Die Liste wählt die Erweiterung über die
+  `Kategorie` des Sybos-Exports, die dieselben Wörter trägt; ohne Stammdaten gilt
+  „Gerät". Das sichtbare Auswahlfeld hat keinen Namen, gesendet wird das versteckte
+  Feld `frmListeListSelect`.
+- Die Listen kommen **seitenweise zu 100** („1 - 100 von 294"), die nächste Seite
+  ist dasselbe Formular mit `BListFrom=100`. Mit `filter=1` („Bereits hinzugefügte
+  Geräte nicht anzeigen") fällt ein Artikel nach dem Speichern aus der Liste; deshalb
+  lädt die Erweiterung nach jedem Speichern dieselbe Seite neu, statt weiterzublättern.
 - Von Hand angelegte Artikel ohne Sybos-ID fehlen — es gibt sie in Sybos nicht.
 - Gelesen werden nur die Stammdaten der im Einsatz genannten Artikel, nicht der
   ganze Bestand. Ein Einsatz-Gast darf sie nicht lesen; dann gilt die Artikel-ID.
 
-**Noch nicht gegen einen Mitschnitt geprüft** sind der Filterwechsel auf Geräte
-bzw. Container und ob die Liste seitenweise kommt. Deshalb ist der Knopf nicht Teil
-von „Material & Mannschaft übernehmen", schaltet den Filter nur um, wenn es die
-Option gibt, meldet eine unvollständige Liste („1 - 50 von 1099") und listet jeden
-nicht gefundenen Artikel auf.
+Grundlage ist der Mitschnitt `captures/add-geraete-2.har` (Filter auf Gerät,
+Klasse 1, drei Artikel, Anzahl, Speichern). Mehrere Seiten und Container sind darin
+nicht durchgespielt; der Knopf ist deshalb vorerst nicht Teil von „Material &
+Mannschaft übernehmen".
 
 **Einsatzbericht-Text** („Texte eintragen"). Die Detailseite eines Einsatzes ist in
 Sybos schon das Bearbeitungsformular. Die Erweiterung schreibt `sybosEinsatzablauf`

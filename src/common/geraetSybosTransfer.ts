@@ -6,19 +6,18 @@
  * mit dieser Funktion, damit Seite und Übertrag nicht auseinanderlaufen
  * (siehe docs/sybos-uebertrag.md).
  */
-import { isContainer, type Geraet, type GeraetEinsatz } from './geraet';
-
-/**
- * Typ des Artikels in Sybos (`WATcode`). Die Geräteauswahl filtert danach;
- * Fahrzeuge (`fuhrp`) und Atemschutz (`atems`) kommen hier nicht vor.
- */
-export type SybosGeraetTyp = 'gerae' | 'cont';
+import type { Geraet, GeraetEinsatz } from './geraet';
 
 export interface SybosGeraetLine {
   /** ID des Artikels in Sybos — Schlüssel der Auswahl und der Anzahl-Felder. */
   sybosId: string;
   name: string;
-  typ: SybosGeraetTyp;
+  /**
+   * Kategorie aus dem Sybos-Export („Gerät", „Container", „Bekleidung" …).
+   * Die Geräteauswahl in Sybos zeigt je Kategorie eine eigene Liste; die
+   * Erweiterung wählt sie über die Beschriftung. Fehlt ohne Stammdaten.
+   */
+  kategorie?: string;
   /** Summe aus allen Einträgen; fehlt, wenn nichts gezählt wurde. */
   anzahl?: number;
   /** Worin `anzahl` zählt: Stück oder Einsatzstunden. */
@@ -69,8 +68,9 @@ export function resolveEinsatzGeraeteForSybos(
     const line: SybosGeraetLine = {
       sybosId,
       name: geraet?.bezeichnung || list[0]?.geraetName || geraetId,
-      typ: geraet && isContainer(geraet) ? 'cont' : 'gerae',
     };
+    const kategorie = geraet?.kategorie?.trim();
+    if (kategorie) line.kategorie = kategorie;
     const stunden = sum(list.map((e) => e.stunden));
     const menge = sum(list.map((e) => e.menge));
     if (stunden !== undefined) {

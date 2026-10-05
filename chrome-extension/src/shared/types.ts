@@ -44,10 +44,7 @@ export type {
 // über die Sybos-ID. Die Zusammenfassung rechnet die App.
 export { resolveEinsatzGeraeteForSybos } from '../../../src/common/geraetSybosTransfer';
 
-export type {
-  SybosGeraetLine,
-  SybosGeraetTyp,
-} from '../../../src/common/geraetSybosTransfer';
+export type { SybosGeraetLine } from '../../../src/common/geraetSybosTransfer';
 
 export {
   GERAET_COLLECTION,

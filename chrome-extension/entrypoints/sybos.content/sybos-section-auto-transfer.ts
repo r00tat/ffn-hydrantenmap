@@ -73,8 +73,8 @@ export function renderAutoTransferSection(content: HTMLElement): void {
   section.appendChild(personalBtn);
   section.appendChild(personalResult);
 
-  // Not part of the combined button: the Geräte filter of the selection popup
-  // is not verified against a recording yet (see sybos-geraete.ts).
+  // Not part of the combined button yet: paging and the Container list are not
+  // in a recording (see docs/sybos-uebertrag.md).
   const geraeteBtn = el(
     'button',
     { className: 'ek-crew-btn' },

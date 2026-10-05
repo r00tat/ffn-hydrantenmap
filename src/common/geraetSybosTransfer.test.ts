@@ -32,6 +32,7 @@ const binder: Geraet = {
   externeId: '815',
   bezeichnung: 'Ölbindemittel',
   verbrauchsmaterial: true,
+  kategorie: 'Gerät',
 };
 const container: Geraet = {
   ...geraetBase,
@@ -52,9 +53,9 @@ describe('resolveEinsatzGeraeteForSybos', () => {
     ];
 
     expect(resolveEinsatzGeraeteForSybos(entries, [pumpe, binder, container])).toEqual([
-      { sybosId: '815', name: 'Ölbindemittel', typ: 'gerae', anzahl: 5, einheit: 'stk' },
-      { sybosId: '73528', name: 'Rollcontainer 1', typ: 'cont' },
-      { sybosId: '4711', name: 'Tauchpumpe', typ: 'gerae', anzahl: 1.5, einheit: 'h' },
+      { sybosId: '815', name: 'Ölbindemittel', kategorie: 'Gerät', anzahl: 5, einheit: 'stk' },
+      { sybosId: '73528', name: 'Rollcontainer 1', kategorie: 'Container' },
+      { sybosId: '4711', name: 'Tauchpumpe', anzahl: 1.5, einheit: 'h' },
     ]);
   });
 
@@ -64,7 +65,7 @@ describe('resolveEinsatzGeraeteForSybos', () => {
     ];
 
     expect(resolveEinsatzGeraeteForSybos(entries, [])).toEqual([
-      { sybosId: '99', name: 'Wärmebildkamera', typ: 'gerae', anzahl: 1, einheit: 'stk' },
+      { sybosId: '99', name: 'Wärmebildkamera', anzahl: 1, einheit: 'stk' },
     ]);
   });
 
