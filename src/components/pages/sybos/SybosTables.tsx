@@ -11,7 +11,13 @@ import { useTranslations } from 'next-intl';
 import { ReactNode } from 'react';
 import { CrewAssignment } from '../../firebase/firestore';
 import { StrengthRow } from '../fahrzeuge-utils';
-import type { FahrtRow, MeasurementTable, SpectrumRow, TruppRow } from './sybosExtras';
+import type {
+  EinsatzGeraetRow,
+  FahrtRow,
+  MeasurementTable,
+  SpectrumRow,
+  TruppRow,
+} from './sybosExtras';
 import { formatSybosTime, MaterialCount } from './sybosReport';
 
 /**
@@ -186,6 +192,40 @@ export function FahrtenTable({ title, rows }: { title: string; rows: FahrtRow[] 
       title={title}
       head={[t('vehicle'), t('fahrer'), t('abfahrt'), t('ankunft'), t('km'), t('ziel')]}
       rows={rows.map((r) => [r.fahrzeug, r.fahrer, r.abfahrt, r.ankunft, r.km, r.ziel])}
+    />
+  );
+}
+
+/**
+ * Geräte und Verbrauchsmaterial des Einsatzes. Die Sybos-ID steht mit, damit
+ * der Artikel in der Geräteauswahl von Sybos eindeutig zu finden ist — die
+ * Bezeichnungen wiederholen sich („Atemschutzmaske").
+ */
+export function EinsatzGeraeteTable({ title, rows }: { title: string; rows: EinsatzGeraetRow[] }) {
+  const t = useTranslations('sybos.cols');
+  return (
+    <TitledTable
+      title={title}
+      head={[
+        t('bezeichnung'),
+        t('inventarNr'),
+        t('sybosId'),
+        t('type'),
+        t('menge'),
+        t('stunden'),
+        t('lagerort'),
+        t('bemerkung'),
+      ]}
+      rows={rows.map((r) => [
+        r.bezeichnung,
+        r.inventarNr,
+        r.sybosId,
+        r.art,
+        r.menge,
+        r.stunden,
+        r.lagerort,
+        r.bemerkung,
+      ])}
     />
   );
 }

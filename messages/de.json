@@ -869,8 +869,14 @@
       "ausgegebenAn": "Ausgegeben an",
       "ausgabe": "Ausgabe",
       "ruecknahme": "Rücknahme",
-      "bemerkung": "Bemerkung"
-    }
+      "bemerkung": "Bemerkung",
+      "inventarNr": "Inventar-Nr.",
+      "sybosId": "Sybos-ID",
+      "menge": "Menge",
+      "stunden": "Stunden",
+      "lagerort": "Lagerort"
+    },
+    "geraete": "Geräte und Verbrauchsmaterial"
   },
   "passkey": {
     "or": "oder",

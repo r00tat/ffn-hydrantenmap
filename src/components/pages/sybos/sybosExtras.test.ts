@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AtemschutzTrupp } from '../../../common/atemschutz';
 import type { FahrtenbuchEntry } from '../../../common/fahrtenbuch';
+import type { Geraet, GeraetBestand, GeraetEinsatz } from '../../../common/geraet';
 import type {
   FcMarker,
   Firecall,
@@ -11,6 +12,8 @@ import type {
 import {
   buildAtemschutzText,
   buildAusgabeRows,
+  buildEinsatzGeraeteText,
+  buildEinsatzGeraetRows,
   buildGeraeteRows,
   buildTruppProtokoll,
   truppProtokollText,
@@ -460,5 +463,120 @@ describe('buildAusgabeRows', () => {
       },
       { geraet: 'PA 10', an: '', status: 'Ausgegeben', ausgabe: '', ruecknahme: '' },
     ]);
+  });
+});
+
+describe('buildEinsatzGeraetRows', () => {
+  const entryBase = {
+    groupId: 'g1',
+    zeitpunkt: '2026-03-01T14:00:00',
+    createdAt: '',
+    createdBy: '',
+  } as const;
+  const geraetBase = {
+    active: true,
+    bestandGesamt: 0,
+    createdAt: '',
+    createdBy: '',
+    updatedAt: '',
+    updatedBy: '',
+  } as const;
+  const pumpe: Geraet = {
+    ...geraetBase,
+    id: '4711',
+    externeId: '4711',
+    bezeichnung: 'Tauchpumpe',
+    inventarNr: 'P-01',
+    verbrauchsmaterial: false,
+    einheitVerwendungsnachweis: 'h',
+  };
+  const binder: Geraet = {
+    ...geraetBase,
+    id: '815',
+    externeId: '815',
+    bezeichnung: 'Ölbindemittel',
+    verbrauchsmaterial: true,
+    einheit: 'Sack',
+  };
+  const bestand = (id: string, fahrzeug: string): GeraetBestand => ({
+    id,
+    geraetId: '815',
+    lagerortKey: `fahrzeug|${fahrzeug}|`,
+    lagerort: { art: 'fahrzeug', fahrzeug },
+    anzahl: 10,
+  });
+  const geraetById = new Map([pumpe, binder].map((g) => [g.id, g]));
+  const bestandById = new Map(
+    [bestand('b1', 'SRF'), bestand('b2', 'TLFA')].map((b) => [b.id, b]),
+  );
+
+  it('fasst Einträge je Artikel und Art zusammen und sortiert alphabetisch', () => {
+    const entries: GeraetEinsatz[] = [
+      { ...entryBase, id: 'e1', geraetId: '4711', geraetName: 'Tauchpumpe', art: 'zugeordnet', stunden: 1.5 },
+      { ...entryBase, id: 'e2', geraetId: '815', geraetName: 'Ölbindemittel', art: 'verbraucht', menge: 3, bestandId: 'b1' },
+      { ...entryBase, id: 'e3', geraetId: '815', geraetName: 'Ölbindemittel', art: 'verbraucht', menge: 2, bestandId: 'b2', bemerkung: 'Straße' },
+      { ...entryBase, id: 'e4', geraetId: '4711', geraetName: 'Tauchpumpe', art: 'zugeordnet', stunden: 1 },
+    ];
+    expect(buildEinsatzGeraetRows(entries, geraetById, bestandById)).toEqual([
+      {
+        bezeichnung: 'Ölbindemittel',
+        inventarNr: '',
+        sybosId: '815',
+        art: 'verbraucht',
+        menge: '5 Sack',
+        stunden: '',
+        lagerort: 'SRF, TLFA',
+        bemerkung: 'Straße',
+      },
+      {
+        bezeichnung: 'Tauchpumpe',
+        inventarNr: 'P-01',
+        sybosId: '4711',
+        art: 'eingesetzt',
+        menge: '',
+        stunden: '2,5',
+        lagerort: '',
+        bemerkung: '',
+      },
+    ]);
+  });
+
+  it('kommt ohne die Stammdaten aus — etwa für Einsatz-Gäste', () => {
+    const entries: GeraetEinsatz[] = [
+      { ...entryBase, id: 'e1', geraetId: '815', geraetName: 'Ölbindemittel', art: 'verbraucht', menge: 1, bestandId: 'b9' },
+      { ...entryBase, id: 'e2', geraetId: '99', geraetName: 'Wärmebildkamera', art: 'zugeordnet' },
+    ];
+    expect(buildEinsatzGeraetRows(entries, new Map(), new Map())).toEqual([
+      {
+        bezeichnung: 'Ölbindemittel',
+        inventarNr: '',
+        sybosId: '815',
+        art: 'verbraucht',
+        menge: '1 Stk',
+        stunden: '',
+        lagerort: '',
+        bemerkung: '',
+      },
+      {
+        bezeichnung: 'Wärmebildkamera',
+        inventarNr: '',
+        sybosId: '99',
+        art: 'eingesetzt',
+        menge: '',
+        stunden: '',
+        lagerort: '',
+        bemerkung: '',
+      },
+    ]);
+  });
+
+  it('liefert den Text mit einer Zeile je Artikel', () => {
+    const entries: GeraetEinsatz[] = [
+      { ...entryBase, id: 'e1', geraetId: '4711', geraetName: 'Tauchpumpe', art: 'zugeordnet', stunden: 2 },
+      { ...entryBase, id: 'e2', geraetId: '815', geraetName: 'Ölbindemittel', art: 'verbraucht', menge: 3, bestandId: 'b1' },
+    ];
+    expect(
+      buildEinsatzGeraeteText(buildEinsatzGeraetRows(entries, geraetById, bestandById)),
+    ).toBe('Ölbindemittel – 3 Sack – verbraucht\nTauchpumpe – 2 h – eingesetzt');
   });
 });

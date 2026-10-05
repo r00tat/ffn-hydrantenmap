@@ -16,7 +16,8 @@ folgt die Reihenfolge der Erfassung in Sybos:
 2. **Einsatzablauf** — die beiden Freitextfelder „Einsatzablauf" und
    „Tätigkeit / Bemerkungen", von Gemini erstellt.
 3. **Kräfte und Material** — eigene Fahrzeuge und Einheiten, namentliche Mannschaft,
-   sonstige Kräfte, eingesetztes Material, Fahrten aus dem Fahrtenbuch mit Kilometern.
+   sonstige Kräfte, eingesetztes Material, Geräte und Verbrauchsmaterial aus
+   `geraetEinsatz`, Fahrten aus dem Fahrtenbuch mit Kilometern.
 4. **Atemschutz** — Leiter des Sammelplatzes und Füllpersonal, eine Zeile je
    Bereitstellung eines Trupps mit Auftrag, Zeiten und Druck, die Geräte der Trupps
    (eine Zeile je Gerät mit Träger und Kennung), die Ausgabe am Sammelplatz und je
@@ -98,6 +99,26 @@ eigenen. Hintergrund zur Stärke: [einsatzmittel-staerke.md](einsatzmittel-staer
 
 Material ist alles auf der Karte, was kein Einsatzmittel ist, gezählt nach Typ und
 Name; Rohre nach Art („2× C-Rohr").
+
+## Geräte und Verbrauchsmaterial
+
+Die Einträge unter „Geräte" am Einsatz (`call/{id}/geraetEinsatz`, siehe
+[geraete-lager.md](geraete-lager.md)) stehen in einer eigenen Tabelle, **eine Zeile je
+Artikel und Art**: In Sybos steht ein Gerät einmal im Bericht. Mengen und Stunden
+werden summiert, die Lagerorte der Verbräuche aufgezählt — Material von zwei
+Fahrzeugen bleibt eine Zeile.
+
+Die **Sybos-ID** steht mit in der Tabelle. Die Bezeichnungen wiederholen sich
+(„Atemschutzmaske", „Handfunkgerät"), die ID nicht; über sie findet man den Artikel
+in der Geräteauswahl von Sybos eindeutig. Beim Import ist die Dokument-ID die
+Sybos-ID, deshalb reicht sie als Rückfall.
+
+Die Stammdaten (Bezeichnung, Inventarnummer, Einheit, Lagerorte) liest nur ein
+Mitglied der Gruppe. Ein Einsatz-Gast sieht die Zeilen trotzdem, mit dem am Eintrag
+kopierten Namen und ohne Lagerort.
+
+An Gemini geht nur Bezeichnung, Menge, Stunden und Art — die Bemerkung nicht, sie
+kann Namen enthalten.
 
 ## Zusammenfassung durch Gemini
 

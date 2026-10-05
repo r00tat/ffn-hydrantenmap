@@ -869,8 +869,14 @@
       "ausgegebenAn": "Issued to",
       "ausgabe": "Issued",
       "ruecknahme": "Returned",
-      "bemerkung": "Remark"
-    }
+      "bemerkung": "Remark",
+      "inventarNr": "Inventory no.",
+      "sybosId": "Sybos ID",
+      "menge": "Quantity",
+      "stunden": "Hours",
+      "lagerort": "Storage location"
+    },
+    "geraete": "Equipment and consumables"
   },
   "passkey": {
     "or": "or",

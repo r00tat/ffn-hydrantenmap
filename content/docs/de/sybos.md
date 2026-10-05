@@ -7,7 +7,7 @@ Die Seite „Sybos-Übertrag" bereitet einen Einsatz so auf, dass er bequem in d
 - **Übersichtskarte:** ganz oben, wie auf der Druckseite
 - **Basisdaten:** Einsatz, Feuerwehr, Alarmierung, Eintreffen, Ende, Dauer, Einsatzort, Beschreibung und der Alarmierungstext
 - **Einsatzablauf:** Zusammenfassung durch die KI, aufgeteilt in „Einsatzablauf" und „Tätigkeit / Bemerkungen"
-- **Kräfte und Material:** Tabellen der eigenen Fahrzeuge mit Stärke und Zeiten, der Mannschaft, der sonstigen Kräfte (Rettung, Polizei, andere Feuerwehren), des Materials und der Fahrten aus dem Fahrtenbuch — alphabetisch sortiert
+- **Kräfte und Material:** Tabellen der eigenen Fahrzeuge mit Stärke und Zeiten, der Mannschaft, der sonstigen Kräfte (Rettung, Polizei, andere Feuerwehren), des Materials auf der Karte, der im Einsatz erfassten Geräte und des verbrauchten Materials (mit Menge, Stunden, Lagerort und Sybos-ID) und der Fahrten aus dem Fahrtenbuch — alphabetisch sortiert
 - **Atemschutz:** Sammelplatz-Leitung, alle Trupps mit Auftrag, Zeiten und Druck, die erfassten Geräte je Träger, die Ausgabe am Sammelplatz und je Trupp das vollständige Protokoll mit allen Druckabfragen und der Druckkurve
 - **Messungen:** Gammaspektren und Messreihen (z.B. Strahlenmessung), jede Messreihe auch als CSV
 - **Sonstige Notizen:** Einsatzorte mit Notizen, Geschäftsbuch und Kostenersatz

@@ -1,9 +1,10 @@
 /**
  * Weitere Abschnitte der Sybos-Seite: Atemschutz, Messungen, Spektren,
- * Fahrten und Anhänge.
+ * Fahrten, Geräte und Anhänge.
  *
  * Getrennt von `sybosReport.ts`, weil diese Daten nicht aus dem
  * Einsatz-Kontext kommen, sondern aus eigenen Sammlungen — Trupps, Fahrtenbuch,
+ * Geräte im Einsatz,
  * Ebenen mit Datenfeldern. Wie dort sind die Werte deutscher Text, so wie er in
  * Sybos eingetragen wird. Siehe docs/sybos-uebertrag.md.
  */
@@ -20,6 +21,12 @@ import {
 } from '../../../common/atemschutz';
 import { sortierteAbfragen } from '../../../common/atemschutzUeberwachung';
 import { driverNamesOf, type FahrtenbuchEntry } from '../../../common/fahrtenbuch';
+import {
+  formatLagerort,
+  type Geraet,
+  type GeraetBestand,
+  type GeraetEinsatz,
+} from '../../../common/geraet';
 import { parseTimestamp } from '../../../common/time-format';
 import type {
   DataSchemaField,
@@ -530,6 +537,96 @@ export function buildFahrtenRows(entries: FahrtenbuchEntry[]): FahrtRow[] {
         ziel: e.ziel || '',
       };
     });
+}
+
+// ---- Geräte und Verbrauchsmaterial ----
+
+export interface EinsatzGeraetRow {
+  bezeichnung: string;
+  inventarNr: string;
+  /** ID des Artikels in Sybos — darüber wählt ihn die Erweiterung aus. */
+  sybosId: string;
+  /** „eingesetzt" oder „verbraucht", wie im Einsatzbericht. */
+  art: 'eingesetzt' | 'verbraucht';
+  /** Summe der Stückzahl mit Einheit, z. B. „5 Sack". */
+  menge: string;
+  /** Summe der Einsatzstunden. */
+  stunden: string;
+  /** Lagerorte, von denen abgebucht wurde. */
+  lagerort: string;
+  bemerkung: string;
+}
+
+function uniqueJoined(values: (string | undefined)[], separator: string): string {
+  return [...new Set(values.map((v) => (v ?? '').trim()).filter(Boolean))].join(separator);
+}
+
+/**
+ * Eine Zeile je Artikel und Art: In Sybos steht ein Gerät einmal im Bericht,
+ * mit der Summe aus allen Einträgen — auch wenn Material von zwei Fahrzeugen
+ * kam. Die Stammdaten (`geraetById`) fehlen einem Einsatz-Gast; dann bleibt es
+ * bei der Kopie des Namens am Eintrag und der Artikel-ID, die beim Import die
+ * Sybos-ID ist.
+ */
+export function buildEinsatzGeraetRows(
+  entries: GeraetEinsatz[],
+  geraetById: Map<string, Geraet>,
+  bestandById: Map<string, GeraetBestand>,
+): EinsatzGeraetRow[] {
+  const groups = new Map<string, GeraetEinsatz[]>();
+  for (const entry of entries) {
+    const key = `${entry.geraetId}|${entry.art}`;
+    const list = groups.get(key);
+    if (list) list.push(entry);
+    else groups.set(key, [entry]);
+  }
+
+  const sum = (list: GeraetEinsatz[], field: 'menge' | 'stunden') => {
+    const values = list.map((e) => e[field]).filter((v): v is number => typeof v === 'number');
+    return values.length > 0 ? values.reduce((a, b) => a + b, 0) : undefined;
+  };
+
+  return [...groups.values()]
+    .map((list) => {
+      const first = list[0];
+      const geraet = geraetById.get(first.geraetId);
+      const menge = sum(list, 'menge');
+      const stunden = sum(list, 'stunden');
+      const einheit = geraet?.einheit || 'Stk';
+      return {
+        bezeichnung: geraet?.bezeichnung || first.geraetName,
+        inventarNr: geraet?.inventarNr ?? '',
+        sybosId: geraet?.externeId || first.geraetId,
+        art: first.art === 'verbraucht' ? 'verbraucht' : 'eingesetzt',
+        menge: menge !== undefined ? `${formatNumber(menge)} ${einheit}` : '',
+        stunden: stunden !== undefined ? formatNumber(stunden) : '',
+        lagerort: uniqueJoined(
+          list.map((e) => {
+            const b = e.bestandId ? bestandById.get(e.bestandId) : undefined;
+            return b ? formatLagerort(b.lagerort) : undefined;
+          }),
+          ', ',
+        ),
+        bemerkung: uniqueJoined(
+          list.map((e) => e.bemerkung),
+          '; ',
+        ),
+      } satisfies EinsatzGeraetRow;
+    })
+    .sort(
+      (a, b) => compareAlphabetically(a.bezeichnung, b.bezeichnung) || a.art.localeCompare(b.art),
+    );
+}
+
+/** Eine Zeile je Artikel — ohne Bemerkung, die kann Namen enthalten. */
+export function buildEinsatzGeraeteText(rows: EinsatzGeraetRow[]): string {
+  return rows
+    .map((r) =>
+      [r.bezeichnung, r.menge, r.stunden ? `${r.stunden} h` : '', r.art]
+        .filter(Boolean)
+        .join(' – '),
+    )
+    .join('\n');
 }
 
 // ---- Anhänge ----

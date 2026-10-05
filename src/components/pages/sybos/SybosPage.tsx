@@ -24,6 +24,7 @@ import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useFirecall, { FirecallContext } from '../../../hooks/useFirecall';
 import { useFirecallLayersSorted } from '../../../hooks/useFirecallLayers';
 import useFirecallLocations from '../../../hooks/useFirecallLocations';
+import useGeraete from '../../../hooks/useGeraete';
 import useFirecallWriteAccess from '../../../hooks/useFirecallWriteAccess';
 import { useFirecallKostenersatz } from '../../../hooks/useKostenersatz';
 import useVehicles from '../../../hooks/useVehicles';
@@ -38,6 +39,7 @@ import {
   type FirecallLayer,
 } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
+import useGeraetEinsatz from '../../Geraete/einsatz/useGeraetEinsatz';
 import DynamicMap from '../../Map/PositionedMap';
 import { useSnackbar } from '../../providers/SnackbarProvider';
 import DiaryTable from '../DiaryTable';
@@ -56,6 +58,8 @@ import {
 } from './sybosReport';
 import {
   buildAtemschutzText,
+  buildEinsatzGeraeteText,
+  buildEinsatzGeraetRows,
   truppProtokollText,
   buildFahrtenRows,
   buildMeasurementTables,
@@ -72,6 +76,7 @@ import { generateSybosSummary } from './sybosSummary';
 import { useAtemschutzReport, useFirecallAlarmText } from './useEinsatzReport';
 import {
   CrewTable,
+  EinsatzGeraeteTable,
   FahrtenTable,
   MaterialTable,
   MeasurementTableView,
@@ -282,7 +287,7 @@ export default function SybosPage() {
   const { diaries } = useDiaries(true);
   const { eintraege } = useGeschaeftsbuchEintraege(true);
   const { crewAssignments } = useContext(FirecallContext);
-  const { email } = useFirebaseLogin();
+  const { email, groups } = useFirebaseLogin();
   const canWrite = useFirecallWriteAccess();
   const showSnackbar = useSnackbar();
   const copy = useCopy();
@@ -296,6 +301,13 @@ export default function SybosPage() {
   const { calculations } = useFirecallKostenersatz(firecall.id);
   const alarmText = useFirecallAlarmText(firecall);
   const computed = useComputedFields(firecallItems, layers);
+  // Die Stammdaten der Geräte liest nur ein Mitglied der Gruppe; ein
+  // Einsatz-Gast sieht die Einträge am Einsatz mit ihrem kopierten Namen.
+  const isGroupMember = !!firecall.group && (groups ?? []).includes(firecall.group);
+  const { geraete: groupGeraete, bestandById } = useGeraete(
+    isGroupMember ? firecall.group : undefined,
+  );
+  const { entries: geraetEntries } = useGeraetEinsatz(firecall.id);
 
   const basis = useMemo(
     () => buildBasisdaten({ firecall, items: firecallItems, locations }),
@@ -314,6 +326,19 @@ export default function SybosPage() {
   const material = useMemo(
     () => materialCounts.map(({ label, count }) => `${count}× ${label}`).join('\n'),
     [materialCounts],
+  );
+  const einsatzGeraetRows = useMemo(
+    () =>
+      buildEinsatzGeraetRows(
+        geraetEntries,
+        new Map(groupGeraete.map((g) => [g.id, g])),
+        bestandById,
+      ),
+    [bestandById, geraetEntries, groupGeraete],
+  );
+  const einsatzGeraete = useMemo(
+    () => buildEinsatzGeraeteText(einsatzGeraetRows),
+    [einsatzGeraetRows],
   );
   const notizen = useMemo(() => buildNotizenText(locations), [locations]);
   const tagebuch = useMemo(() => buildTagebuchText(diaries), [diaries]);
@@ -419,6 +444,7 @@ export default function SybosPage() {
       { title: t('mannschaft'), text: mannschaft, private: true },
       { title: t('sonstigeKraefte'), text: kraefte.fremde },
       { title: t('material'), text: material },
+      { title: t('geraete'), text: einsatzGeraete },
       // Fahrer stehen mit Namen darin, deshalb wie die Mannschaft privat.
       { title: t('fahrten'), text: fahrten, private: true },
       { title: t('alarmtext'), text: alarmText },
@@ -439,6 +465,7 @@ export default function SybosPage() {
       assp,
       atemschutz,
       basis,
+      einsatzGeraete,
       fahrten,
       geraete,
       geschaeftsbuch,
@@ -614,6 +641,7 @@ export default function SybosPage() {
           <CrewTable title={t('mannschaft')} crew={crewSorted} />
           <StrengthRowsTable title={t('sonstigeKraefte')} rows={kraefte.fremdeRows} />
           <MaterialTable title={t('material')} material={materialCounts} />
+          <EinsatzGeraeteTable title={t('geraete')} rows={einsatzGeraetRows} />
           <FahrtenTable title={t('fahrten')} rows={fahrtenRows} />
         </Section>
 
