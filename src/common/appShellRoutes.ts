@@ -40,6 +40,7 @@ export const APP_SHELL_PAGES: readonly string[] = [
   '/fahrtenbuch/maengel',
   '/fahrtenbuch/statistik',
   '/fahrzeuge',
+  '/geraete',
   '/kennzeichen',
   '/rettungskarten',
   '/blaulicht-sms',
@@ -64,6 +65,7 @@ export const APP_SHELL_PAGES: readonly string[] = [
   '/docs/energiespektrum',
   '/docs/fahrtenbuch',
   '/docs/fahrzeuge',
+  '/docs/geraete',
   '/docs/geschaeftsbuch',
   '/docs/karte',
   '/docs/ki',
@@ -101,6 +103,7 @@ export const FIRECALL_SECTION_NAMES = [
   'atemschutz',
   'atemschutzueberwachung',
   'einsaetze',
+  'geraete',
 ] as const;
 
 export type FirecallSectionName = (typeof FIRECALL_SECTION_NAMES)[number];

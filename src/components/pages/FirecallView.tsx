@@ -28,6 +28,7 @@ const SECTIONS: FirecallSectionRegistry = {
   atemschutz: dynamic(() => import('./AtemschutzWrapper')),
   atemschutzueberwachung: dynamic(() => import('./UeberwachungWrapper')),
   einsaetze: dynamic(() => import('./Einsaetze')),
+  geraete: dynamic(() => import('../Geraete/einsatz/GeraeteEinsatzSection')),
 };
 
 /**

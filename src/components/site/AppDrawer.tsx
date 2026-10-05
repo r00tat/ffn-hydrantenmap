@@ -28,6 +28,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutlined';
 import HistoryIcon from '@mui/icons-material/History';
 import HubIcon from '@mui/icons-material/Hub';
 import InfoIcon from '@mui/icons-material/Info';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 import LayersIcon from '@mui/icons-material/Layers';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
@@ -192,6 +193,8 @@ export default function AppDrawer({
   const firecallId = useFirecallId();
   const pathname = usePathname();
   const t = useTranslations('drawer');
+  const tGeraete = useTranslations('geraete');
+  const tGeraetEinsatz = useTranslations('geraetEinsatz');
   const bugReport = useBugReport();
 
   /** Immer ohne Aufklappen erreichbar. */
@@ -301,6 +304,16 @@ export default function AppDrawer({
           einsatzSection: 'kostenersatz',
         },
         {
+          // Neben dem Kostenersatz: Was im Einsatz verwendet und verbraucht
+          // wurde, gehört zur Dokumentation des Einsatzes. Ohne Einsatz führt
+          // der Punkt zur Einsatzwahl — der Lagerbestand hat einen eigenen
+          // Punkt unter „Fahrzeuge".
+          text: tGeraetEinsatz('menuTitle'),
+          icon: <Inventory2Icon />,
+          href: '/einsaetze',
+          einsatzSection: 'geraete',
+        },
+        {
           text: t('chat'),
           icon: <ChatIcon />,
           href: '/chat',
@@ -353,6 +366,16 @@ export default function AppDrawer({
           text: t('fuellprotokoll'),
           icon: <PropaneTankIcon />,
           href: '/atemschutz/fuellprotokoll',
+        },
+        {
+          // Neben dem Füllprotokoll: Lager und Bestand sind Gerätearbeit wie
+          // dieses und hängen an keinem Einsatz. Für alle Gruppenmitglieder —
+          // lesen dürfen alle, pflegen nur Gruppen-Admin und Gerätemeister.
+          // Bewusst ohne `einsatzSection`: Die Zuordnung im Einsatz ist ein
+          // eigener Abschnitt der Einsatzseite.
+          text: tGeraete('title'),
+          icon: <Inventory2Icon />,
+          href: '/geraete',
         },
       ],
     },

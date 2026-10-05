@@ -9,17 +9,62 @@ import { unzipSync, strFromU8 } from 'fflate';
  * Auslegung („45250 ist ein Datum", „6,8 ist ein Volumen") gehört nach
  * `atemschutzImport.ts` und nicht hierher.
  */
-export function readXlsxSheet(data: Uint8Array, sheetIndex = 1): string[][] {
-  const files = unzipSync(data);
-
+export function readXlsxSheet(
+  data: Uint8Array,
+  sheetIndex = 1,
+  maxPartBytes = XLSX_MAX_PART_BYTES,
+): string[][] {
   const sheetPath = `xl/worksheets/sheet${sheetIndex}.xml`;
+  const files = unzipParts(data, [sheetPath, SHARED_STRINGS_PATH], maxPartBytes);
+
   const sheetXml = files[sheetPath];
   if (!sheetXml) {
     throw new Error(`xlsx: ${sheetPath} nicht gefunden`);
   }
 
-  const shared = readSharedStrings(files['xl/sharedStrings.xml']);
+  const shared = readSharedStrings(files[SHARED_STRINGS_PATH]);
   return parseSheet(strFromU8(sheetXml), shared);
+}
+
+/**
+ * Höchstgröße eines entpackten Teils der Datei. Der Artikelexport von Sybos
+ * hat ein Blatt von wenigen MB; die Grenze schützt den Server vor einer
+ * Zip-Bombe, deren Teil auf Hunderte MB aufgeht.
+ */
+export const XLSX_MAX_PART_BYTES = 50 * 1024 * 1024;
+
+const SHARED_STRINGS_PATH = 'xl/sharedStrings.xml';
+
+/**
+ * Entpackt nur die genannten Teile, jeden höchstens `maxPartBytes` groß.
+ *
+ * Ohne Filter entpackt `unzipSync` jeden Eintrag des Archivs in den
+ * Speicher. Die Grenze gilt für die im Archiv angegebene Größe: `fflate`
+ * entpackt in einen Puffer genau dieser Größe und vergrößert ihn nicht, ein
+ * gelogener Eintrag kann also nicht mehr belegen.
+ */
+function unzipParts(
+  data: Uint8Array,
+  names: string[],
+  maxPartBytes: number,
+): Record<string, Uint8Array> {
+  const tooLarge: string[] = [];
+  let total = 0;
+  const files = unzipSync(data, {
+    filter: (file) => {
+      if (!names.includes(file.name)) return false;
+      total += file.originalSize;
+      if (file.originalSize > maxPartBytes || total > maxPartBytes * names.length) {
+        tooLarge.push(file.name);
+        return false;
+      }
+      return true;
+    },
+  });
+  if (tooLarge.length > 0) {
+    throw new Error(`xlsx: ${tooLarge.join(', ')} zu groß`);
+  }
+  return files;
 }
 
 /**
