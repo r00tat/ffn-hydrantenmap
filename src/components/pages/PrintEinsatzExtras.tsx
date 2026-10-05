@@ -100,7 +100,7 @@ export function PrintGeraete() {
       <Typography variant="h4" className="print-section">
         {t('sectionGeraete')}
       </Typography>
-      <EinsatzGeraeteTable title={tSybos('geraete')} rows={rows} />
+      <EinsatzGeraeteTable title={tSybos('geraete')} rows={rows} print />
     </Box>
   );
 }

@@ -200,9 +200,44 @@ export function FahrtenTable({ title, rows }: { title: string; rows: FahrtRow[] 
  * Geräte und Verbrauchsmaterial des Einsatzes. Die Sybos-ID steht mit, damit
  * der Artikel in der Geräteauswahl von Sybos eindeutig zu finden ist — die
  * Bezeichnungen wiederholen sich („Atemschutzmaske").
+ *
+ * `print`: schmale Fassung für die Druckseite. Acht Spalten passen nicht auf
+ * A4 hochkant; die Sybos-ID braucht nur die Erweiterung, und ein Artikel hat
+ * entweder eine Menge oder Stunden — sie teilen sich eine Spalte.
  */
-export function EinsatzGeraeteTable({ title, rows }: { title: string; rows: EinsatzGeraetRow[] }) {
+export function EinsatzGeraeteTable({
+  title,
+  rows,
+  print = false,
+}: {
+  title: string;
+  rows: EinsatzGeraetRow[];
+  print?: boolean;
+}) {
   const t = useTranslations('sybos.cols');
+  if (print) {
+    return (
+      <TitledTable
+        title={title}
+        head={[
+          t('bezeichnung'),
+          t('inventarNr'),
+          t('type'),
+          t('menge'),
+          t('lagerort'),
+          t('bemerkung'),
+        ]}
+        rows={rows.map((r) => [
+          r.bezeichnung,
+          r.inventarNr,
+          r.art,
+          [r.menge, r.stunden ? `${r.stunden} h` : ''].filter(Boolean).join(', '),
+          r.lagerort,
+          r.bemerkung,
+        ])}
+      />
+    );
+  }
   return (
     <TitledTable
       title={title}

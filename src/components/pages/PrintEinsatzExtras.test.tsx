@@ -92,6 +92,27 @@ describe('PrintGeraete', () => {
     expect(screen.getByText('SRF · GR 2')).toBeInTheDocument();
   });
 
+  it('passt auf die Seite: ohne Sybos-ID, Stunden in der Mengen-Spalte', () => {
+    state.entries = [
+      verbrauch,
+      {
+        ...verbrauch,
+        id: 'e3',
+        geraetId: 'aggregat',
+        geraetName: 'Stromaggregat',
+        art: 'zugeordnet',
+        bestandId: undefined,
+        menge: undefined,
+        stunden: 1.5,
+      },
+    ];
+    render(<PrintGeraete />);
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers).toEqual(['Bezeichnung', 'Inventar-Nr.', 'Art', 'Menge', 'Lagerort', 'Bemerkung']);
+    expect(screen.getByText('1,5 h')).toBeInTheDocument();
+    expect(screen.getByText('2 Sack')).toBeInTheDocument();
+  });
+
   it('ohne Einträge kein Abschnitt', () => {
     const { container } = render(<PrintGeraete />);
     expect(container).toBeEmptyDOMElement();
