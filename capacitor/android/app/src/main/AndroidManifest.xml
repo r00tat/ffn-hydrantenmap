@@ -49,6 +49,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Netzwechsel melden: Das Offline-Overlay lädt neu, sobald das Netz geprüft steht. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Bluetooth Low Energy (Android 12+ runtime permissions) -->
     <uses-permission

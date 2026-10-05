@@ -5,6 +5,7 @@ import {
   FAST_NAVIGATION_TIMEOUT_MS,
   LEGACY_RSC_CACHES,
   NAVIGATION_TIMEOUT_MS,
+  OFFLINE_FALLBACK_HEADER,
   OFFLINE_PAGE_PATH,
   RECENT_FAILURE_WINDOW_MS,
   WARM_CONCURRENCY,
@@ -290,6 +291,31 @@ describe('handleAppShellNavigation', () => {
     expect(res.status).toBe(503);
     expect(res.headers.get('Content-Type')).toContain('text/html');
     expect(await res.text()).toMatch(/offline/i);
+  });
+
+  it('kennzeichnet die eingebaute Offline-Seite für die Android-App', async () => {
+    // Die App zeigt bei einer 5xx-Antwort der Hauptseite einen nativen
+    // Fehlerdialog. Über der eingebauten Seite, die selbst „Erneut versuchen"
+    // anbietet, wäre der nur ein zweiter, verdeckender Hinweis.
+    const res = await handleAppShellNavigation(navigation('/'), {
+      ...deps(new FakeCache(), offlineFetch),
+      openCache: async () => {
+        throw new Error('no cache storage');
+      },
+    });
+    expect(res.headers.get(OFFLINE_FALLBACK_HEADER)).toBe('1');
+    // Daran erkennt die App, dass eine Seite mit eigenem „Erneut versuchen"
+    // steht und kein natives Overlay nötig ist (`OfflineLoadPolicy.PROBE_SCRIPT`).
+    expect(await res.text()).toContain('<meta name="einsatzkarte-offline">');
+  });
+
+  it('kennzeichnet eine echte 5xx-Antwort des Servers nicht', async () => {
+    const res = await handleAppShellNavigation(
+      navigation('/'),
+      deps(new FakeCache(), async () => new Response('kaputt', { status: 502 })),
+    );
+    expect(res.status).toBe(502);
+    expect(res.headers.get(OFFLINE_FALLBACK_HEADER)).toBeNull();
   });
 });
 

@@ -43,6 +43,13 @@ import { withTimeout } from '../lib/withTimeout';
 export const APP_SHELL_CACHE_PREFIX = 'app-shell-';
 export const OFFLINE_PAGE_PATH = '/offline';
 /**
+ * Kennzeichnet die eingebaute Offline-Seite (503). Die Android-App
+ * (`MainActivity.java`, `OfflineLoadPolicy.OFFLINE_FALLBACK_HEADER`) zeigt
+ * sonst bei jeder 5xx-Antwort der Hauptseite einen nativen Fehlerdialog —
+ * über einer Seite, die selbst „Erneut versuchen" anbietet.
+ */
+export const OFFLINE_FALLBACK_HEADER = 'X-Einsatzkarte-Offline-Fallback';
+/**
  * Zeitgrenze einer Navigation, bevor der Cache antwortet. Großzügiger als der
  * Ping (5 s), weil ein kalter Cloud-Run-Start länger braucht und eine
  * langsame, aber funktionierende Verbindung frische Seiten bekommen soll.
@@ -236,6 +243,7 @@ export function offlineFallbackHtml(): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="einsatzkarte-offline">
 <title>Offline – Einsatzkarte</title>
 <style>
 body{font-family:system-ui,sans-serif;margin:0;padding:24px;color:#222;background:#fff}
@@ -344,6 +352,7 @@ export async function handleAppShellNavigation(
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
+      [OFFLINE_FALLBACK_HEADER]: '1',
     },
   });
 }

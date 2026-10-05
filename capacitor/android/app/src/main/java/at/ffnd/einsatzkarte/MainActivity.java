@@ -6,6 +6,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
@@ -37,23 +40,27 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.util.HashSet;
-import java.util.Set;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
     private boolean errorDialogShown = false;
     private boolean allowInsecureSsl = false;
-    private boolean offlineOverlayShown = false;
-    private static final Set<Integer> TRANSIENT_ERRORS = new HashSet<>();
-    static {
-        TRANSIENT_ERRORS.add(WebViewClient.ERROR_CONNECT);
-        TRANSIENT_ERRORS.add(WebViewClient.ERROR_HOST_LOOKUP);
-        TRANSIENT_ERRORS.add(WebViewClient.ERROR_TIMEOUT);
-        TRANSIENT_ERRORS.add(WebViewClient.ERROR_IO);
-        TRANSIENT_ERRORS.add(WebViewClient.ERROR_PROXY_AUTHENTICATION);
-    }
     private SwipeRefreshLayout swipeRefreshLayout = null;
+
+    // Hauptseite ohne Netz, siehe OfflineLoadPolicy und docs/offline-modus.md.
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** Die zuletzt am Netz gescheiterte Adresse der Hauptseite, sonst null. */
+    private String failedUrl = null;
+    /** Ein Netzfehler der Hauptseite seit dem letzten onPageStarted. */
+    private boolean mainFrameFailed = false;
+    private int probesDone = 0;
+    private boolean loadingOverlay = false;
+    private boolean overlayVisible = false;
+    private boolean firstRetryDone = false;
+    private boolean spuriousErrorReported = false;
+    private ConnectivityManager.NetworkCallback networkCallback = null;
+    private final Runnable probeRunnable = this::probeAfterMainFrameError;
+    private final Runnable retryRunnable = this::retryFailedLoad;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -108,17 +115,24 @@ public class MainActivity extends BridgeActivity {
 
         swipeRefreshLayout = findViewById(R.id.swipe_refresh);
         if (swipeRefreshLayout != null) {
-            swipeRefreshLayout.setOnRefreshListener(() -> webView.reload());
+            swipeRefreshLayout.setOnRefreshListener(() -> {
+                // Ein reload() lüde nur die Overlay-Seite selbst neu.
+                if (overlayVisible && failedUrl != null) {
+                    loadFailedUrl();
+                } else {
+                    webView.reload();
+                }
+            });
         }
+
+        registerNetworkCallback();
 
         webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
                 errorDialogShown = false;
-                if (url != null && !"about:blank".equals(url)) {
-                    offlineOverlayShown = false;
-                }
+                mainFrameFailed = false;
             }
 
             @Override
@@ -126,6 +140,12 @@ public class MainActivity extends BridgeActivity {
                 super.onPageFinished(view, url);
                 if (swipeRefreshLayout != null) {
                     swipeRefreshLayout.setRefreshing(false);
+                }
+                if (loadingOverlay) {
+                    loadingOverlay = false;
+                    overlayVisible = true;
+                } else if (!mainFrameFailed) {
+                    onMainFrameLoaded();
                 }
             }
 
@@ -135,8 +155,9 @@ public class MainActivity extends BridgeActivity {
                 if (!request.isForMainFrame()) return;
                 int code = error.getErrorCode();
                 String url = request.getUrl().toString();
-                if (TRANSIENT_ERRORS.contains(code)) {
-                    showOfflineOverlay(url);
+                logToCrashlytics("main frame error " + code + " " + error.getDescription());
+                if (OfflineLoadPolicy.isConnectivityError(code, hasValidatedNetwork())) {
+                    onMainFrameNetworkError(url);
                 } else {
                     showLoadErrorDialog(url, error.getDescription() + " (Code " + code + ")");
                 }
@@ -145,7 +166,10 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
                 super.onReceivedHttpError(view, request, errorResponse);
-                if (request.isForMainFrame()) {
+                // Die eingebaute Offline-Seite des Service Workers (503) bietet
+                // selbst „Erneut versuchen"; ein Dialog darüber verdeckte sie nur.
+                if (request.isForMainFrame()
+                    && !OfflineLoadPolicy.isOfflineFallbackResponse(errorResponse.getResponseHeaders())) {
                     showLoadErrorDialog(request.getUrl().toString(), "HTTP " + errorResponse.getStatusCode() + " " + errorResponse.getReasonPhrase());
                 }
             }
@@ -228,26 +252,202 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    private void showOfflineOverlay(String url) {
-        if (offlineOverlayShown) return;
-        offlineOverlayShown = true;
-        String html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-            + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            + "<style>body{font-family:system-ui,-apple-system,sans-serif;"
-            + "background:#111;color:#eee;display:flex;flex-direction:column;"
-            + "align-items:center;justify-content:center;height:100vh;margin:0;"
-            + "padding:16px;text-align:center}"
-            + "h1{font-size:20px;margin:0 0 8px}"
-            + "p{margin:0 0 24px;opacity:.8}"
-            + "button{background:#d32f2f;color:#fff;border:0;border-radius:8px;"
-            + "padding:12px 24px;font-size:16px}</style></head><body>"
-            + "<h1>" + getString(R.string.offline_overlay_title) + "</h1>"
-            + "<p>" + getString(R.string.offline_overlay_message) + "</p>"
-            + "<button onclick=\"window.location.reload()\">"
-            + getString(R.string.offline_overlay_retry) + "</button></body></html>";
-        runOnUiThread(() -> {
-            bridge.getWebView().loadDataWithBaseURL(url, html, "text/html", "UTF-8", url);
+    /**
+     * Netzfehler der Hauptseite. Nicht sofort das Overlay: Beim Kaltstart
+     * meldet WebView den Fehler der parallelen Netzanfrage, während der
+     * Service Worker die Seite aus dem Cache liefert. Erst nachsehen, was
+     * tatsächlich angezeigt wird (OfflineLoadPolicy).
+     *
+     * Bewusst auch nicht synchron aus onReceivedError heraus eine neue Seite
+     * laden: Die konkurrierte mit der Fehlerseite, die Chromium gerade
+     * übernimmt, und blieb dabei mitunter auf der Strecke — zurück blieb
+     * „Webseite nicht verfügbar" ohne jeden Knopf.
+     */
+    private void onMainFrameNetworkError(String url) {
+        mainFrameFailed = true;
+        failedUrl = url;
+        probesDone = 0;
+        mainHandler.removeCallbacks(probeRunnable);
+        mainHandler.postDelayed(probeRunnable, OfflineLoadPolicy.PROBE_DELAY_MS);
+    }
+
+    private void probeAfterMainFrameError() {
+        if (failedUrl == null || isFinishing()) return;
+        WebView webView = bridge.getWebView();
+        webView.evaluateJavascript(OfflineLoadPolicy.PROBE_SCRIPT, result -> {
+            if (failedUrl == null || isFinishing()) return;
+            switch (OfflineLoadPolicy.classifyProbe(result, webView.getProgress(), probesDone)) {
+                case PAGE_LOADED:
+                    reportSpuriousMainFrameError();
+                    onMainFrameLoaded();
+                    break;
+                case LOADING:
+                    probesDone++;
+                    mainHandler.postDelayed(probeRunnable, OfflineLoadPolicy.PROBE_INTERVAL_MS);
+                    break;
+                case ERROR_PAGE:
+                    showOfflineOverlay();
+                    break;
+                case OVERLAY:
+                default:
+                    break;
+            }
         });
+    }
+
+    /** Die Hauptseite steht: Overlay und Neuversuche sind erledigt. */
+    private void onMainFrameLoaded() {
+        failedUrl = null;
+        overlayVisible = false;
+        firstRetryDone = false;
+        probesDone = 0;
+        mainHandler.removeCallbacks(probeRunnable);
+        mainHandler.removeCallbacks(retryRunnable);
+    }
+
+    private void showOfflineOverlay() {
+        if (failedUrl == null) return;
+        String html = OfflineLoadPolicy.overlayHtml(
+            getString(R.string.offline_overlay_title),
+            getString(R.string.offline_overlay_message),
+            getString(R.string.offline_overlay_retry),
+            failedUrl
+        );
+        loadingOverlay = true;
+        bridge.getWebView().loadDataWithBaseURL(failedUrl, html, "text/html", "UTF-8", failedUrl);
+        scheduleRetry();
+    }
+
+    /**
+     * Das Overlay wartet wirklich: ein erster Neuversuch gleich (jetzt mit
+     * laufendem Service Worker), danach bei jedem geprüften Netz
+     * (registerNetworkCallback) und, falls das Netz steht, der Server aber
+     * nicht antwortete, im Takt.
+     */
+    private void scheduleRetry() {
+        mainHandler.removeCallbacks(retryRunnable);
+        mainHandler.postDelayed(
+            retryRunnable,
+            firstRetryDone
+                ? OfflineLoadPolicy.VALIDATED_RETRY_INTERVAL_MS
+                : OfflineLoadPolicy.FIRST_RETRY_DELAY_MS
+        );
+    }
+
+    private void retryFailedLoad() {
+        if (failedUrl == null || isFinishing()) return;
+        if (!overlayVisible && !loadingOverlay) return;
+        if (firstRetryDone && !hasValidatedNetwork()) {
+            // Ohne Netz kein Versuch im Takt: Jeder Fehlschlag zeigte kurz die
+            // Fehlerseite von Chromium. Das Netz meldet sich selbst.
+            scheduleRetry();
+            return;
+        }
+        reloadIfNoAppPage();
+    }
+
+    /**
+     * Automatisches Neuladen nur, wenn keine Seite der App steht. #515 hatte
+     * NetworkCallback und Auto-Retry entfernt, weil sie beim Wechsel WLAN/LTE
+     * die laufende Seite neu luden: Ein Merker sagte „Overlay", obwohl längst
+     * die Karte stand. Deshalb entscheidet hier nicht ein Merker, sondern
+     * der Blick ins WebView.
+     */
+    private void reloadIfNoAppPage() {
+        if (failedUrl == null || isFinishing()) return;
+        bridge.getWebView().evaluateJavascript(OfflineLoadPolicy.PROBE_SCRIPT, result -> {
+            if (failedUrl == null || isFinishing()) return;
+            if (OfflineLoadPolicy.mayAutoReload(result)) {
+                loadFailedUrl();
+            } else {
+                onMainFrameLoaded();
+            }
+        });
+    }
+
+    private void loadFailedUrl() {
+        if (failedUrl == null) return;
+        firstRetryDone = true;
+        overlayVisible = false;
+        loadingOverlay = false;
+        mainHandler.removeCallbacks(retryRunnable);
+        bridge.getWebView().loadUrl(failedUrl);
+    }
+
+    private void registerNetworkCallback() {
+        try {
+            ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+            if (cm == null) return;
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
+                    if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) return;
+                    mainHandler.post(() -> {
+                        if (overlayVisible && failedUrl != null && !isFinishing()) {
+                            reloadIfNoAppPage();
+                        }
+                    });
+                }
+            };
+            cm.registerDefaultNetworkCallback(networkCallback);
+        } catch (RuntimeException ex) {
+            // Ohne Rückmeldung bleibt der Takt und der Knopf im Overlay.
+            networkCallback = null;
+            Log.w(TAG, "Network callback not registered", ex);
+        }
+    }
+
+    private boolean hasValidatedNetwork() {
+        try {
+            ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+            if (cm == null) return false;
+            Network network = cm.getActiveNetwork();
+            if (network == null) return false;
+            NetworkCapabilities caps = cm.getNetworkCapabilities(network);
+            return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    /**
+     * Einmal je Prozess: Fehler der Hauptseite, obwohl eine Seite der App
+     * steht. Belegt im Feld, dass der Fehler von der parallelen Netzanfrage
+     * beim Start des Service Workers kommt (OfflineLoadPolicy).
+     */
+    private void reportSpuriousMainFrameError() {
+        if (spuriousErrorReported) return;
+        spuriousErrorReported = true;
+        try {
+            FirebaseCrashlytics.getInstance().recordException(
+                new RuntimeException("main frame error although the page loaded (service worker)")
+            );
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to report spurious main frame error", t);
+        }
+    }
+
+    private static void logToCrashlytics(String message) {
+        try {
+            FirebaseCrashlytics.getInstance().log(message);
+        } catch (Throwable t) {
+            Log.w(TAG, "Crashlytics log failed", t);
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        mainHandler.removeCallbacksAndMessages(null);
+        if (networkCallback != null) {
+            try {
+                ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+                if (cm != null) cm.unregisterNetworkCallback(networkCallback);
+            } catch (RuntimeException ex) {
+                Log.w(TAG, "Network callback not unregistered", ex);
+            }
+            networkCallback = null;
+        }
+        super.onDestroy();
     }
 
     private void showLoadErrorDialog(String url, String details) {
