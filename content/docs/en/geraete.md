@@ -9,6 +9,7 @@
 - **Stock per location:** vehicle and compartment (e.g. "SRF · GR 2"), room (e.g. "Fire station · Storage") or a container (e.g. "Oil booms 1")
 - **Receipt, transfer, stocktaking:** top up stock, move it between locations or set the counted value
 - **Import from Sybos:** item export as an Excel file, with a preview before applying
+- **Sets:** several items of equipment and supplies as one bundle (e.g. "oil spill"), recorded in an operation with one click or scan
 - **During an operation:** assign equipment and consume supplies, even without a connection
 
 ## Instructions
@@ -30,6 +31,23 @@ Without a connection the entry is stored on the device. Booking it off the stock
 If a consumption is changed or deleted later, the stock is corrected accordingly.
 
 The same list is also on the **operation overview** as the collapsible section "Equipment & supplies".
+
+### During an operation: record a set
+
+1. In the **Record** dialog, search for the set's name — sets are listed below the items and marked "Set" — or scan the code of the set or its set box
+2. The preview shows every entry that will be created. Quantity, hours and location can be changed per row. Greyed-out rows are not created; the reason is shown next to them (e.g. "inactive")
+3. Add further sets or single items if needed
+4. Save with **"Record …"**
+
+In the operation's list the entries appear under the heading "Set ‹name›", which can be collapsed. Single entries stay editable; the menu on the heading offers **Remove whole set**, which removes all entries of this set at once — consumed supplies are booked back to stock.
+
+### Maintain sets
+
+1. In "Equipment & supplies", open the **Sets** tab and choose **New set** (or click an existing one)
+2. Enter a name and add the contents via the item search. Enter the quantity per item and, for consumables, a fixed location if needed. Without a fixed location — or if it no longer exists — the matching location is suggested as for single items
+3. Optionally choose the **Sybos set item** (e.g. the oil spill box). It is recorded along with the set in an operation, and its barcodes find the set automatically
+4. Enter or scan your own **codes**, such as a QR sticker on the box. A code must not already belong to an item or another set
+5. Save. Switch a set that is currently not in use to inactive — it then no longer appears in operations
 
 ### Maintain stock
 
@@ -61,7 +79,8 @@ If supplies were consumed or stock was booked by hand since the last import, the
 ## Permissions
 
 - **View, assign, consume:** all members of the fire brigade, or everyone with access to the operation
-- **Maintain items and stock, import:** fire brigade administrators and equipment managers
+- **Maintain items, stock and sets, import:** fire brigade administrators and equipment managers
+- **Choose sets in an operation:** members of the fire brigade; guests of an operation record single items
 
 ## Notes
 

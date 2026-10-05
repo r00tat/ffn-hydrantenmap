@@ -4,6 +4,7 @@ import {
   type FirecallListEntry,
 } from './sybos-firecall-select';
 import { renderAutoTransferSection } from './sybos-section-auto-transfer';
+import { renderBerichtTextSection } from './sybos-section-bericht-text';
 import { renderPersonnelSection } from './sybos-section-personnel';
 import { renderVehicleTableSection } from './sybos-section-vehicle-table';
 import { renderMannschaftEditSection } from './sybos-section-mannschaft-edit';
@@ -28,6 +29,9 @@ interface Firecall {
   name?: string;
   description?: string;
   date?: string;
+  /** Texte der Sybos-Übertrag-Seite der Einsatzkarte. */
+  sybosEinsatzablauf?: string;
+  sybosTaetigkeit?: string;
 }
 
 /** Store the selection and re-render everything from it. */
@@ -102,6 +106,10 @@ function showFirecall(
 
   // Page-specific sections (each renders only if its SYBOS page is detected)
   renderAutoTransferSection(content);
+  renderBerichtTextSection(content, {
+    einsatzablauf: fc.sybosEinsatzablauf ?? '',
+    taetigkeit: fc.sybosTaetigkeit ?? '',
+  });
   renderPersonnelSection(content);
   renderVehicleTableSection(content);
   renderMannschaftEditSection(content);

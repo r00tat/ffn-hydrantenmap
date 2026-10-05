@@ -19,6 +19,7 @@ import {
   GERAET_COLLECTION,
   GERAET_EINSATZ_COLLECTION,
   GERAET_MATERIAL_TYPEN,
+  GERAET_SET_COLLECTION,
   isContainer,
   isValidMenge,
   lagerortKey,
@@ -28,6 +29,8 @@ import {
   type GeraetBuchungArt,
   type GeraetEinsatz,
   type GeraetLagerort,
+  type GeraetSet,
+  type GeraetSetItem,
 } from '../../common/geraet';
 import {
   applyStockDelta,
@@ -44,6 +47,11 @@ import {
   type ParsedGeraet,
   type ParsedGeraetBestand,
 } from '../../common/geraetImport';
+import {
+  normalizeSetCodes,
+  validateGeraetSet,
+  type GeraetSetInput,
+} from '../../common/geraetSet';
 import { readXlsxSheet } from '../../common/xlsx';
 import { firestore } from '../../server/firebase/admin';
 import { actionFahrtenbuchManagerRequired } from '../Fahrtenbuch/authGuards';
@@ -102,6 +110,10 @@ function bestandCol(groupId: string) {
 
 function buchungCol(groupId: string) {
   return groupRef(groupId).collection(GERAET_BUCHUNG_COLLECTION);
+}
+
+function setCol(groupId: string) {
+  return groupRef(groupId).collection(GERAET_SET_COLLECTION);
 }
 
 /**
@@ -562,6 +574,135 @@ export async function deleteGeraet(
     await batch.commit();
   }
   return { id: geraetId, deleted: true };
+}
+
+// --- Sets --------------------------------------------------------------------
+
+/** Höchstzahl der Inhalte und Codes eines Sets — schützt die Dokumentgröße. */
+const SET_MAX_ENTRIES = 200;
+
+/**
+ * Die Eingabe aus dem Browser in die Form, die `validateGeraetSet` prüft:
+ * IDs werden Teil von Dokumentpfaden und müssen sicher sein, Texte getrimmt,
+ * Codes normalisiert.
+ */
+function sanitizeSetInput(input: unknown): GeraetSetInput {
+  if (!input || typeof input !== 'object') {
+    throw new ApiException('invalid geraetSet', { status: 400 });
+  }
+  const raw = input as Partial<GeraetSetInput>;
+  const inhalt: unknown[] = Array.isArray(raw.inhalt) ? raw.inhalt : [];
+  const codes = Array.isArray(raw.codes)
+    ? raw.codes.filter((c): c is string => typeof c === 'string')
+    : [];
+  if (inhalt.length > SET_MAX_ENTRIES || codes.length > SET_MAX_ENTRIES) {
+    throw new ApiException('invalid geraetSet: too many entries', { status: 400 });
+  }
+  const items = inhalt.map((item): GeraetSetItem => {
+    const { geraetId, menge, bestandId } = (item ?? {}) as Partial<GeraetSetItem>;
+    assertSafeId(geraetId, 'geraetId');
+    if (bestandId !== undefined && bestandId !== '') assertSafeId(bestandId, 'bestandId');
+    return compact({
+      geraetId,
+      menge: menge === undefined || menge === null ? undefined : menge,
+      bestandId: bestandId || undefined,
+    });
+  });
+  const artikelId = trimmed(raw.sybosSetArtikelId);
+  if (artikelId) assertSafeId(artikelId, 'sybosSetArtikelId');
+  return {
+    id: raw.id || undefined,
+    name: trimmed(raw.name) ?? '',
+    sybosSetArtikelId: artikelId,
+    codes: normalizeSetCodes(codes),
+    inhalt: items,
+    active: raw.active !== false,
+    bemerkung: trimmed(raw.bemerkung),
+  };
+}
+
+/**
+ * Legt ein Set an oder ändert es.
+ *
+ * Geprüft wird mit derselben Logik wie im Dialog (`validateGeraetSet`), aber
+ * gegen den Stand der Gruppe am Server — einschließlich der Eindeutigkeit der
+ * Codes über Artikel und andere aktive Sets. Gelesen wird die ganze Gruppe;
+ * bei einigen hundert Artikeln ist das günstiger als je Code eine Abfrage.
+ */
+export async function saveGeraetSet(
+  groupId: string,
+  input: GeraetSetInput,
+): Promise<{ id: string }> {
+  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const actor = actorOf(session);
+  const clean = sanitizeSetInput(input);
+  const id = clean.id;
+  if (id !== undefined) assertSafeId(id, 'setId');
+
+  const [geraeteSnap, bestandSnap, setSnap] = await Promise.all([
+    geraetCol(groupId).get(),
+    bestandCol(groupId).get(),
+    setCol(groupId).get(),
+  ]);
+  const geraete = geraeteSnap.docs.map((d) => geraetSnapshot(d.id, d.data()));
+  const bestaende = bestandSnap.docs
+    .map((d) => bestandSnapshot(d.id, d.data()))
+    .filter((b) => b.archiviert !== true);
+  const sets = setSnap.docs.map((d) => ({ ...(d.data() as GeraetSet), id: d.id }));
+  if (id !== undefined && !sets.some((s) => s.id === id)) throw notFound('geraetSet', id);
+
+  const errors = validateGeraetSet(clean, { geraete, sets, bestaende });
+  if (errors.length > 0) {
+    throw new ApiException(`invalid geraetSet: ${errors.map((e) => e.code).join(', ')}`, {
+      status: 400,
+    });
+  }
+
+  const fields = {
+    name: clean.name,
+    codes: clean.codes,
+    inhalt: clean.inhalt,
+    active: clean.active,
+    updatedAt: actor.now,
+    updatedBy: actor.uid,
+  };
+  if (id === undefined) {
+    const ref = setCol(groupId).doc();
+    await ref.set(
+      compact({
+        ...fields,
+        sybosSetArtikelId: clean.sybosSetArtikelId,
+        bemerkung: clean.bemerkung,
+        createdAt: actor.now,
+        createdBy: actor.uid,
+      }),
+    );
+    return { id: ref.id };
+  }
+  await setCol(groupId)
+    .doc(id)
+    .update({
+      ...fields,
+      sybosSetArtikelId: clean.sybosSetArtikelId ?? FieldValue.delete(),
+      bemerkung: clean.bemerkung ?? FieldValue.delete(),
+    });
+  return { id };
+}
+
+/**
+ * Löscht ein Set. Einträge im Einsatz behalten `setName`; ihr `setId` zeigt
+ * danach ins Leere — gruppiert wird über `setZuordnungId`.
+ */
+export async function deleteGeraetSet(
+  groupId: string,
+  setId: string,
+): Promise<{ id: string }> {
+  await actionFahrtenbuchManagerRequired(groupId);
+  assertSafeId(setId, 'setId');
+  const ref = setCol(groupId).doc(setId);
+  if (!(await ref.get()).exists) throw notFound('geraetSet', setId);
+  await ref.delete();
+  return { id: setId };
 }
 
 // --- Bestand -----------------------------------------------------------------

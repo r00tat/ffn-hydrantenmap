@@ -10,12 +10,16 @@ import useFirecall, { FirecallContext } from '../../hooks/useFirecall';
 import { AusgabeTable, GeraeteTable, TruppProtokollView } from './sybos/SybosAtemschutz';
 import { buildFahrtenRows } from './sybos/sybosExtras';
 import { sortCrew } from './sybos/sybosReport';
-import { CrewTable, FahrtenTable, TruppTable } from './sybos/SybosTables';
-import { useAtemschutzReport, useFirecallAlarmText } from './sybos/useEinsatzReport';
+import { CrewTable, EinsatzGeraeteTable, FahrtenTable, TruppTable } from './sybos/SybosTables';
+import {
+  useAtemschutzReport,
+  useEinsatzGeraetRows,
+  useFirecallAlarmText,
+} from './sybos/useEinsatzReport';
 
 /**
  * Abschnitte der Druckseite, die aus der Sybos-Seite kommen: Sie lesen aus
- * eigenen Sammlungen (Fahrtenbuch, Atemschutz, BlaulichtSMS) und verwenden
+ * eigenen Sammlungen (Fahrtenbuch, Atemschutz, Geräte, BlaulichtSMS) und verwenden
  * dieselben Tabellen, damit Ausdruck und Sybos-Übertrag übereinstimmen.
  */
 
@@ -79,6 +83,24 @@ export function PrintMannschaft() {
         <CrewTable title={tSybos('mannschaft')} crew={crew} />
         <FahrtenTable title={tSybos('fahrten')} rows={fahrten} />
       </Stack>
+    </Box>
+  );
+}
+
+/** Geräte und Verbrauchsmaterial, eine Zeile je Artikel wie auf der Sybos-Seite. */
+export function PrintGeraete() {
+  const t = useTranslations('print');
+  const tSybos = useTranslations('sybos');
+  const firecall = useFirecall();
+  const rows = useEinsatzGeraetRows(firecall);
+
+  if (rows.length === 0) return null;
+  return (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h4" className="print-section">
+        {t('sectionGeraete')}
+      </Typography>
+      <EinsatzGeraeteTable title={tSybos('geraete')} rows={rows} print />
     </Box>
   );
 }

@@ -39,3 +39,16 @@ export type {
   EinsatzKmMissing,
   EinsatzVehicleKm,
 } from '../../../src/common/fahrtenbuchEinsatzKm';
+
+// Geräte des Einsatzes für den Übertrag nach SYBOS — eine Zeile je Artikel,
+// über die Sybos-ID. Die Zusammenfassung rechnet die App.
+export { resolveEinsatzGeraeteForSybos } from '../../../src/common/geraetSybosTransfer';
+
+export type { SybosGeraetLine } from '../../../src/common/geraetSybosTransfer';
+
+export {
+  GERAET_COLLECTION,
+  GERAET_EINSATZ_COLLECTION,
+} from '../../../src/common/geraet';
+
+export type { Geraet, GeraetEinsatz } from '../../../src/common/geraet';

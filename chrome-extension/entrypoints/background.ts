@@ -23,8 +23,13 @@ import { initExtensionAppCheck } from '@shared/appCheck';
 import {
   FAHRTENBUCH_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
+  GERAET_COLLECTION,
+  GERAET_EINSATZ_COLLECTION,
   GROUP_COLLECTION_ID,
+  resolveEinsatzGeraeteForSybos,
   resolveEinsatzVehicleKilometers,
+  type Geraet,
+  type GeraetEinsatz,
   type EinsatzVehicleKm,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
@@ -37,6 +42,7 @@ type MessageRequest =
   | { type: 'AUTH_STATE_CHANGED' }
   | { type: 'GET_CREW_ASSIGNMENTS' }
   | { type: 'GET_FIRECALL_VEHICLES' }
+  | { type: 'GET_FIRECALL_GERAETE' }
   | { type: 'GET_FIRECALL_LIST' };
 
 export default defineBackground({
@@ -178,6 +184,47 @@ export default defineBackground({
         return { ...v, kilometers: km?.km, kilometersMissing: km?.missing };
       });
       return { vehicles };
+    }
+
+    /**
+     * Geräte und Verbrauchsmaterial des Einsatzes für den Übertrag nach
+     * SYBOS, eine Zeile je Artikel. Gelesen werden die Einträge am Einsatz
+     * und nur die Stammdaten der darin genannten Artikel — nicht der ganze
+     * Bestand der Gruppe.
+     *
+     * Die Stammdaten sind nur für Gruppenmitglieder lesbar. Fehlen sie (Gast
+     * im Einsatz, Artikel gelöscht), rechnet `resolveEinsatzGeraeteForSybos`
+     * mit der Artikel-ID weiter, die beim Import die Sybos-ID ist.
+     */
+    async function getFirecallGeraete(firecallId: string) {
+      const entrySnap = await getDocs(
+        collection(firestore, 'call', firecallId, GERAET_EINSATZ_COLLECTION),
+      );
+      const entries = entrySnap.docs.map(
+        (d) => ({ ...d.data(), id: d.id }) as GeraetEinsatz,
+      );
+      if (entries.length === 0) return { geraete: [] };
+
+      let geraete: Geraet[] = [];
+      try {
+        const firecallSnap = await getDoc(doc(firestore, 'call', firecallId));
+        const groupId = (firecallSnap.data() as { group?: string } | undefined)
+          ?.group;
+        if (groupId) {
+          const ids = [...new Set(entries.map((e) => e.geraetId))];
+          const snaps = await Promise.all(
+            ids.map((id) =>
+              getDoc(doc(firestore, GROUP_COLLECTION_ID, groupId, GERAET_COLLECTION, id)),
+            ),
+          );
+          geraete = snaps
+            .filter((s) => s.exists())
+            .map((s) => ({ ...s.data(), id: s.id }) as Geraet);
+        }
+      } catch (err) {
+        console.warn('[EK] Geräte-Stammdaten nicht lesbar:', err);
+      }
+      return { geraete: resolveEinsatzGeraeteForSybos(entries, geraete) };
     }
 
     async function getFirecallList(): Promise<{
@@ -324,6 +371,16 @@ export default defineBackground({
           );
           if (!selectedFirecallId) return { vehicles: [] };
           return getFirecallVehicles(selectedFirecallId);
+        }
+
+        case 'GET_FIRECALL_GERAETE': {
+          await ensureAuthenticated();
+          if (!currentUser) return { error: 'Not authenticated' };
+          const { selectedFirecallId } = await chrome.storage.local.get(
+            'selectedFirecallId',
+          );
+          if (!selectedFirecallId) return { geraete: [] };
+          return getFirecallGeraete(selectedFirecallId);
         }
 
         case 'GET_FIRECALL_LIST': {

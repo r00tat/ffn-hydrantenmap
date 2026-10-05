@@ -14,12 +14,12 @@ import {
  * Firestore, damit sie ohne Mocks testbar ist.
  */
 
-function normalize(value?: string): string {
+export function normalizeCode(value?: string): string {
   return (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 /** Die Kennungen, über die ein Artikel per Scan oder Eingabe gefunden wird. */
-function codesOf(g: Geraet): string[] {
+export function geraetCodesOf(g: Geraet): string[] {
   return [
     ...(g.barcodes ?? []),
     g.inventarNr,
@@ -27,7 +27,7 @@ function codesOf(g: Geraet): string[] {
     g.seriennummer,
     g.externeId,
   ]
-    .map((c) => normalize(c))
+    .map((c) => normalizeCode(c))
     .filter(Boolean);
 }
 
@@ -49,9 +49,9 @@ function searchTextOf(g: Geraet): string {
     g.klasse3,
     g.bemerkung,
     g.zubehoer,
-    ...codesOf(g),
+    ...geraetCodesOf(g),
   ]
-    .map((c) => normalize(c))
+    .map((c) => normalizeCode(c))
     .join(' ');
 }
 
@@ -63,7 +63,7 @@ function searchTextOf(g: Geraet): string {
  * Einsatz nicht mehr verwendet.
  */
 export function searchGeraete(geraete: Geraet[], text: string, limit = 50): Geraet[] {
-  const words = normalize(text).split(' ').filter(Boolean);
+  const words = normalizeCode(text).split(' ').filter(Boolean);
   const byName: Geraet[] = [];
   const byOther: Geraet[] = [];
   for (const g of geraete) {
@@ -73,7 +73,7 @@ export function searchGeraete(geraete: Geraet[], text: string, limit = 50): Gera
       if (byName.length >= limit) break;
       continue;
     }
-    const name = normalize(g.bezeichnung);
+    const name = normalizeCode(g.bezeichnung);
     if (words.every((w) => name.includes(w))) {
       byName.push(g);
       if (byName.length >= limit) break;
@@ -86,9 +86,9 @@ export function searchGeraete(geraete: Geraet[], text: string, limit = 50): Gera
 
 /** Exakter Treffer eines gescannten oder getippten Codes. */
 export function findGeraetByCode(geraete: Geraet[], code: string): Geraet[] {
-  const wanted = normalize(code);
+  const wanted = normalizeCode(code);
   if (!wanted) return [];
-  return geraete.filter((g) => g.active !== false && codesOf(g).includes(wanted));
+  return geraete.filter((g) => g.active !== false && geraetCodesOf(g).includes(wanted));
 }
 
 /** Verbrauchsmaterial wird verbraucht (bucht ab), alles andere nur zugeordnet. */
@@ -129,10 +129,10 @@ export function matchesFirecallVehicle(
     return !!lagerort.containerId && containerIds.includes(lagerort.containerId);
   }
   if (lagerort.art !== 'fahrzeug') return false;
-  const fahrzeug = normalize(lagerort.fahrzeug);
+  const fahrzeug = normalizeCode(lagerort.fahrzeug);
   if (!fahrzeug) return false;
   return vehicleNames.some((name) => {
-    const vehicle = normalize(name);
+    const vehicle = normalizeCode(name);
     return (
       !!vehicle && (containsWords(vehicle, fahrzeug) || containsWords(fahrzeug, vehicle))
     );

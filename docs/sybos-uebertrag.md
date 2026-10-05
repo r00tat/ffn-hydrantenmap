@@ -16,7 +16,8 @@ folgt die Reihenfolge der Erfassung in Sybos:
 2. **Einsatzablauf** — die beiden Freitextfelder „Einsatzablauf" und
    „Tätigkeit / Bemerkungen", von Gemini erstellt.
 3. **Kräfte und Material** — eigene Fahrzeuge und Einheiten, namentliche Mannschaft,
-   sonstige Kräfte, eingesetztes Material, Fahrten aus dem Fahrtenbuch mit Kilometern.
+   sonstige Kräfte, eingesetztes Material, Geräte und Verbrauchsmaterial aus
+   `geraetEinsatz`, Fahrten aus dem Fahrtenbuch mit Kilometern.
 4. **Atemschutz** — Leiter des Sammelplatzes und Füllpersonal, eine Zeile je
    Bereitstellung eines Trupps mit Auftrag, Zeiten und Druck, die Geräte der Trupps
    (eine Zeile je Gerät mit Träger und Kennung), die Ausgabe am Sammelplatz und je
@@ -40,11 +41,11 @@ Abschnitte ohne Daten bleiben weg. Die Builder für 3.–7. stehen in
 
 ## Dieselben Abschnitte auf der Druckseite
 
-Alarmierungstext, Einsatzablauf und Tätigkeit, Mannschaft und Fahrten, der ganze
-Atemschutz samt Protokoll je Trupp und die Anhänge an Elementen stehen auch auf der
+Alarmierungstext, Einsatzablauf und Tätigkeit, Mannschaft und Fahrten, Geräte und
+Verbrauchsmaterial, der ganze Atemschutz samt Protokoll je Trupp und die Anhänge an Elementen stehen auch auf der
 Druckseite ([PrintEinsatzExtras.tsx](../src/components/pages/PrintEinsatzExtras.tsx)).
 Sie verwenden dieselben Tabellen und Hooks (`useAtemschutzReport`,
-`useFirecallAlarmText` in [useEinsatzReport.ts](../src/components/pages/sybos/useEinsatzReport.ts)),
+`useEinsatzGeraetRows`, `useFirecallAlarmText` in [useEinsatzReport.ts](../src/components/pages/sybos/useEinsatzReport.ts)),
 damit Ausdruck und Übertrag nicht auseinanderlaufen. Auf Papier fehlen nur die
 Kopier-Knöpfe. Messreihen bekommen dort keine eigene Tabelle: Die Datenfelder stehen
 schon in den Einsatzmittel-Details je Ebene. Kostenersatz bleibt draußen, er hat einen
@@ -98,6 +99,76 @@ eigenen. Hintergrund zur Stärke: [einsatzmittel-staerke.md](einsatzmittel-staer
 
 Material ist alles auf der Karte, was kein Einsatzmittel ist, gezählt nach Typ und
 Name; Rohre nach Art („2× C-Rohr").
+
+## Geräte und Verbrauchsmaterial
+
+Die Einträge unter „Geräte" am Einsatz (`call/{id}/geraetEinsatz`, siehe
+[geraete-lager.md](geraete-lager.md)) stehen in einer eigenen Tabelle, **eine Zeile je
+Artikel und Art**: In Sybos steht ein Gerät einmal im Bericht. Mengen und Stunden
+werden summiert, die Lagerorte der Verbräuche aufgezählt — Material von zwei
+Fahrzeugen bleibt eine Zeile.
+
+Die **Sybos-ID** steht mit in der Tabelle. Die Bezeichnungen wiederholen sich
+(„Atemschutzmaske", „Handfunkgerät"), die ID nicht; über sie findet man den Artikel
+in der Geräteauswahl von Sybos eindeutig. Beim Import ist die Dokument-ID die
+Sybos-ID, deshalb reicht sie als Rückfall.
+
+Die Stammdaten (Bezeichnung, Inventarnummer, Einheit, Lagerorte) liest nur ein
+Mitglied der Gruppe. Ein Einsatz-Gast sieht die Zeilen trotzdem, mit dem am Eintrag
+kopierten Namen und ohne Lagerort.
+
+An Gemini geht nur Bezeichnung, Menge, Stunden und Art — die Bemerkung nicht, sie
+kann Namen enthalten.
+
+## Übertrag mit der Chrome-Erweiterung
+
+Die Erweiterung (`chrome-extension/`) überträgt zwei Teile dieser Seite selbst.
+
+**Geräte** („Geräte übernehmen" im Abschnitt „Automatisch übernehmen"). Dieselben
+zwei Sybos-Formulare wie bei den Fahrzeugen: Geräteauswahl (`frmGeraetSelect`), dann
+das Material-Formular mit der Anzahl. Zugeordnet wird **über die Sybos-ID, nicht über
+den Namen** — die Zeilen-ID der Auswahl ist die Artikel-ID des Sybos-Exports. Die
+Zusammenfassung je Artikel rechnet `resolveEinsatzGeraeteForSybos`
+(`src/common/geraetSybosTransfer.ts`), damit Seite und Erweiterung gleich zählen:
+
+- Stunden gehen vor Stück; Sybos nimmt nur ganze Zahlen, gerundet wird auf
+  mindestens 1 und die Erweiterung zeigt den ursprünglichen Wert an.
+- Die Geräteauswahl zeigt **eine Liste je Artikeltyp** („Listenauswahl": Gerät,
+  Container, Bekleidung … zwölf insgesamt). Die Liste wählt die Erweiterung über die
+  `Kategorie` des Sybos-Exports, die dieselben Wörter trägt; ohne Stammdaten gilt
+  „Gerät". Das sichtbare Auswahlfeld hat keinen Namen, gesendet wird das versteckte
+  Feld `frmListeListSelect`.
+- Die Listen kommen **seitenweise zu 100** („1 - 100 von 294"), die nächste Seite
+  ist dasselbe Formular mit `BListFrom=100`. Mit `filter=1` („Bereits hinzugefügte
+  Geräte nicht anzeigen") fällt ein Artikel nach dem Speichern aus der Liste; deshalb
+  lädt die Erweiterung nach jedem Speichern dieselbe Seite neu, statt weiterzublättern.
+- Von Hand angelegte Artikel ohne Sybos-ID fehlen — es gibt sie in Sybos nicht.
+- Gelesen werden nur die Stammdaten der im Einsatz genannten Artikel, nicht der
+  ganze Bestand. Ein Einsatz-Gast darf sie nicht lesen; dann gilt die Artikel-ID.
+
+Grundlage ist der Mitschnitt `captures/add-geraete-2.har` (Filter auf Gerät,
+Klasse 1, drei Artikel, Anzahl, Speichern). Der gemeinsame Knopf läuft in der
+Reihenfolge Fahrzeuge → Geräte → Mannschaft: Personen lassen sich nur einem Fahrzeug
+zuordnen, das schon am Einsatz steht.
+
+**Erst nach dem Speichern.** Alle Knöpfe unter „Automatisch übernehmen" sind
+gesperrt, mit Hinweis, solange der Einsatz in Sybos nicht gespeichert ist:
+
+- Ein neuer Einsatz hat noch keine ID — Sybos zeigt sie erst nach dem Speichern in
+  den `idParent=`-Verweisen. Die Erweiterung hätte nichts, woran sie Fahrzeuge
+  hängen kann, und das Neuladen danach landete wieder im leeren Formular.
+- Ungespeicherte Eingaben im Formular gingen beim Neuladen nach dem Übertrag
+  verloren. Die Erweiterung merkt sich die erste Eingabe im Formular (auch die von
+  „Texte eintragen") und sperrt ab dann. Speichern lädt die Seite neu und gibt die
+  Knöpfe wieder frei.
+
+**Einsatzbericht-Text** („Texte eintragen"). Die Detailseite eines Einsatzes ist in
+Sybos schon das Bearbeitungsformular. Die Erweiterung schreibt `sybosEinsatzablauf`
+in „Einsatzablauf" (`ESunfallhergang`) und `sybosTaetigkeit` in „Tätigkeit /
+Bemerkung" (`ESbemerkungIntern`) **ins offene Formular, ohne zu speichern** —
+gespeichert wird mit dem Knopf von Sybos. So lässt sich der Text vorher lesen, und ein
+Senden im Hintergrund samt Neuladen kann keine anderen ungespeicherten Änderungen
+verwerfen. Steht in Sybos schon ein anderer Text, fragt sie vor dem Überschreiben.
 
 ## Zusammenfassung durch Gemini
 

@@ -6,7 +6,16 @@ import {
   type MaterialLineKm,
   type OrchestrateResult,
 } from './sybos-orchestrate';
+import { orchestrateGeraete, type GeraeteResult } from './sybos-geraete';
 import { findEinsatzId, reloadUrlForEinsatz } from './sybos-post';
+import {
+  TRANSFER_BLOCK_MESSAGES,
+  hasUnsavedChanges,
+  isEinsatzDetailPage,
+  onUnsavedChange,
+  transferBlock,
+  watchUnsavedChanges,
+} from './sybos-einsatz-state';
 import { hasSybosPersonTable } from './sybos-table';
 import { hasSybosVehicleList } from './sybos-vehicle-list';
 import { hasSybosVehicleTable } from './sybos-vehicle-table';
@@ -19,16 +28,20 @@ const RELOAD_DELAY_MS = 1800;
 
 /**
  * Append the "Automatisch übernehmen" section with the one-click transfer
- * buttons. Renders only on the plain SYBOS Einsatz detail page — i.e. when we
- * know the Einsatz id but none of the interactive selection/edit pages (which
- * already render their own section) are currently shown.
+ * buttons. Renders on the SYBOS Einsatz form — but not while one of the
+ * interactive selection/edit pages (which render their own section) is shown.
  *
- * Button order matters: Material must run before Mannschaft, because a person
- * can only be assigned to a vehicle that already exists in the Einsatz. The
- * combined button enforces that order in a single click.
+ * The buttons stay disabled, with a hint, until the Einsatz is saved: a new
+ * Einsatz has no id to post to yet, and unsaved edits would be lost on the
+ * reload after the transfer (see `sybos-einsatz-state.ts`).
+ *
+ * Button order matters: Material and Geräte must run before Mannschaft,
+ * because a person can only be assigned to a vehicle that already exists in
+ * the Einsatz. The combined button enforces that order in a single click.
  */
 export function renderAutoTransferSection(content: HTMLElement): void {
-  if (!findEinsatzId()) return;
+  const einsatzId = findEinsatzId();
+  if (!einsatzId && !isEinsatzDetailPage(window.location.href)) return;
   if (
     hasSybosPersonTable() ||
     hasSybosVehicleList() ||
@@ -42,43 +55,58 @@ export function renderAutoTransferSection(content: HTMLElement): void {
   section.appendChild(
     el('div', { className: 'ek-crew-title' }, 'Automatisch übernehmen')
   );
+  const hint = el('div', { className: 'ek-crew-result warning' });
+  section.appendChild(hint);
 
-  // Primary: both steps in the correct order (Material first, then Mannschaft).
-  const combinedBtn = el(
-    'button',
-    { className: 'ek-crew-btn' },
-    'Material & Mannschaft übernehmen'
-  );
-  const combinedResult = el('div');
-  section.appendChild(combinedBtn);
-  section.appendChild(combinedResult);
+  const addButton = (label: string): [HTMLButtonElement, HTMLElement] => {
+    const btn = el('button', { className: 'ek-crew-btn' }, label);
+    const result = el('div');
+    section.appendChild(btn);
+    section.appendChild(result);
+    return [btn, result];
+  };
 
-  // Material must be offered before Personal (see note above).
-  const materialBtn = el(
-    'button',
-    { className: 'ek-crew-btn' },
-    'Material übernehmen'
+  // Primary: all steps in the correct order (Material, Geräte, Mannschaft).
+  const [combinedBtn, combinedResult] = addButton(
+    'Material, Geräte & Mannschaft übernehmen'
   );
-  const materialResult = el('div');
-  section.appendChild(materialBtn);
-  section.appendChild(materialResult);
-
-  const personalBtn = el(
-    'button',
-    { className: 'ek-crew-btn' },
-    'Mannschaft übernehmen'
-  );
-  const personalResult = el('div');
-  section.appendChild(personalBtn);
-  section.appendChild(personalResult);
+  // Material and Geräte are offered before Personal (see note above).
+  const [materialBtn, materialResult] = addButton('Material übernehmen');
+  const [geraeteBtn, geraeteResult] = addButton('Geräte übernehmen');
+  const [personalBtn, personalResult] = addButton('Mannschaft übernehmen');
+  const buttons = [combinedBtn, materialBtn, geraeteBtn, personalBtn];
 
   content.appendChild(section);
+
+  const applyBlock = () => {
+    const block = transferBlock({
+      einsatzId,
+      unsavedChanges: hasUnsavedChanges(),
+    });
+    hint.textContent = block ? `⚠ ${TRANSFER_BLOCK_MESSAGES[block]}` : '';
+    hint.hidden = !block;
+    for (const btn of buttons) btn.disabled = block !== null;
+  };
+  applyBlock();
+  watchUnsavedChanges();
+  // The panel is rebuilt on every Einsatz switch; a detached section must not
+  // keep listening.
+  const unsubscribe = onUnsavedChange(() => {
+    if (!section.isConnected) {
+      unsubscribe();
+      return;
+    }
+    applyBlock();
+  });
 
   combinedBtn.addEventListener('click', () =>
     runCombined(combinedBtn, combinedResult)
   );
   materialBtn.addEventListener('click', () =>
     runTransfer(materialBtn, materialResult, orchestrateMaterial, 'material')
+  );
+  geraeteBtn.addEventListener('click', () =>
+    runGeraete(geraeteBtn, geraeteResult)
   );
   personalBtn.addEventListener('click', () =>
     runTransfer(personalBtn, personalResult, orchestratePersonal, 'personal')
@@ -144,8 +172,9 @@ async function runTransfer(
 }
 
 /**
- * Run both flows in the required order: Material first (so its vehicles exist
- * in the Einsatz), then Mannschaft (which assigns people to those vehicles).
+ * Run all flows in the required order: Material first (so its vehicles exist
+ * in the Einsatz), then Geräte, then Mannschaft (which assigns people to
+ * those vehicles).
  */
 async function runCombined(
   btn: HTMLButtonElement,
@@ -162,6 +191,12 @@ async function runCombined(
     );
     renderResult(resultArea, materialResult, 'material');
 
+    const geraeteResult = await orchestrateGeraete();
+    resultArea.appendChild(
+      el('div', { className: 'ek-crew-title' }, 'Geräte')
+    );
+    renderGeraeteResult(resultArea, geraeteResult);
+
     const personalResult = await orchestratePersonal();
     resultArea.appendChild(
       el('div', { className: 'ek-crew-title' }, 'Mannschaft')
@@ -170,6 +205,7 @@ async function runCombined(
 
     if (
       transferredSomething(materialResult) ||
+      geraeteTransferred(geraeteResult) ||
       transferredSomething(personalResult)
     ) {
       scheduleReload(resultArea);
@@ -360,6 +396,84 @@ function renderMaterialResult(
   if (result.matched.length === 0 && result.notFound.length === 0) {
     resultArea.appendChild(
       el('div', { className: 'ek-crew-result' }, 'Kein Material übernommen')
+    );
+  }
+}
+
+/** Geräte count as transferred even when a later list failed. */
+function geraeteTransferred(result: GeraeteResult): boolean {
+  return result.matched.length > 0;
+}
+
+async function runGeraete(
+  btn: HTMLButtonElement,
+  resultArea: HTMLElement
+): Promise<void> {
+  btn.disabled = true;
+  btn.textContent = 'Übertrage...';
+  resultArea.replaceChildren();
+
+  const result = await orchestrateGeraete();
+  renderGeraeteResult(resultArea, result);
+  if (geraeteTransferred(result)) {
+    scheduleReload(resultArea);
+    return;
+  }
+
+  btn.textContent = 'Erneut übernehmen';
+  btn.disabled = false;
+}
+
+function renderGeraeteResult(
+  resultArea: HTMLElement,
+  result: GeraeteResult
+): void {
+  for (const warning of result.warnings) {
+    resultArea.appendChild(
+      el('div', { className: 'ek-crew-result warning' }, `⚠ ${warning}`)
+    );
+  }
+
+  if (result.matched.length > 0) {
+    resultArea.appendChild(
+      el(
+        'div',
+        { className: 'ek-crew-result success' },
+        `✓ ${result.matched.length} übernommen`
+      )
+    );
+    appendNames(
+      resultArea,
+      result.amounts.map((amount) => {
+        if (amount.anzahl === undefined) return `${amount.label} — ohne Anzahl`;
+        const unit = amount.einheit === 'h' ? ' h' : '';
+        const rounded =
+          amount.gerundet !== undefined ? ` (gerundet aus ${amount.gerundet})` : '';
+        return `${amount.label}: ${amount.anzahl}${unit}${rounded}`;
+      })
+    );
+  }
+
+  if (result.notFound.length > 0) {
+    resultArea.appendChild(
+      el(
+        'div',
+        { className: 'ek-crew-result warning' },
+        `⚠ ${result.notFound.length} nicht gefunden`
+      )
+    );
+    appendNames(resultArea, result.notFound);
+  }
+
+  // An error after a partial run (Geräte saved, Container failed) still shows
+  // what made it in above.
+  if (result.error) {
+    resultArea.appendChild(
+      el('div', { className: 'ek-crew-result warning' }, `✗ ${result.error}`)
+    );
+  } else if (result.matched.length === 0 && result.notFound.length === 0) {
+    resultArea.appendChild(
+      el('div', { className: 'ek-crew-result' }, 'Keine Geräte übernommen')
     );
   }
 }

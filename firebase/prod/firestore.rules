@@ -399,7 +399,8 @@ service cloud.firestore {
       }
 
       // Geräte und Lagerartikel der Gruppe: Stammdaten (`geraet`), Bestand je
-      // Lagerort (`geraetBestand`) und das Buchungsprotokoll (`geraetBuchung`).
+      // Lagerort (`geraetBestand`), das Buchungsprotokoll (`geraetBuchung`)
+      // und die Sets daraus (`geraetSet`).
       // Jedes Gruppenmitglied liest — im Einsatz wird daraus ausgewählt und der
       // Bestand angezeigt. Geschrieben wird ausschließlich über Server Actions
       // (Admin SDK): `bestandGesamt` am Artikel muss in derselben Transaktion
@@ -419,6 +420,15 @@ service cloud.firestore {
       }
 
       match /geraetBuchung/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow create, update, delete: if false;
+      }
+
+      // Sets aus Geräten und Material: Gelesen wird wie oben (Auswahl im
+      // Einsatz, auch offline aus dem Cache), geschrieben nur über die Server
+      // Actions `saveGeraetSet`/`deleteGeraetSet` — dort laufen die Prüfungen
+      // der Codes und Inhalte. Einsatz-Gäste lesen keine Sets.
+      match /geraetSet/{doc} {
         allow read: if fahrtenbuchMember();
         allow create, update, delete: if false;
       }

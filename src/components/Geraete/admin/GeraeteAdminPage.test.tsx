@@ -5,17 +5,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Geraet, GeraetBestand } from '../../../common/geraet';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
-const { useFirebaseLogin, useFahrtenbuchGroup, useGeraete, setGeraeteVerbrauchsmaterial } =
-  vi.hoisted(() => ({
-    useFirebaseLogin: vi.fn(),
-    useFahrtenbuchGroup: vi.fn(),
-    useGeraete: vi.fn(),
-    setGeraeteVerbrauchsmaterial: vi.fn(),
-  }));
+const {
+  useFirebaseLogin,
+  useFahrtenbuchGroup,
+  useGeraete,
+  useGeraetSets,
+  setGeraeteVerbrauchsmaterial,
+} = vi.hoisted(() => ({
+  useFirebaseLogin: vi.fn(),
+  useFahrtenbuchGroup: vi.fn(),
+  useGeraete: vi.fn(),
+  useGeraetSets: vi.fn(),
+  setGeraeteVerbrauchsmaterial: vi.fn(),
+}));
 
 vi.mock('../../../hooks/useFirebaseLogin', () => ({ default: useFirebaseLogin }));
 vi.mock('../../../hooks/useFahrtenbuchGroup', () => ({ default: useFahrtenbuchGroup }));
 vi.mock('../../../hooks/useGeraete', () => ({ default: useGeraete }));
+vi.mock('../../../hooks/useGeraetSets', () => ({ default: useGeraetSets }));
 vi.mock('../../../hooks/useOnline', () => ({ default: () => true }));
 vi.mock('../../../hooks/useConnectivity', () => ({
   default: () => ({ status: 'online' }),
@@ -28,6 +35,8 @@ vi.mock('../geraeteActions', () => ({
   previewGeraetImport: vi.fn(),
   importGeraete: vi.fn(),
   setGeraeteVerbrauchsmaterial,
+  saveGeraetSet: vi.fn(),
+  deleteGeraetSet: vi.fn(),
 }));
 
 import GeraeteAdminPage from './GeraeteAdminPage';
@@ -91,6 +100,23 @@ function setup({ manager }: { manager: boolean }) {
     loading: false,
     fromCache: false,
   });
+  useGeraetSets.mockReturnValue({
+    sets: [
+      {
+        id: 'oelspur',
+        name: 'Ölspur',
+        codes: ['OEL'],
+        inhalt: [{ geraetId: 'vlies' }],
+        active: true,
+        createdAt: '',
+        createdBy: '',
+        updatedAt: '',
+        updatedBy: '',
+      },
+    ],
+    loading: false,
+    fromCache: false,
+  });
 }
 
 describe('GeraeteAdminPage', () => {
@@ -128,6 +154,17 @@ describe('GeraeteAdminPage', () => {
     expect(screen.getByText('Bindevlies Economy')).toBeInTheDocument();
     expect(screen.queryByText('Rettungsschere')).not.toBeInTheDocument();
     expect(screen.getByText(/Bestand 4 Sack · Mindestbestand 10/)).toBeInTheDocument();
+  });
+
+  it('zeigt die Sets der Gruppe im Reiter „Sets"', async () => {
+    setup({ manager: true });
+    const user = userEvent.setup();
+    renderWithIntl(<GeraeteAdminPage />);
+    await user.click(screen.getByRole('tab', { name: 'Sets (1)' }));
+    expect(useGeraetSets).toHaveBeenCalledWith('ffnd');
+    expect(screen.getByText('Ölspur')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Neues Set' })).toBeInTheDocument();
+    expect(screen.queryByText('Rettungsschere')).not.toBeInTheDocument();
   });
 
   it('bietet Mitgliedern keine Pflege an', async () => {

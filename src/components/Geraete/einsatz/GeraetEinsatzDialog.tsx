@@ -5,6 +5,7 @@ import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -26,13 +27,21 @@ import {
   type Geraet,
   type GeraetBestand,
   type GeraetEinsatz,
+  type GeraetSet,
 } from '../../../common/geraet';
+import {
+  expandSetForEinsatz,
+  findByCode,
+  searchSets,
+  type EinsatzPick,
+} from '../../../common/geraetSet';
 import GeraetSteckbrief from '../GeraetSteckbrief';
 import GeraetScanDialog from './GeraetScanDialog';
+import GeraetSetPreview, { type SetPreviewField, type SetPreviewGroup } from './GeraetSetPreview';
 import {
   buildGeraetEinsatzData,
   buildGeraetEinsatzUpdate,
-  findGeraetByCode,
+  einsatzArtFor,
   geraetForEntry,
   geraetOptionDetails,
   geraetOptionLabel,
@@ -61,10 +70,26 @@ export interface GeraetEinsatzDialogProps {
   createdBy: string;
   /** Gesetzt: Eintrag bearbeiten, der Artikel bleibt fest. */
   entry?: GeraetEinsatz;
+  /**
+   * Sets der Gruppe. Einsatz-Gäste dürfen sie nicht lesen und bekommen
+   * keine — dann bietet die Suche nur Artikel an.
+   */
+  sets?: GeraetSet[];
 }
 
 const EMPTY_BESTAENDE: GeraetBestand[] = [];
 const EMPTY_IDS: string[] = [];
+const EMPTY_SETS: GeraetSet[] = [];
+
+type RowValues = Record<SetPreviewField, string>;
+
+function pickKey(pick: EinsatzPick): string {
+  return pick.kind === 'set' ? `set:${pick.set.id}` : `geraet:${pick.geraet.id}`;
+}
+
+function pickLabel(pick: EinsatzPick): string {
+  return pick.kind === 'set' ? pick.set.name : geraetOptionLabel(pick.geraet);
+}
 
 function parseNumber(text: string): number | undefined {
   const trimmed = text.trim().replace(',', '.');
@@ -106,6 +131,10 @@ function placeholderGeraet(entry: GeraetEinsatz): Geraet {
  * vorbelegten Lagerort — und bei Bedarf danach je Eintrag ergänzt. Im Einsatz
  * zählt, dass alles schnell drin ist.
  *
+ * Ein Set schlägt seine Einträge vor: Die Vorschau zeigt sie je Zeile
+ * änderbar, gespeichert wird je Eintrag mit `setZuordnungId` — so lässt sich
+ * das Set in der Liste zusammen anzeigen und wieder entfernen.
+ *
  * Gespeichert wird lokal (`addDocLocal`/`updateDocLocal`), der Dialog schließt
  * sofort — auch offline. Das Abbuchen vom Lager stößt `geraetEinsatzWrites`
  * an; bis der Server es bestätigt, zeigt die Liste „noch nicht gebucht".
@@ -120,19 +149,34 @@ export default function GeraetEinsatzDialog({
   assignedIds = EMPTY_IDS,
   createdBy,
   entry,
+  sets = EMPTY_SETS,
 }: GeraetEinsatzDialogProps) {
   const t = useTranslations('geraetEinsatz.dialog');
   const editing = !!entry;
 
   // Beim Bearbeiten gilt die Art des Eintrags, nicht der heutige Stand des
   // Artikels (`geraetForEntry`).
-  const [selected, setSelected] = useState<Geraet[]>(() => {
+  const [picks, setPicks] = useState<EinsatzPick[]>(() => {
     if (!entry) return [];
     const current = geraete.find((g) => g.id === entry.geraetId);
-    return [current ? geraetForEntry(current, entry) : placeholderGeraet(entry)];
+    return [
+      {
+        kind: 'geraet',
+        geraet: current ? geraetForEntry(current, entry) : placeholderGeraet(entry),
+      },
+    ];
   });
-  const geraet = selected.length === 1 ? selected[0] : null;
-  const many = selected.length > 1;
+  const selected = useMemo(
+    () => picks.flatMap((p) => (p.kind === 'geraet' ? [p.geraet] : [])),
+    [picks],
+  );
+  const selectedSets = useMemo(
+    () => picks.flatMap((p) => (p.kind === 'set' ? [p.set] : [])),
+    [picks],
+  );
+  const withSets = selectedSets.length > 0;
+  const geraet = !withSets && selected.length === 1 ? selected[0] : null;
+  const many = !withSets && selected.length > 1;
   const [inputValue, setInputValue] = useState('');
   const [bestandId, setBestandId] = useState(entry?.bestandId ?? '');
   const [menge, setMenge] = useState(() => (entry ? formatNumber(entry.menge) : ''));
@@ -141,8 +185,24 @@ export default function GeraetEinsatzDialog({
   const [error, setError] = useState<GeraetEinsatzValidationError | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+  // Geänderte Werte und Fehler der Vorschau, je Zeile (`SetPreviewRow.key`).
+  const [rowEdits, setRowEdits] = useState<Record<string, Partial<RowValues>>>({});
+  const [rowErrors, setRowErrors] = useState<
+    Record<string, GeraetEinsatzValidationError | undefined>
+  >({});
 
-  const bestaende = geraet ? (bestaendeByGeraet.get(geraet.id) ?? EMPTY_BESTAENDE) : EMPTY_BESTAENDE;
+  const geraetById = useMemo(() => new Map(geraete.map((g) => [g.id, g])), [geraete]);
+  const optionByKey = useMemo(() => {
+    const map = new Map<string, EinsatzPick>();
+    for (const g of geraete) map.set(`geraet:${g.id}`, { kind: 'geraet', geraet: g });
+    for (const s of sets) map.set(`set:${s.id}`, { kind: 'set', set: s });
+    return map;
+  }, [geraete, sets]);
+  const options = useMemo(() => [...optionByKey.values()], [optionByKey]);
+
+  const bestaende = geraet
+    ? (bestaendeByGeraet.get(geraet.id) ?? EMPTY_BESTAENDE)
+    : EMPTY_BESTAENDE;
   const hours = geraet ? usesHours(geraet) : false;
   const einheit = geraet?.einheit;
 
@@ -159,22 +219,99 @@ export default function GeraetEinsatzDialog({
       ? pickDefaultBestand(bestaendeByGeraet.get(g.id) ?? [], vehicleNames, assignedIds)
       : undefined;
 
-  const select = (next: Geraet[]) => {
-    setSelected(next);
+  // Die Vorschau, sobald ein Set gewählt ist: je Set seine Einträge, darunter
+  // die einzeln gewählten Artikel mit denselben Vorgaben wie bei „mehrere".
+  const previewGroups = useMemo((): SetPreviewGroup[] => {
+    if (!withSets) return [];
+    const values = (key: string, base: RowValues): RowValues => ({ ...base, ...rowEdits[key] });
+    const groups: SetPreviewGroup[] = selectedSets.map((set) => {
+      const groupKey = `set:${set.id}`;
+      const { rows, skipped } = expandSetForEinsatz(set, {
+        geraetById,
+        bestaendeByGeraet,
+        vehicleNames,
+        containerIds: assignedIds,
+      });
+      return {
+        key: groupKey,
+        title: t('setPreviewTitle', { name: set.name }),
+        skipped,
+        rows: rows.map((r) => {
+          const key = `${groupKey}:${r.geraet.id}`;
+          return {
+            key,
+            geraet: r.geraet,
+            fromSetArtikel: r.fromSetArtikel,
+            error: rowErrors[key],
+            ...values(key, {
+              menge: formatNumber(r.menge),
+              stunden: '',
+              bestandId: r.bestandId ?? '',
+            }),
+          };
+        }),
+      };
+    });
+    if (selected.length > 0) {
+      groups.push({
+        key: 'single',
+        title: t('setPreviewSingles'),
+        skipped: [],
+        rows: selected.map((g) => {
+          const key = `single:${g.id}`;
+          const bestand =
+            einsatzArtFor(g) === 'verbraucht'
+              ? pickDefaultBestand(bestaendeByGeraet.get(g.id) ?? [], vehicleNames, assignedIds)
+              : undefined;
+          return {
+            key,
+            geraet: g,
+            fromSetArtikel: false,
+            error: rowErrors[key],
+            ...values(key, {
+              menge: usesHours(g) ? '' : '1',
+              stunden: '',
+              bestandId: bestand?.id ?? '',
+            }),
+          };
+        }),
+      });
+    }
+    return groups;
+  }, [
+    withSets,
+    selectedSets,
+    selected,
+    rowEdits,
+    rowErrors,
+    geraetById,
+    bestaendeByGeraet,
+    vehicleNames,
+    assignedIds,
+    t,
+  ]);
+  const previewCount = previewGroups.reduce((sum, g) => sum + g.rows.length, 0);
+
+  const select = (next: EinsatzPick[]) => {
+    setPicks(next);
     setError(null);
+    setRowErrors({});
     setScanMessage(null);
-    if (next.length !== 1) return;
-    const [single] = next;
+    if (next.length !== 1 || next[0].kind !== 'geraet') return;
+    const single = next[0].geraet;
     setBestandId(defaultBestandOf(single)?.id ?? '');
     if (!usesHours(single) && !menge) setMenge('1');
   };
 
   const handleCode = (code: string) => {
-    const matches = findGeraetByCode(geraete, code);
+    // „Set gewinnt": Der Code eines gebundenen Set-Artikels liefert das Set.
+    const matches = findByCode(code, { geraete, sets });
     if (matches.length === 1) {
       const [match] = matches;
-      select(selected.some((g) => g.id === match.id) ? selected : [...selected, match]);
+      const key = pickKey(match);
+      select(picks.some((p) => pickKey(p) === key) ? picks : [...picks, match]);
       setInputValue('');
+      if (match.kind === 'set') setScanMessage(t('setCodeFound', { name: match.set.name }));
       return;
     }
     // Mehrere oder keiner: Der Code bleibt im Suchfeld stehen, die Auswahl
@@ -185,7 +322,58 @@ export default function GeraetEinsatzDialog({
     );
   };
 
+  const handleRowChange = (rowKey: string, field: SetPreviewField, value: string) => {
+    setRowEdits((prev) => ({ ...prev, [rowKey]: { ...prev[rowKey], [field]: value } }));
+    setRowErrors((prev) => ({ ...prev, [rowKey]: undefined }));
+  };
+
+  const saveWithSets = () => {
+    const errors: Record<string, GeraetEinsatzValidationError> = {};
+    const prepared = previewGroups.map((group) => ({
+      set: selectedSets.find((s) => `set:${s.id}` === group.key),
+      inputs: group.rows.map((row) => {
+        const hours = usesHours(row.geraet);
+        const input = {
+          geraet: row.geraet,
+          bestandId: row.bestandId || undefined,
+          menge: hours ? undefined : parseNumber(row.menge),
+          stunden: hours ? parseNumber(row.stunden) : undefined,
+          bemerkung,
+        };
+        const validation = validateGeraetEinsatzInput(
+          input,
+          (bestaendeByGeraet.get(row.geraet.id) ?? EMPTY_BESTAENDE).length,
+        );
+        if (validation) errors[row.key] = validation;
+        return input;
+      }),
+    }));
+    if (Object.keys(errors).length > 0) {
+      setRowErrors(errors);
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    for (const { set, inputs } of prepared) {
+      // Eine Kennung je Zuordnung: Dasselbe Set zweimal im Einsatz bleibt in
+      // der Liste getrennt.
+      const setFields = set
+        ? { setId: set.id, setName: set.name, setZuordnungId: crypto.randomUUID() }
+        : {};
+      for (const input of inputs) {
+        addGeraetEinsatz(firecallId, {
+          ...buildGeraetEinsatzData({ ...input, groupId, nowIso, createdBy }),
+          ...setFields,
+        });
+      }
+    }
+    onClose();
+  };
+
   const handleSave = () => {
+    if (withSets) {
+      saveWithSets();
+      return;
+    }
     if (many) {
       const nowIso = new Date().toISOString();
       for (const g of selected) {
@@ -244,9 +432,7 @@ export default function GeraetEinsatzDialog({
         <DialogTitle>{editing ? t('titleEdit') : t('titleAdd')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
-            {geraete.length === 0 && !editing && (
-              <Alert severity="info">{t('noArticles')}</Alert>
-            )}
+            {geraete.length === 0 && !editing && <Alert severity="info">{t('noArticles')}</Alert>}
             <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
               {editing ? (
                 <TextField
@@ -256,12 +442,12 @@ export default function GeraetEinsatzDialog({
                   value={geraet ? geraetOptionLabel(geraet) : ''}
                 />
               ) : (
-                <Autocomplete<Geraet, true>
+                <Autocomplete<EinsatzPick, true>
                   fullWidth
                   multiple
                   disableCloseOnSelect
-                  options={geraete}
-                  value={selected}
+                  options={options}
+                  value={picks}
                   inputValue={inputValue}
                   onInputChange={(_e, value, reason) => {
                     // Nach einer Auswahl bleibt der Suchbegriff stehen — so
@@ -270,15 +456,39 @@ export default function GeraetEinsatzDialog({
                     if (reason !== 'reset' && reason !== 'selectOption') setInputValue(value);
                   }}
                   onChange={(_e, value) => select(value)}
-                  filterOptions={(options, state) => searchGeraete(options, state.inputValue)}
-                  getOptionLabel={geraetOptionLabel}
+                  // Sets stehen unter den Artikel-Treffern.
+                  filterOptions={(_options, state) => [
+                    ...searchGeraete(geraete, state.inputValue).flatMap(
+                      (g) => optionByKey.get(`geraet:${g.id}`) ?? [],
+                    ),
+                    ...searchSets(sets, state.inputValue).flatMap(
+                      (s) => optionByKey.get(`set:${s.id}`) ?? [],
+                    ),
+                  ]}
+                  getOptionLabel={pickLabel}
                   // Ohne Inventar-Nr. tragen gleichnamige Artikel dasselbe
                   // Label — der Schlüssel muss die ID sein.
-                  getOptionKey={(option) => option.id}
-                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  getOptionKey={pickKey}
+                  isOptionEqualToValue={(a, b) => pickKey(a) === pickKey(b)}
                   noOptionsText={t('noOptions')}
-                  renderOption={(props, option) => {
+                  renderOption={(props, pick) => {
                     const { key, ...rest } = props;
+                    if (pick.kind === 'set') {
+                      return (
+                        <li key={key} {...rest}>
+                          <Box>
+                            <Typography variant="body2" component="div">
+                              {pick.set.name}{' '}
+                              <Chip size="small" variant="outlined" label={t('setChip')} />
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" component="div">
+                              {t('setItems', { count: pick.set.inhalt?.length ?? 0 })}
+                            </Typography>
+                          </Box>
+                        </li>
+                      );
+                    }
+                    const option = pick.geraet;
                     const details = geraetOptionDetails(
                       option,
                       bestaendeByGeraet.get(option.id) ?? EMPTY_BESTAENDE,
@@ -352,6 +562,16 @@ export default function GeraetEinsatzDialog({
               </>
             )}
 
+            {withSets && (
+              <GeraetSetPreview
+                groups={previewGroups}
+                bestaendeByGeraet={bestaendeByGeraet}
+                vehicleNames={vehicleNames}
+                assignedIds={assignedIds}
+                onChange={handleRowChange}
+              />
+            )}
+
             {geraet && (
               <Alert severity={geraet.verbrauchsmaterial ? 'warning' : 'info'}>
                 {geraet.verbrauchsmaterial ? t('consumableInfo') : t('deviceInfo')}
@@ -422,15 +642,15 @@ export default function GeraetEinsatzDialog({
         <DialogActions>
           <Button onClick={onClose}>{t('cancel')}</Button>
           <Button variant="contained" onClick={handleSave}>
-            {many ? t('saveMany', { count: selected.length }) : t('save')}
+            {withSets
+              ? t('saveMany', { count: previewCount })
+              : many
+                ? t('saveMany', { count: selected.length })
+                : t('save')}
           </Button>
         </DialogActions>
       </Dialog>
-      <GeraetScanDialog
-        open={scanOpen}
-        onClose={() => setScanOpen(false)}
-        onCode={handleCode}
-      />
+      <GeraetScanDialog open={scanOpen} onClose={() => setScanOpen(false)} onCode={handleCode} />
     </>
   );
 }

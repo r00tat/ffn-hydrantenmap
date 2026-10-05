@@ -10,6 +10,12 @@ Chrome Extension (Manifest V3) für die Einsatzkarte der FF Neusiedl am See. Bie
   des offenen SYBOS-Einsatzes und vergleicht sie mit den Einsätzen der Einsatzkarte.
   Passt die Auswahl nicht, warnt das Panel vor dem Übertragen und bietet den besser
   passenden Einsatz per Klick an (siehe `firecall-matching.ts`)
+- **Geräte übernehmen**: Geräte und Verbrauchsmaterial des Einsatzes über die
+  Sybos-ID in die Geräteauswahl, mit Anzahl bzw. Stunden (siehe `sybos-geraete.ts`
+  und `docs/sybos-uebertrag.md`)
+- **Einsatzbericht-Text**: Einsatzablauf und Tätigkeit aus der Seite „Sybos-Übertrag"
+  ins offene Einsatzformular eintragen; gespeichert wird in SYBOS
+  (siehe `sybos-bericht-text.ts`)
 - **Echtzeit**: Firestore-Subscriptions für Live-Updates von Einsätzen und Tagebucheinträgen
 
 ## Tech Stack

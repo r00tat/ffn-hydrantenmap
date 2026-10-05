@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Geraet, GeraetBestand, GeraetEinsatz } from '../../../common/geraet';
+import type { Geraet, GeraetBestand, GeraetEinsatz, GeraetSet } from '../../../common/geraet';
 import { renderWithIntl as render } from '../../../test-utils/intlRender';
 
 const state = vi.hoisted(() => ({
@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   dialogProps: vi.fn(),
   groups: ['ffnd'] as string[],
   reconnect: undefined as undefined | (() => void),
+  setsGroupId: vi.fn(),
 }));
 
 vi.mock('../../../hooks/useFirecall', () => ({ default: () => state.firecall }));
@@ -67,6 +68,23 @@ vi.mock('../../../hooks/useGeraete', () => ({
     fromCache: false,
   }),
 }));
+const oelspurSet: GeraetSet = {
+  id: 'oelspur',
+  name: 'Ölspur',
+  codes: [],
+  inhalt: [{ geraetId: 'vlies' }],
+  active: true,
+  createdAt: '',
+  createdBy: '',
+  updatedAt: '',
+  updatedBy: '',
+};
+vi.mock('../../../hooks/useGeraetSets', () => ({
+  default: (groupId?: string) => {
+    state.setsGroupId(groupId);
+    return { sets: groupId ? [oelspurSet] : [], loading: false, fromCache: false };
+  },
+}));
 vi.mock('./useGeraetEinsatz', () => ({
   default: () => ({ entries: state.entries, loading: false, fromCache: state.fromCache }),
 }));
@@ -75,7 +93,12 @@ vi.mock('./geraetEinsatzWrites', () => ({
   resyncPendingBooking: state.resync,
 }));
 vi.mock('./GeraetEinsatzDialog', () => ({
-  default: (props: { entry?: GeraetEinsatz; groupId: string; vehicleNames: string[] }) => {
+  default: (props: {
+    entry?: GeraetEinsatz;
+    groupId: string;
+    vehicleNames: string[];
+    sets?: GeraetSet[];
+  }) => {
     state.dialogProps(props);
     return <div>Dialog {props.entry ? `bearbeiten ${props.entry.id}` : 'neu'}</div>;
   },
@@ -246,5 +269,76 @@ describe('GeraeteEinsatzSection', () => {
     state.firecall = { id: 'unknown', name: '' };
     render(<GeraeteEinsatzSection />);
     expect(screen.getByText('Kein Einsatz gewählt.')).toBeInTheDocument();
+  });
+
+  describe('Sets', () => {
+    const inSet = (entry: GeraetEinsatz, id: string): GeraetEinsatz => ({
+      ...entry,
+      id,
+      setId: 'oelspur',
+      setName: 'Ölspur',
+      setZuordnungId: 'z1',
+    });
+    const setEntries = [inSet(verbrauch, 's1'), inSet(zuordnung, 's2')];
+
+    it('gibt Gruppenmitgliedern die Sets an den Dialog', async () => {
+      const user = userEvent.setup();
+      render(<GeraeteEinsatzSection />);
+      await user.click(screen.getByRole('button', { name: 'Erfassen' }));
+      expect(state.dialogProps).toHaveBeenCalledWith(
+        expect.objectContaining({ sets: [oelspurSet] }),
+      );
+    });
+
+    it('liest für Einsatz-Gäste keine Sets', async () => {
+      state.groups = ['allUsers'];
+      const user = userEvent.setup();
+      render(<GeraeteEinsatzSection />);
+      expect(state.setsGroupId).toHaveBeenCalledWith(undefined);
+      expect(state.setsGroupId).not.toHaveBeenCalledWith('ffnd');
+      await user.click(screen.getByRole('button', { name: 'Erfassen' }));
+      expect(state.dialogProps).toHaveBeenCalledWith(expect.objectContaining({ sets: [] }));
+    });
+
+    it('fasst die Einträge einer Set-Zuordnung unter einer Überschrift zusammen', () => {
+      state.entries = [...setEntries, { ...verbrauch, id: 'e9', geraetName: 'Besen' }];
+      render(<GeraeteEinsatzSection />);
+      const header = screen.getByRole('listitem', { name: 'Set Ölspur' });
+      expect(within(header).getByText('2 Einträge')).toBeInTheDocument();
+      expect(screen.getByText('Stromaggregat')).toBeInTheDocument();
+      expect(screen.getByText('Besen')).toBeInTheDocument();
+    });
+
+    it('klappt ein Set zu und wieder auf', async () => {
+      const user = userEvent.setup();
+      state.entries = setEntries;
+      render(<GeraeteEinsatzSection />);
+      await user.click(screen.getByRole('button', { name: 'Zuklappen' }));
+      expect(screen.queryByText('Stromaggregat')).toBeNull();
+      await user.click(screen.getByRole('button', { name: 'Aufklappen' }));
+      expect(screen.getByText('Stromaggregat')).toBeInTheDocument();
+    });
+
+    it('entfernt das ganze Set nach Rückfrage', async () => {
+      const user = userEvent.setup();
+      state.entries = setEntries;
+      render(<GeraeteEinsatzSection />);
+      await user.click(screen.getByRole('button', { name: 'Aktionen für das Set' }));
+      await user.click(screen.getByRole('menuitem', { name: 'Ganzes Set entfernen' }));
+      expect(
+        screen.getByText(/Alle 2 Einträge des Sets „Ölspur“ werden entfernt/),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Löschen' }));
+      expect(state.deleteEntry).toHaveBeenCalledTimes(2);
+      expect(state.deleteEntry).toHaveBeenCalledWith('fc1', setEntries[0]);
+      expect(state.deleteEntry).toHaveBeenCalledWith('fc1', setEntries[1]);
+    });
+
+    it('ohne Schreibrecht kein Menü am Set', () => {
+      state.canWrite = false;
+      state.entries = setEntries;
+      render(<GeraeteEinsatzSection />);
+      expect(screen.queryByRole('button', { name: 'Aktionen für das Set' })).toBeNull();
+    });
   });
 });

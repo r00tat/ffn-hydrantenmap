@@ -269,9 +269,11 @@ import {
   createGeraetBestand,
   deleteGeraet,
   deleteGeraetBestand,
+  deleteGeraetSet,
   importGeraete,
   previewGeraetImport,
   saveGeraet,
+  saveGeraetSet,
   setGeraeteVerbrauchsmaterial,
   syncGeraetVerbrauch,
   updateGeraetBestand,
@@ -1388,5 +1390,182 @@ describe('importGeraete', () => {
 
   it('lehnt unbrauchbare Zustimmungen ab', async () => {
     await expect(importGeraete('ffnd', file([{ id: '1' }]), 'x' as never)).rejects.toThrow();
+  });
+});
+
+// --- Sets --------------------------------------------------------------------
+
+function putSet(id: string, data: Record<string, unknown> = {}) {
+  fake.put(`${G}/geraetSet/${id}`, {
+    name: 'Ölspur',
+    codes: [],
+    inhalt: [{ geraetId: 'besen' }],
+    active: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    createdBy: 'u0',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    updatedBy: 'u0',
+    ...data,
+  });
+}
+
+function geraetSet(id: string) {
+  return fake.get(`${G}/geraetSet/${id}`) as Record<string, unknown> | undefined;
+}
+
+function putSetArtikel() {
+  putGeraet('besen', { bezeichnung: 'Besen', verbrauchsmaterial: false });
+  putGeraet('binder', { bezeichnung: 'Ölbindemittel' });
+  putGeraet('pumpe', { bezeichnung: 'Tauchpumpe', verbrauchsmaterial: false, barcodes: ['ABC123'] });
+  putGeraet('kiste', {
+    bezeichnung: 'Ölspur-Kiste',
+    verbrauchsmaterial: false,
+    materialTyp: 'Set-Artikel',
+    barcodes: ['SET-1'],
+  });
+  putBestand('b-lager', 'binder', lager, 40);
+  putBestand('p-lager', 'pumpe', lager, 1);
+}
+
+const validSet = {
+  name: '  Ölspur ',
+  codes: [' OEL ', 'oel'],
+  inhalt: [{ geraetId: 'besen' }, { geraetId: 'binder', menge: 3, bestandId: 'b-lager' }],
+  active: true,
+};
+
+describe('saveGeraetSet', () => {
+  beforeEach(putSetArtikel);
+
+  it('verlangt Gruppen-Admin oder Gerätemeister', async () => {
+    managerGuard.mockRejectedValue(new Error('forbidden'));
+    await expect(saveGeraetSet('ffnd', validSet)).rejects.toThrow('forbidden');
+    expect(managerGuard).toHaveBeenCalledWith('ffnd');
+    expect(fake.list(`${G}/geraetSet`)).toHaveLength(0);
+  });
+
+  it('legt ein Set an, normalisiert Codes und setzt Autor und Zeitpunkte', async () => {
+    const { id } = await saveGeraetSet('ffnd', {
+      ...validSet,
+      sybosSetArtikelId: 'kiste',
+      bemerkung: '  am SRF ',
+    });
+    expect(geraetSet(id)).toEqual({
+      name: 'Ölspur',
+      codes: ['OEL'],
+      inhalt: [{ geraetId: 'besen' }, { geraetId: 'binder', menge: 3, bestandId: 'b-lager' }],
+      active: true,
+      sybosSetArtikelId: 'kiste',
+      bemerkung: 'am SRF',
+      createdAt: expect.any(String),
+      createdBy: 'u1',
+      updatedAt: expect.any(String),
+      updatedBy: 'u1',
+    });
+  });
+
+  it('ändert ein bestehendes Set und behält createdAt/createdBy', async () => {
+    putSet('s1', { codes: ['ALT'] });
+    await saveGeraetSet('ffnd', { ...validSet, id: 's1', active: false });
+    expect(geraetSet('s1')).toMatchObject({
+      name: 'Ölspur',
+      codes: ['OEL'],
+      active: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      createdBy: 'u0',
+      updatedBy: 'u1',
+    });
+  });
+
+  it('löscht geleerte optionale Felder beim Ändern', async () => {
+    putSet('s1', { sybosSetArtikelId: 'kiste', bemerkung: 'alt' });
+    await saveGeraetSet('ffnd', { ...validSet, id: 's1', sybosSetArtikelId: '', bemerkung: ' ' });
+    const s = geraetSet('s1')!;
+    expect(s.sybosSetArtikelId).toBeUndefined();
+    expect(s.bemerkung).toBeUndefined();
+  });
+
+  it('lehnt ein unbekanntes Set beim Ändern mit 404 ab', async () => {
+    await expect(saveGeraetSet('ffnd', { ...validSet, id: 'weg' })).rejects.toThrow(/not found/);
+    expect(fake.list(`${G}/geraetSet`)).toHaveLength(0);
+  });
+
+  it('prüft serverseitig mit validateGeraetSet', async () => {
+    await expect(saveGeraetSet('ffnd', { ...validSet, codes: ['abc123'] })).rejects.toThrow(
+      /codeCollision/,
+    );
+    putSet('s2', { name: 'Hochwasser', codes: ['HW-1'] });
+    await expect(saveGeraetSet('ffnd', { ...validSet, codes: ['hw-1'] })).rejects.toThrow(
+      /codeCollision/,
+    );
+    await expect(saveGeraetSet('ffnd', { ...validSet, name: ' ' })).rejects.toThrow(
+      /nameMissing/,
+    );
+    await expect(
+      saveGeraetSet('ffnd', { ...validSet, sybosSetArtikelId: 'pumpe' }),
+    ).rejects.toThrow(/notSetArtikel/);
+    expect(fake.list(`${G}/geraetSet`)).toHaveLength(1);
+  });
+
+  it('lehnt einen Lagerort eines anderen Artikels ab', async () => {
+    await expect(
+      saveGeraetSet('ffnd', {
+        ...validSet,
+        inhalt: [{ geraetId: 'binder', bestandId: 'p-lager' }],
+      }),
+    ).rejects.toThrow(/invalidBestand/);
+  });
+
+  it('lehnt einen archivierten Lagerort ab', async () => {
+    fake.put(`${G}/geraetBestand/b-alt`, {
+      geraetId: 'binder',
+      lagerort: srf,
+      lagerortKey: lagerortKey(srf),
+      anzahl: 0,
+      archiviert: true,
+    });
+    await expect(
+      saveGeraetSet('ffnd', { ...validSet, inhalt: [{ geraetId: 'binder', bestandId: 'b-alt' }] }),
+    ).rejects.toThrow(/invalidBestand/);
+  });
+
+  it('lehnt unsichere IDs ab', async () => {
+    await expect(
+      saveGeraetSet('ffnd', { ...validSet, inhalt: [{ geraetId: 'a/b' }] }),
+    ).rejects.toThrow(/invalid geraetId/);
+    await expect(saveGeraetSet('ffnd', { ...validSet, id: '..' })).rejects.toThrow(
+      /invalid setId/,
+    );
+  });
+
+  it('lehnt eine kaputte Eingabe ab', async () => {
+    await expect(saveGeraetSet('ffnd', null as never)).rejects.toThrow(/invalid geraetSet/);
+  });
+});
+
+describe('deleteGeraetSet', () => {
+  it('verlangt Gruppen-Admin oder Gerätemeister', async () => {
+    putSet('s1');
+    managerGuard.mockRejectedValue(new Error('forbidden'));
+    await expect(deleteGeraetSet('ffnd', 's1')).rejects.toThrow('forbidden');
+    expect(managerGuard).toHaveBeenCalledWith('ffnd');
+    expect(geraetSet('s1')).toBeDefined();
+  });
+
+  it('löscht das Set und lässt Einsatz-Einträge unberührt', async () => {
+    putSet('s1');
+    fake.put('call/fc1/geraetEinsatz/e1', {
+      geraetId: 'besen',
+      setId: 's1',
+      setName: 'Ölspur',
+      setZuordnungId: 'z1',
+    });
+    await expect(deleteGeraetSet('ffnd', 's1')).resolves.toEqual({ id: 's1' });
+    expect(geraetSet('s1')).toBeUndefined();
+    expect(fake.get('call/fc1/geraetEinsatz/e1')).toMatchObject({ setName: 'Ölspur' });
+  });
+
+  it('meldet ein unbekanntes Set mit 404', async () => {
+    await expect(deleteGeraetSet('ffnd', 'weg')).rejects.toThrow(/not found/);
   });
 });

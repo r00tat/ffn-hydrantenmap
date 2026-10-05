@@ -46,6 +46,7 @@ import GeschaeftsbuchPrint from '../pages/GeschaeftsbuchPrint';
 import {
   PrintAtemschutz,
   PrintEinsatzablauf,
+  PrintGeraete,
   PrintMannschaft,
 } from '../pages/PrintEinsatzExtras';
 import { collectAttachments } from '../pages/sybos/sybosExtras';
@@ -350,6 +351,9 @@ export default function PrintPage() {
 
       {/* Mannschaft und Fahrten */}
       <PrintMannschaft />
+
+      {/* Geräte und Verbrauchsmaterial */}
+      <PrintGeraete />
 
       {/* 4. Einsatzmittel pro Layer (detailed) */}
       {Object.keys(groupedByLayer).length > 0 && (

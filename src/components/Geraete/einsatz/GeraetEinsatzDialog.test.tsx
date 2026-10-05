@@ -2,12 +2,13 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Geraet, GeraetBestand, GeraetEinsatz } from '../../../common/geraet';
+import type { Geraet, GeraetBestand, GeraetEinsatz, GeraetSet } from '../../../common/geraet';
 import { renderWithIntl as render } from '../../../test-utils/intlRender';
 
 const mocks = vi.hoisted(() => ({
   add: vi.fn((..._args: unknown[]) => 'new-id'),
   update: vi.fn((..._args: unknown[]) => undefined),
+  scanCode: 'ABC123',
 }));
 
 vi.mock('./geraetEinsatzWrites', () => ({
@@ -20,7 +21,7 @@ vi.mock('firebase/firestore', () => ({ deleteField: () => 'DELETE' }));
 // Geschwister `aria-hidden` setzt — daher `hidden: true` beim Suchen.
 vi.mock('./GeraetScanDialog', () => ({
   default: ({ open, onCode }: { open: boolean; onCode: (code: string) => void }) =>
-    open ? <button onClick={() => onCode('ABC123')}>Scan liefern</button> : null,
+    open ? <button onClick={() => onCode(mocks.scanCode)}>Scan liefern</button> : null,
 }));
 
 import GeraetEinsatzDialog from './GeraetEinsatzDialog';
@@ -108,6 +109,7 @@ async function pickArticle(text: string, option: RegExp) {
 describe('GeraetEinsatzDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.scanCode = 'ABC123';
   });
 
   it('unterscheidet gleichnamige Geräte an Typ und Seriennummer und zeigt den Steckbrief', async () => {
@@ -128,7 +130,12 @@ describe('GeraetEinsatzDialog', () => {
       seriennummer: 'SN-2',
       zubehoer: 'Prüfschale',
     });
-    const pruefgas = geraet({ ...m1, id: 'pg', bezeichnung: 'Prüfgas X-am', seriennummer: undefined });
+    const pruefgas = geraet({
+      ...m1,
+      id: 'pg',
+      bezeichnung: 'Prüfgas X-am',
+      seriennummer: undefined,
+    });
     renderDialog({ geraete: [m1, m2, pruefgas] });
     const user = userEvent.setup();
     await user.type(screen.getByRole('combobox', { name: /Artikel/ }), 'messgerät');
@@ -272,10 +279,7 @@ describe('GeraetEinsatzDialog', () => {
     expect(options).toHaveLength(2);
     await user.click(options[1]);
     await user.click(screen.getByRole('button', { name: '2 erfassen' }));
-    expect(mocks.add.mock.calls.map((c) => (c[1] as GeraetEinsatz).geraetId)).toEqual([
-      'p1',
-      'p2',
-    ]);
+    expect(mocks.add.mock.calls.map((c) => (c[1] as GeraetEinsatz).geraetId)).toEqual(['p1', 'p2']);
     expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/);
     errors.mockRestore();
   });
@@ -395,5 +399,166 @@ describe('GeraetEinsatzDialog', () => {
       bemerkung: 'nachgetragen',
       gebucht: false,
     });
+  });
+});
+
+describe('GeraetEinsatzDialog mit Sets', () => {
+  const kiste = geraet({
+    id: 'kiste',
+    bezeichnung: 'Ölspur-Kiste',
+    materialTyp: 'Set-Artikel',
+    barcodes: ['KISTE-1'],
+  });
+  const alt = geraet({ id: 'alt', bezeichnung: 'Altgerät', active: false });
+  const oelspur: GeraetSet = {
+    id: 'oelspur',
+    name: 'Ölspur',
+    sybosSetArtikelId: 'kiste',
+    codes: ['OEL'],
+    inhalt: [
+      { geraetId: 'vlies', menge: 4, bestandId: 'lager' },
+      { geraetId: 'pumpe' },
+      { geraetId: 'alt' },
+    ],
+    active: true,
+    createdAt: '',
+    createdBy: '',
+    updatedAt: '',
+    updatedBy: '',
+  };
+
+  function renderWithSets() {
+    return renderDialog({ geraete: [vlies, pumpe, aggregat, kiste, alt], sets: [oelspur] });
+  }
+
+  function row(name: RegExp) {
+    return screen.getByRole('listitem', { name });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.scanCode = 'ABC123';
+  });
+
+  it('bietet ein Set unter den Artikeln an, mit Kennzeichen und Inhaltszahl', async () => {
+    renderWithSets();
+    const user = userEvent.setup();
+    await user.type(screen.getByRole('combobox', { name: /Artikel/ }), 'ölspur');
+    const options = await screen.findAllByRole('option');
+    const set = options[options.length - 1];
+    expect(set).toHaveTextContent('Ölspur');
+    expect(set).toHaveTextContent('Set');
+    expect(set).toHaveTextContent('3 Inhalte');
+  });
+
+  it('zeigt die Vorschau eines Sets und legt alle Einträge mit Set-Bezug an', async () => {
+    const { onClose } = renderWithSets();
+    const user = await pickArticle('ölspur', /^Ölspur Set/);
+
+    expect(screen.getByText('Set Ölspur')).toBeInTheDocument();
+    expect(within(row(/Ölspur-Kiste/)).getByText(/Set-Artikel/)).toBeInTheDocument();
+    expect(row(/Bindevlies/)).toBeInTheDocument();
+    expect(row(/Tauchpumpe/)).toBeInTheDocument();
+    expect(within(row(/Altgerät/)).getByText('inaktiv – wird nicht angelegt')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '3 erfassen' }));
+
+    expect(mocks.add).toHaveBeenCalledTimes(3);
+    const data = mocks.add.mock.calls.map((c) => c[1] as Omit<GeraetEinsatz, 'id'>);
+    expect(data[0]).toMatchObject({
+      geraetId: 'kiste',
+      art: 'zugeordnet',
+      menge: 1,
+      setId: 'oelspur',
+      setName: 'Ölspur',
+    });
+    expect(data[1]).toMatchObject({
+      geraetId: 'vlies',
+      art: 'verbraucht',
+      bestandId: 'lager',
+      menge: 4,
+      setId: 'oelspur',
+    });
+    expect(data[2]).toMatchObject({ geraetId: 'pumpe', art: 'zugeordnet', menge: 1 });
+    expect(data[0].setZuordnungId).toBeTruthy();
+    expect(new Set(data.map((d) => d.setZuordnungId)).size).toBe(1);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('Menge und Lagerort lassen sich je Zeile ändern', async () => {
+    renderWithSets();
+    const user = await pickArticle('ölspur', /^Ölspur Set/);
+    const vliesRow = row(/Bindevlies/);
+    const menge = within(vliesRow).getByRole('textbox', { name: 'Menge (Stk)' });
+    await user.clear(menge);
+    await user.type(menge, '2');
+    await user.click(within(vliesRow).getByRole('combobox', { name: 'Lagerort' }));
+    await user.click(
+      within(screen.getByRole('listbox')).getByRole('option', { name: /SRF · GR 2/ }),
+    );
+    await user.click(screen.getByRole('button', { name: '3 erfassen' }));
+    const [, data] = mocks.add.mock.calls[1] as [string, Omit<GeraetEinsatz, 'id'>];
+    expect(data).toMatchObject({ geraetId: 'vlies', bestandId: 'srf', menge: 2 });
+  });
+
+  it('erfasst ein Set zusammen mit einzelnen Artikeln', async () => {
+    renderWithSets();
+    const user = await pickArticle('ölspur', /^Ölspur Set/);
+    const input = screen.getByRole('combobox', { name: /Artikel/ });
+    await user.clear(input);
+    await user.type(input, 'strom');
+    await user.click(await screen.findByRole('option', { name: /Stromaggregat/ }));
+
+    expect(screen.getByText('Einzelne Artikel')).toBeInTheDocument();
+    await user.type(within(row(/Stromaggregat/)).getByRole('textbox', { name: 'Stunden' }), '1,5');
+    await user.click(screen.getByRole('button', { name: '4 erfassen' }));
+
+    expect(mocks.add).toHaveBeenCalledTimes(4);
+    const last = mocks.add.mock.calls[3][1] as Omit<GeraetEinsatz, 'id'>;
+    expect(last).toMatchObject({ geraetId: 'aggregat', stunden: 1.5 });
+    expect('setId' in last).toBe(false);
+    expect('setZuordnungId' in last).toBe(false);
+  });
+
+  it('meldet eine ungültige Menge an der Zeile und speichert nichts', async () => {
+    const { onClose } = renderWithSets();
+    const user = await pickArticle('ölspur', /^Ölspur Set/);
+    const vliesRow = row(/Bindevlies/);
+    const menge = within(vliesRow).getByRole('textbox', { name: 'Menge (Stk)' });
+    await user.clear(menge);
+    await user.type(menge, 'abc');
+    await user.click(screen.getByRole('button', { name: '3 erfassen' }));
+    expect(within(vliesRow).getByText('Bitte eine gültige Menge angeben.')).toBeInTheDocument();
+    expect(mocks.add).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('übernimmt ein Set per Scan seines Codes', async () => {
+    mocks.scanCode = 'OEL';
+    renderWithSets();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Barcode scannen' }));
+    await user.click(screen.getByRole('button', { name: 'Scan liefern', hidden: true }));
+    expect(screen.getByText('Set „Ölspur“ übernommen.')).toBeInTheDocument();
+    expect(screen.getByText('Set Ölspur')).toBeInTheDocument();
+  });
+
+  it('der Scan des Set-Artikels übernimmt das Set, nicht nur die Kiste', async () => {
+    mocks.scanCode = 'KISTE-1';
+    renderWithSets();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Barcode scannen' }));
+    await user.click(screen.getByRole('button', { name: 'Scan liefern', hidden: true }));
+    expect(screen.getByText('Set Ölspur')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '3 erfassen' })).toBeInTheDocument();
+  });
+
+  it('ohne Sets (Einsatz-Gast) bietet die Suche nur Artikel an', async () => {
+    renderDialog({ geraete: [vlies, pumpe, kiste] });
+    const user = userEvent.setup();
+    await user.type(screen.getByRole('combobox', { name: /Artikel/ }), 'ölspur');
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('Ölspur-Kiste');
   });
 });

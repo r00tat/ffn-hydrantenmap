@@ -56,6 +56,7 @@ import {
 } from './sybosReport';
 import {
   buildAtemschutzText,
+  buildEinsatzGeraeteText,
   truppProtokollText,
   buildFahrtenRows,
   buildMeasurementTables,
@@ -69,9 +70,14 @@ import {
 import { AusgabeTable, GeraeteTable, TruppProtokollView } from './SybosAtemschutz';
 import { AttachmentList, DriveFiles } from './SybosFiles';
 import { generateSybosSummary } from './sybosSummary';
-import { useAtemschutzReport, useFirecallAlarmText } from './useEinsatzReport';
+import {
+  useAtemschutzReport,
+  useEinsatzGeraetRows,
+  useFirecallAlarmText,
+} from './useEinsatzReport';
 import {
   CrewTable,
+  EinsatzGeraeteTable,
   FahrtenTable,
   MaterialTable,
   MeasurementTableView,
@@ -296,6 +302,7 @@ export default function SybosPage() {
   const { calculations } = useFirecallKostenersatz(firecall.id);
   const alarmText = useFirecallAlarmText(firecall);
   const computed = useComputedFields(firecallItems, layers);
+  const einsatzGeraetRows = useEinsatzGeraetRows(firecall);
 
   const basis = useMemo(
     () => buildBasisdaten({ firecall, items: firecallItems, locations }),
@@ -314,6 +321,10 @@ export default function SybosPage() {
   const material = useMemo(
     () => materialCounts.map(({ label, count }) => `${count}× ${label}`).join('\n'),
     [materialCounts],
+  );
+  const einsatzGeraete = useMemo(
+    () => buildEinsatzGeraeteText(einsatzGeraetRows),
+    [einsatzGeraetRows],
   );
   const notizen = useMemo(() => buildNotizenText(locations), [locations]);
   const tagebuch = useMemo(() => buildTagebuchText(diaries), [diaries]);
@@ -419,6 +430,7 @@ export default function SybosPage() {
       { title: t('mannschaft'), text: mannschaft, private: true },
       { title: t('sonstigeKraefte'), text: kraefte.fremde },
       { title: t('material'), text: material },
+      { title: t('geraete'), text: einsatzGeraete },
       // Fahrer stehen mit Namen darin, deshalb wie die Mannschaft privat.
       { title: t('fahrten'), text: fahrten, private: true },
       { title: t('alarmtext'), text: alarmText },
@@ -439,6 +451,7 @@ export default function SybosPage() {
       assp,
       atemschutz,
       basis,
+      einsatzGeraete,
       fahrten,
       geraete,
       geschaeftsbuch,
@@ -614,6 +627,7 @@ export default function SybosPage() {
           <CrewTable title={t('mannschaft')} crew={crewSorted} />
           <StrengthRowsTable title={t('sonstigeKraefte')} rows={kraefte.fremdeRows} />
           <MaterialTable title={t('material')} material={materialCounts} />
+          <EinsatzGeraeteTable title={t('geraete')} rows={einsatzGeraetRows} />
           <FahrtenTable title={t('fahrten')} rows={fahrtenRows} />
         </Section>
 
