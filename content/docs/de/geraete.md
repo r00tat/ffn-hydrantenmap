@@ -6,7 +6,7 @@ Unter „Geräte & Material" liegen die Geräte und Lagerartikel deiner Feuerweh
 
 - **Artikelliste:** alle Geräte und Lagerartikel mit Lagerorten und Gesamtbestand, filterbar nach Klasse, Lagerort, Verbrauchsmaterial und „unter Mindestbestand"
 - **Nachzubestellen:** Artikel, deren Bestand unter den Mindestbestand gefallen ist
-- **Bestand je Lagerort:** Fahrzeug und Laderaum (z.B. „SRF · GR 2") oder Raum (z.B. „Feuerwehrhaus · Lager")
+- **Bestand je Lagerort:** Fahrzeug und Laderaum (z.B. „SRF · GR 2"), Raum (z.B. „Feuerwehrhaus · Lager") oder ein Container (z.B. „Ölsperren 1")
 - **Zugang, Umbuchung, Inventur:** Bestand auffüllen, zwischen Lagerorten verschieben oder den Ist-Wert setzen
 - **Import aus Sybos:** Artikelexport als Excel-Datei, mit Vorschau vor der Übernahme
 - **Im Einsatz:** Geräte zuordnen und Material verbrauchen, auch ohne Netz
@@ -16,7 +16,7 @@ Unter „Geräte & Material" liegen die Geräte und Lagerartikel deiner Feuerweh
 ### Im Einsatz: Gerät zuordnen oder Material verbrauchen
 
 1. Im Einsatz den Abschnitt „Geräte & Material" öffnen
-2. Artikel suchen (Bezeichnung oder Inventar-Nr.)
+2. Artikel suchen — nach Bezeichnung, Inventar-Nr., Barcode, Seriennummer, aber auch nach Gattung oder Klasse (z.B. „Messgerät", „Gasmessgerät"). Unter jedem Treffer stehen Typ, Seriennummer und Lagerort, damit gleichnamige Geräte unterscheidbar sind; nach der Auswahl zeigt der Dialog die Stammdaten aus Sybos
 3. Bei einem Gerät die Anzahl bzw. die Stunden eintragen — der Bestand ändert sich dabei nicht
 4. Bei Verbrauchsmaterial die Menge eintragen und den Lagerort wählen, von dem es genommen wurde
 5. Speichern — der Eintrag ist sofort im Einsatz sichtbar
@@ -27,16 +27,19 @@ Ohne Netz wird der Eintrag auf dem Gerät gespeichert. Das Abbuchen vom Lager wi
 
 Wird ein Verbrauch nachträglich geändert oder gelöscht, wird der Bestand entsprechend korrigiert.
 
+Dieselbe Liste steht auch in der **Einsatzübersicht** als aufklappbarer Abschnitt „Geräte & Material".
+
 ### Bestand pflegen
 
 1. Im Menü „Geräte & Material" öffnen
 2. Artikel auswählen
 3. Beim gewünschten Lagerort **Zugang** (Material eingetroffen), **Umbuchung** (z.B. vom Lager auf das SRF) oder **Inventur** (gezählten Ist-Wert eintragen) wählen
 4. Beim Artikel festlegen, ob er **Verbrauchsmaterial** ist, und bei Bedarf **Einheit** und **Mindestbestand** eintragen
+5. Einen weiteren Lagerort legst du mit **Neuer Lagerort** an. Als Art stehen Raum, Fahrzeug und **Container** zur Wahl; Container sind die Artikel der Sybos-Kategorie „Container" und müssen dafür importiert sein
 
 ### Aus Sybos importieren
 
-1. In Sybos den Artikelexport als Excel-Datei erstellen (eine Zeile je Artikel und Lagerort)
+1. In Sybos den Artikelexport als Excel-Datei erstellen (eine Zeile je Artikel und Lagerort) — **mit den Lagerort-Spalten**. Fehlen sie, übernimmt der Import nur die Stammdaten und lässt den Bestand, wie er ist. Container (Rollcontainer, Paletten) als eigenen Export der Kategorie „Container" ebenfalls importieren
 2. In „Geräte & Material" auf „Import" klicken und die Datei wählen
 3. Die Vorschau prüfen: neue Artikel, geänderte Stammdaten, neue Lagerorte und Abweichungen beim Bestand
 4. Abweichungen einzeln als Inventur übernehmen oder verwerfen

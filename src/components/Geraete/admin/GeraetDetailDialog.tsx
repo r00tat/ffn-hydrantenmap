@@ -4,6 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlined';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
@@ -27,6 +28,7 @@ import {
   type Geraet,
   type GeraetBestand,
 } from '../../../common/geraet';
+import GeraetSteckbrief from '../GeraetSteckbrief';
 import BestandBookingDialog, { type BestandBookingMode } from './BestandBookingDialog';
 import LagerortDialog from './LagerortDialog';
 
@@ -38,6 +40,8 @@ export interface GeraetDetailDialogProps {
   bestaende: GeraetBestand[];
   /** Alle Bestände der Gruppe (Vorschläge im Lagerort-Dialog). */
   allBestaende: GeraetBestand[];
+  /** Die Container der Gruppe — wählbar als Lagerort. */
+  containers: Geraet[];
   /** Gruppen-Admin oder Gerätemeister — sonst nur lesen. */
   canManage: boolean;
   onClose: () => void;
@@ -55,6 +59,7 @@ export default function GeraetDetailDialog({
   geraet,
   bestaende,
   allBestaende,
+  containers,
   canManage,
   onClose,
   onEdit,
@@ -76,25 +81,6 @@ export default function GeraetDetailDialog({
       ),
     [bestaende],
   );
-
-  const details: [string, string | undefined][] = [
-    [t('fields.inventarNr'), geraet.inventarNr],
-    [t('fields.zusatzInventarNr'), geraet.zusatzInventarNr],
-    [
-      t('fields.klasse'),
-      [geraet.klasse1, geraet.klasse2, geraet.klasse3].filter(Boolean).join(' / '),
-    ],
-    [t('fields.materialTyp'), geraet.materialTyp],
-    [
-      t('fields.hersteller'),
-      [geraet.hersteller, geraet.herstellerTyp].filter(Boolean).join(' · '),
-    ],
-    [t('fields.seriennummer'), geraet.seriennummer],
-    [t('fields.baujahr'), geraet.baujahr != null ? String(geraet.baujahr) : undefined],
-    [t('fields.besitzer'), geraet.besitzer],
-    [t('fields.kostenersatzRateId'), geraet.kostenersatzRateId],
-    [t('fields.bemerkung'), geraet.bemerkung],
-  ];
 
   const einheit = geraet.einheit ?? '';
 
@@ -149,18 +135,9 @@ export default function GeraetDetailDialog({
           )}
         </Typography>
 
-        <Stack spacing={0.5} sx={{ mb: 2 }}>
-          {details
-            .filter(([, value]) => !!value)
-            .map(([label, value]) => (
-              <Typography key={label} variant="body2">
-                <Typography component="span" variant="body2" color="text.secondary">
-                  {label}:
-                </Typography>{' '}
-                {value}
-              </Typography>
-            ))}
-        </Stack>
+        <Box sx={{ mb: 2 }}>
+          <GeraetSteckbrief geraet={geraet} />
+        </Box>
 
         <Stack direction="row" sx={{ alignItems: 'center', mb: 1 }}>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -249,6 +226,7 @@ export default function GeraetDetailDialog({
           geraet={geraet}
           existing={bestaende}
           allBestaende={allBestaende}
+          containers={containers}
           onClose={() => setLagerortOpen(false)}
         />
       )}

@@ -18,6 +18,7 @@ import {
   GERAET_COLLECTION,
   GERAET_EINSATZ_COLLECTION,
   GERAET_MATERIAL_TYPEN,
+  isContainer,
   isValidMenge,
   lagerortKey,
   type Geraet,
@@ -226,7 +227,7 @@ async function notifyAfterCommit(
 
 // --- Lagerort ----------------------------------------------------------------
 
-const LAGERORT_ARTEN: GeraetLagerort['art'][] = ['fahrzeug', 'raum', 'set'];
+const LAGERORT_ARTEN: GeraetLagerort['art'][] = ['fahrzeug', 'raum', 'container', 'set'];
 
 /**
  * Bereinigt einen Lagerort aus dem Browser. Behalten werden nur die Felder,
@@ -244,12 +245,20 @@ function sanitizeLagerort(input: unknown): GeraetLagerort {
       ? compact({ art, fahrzeug: trimmed(raw.fahrzeug), laderaum: trimmed(raw.laderaum) })
       : art === 'raum'
         ? compact({ art, standort: trimmed(raw.standort), raum: trimmed(raw.raum) })
-        : { art };
+        : art === 'container'
+          ? compact({ art, containerId: trimmed(raw.containerId) })
+          : { art };
   if (art === 'fahrzeug' && !lagerort.fahrzeug) {
     throw new ApiException('invalid lagerort: fahrzeug missing', { status: 400 });
   }
   if (art === 'raum' && !lagerort.standort && !lagerort.raum) {
     throw new ApiException('invalid lagerort: raum missing', { status: 400 });
+  }
+  if (art === 'container') {
+    if (!lagerort.containerId) {
+      throw new ApiException('invalid lagerort: container missing', { status: 400 });
+    }
+    assertSafeId(lagerort.containerId, 'containerId');
   }
   const bemerkung = trimmed(raw.bemerkung);
   if (bemerkung) lagerort.bemerkung = bemerkung;
@@ -499,6 +508,23 @@ export async function createGeraetBestand(
   const crossed = await firestore.runTransaction(async (tx: Transaction) => {
     const snap = await tx.get(geraetRef);
     if (!snap.exists) throw notFound('geraet', geraetId);
+    if (place.containerId) {
+      // Die Bezeichnung kommt vom Container-Artikel, nicht aus dem Browser —
+      // und nur ein Artikel der Kategorie „Container" taugt als Lagerort.
+      if (place.containerId === geraetId) {
+        throw new ApiException('invalid lagerort: container cannot hold itself', {
+          status: 400,
+        });
+      }
+      const containerSnap = await tx.get(geraetCol(groupId).doc(place.containerId));
+      const container = containerSnap.data() as Partial<Geraet> | undefined;
+      if (!containerSnap.exists || !container || !isContainer(container)) {
+        throw new ApiException(`invalid lagerort: container ${place.containerId} not found`, {
+          status: 400,
+        });
+      }
+      place.container = trimmed(container.bezeichnung) ?? place.containerId;
+    }
     const duplicate = await tx.get(
       bestandCol(groupId)
         .where('geraetId', '==', geraetId)
@@ -883,7 +909,7 @@ async function prepareImport(groupId: string, fileBase64: unknown): Promise<Impo
   if (rows.length > IMPORT_MAX_ROWS) {
     throw new ApiException('too many rows', { status: 413 });
   }
-  const { artikel: parsed, errors } = parseGeraetExport(rows);
+  const { artikel: parsed, errors, withBestand } = parseGeraetExport(rows);
 
   const [geraeteSnap, bestaendeSnap] = await Promise.all([
     geraetCol(groupId).get(),
@@ -910,11 +936,15 @@ async function prepareImport(groupId: string, fileBase64: unknown): Promise<Impo
     if (!g.importedAt || (b.createdAt ?? '') > g.importedAt) bookedSince.add(g.id);
   }
 
-  const plan = planGeraetImport(parsed, {
-    geraete,
-    bestaende,
-    hasBookingsSinceImport: (geraetId) => bookedSince.has(geraetId),
-  });
+  const plan = planGeraetImport(
+    parsed,
+    {
+      geraete,
+      bestaende,
+      hasBookingsSinceImport: (geraetId) => bookedSince.has(geraetId),
+    },
+    { withBestand },
+  );
 
   // Dieselbe Zuordnung wie im Abgleich: Sybos-ID, ersatzweise Dokument-ID.
   const byExterneId = new Map<string, string>();

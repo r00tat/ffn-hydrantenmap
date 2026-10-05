@@ -6,7 +6,7 @@
 
 - **Item list:** all equipment and stock items with storage locations and total stock, filterable by class, location, consumable and "below minimum"
 - **To reorder:** items whose stock has fallen below the minimum
-- **Stock per location:** vehicle and compartment (e.g. "SRF · GR 2") or room (e.g. "Fire station · Storage")
+- **Stock per location:** vehicle and compartment (e.g. "SRF · GR 2"), room (e.g. "Fire station · Storage") or a container (e.g. "Oil booms 1")
 - **Receipt, transfer, stocktaking:** top up stock, move it between locations or set the counted value
 - **Import from Sybos:** item export as an Excel file, with a preview before applying
 - **During an operation:** assign equipment and consume supplies, even without a connection
@@ -16,7 +16,7 @@
 ### During an operation: assign equipment or consume supplies
 
 1. Open the "Equipment & supplies" section of the operation
-2. Search for the item (name or inventory number)
+2. Search for the item — by name, inventory number, barcode, serial number, but also by type or class (e.g. "gas detector"). Below each match you see model, serial number and location, so items with the same name can be told apart; once selected, the dialog shows the master data from Sybos
 3. For equipment, enter the quantity or hours — the stock does not change
 4. For consumables, enter the quantity and choose the location it was taken from
 5. Save — the entry shows up in the operation immediately
@@ -27,16 +27,19 @@ Without a connection the entry is stored on the device. Booking it off the stock
 
 If a consumption is changed or deleted later, the stock is corrected accordingly.
 
+The same list is also on the **operation overview** as the collapsible section "Equipment & supplies".
+
 ### Maintain stock
 
 1. Open "Equipment & supplies" in the menu
 2. Select an item
 3. At the location, choose **Receipt** (supplies arrived), **Transfer** (e.g. from storage to the SRF) or **Stocktaking** (enter the counted value)
 4. On the item, set whether it is a **consumable** and, if needed, a **unit** and a **minimum stock**
+5. Add another location with **New storage location**. You can choose room, vehicle or **container**; containers are the items of the Sybos category "Container" and have to be imported first
 
 ### Import from Sybos
 
-1. Create the item export in Sybos as an Excel file (one row per item and location)
+1. Create the item export in Sybos as an Excel file (one row per item and location) — **including the location columns**. Without them the import only takes over master data and leaves the stock as it is. Import containers (roll containers, pallets) from their own export of the category "Container" as well
 2. In "Equipment & supplies", click "Import" and choose the file
 3. Check the preview: new items, changed master data, new locations and stock deviations
 4. Accept each deviation as stocktaking or discard it

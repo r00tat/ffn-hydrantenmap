@@ -110,6 +110,56 @@ describe('GeraetEinsatzDialog', () => {
     vi.clearAllMocks();
   });
 
+  it('unterscheidet gleichnamige Geräte an Typ und Seriennummer und zeigt den Steckbrief', async () => {
+    const m1 = geraet({
+      id: 'm1',
+      bezeichnung: 'Mehrgasmessgerät 1',
+      klasse1: 'Messgeräte und Nachweismittel',
+      vorlage: 'Gasmessgerät',
+      hersteller: 'Dräger',
+      herstellerTyp: 'X-am 5000',
+      seriennummer: 'SN-1',
+    });
+    const m2 = geraet({
+      ...m1,
+      id: 'm2',
+      bezeichnung: 'Mehrgasmessgerät 2',
+      herstellerTyp: 'X-am 2800',
+      seriennummer: 'SN-2',
+      zubehoer: 'Prüfschale',
+    });
+    const pruefgas = geraet({ ...m1, id: 'pg', bezeichnung: 'Prüfgas X-am', seriennummer: undefined });
+    renderDialog({ geraete: [m1, m2, pruefgas] });
+    const user = userEvent.setup();
+    await user.type(screen.getByRole('combobox', { name: /Artikel/ }), 'messgerät');
+
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(3);
+    expect(options[1]).toHaveTextContent('Gerät · Gasmessgerät · Dräger X-am 2800 · SN SN-2');
+
+    await user.click(options[1]);
+    expect(screen.getByText('Prüfschale')).toBeInTheDocument();
+  });
+
+  it('belegt beim Verbrauch den Lagerort in einem zugeordneten Container vor', async () => {
+    const imContainer = new Map(bestaende);
+    imContainer.set('vlies', [
+      ...(bestaende.get('vlies') ?? []),
+      {
+        id: 'container',
+        geraetId: 'vlies',
+        lagerortKey: 'container|c1',
+        lagerort: { art: 'container', container: 'Ölsperren 1', containerId: 'c1' },
+        anzahl: 1,
+      },
+    ]);
+    renderDialog({ bestaendeByGeraet: imContainer, vehicleNames: [], assignedIds: ['c1'] });
+    await pickArticle('binde', /Bindevlies/);
+    expect(screen.getByRole('combobox', { name: 'Lagerort' })).toHaveTextContent(
+      'Ölsperren 1 – Bestand 1 · im Einsatz',
+    );
+  });
+
   it('ordnet ein Gerät zu, ohne Lagerort und ohne auf den Server zu warten', async () => {
     const { onClose } = renderDialog();
     const user = await pickArticle('4711', /Tauchpumpe/);

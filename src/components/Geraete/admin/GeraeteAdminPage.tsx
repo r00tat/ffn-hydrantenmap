@@ -22,6 +22,7 @@ import { useMemo, useState } from 'react';
 import {
   formatLagerort,
   isBelowMinimum,
+  isContainer,
   type Geraet,
   type GeraetBestand,
 } from '../../../common/geraet';
@@ -71,6 +72,7 @@ export default function GeraeteAdminPage() {
     useFirebaseLogin();
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { geraete, bestaende, bestaendeByGeraet, loading, fromCache } = useGeraete(groupId);
+  const containers = useMemo(() => geraete.filter(isContainer), [geraete]);
 
   const canManage =
     !!groupId &&
@@ -336,6 +338,7 @@ export default function GeraeteAdminPage() {
           geraet={detail}
           bestaende={bestaendeByGeraet.get(detail.id) ?? []}
           allBestaende={bestaende}
+          containers={containers}
           canManage={canManage}
           onClose={() => setDetailId(undefined)}
           onEdit={() => setEdit({ geraet: detail })}

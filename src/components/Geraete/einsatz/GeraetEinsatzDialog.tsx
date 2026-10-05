@@ -24,12 +24,14 @@ import {
   type GeraetBestand,
   type GeraetEinsatz,
 } from '../../../common/geraet';
+import GeraetSteckbrief from '../GeraetSteckbrief';
 import GeraetScanDialog from './GeraetScanDialog';
 import {
   buildGeraetEinsatzData,
   buildGeraetEinsatzUpdate,
   findGeraetByCode,
   geraetForEntry,
+  geraetOptionDetails,
   geraetOptionLabel,
   matchesFirecallVehicle,
   pickDefaultBestand,
@@ -48,12 +50,18 @@ export interface GeraetEinsatzDialogProps {
   bestaendeByGeraet: Map<string, GeraetBestand[]>;
   /** Namen der Einsatzmittel — für die Vorbelegung des Lagerorts. */
   vehicleNames: string[];
+  /**
+   * IDs der Artikel, die dem Einsatz schon zugeordnet sind. Ein Container
+   * darunter macht seine Lagerorte zu solchen „im Einsatz".
+   */
+  assignedIds?: string[];
   createdBy: string;
   /** Gesetzt: Eintrag bearbeiten, der Artikel bleibt fest. */
   entry?: GeraetEinsatz;
 }
 
 const EMPTY_BESTAENDE: GeraetBestand[] = [];
+const EMPTY_IDS: string[] = [];
 
 function parseNumber(text: string): number | undefined {
   const trimmed = text.trim().replace(',', '.');
@@ -100,6 +108,7 @@ export default function GeraetEinsatzDialog({
   geraete,
   bestaendeByGeraet,
   vehicleNames,
+  assignedIds = EMPTY_IDS,
   createdBy,
   entry,
 }: GeraetEinsatzDialogProps) {
@@ -144,7 +153,7 @@ export default function GeraetEinsatzDialog({
     }
     setInputValue(geraetOptionLabel(next));
     const defaultBestand = next.verbrauchsmaterial
-      ? pickDefaultBestand(bestaendeByGeraet.get(next.id) ?? [], vehicleNames)
+      ? pickDefaultBestand(bestaendeByGeraet.get(next.id) ?? [], vehicleNames, assignedIds)
       : undefined;
     setBestandId(defaultBestand?.id ?? '');
     if (!usesHours(next) && !menge) setMenge('1');
@@ -227,17 +236,22 @@ export default function GeraetEinsatzDialog({
                 noOptionsText={t('noOptions')}
                 renderOption={(props, option) => {
                   const { key, ...rest } = props;
+                  const details = geraetOptionDetails(
+                    option,
+                    bestaendeByGeraet.get(option.id) ?? EMPTY_BESTAENDE,
+                  );
                   return (
                     <li key={key} {...rest}>
                       <Box>
                         <Typography variant="body2">{geraetOptionLabel(option)}</Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" component="div">
                           {option.verbrauchsmaterial
                             ? t('optionConsumable', {
                                 bestand: option.bestandGesamt ?? 0,
                                 einheit: option.einheit ?? t('pieces'),
                               })
                             : t('optionDevice')}
+                          {details ? ` · ${details}` : ''}
                         </Typography>
                       </Box>
                     </li>
@@ -269,6 +283,8 @@ export default function GeraetEinsatzDialog({
               </Alert>
             )}
 
+            {geraet && <GeraetSteckbrief geraet={geraet} compact />}
+
             {geraet?.verbrauchsmaterial &&
               (sortedBestaende.length > 0 ? (
                 <TextField
@@ -285,7 +301,7 @@ export default function GeraetEinsatzDialog({
                         lagerort: formatLagerort(b.lagerort),
                         anzahl: b.anzahl ?? 0,
                       })}
-                      {matchesFirecallVehicle(b.lagerort, vehicleNames)
+                      {matchesFirecallVehicle(b.lagerort, vehicleNames, assignedIds)
                         ? ` · ${t('onFirecallVehicle')}`
                         : ''}
                     </MenuItem>

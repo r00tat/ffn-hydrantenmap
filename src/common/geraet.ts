@@ -68,13 +68,25 @@ export const GERAET_MATERIAL_TYPEN: GeraetMaterialTyp[] = [
  */
 export type GeraetEinheitVerwendungsnachweis = 'stk' | 'h';
 
-export type GeraetLagerortArt = 'fahrzeug' | 'raum' | 'set';
+export type GeraetLagerortArt = 'fahrzeug' | 'raum' | 'container' | 'set';
+
+/**
+ * Die Kategorie, unter der Sybos Rollcontainer, Paletten und Kisten führt.
+ * Ein Container ist dort ein eigener Artikel und kein Fahrzeug — als
+ * Lagerort verweist er deshalb auf seinen Artikel (`containerId`).
+ */
+export const GERAET_KATEGORIE_CONTAINER = 'Container';
+
+/** Ist der Artikel ein Container (und damit als Lagerort wählbar)? */
+export function isContainer(g: Pick<Geraet, 'kategorie'>): boolean {
+  return (g.kategorie ?? '').trim().toLowerCase() === GERAET_KATEGORIE_CONTAINER.toLowerCase();
+}
 
 /**
  * Ein Lagerort, wie ihn der Export beschreibt.
  *
  * Bewusst Text und keine Pflicht-Verknüpfung mit den Fahrtenbuch-Fahrzeugen:
- * Unter „Fahrzeug" stehen in Sybos auch Rollcontainer und Kisten.
+ * Die Namen in Sybos und im Fahrtenbuch sind nicht gleich gepflegt.
  */
 export interface GeraetLagerort {
   art: GeraetLagerortArt;
@@ -86,6 +98,14 @@ export interface GeraetLagerort {
   standort?: string;
   /** Bei `raum`: Raum, z. B. „Lager". */
   raum?: string;
+  /** Bei `container`: Bezeichnung des Containers, z. B. „Ölsperren 1". */
+  container?: string;
+  /**
+   * Bei `container`: ID des Container-Artikels. Teil der Identität — zwei
+   * Container dürfen gleich heißen, und ein umbenannter Container bleibt
+   * derselbe Lagerort.
+   */
+  containerId?: string;
   /** „Lagerort-Bemerkung" — kein Teil der Identität des Lagerorts. */
   bemerkung?: string;
   /** Optional verknüpftes Fahrtenbuch-Fahrzeug. */
@@ -112,6 +132,18 @@ export interface Geraet {
   baujahr?: number;
   besitzer?: string;
   bemerkung?: string;
+  /** Sybos-Vorlage, z. B. „Gasmessgerät" — die Gattung hinter der Bezeichnung. */
+  vorlage?: string;
+  /** Zubehör laut Sybos, z. B. „Automatische Pumpe S/N: …". */
+  zubehoer?: string;
+  /** Anschaffungs-Datum (`YYYY-MM-DD`). */
+  anschaffungsDatum?: string;
+  /** „Verfügbar bis" (`YYYY-MM-DD`) — etwa das Ablaufdatum eines Prüfgases. */
+  verfuegbarBis?: string;
+  /** Lebensdauer, Einheit in `lebensdauerEinheit`. */
+  lebensdauer?: number;
+  /** Einheit der Lebensdauer wie im Export, z. B. „Jahr(e)" oder „Monat(e)". */
+  lebensdauerEinheit?: string;
   einheitVerwendungsnachweis?: GeraetEinheitVerwendungsnachweis;
   /**
    * true → ein Verbrauch im Einsatz bucht vom Bestand ab. Eigenes Flag, weil
@@ -245,6 +277,8 @@ export function lagerortKey(l: GeraetLagerort): string {
       return ['fahrzeug', normalizePart(l.fahrzeug), normalizePart(l.laderaum)].join('|');
     case 'raum':
       return ['raum', normalizePart(l.standort), normalizePart(l.raum)].join('|');
+    case 'container':
+      return ['container', normalizePart(l.containerId ?? l.container)].join('|');
     default:
       return 'set';
   }
@@ -259,14 +293,19 @@ export function deviationKey(d: { geraetId: string; lagerortKey: string }): stri
   return `${d.geraetId}|${d.lagerortKey}`;
 }
 
-/** Anzeige eines Lagerorts, z. B. „SRF · GR 2" oder „Feuerwehrhaus · Lager". */
+/**
+ * Anzeige eines Lagerorts, z. B. „SRF · GR 2", „Feuerwehrhaus · Lager" oder
+ * „Ölsperren 1".
+ */
 export function formatLagerort(l: GeraetLagerort): string {
   const parts =
     l.art === 'fahrzeug'
       ? [l.fahrzeug, l.laderaum]
       : l.art === 'raum'
         ? [l.standort, l.raum]
-        : ['Set-Artikel'];
+        : l.art === 'container'
+          ? [l.container]
+          : ['Set-Artikel'];
   return parts
     .map((p) => (p ?? '').trim())
     .filter(Boolean)

@@ -31,6 +31,11 @@ const lager: GeraetBestand = {
   anzahl: 3,
 };
 
+const containers: Geraet[] = [
+  { ...geraet, id: 'c1', bezeichnung: 'Ölsperren 1', kategorie: 'Container', verbrauchsmaterial: false },
+  { ...geraet, id: 'c2', bezeichnung: 'Alter Container', kategorie: 'Container', active: false },
+];
+
 describe('LagerortDialog', () => {
   const onClose = vi.fn();
 
@@ -47,6 +52,7 @@ describe('LagerortDialog', () => {
         geraet={geraet}
         existing={[lager]}
         allBestaende={[lager]}
+        containers={containers}
         onClose={onClose}
       />,
     );
@@ -103,12 +109,31 @@ describe('LagerortDialog', () => {
     expect(createGeraetBestand).not.toHaveBeenCalled();
   });
 
+  it('legt einen Container als Lagerort an', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getByLabelText('Art'));
+    await user.click(await screen.findByRole('option', { name: 'Container' }));
+    await user.click(screen.getByLabelText(/^Container/));
+    expect(screen.queryByRole('option', { name: 'Alter Container' })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('option', { name: 'Ölsperren 1' }));
+    await user.click(screen.getByRole('button', { name: 'Erstellen' }));
+    await waitFor(() =>
+      expect(createGeraetBestand).toHaveBeenCalledWith(
+        'ffnd',
+        'g1',
+        { art: 'container', containerId: 'c1', container: 'Ölsperren 1' },
+        0,
+      ),
+    );
+  });
+
   it('verlangt einen Standort', async () => {
     const user = userEvent.setup();
     render();
     await user.click(screen.getByRole('button', { name: 'Erstellen' }));
     expect(
-      await screen.findByText('Bitte Fahrzeug bzw. Standort angeben.'),
+      await screen.findByText('Bitte Fahrzeug, Container bzw. Standort angeben.'),
     ).toBeInTheDocument();
   });
 });

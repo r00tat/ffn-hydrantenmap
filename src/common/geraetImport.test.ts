@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Geraet, GeraetBestand } from './geraet';
 import {
   GERAET_EXPORT_COLUMNS,
+  parseExportDate,
   parseGeraetExport,
   planGeraetImport,
   suggestConsumable,
@@ -61,7 +62,7 @@ describe('GERAET_EXPORT_COLUMNS', () => {
 
 describe('parseGeraetExport', () => {
   it('liefert für eine leere Datei nichts', () => {
-    expect(parseGeraetExport([])).toEqual({ artikel: [], errors: [] });
+    expect(parseGeraetExport([])).toEqual({ artikel: [], errors: [], withBestand: true });
   });
 
   it('meldet fehlende Pflichtspalten', () => {
@@ -176,6 +177,35 @@ describe('parseGeraetExport', () => {
     for (const value of Object.values(artikel[0].stammdaten)) {
       expect(value).not.toBeUndefined();
     }
+  });
+
+  it('übernimmt Vorlage, Zubehör, Daten und Lebensdauer', () => {
+    const { artikel } = parseGeraetExport([
+      HEADER,
+      row({
+        ID: '3001',
+        Bezeichnung: 'Mehrgasmessgerät 1',
+        Vorlage: 'Gasmessgerät',
+        'Zubehör': 'Lademodul\nPumpe',
+        'Anschaffungs-Datum': '42205',
+        'Verfügbar bis': '2025-01-20',
+        Lebensdauer: '10',
+        Einheit: 'Jahr(e)',
+        Status: 'aktiv',
+      }),
+      row({ ID: '3002', Bezeichnung: 'Ohne Lebensdauer', Einheit: 'Monat(e)', Status: 'aktiv' }),
+    ]);
+    expect(artikel[0].stammdaten).toMatchObject({
+      vorlage: 'Gasmessgerät',
+      zubehoer: 'Lademodul\nPumpe',
+      anschaffungsDatum: '2015-07-20',
+      verfuegbarBis: '2025-01-20',
+      lebensdauer: 10,
+      lebensdauerEinheit: 'Jahr(e)',
+    });
+    // Die Einheit allein ist keine Angabe — sie steht im Export in jeder Zeile.
+    expect(artikel[1].stammdaten).not.toHaveProperty('lebensdauerEinheit');
+    expect(artikel[1].stammdaten).not.toHaveProperty('lebensdauer');
   });
 
   it('kennt die vier Material-Typen und verwirft unbekannte', () => {
@@ -577,5 +607,71 @@ describe('planGeraetImport', () => {
       { geraete: [], bestaende: [], hasBookingsSinceImport: noBookings },
     );
     expect(JSON.parse(JSON.stringify(plan))).toEqual(plan);
+  });
+});
+
+describe('parseExportDate', () => {
+  it('liest Excel-Seriennummern, auch mit Uhrzeit', () => {
+    expect(parseExportDate('42205')).toBe('2015-07-20');
+    expect(parseExportDate('44946.5')).toBe('2023-01-20');
+  });
+
+  it('nimmt ISO-Daten an und verwirft Unlesbares', () => {
+    expect(parseExportDate('2034-02-12 00:00:00')).toBe('2034-02-12');
+    expect(parseExportDate('')).toBeUndefined();
+    expect(parseExportDate('demnächst')).toBeUndefined();
+    expect(parseExportDate('12')).toBeUndefined();
+  });
+});
+
+describe('Bestand, den der Export nicht kennt', () => {
+  it('setzt einen Container-Lagerort aus der App beim Import nicht auf 0', () => {
+    const plan = planGeraetImport([parsed('1001', [{ lagerortKey: LAGER, anzahl: 5 }])], {
+      geraete: [geraet({ id: '1001' })],
+      bestaende: [
+        bestand({ id: 'b1', geraetId: '1001', anzahl: 5 }),
+        bestand({
+          id: 'b2',
+          geraetId: '1001',
+          lagerortKey: 'container|c1',
+          lagerort: { art: 'container', container: 'Ölsperren 1', containerId: 'c1' },
+          anzahl: 3,
+        }),
+      ],
+      hasBookingsSinceImport: noBookings,
+    });
+    expect(plan.bestandUpdate).toEqual([]);
+    expect(plan.deviations).toEqual([]);
+  });
+
+  it('lässt ohne Lagerort-Spalten jeden Bestand unangetastet', () => {
+    const plan = planGeraetImport(
+      [parsed('1001', [])],
+      {
+        geraete: [geraet({ id: '1001' })],
+        bestaende: [bestand({ id: 'b1', geraetId: '1001', anzahl: 5 })],
+        hasBookingsSinceImport: () => true,
+      },
+      { withBestand: false },
+    );
+    expect(plan.bestandUpdate).toEqual([]);
+    expect(plan.deviations).toEqual([]);
+    expect(plan.bestandCreate).toEqual([]);
+  });
+
+  it('erkennt eine Datei ohne Lagerort-Spalten und sagt es', () => {
+    const header = HEADER.filter(
+      (c) => !['Lagerort', 'Fahrzeug-Name', 'Laderaum', 'Standort', 'Raum', 'Anzahl'].includes(c),
+    );
+    const result = parseGeraetExport([
+      header,
+      header.map((c) => (({ ID: '1', Bezeichnung: 'Abschleppseil' }) as Record<string, string>)[c] ?? ''),
+    ]);
+    expect(result.withBestand).toBe(false);
+    expect(result.artikel).toHaveLength(1);
+    expect(result.errors).toEqual([
+      expect.stringMatching(/ohne Lagerort-Spalten.*Bestand bleibt unverändert/),
+    ]);
+    expect(parseGeraetExport([HEADER]).withBestand).toBe(true);
   });
 });

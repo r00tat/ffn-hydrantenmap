@@ -30,10 +30,12 @@ export interface LagerortDialogProps {
   existing: GeraetBestand[];
   /** Alle Bestände der Gruppe, als Vorschläge für Fahrzeug und Standort. */
   allBestaende: GeraetBestand[];
+  /** Die Container der Gruppe (Artikel der Kategorie „Container"). */
+  containers: Geraet[];
   onClose: () => void;
 }
 
-type Art = 'fahrzeug' | 'raum';
+type Art = 'fahrzeug' | 'raum' | 'container';
 
 function distinct(values: (string | undefined)[]): string[] {
   return [...new Set(values.map((v) => v?.trim()).filter((v): v is string => !!v))].sort(
@@ -45,7 +47,8 @@ function distinct(values: (string | undefined)[]): string[] {
  * Einen weiteren Lagerort für einen Artikel anlegen, optional mit
  * Anfangsbestand (als Zugang gebucht). Fahrzeug und Standort schlagen die
  * Namen vor, die es in der Gruppe schon gibt — sonst entstehen aus „SRF" und
- * „S R F" zwei Lagerorte.
+ * „S R F" zwei Lagerorte. Ein Container wird aus den Container-Artikeln
+ * gewählt und nicht getippt: Er ist in Sybos ein Artikel, kein Fahrzeug.
  */
 export default function LagerortDialog({
   open,
@@ -53,6 +56,7 @@ export default function LagerortDialog({
   geraet,
   existing,
   allBestaende,
+  containers,
   onClose,
 }: LagerortDialogProps) {
   const t = useTranslations('geraete');
@@ -63,6 +67,7 @@ export default function LagerortDialog({
   const [laderaum, setLaderaum] = useState('');
   const [standort, setStandort] = useState('');
   const [raum, setRaum] = useState('');
+  const [container, setContainer] = useState<Geraet | null>(null);
   const [bemerkung, setBemerkung] = useState('');
   const [anzahl, setAnzahl] = useState('0');
   const [busy, setBusy] = useState(false);
@@ -71,6 +76,10 @@ export default function LagerortDialog({
   const fahrzeugOptions = useMemo(
     () => distinct(allBestaende.map((b) => b.lagerort.fahrzeug)),
     [allBestaende],
+  );
+  const containerOptions = useMemo(
+    () => containers.filter((c) => c.active !== false && c.id !== geraet.id),
+    [containers, geraet.id],
   );
   const standortOptions = useMemo(
     () => distinct(allBestaende.map((b) => b.lagerort.standort)),
@@ -82,10 +91,16 @@ export default function LagerortDialog({
     const lagerort: GeraetLagerort =
       art === 'fahrzeug'
         ? { art, fahrzeug: fahrzeug.trim(), laderaum: laderaum.trim() || undefined }
-        : { art, standort: standort.trim(), raum: raum.trim() || undefined };
+        : art === 'container'
+          ? { art, containerId: container?.id, container: container?.bezeichnung }
+          : { art, standort: standort.trim(), raum: raum.trim() || undefined };
     if (bemerkung.trim()) lagerort.bemerkung = bemerkung.trim();
 
-    if ((art === 'fahrzeug' && !lagerort.fahrzeug) || (art === 'raum' && !lagerort.standort)) {
+    if (
+      (art === 'fahrzeug' && !lagerort.fahrzeug) ||
+      (art === 'raum' && !lagerort.standort) ||
+      (art === 'container' && !lagerort.containerId)
+    ) {
       setError(t('errors.lagerortRequired'));
       return;
     }
@@ -127,9 +142,25 @@ export default function LagerortDialog({
           >
             <MenuItem value="raum">{t('lagerort.artRaum')}</MenuItem>
             <MenuItem value="fahrzeug">{t('lagerort.artFahrzeug')}</MenuItem>
+            <MenuItem value="container">{t('lagerort.artContainer')}</MenuItem>
           </TextField>
 
-          {art === 'fahrzeug' ? (
+          {art === 'container' ? (
+            containerOptions.length === 0 ? (
+              <Alert severity="info">{t('lagerort.noContainer')}</Alert>
+            ) : (
+              <Autocomplete<Geraet>
+                options={containerOptions}
+                value={container}
+                onChange={(_, value) => setContainer(value)}
+                getOptionLabel={(c) => c.bezeichnung}
+                isOptionEqualToValue={(a, b) => a.id === b.id}
+                renderInput={(params) => (
+                  <TextField {...params} label={t('lagerort.container')} required />
+                )}
+              />
+            )
+          ) : art === 'fahrzeug' ? (
             <>
               <Autocomplete
                 freeSolo

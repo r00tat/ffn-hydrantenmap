@@ -1,4 +1,5 @@
 import {
+  formatLagerort,
   GERAET_MAX_MENGE,
   type Geraet,
   type GeraetBestand,
@@ -30,30 +31,57 @@ function codesOf(g: Geraet): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Alles, worüber ein Artikel gefunden werden soll. Die Bezeichnung allein
+ * reicht nicht: In Sybos heißt ein Gerät „Mehrgasmessgerät 1", ein anderes
+ * „Dräger - Prüfgas X-am" — dass beide zu den Gasmessgeräten gehören, steht
+ * nur in Klasse und Vorlage.
+ */
 function searchTextOf(g: Geraet): string {
-  return [g.bezeichnung, g.herstellerTyp, g.hersteller, ...codesOf(g)]
+  return [
+    g.bezeichnung,
+    g.herstellerTyp,
+    g.hersteller,
+    g.vorlage,
+    g.kategorie,
+    g.klasse1,
+    g.klasse2,
+    g.klasse3,
+    g.bemerkung,
+    g.zubehoer,
+    ...codesOf(g),
+  ]
     .map((c) => normalize(c))
     .join(' ');
 }
 
 /**
- * Artikel für die Suche im Dialog: alle Suchwörter müssen in Bezeichnung,
- * Hersteller oder einer Kennung vorkommen. Inaktive Artikel fehlen — sie
- * werden im Einsatz nicht mehr verwendet.
+ * Artikel für die Suche im Dialog: alle Suchwörter müssen irgendwo am Artikel
+ * vorkommen (`searchTextOf`). Artikel, deren Bezeichnung alle Wörter enthält,
+ * stehen vorn — sonst verdrängte die Klasse „Messgeräte und Nachweismittel"
+ * das eigentlich gesuchte Gerät. Inaktive Artikel fehlen — sie werden im
+ * Einsatz nicht mehr verwendet.
  */
 export function searchGeraete(geraete: Geraet[], text: string, limit = 50): Geraet[] {
   const words = normalize(text).split(' ').filter(Boolean);
-  const result: Geraet[] = [];
+  const byName: Geraet[] = [];
+  const byOther: Geraet[] = [];
   for (const g of geraete) {
     if (g.active === false) continue;
-    if (words.length > 0) {
-      const haystack = searchTextOf(g);
-      if (!words.every((w) => haystack.includes(w))) continue;
+    if (words.length === 0) {
+      byName.push(g);
+      if (byName.length >= limit) break;
+      continue;
     }
-    result.push(g);
-    if (result.length >= limit) break;
+    const name = normalize(g.bezeichnung);
+    if (words.every((w) => name.includes(w))) {
+      byName.push(g);
+      if (byName.length >= limit) break;
+    } else if (byOther.length < limit && words.every((w) => searchTextOf(g).includes(w))) {
+      byOther.push(g);
+    }
   }
-  return result;
+  return [...byName, ...byOther].slice(0, limit);
 }
 
 /** Exakter Treffer eines gescannten oder getippten Codes. */
@@ -83,15 +111,23 @@ function containsWords(haystack: string, needle: string): boolean {
 }
 
 /**
- * Liegt der Lagerort auf einem Fahrzeug des Einsatzes? Verglichen wird der
- * Name als ganzes Wort, in beide Richtungen: „SRF" am Lagerort passt auf das
- * Einsatzmittel „SRF Neusiedl" und umgekehrt — die Namen sind in Sybos und
- * auf der Karte nicht gleich gepflegt.
+ * Liegt der Lagerort auf einem Fahrzeug des Einsatzes oder in einem Container,
+ * der dem Einsatz zugeordnet ist?
+ *
+ * Fahrzeuge werden über den Namen als ganzes Wort verglichen, in beide
+ * Richtungen: „SRF" am Lagerort passt auf das Einsatzmittel „SRF Neusiedl"
+ * und umgekehrt — die Namen sind in Sybos und auf der Karte nicht gleich
+ * gepflegt. Ein Container ist dagegen selbst ein Artikel; er ist am Einsatz,
+ * wenn er dort zugeordnet ist (`containerIds`).
  */
 export function matchesFirecallVehicle(
   lagerort: GeraetLagerort,
   vehicleNames: string[],
+  containerIds: string[] = [],
 ): boolean {
+  if (lagerort.art === 'container') {
+    return !!lagerort.containerId && containerIds.includes(lagerort.containerId);
+  }
   if (lagerort.art !== 'fahrzeug') return false;
   const fahrzeug = normalize(lagerort.fahrzeug);
   if (!fahrzeug) return false;
@@ -113,15 +149,16 @@ function largest(bestaende: GeraetBestand[]): GeraetBestand | undefined {
 
 /**
  * Vorbelegung des Lagerorts beim Verbrauch: ein Lagerort auf einem Fahrzeug
- * des Einsatzes (dort wurde das Material am ehesten entnommen), sonst der mit
- * dem größten Bestand.
+ * oder in einem Container des Einsatzes (dort wurde das Material am ehesten
+ * entnommen), sonst der mit dem größten Bestand.
  */
 export function pickDefaultBestand(
   bestaende: GeraetBestand[],
   vehicleNames: string[],
+  containerIds: string[] = [],
 ): GeraetBestand | undefined {
   const onVehicle = bestaende.filter((b) =>
-    matchesFirecallVehicle(b.lagerort, vehicleNames),
+    matchesFirecallVehicle(b.lagerort, vehicleNames, containerIds),
   );
   return largest(onVehicle) ?? largest(bestaende);
 }
@@ -272,4 +309,36 @@ export function isPendingBooking(entry: Pick<GeraetEinsatz, 'art' | 'gebucht'>):
 /** Anzeige eines Artikels in Suche und Liste. */
 export function geraetOptionLabel(g: Pick<Geraet, 'bezeichnung' | 'inventarNr'>): string {
   return g.inventarNr ? `${g.bezeichnung} (${g.inventarNr})` : g.bezeichnung;
+}
+
+/** So viele Lagerorte nennt die Zeile unter einem Artikel, der Rest wird gezählt. */
+const DETAIL_LAGERORTE = 2;
+
+/**
+ * Die zweite Zeile eines Artikels in der Auswahl: woran sich gleichnamige
+ * Geräte unterscheiden lassen — Gattung, Hersteller und Typ, Seriennummer und
+ * wo es liegt. „Mehrgasmessgerät 1" und „2" sind erst so auseinanderzuhalten.
+ */
+export function geraetOptionDetails(
+  g: Pick<Geraet, 'vorlage' | 'klasse1' | 'hersteller' | 'herstellerTyp' | 'seriennummer'>,
+  bestaende: GeraetBestand[],
+): string {
+  const herstellerTyp = [g.hersteller, g.herstellerTyp]
+    .map((v) => (v ?? '').trim())
+    .filter(Boolean)
+    .join(' ');
+  const lagerorte = [...new Set(bestaende.map((b) => formatLagerort(b.lagerort)).filter(Boolean))];
+  const lagerortText =
+    lagerorte.length > DETAIL_LAGERORTE + 1
+      ? `${lagerorte.slice(0, DETAIL_LAGERORTE).join(', ')} +${lagerorte.length - DETAIL_LAGERORTE}`
+      : lagerorte.join(', ');
+  return [
+    g.vorlage || g.klasse1,
+    herstellerTyp,
+    g.seriennummer ? `SN ${g.seriennummer}` : undefined,
+    lagerortText,
+  ]
+    .map((v) => (v ?? '').trim())
+    .filter(Boolean)
+    .join(' · ');
 }

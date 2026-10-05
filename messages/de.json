@@ -3875,7 +3875,13 @@
       "mindestbestand": "Mindestbestand",
       "mindestbestandHint": "Über alle Lagerorte; nur bei Verbrauchsmaterial",
       "einheitVerwendungsnachweis": "Verwendungsnachweis in",
-      "active": "Aktiv"
+      "active": "Aktiv",
+      "barcodes": "Barcodes",
+      "vorlage": "Vorlage",
+      "zubehoer": "Zubehör",
+      "anschaffungsDatum": "Anschaffung",
+      "verfuegbarBis": "Verfügbar bis",
+      "lebensdauer": "Lebensdauer"
     },
     "verwendungsnachweis": {
       "none": "nicht erfasst",
@@ -3894,7 +3900,7 @@
       "countInvalid": "Bitte eine Zahl ab 0 angeben.",
       "mengeInvalid": "Bitte eine Menge größer 0 angeben.",
       "zielRequired": "Bitte einen Ziel-Lagerort wählen.",
-      "lagerortRequired": "Bitte Fahrzeug bzw. Standort angeben.",
+      "lagerortRequired": "Bitte Fahrzeug, Container bzw. Standort angeben.",
       "lagerortExists": "Diesen Lagerort gibt es für den Artikel schon.",
       "saveFailed": "Speichern fehlgeschlagen: {error}"
     },
@@ -3924,13 +3930,16 @@
       "title": "Neuer Lagerort",
       "art": "Art",
       "artRaum": "Raum",
-      "artFahrzeug": "Fahrzeug / Behälter",
+      "artFahrzeug": "Fahrzeug",
       "fahrzeug": "Fahrzeug",
       "laderaum": "Laderaum",
       "standort": "Standort",
       "raum": "Raum",
       "bemerkung": "Lagerort-Bemerkung",
-      "anzahl": "Anfangsbestand"
+      "anzahl": "Anfangsbestand",
+      "artContainer": "Container",
+      "container": "Container",
+      "noContainer": "Es sind keine Container erfasst. Container sind Artikel der Sybos-Kategorie „Container“ – erst importieren, dann hier wählen."
     },
     "import": {
       "open": "Import",
@@ -4014,7 +4023,7 @@
       "deviceInfo": "Gerät – wird dem Einsatz zugeordnet, der Bestand bleibt unverändert.",
       "lagerort": "Lagerort",
       "lagerortOption": "{lagerort} – Bestand {anzahl, number}",
-      "onFirecallVehicle": "Fahrzeug im Einsatz",
+      "onFirecallVehicle": "im Einsatz",
       "noBestand": "Für diesen Artikel ist kein Lagerort erfasst. Der Verbrauch wird dokumentiert, aber nicht abgebucht.",
       "menge": "Menge",
       "mengeUnit": "Menge ({einheit})",

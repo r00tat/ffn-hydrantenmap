@@ -513,6 +513,44 @@ describe('createGeraetBestand', () => {
     await expect(createGeraetBestand('ffnd', 'g1', { art: 'quatsch' } as never)).rejects.toThrow();
   });
 
+  it('legt einen Container als Lagerort an und nimmt dessen Bezeichnung', async () => {
+    putGeraet('g1');
+    putGeraet('c1', { bezeichnung: 'Ölsperren 1', kategorie: 'Container' });
+    const { id } = await createGeraetBestand(
+      'ffnd',
+      'g1',
+      { art: 'container', containerId: 'c1', container: 'falscher Name', fahrzeug: 'SRF' } as never,
+      3,
+    );
+    expect(bestand(id)).toMatchObject({
+      lagerortKey: 'container|c1',
+      lagerort: { art: 'container', containerId: 'c1', container: 'Ölsperren 1' },
+      anzahl: 3,
+    });
+    expect(bestand(id)!.lagerort).not.toHaveProperty('fahrzeug');
+  });
+
+  it('lehnt einen Container ab, der keiner ist oder fehlt', async () => {
+    putGeraet('g1');
+    putGeraet('kein', { kategorie: 'Gerät' });
+    await expect(
+      createGeraetBestand('ffnd', 'g1', { art: 'container', containerId: 'kein' }),
+    ).rejects.toThrow(/container/i);
+    await expect(
+      createGeraetBestand('ffnd', 'g1', { art: 'container', containerId: 'fehlt' }),
+    ).rejects.toThrow(/container/i);
+    await expect(createGeraetBestand('ffnd', 'g1', { art: 'container' })).rejects.toThrow(
+      /container/i,
+    );
+  });
+
+  it('lehnt einen Container als eigenen Lagerort ab', async () => {
+    putGeraet('c1', { bezeichnung: 'Ölsperren 1', kategorie: 'Container' });
+    await expect(
+      createGeraetBestand('ffnd', 'c1', { art: 'container', containerId: 'c1' }),
+    ).rejects.toThrow(/container/i);
+  });
+
   it('lehnt eine unsinnige Anfangsmenge ab', async () => {
     putGeraet('g1');
     await expect(createGeraetBestand('ffnd', 'g1', srf, 1e308)).rejects.toThrow(/anzahl/);
@@ -899,6 +937,13 @@ interface Row {
   anzahl?: number;
 }
 
+/** Der Export kennt keinen Container als Lagerort — der entsteht nur in der App. */
+const EXPORT_LAGERORT: Partial<Record<GeraetLagerort['art'], string>> = {
+  fahrzeug: 'Fahrzeug',
+  raum: 'Raum',
+  set: 'Set-Artikel',
+};
+
 function rowsOf(rows: Row[]): string[][] {
   return [
     HEADER,
@@ -910,7 +955,7 @@ function rowsOf(rows: Row[]): string[][] {
       r.materialTyp ?? 'Massenartikel',
       r.status ?? 'aktiv',
       r.bemerkung ?? '',
-      r.lagerort ? { fahrzeug: 'Fahrzeug', raum: 'Raum', set: 'Set-Artikel' }[r.lagerort.art] : '',
+      r.lagerort ? (EXPORT_LAGERORT[r.lagerort.art] ?? '') : '',
       r.lagerort?.fahrzeug ?? '',
       r.lagerort?.laderaum ?? '',
       r.lagerort?.standort ?? '',

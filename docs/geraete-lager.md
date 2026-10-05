@@ -38,10 +38,51 @@ Neusiedl hatte 1106 Zeilen zu 765 IDs. Daraus folgt die Aufteilung in Stammdaten
 gruppiert nach `ID`.
 
 `Lagerort` ist `Fahrzeug` (mit `Fahrzeug-Name` und `Laderaum`), `Raum` (mit
-`Standort` und `Raum`) oder `Set-Artikel`. Unter „Fahrzeug" stehen in Sybos auch
-Behälter wie ein Rollcontainer oder eine Strahlenschutzausrüstung. Der Lagerort ist
-deshalb **ein Text, keine Pflichtverknüpfung** mit den Fahrtenbuch-Fahrzeugen;
-`vehicleId` ist eine optionale Zusatzangabe.
+`Standort` und `Raum`) oder `Set-Artikel`. Der Fahrzeug-Lagerort ist **ein Text,
+keine Pflichtverknüpfung** mit den Fahrtenbuch-Fahrzeugen — die Namen sind in Sybos
+und im Fahrtenbuch nicht gleich gepflegt; `vehicleId` ist eine optionale
+Zusatzangabe.
+
+**Die Lagerort-Spalten lassen sich in Sybos abwählen.** Ein Export ohne sie (der
+zweite Geräte-Export vom 5. 10. 2026: dieselben 1106 Zeilen, aber keine Spalten
+`Lagerort` bis `Anzahl`) sagt über den Bestand nichts. `parseGeraetExport` meldet
+das (`withBestand: false`) und der Import übernimmt dann nur Stammdaten — sonst
+zählte jeder vorhandene Lagerort als „in der Datei fehlt" und würde auf 0 gesetzt.
+
+### Container als Lagerort
+
+Rollcontainer, Paletten und Kisten sind in Sybos **eigene Artikel** der Kategorie
+`Container` (eigener Export, mit Versicherungsspalten), keine Fahrzeuge. Als
+Lagerort verweisen sie deshalb auf ihren Artikel: `art: 'container'` mit
+`containerId` und der Bezeichnung als Kopie in `container`. Der Schlüssel ist
+`container|<containerId>` — zwei Container dürfen gleich heißen, und ein
+umbenannter Container bleibt derselbe Lagerort. Die Bezeichnung setzt der Server
+aus dem Artikel, nicht aus dem Browser, und nimmt nur Artikel mit
+`kategorie: Container` (`isContainer`); ein Container kann nicht sein eigener
+Lagerort sein.
+
+Der Export kennt diesen Lagerort nicht. Ein Import setzt einen Container-Bestand
+deshalb **nie** auf 0, auch wenn er in der Datei fehlt — er fehlte in jeder.
+
+Im Einsatz zählt ein Lagerort im Container als „im Einsatz", sobald der Container
+selbst dem Einsatz zugeordnet ist; der Verbrauch wird dann von dort vorbelegt,
+wie bei einem Fahrzeug des Einsatzes.
+
+### Weitere Stammdaten aus dem Export
+
+Neben Bezeichnung, Klassen und Kennungen übernimmt der Import `Vorlage`
+(`vorlage`, die Gattung wie „Gasmessgerät"), `Zubehör` (`zubehoer`),
+`Anschaffungs-Datum`, `Verfügbar bis` (beide als `YYYY-MM-DD`, die Datei trägt
+Excel-Seriennummern) und `Lebensdauer` mit der Spalte `Einheit` als
+`lebensdauerEinheit`. Diese `Einheit` ist die der Lebensdauer, **nicht** die
+Zähleinheit des Artikels (`einheit`, von Hand gepflegt) — sie steht in jeder Zeile
+und wird nur zusammen mit einer Lebensdauer übernommen.
+
+Suche und Auswahl im Einsatz nutzen das: Gesucht wird auch in Vorlage, Kategorie,
+Klassen, Bemerkung und Zubehör, Treffer in der Bezeichnung stehen vorn. Die zweite
+Zeile einer Option nennt Vorlage, Hersteller und Typ, Seriennummer und Lagerort —
+„Mehrgasmessgerät 1" und „2" unterscheiden sich nur dort (X-am 5000 gegen X-am
+2800).
 
 ### `lagerortKey`
 

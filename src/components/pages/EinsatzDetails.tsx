@@ -54,6 +54,7 @@ import {
 } from '../../app/blaulicht-sms/actions';
 import AlarmCard from '../../app/blaulicht-sms/AlarmCard';
 import EinsatzFahrtenbuch from '../Fahrtenbuch/EinsatzFahrtenbuch';
+import GeraeteEinsatzSection from '../Geraete/einsatz/GeraeteEinsatzSection';
 import CrewAssignmentBoard from './CrewAssignmentBoard';
 import EinsatzDetailSection from './EinsatzDetailSection';
 import EinsatzorteWrapper from './EinsatzorteWrapper';
@@ -70,6 +71,7 @@ export default function EinsatzDetails() {
   const t = useTranslations('einsatzDetails');
   const tCommon = useTranslations('common');
   const tFahrtenbuch = useTranslations('fahrtenbuch');
+  const tGeraete = useTranslations('geraetEinsatz');
   const firecallId = useFirecallId();
   const setFirecallId = useFirecallSelect();
   const { isAdmin, email, myGroups, groups, groupAdmin } =
@@ -516,6 +518,20 @@ export default function EinsatzDetails() {
           onToggle={toggleSection}
         >
           <EinsatzFahrtenbuch firecallId={firecall.id} firecall={firecall} />
+        </EinsatzDetailSection>
+      )}
+
+      {/* Geräte & Material — ebenfalls nur mit Gruppe: Artikel und Lager
+          gehören einer Gruppe. Eingebettet ist es derselbe Abschnitt wie unter
+          /einsatz/{id}/geraete, nur ohne Seitenrahmen. */}
+      {firecall.id && firecall.group && (
+        <EinsatzDetailSection
+          sectionId="geraete"
+          title={tGeraete('title')}
+          expanded={openSections['geraete'] === true}
+          onToggle={toggleSection}
+        >
+          <GeraeteEinsatzSection embedded />
         </EinsatzDetailSection>
       )}
 

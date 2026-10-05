@@ -6,6 +6,7 @@ import {
   einsatzArtFor,
   findGeraetByCode,
   geraetForEntry,
+  geraetOptionDetails,
   geraetOptionLabel,
   isPendingBooking,
   matchesFirecallVehicle,
@@ -63,6 +64,36 @@ describe('searchGeraete', () => {
 
   it('lässt inaktive Artikel weg und liefert ohne Suchtext alle aktiven', () => {
     expect(searchGeraete(list, '').map((g) => g.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('findet auch über Klasse, Vorlage, Hersteller-Typ und Bemerkung', () => {
+    const messgeraete = [
+      geraet({
+        id: 'm1',
+        bezeichnung: 'Mehrgasmessgerät 1',
+        klasse1: 'Messgeräte und Nachweismittel',
+        vorlage: 'Gasmessgerät',
+        herstellerTyp: 'X-am 5000',
+      }),
+      geraet({
+        id: 'pg',
+        bezeichnung: 'Dräger - Prüfgas X-am',
+        klasse1: 'Messgeräte und Nachweismittel',
+        vorlage: 'Gasmessgerät',
+      }),
+      geraet({ id: 'wbk', bezeichnung: 'Wärmebildkamera - RLFA', klasse1: 'Messgeräte und Nachweismittel' }),
+      geraet({ id: 'tox', bezeichnung: 'Toxmessgeräteset', bemerkung: 'H2S-Sensor' }),
+    ];
+    // Treffer in der Bezeichnung stehen vorn, danach die übrigen.
+    expect(searchGeraete(messgeraete, 'messgerät').map((g) => g.id)).toEqual([
+      'm1',
+      'tox',
+      'pg',
+      'wbk',
+    ]);
+    expect(searchGeraete(messgeraete, 'gasmess').map((g) => g.id)).toEqual(['m1', 'pg']);
+    expect(searchGeraete(messgeraete, 'x-am 5000').map((g) => g.id)).toEqual(['m1']);
+    expect(searchGeraete(messgeraete, 'h2s').map((g) => g.id)).toEqual(['tox']);
   });
 
   it('begrenzt die Trefferzahl', () => {
@@ -359,5 +390,53 @@ describe('geraetForEntry', () => {
     expect(usesHours(geraetForEntry(geraet({ einheitVerwendungsnachweis: 'h' }), pieces))).toBe(
       false,
     );
+  });
+});
+
+describe('geraetOptionDetails', () => {
+  it('nennt Hersteller, Typ, Seriennummer und Lagerort', () => {
+    const g = geraet({
+      bezeichnung: 'Mehrgasmessgerät 2',
+      hersteller: 'Dräger',
+      herstellerTyp: 'X-am 2800',
+      seriennummer: 'ARRJ0726',
+      vorlage: 'Gasmessgerät',
+    });
+    expect(
+      geraetOptionDetails(g, [
+        bestand({ lagerort: { art: 'fahrzeug', fahrzeug: 'KRF-S', laderaum: 'G1' } }),
+      ]),
+    ).toBe('Gasmessgerät · Dräger X-am 2800 · SN ARRJ0726 · KRF-S · G1');
+  });
+
+  it('nimmt die Klasse, wenn es keine Vorlage gibt, und lässt Leeres weg', () => {
+    expect(geraetOptionDetails(geraet({ klasse1: 'Messgeräte und Nachweismittel' }), [])).toBe(
+      'Messgeräte und Nachweismittel',
+    );
+    expect(geraetOptionDetails(geraet({}), [])).toBe('');
+  });
+
+  it('kürzt viele Lagerorte ab', () => {
+    const many = ['A', 'B', 'C', 'D'].map((name, i) =>
+      bestand({ id: `b${i}`, lagerort: { art: 'raum', standort: name } }),
+    );
+    expect(geraetOptionDetails(geraet({}), many)).toBe('A, B +2');
+  });
+});
+
+describe('Container am Einsatz', () => {
+  const imContainer = { art: 'container' as const, container: 'Ölsperren 1', containerId: 'c1' };
+
+  it('zählt einen Lagerort im zugeordneten Container als am Einsatz', () => {
+    expect(matchesFirecallVehicle(imContainer, [], ['c1'])).toBe(true);
+    expect(matchesFirecallVehicle(imContainer, ['Ölsperren 1'], [])).toBe(false);
+    expect(matchesFirecallVehicle(imContainer, [], ['c2'])).toBe(false);
+  });
+
+  it('belegt den Lagerort im zugeordneten Container vor', () => {
+    const lager = bestand({ id: 'lager', anzahl: 50 });
+    const container = bestand({ id: 'container', anzahl: 2, lagerort: imContainer });
+    expect(pickDefaultBestand([lager, container], [], ['c1'])?.id).toBe('container');
+    expect(pickDefaultBestand([lager, container], [])?.id).toBe('lager');
   });
 });

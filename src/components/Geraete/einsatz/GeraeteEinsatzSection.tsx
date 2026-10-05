@@ -17,7 +17,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   formatLagerort,
   GERAET_EINSATZ_COLLECTION,
@@ -50,8 +50,11 @@ type DialogState = { mode: 'add' } | { mode: 'edit'; entry: GeraetEinsatz } | nu
  * Geräte werden nur zugeordnet; Verbrauchsmaterial bucht vom gewählten
  * Lagerort ab. Die Liste kommt aus dem lokalen Cache und ist offline
  * vollständig, soweit sie auf diesem Gerät geschrieben wurde.
+ *
+ * `embedded`: als Abschnitt der Einsatz-Detailseite — ohne Seitenrahmen,
+ * Überschrift und Einleitung, die trägt dort der aufklappbare Abschnitt.
  */
-export default function GeraeteEinsatzSection() {
+export default function GeraeteEinsatzSection({ embedded = false }: { embedded?: boolean }) {
   const t = useTranslations('geraetEinsatz');
   const format = useFormatter();
   const firecall = useFirecall();
@@ -77,6 +80,8 @@ export default function GeraeteEinsatzSection() {
     () => vehicles.map((v) => v.name).filter((name): name is string => !!name),
     [vehicles],
   );
+
+  const assignedIds = useMemo(() => entries.map((e) => e.geraetId), [entries]);
 
   const bestandById = useMemo(() => {
     const map = new Map<string, GeraetBestand>();
@@ -133,14 +138,20 @@ export default function GeraeteEinsatzSection() {
     return b ? formatLagerort(b.lagerort) : t('lagerortUnknown');
   };
 
+  const Frame = embedded ? EmbeddedFrame : PageFrame;
+
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
+    <Frame>
       <Stack
         direction="row"
         spacing={2}
-        sx={{ mb: 1, alignItems: 'center', justifyContent: 'space-between' }}
+        sx={{
+          mb: 1,
+          alignItems: 'center',
+          justifyContent: embedded ? 'flex-end' : 'space-between',
+        }}
       >
-        <Typography variant="h4">{t('title')}</Typography>
+        {!embedded && <Typography variant="h4">{t('title')}</Typography>}
         {canWrite && groupId && (
           <Button
             variant="contained"
@@ -151,9 +162,11 @@ export default function GeraeteEinsatzSection() {
           </Button>
         )}
       </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {t('intro')}
-      </Typography>
+      {!embedded && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {t('intro')}
+        </Typography>
+      )}
 
       {!groupId && <Alert severity="info">{t('noGroup')}</Alert>}
       {!canWrite && <Alert severity="info">{t('readOnly')}</Alert>}
@@ -252,6 +265,7 @@ export default function GeraeteEinsatzSection() {
           geraete={geraete}
           bestaendeByGeraet={bestaendeByGeraet}
           vehicleNames={vehicleNames}
+          assignedIds={assignedIds}
           createdBy={email ?? uid ?? ''}
           entry={dialog.mode === 'edit' ? dialog.entry : undefined}
         />
@@ -271,6 +285,18 @@ export default function GeraeteEinsatzSection() {
           }}
         />
       )}
+    </Frame>
+  );
+}
+
+function PageFrame({ children }: { children: ReactNode }) {
+  return (
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      {children}
     </Container>
   );
+}
+
+function EmbeddedFrame({ children }: { children: ReactNode }) {
+  return <Box>{children}</Box>;
 }

@@ -151,6 +151,24 @@ describe('GeraeteEinsatzSection', () => {
     );
   });
 
+  it('gibt dem Dialog die zugeordneten Artikel mit — Container darunter zählen als im Einsatz', async () => {
+    state.entries = [verbrauch, zuordnung];
+    const user = userEvent.setup();
+    render(<GeraeteEinsatzSection />);
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(state.dialogProps).toHaveBeenCalledWith(
+      expect.objectContaining({ assignedIds: ['vlies', 'aggregat'] }),
+    );
+  });
+
+  it('eingebettet ohne Überschrift und Einleitung, aber mit Liste und Erfassen', () => {
+    state.entries = [zuordnung];
+    render(<GeraeteEinsatzSection embedded />);
+    expect(screen.queryByRole('heading', { name: 'Geräte & Material' })).toBeNull();
+    expect(screen.getByText('Stromaggregat')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erfassen' })).toBeInTheDocument();
+  });
+
   it('bearbeitet einen Eintrag', async () => {
     const user = userEvent.setup();
     state.entries = [verbrauch];

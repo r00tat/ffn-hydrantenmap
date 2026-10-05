@@ -52,6 +52,13 @@ export const GERAET_EXPORT_COLUMNS = {
   seriennummer: 'Seriennummer',
   bemerkung: 'Bemerkung',
   besitzer: 'Besitzer',
+  vorlage: 'Vorlage',
+  zubehoer: 'Zubehör',
+  anschaffungsDatum: 'Anschaffungs-Datum',
+  verfuegbarBis: 'Verfügbar bis',
+  lebensdauer: 'Lebensdauer',
+  /** Einheit der Lebensdauer — nicht die Zähleinheit des Artikels. */
+  lebensdauerEinheit: 'Einheit',
   status: 'Status',
   einheitVerwendungsnachweis: 'Einheit Verwendungsnachweis',
   lagerort: 'Lagerort',
@@ -97,6 +104,12 @@ export const GERAET_IMPORT_FIELDS = [
   'seriennummer',
   'bemerkung',
   'besitzer',
+  'vorlage',
+  'zubehoer',
+  'anschaffungsDatum',
+  'verfuegbarBis',
+  'lebensdauer',
+  'lebensdauerEinheit',
   'einheitVerwendungsnachweis',
   'active',
 ] as const satisfies readonly (keyof Geraet)[];
@@ -131,6 +144,12 @@ export interface ParsedGeraet {
 
 export interface ParsedGeraetExport {
   artikel: ParsedGeraet[];
+  /**
+   * Trägt die Datei die Spalte „Lagerort"? Sybos lässt sich auch ohne die
+   * Lagerort-Spalten exportieren — dann sagt die Datei über den Bestand
+   * nichts, und ein fehlender Lagerort heißt nicht „dort liegt nichts mehr".
+   */
+  withBestand: boolean;
   /** Meldungen auf Deutsch, je Zeile mit ihrer Nummer in der Tabelle. */
   errors: string[];
 }
@@ -144,6 +163,28 @@ export interface ParsedGeraetExport {
  */
 export function suggestConsumable(kategorie?: string): boolean {
   return /verbrauch|lagerartikel/i.test(kategorie ?? '');
+}
+
+/** Tag 0 der Excel-Seriennummern (mit dem Schaltjahrfehler von 1900). */
+const EXCEL_EPOCH_MS = Date.UTC(1899, 11, 30);
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Ein Datum aus dem Export als `YYYY-MM-DD`. Die XLSX-Datei trägt Datumswerte
+ * als Seriennummer („45250", auch mit Uhrzeit als Bruchteil); ein bereits
+ * als Text geschriebenes ISO-Datum wird ebenso angenommen. Unlesbares:
+ * `undefined`.
+ */
+export function parseExportDate(value: string): string | undefined {
+  const v = value.trim();
+  if (!v) return undefined;
+  const iso = /^(\d{4}-\d{2}-\d{2})/.exec(v);
+  if (iso) return iso[1];
+  if (!/^\d+(\.\d+)?$/.test(v)) return undefined;
+  const serial = Math.floor(Number(v));
+  // Vor 1950 oder nach 2200 ist es keine Seriennummer eines Datums.
+  if (serial < 18264 || serial > 109574) return undefined;
+  return new Date(EXCEL_EPOCH_MS + serial * DAY_MS).toISOString().slice(0, 10);
 }
 
 function parseMaterialTyp(value: string): GeraetMaterialTyp | undefined {
@@ -174,7 +215,7 @@ function parseNumber(value: string): number | undefined {
  */
 export function parseGeraetExport(rows: string[][]): ParsedGeraetExport {
   const errors: string[] = [];
-  if (rows.length === 0) return { artikel: [], errors };
+  if (rows.length === 0) return { artikel: [], errors, withBestand: true };
 
   const index = new Map<string, number>();
   rows[0].forEach((name, i) => index.set((name ?? '').trim(), i));
@@ -183,7 +224,14 @@ export function parseGeraetExport(rows: string[][]): ParsedGeraetExport {
     return {
       artikel: [],
       errors: [`Spalte(n) nicht gefunden: ${missing.join(', ')}`],
+      withBestand: true,
     };
+  }
+  const withBestand = index.has(GERAET_EXPORT_COLUMNS.lagerort);
+  if (!withBestand) {
+    errors.push(
+      'Datei ohne Lagerort-Spalten: Es werden nur Stammdaten übernommen, der Bestand bleibt unverändert.',
+    );
   }
 
   const cell = (row: string[], column: string): string =>
@@ -236,7 +284,7 @@ export function parseGeraetExport(rows: string[][]): ParsedGeraetExport {
     artikel.bestaende.push(bestand);
   });
 
-  return { artikel: [...byId.values()], errors };
+  return { artikel: [...byId.values()], errors, withBestand };
 }
 
 type CellReader = (row: string[], column: string) => string;
@@ -266,6 +314,8 @@ function buildStammdaten(
     ['seriennummer', c.seriennummer],
     ['bemerkung', c.bemerkung],
     ['besitzer', c.besitzer],
+    ['vorlage', c.vorlage],
+    ['zubehoer', c.zubehoer],
   ] as const;
   for (const [field, column] of text) {
     const value = cell(row, column);
@@ -283,6 +333,20 @@ function buildStammdaten(
 
   const baujahr = Number(cell(row, c.baujahr));
   if (Number.isInteger(baujahr) && baujahr > 1900) stammdaten.baujahr = baujahr;
+
+  const anschaffungsDatum = parseExportDate(cell(row, c.anschaffungsDatum));
+  if (anschaffungsDatum) stammdaten.anschaffungsDatum = anschaffungsDatum;
+  const verfuegbarBis = parseExportDate(cell(row, c.verfuegbarBis));
+  if (verfuegbarBis) stammdaten.verfuegbarBis = verfuegbarBis;
+
+  // Die Einheit steht in jeder Zeile („Monat(e)"), zählt aber nur zusammen
+  // mit einer Lebensdauer.
+  const lebensdauer = parseNumber(cell(row, c.lebensdauer));
+  if (lebensdauer !== undefined && Number.isFinite(lebensdauer) && lebensdauer > 0) {
+    stammdaten.lebensdauer = lebensdauer;
+    const lebensdauerEinheit = cell(row, c.lebensdauerEinheit);
+    if (lebensdauerEinheit) stammdaten.lebensdauerEinheit = lebensdauerEinheit;
+  }
 
   return stammdaten;
 }
@@ -425,6 +489,7 @@ function sameValue(a: unknown, b: unknown): boolean {
 export function planGeraetImport(
   parsed: ParsedGeraet[],
   existing: GeraetImportExisting,
+  { withBestand = true }: { withBestand?: boolean } = {},
 ): GeraetImportPlan {
   const plan: GeraetImportPlan = {
     create: [],
@@ -509,8 +574,13 @@ export function planGeraetImport(
     }
 
     // In der Datei nicht mehr vorhandene Lagerorte: Der Bestand dort ist 0.
+    // Nicht, wenn die Datei gar keine Lagerorte trägt, und nie bei einem
+    // Container — den gibt es nur in der App, Sybos führt ihn nicht als
+    // Lagerort, und er fehlte in jeder Datei.
+    if (!withBestand) continue;
     for (const bestand of current) {
       if (seen.has(bestand.lagerortKey)) continue;
+      if (bestand.lagerort?.art === 'container') continue;
       classifyChange(plan, booked, geraetId, bestand, 0);
     }
   }

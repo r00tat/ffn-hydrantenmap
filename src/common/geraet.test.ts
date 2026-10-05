@@ -8,6 +8,7 @@ import {
   deviationKey,
   formatLagerort,
   isBelowMinimum,
+  isContainer,
   isValidMenge,
   lagerortKey,
   parseMenge,
@@ -148,5 +149,29 @@ describe('parseMenge', () => {
     expect(parseMenge('-1')).toBeUndefined();
     expect(parseMenge('1e308')).toBeUndefined();
     expect(parseMenge('abc')).toBeUndefined();
+  });
+});
+
+describe('Container als Lagerort', () => {
+  it('schlüsselt nach der Artikel-ID, nicht nach dem Namen', () => {
+    expect(
+      lagerortKey({ art: 'container', container: 'Ölsperren 1', containerId: '93599' }),
+    ).toBe('container|93599');
+    expect(
+      lagerortKey({ art: 'container', container: 'Umbenannt', containerId: '93599' }),
+    ).toBe('container|93599');
+  });
+
+  it('zeigt die Bezeichnung des Containers', () => {
+    expect(
+      formatLagerort({ art: 'container', container: 'Ölsperren 1', containerId: '93599' }),
+    ).toBe('Ölsperren 1');
+  });
+
+  it('erkennt Container an der Sybos-Kategorie', () => {
+    expect(isContainer({ kategorie: 'Container' })).toBe(true);
+    expect(isContainer({ kategorie: ' container ' })).toBe(true);
+    expect(isContainer({ kategorie: 'Gerät' })).toBe(false);
+    expect(isContainer({})).toBe(false);
   });
 });

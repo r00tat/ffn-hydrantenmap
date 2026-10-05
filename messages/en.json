@@ -3875,7 +3875,13 @@
       "mindestbestand": "Minimum stock",
       "mindestbestandHint": "Across all locations; consumables only",
       "einheitVerwendungsnachweis": "Usage recorded in",
-      "active": "Active"
+      "active": "Active",
+      "barcodes": "Barcodes",
+      "vorlage": "Template",
+      "zubehoer": "Accessories",
+      "anschaffungsDatum": "Purchased",
+      "verfuegbarBis": "Available until",
+      "lebensdauer": "Service life"
     },
     "verwendungsnachweis": {
       "none": "not recorded",
@@ -3894,7 +3900,7 @@
       "countInvalid": "Please enter a number of 0 or more.",
       "mengeInvalid": "Please enter a quantity greater than 0.",
       "zielRequired": "Please choose a target location.",
-      "lagerortRequired": "Please enter a vehicle or site.",
+      "lagerortRequired": "Please enter a vehicle, container or site.",
       "lagerortExists": "This item already has this storage location.",
       "saveFailed": "Saving failed: {error}"
     },
@@ -3924,13 +3930,16 @@
       "title": "New storage location",
       "art": "Type",
       "artRaum": "Room",
-      "artFahrzeug": "Vehicle / container",
+      "artFahrzeug": "Vehicle",
       "fahrzeug": "Vehicle",
       "laderaum": "Compartment",
       "standort": "Site",
       "raum": "Room",
       "bemerkung": "Location remark",
-      "anzahl": "Initial stock"
+      "anzahl": "Initial stock",
+      "artContainer": "Container",
+      "container": "Container",
+      "noContainer": "No containers recorded. Containers are articles of the Sybos category “Container” – import them first, then pick one here."
     },
     "import": {
       "open": "Import",
@@ -4014,7 +4023,7 @@
       "deviceInfo": "Equipment – assigned to the operation, stock stays unchanged.",
       "lagerort": "Storage location",
       "lagerortOption": "{lagerort} – stock {anzahl, number}",
-      "onFirecallVehicle": "vehicle in this operation",
+      "onFirecallVehicle": "in this operation",
       "noBestand": "No storage location is recorded for this article. The consumption is documented but not booked.",
       "menge": "Quantity",
       "mengeUnit": "Quantity ({einheit})",
