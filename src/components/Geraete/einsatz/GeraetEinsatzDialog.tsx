@@ -265,12 +265,16 @@ export default function GeraetEinsatzDialog({
                   inputValue={inputValue}
                   onInputChange={(_e, value, reason) => {
                     // Nach einer Auswahl bleibt der Suchbegriff stehen — so
-                    // lassen sich mehrere Treffer nacheinander anklicken.
-                    if (reason !== 'reset') setInputValue(value);
+                    // lassen sich mehrere Treffer nacheinander anklicken. MUI
+                    // leert ihn bei `multiple` mit `selectOption`.
+                    if (reason !== 'reset' && reason !== 'selectOption') setInputValue(value);
                   }}
                   onChange={(_e, value) => select(value)}
                   filterOptions={(options, state) => searchGeraete(options, state.inputValue)}
                   getOptionLabel={geraetOptionLabel}
+                  // Ohne Inventar-Nr. tragen gleichnamige Artikel dasselbe
+                  // Label — der Schlüssel muss die ID sein.
+                  getOptionKey={(option) => option.id}
                   isOptionEqualToValue={(a, b) => a.id === b.id}
                   noOptionsText={t('noOptions')}
                   renderOption={(props, option) => {

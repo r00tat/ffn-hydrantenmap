@@ -257,6 +257,29 @@ describe('GeraetEinsatzDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('behält den Suchbegriff nach der Auswahl — gleichnamige Artikel lassen sich nacheinander anklicken', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const plane1 = geraet({ id: 'p1', bezeichnung: 'Abdeckplane', seriennummer: 'A' });
+    const plane2 = geraet({ id: 'p2', bezeichnung: 'Abdeckplane', seriennummer: 'B' });
+    renderDialog({ geraete: [plane1, plane2, pumpe] });
+    const user = userEvent.setup();
+    const input = screen.getByRole('combobox', { name: /Artikel/ });
+    await user.type(input, 'abdeck');
+    const [first] = await screen.findAllByRole('option');
+    await user.click(first);
+    expect(input).toHaveValue('abdeck');
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(2);
+    await user.click(options[1]);
+    await user.click(screen.getByRole('button', { name: '2 erfassen' }));
+    expect(mocks.add.mock.calls.map((c) => (c[1] as GeraetEinsatz).geraetId)).toEqual([
+      'p1',
+      'p2',
+    ]);
+    expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+    errors.mockRestore();
+  });
+
   it('nimmt einen abgewählten Artikel wieder heraus und zeigt dann die Einzelfelder', async () => {
     renderDialog();
     const user = await pickArticle('binde', /Bindevlies/);
