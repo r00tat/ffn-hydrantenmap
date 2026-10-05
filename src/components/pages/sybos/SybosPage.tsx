@@ -24,7 +24,6 @@ import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useFirecall, { FirecallContext } from '../../../hooks/useFirecall';
 import { useFirecallLayersSorted } from '../../../hooks/useFirecallLayers';
 import useFirecallLocations from '../../../hooks/useFirecallLocations';
-import useGeraete from '../../../hooks/useGeraete';
 import useFirecallWriteAccess from '../../../hooks/useFirecallWriteAccess';
 import { useFirecallKostenersatz } from '../../../hooks/useKostenersatz';
 import useVehicles from '../../../hooks/useVehicles';
@@ -39,7 +38,6 @@ import {
   type FirecallLayer,
 } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
-import useGeraetEinsatz from '../../Geraete/einsatz/useGeraetEinsatz';
 import DynamicMap from '../../Map/PositionedMap';
 import { useSnackbar } from '../../providers/SnackbarProvider';
 import DiaryTable from '../DiaryTable';
@@ -59,7 +57,6 @@ import {
 import {
   buildAtemschutzText,
   buildEinsatzGeraeteText,
-  buildEinsatzGeraetRows,
   truppProtokollText,
   buildFahrtenRows,
   buildMeasurementTables,
@@ -73,7 +70,11 @@ import {
 import { AusgabeTable, GeraeteTable, TruppProtokollView } from './SybosAtemschutz';
 import { AttachmentList, DriveFiles } from './SybosFiles';
 import { generateSybosSummary } from './sybosSummary';
-import { useAtemschutzReport, useFirecallAlarmText } from './useEinsatzReport';
+import {
+  useAtemschutzReport,
+  useEinsatzGeraetRows,
+  useFirecallAlarmText,
+} from './useEinsatzReport';
 import {
   CrewTable,
   EinsatzGeraeteTable,
@@ -287,7 +288,7 @@ export default function SybosPage() {
   const { diaries } = useDiaries(true);
   const { eintraege } = useGeschaeftsbuchEintraege(true);
   const { crewAssignments } = useContext(FirecallContext);
-  const { email, groups } = useFirebaseLogin();
+  const { email } = useFirebaseLogin();
   const canWrite = useFirecallWriteAccess();
   const showSnackbar = useSnackbar();
   const copy = useCopy();
@@ -301,13 +302,7 @@ export default function SybosPage() {
   const { calculations } = useFirecallKostenersatz(firecall.id);
   const alarmText = useFirecallAlarmText(firecall);
   const computed = useComputedFields(firecallItems, layers);
-  // Die Stammdaten der Geräte liest nur ein Mitglied der Gruppe; ein
-  // Einsatz-Gast sieht die Einträge am Einsatz mit ihrem kopierten Namen.
-  const isGroupMember = !!firecall.group && (groups ?? []).includes(firecall.group);
-  const { geraete: groupGeraete, bestandById } = useGeraete(
-    isGroupMember ? firecall.group : undefined,
-  );
-  const { entries: geraetEntries } = useGeraetEinsatz(firecall.id);
+  const einsatzGeraetRows = useEinsatzGeraetRows(firecall);
 
   const basis = useMemo(
     () => buildBasisdaten({ firecall, items: firecallItems, locations }),
@@ -326,15 +321,6 @@ export default function SybosPage() {
   const material = useMemo(
     () => materialCounts.map(({ label, count }) => `${count}× ${label}`).join('\n'),
     [materialCounts],
-  );
-  const einsatzGeraetRows = useMemo(
-    () =>
-      buildEinsatzGeraetRows(
-        geraetEntries,
-        new Map(groupGeraete.map((g) => [g.id, g])),
-        bestandById,
-      ),
-    [bestandById, geraetEntries, groupGeraete],
   );
   const einsatzGeraete = useMemo(
     () => buildEinsatzGeraeteText(einsatzGeraetRows),

@@ -759,7 +759,8 @@
     "doneAt": "✓ erledigt {time}",
     "sectionAblauf": "Einsatzablauf",
     "sectionMannschaft": "Mannschaft und Fahrten",
-    "sectionAtemschutz": "Atemschutz"
+    "sectionAtemschutz": "Atemschutz",
+    "sectionGeraete": "Geräte & Material"
   },
   "sybos": {
     "title": "Übertrag nach Sybos",

@@ -41,11 +41,11 @@ Abschnitte ohne Daten bleiben weg. Die Builder für 3.–7. stehen in
 
 ## Dieselben Abschnitte auf der Druckseite
 
-Alarmierungstext, Einsatzablauf und Tätigkeit, Mannschaft und Fahrten, der ganze
-Atemschutz samt Protokoll je Trupp und die Anhänge an Elementen stehen auch auf der
+Alarmierungstext, Einsatzablauf und Tätigkeit, Mannschaft und Fahrten, Geräte und
+Verbrauchsmaterial, der ganze Atemschutz samt Protokoll je Trupp und die Anhänge an Elementen stehen auch auf der
 Druckseite ([PrintEinsatzExtras.tsx](../src/components/pages/PrintEinsatzExtras.tsx)).
 Sie verwenden dieselben Tabellen und Hooks (`useAtemschutzReport`,
-`useFirecallAlarmText` in [useEinsatzReport.ts](../src/components/pages/sybos/useEinsatzReport.ts)),
+`useEinsatzGeraetRows`, `useFirecallAlarmText` in [useEinsatzReport.ts](../src/components/pages/sybos/useEinsatzReport.ts)),
 damit Ausdruck und Übertrag nicht auseinanderlaufen. Auf Papier fehlen nur die
 Kopier-Knöpfe. Messreihen bekommen dort keine eigene Tabelle: Die Datenfelder stehen
 schon in den Einsatzmittel-Details je Ebene. Kostenersatz bleibt draußen, er hat einen

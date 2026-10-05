@@ -759,7 +759,8 @@
     "doneAt": "✓ done {time}",
     "sectionAblauf": "Course of operation",
     "sectionMannschaft": "Crew and trips",
-    "sectionAtemschutz": "Breathing apparatus"
+    "sectionAtemschutz": "Breathing apparatus",
+    "sectionGeraete": "Equipment & supplies"
   },
   "sybos": {
     "title": "Transfer to Sybos",

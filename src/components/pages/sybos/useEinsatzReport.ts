@@ -6,10 +6,14 @@ import type { BlaulichtSmsAlarm } from '../../../common/blaulichtsms';
 import { vorgabeGeraetesatz } from '../../../common/atemschutzUeberwachung';
 import useAtemschutzEinsatzdaten from '../../../hooks/useAtemschutzEinsatzdaten';
 import useAtemschutzGeraete from '../../../hooks/useAtemschutzGeraete';
+import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
+import useGeraete from '../../../hooks/useGeraete';
 import useOnline from '../../../hooks/useOnline';
 import { firecallAlarmIds, type Firecall } from '../../firebase/firestore';
+import useGeraetEinsatz from '../../Geraete/einsatz/useGeraetEinsatz';
 import {
   buildAusgabeRows,
+  buildEinsatzGeraetRows,
   buildGeraeteRows,
   buildTruppProtokolle,
   buildTruppRows,
@@ -89,4 +93,20 @@ export function useAtemschutzReport(firecall: Firecall) {
   const ausgabeRows = useMemo(() => buildAusgabeRows(ausgaben), [ausgaben]);
 
   return { vorgabe, truppRows, truppsById, protokolle, geraeteRows, ausgabeRows };
+}
+
+/**
+ * Geräte und Verbrauchsmaterial des Einsatzes, eine Zeile je Artikel und Art —
+ * für Sybos-Seite und Ausdruck gleich. Die Stammdaten liest nur ein Mitglied
+ * der Gruppe; ein Einsatz-Gast sieht die Einträge mit ihrem kopierten Namen.
+ */
+export function useEinsatzGeraetRows(firecall: Firecall) {
+  const { groups } = useFirebaseLogin();
+  const isGroupMember = !!firecall.group && (groups ?? []).includes(firecall.group);
+  const { geraete, bestandById } = useGeraete(isGroupMember ? firecall.group : undefined);
+  const { entries } = useGeraetEinsatz(firecall.id);
+  return useMemo(
+    () => buildEinsatzGeraetRows(entries, new Map(geraete.map((g) => [g.id, g])), bestandById),
+    [bestandById, entries, geraete],
+  );
 }

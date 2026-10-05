@@ -21,6 +21,11 @@ vi.mock('../../firebase/firestore', () => ({
 
 vi.mock('../../../hooks/useAtemschutzEinsatzdaten', () => ({ default: vi.fn() }));
 vi.mock('../../../hooks/useAtemschutzGeraete', () => ({ default: vi.fn() }));
+vi.mock('../../../hooks/useFirebaseLogin', () => ({ default: () => ({ groups: [] }) }));
+vi.mock('../../../hooks/useGeraete', () => ({
+  default: () => ({ geraete: [], bestandById: new Map() }),
+}));
+vi.mock('../../Geraete/einsatz/useGeraetEinsatz', () => ({ default: () => ({ entries: [] }) }));
 
 import type { Firecall } from '../../firebase/firestore';
 import { useFirecallAlarms } from './useEinsatzReport';
