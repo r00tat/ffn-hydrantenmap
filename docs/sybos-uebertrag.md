@@ -147,9 +147,20 @@ Zusammenfassung je Artikel rechnet `resolveEinsatzGeraeteForSybos`
   ganze Bestand. Ein Einsatz-Gast darf sie nicht lesen; dann gilt die Artikel-ID.
 
 Grundlage ist der Mitschnitt `captures/add-geraete-2.har` (Filter auf Gerät,
-Klasse 1, drei Artikel, Anzahl, Speichern). Mehrere Seiten und Container sind darin
-nicht durchgespielt; der Knopf ist deshalb vorerst nicht Teil von „Material &
-Mannschaft übernehmen".
+Klasse 1, drei Artikel, Anzahl, Speichern). Der gemeinsame Knopf läuft in der
+Reihenfolge Fahrzeuge → Geräte → Mannschaft: Personen lassen sich nur einem Fahrzeug
+zuordnen, das schon am Einsatz steht.
+
+**Erst nach dem Speichern.** Alle Knöpfe unter „Automatisch übernehmen" sind
+gesperrt, mit Hinweis, solange der Einsatz in Sybos nicht gespeichert ist:
+
+- Ein neuer Einsatz hat noch keine ID — Sybos zeigt sie erst nach dem Speichern in
+  den `idParent=`-Verweisen. Die Erweiterung hätte nichts, woran sie Fahrzeuge
+  hängen kann, und das Neuladen danach landete wieder im leeren Formular.
+- Ungespeicherte Eingaben im Formular gingen beim Neuladen nach dem Übertrag
+  verloren. Die Erweiterung merkt sich die erste Eingabe im Formular (auch die von
+  „Texte eintragen") und sperrt ab dann. Speichern lädt die Seite neu und gibt die
+  Knöpfe wieder frei.
 
 **Einsatzbericht-Text** („Texte eintragen"). Die Detailseite eines Einsatzes ist in
 Sybos schon das Bearbeitungsformular. Die Erweiterung schreibt `sybosEinsatzablauf`
