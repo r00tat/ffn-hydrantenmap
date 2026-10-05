@@ -114,7 +114,10 @@ nach einem Tag ohne Besuch war die Seite weg.
   RSC-Regel unten). Danach, bei einem Netzfehler oder einer 5xx-Antwort, der
   Cache: erst die eigene Seite, dann dieselbe ohne Query (`/map?lat=…`), dann
   der Precache dieses Builds, dann eine **Vorlage**, dann `/offline`, zuletzt
-  eine eingebaute HTML-Seite. Bewusst nicht die übrigen Caches: Die Auffangregel `others` hält
+  eine eingebaute HTML-Seite (503, mit Header `X-Einsatzkarte-Offline-Fallback: 1`
+  und `<meta name="einsatzkarte-offline">`, an denen die Android-App sie
+  erkennt, siehe [offline-modus.md](offline-modus.md#hauptseite-ohne-netz-mainactivity-offlineloadpolicy)).
+  Bewusst nicht die übrigen Caches: Die Auffangregel `others` hält
   HTML früherer Builds, dessen Chunks offline fehlen — eine weiße Seite wäre
   schlechter als `/offline`. Gespeichert wird nur eine `200` ohne Umleitung
   mit `text/html`.

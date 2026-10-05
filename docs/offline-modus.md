@@ -316,6 +316,51 @@ Deshalb:
   `offline`) hinaus. Erst diese Zahl sagt, ob ein eigener Weg nötig ist, etwa
   ein natives Ablegen des JS-SDK-Benutzers.
 
+#### Hauptseite ohne Netz (`MainActivity`, `OfflineLoadPolicy`)
+
+Scheitert die Hauptseite am Netz, meldet WebView `onReceivedError`. Das heißt
+in der App nicht, dass nichts angezeigt wird: Läuft der Service Worker beim
+Kaltstart noch nicht, schickt Chromium die Netzanfrage der Navigation parallel
+zu seinem Start ab. Offline scheitert sie und wird gemeldet, während der
+Worker die Seite aus seinem Cache liefert. Früher ersetzte das Overlay
+„Einsatzkarte wartet auf Netzwerk…" sofort genau diese Seite, und erst
+„Erneut versuchen" brachte sie zurück — nun mit laufendem Worker.
+
+- **Erst nachsehen, dann das Overlay.** Nach anderthalb Sekunden prüft
+  `PROBE_SCRIPT`, was im WebView steht: eine Seite der App (Next.js-Skripte
+  oder die eingebaute Offline-Seite des Workers mit
+  `<meta name="einsatzkarte-offline">`) bleibt stehen; solange die Navigation
+  noch läuft, wird weiter gewartet (höchstens zehn Blicke). Nur sonst kommt
+  das Overlay. Steht trotz Fehler eine Seite, geht einmal je Prozess ein
+  Non-Fatal an Crashlytics — er belegt die Erklärung oben im Feld.
+- **Das Overlay wartet wirklich.** Zwei Sekunden nach dem Einblenden folgt ein
+  erster Neuversuch, genau der Knopfdruck von früher. Danach lädt es neu,
+  sobald `ConnectivityManager` ein geprüftes Netz meldet
+  (`ACCESS_NETWORK_STATE`), und bei bestehendem Netz alle 30 Sekunden. Ohne
+  Netz wird nicht im Takt versucht: Jeder Fehlschlag zeigte kurz die
+  Fehlerseite von Chromium.
+- **Neuversuche navigieren auf die gescheiterte Adresse.** Ein
+  `location.reload()` lud nur die Overlay-Seite selbst neu, die per
+  `loadDataWithBaseURL` kam; das galt auch für das Herunterziehen.
+- **Das Overlay kommt nicht mehr synchron aus `onReceivedError`.** Die Seite
+  konkurrierte mit der Fehlerseite, die Chromium gerade übernimmt, und blieb
+  mitunter auf der Strecke — zurück blieb „Webseite nicht verfügbar" ohne
+  jeden Knopf, der Fall einer Seite, die noch nie im Cache lag.
+- **`ERROR_UNKNOWN` ohne geprüftes Netz zählt als Funkloch.** `ERR_FAILED`
+  und `ERR_NETWORK_CHANGED` landen dort; vorher bekamen sie den Dialog mit
+  „URL ändern". Mit Netz bleibt es beim Dialog.
+- **Die eingebaute Offline-Seite des Workers (503) bekommt keinen Dialog.**
+  Sie trägt den Header `X-Einsatzkarte-Offline-Fallback: 1` und hat selbst
+  „Erneut versuchen"; eine echte 5xx des Servers trägt ihn nicht.
+
+### Kein Neuladen beim Reconnect
+
+`SerwistProvider` lädt in der Voreinstellung (`reloadOnOnline`) bei jedem
+`online`-Ereignis die ganze Seite neu — die Karte baute sich auf, sobald das
+Netz zurückkam. In `src/app/layout.tsx` ist das abgeschaltet: Firestore, die
+Warteschlangen und die Wiederherstellung der Anmeldung holen ihren Teil über
+`onReconnect` selbst nach.
+
 ## Daten für den Offline-Fall vorbereiten
 
 ### Firestore-Cache vorwärmen (`src/lib/firestoreWarmup.ts`)
@@ -454,8 +499,12 @@ Bausteine. Hintergrund in
   bleiben die beim Betriebssystem hinterlegten Termine stehen). Ohne die
   Erlaubnis für exakte Alarme können sie sich dort um Minuten verspäten; die
   Screen Wake Lock API fehlt in der WebView vermutlich.
-- **Android-Kaltstart ohne Netz** ist ungeprüft (siehe oben): Er hängt daran,
-  ob die WebView ihren Firebase-Benutzer über einen Prozessstart behält.
+- **Android-Kaltstart ohne Netz** ist nur teilweise geprüft (siehe oben): Er
+  hängt daran, ob die WebView ihren Firebase-Benutzer über einen Prozessstart
+  behält. Dass der gemeldete Fehler der Hauptseite von der parallelen
+  Netzanfrage beim Start des Service Workers kommt, ist eine Ableitung aus
+  dem Verhalten, an keinem Gerät nachgestellt; der Non-Fatal in Crashlytics
+  soll es belegen.
 - **Seitenwechsel offline laden die Seite neu — außer zwischen den
   Einsatzseiten.** Karte und Abschnitte unter `/einsatz/<id>[/<abschnitt>]`
   wechseln per `history.pushState` ohne Server, auch zu einem anderen Einsatz (siehe

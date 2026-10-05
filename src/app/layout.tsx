@@ -107,10 +107,16 @@ export default async function RootLayout({
             Service Worker im Root-Scope. In der Entwicklung bleibt er aus, damit
             kein Precache-Layer zwischen Dev-Server und Browser haengt — das war
             vorher implizit so, weil das Serwist-Webpack-Plugin nur im
-            Production-Build lief. */}
+            Production-Build lief.
+            `reloadOnOnline` ist aus: Serwist lädt sonst bei jedem
+            `online`-Ereignis die ganze Seite neu, und die Karte baut sich
+            mitten im Einsatz auf, sobald das Netz zurückkommt. Den Reconnect
+            übernehmen Firestore, die Warteschlangen und die Anmeldung selbst
+            (docs/offline-modus.md). */}
         <SerwistProvider
           swUrl={SERWIST_SW_URL}
           disable={process.env.NODE_ENV !== 'production'}
+          reloadOnOnline={false}
           options={{ scope: '/' }}
         >
           <IntlClientProvider locale={locale}>
