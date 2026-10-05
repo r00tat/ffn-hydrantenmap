@@ -3835,7 +3835,8 @@
     "newGeraet": "New item",
     "tabs": {
       "list": "Items ({count})",
-      "reorder": "To reorder ({count})"
+      "reorder": "To reorder ({count})",
+      "sets": "Sets ({count})"
     },
     "filters": {
       "search": "Search (name, inventory no., barcode)",
@@ -4017,6 +4018,61 @@
       "createTitle": "New items",
       "updateTitle": "Changed master data",
       "bestandUpdateTitle": "Updated stock levels"
+    },
+    "sets": {
+      "list": {
+        "search": "Search (name, code)",
+        "new": "New set",
+        "empty": "No sets yet.",
+        "items": "{count, plural, one {# item} other {# items}}",
+        "inactive": "inactive",
+        "sybos": "Sybos: {name}",
+        "hint": "A set bundles equipment and supplies. During an operation it is assigned as a whole, creating one entry per item."
+      },
+      "dialog": {
+        "titleNew": "New set",
+        "titleEdit": "Edit set",
+        "name": "Name",
+        "bemerkung": "Note",
+        "active": "Active",
+        "sybosArtikel": "Sybos set article",
+        "sybosArtikelHint": "Optional. The set article itself is recorded as assigned during the operation.",
+        "artikelCodes": "Codes of the set article – apply automatically",
+        "codes": "Codes",
+        "codesHint": "Type a barcode or QR code and press Enter",
+        "scan": "Scan code",
+        "inhalt": "Add item",
+        "inhaltHint": "Click several articles one after another",
+        "inhaltEmpty": "No items yet.",
+        "noOptions": "No article found",
+        "menge": "Quantity",
+        "mengeUnit": "Quantity ({einheit})",
+        "lagerort": "Storage location",
+        "lagerortDefault": "preselected during the operation",
+        "device": "Equipment",
+        "consumable": "Supplies",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove",
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "deleteTitle": "Delete set?",
+        "deleteText": "The set “{name}” will be deleted. Entries in operations keep the set name."
+      },
+      "errors": {
+        "nameMissing": "Please enter a name.",
+        "noItems": "Please choose at least one item.",
+        "notSetArtikel": "The chosen article is not a Sybos set article.",
+        "unknownItem": "This article no longer exists.",
+        "duplicateItem": "The article is already in the set.",
+        "setArtikelAsItem": "The set article cannot be an item at the same time.",
+        "invalidMenge": "Please enter a quantity greater than 0.",
+        "invalidBestand": "The storage location does not belong to this article.",
+        "bestandNotConsumable": "A storage location only applies to supplies.",
+        "codeCollision": "The code “{value}” already belongs to the article “{name}”.",
+        "codeCollisionSet": "The code “{value}” already belongs to the set “{name}”."
+      }
     }
   },
   "geraetEinsatz": {
@@ -4047,8 +4103,8 @@
       "titleAdd": "Record equipment or supplies",
       "titleEdit": "Edit entry",
       "article": "Article",
-      "articleHint": "Name, inventory no. or barcode",
-      "noOptions": "No article found",
+      "articleHint": "Name, inventory no., barcode or set",
+      "noOptions": "No article or set found",
       "noArticles": "No equipment is recorded for this operation's group.",
       "optionConsumable": "Consumable · stock {bestand, number} {einheit}",
       "optionDevice": "Equipment",
@@ -4078,7 +4134,19 @@
       "manyInfo": "{count} articles will be recorded: devices assigned, consumables with quantity 1 from the preselected location. Quantity, hours and location can be changed per entry afterwards.",
       "manyConsumable": "1 {einheit} from {lagerort}",
       "manyConsumableNoBestand": "1 {einheit}, no storage location – not booked",
-      "saveMany": "Record {count}"
+      "saveMany": "Record {count}",
+      "setChip": "Set",
+      "setItems": "{count, plural, one {# item} other {# items}}",
+      "setPreviewTitle": "Set {name}",
+      "setPreviewSingles": "Individual articles",
+      "setPreviewInfo": "These entries will be created. Quantity, hours and storage location can be changed per row.",
+      "setArtikel": "Set article",
+      "setSkipped": {
+        "missing": "article no longer exists – not created",
+        "inactive": "inactive – not created",
+        "noBestand": "no storage location – not created"
+      },
+      "setCodeFound": "Set “{name}” added."
     },
     "scanner": {
       "title": "Scan barcode",
@@ -4091,6 +4159,16 @@
       "manualHint": "Barcode, inventory no. or serial number – confirm with Enter",
       "use": "Use",
       "close": "Close"
+    },
+    "setGroup": {
+      "title": "Set {name}",
+      "count": "{count, plural, one {# entry} other {# entries}}",
+      "menu": "Set actions",
+      "removeAll": "Remove whole set",
+      "removeTitle": "Remove whole set?",
+      "removeText": "All {count} entries of the set “{name}” will be removed. Consumed supplies are booked back to stock.",
+      "expand": "Expand",
+      "collapse": "Collapse"
     }
   }
 }

@@ -16,6 +16,9 @@ export const GERAET_BUCHUNG_COLLECTION = 'geraetBuchung';
 /** Subcollection unter `call/{firecallId}` — Zuordnung und Verbrauch. */
 export const GERAET_EINSATZ_COLLECTION = 'geraetEinsatz';
 
+/** Subcollection unter `groups/{groupId}` — Zusammenstellungen aus Artikeln. */
+export const GERAET_SET_COLLECTION = 'geraetSet';
+
 /**
  * Höchste Menge einer Buchung, eines Ist-Werts und eines Verbrauchs. Schützt
  * den Bestand vor unsinnigen Werten: Eine Menge wie `1e308` würde über die
@@ -262,6 +265,15 @@ export interface GeraetEinsatz {
   stunden?: number;
   zeitpunkt: string;
   bemerkung?: string;
+  /** Das Set, aus dem der Eintrag stammt — nach dem Löschen des Sets ins Leere. */
+  setId?: string;
+  /** Kopie des Set-Namens, lesbar für Gäste und nach dem Löschen des Sets. */
+  setName?: string;
+  /**
+   * Eine ID je Zuordnung eines Sets: Dasselbe Set kann zweimal im Einsatz
+   * sein, „Ganzes Set entfernen" löscht genau eine Zuordnung.
+   */
+  setZuordnungId?: string;
   /** Der Server hat abgebucht — sonst „noch nicht synchronisiert". */
   gebucht?: boolean;
   /**
@@ -273,6 +285,36 @@ export interface GeraetEinsatz {
   syncRev?: number;
   createdAt: string;
   createdBy: string;
+}
+
+/** Ein Inhalt eines Sets. */
+export interface GeraetSetItem {
+  geraetId: string;
+  /** Stück; bei Verbrauchsmaterial die Verbrauchsmenge. Standard 1. */
+  menge?: number;
+  /** Fester Lagerort, nur bei Verbrauchsmaterial. */
+  bestandId?: string;
+}
+
+/**
+ * Ein Set: `groups/{groupId}/geraetSet/{id}`. Eigene Zusammenstellung,
+ * optional an einen Sybos-Set-Artikel gebunden — der Export verrät nicht,
+ * welche Komponente zu welchem Set gehört (docs/geraete-lager.md, „Sets").
+ */
+export interface GeraetSet {
+  id: string;
+  name: string;
+  /** Geraet-ID eines Artikels mit Material-Typ „Set-Artikel". */
+  sybosSetArtikelId?: string;
+  /** Eigene Codes (Barcode, QR). */
+  codes: string[];
+  inhalt: GeraetSetItem[];
+  active: boolean;
+  bemerkung?: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
 }
 
 function normalizePart(value?: string): string {

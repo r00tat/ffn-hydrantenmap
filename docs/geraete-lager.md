@@ -10,6 +10,7 @@ verbraucht wird, soll automatisch aus dem Lager ausgebucht werden).
 | --- | --- |
 | Typen, Sammlungsnamen, `lagerortKey`, `formatLagerort` | [`src/common/geraet.ts`](../src/common/geraet.ts) |
 | Bestandslogik (rein, ohne Firestore) | [`src/common/geraetBestandLogic.ts`](../src/common/geraetBestandLogic.ts) |
+| Sets: Prüfung, Code-Suche, Auflösen im Einsatz (rein) | [`src/common/geraetSet.ts`](../src/common/geraetSet.ts) |
 | Sybos-Import: Parser und Plan | [`src/common/geraetImport.ts`](../src/common/geraetImport.ts) |
 | Server Actions | [`src/components/Geraete/geraeteActions.ts`](../src/components/Geraete/geraeteActions.ts) |
 | Nachbestellmail | [`src/components/Geraete/notifyNachbestellung.ts`](../src/components/Geraete/notifyNachbestellung.ts) |
@@ -24,7 +25,8 @@ verbraucht wird, soll automatisch aus dem Lager ausgebucht werden).
 | `groups/{groupId}/geraet/{id}` | Stammdaten je Artikel, `id` = Sybos-`ID` bzw. generiert | nur Server Actions |
 | `groups/{groupId}/geraetBestand/{id}` | Bestand je Artikel **und** Lagerort (`lagerort`, `lagerortKey`, `anzahl`) | nur Server Actions |
 | `groups/{groupId}/geraetBuchung/{id}` | Protokoll jeder Bestandsänderung, `menge` vorzeichenbehaftet | nur Server Actions |
-| `call/{firecallId}/geraetEinsatz/{id}` | Zuordnung oder Verbrauch im Einsatz | Client (lokal, auch offline) |
+| `groups/{groupId}/geraetSet/{id}` | Set: Name, Codes, Inhalte (`geraetId`, `menge`, fester `bestandId`), optional `sybosSetArtikelId` | nur Server Actions |
+| `call/{firecallId}/geraetEinsatz/{id}` | Zuordnung oder Verbrauch im Einsatz; aus einem Set mit `setId`, `setName`, `setZuordnungId` | Client (lokal, auch offline) |
 
 Die Feldnamen sind deutsch wie im übrigen Datenmodell (`bezeichnung`,
 `bestandGesamt`, `mindestbestand`, `nachbestellenSeit`, `anzahl`, `menge`).
@@ -292,9 +294,56 @@ eigene Empfängerliste wäre eine weitere Einstellung, die gepflegt werden muss,
 landete bei denselben Leuten: Wer Fahrzeugmängel bearbeitet, kümmert sich in der
 Regel auch um die Beladung.
 
+## Sets
+
+Ein Set fasst Geräte und Verbrauchsmaterial zusammen („Ölspur": Besen, 3 Sack
+Bindemittel, Schaufel) und wird im Einsatz als Ganzes erfasst. Gepflegt wird es
+im Reiter „Sets" der Pflege-Seite, optional an einen Sybos-**Set-Artikel**
+gebunden (`materialTyp === 'Set-Artikel'`).
+
+**Warum eine eigene Sammlung und nicht der Sybos-Export.** Der Export kennt
+Set-Artikel und Set-Komponenten, verrät aber nicht, welche Komponente zu welchem
+Set gehört (oben: „Eine Set-Komponente liegt im Set-Artikel"). Die Zuordnung
+entsteht deshalb in der App, in `geraetSet` — der Import fasst die Sammlung nie
+an, und ein Set ohne Sybos-Bindung ist genauso möglich.
+
+**Warum Einzeleinträge.** Beim Zuordnen entsteht je Inhalt ein normaler
+`geraetEinsatz`-Eintrag, kein Set-Eintrag. Abgleich, Rückbuchung beim Löschen,
+Sybos-Übertrag und Chrome-Erweiterung arbeiten damit unverändert; ein Verbrauch
+aus dem Set ist ein Verbrauch wie jeder andere. Zusammengehalten werden die
+Einträge nur durch `setZuordnungId` — eine neue ID je Set und Speichern. Dasselbe
+Set darf zweimal im Einsatz stehen, und „Ganzes Set entfernen" löscht genau eine
+Zuordnung (je Eintrag, also mit Rückbuchung). `setName` ist eine Kopie, damit die
+Überschrift auch für Gäste und nach dem Löschen des Sets lesbar bleibt; `setId`
+wird außer zur Herkunft nicht ausgewertet.
+
+**Der gebundene Set-Artikel bekommt selbst einen Eintrag**, als erster, immer
+`zugeordnet` mit Menge 1 — auch wenn er in Sybos als Massenartikel oder mit
+Stunden geführt ist. So steht die Kiste mit ihrem Inhalt im Einsatz und in Sybos.
+
+**Codes: „Set gewinnt".** Ein Set trägt eigene Codes (Barcode, QR) und erbt die
+seines Set-Artikels, ohne sie einzutragen (`setCodesOf`). Ein eigener Code darf
+weder an einem Artikel noch an einem anderen aktiven Set stehen, sonst wäre der
+Scan mehrdeutig; `validateGeraetSet` prüft das im Dialog und `saveGeraetSet`
+noch einmal gegen den Stand der Gruppe. Scannt jemand den Set-Artikel, liefert
+`findByCode` das Set und lässt den Artikel aus den Treffern — wer die Kiste
+scannt, will ihren Inhalt.
+
+**Fester Lagerort mit Rückfall.** Ein Verbrauchsmaterial im Set kann einen festen
+Lagerort tragen (das Bindemittel kommt immer vom SRF). Fehlt er oder gibt es ihn
+nicht mehr, gilt wie beim Einzelerfassen `pickDefaultBestand`. Hat der Artikel gar
+keinen Lagerort, wird er übersprungen (`noBestand`) statt ohne Lagerort angelegt —
+ebenso gelöschte (`missing`) und inaktive (`inactive`) Artikel. Die Vorschau im
+Dialog zeigt sie ausgegraut mit Grund; Menge, Stunden und Lagerort sind dort je
+Zeile änderbar.
+
+**Gäste** lesen keine Sets (`fahrtenbuchMember()`), `useGeraetSets` abonniert ohne
+Gruppenmitgliedschaft nichts. Sie erfassen einzelne Artikel und sehen bestehende
+Set-Einträge unter dem kopierten Namen.
+
 ## Berechtigungen
 
-Pflege — Artikel anlegen und ändern, Zugang, Umbuchung, Inventur, Import — dürfen
+Pflege — Artikel anlegen und ändern, Zugang, Umbuchung, Inventur, Import, Sets — dürfen
 **Gruppen-Admin und Gerätemeister** der Gruppe
 (`actionFahrtenbuchManagerRequired(groupId)`, plus `assertTenantGroup`). Der
 Gerätemeister pflegt schon Fahrzeuge und Personen im Fahrtenbuch; die Beladung
@@ -304,7 +353,8 @@ eine weitere Liste am Benutzerdokument, die in der Praxis dieselben Personen tr�
 Lesen dürfen alle Mitglieder der Gruppe (`fahrtenbuchMember()` in den
 Firestore-Regeln), denn der Einsatz-Dialog braucht Artikel und Lagerorte — auch
 offline aus dem Cache. Schreiben aus dem Client ist für `geraet`, `geraetBestand` und
-`geraetBuchung` gesperrt, damit `bestandGesamt` und Protokoll nicht auseinanderlaufen.
+`geraetBuchung` gesperrt, damit `bestandGesamt` und Protokoll nicht auseinanderlaufen;
+für `geraetSet`, damit die Code-Eindeutigkeit nur an einer Stelle geprüft wird.
 `call/{id}/geraetEinsatz` fällt unter die allgemeine Regel für Unterdokumente eines
 Einsatzes; nur so kann der Eintrag offline lokal geschrieben werden. Rollen
 allgemein: [berechtigungen.md](berechtigungen.md).
@@ -365,6 +415,8 @@ zwei Wegen. Steht er schon auf 0, bleibt er, wie er ist.
   Kostenersatz-Vorschläge aus `kostenersatzRateId` — die Felder sind angelegt, die
   Anbindung ist ein eigener Schritt.
 - Ein Rückschreiben nach Sybos. Der Bestand in Sybos wird von Hand nachgeführt.
+- Sets aus dem Sybos-Export ableiten (die Zuordnung steht nicht darin), Sets im
+  Einsatz anlegen oder ändern, Sets im Set.
 - Der Wert von `Kategorie` im Lagerartikel-Export ist noch nicht bekannt; die
   Vorbelegung von `verbrauchsmaterial` greift erst, wenn er „verbrauch" oder
   „lagerartikel" enthält.

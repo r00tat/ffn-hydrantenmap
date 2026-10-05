@@ -32,6 +32,7 @@ import {
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useGeraete from '../../../hooks/useGeraete';
+import useGeraetSets from '../../../hooks/useGeraetSets';
 import { isFahrtenbuchManager } from '../../Fahrtenbuch/managerPermissions';
 import OfflineListHint from '../../site/OfflineListHint';
 import OnlineOnly from '../../site/OnlineOnly';
@@ -40,6 +41,7 @@ import { callAction } from './actionResult';
 import GeraetDetailDialog from './GeraetDetailDialog';
 import GeraetEditDialog from './GeraetEditDialog';
 import GeraeteImportDialog from './GeraeteImportDialog';
+import GeraetSetsTab from './GeraetSetsTab';
 import {
   DEFAULT_GERAETE_FILTER,
   filterGeraete,
@@ -52,7 +54,7 @@ import {
 /** Seitengröße der Artikelliste — der Geräte-Export allein hat über 700 Artikel. */
 const PAGE_SIZE = 100;
 
-type View = 'list' | 'reorder';
+type View = 'list' | 'reorder' | 'sets';
 
 /** Die Lagerorte eines Artikels als kurze Zeile: zwei Orte, dann „+N". */
 function lagerortSummary(bestaende: GeraetBestand[] | undefined): string {
@@ -77,6 +79,7 @@ export default function GeraeteAdminPage() {
     useFirebaseLogin();
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { geraete, bestaende, bestaendeByGeraet, loading, fromCache } = useGeraete(groupId);
+  const { sets } = useGeraetSets(groupId);
   const containers = useMemo(() => geraete.filter(isContainer), [geraete]);
 
   const canManage =
@@ -278,6 +281,7 @@ export default function GeraeteAdminPage() {
       >
         <Tab value="list" label={t('tabs.list', { count: filtered.length })} />
         <Tab value="reorder" label={t('tabs.reorder', { count: reorder.length })} />
+        <Tab value="sets" label={t('tabs.sets', { count: sets.length })} />
       </Tabs>
 
       {loading && <LinearProgress sx={{ mb: 2 }} />}
@@ -456,6 +460,16 @@ export default function GeraeteAdminPage() {
             </List>
           )}
         </>
+      )}
+
+      {view === 'sets' && groupId && (
+        <GeraetSetsTab
+          groupId={groupId}
+          canManage={canManage}
+          geraete={geraete}
+          bestaendeByGeraet={bestaendeByGeraet}
+          sets={sets}
+        />
       )}
 
       {detail && groupId && (

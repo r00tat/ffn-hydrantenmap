@@ -9,6 +9,7 @@ Unter „Geräte & Material" liegen die Geräte und Lagerartikel deiner Feuerweh
 - **Bestand je Lagerort:** Fahrzeug und Laderaum (z.B. „SRF · GR 2"), Raum (z.B. „Feuerwehrhaus · Lager") oder ein Container (z.B. „Ölsperren 1")
 - **Zugang, Umbuchung, Inventur:** Bestand auffüllen, zwischen Lagerorten verschieben oder den Ist-Wert setzen
 - **Import aus Sybos:** Artikelexport als Excel-Datei, mit Vorschau vor der Übernahme
+- **Sets:** mehrere Geräte und Materialien als Zusammenstellung (z.B. „Ölspur"), im Einsatz mit einem Klick oder Scan erfasst
 - **Im Einsatz:** Geräte zuordnen und Material verbrauchen, auch ohne Netz
 
 ## Anleitung
@@ -30,6 +31,23 @@ Ohne Netz wird der Eintrag auf dem Gerät gespeichert. Das Abbuchen vom Lager wi
 Wird ein Verbrauch nachträglich geändert oder gelöscht, wird der Bestand entsprechend korrigiert.
 
 Dieselbe Liste steht auch in der **Einsatzübersicht** als aufklappbarer Abschnitt „Geräte & Material".
+
+### Im Einsatz: Set erfassen
+
+1. Im Dialog **Erfassen** den Namen des Sets suchen — Sets stehen unter den Artikeln und sind mit „Set" gekennzeichnet — oder den Code des Sets bzw. der Set-Kiste scannen
+2. Die Vorschau zeigt alle Einträge, die angelegt werden. Menge, Stunden und Lagerort lassen sich je Zeile ändern. Ausgegraute Zeilen werden nicht angelegt, der Grund steht dabei (z.B. „inaktiv")
+3. Bei Bedarf weitere Sets oder einzelne Artikel dazuwählen
+4. Mit **„… erfassen"** speichern
+
+In der Liste des Einsatzes stehen die Einträge unter der Überschrift „Set ‹Name›", zum Auf- und Zuklappen. Einzelne Einträge bleiben änderbar; über das Menü an der Überschrift entfernst du mit **Ganzes Set entfernen** alle Einträge dieses Sets auf einmal — verbrauchtes Material wird dabei ins Lager zurückgebucht.
+
+### Sets pflegen
+
+1. In „Geräte & Material" den Reiter **Sets** öffnen und **Neues Set** wählen (oder ein bestehendes anklicken)
+2. Name eintragen und die Inhalte über die Artikelsuche hinzufügen. Je Inhalt die Menge eintragen, bei Verbrauchsmaterial bei Bedarf einen festen Lagerort. Ohne festen Lagerort — oder wenn es ihn nicht mehr gibt — wird wie beim Einzelerfassen der passende Lagerort vorgeschlagen
+3. Optional den **Sybos-Set-Artikel** wählen (z.B. die Ölspur-Kiste). Er wird im Einsatz selbst mit eingetragen, seine Barcodes finden das Set automatisch
+4. Eigene **Codes** eintragen oder scannen, etwa einen QR-Aufkleber an der Kiste. Ein Code darf nicht schon an einem Artikel oder einem anderen Set stehen
+5. Speichern. Ein Set, das gerade nicht gebraucht wird, schaltest du auf inaktiv — es erscheint dann im Einsatz nicht mehr
 
 ### Bestand pflegen
 
@@ -61,7 +79,8 @@ Wurde seit dem letzten Import im Einsatz verbraucht oder von Hand gebucht, über
 ## Berechtigungen
 
 - **Ansehen, zuordnen, verbrauchen:** alle Mitglieder der Feuerwehr bzw. alle mit Zugriff auf den Einsatz
-- **Artikel und Bestand pflegen, Import:** Administratoren der Feuerwehr und Gerätemeister
+- **Artikel, Bestand und Sets pflegen, Import:** Administratoren der Feuerwehr und Gerätemeister
+- **Sets im Einsatz wählen:** Mitglieder der Feuerwehr; Gäste eines Einsatzes erfassen einzelne Artikel
 
 ## Hinweise
 

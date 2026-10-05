@@ -3835,7 +3835,8 @@
     "newGeraet": "Neuer Artikel",
     "tabs": {
       "list": "Artikel ({count})",
-      "reorder": "Nachzubestellen ({count})"
+      "reorder": "Nachzubestellen ({count})",
+      "sets": "Sets ({count})"
     },
     "filters": {
       "search": "Suche (Bezeichnung, Inventar-Nr., Barcode)",
@@ -4017,6 +4018,61 @@
       "createTitle": "Neue Artikel",
       "updateTitle": "Geänderte Stammdaten",
       "bestandUpdateTitle": "Aktualisierte Bestände"
+    },
+    "sets": {
+      "list": {
+        "search": "Suche (Name, Code)",
+        "new": "Neues Set",
+        "empty": "Keine Sets angelegt.",
+        "items": "{count, plural, one {# Inhalt} other {# Inhalte}}",
+        "inactive": "inaktiv",
+        "sybos": "Sybos: {name}",
+        "hint": "Ein Set fasst Geräte und Verbrauchsmaterial zusammen. Im Einsatz wird es als Ganzes zugeordnet, dabei entsteht je Inhalt ein Eintrag."
+      },
+      "dialog": {
+        "titleNew": "Neues Set",
+        "titleEdit": "Set bearbeiten",
+        "name": "Name",
+        "bemerkung": "Bemerkung",
+        "active": "Aktiv",
+        "sybosArtikel": "Sybos-Set-Artikel",
+        "sybosArtikelHint": "Optional. Der Set-Artikel wird im Einsatz selbst als zugeordnet eingetragen.",
+        "artikelCodes": "Codes des Set-Artikels – gelten automatisch",
+        "codes": "Codes",
+        "codesHint": "Barcode oder QR-Code eintippen und mit Enter übernehmen",
+        "scan": "Code scannen",
+        "inhalt": "Inhalt hinzufügen",
+        "inhaltHint": "Mehrere Artikel nacheinander anklicken",
+        "inhaltEmpty": "Noch kein Inhalt.",
+        "noOptions": "Kein Artikel gefunden",
+        "menge": "Menge",
+        "mengeUnit": "Menge ({einheit})",
+        "lagerort": "Lagerort",
+        "lagerortDefault": "im Einsatz vorbelegt",
+        "device": "Gerät",
+        "consumable": "Verbrauchsmaterial",
+        "moveUp": "Nach oben",
+        "moveDown": "Nach unten",
+        "remove": "Entfernen",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "delete": "Löschen",
+        "deleteTitle": "Set löschen?",
+        "deleteText": "Das Set „{name}“ wird gelöscht. Einträge in Einsätzen bleiben mit dem Set-Namen erhalten."
+      },
+      "errors": {
+        "nameMissing": "Bitte einen Namen angeben.",
+        "noItems": "Bitte mindestens einen Inhalt wählen.",
+        "notSetArtikel": "Der gewählte Artikel ist kein Sybos-Set-Artikel.",
+        "unknownItem": "Diesen Artikel gibt es nicht mehr.",
+        "duplicateItem": "Der Artikel steht schon im Set.",
+        "setArtikelAsItem": "Der Set-Artikel kann nicht zugleich Inhalt sein.",
+        "invalidMenge": "Bitte eine Menge größer 0 angeben.",
+        "invalidBestand": "Der Lagerort gehört nicht zu diesem Artikel.",
+        "bestandNotConsumable": "Ein Lagerort gilt nur für Verbrauchsmaterial.",
+        "codeCollision": "Der Code „{value}“ gehört schon zum Artikel „{name}“.",
+        "codeCollisionSet": "Der Code „{value}“ gehört schon zum Set „{name}“."
+      }
     }
   },
   "geraetEinsatz": {
@@ -4047,8 +4103,8 @@
       "titleAdd": "Gerät oder Material erfassen",
       "titleEdit": "Eintrag bearbeiten",
       "article": "Artikel",
-      "articleHint": "Bezeichnung, Inventar-Nr. oder Barcode",
-      "noOptions": "Kein Artikel gefunden",
+      "articleHint": "Bezeichnung, Inventar-Nr., Barcode oder Set",
+      "noOptions": "Kein Artikel oder Set gefunden",
       "noArticles": "Für die Gruppe dieses Einsatzes sind keine Geräte erfasst.",
       "optionConsumable": "Verbrauchsmaterial · Bestand {bestand, number} {einheit}",
       "optionDevice": "Gerät",
@@ -4078,7 +4134,19 @@
       "manyInfo": "{count} Artikel werden erfasst: Geräte zugeordnet, Verbrauchsmaterial mit Menge 1 vom vorbelegten Lagerort. Menge, Stunden und Lagerort lassen sich danach je Eintrag ändern.",
       "manyConsumable": "1 {einheit} von {lagerort}",
       "manyConsumableNoBestand": "1 {einheit}, ohne Lagerort – nicht abgebucht",
-      "saveMany": "{count} erfassen"
+      "saveMany": "{count} erfassen",
+      "setChip": "Set",
+      "setItems": "{count, plural, one {# Inhalt} other {# Inhalte}}",
+      "setPreviewTitle": "Set {name}",
+      "setPreviewSingles": "Einzelne Artikel",
+      "setPreviewInfo": "Diese Einträge werden angelegt. Menge, Stunden und Lagerort lassen sich je Zeile ändern.",
+      "setArtikel": "Set-Artikel",
+      "setSkipped": {
+        "missing": "Artikel gibt es nicht mehr – wird nicht angelegt",
+        "inactive": "inaktiv – wird nicht angelegt",
+        "noBestand": "kein Lagerort erfasst – wird nicht angelegt"
+      },
+      "setCodeFound": "Set „{name}“ übernommen."
     },
     "scanner": {
       "title": "Barcode scannen",
@@ -4091,6 +4159,16 @@
       "manualHint": "Barcode, Inventar-Nr. oder Seriennummer – mit Enter übernehmen",
       "use": "Übernehmen",
       "close": "Schließen"
+    },
+    "setGroup": {
+      "title": "Set {name}",
+      "count": "{count, plural, one {# Eintrag} other {# Einträge}}",
+      "menu": "Aktionen für das Set",
+      "removeAll": "Ganzes Set entfernen",
+      "removeTitle": "Ganzes Set entfernen?",
+      "removeText": "Alle {count} Einträge des Sets „{name}“ werden entfernt. Verbrauchtes Material wird ins Lager zurückgebucht.",
+      "expand": "Aufklappen",
+      "collapse": "Zuklappen"
     }
   }
 }
