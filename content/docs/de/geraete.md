@@ -36,7 +36,7 @@ Dieselbe Liste steht auch in der **Einsatzübersicht** als aufklappbarer Abschni
 1. Im Menü „Geräte & Material" öffnen
 2. Artikel auswählen
 3. Beim gewünschten Lagerort **Zugang** (Material eingetroffen), **Umbuchung** (z.B. vom Lager auf das SRF) oder **Inventur** (gezählten Ist-Wert eintragen) wählen
-4. Beim Artikel festlegen, ob er **Verbrauchsmaterial** ist, und bei Bedarf **Einheit** und **Mindestbestand** eintragen
+4. Ob ein Artikel **Verbrauchsmaterial** ist, schaltest du direkt im Artikel mit dem Schalter oben um. Sybos liefert diese Angabe nicht mit, nach dem Import ist also jeder Artikel ein Gerät. Für viele Artikel auf einmal: in der Liste **Auswählen** klicken, Artikel anklicken (oder mit Suche und Filtern eingrenzen und **Alle … auswählen**) und **Als Verbrauchsmaterial** wählen. Unter **Bearbeiten** trägst du bei Bedarf **Einheit** und **Mindestbestand** ein. Darunter stehen alle Stammdaten aus Sybos; bei importierten Artikeln überschreibt der nächste Import diese wieder
 5. Einen weiteren Lagerort legst du mit **Neuer Lagerort** an. Als Art stehen Raum, Fahrzeug und **Container** zur Wahl; Container sind die Artikel der Sybos-Kategorie „Container" und müssen dafür importiert sein
 6. Mit dem Stift ändert sich ein Lagerort, mit dem Papierkorb wird er gelöscht. Ein Restbestand wird dabei ausgebucht. Wurde aus dem Lagerort in einem Einsatz verbraucht, wird er nur ausgeblendet, damit der Einsatz ihn weiter zeigt
 

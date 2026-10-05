@@ -5,11 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Geraet, GeraetBestand } from '../../../common/geraet';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
-const { useFirebaseLogin, useFahrtenbuchGroup, useGeraete } = vi.hoisted(() => ({
-  useFirebaseLogin: vi.fn(),
-  useFahrtenbuchGroup: vi.fn(),
-  useGeraete: vi.fn(),
-}));
+const { useFirebaseLogin, useFahrtenbuchGroup, useGeraete, setGeraeteVerbrauchsmaterial } =
+  vi.hoisted(() => ({
+    useFirebaseLogin: vi.fn(),
+    useFahrtenbuchGroup: vi.fn(),
+    useGeraete: vi.fn(),
+    setGeraeteVerbrauchsmaterial: vi.fn(),
+  }));
 
 vi.mock('../../../hooks/useFirebaseLogin', () => ({ default: useFirebaseLogin }));
 vi.mock('../../../hooks/useFahrtenbuchGroup', () => ({ default: useFahrtenbuchGroup }));
@@ -25,6 +27,7 @@ vi.mock('../geraeteActions', () => ({
   bookGeraetBestand: vi.fn(),
   previewGeraetImport: vi.fn(),
   importGeraete: vi.fn(),
+  setGeraeteVerbrauchsmaterial,
 }));
 
 import GeraeteAdminPage from './GeraeteAdminPage';
@@ -93,6 +96,7 @@ function setup({ manager }: { manager: boolean }) {
 describe('GeraeteAdminPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setGeraeteVerbrauchsmaterial.mockResolvedValue({ updated: 1 });
   });
 
   it('listet die Artikel und filtert nach Suchtext', async () => {
@@ -162,5 +166,64 @@ describe('GeraeteAdminPage', () => {
     expect(
       screen.getByText('Bitte melde dich an, um Geräte & Material zu sehen.'),
     ).toBeInTheDocument();
+  });
+
+  describe('mehrere Artikel auswählen', () => {
+    it('markiert die ausgewählten Artikel als Verbrauchsmaterial', async () => {
+      setup({ manager: true });
+      const user = userEvent.setup();
+      renderWithIntl(<GeraeteAdminPage />);
+      await user.click(screen.getByRole('button', { name: 'Auswählen' }));
+      // Im Auswahlmodus öffnet ein Klick keinen Detaildialog, er wählt aus.
+      await user.click(screen.getByText('Rettungsschere'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Rettungsschere' })).toBeChecked();
+      expect(screen.getByText('1 ausgewählt')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Als Verbrauchsmaterial' }));
+      expect(setGeraeteVerbrauchsmaterial).toHaveBeenCalledWith('ffnd', ['schere'], true);
+      expect(await screen.findByText('1 Artikel geändert')).toBeInTheDocument();
+      expect(screen.getByText('0 ausgewählt')).toBeInTheDocument();
+    });
+
+    it('wählt alle gefilterten Artikel aus und markiert sie als Gerät', async () => {
+      setup({ manager: true });
+      const user = userEvent.setup();
+      renderWithIntl(<GeraeteAdminPage />);
+      await user.type(screen.getByLabelText(/^Suche/), 'vlies');
+      await user.click(screen.getByRole('button', { name: 'Auswählen' }));
+      await user.click(screen.getByRole('button', { name: 'Alle 1 auswählen' }));
+      await user.click(screen.getByRole('button', { name: 'Als Gerät' }));
+      expect(setGeraeteVerbrauchsmaterial).toHaveBeenCalledWith('ffnd', ['vlies'], false);
+    });
+
+    it('zeigt einen Fehler beim Markieren an und behält die Auswahl', async () => {
+      setGeraeteVerbrauchsmaterial.mockRejectedValue(new Error('kaputt'));
+      setup({ manager: true });
+      const user = userEvent.setup();
+      renderWithIntl(<GeraeteAdminPage />);
+      await user.click(screen.getByRole('button', { name: 'Auswählen' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Rettungsschere' }));
+      await user.click(screen.getByRole('button', { name: 'Als Verbrauchsmaterial' }));
+      expect(await screen.findByText('Speichern fehlgeschlagen: kaputt')).toBeInTheDocument();
+      expect(screen.getByText('1 ausgewählt')).toBeInTheDocument();
+    });
+
+    it('beendet die Auswahl mit „Fertig"', async () => {
+      setup({ manager: true });
+      const user = userEvent.setup();
+      renderWithIntl(<GeraeteAdminPage />);
+      await user.click(screen.getByRole('button', { name: 'Auswählen' }));
+      await user.click(screen.getByRole('button', { name: 'Fertig' }));
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+      await user.click(screen.getByText('Rettungsschere'));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('bietet Mitgliedern keine Auswahl an', () => {
+      setup({ manager: false });
+      renderWithIntl(<GeraeteAdminPage />);
+      expect(screen.queryByRole('button', { name: 'Auswählen' })).not.toBeInTheDocument();
+    });
   });
 });

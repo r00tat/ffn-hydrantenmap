@@ -14,8 +14,10 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -33,7 +35,7 @@ import {
 } from '../../../common/geraet';
 import ConfirmDialog from '../../dialogs/ConfirmDialog';
 import GeraetSteckbrief from '../GeraetSteckbrief';
-import { deleteGeraetBestand } from '../geraeteActions';
+import { deleteGeraetBestand, saveGeraet } from '../geraeteActions';
 import { callAction } from './actionResult';
 import BestandBookingDialog, { type BestandBookingMode } from './BestandBookingDialog';
 import LagerortDialog from './LagerortDialog';
@@ -57,7 +59,9 @@ export interface GeraetDetailDialogProps {
 /**
  * Ein Artikel mit seinem Bestand je Lagerort. Mitglieder sehen, wo was liegt;
  * Gruppen-Admin und Gerätemeister buchen hier Zugang, Umbuchung und Inventur
- * und legen Lagerorte an, ändern und löschen sie.
+ * und legen Lagerorte an, ändern und löschen sie. Ob der Artikel
+ * Verbrauchsmaterial ist, schalten sie direkt hier um — der Sybos-Export sagt
+ * das nicht, also ist es nach dem Import für jeden Artikel einzeln zu setzen.
  */
 export default function GeraetDetailDialog({
   open,
@@ -82,6 +86,22 @@ export default function GeraetDetailDialog({
   const [lagerortDialog, setLagerortDialog] = useState<GeraetBestand | null>();
   const [toDelete, setToDelete] = useState<GeraetBestand>();
   const [error, setError] = useState<string>();
+  const [savingConsumable, setSavingConsumable] = useState(false);
+
+  const handleConsumable = async (verbrauchsmaterial: boolean) => {
+    setError(undefined);
+    setSavingConsumable(true);
+    // Wie im Bearbeiten-Dialog: Ein Mindestbestand gilt nur für Verbrauchsmaterial.
+    const outcome = await callAction(() =>
+      saveGeraet(groupId, {
+        id: geraet.id,
+        verbrauchsmaterial,
+        ...(verbrauchsmaterial ? {} : { mindestbestand: null }),
+      }),
+    );
+    setSavingConsumable(false);
+    if (!outcome.ok) setError(t('errors.saveFailed', { error: outcome.error }));
+  };
 
   const handleDelete = async (bestand: GeraetBestand) => {
     setError(undefined);
@@ -119,9 +139,27 @@ export default function GeraetDetailDialog({
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>{geraet.bezeichnung}</DialogTitle>
       <DialogContent>
-        <Stack direction="row" spacing={1} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
-          {geraet.verbrauchsmaterial && (
-            <Chip size="small" color="primary" label={t('list.consumable')} />
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}
+        >
+          {canManage ? (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={!!geraet.verbrauchsmaterial}
+                  disabled={savingConsumable}
+                  onChange={(e) => handleConsumable(e.target.checked)}
+                />
+              }
+              label={t('fields.verbrauchsmaterial')}
+            />
+          ) : (
+            geraet.verbrauchsmaterial && (
+              <Chip size="small" color="primary" label={t('list.consumable')} />
+            )
           )}
           {!geraet.active && <Chip size="small" label={t('list.inactive')} />}
           {isBelowMinimum(geraet) && (

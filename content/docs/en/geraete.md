@@ -36,7 +36,7 @@ The same list is also on the **operation overview** as the collapsible section "
 1. Open "Equipment & supplies" in the menu
 2. Select an item
 3. At the location, choose **Receipt** (supplies arrived), **Transfer** (e.g. from storage to the SRF) or **Stocktaking** (enter the counted value)
-4. On the item, set whether it is a **consumable** and, if needed, a **unit** and a **minimum stock**
+4. Whether an item is a **consumable** is switched directly in the item with the switch at the top. Sybos does not export this, so after an import every item is a device. For many items at once: click **Select** in the list, click the items (or narrow them down with search and filters and use **Select all …**) and choose **Mark as consumable**. Under **Edit**, enter a **unit** and a **minimum stock** if needed. Below are all master data from Sybos; for imported items the next import overwrites them again
 5. Add another location with **New storage location**. You can choose room, vehicle or **container**; containers are the items of the Sybos category "Container" and have to be imported first
 6. The pencil edits a location, the bin deletes it. Any remaining stock is booked out. If an operation used material from the location, it is only hidden so the operation still shows it
 

@@ -299,7 +299,24 @@ const TEXT_FIELDS = [
   'bemerkung',
   'einheit',
   'kostenersatzRateId',
+  'vorlage',
+  'zubehoer',
+  'lebensdauerEinheit',
+  'versicherung',
+  'polizzenummer',
+  'kasko',
 ] as const satisfies readonly (keyof Geraet)[];
+
+const DATE_FIELDS = ['anschaffungsDatum', 'verfuegbarVon', 'verfuegbarBis'] as const satisfies
+  readonly (keyof Geraet)[];
+
+/** `YYYY-MM-DD` und ein echtes Datum — sonst `undefined` (löschen). */
+function isoDate(value: unknown): string | undefined {
+  const text = trimmed(value);
+  if (!text || !/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
+  const date = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(text) ? text : undefined;
+}
 
 /**
  * Übersetzt die Eingabe in ein Patch. `undefined` im Ergebnis heißt „löschen";
@@ -345,6 +362,24 @@ function geraetPatch(input: SaveGeraetInput): Record<string, unknown> {
     const value = input.baujahr;
     patch.baujahr =
       isFiniteNumber(value) && Number.isInteger(value) && value > 1900 ? value : undefined;
+  }
+  for (const field of DATE_FIELDS) {
+    if (has(field)) patch[field] = isoDate(input[field]);
+  }
+  if (has('baumonat')) {
+    const value = input.baumonat;
+    patch.baumonat =
+      isFiniteNumber(value) && Number.isInteger(value) && value >= 1 && value <= 12
+        ? value
+        : undefined;
+  }
+  if (has('lebensdauer')) {
+    const value = input.lebensdauer;
+    patch.lebensdauer = isFiniteNumber(value) && value > 0 ? value : undefined;
+  }
+  if (has('einkaufspreis')) {
+    const value = input.einkaufspreis;
+    patch.einkaufspreis = isFiniteNumber(value) && value >= 0 ? value : undefined;
   }
   if (has('mindestbestand')) {
     const value = input.mindestbestand;
@@ -437,6 +472,53 @@ export async function saveGeraet(
 
 /** Höchstzahl der Schreibvorgänge je Batch — Firestore erlaubt 500. */
 const BATCH_LIMIT = 450;
+
+/**
+ * Markiert mehrere Artikel auf einmal als Verbrauchsmaterial oder als Gerät.
+ *
+ * Der Sybos-Export sagt nicht, was verbraucht wird — nach einem Import ist
+ * jeder Artikel ein Gerät und die Verbrauchsartikel sind von Hand
+ * auszuwählen. Beim Abschalten fallen wie in `saveGeraet` Mindestbestand und
+ * offene Nachbestellung weg; sie gelten nur für Verbrauchsmaterial. Artikel,
+ * die den Wert schon haben, und unbekannte IDs bleiben unberührt.
+ */
+export async function setGeraeteVerbrauchsmaterial(
+  groupId: string,
+  geraetIds: string[],
+  verbrauchsmaterial: boolean,
+): Promise<{ updated: number }> {
+  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const actor = actorOf(session);
+  if (!Array.isArray(geraetIds) || typeof verbrauchsmaterial !== 'boolean') {
+    throw new ApiException('invalid verbrauchsmaterial selection', { status: 400 });
+  }
+  const ids = [...new Set(geraetIds)];
+  for (const id of ids) assertSafeId(id, 'geraetId');
+
+  const refs = ids.map((id) => geraetCol(groupId).doc(id));
+  const snaps = await Promise.all(refs.map((ref) => ref.get()));
+  const changed = snaps.filter(
+    (snap) =>
+      snap.exists &&
+      !!(snap.data() as Partial<Geraet>).verbrauchsmaterial !== verbrauchsmaterial,
+  );
+
+  const patch: Record<string, unknown> = {
+    verbrauchsmaterial,
+    updatedAt: actor.now,
+    updatedBy: actor.uid,
+  };
+  if (!verbrauchsmaterial) {
+    patch.mindestbestand = FieldValue.delete();
+    patch.nachbestellenSeit = FieldValue.delete();
+  }
+  for (let i = 0; i < changed.length; i += BATCH_LIMIT) {
+    const batch = firestore.batch();
+    for (const snap of changed.slice(i, i + BATCH_LIMIT)) batch.update(snap.ref, patch);
+    await batch.commit();
+  }
+  return { updated: changed.length };
+}
 
 /**
  * Löscht einen Artikel — oder deaktiviert ihn, wenn er schon gebucht wurde.

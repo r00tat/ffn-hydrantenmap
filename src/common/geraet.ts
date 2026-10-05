@@ -311,7 +311,8 @@ export function deviationKey(d: { geraetId: string; lagerortKey: string }): stri
 
 /**
  * Anzeige eines Lagerorts, z. B. „SRF · GR 2", „Feuerwehrhaus · Lager" oder
- * „Ölsperren 1".
+ * „Ölsperren 1". Eine Set-Komponente liegt „im Set" — welches, sagt der
+ * Export nicht.
  */
 export function formatLagerort(l: GeraetLagerort): string {
   const parts =
@@ -321,7 +322,7 @@ export function formatLagerort(l: GeraetLagerort): string {
         ? [l.standort, l.raum]
         : l.art === 'container'
           ? [l.container]
-          : ['Set-Artikel'];
+          : ['Teil eines Set-Artikels'];
   return parts
     .map((p) => (p ?? '').trim())
     .filter(Boolean)

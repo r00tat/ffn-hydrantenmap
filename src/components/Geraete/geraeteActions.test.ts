@@ -272,6 +272,7 @@ import {
   importGeraete,
   previewGeraetImport,
   saveGeraet,
+  setGeraeteVerbrauchsmaterial,
   syncGeraetVerbrauch,
   updateGeraetBestand,
 } from './geraeteActions';
@@ -348,6 +349,7 @@ describe('Guards der Pflege-Actions', () => {
   it.each([
     ['saveGeraet', () => saveGeraet('ffnd', { bezeichnung: 'X' })],
     ['deleteGeraet', () => deleteGeraet('ffnd', 'g1')],
+    ['setGeraeteVerbrauchsmaterial', () => setGeraeteVerbrauchsmaterial('ffnd', ['g1'], false)],
     ['createGeraetBestand', () => createGeraetBestand('ffnd', 'g1', srf)],
     [
       'bookGeraetBestand',
@@ -438,6 +440,52 @@ describe('saveGeraet', () => {
     await expect(saveGeraet('ffnd', { id: 'a/b', bezeichnung: 'X' })).rejects.toThrow();
   });
 
+  it('speichert alle Sybos-Stammdaten und verwirft unsinnige Werte', async () => {
+    const { id } = await saveGeraet('ffnd', {
+      bezeichnung: 'Mehrgasmessgerät 1',
+      vorlage: ' Gasmessgerät ',
+      zubehoer: 'Pumpe',
+      versicherung: 'Muster Versicherung',
+      polizzenummer: 'P-1',
+      kasko: 'ja',
+      lebensdauer: 10,
+      lebensdauerEinheit: 'Jahr(e)',
+      anschaffungsDatum: '2015-07-20',
+      verfuegbarVon: '2015-07-21',
+      verfuegbarBis: '2025-01-20',
+      baumonat: 5,
+      einkaufspreis: 1078.8,
+    });
+    expect(geraet(id)).toMatchObject({
+      vorlage: 'Gasmessgerät',
+      zubehoer: 'Pumpe',
+      versicherung: 'Muster Versicherung',
+      polizzenummer: 'P-1',
+      kasko: 'ja',
+      lebensdauer: 10,
+      lebensdauerEinheit: 'Jahr(e)',
+      anschaffungsDatum: '2015-07-20',
+      verfuegbarVon: '2015-07-21',
+      verfuegbarBis: '2025-01-20',
+      baumonat: 5,
+      einkaufspreis: 1078.8,
+    });
+
+    await saveGeraet('ffnd', {
+      id,
+      anschaffungsDatum: '20.07.2015',
+      baumonat: 13,
+      einkaufspreis: -1,
+      lebensdauer: 0,
+      vorlage: '',
+    });
+    const g = geraet(id)!;
+    for (const field of ['anschaffungsDatum', 'baumonat', 'einkaufspreis', 'lebensdauer', 'vorlage']) {
+      expect(g).not.toHaveProperty(field);
+    }
+    expect(g.verfuegbarBis).toBe('2025-01-20');
+  });
+
   it('übernimmt nur gültige Werte für Material-Typ, Einheit und Barcodes', async () => {
     const { id } = await saveGeraet('ffnd', {
       bezeichnung: 'Filter',
@@ -451,6 +499,58 @@ describe('saveGeraet', () => {
     expect(g.einheitVerwendungsnachweis).toBe('h');
     expect(g.barcodes).toEqual(['123', '456']);
     expect(g.mindestbestand).toBeUndefined();
+  });
+});
+
+describe('setGeraeteVerbrauchsmaterial', () => {
+  it('markiert mehrere Artikel auf einmal als Verbrauchsmaterial', async () => {
+    putGeraet('g1', { verbrauchsmaterial: false });
+    putGeraet('g2', { verbrauchsmaterial: false });
+    const result = await setGeraeteVerbrauchsmaterial('ffnd', ['g1', 'g2'], true);
+    expect(result).toEqual({ updated: 2 });
+    expect(geraet('g1')).toMatchObject({ verbrauchsmaterial: true, updatedBy: 'u1' });
+    expect(geraet('g2')).toMatchObject({ verbrauchsmaterial: true, updatedBy: 'u1' });
+  });
+
+  it('nimmt beim Abschalten Mindestbestand und Nachbestellung weg', async () => {
+    putGeraet('g1', {
+      mindestbestand: 5,
+      bestandGesamt: 2,
+      nachbestellenSeit: '2026-01-02T00:00:00.000Z',
+    });
+    await setGeraeteVerbrauchsmaterial('ffnd', ['g1'], false);
+    const g = geraet('g1')!;
+    expect(g.verbrauchsmaterial).toBe(false);
+    expect(g.mindestbestand).toBeUndefined();
+    expect(g.nachbestellenSeit).toBeUndefined();
+    expect(g.bestandGesamt).toBe(2);
+  });
+
+  it('lässt Artikel mit dem Wert schon und unbekannte IDs aus', async () => {
+    putGeraet('g1', { verbrauchsmaterial: true });
+    putGeraet('g2', { verbrauchsmaterial: false });
+    const result = await setGeraeteVerbrauchsmaterial('ffnd', ['g1', 'g2', 'g2', 'fehlt'], true);
+    expect(result).toEqual({ updated: 1 });
+    expect(geraet('g1')!.updatedBy).toBe('u0');
+    expect(geraet('fehlt')).toBeUndefined();
+  });
+
+  it('teilt große Auswahlen auf mehrere Batches', async () => {
+    const ids = Array.from({ length: 500 }, (_, i) => `g${i}`);
+    for (const id of ids) putGeraet(id, { verbrauchsmaterial: false });
+    const result = await setGeraeteVerbrauchsmaterial('ffnd', ids, true);
+    expect(result).toEqual({ updated: 500 });
+    expect(Math.max(...fake.batchSizes)).toBeLessThanOrEqual(450);
+  });
+
+  it('lehnt ungültige Eingaben ab', async () => {
+    await expect(
+      setGeraeteVerbrauchsmaterial('ffnd', 'g1' as never, true),
+    ).rejects.toThrow(/invalid/);
+    await expect(setGeraeteVerbrauchsmaterial('ffnd', ['a/b'], true)).rejects.toThrow();
+    await expect(
+      setGeraeteVerbrauchsmaterial('ffnd', ['g1'], 'ja' as never),
+    ).rejects.toThrow(/invalid/);
   });
 });
 

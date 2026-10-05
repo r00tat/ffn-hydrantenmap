@@ -3846,7 +3846,15 @@
       "belowMinimum": "below minimum",
       "stock": "{anzahl} {einheit}",
       "empty": "No items found.",
-      "showMore": "Show more ({count})"
+      "showMore": "Show more ({count})",
+      "select": "Select",
+      "selectDone": "Done",
+      "selected": "{count} selected",
+      "selectAll": "Select all {count}",
+      "markConsumable": "Mark as consumable",
+      "markDevice": "Mark as device",
+      "marked": "{count} items changed",
+      "selectHint": "Click items to select them. Use the filters to narrow down matching items and select them all at once."
     },
     "reorder": {
       "hint": "Items whose total stock has dropped below the minimum. When it drops below, a notice goes to the group's defect e-mail.",
@@ -3886,7 +3894,14 @@
       "einkaufspreis": "Purchase price",
       "versicherung": "Liability insurance",
       "polizzenummer": "Policy",
-      "kasko": "Comprehensive insurance"
+      "kasko": "Comprehensive insurance",
+      "kategorie": "Category",
+      "klasse2": "Class 2",
+      "klasse3": "Class 3",
+      "herstellerTyp": "Model",
+      "baumonat": "Month of manufacture",
+      "lebensdauerEinheit": "Service life in",
+      "barcodesHint": "Separate several with commas"
     },
     "verwendungsnachweis": {
       "none": "not recorded",
@@ -3897,7 +3912,9 @@
       "titleNew": "New item",
       "titleEdit": "Edit item",
       "importHint": "This item comes from Sybos: the next import overwrites name, inventory no., class and remark. Consumable, unit, minimum stock and cost recovery item are kept.",
-      "deleteConfirm": "Delete this item? If it has bookings it is only deactivated."
+      "deleteConfirm": "Delete this item? If it has bookings it is only deactivated.",
+      "sectionApp": "Maintained in the app",
+      "sectionSybos": "Master data from Sybos"
     },
     "errors": {
       "bezeichnungRequired": "Please enter a name.",
@@ -3908,7 +3925,8 @@
       "lagerortRequired": "Please enter a vehicle, container or site.",
       "lagerortExists": "This item already has this storage location.",
       "saveFailed": "Saving failed: {error}",
-      "deleteFailed": "Delete failed: {error}"
+      "deleteFailed": "Delete failed: {error}",
+      "fieldInvalid": "Invalid value for “{field}”."
     },
     "detail": {
       "bestandGesamt": "Total stock",

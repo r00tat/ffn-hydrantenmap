@@ -49,6 +49,22 @@ zweite Geräte-Export vom 5. 10. 2026: dieselben 1106 Zeilen, aber keine Spalten
 das (`withBestand: false`) und der Import übernimmt dann nur Stammdaten — sonst
 zählte jeder vorhandene Lagerort als „in der Datei fehlt" und würde auf 0 gesetzt.
 
+Der dritte Export (wieder mit Lagerort-Spalten) bestätigt das Format: 1106 Zeilen,
+765 IDs, 1099 Lagerorte — 939 `Fahrzeug`, 134 `Raum`, 26 `Set-Artikel` — und 7
+Artikel ganz ohne Lagerort, die ohne Bestand angelegt werden. Je ID sind die
+Stammdaten in allen Zeilen gleich, kein Lagerort steht doppelt. Zwei
+Beobachtungen:
+
+- **Eine Set-Komponente liegt „im Set-Artikel"**, ohne Fahrzeug, Raum oder Angabe,
+  *welches* Set. Die Spalten verraten die Zuordnung nicht (nur manche
+  Bezeichnungen wie „Spreizer - SRF"), darum bleibt es beim Schlüssel `set` und
+  der Anzeige „Teil eines Set-Artikels". Der Set-Artikel selbst hat einen
+  normalen Lagerort.
+- **Rollcontainer und Paletten stehen dort auch als `Fahrzeug-Name`**
+  („CBRN - Rollcontainer 1 (DEKON)", „Höhenrettung - Palette"). Der Import nimmt
+  sie, wie sie kommen, als Fahrzeug-Lagerort; eine Verknüpfung mit einem
+  Container-Artikel gleichen Namens zieht er nicht.
+
 ### Container als Lagerort
 
 Rollcontainer, Paletten und Kisten sind in Sybos **eigene Artikel** der Kategorie
@@ -83,6 +99,13 @@ wenn es vom Anschaffungs-Datum abweicht), `Herstellungs-Monat` (`baumonat`, 1–
 angezeigt als „05/2020" am Baujahr), `Einkaufspreis` (`einkaufspreis`, Euro) und
 die drei Versicherungsspalten des Container-Exports (`versicherung`,
 `polizzenummer`, `kasko`).
+
+Alle diese Felder lassen sich im Bearbeiten-Dialog auch von Hand pflegen —
+für Artikel ohne Sybos. Bei einem importierten Artikel überschreibt sie der
+nächste Import; die App-Felder (Verbrauchsmaterial, Einheit, Mindestbestand,
+Kostenersatz-Position) fasst er nie an. `saveGeraet` verwirft unsinnige Werte
+still (Datum nicht `YYYY-MM-DD`, Monat außerhalb 1–12, negative Preise), der
+Dialog meldet sie vorher.
 
 Bewusst **nicht** übernommen:
 
@@ -122,6 +145,29 @@ Es wird **von Hand** gepflegt. Der Import schlägt es beim Anlegen nur vor
 schreibt es danach nie mehr, ebenso wenig `mindestbestand`, `einheit` und
 `kostenersatzRateId`. Im Geräte-Export steht in `Kategorie` durchgehend „Gerät",
 dort wird also nichts vorgeschlagen.
+
+Auch keine andere Spalte trägt die Unterscheidung (geprüft am Geräte-Export mit
+765 Artikeln): `Massenartikel` umfasst Strahlrohre, Druckschläuche und Schäkel,
+die Klasse „Auffangbeh., Bindemittel, Dicht." mischt Bindemittel mit
+Auffangwannen und IBC-Containern, und `Einheit Verwendungsnachweis` = `stk`
+steht auch an Einzelartikeln mit Seriennummer. Eine Vorbelegung über
+Stichwörter in der Bezeichnung wäre Raten, das ohnehin nachzuprüfen wäre.
+
+Nach einem Import ist deshalb jeder Artikel ein Gerät, und die Verbrauchsartikel
+werden von Hand markiert — auf zwei Wegen:
+
+- **Einzeln** mit dem Schalter im Detaildialog des Artikels. Er schreibt über
+  `saveGeraet` nur `verbrauchsmaterial`, beim Abschalten auch
+  `mindestbestand: null`.
+- **Mehrere auf einmal** im Auswahlmodus der Artikelliste: Filter und Suche
+  grenzen ein („Binde", Klasse „Schadstoffausrüstung"), „Alle N auswählen"
+  nimmt alle gefilterten, nicht nur die angezeigte Seite.
+  `setGeraeteVerbrauchsmaterial` schreibt in Batches und lässt Artikel aus,
+  die den Wert schon haben.
+
+Beim Abschalten fallen in beiden Fällen Mindestbestand und offene
+Nachbestellmeldung weg — wie im Bearbeiten-Dialog, beide gelten nur für
+Verbrauchsmaterial.
 
 ## Geräte werden zugeordnet, Material wird verbraucht
 

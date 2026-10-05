@@ -98,7 +98,8 @@ describe('formatLagerort', () => {
   });
 
   it('benennt den Set-Artikel', () => {
-    expect(formatLagerort({ art: 'set' })).toBe('Set-Artikel');
+    // Sybos sagt nicht, in welchem Set — nur, dass die Komponente in einem liegt.
+    expect(formatLagerort({ art: 'set' })).toBe('Teil eines Set-Artikels');
   });
 });
 

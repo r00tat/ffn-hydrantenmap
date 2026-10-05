@@ -3846,7 +3846,15 @@
       "belowMinimum": "unter Mindestbestand",
       "stock": "{anzahl} {einheit}",
       "empty": "Keine Artikel gefunden.",
-      "showMore": "Weitere anzeigen ({count})"
+      "showMore": "Weitere anzeigen ({count})",
+      "select": "Auswählen",
+      "selectDone": "Fertig",
+      "selected": "{count} ausgewählt",
+      "selectAll": "Alle {count} auswählen",
+      "markConsumable": "Als Verbrauchsmaterial",
+      "markDevice": "Als Gerät",
+      "marked": "{count} Artikel geändert",
+      "selectHint": "Artikel anklicken, um sie auszuwählen. Mit den Filtern lassen sich passende Artikel eingrenzen und alle auf einmal wählen."
     },
     "reorder": {
       "hint": "Artikel, deren Gesamtbestand unter den Mindestbestand gefallen ist. Beim Unterschreiten geht eine Meldung an die Mängel-E-Mail der Gruppe.",
@@ -3886,7 +3894,14 @@
       "einkaufspreis": "Einkaufspreis",
       "versicherung": "Haftpflicht-Versicherung",
       "polizzenummer": "Polizze",
-      "kasko": "Kasko"
+      "kasko": "Kasko",
+      "kategorie": "Kategorie",
+      "klasse2": "Klasse 2",
+      "klasse3": "Klasse 3",
+      "herstellerTyp": "Typ",
+      "baumonat": "Herstellungs-Monat",
+      "lebensdauerEinheit": "Lebensdauer in",
+      "barcodesHint": "Mehrere durch Komma getrennt"
     },
     "verwendungsnachweis": {
       "none": "nicht erfasst",
@@ -3897,7 +3912,9 @@
       "titleNew": "Neuer Artikel",
       "titleEdit": "Artikel bearbeiten",
       "importHint": "Dieser Artikel stammt aus Sybos: Bezeichnung, Inventar-Nr., Klasse und Bemerkung überschreibt der nächste Import. Verbrauchsmaterial, Einheit, Mindestbestand und Kostenersatz-Position bleiben.",
-      "deleteConfirm": "Artikel löschen? Hat er Buchungen, wird er nur deaktiviert."
+      "deleteConfirm": "Artikel löschen? Hat er Buchungen, wird er nur deaktiviert.",
+      "sectionApp": "Pflege in der App",
+      "sectionSybos": "Stammdaten aus Sybos"
     },
     "errors": {
       "bezeichnungRequired": "Bitte eine Bezeichnung angeben.",
@@ -3908,7 +3925,8 @@
       "lagerortRequired": "Bitte Fahrzeug, Container bzw. Standort angeben.",
       "lagerortExists": "Diesen Lagerort gibt es für den Artikel schon.",
       "saveFailed": "Speichern fehlgeschlagen: {error}",
-      "deleteFailed": "Löschen fehlgeschlagen: {error}"
+      "deleteFailed": "Löschen fehlgeschlagen: {error}",
+      "fieldInvalid": "Ungültiger Wert bei „{field}“."
     },
     "detail": {
       "bestandGesamt": "Bestand gesamt",

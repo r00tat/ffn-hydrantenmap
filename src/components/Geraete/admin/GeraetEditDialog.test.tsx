@@ -123,6 +123,99 @@ describe('GeraetEditDialog', () => {
     );
   });
 
+  it('zeigt alle Stammdaten aus Sybos vorbefüllt und schickt sie mit', async () => {
+    const user = userEvent.setup();
+    render(
+      vlies({
+        zusatzInventarNr: '81762',
+        barcodes: ['0315-8828', '0915-0127'],
+        kategorie: 'Gerät',
+        klasse1: 'Schadstoffausrüstung',
+        klasse2: 'Bindemittel',
+        klasse3: 'Vlies',
+        vorlage: 'Bindemittel',
+        materialTyp: 'Massenartikel',
+        hersteller: 'Muster',
+        herstellerTyp: 'Economy',
+        seriennummer: 'S-1',
+        baujahr: 2020,
+        baumonat: 5,
+        besitzer: 'Freiwillige Feuerwehr',
+        anschaffungsDatum: '2020-06-01',
+        verfuegbarVon: '2020-06-02',
+        verfuegbarBis: '2030-06-01',
+        lebensdauer: 10,
+        lebensdauerEinheit: 'Jahr(e)',
+        einkaufspreis: 67,
+        zubehoer: 'Sack',
+        versicherung: 'Muster Versicherung',
+        polizzenummer: 'P-1',
+        kasko: 'ja',
+      }),
+    );
+    expect(screen.getByLabelText('Barcodes')).toHaveValue('0315-8828, 0915-0127');
+    expect(screen.getByLabelText('Klasse 3')).toHaveValue('Vlies');
+    expect(screen.getByLabelText('Verfügbar bis')).toHaveValue('2030-06-01');
+    expect(screen.getByLabelText('Polizze')).toHaveValue('P-1');
+
+    const preis = screen.getByLabelText('Einkaufspreis');
+    await user.clear(preis);
+    await user.type(preis, '70,5');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(saveGeraet).toHaveBeenCalledWith(
+        'ffnd',
+        expect.objectContaining({
+          zusatzInventarNr: '81762',
+          barcodes: ['0315-8828', '0915-0127'],
+          kategorie: 'Gerät',
+          klasse2: 'Bindemittel',
+          klasse3: 'Vlies',
+          vorlage: 'Bindemittel',
+          materialTyp: 'Massenartikel',
+          herstellerTyp: 'Economy',
+          seriennummer: 'S-1',
+          baujahr: 2020,
+          baumonat: 5,
+          besitzer: 'Freiwillige Feuerwehr',
+          anschaffungsDatum: '2020-06-01',
+          verfuegbarVon: '2020-06-02',
+          verfuegbarBis: '2030-06-01',
+          lebensdauer: 10,
+          lebensdauerEinheit: 'Jahr(e)',
+          einkaufspreis: 70.5,
+          zubehoer: 'Sack',
+          versicherung: 'Muster Versicherung',
+          polizzenummer: 'P-1',
+          kasko: 'ja',
+        }),
+      ),
+    );
+  });
+
+  it('löscht geleerte Zahlen und lehnt einen unsinnigen Herstellungs-Monat ab', async () => {
+    const user = userEvent.setup();
+    render(vlies({ baujahr: 2020, baumonat: 5 }));
+    await user.clear(screen.getByLabelText('Baujahr'));
+    const monat = screen.getByLabelText('Herstellungs-Monat');
+    await user.clear(monat);
+    await user.type(monat, '13');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByText('Ungültiger Wert bei „Herstellungs-Monat“.'),
+    ).toBeInTheDocument();
+    expect(saveGeraet).not.toHaveBeenCalled();
+
+    await user.clear(monat);
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(saveGeraet).toHaveBeenCalledWith(
+        'ffnd',
+        expect.objectContaining({ baujahr: null, baumonat: null }),
+      ),
+    );
+  });
+
   it('lehnt einen negativen Mindestbestand ab', async () => {
     const user = userEvent.setup();
     render(vlies());

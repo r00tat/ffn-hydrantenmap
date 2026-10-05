@@ -2,14 +2,17 @@
 
 import AddIcon from '@mui/icons-material/Add';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
 import LinearProgress from '@mui/material/LinearProgress';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
@@ -18,7 +21,7 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   formatLagerort,
   isBelowMinimum,
@@ -32,6 +35,8 @@ import useGeraete from '../../../hooks/useGeraete';
 import { isFahrtenbuchManager } from '../../Fahrtenbuch/managerPermissions';
 import OfflineListHint from '../../site/OfflineListHint';
 import OnlineOnly from '../../site/OnlineOnly';
+import { setGeraeteVerbrauchsmaterial } from '../geraeteActions';
+import { callAction } from './actionResult';
 import GeraetDetailDialog from './GeraetDetailDialog';
 import GeraetEditDialog from './GeraetEditDialog';
 import GeraeteImportDialog from './GeraeteImportDialog';
@@ -89,6 +94,15 @@ export default function GeraeteAdminPage() {
   const [detailId, setDetailId] = useState<string>();
   const [edit, setEdit] = useState<{ geraet?: Geraet }>();
   const [importOpen, setImportOpen] = useState(false);
+  /**
+   * Auswahlmodus der Liste: `undefined` aus, sonst die gewählten IDs. Damit
+   * werden die Verbrauchsartikel nach einem Import markiert — der Export sagt
+   * nicht, welche es sind.
+   */
+  const [selection, setSelection] = useState<Set<string>>();
+  const [marking, setMarking] = useState(false);
+  const [markResult, setMarkResult] = useState<{ ok: boolean; text: string }>();
+  const idPrefix = useId();
 
   const klassen = useMemo(() => klasse1Options(geraete), [geraete]);
   const lagerorte = useMemo(() => lagerortOptions(bestaende), [bestaende]);
@@ -99,6 +113,30 @@ export default function GeraeteAdminPage() {
   const reorder = useMemo(() => reorderList(geraete), [geraete]);
 
   const detail = detailId ? geraete.find((g) => g.id === detailId) : undefined;
+
+  const toggleSelected = (id: string) =>
+    setSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const markSelected = async (verbrauchsmaterial: boolean) => {
+    if (!groupId || !selection || selection.size === 0) return;
+    setMarkResult(undefined);
+    setMarking(true);
+    const outcome = await callAction(() =>
+      setGeraeteVerbrauchsmaterial(groupId, [...selection], verbrauchsmaterial),
+    );
+    setMarking(false);
+    if (!outcome.ok) {
+      setMarkResult({ ok: false, text: t('errors.saveFailed', { error: outcome.error }) });
+      return;
+    }
+    setMarkResult({ ok: true, text: t('list.marked', { count: outcome.value.updated }) });
+    setSelection(new Set());
+  };
 
   const updateFilter = (patch: Partial<GeraeteFilter>) => {
     setFilter((prev) => ({ ...prev, ...patch }));
@@ -131,12 +169,28 @@ export default function GeraeteAdminPage() {
     const secondary = [g.inventarNr, g.klasse1, lagerortSummary(bestaendeByGeraet.get(g.id))]
       .filter(Boolean)
       .join(' · ');
+    const labelId = `${idPrefix}-${g.id}`;
     return (
-      <ListItemButton key={g.id} divider onClick={() => setDetailId(g.id)}>
+      <ListItemButton
+        key={g.id}
+        divider
+        onClick={() => (selection ? toggleSelected(g.id) : setDetailId(g.id))}
+      >
+        {selection && (
+          <ListItemIcon sx={{ minWidth: 40 }}>
+            <Checkbox
+              edge="start"
+              checked={selection.has(g.id)}
+              tabIndex={-1}
+              disableRipple
+              slotProps={{ input: { 'aria-labelledby': labelId } }}
+            />
+          </ListItemIcon>
+        )}
         <ListItemText
           primary={
             <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-              <span>{g.bezeichnung}</span>
+              <span id={labelId}>{g.bezeichnung}</span>
               {g.verbrauchsmaterial && (
                 <Chip size="small" variant="outlined" label={t('list.consumable')} />
               )}
@@ -273,11 +327,84 @@ export default function GeraeteAdminPage() {
               sx={{ minWidth: 240 }}
             />
           </Stack>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            useFlexGap
+            sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}
+          >
             {toggleChip('onlyConsumable', t('filters.onlyConsumable'))}
             {toggleChip('onlyBelowMinimum', t('filters.onlyBelowMinimum'))}
             {toggleChip('showInactive', t('filters.showInactive'))}
+            {canManage && !selection && (
+              <OnlineOnly>
+                <Button
+                  size="small"
+                  sx={{ ml: 'auto' }}
+                  onClick={() => {
+                    setMarkResult(undefined);
+                    setSelection(new Set());
+                  }}
+                >
+                  {t('list.select')}
+                </Button>
+              </OnlineOnly>
+            )}
           </Stack>
+
+          {selection && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                {t('list.selectHint')}
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                sx={{ flexWrap: 'wrap', alignItems: 'center' }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 'bold', mr: 1 }}>
+                  {t('list.selected', { count: selection.size })}
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() =>
+                    setSelection((prev) => new Set([...(prev ?? []), ...filtered.map((g) => g.id)]))
+                  }
+                >
+                  {t('list.selectAll', { count: filtered.length })}
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={marking || selection.size === 0}
+                  onClick={() => markSelected(true)}
+                >
+                  {t('list.markConsumable')}
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={marking || selection.size === 0}
+                  onClick={() => markSelected(false)}
+                >
+                  {t('list.markDevice')}
+                </Button>
+                <Button size="small" sx={{ ml: 'auto' }} onClick={() => setSelection(undefined)}>
+                  {t('list.selectDone')}
+                </Button>
+              </Stack>
+            </Box>
+          )}
+          {markResult && (
+            <Alert
+              severity={markResult.ok ? 'success' : 'error'}
+              sx={{ mb: 2 }}
+              onClose={() => setMarkResult(undefined)}
+            >
+              {markResult.text}
+            </Alert>
+          )}
 
           {!loading && filtered.length === 0 ? (
             <Typography color="text.secondary">{t('list.empty')}</Typography>
