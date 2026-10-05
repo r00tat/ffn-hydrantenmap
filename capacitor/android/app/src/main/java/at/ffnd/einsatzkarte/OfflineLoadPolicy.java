@@ -118,6 +118,16 @@ public final class OfflineLoadPolicy {
         return ProbeOutcome.ERROR_PAGE;
     }
 
+    /**
+     * Ob ein automatischer Neuversuch (Takt oder Netzrückmeldung) laden darf:
+     * nie, wenn eine Seite der App steht — deren Zustand ginge verloren.
+     * Overlay, Fehlerseite von Chromium oder ein nicht auswertbares Ergebnis
+     * dürfen ersetzt werden.
+     */
+    public static boolean mayAutoReload(String jsResult) {
+        return !"app".equals(decodeJsString(jsResult));
+    }
+
     /** Ob die Antwort die eingebaute Offline-Seite des Service Workers ist. */
     public static boolean isOfflineFallbackResponse(Map<String, String> headers) {
         if (headers == null) return false;

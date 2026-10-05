@@ -343,7 +343,26 @@ public class MainActivity extends BridgeActivity {
             scheduleRetry();
             return;
         }
-        loadFailedUrl();
+        reloadIfNoAppPage();
+    }
+
+    /**
+     * Automatisches Neuladen nur, wenn keine Seite der App steht. #515 hatte
+     * NetworkCallback und Auto-Retry entfernt, weil sie beim Wechsel WLAN/LTE
+     * die laufende Seite neu luden: Ein Merker sagte „Overlay", obwohl längst
+     * die Karte stand. Deshalb entscheidet hier nicht ein Merker, sondern
+     * der Blick ins WebView.
+     */
+    private void reloadIfNoAppPage() {
+        if (failedUrl == null || isFinishing()) return;
+        bridge.getWebView().evaluateJavascript(OfflineLoadPolicy.PROBE_SCRIPT, result -> {
+            if (failedUrl == null || isFinishing()) return;
+            if (OfflineLoadPolicy.mayAutoReload(result)) {
+                loadFailedUrl();
+            } else {
+                onMainFrameLoaded();
+            }
+        });
     }
 
     private void loadFailedUrl() {
@@ -365,7 +384,7 @@ public class MainActivity extends BridgeActivity {
                     if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) return;
                     mainHandler.post(() -> {
                         if (overlayVisible && failedUrl != null && !isFinishing()) {
-                            loadFailedUrl();
+                            reloadIfNoAppPage();
                         }
                     });
                 }

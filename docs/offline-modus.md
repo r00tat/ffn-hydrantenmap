@@ -318,6 +318,15 @@ Deshalb:
 
 #### Hauptseite ohne Netz (`MainActivity`, `OfflineLoadPolicy`)
 
+Das Overlay „Einsatzkarte wartet auf Netzwerk…" ist älter als der
+Offline-Modus: #514 führte es ein, damit die App bei einem Funkloch oder beim
+Wechsel WLAN/LTE nicht auf der Fehlerseite von Chromium hängen bleibt
+([Plan](plans/2026-04-21-native-app-stability-design.md)). Ein
+`NetworkCallback` und ein Neuversuch nach fünf Sekunden kamen gleich mit und
+flogen in #515 wieder hinaus: Sie luden beim Netzwechsel die laufende Seite
+neu, weil der Merker `offlineOverlayShown` „Overlay" sagte, obwohl längst die
+Karte stand. Seither blieb nur der Knopf.
+
 Scheitert die Hauptseite am Netz, meldet WebView `onReceivedError`. Das heißt
 in der App nicht, dass nichts angezeigt wird: Läuft der Service Worker beim
 Kaltstart noch nicht, schickt Chromium die Netzanfrage der Navigation parallel
@@ -338,7 +347,10 @@ Worker die Seite aus seinem Cache liefert. Früher ersetzte das Overlay
   sobald `ConnectivityManager` ein geprüftes Netz meldet
   (`ACCESS_NETWORK_STATE`), und bei bestehendem Netz alle 30 Sekunden. Ohne
   Netz wird nicht im Takt versucht: Jeder Fehlschlag zeigte kurz die
-  Fehlerseite von Chromium.
+  Fehlerseite von Chromium. **Jedes automatische Neuladen sieht vorher
+  ins WebView** (`mayAutoReload`): Steht eine Seite der App, wird nicht
+  geladen, sondern nur der Zustand aufgeräumt. Das schließt den Fehler aus
+  #515 aus, statt sich wieder auf einen Merker zu verlassen.
 - **Neuversuche navigieren auf die gescheiterte Adresse.** Ein
   `location.reload()` lud nur die Overlay-Seite selbst neu, die per
   `loadDataWithBaseURL` kam; das galt auch für das Herunterziehen.

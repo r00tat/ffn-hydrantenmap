@@ -104,6 +104,15 @@ class OfflineLoadPolicyTest {
     }
 
     @Test
+    fun neverAutoReloadsALoadedAppPage() {
+        // #515: Ein Neuladen beim Netzwechsel warf den Zustand der Karte weg.
+        assertFalse(OfflineLoadPolicy.mayAutoReload("\"app\""))
+        assertTrue(OfflineLoadPolicy.mayAutoReload("\"overlay\""))
+        assertTrue(OfflineLoadPolicy.mayAutoReload("\"other:chrome-error://chromewebdata/\""))
+        assertTrue(OfflineLoadPolicy.mayAutoReload("null"))
+    }
+
+    @Test
     fun recognisesTheServiceWorkerFallbackHeader() {
         assertTrue(
             OfflineLoadPolicy.isOfflineFallbackResponse(
