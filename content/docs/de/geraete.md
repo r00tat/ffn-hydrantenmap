@@ -16,10 +16,12 @@ Unter „Geräte & Material" liegen die Geräte und Lagerartikel deiner Feuerweh
 ### Im Einsatz: Gerät zuordnen oder Material verbrauchen
 
 1. Im Einsatz den Abschnitt „Geräte & Material" öffnen
-2. Artikel suchen — nach Bezeichnung, Inventar-Nr., Barcode, Seriennummer, aber auch nach Gattung oder Klasse (z.B. „Messgerät", „Gasmessgerät"). Unter jedem Treffer stehen Typ, Seriennummer und Lagerort, damit gleichnamige Geräte unterscheidbar sind; nach der Auswahl zeigt der Dialog die Stammdaten aus Sybos
+2. Artikel suchen und anklicken — nach Bezeichnung, Inventar-Nr., Barcode, Seriennummer, aber auch nach Gattung oder Klasse (z.B. „Messgerät", „Gasmessgerät"). Unter jedem Treffer stehen Typ, Seriennummer und Lagerort, damit gleichnamige Geräte unterscheidbar sind; nach der Auswahl zeigt der Dialog die Stammdaten aus Sybos
 3. Bei einem Gerät die Anzahl bzw. die Stunden eintragen — der Bestand ändert sich dabei nicht
 4. Bei Verbrauchsmaterial die Menge eintragen und den Lagerort wählen, von dem es genommen wurde
 5. Speichern — der Eintrag ist sofort im Einsatz sichtbar
+
+Mehrere Geräte auf einmal: Die Liste bleibt nach dem Anklicken offen, du kannst gleich weitere Artikel wählen. Mit **„… erfassen"** werden alle eingetragen — Geräte zugeordnet, Verbrauchsmaterial mit Menge 1 vom vorgeschlagenen Lagerort. Menge, Stunden oder Lagerort trägst du bei Bedarf danach über **Bearbeiten** am Eintrag nach. Artikel, die schon im Einsatz erfasst sind, sind in der Liste als „bereits im Einsatz" gekennzeichnet.
 
 :::info
 Ohne Netz wird der Eintrag auf dem Gerät gespeichert. Das Abbuchen vom Lager wird nachgeholt, sobald wieder eine Verbindung besteht. Bis dahin ist der Eintrag als „noch nicht abgebucht" markiert.
@@ -36,6 +38,7 @@ Dieselbe Liste steht auch in der **Einsatzübersicht** als aufklappbarer Abschni
 3. Beim gewünschten Lagerort **Zugang** (Material eingetroffen), **Umbuchung** (z.B. vom Lager auf das SRF) oder **Inventur** (gezählten Ist-Wert eintragen) wählen
 4. Beim Artikel festlegen, ob er **Verbrauchsmaterial** ist, und bei Bedarf **Einheit** und **Mindestbestand** eintragen
 5. Einen weiteren Lagerort legst du mit **Neuer Lagerort** an. Als Art stehen Raum, Fahrzeug und **Container** zur Wahl; Container sind die Artikel der Sybos-Kategorie „Container" und müssen dafür importiert sein
+6. Mit dem Stift ändert sich ein Lagerort, mit dem Papierkorb wird er gelöscht. Ein Restbestand wird dabei ausgebucht. Wurde aus dem Lagerort in einem Einsatz verbraucht, wird er nur ausgeblendet, damit der Einsatz ihn weiter zeigt
 
 ### Aus Sybos importieren
 

@@ -208,6 +208,35 @@ describe('parseGeraetExport', () => {
     expect(artikel[1].stammdaten).not.toHaveProperty('lebensdauer');
   });
 
+  it('übernimmt Verfügbar von, Herstellungs-Monat, Einkaufspreis und Versicherung', () => {
+    const { artikel } = parseGeraetExport([
+      HEADER,
+      row({
+        ID: '3003',
+        Bezeichnung: 'Rollcontainer Ölsperre',
+        'Verfügbar von': '2020-11-04 00:00:00',
+        'Herstellungs-Jahr (Baujahr)': '2020',
+        'Herstellungs-Monat': '5',
+        Einkaufspreis: '1078.8',
+        'Haftpflicht-Versicherung Name': 'Muster Versicherung',
+        'Haftpflicht-Versicherung (Polizzenummer)': 'P-123',
+        Kasko: 'ja',
+        Status: 'aktiv',
+      }),
+      row({ ID: '3004', Bezeichnung: 'Ohne Angaben', 'Herstellungs-Monat': '13', Status: 'aktiv' }),
+    ]);
+    expect(artikel[0].stammdaten).toMatchObject({
+      verfuegbarVon: '2020-11-04',
+      baumonat: 5,
+      einkaufspreis: 1078.8,
+      versicherung: 'Muster Versicherung',
+      polizzenummer: 'P-123',
+      kasko: 'ja',
+    });
+    expect(artikel[1].stammdaten).not.toHaveProperty('baumonat');
+    expect(artikel[1].stammdaten).not.toHaveProperty('einkaufspreis');
+  });
+
   it('kennt die vier Material-Typen und verwirft unbekannte', () => {
     const typen = ['Einzelartikel', 'Massenartikel', 'Set-Artikel', 'Set-Komponente', 'Anderes'];
     const { artikel } = parseGeraetExport([

@@ -130,6 +130,10 @@ export interface Geraet {
   hersteller?: string;
   herstellerTyp?: string;
   baujahr?: number;
+  /** Herstellungs-Monat (1–12), nur zusammen mit `baujahr` aussagekräftig. */
+  baumonat?: number;
+  /** Einkaufspreis in Euro laut Sybos. */
+  einkaufspreis?: number;
   besitzer?: string;
   bemerkung?: string;
   /** Sybos-Vorlage, z. B. „Gasmessgerät" — die Gattung hinter der Bezeichnung. */
@@ -138,12 +142,18 @@ export interface Geraet {
   zubehoer?: string;
   /** Anschaffungs-Datum (`YYYY-MM-DD`). */
   anschaffungsDatum?: string;
+  /** „Verfügbar von" (`YYYY-MM-DD`), meist gleich dem Anschaffungs-Datum. */
+  verfuegbarVon?: string;
   /** „Verfügbar bis" (`YYYY-MM-DD`) — etwa das Ablaufdatum eines Prüfgases. */
   verfuegbarBis?: string;
   /** Lebensdauer, Einheit in `lebensdauerEinheit`. */
   lebensdauer?: number;
   /** Einheit der Lebensdauer wie im Export, z. B. „Jahr(e)" oder „Monat(e)". */
   lebensdauerEinheit?: string;
+  /** Haftpflicht-Versicherung laut Sybos — nur im Container-Export. */
+  versicherung?: string;
+  polizzenummer?: string;
+  kasko?: string;
   einheitVerwendungsnachweis?: GeraetEinheitVerwendungsnachweis;
   /**
    * true → ein Verbrauch im Einsatz bucht vom Bestand ab. Eigenes Flag, weil
@@ -185,6 +195,12 @@ export interface GeraetBestand {
   lagerort: GeraetLagerort;
   /** Darf negativ werden: Die Realität geht vor. */
   anzahl: number;
+  /**
+   * Gelöschter Lagerort, auf den noch ein Verbrauch im Einsatz zeigt. Er
+   * bleibt lesbar, damit der Einsatz seinen Lagerort zeigt und ein Storno
+   * zurückbuchen kann; in Listen und Auswahl fehlt er.
+   */
+  archiviert?: boolean;
   updatedAt?: string;
   updatedBy?: string;
 }

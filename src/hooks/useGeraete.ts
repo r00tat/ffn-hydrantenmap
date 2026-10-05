@@ -13,8 +13,13 @@ import { useFirebaseCollectionState } from './useFirebaseCollection';
 export interface UseGeraeteResult {
   /** Alle Artikel der Gruppe, nach Bezeichnung sortiert (auch inaktive). */
   geraete: Geraet[];
-  /** Alle Bestände der Gruppe, über alle Artikel und Lagerorte. */
+  /** Alle Bestände der Gruppe, über alle Artikel und Lagerorte — ohne archivierte. */
   bestaende: GeraetBestand[];
+  /**
+   * Jeder Bestand nach ID, auch archivierte: Ein Verbrauch im Einsatz zeigt
+   * seinen Lagerort, auch wenn dieser inzwischen gelöscht ist.
+   */
+  bestandById: Map<string, GeraetBestand>;
   /** Bestände je Artikel-ID — für Liste, Filter und Lagerortwahl. */
   bestaendeByGeraet: Map<string, GeraetBestand[]>;
   loading: boolean;
@@ -54,6 +59,7 @@ export default function useGeraete(groupId?: string): UseGeraeteResult {
       return {
         geraete: [],
         bestaende: [],
+        bestandById: new Map(),
         bestaendeByGeraet: new Map(),
         loading: false,
         fromCache: false,
@@ -62,7 +68,9 @@ export default function useGeraete(groupId?: string): UseGeraeteResult {
     const geraete = [...(geraeteState.records ?? [])].sort((a, b) =>
       collator.compare(a.bezeichnung ?? '', b.bezeichnung ?? ''),
     );
-    const bestaende = bestaendeState.records ?? [];
+    const allBestaende = bestaendeState.records ?? [];
+    const bestandById = new Map(allBestaende.map((b) => [b.id, b]));
+    const bestaende = allBestaende.filter((b) => b.archiviert !== true);
     const bestaendeByGeraet = new Map<string, GeraetBestand[]>();
     for (const b of bestaende) {
       const list = bestaendeByGeraet.get(b.geraetId);
@@ -72,6 +80,7 @@ export default function useGeraete(groupId?: string): UseGeraeteResult {
     return {
       geraete,
       bestaende,
+      bestandById,
       bestaendeByGeraet,
       loading: geraeteState.loading || bestaendeState.loading,
       fromCache: geraeteState.fromCache || bestaendeState.fromCache,

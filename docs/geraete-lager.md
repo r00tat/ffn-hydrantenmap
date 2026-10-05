@@ -78,6 +78,19 @@ Excel-Seriennummern) und `Lebensdauer` mit der Spalte `Einheit` als
 Zähleinheit des Artikels (`einheit`, von Hand gepflegt) — sie steht in jeder Zeile
 und wird nur zusammen mit einer Lebensdauer übernommen.
 
+Ebenso übernommen: `Verfügbar von` (`verfuegbarVon`; der Steckbrief zeigt es nur,
+wenn es vom Anschaffungs-Datum abweicht), `Herstellungs-Monat` (`baumonat`, 1–12,
+angezeigt als „05/2020" am Baujahr), `Einkaufspreis` (`einkaufspreis`, Euro) und
+die drei Versicherungsspalten des Container-Exports (`versicherung`,
+`polizzenummer`, `kasko`).
+
+Bewusst **nicht** übernommen:
+
+- `Dienststelle` und `Feuerwehr-Nummer` — in jeder Zeile dieselben, die Gruppe
+  sagt dasselbe.
+- `Kurzbezeichnung Klasse 1–3` — fast immer leer, sonst „Sonstiges"; die Klassen
+  selbst sind da.
+
 Suche und Auswahl im Einsatz nutzen das: Gesucht wird auch in Vorlage, Kategorie,
 Klassen, Bemerkung und Zubehör, Treffer in der Bezeichnung stehen vorn. Die zweite
 Zeile einer Option nennt Vorlage, Hersteller und Typ, Seriennummer und Lagerort —
@@ -121,6 +134,36 @@ Ein `geraetEinsatz`-Eintrag hat `art: 'zugeordnet'` oder `'verbraucht'`.
   den Bestand verfallen.
 - **Verbraucht** gibt es nur bei Verbrauchsmaterial und braucht einen Lagerort
   (`bestandId`), von dem abgebucht wird.
+
+Beim Erfassen lassen sich mehrere Artikel nacheinander anklicken
+(`Autocomplete` mit `multiple` und `disableCloseOnSelect`; der Suchbegriff bleibt
+nach jeder Auswahl stehen). Bei genau einem Artikel zeigt der Dialog Lagerort,
+Menge und Stunden wie bisher. Bei mehreren entstehen die Einträge mit den
+Vorgaben — Menge 1, Verbrauch vom vorbelegten Lagerort (`pickDefaultBestand`),
+Stunden leer — und werden bei Bedarf danach je Eintrag ergänzt. Im Einsatz zählt,
+dass alles schnell drin ist; jeder Eintrag läuft durch denselben Abgleich wie ein
+einzeln erfasster.
+
+## Lagerort ändern und löschen
+
+`updateGeraetBestand` ändert den Lagerort eines Bestands samt `lagerortKey`; Menge
+und Buchungen hängen an der Bestands-ID und bleiben. Der neue Schlüssel ist ab dann
+die Import-Identität: Führt Sybos den alten Lagerort weiter, legt der nächste
+Import ihn wieder an — einen in der App umbenannten Fahrzeug-Lagerort also auch in
+Sybos umbenennen.
+
+`deleteGeraetBestand` bucht einen Restbestand als `inventur` aus, die Bemerkung
+nennt den Lagerort („Lagerort gelöscht: SRF · GR 2"), weil die Buchung ihn
+überdauert. Danach:
+
+- **Kein Verbrauch im Einsatz** zeigt auf ihn → das Dokument wird gelöscht.
+- **Ein Verbrauch zeigt auf ihn** → er wird nur archiviert (`archiviert: true`,
+  Anzahl 0). `useGeraete` lässt ihn in `bestaende` und `bestaendeByGeraet` weg, in
+  `bestandById` bleibt er, damit der Einsatz seinen Lagerort weiter zeigt. Ein
+  Löschen oder Ändern des Verbrauchs bucht dorthin zurück; `syncGeraetVerbrauch`
+  holt den Lagerort dann zurück, weil Bestand an einem unsichtbaren Ort verloren
+  wäre. Legt jemand denselben Lagerort neu an oder führt der Import ihn, wird der
+  archivierte wiederbelebt statt ein zweiter mit gleichem Schlüssel angelegt.
 
 ## `bestandGesamt` ist mitgeführt
 

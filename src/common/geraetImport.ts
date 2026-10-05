@@ -55,7 +55,13 @@ export const GERAET_EXPORT_COLUMNS = {
   vorlage: 'Vorlage',
   zubehoer: 'Zubehör',
   anschaffungsDatum: 'Anschaffungs-Datum',
+  verfuegbarVon: 'Verfügbar von',
   verfuegbarBis: 'Verfügbar bis',
+  baumonat: 'Herstellungs-Monat',
+  einkaufspreis: 'Einkaufspreis',
+  versicherung: 'Haftpflicht-Versicherung Name',
+  polizzenummer: 'Haftpflicht-Versicherung (Polizzenummer)',
+  kasko: 'Kasko',
   lebensdauer: 'Lebensdauer',
   /** Einheit der Lebensdauer — nicht die Zähleinheit des Artikels. */
   lebensdauerEinheit: 'Einheit',
@@ -107,7 +113,13 @@ export const GERAET_IMPORT_FIELDS = [
   'vorlage',
   'zubehoer',
   'anschaffungsDatum',
+  'verfuegbarVon',
   'verfuegbarBis',
+  'baumonat',
+  'einkaufspreis',
+  'versicherung',
+  'polizzenummer',
+  'kasko',
   'lebensdauer',
   'lebensdauerEinheit',
   'einheitVerwendungsnachweis',
@@ -316,6 +328,9 @@ function buildStammdaten(
     ['besitzer', c.besitzer],
     ['vorlage', c.vorlage],
     ['zubehoer', c.zubehoer],
+    ['versicherung', c.versicherung],
+    ['polizzenummer', c.polizzenummer],
+    ['kasko', c.kasko],
   ] as const;
   for (const [field, column] of text) {
     const value = cell(row, column);
@@ -336,6 +351,16 @@ function buildStammdaten(
 
   const anschaffungsDatum = parseExportDate(cell(row, c.anschaffungsDatum));
   if (anschaffungsDatum) stammdaten.anschaffungsDatum = anschaffungsDatum;
+  const baumonat = Number(cell(row, c.baumonat));
+  if (Number.isInteger(baumonat) && baumonat >= 1 && baumonat <= 12) stammdaten.baumonat = baumonat;
+
+  const einkaufspreis = parseNumber(cell(row, c.einkaufspreis));
+  if (einkaufspreis !== undefined && Number.isFinite(einkaufspreis) && einkaufspreis > 0) {
+    stammdaten.einkaufspreis = einkaufspreis;
+  }
+
+  const verfuegbarVon = parseExportDate(cell(row, c.verfuegbarVon));
+  if (verfuegbarVon) stammdaten.verfuegbarVon = verfuegbarVon;
   const verfuegbarBis = parseExportDate(cell(row, c.verfuegbarBis));
   if (verfuegbarBis) stammdaten.verfuegbarBis = verfuegbarBis;
 

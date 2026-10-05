@@ -268,10 +268,12 @@ import {
   bookGeraetBestand,
   createGeraetBestand,
   deleteGeraet,
+  deleteGeraetBestand,
   importGeraete,
   previewGeraetImport,
   saveGeraet,
   syncGeraetVerbrauch,
+  updateGeraetBestand,
 } from './geraeteActions';
 
 const G = 'groups/ffnd';
@@ -351,6 +353,8 @@ describe('Guards der Pflege-Actions', () => {
       'bookGeraetBestand',
       () => bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: 1 }),
     ],
+    ['updateGeraetBestand', () => updateGeraetBestand('ffnd', 'b1', lager)],
+    ['deleteGeraetBestand', () => deleteGeraetBestand('ffnd', 'b1')],
     ['previewGeraetImport', () => previewGeraetImport('ffnd', '')],
     ['importGeraete', () => importGeraete('ffnd', '', [])],
   ])('%s verlangt Gruppen-Admin oder Gerätemeister', async (_name, call) => {
@@ -492,6 +496,22 @@ describe('createGeraetBestand', () => {
     ]);
   });
 
+  it('holt einen archivierten Lagerort mit demselben Schlüssel zurück', async () => {
+    putGeraet('g1');
+    fake.put(`${G}/geraetBestand/alt`, {
+      geraetId: 'g1',
+      lagerort: srf,
+      lagerortKey: lagerortKey(srf),
+      anzahl: 0,
+      archiviert: true,
+    });
+    await expect(createGeraetBestand('ffnd', 'g1', srf, 2)).resolves.toEqual({ id: 'alt' });
+    expect(bestand('alt')).toMatchObject({ anzahl: 2 });
+    expect(bestand('alt')).not.toHaveProperty('archiviert');
+    expect(fake.list(`${G}/geraetBestand`)).toHaveLength(1);
+    expect(geraet('g1')!.bestandGesamt).toBe(2);
+  });
+
   it('bucht nichts bei Anfangsmenge 0', async () => {
     putGeraet('g1');
     await createGeraetBestand('ffnd', 'g1', srf);
@@ -556,6 +576,112 @@ describe('createGeraetBestand', () => {
     await expect(createGeraetBestand('ffnd', 'g1', srf, 1e308)).rejects.toThrow(/anzahl/);
     await expect(createGeraetBestand('ffnd', 'g1', srf, -1)).rejects.toThrow(/anzahl/);
     expect(fake.list(`${G}/geraetBestand`)).toHaveLength(0);
+  });
+});
+
+describe('updateGeraetBestand', () => {
+  it('ändert den Lagerort samt Schlüssel und lässt Menge und Buchungen stehen', async () => {
+    putGeraet('g1', { bestandGesamt: 3 });
+    putBestand('b1', 'g1', srf, 3);
+    await updateGeraetBestand('ffnd', 'b1', { art: 'raum', standort: ' Feuerwehrhaus ', raum: 'Lager' });
+    expect(bestand('b1')).toMatchObject({
+      geraetId: 'g1',
+      lagerortKey: 'raum|feuerwehrhaus|lager',
+      lagerort: { art: 'raum', standort: 'Feuerwehrhaus', raum: 'Lager' },
+      anzahl: 3,
+      updatedBy: 'u1',
+    });
+    expect(geraet('g1')!.bestandGesamt).toBe(3);
+    expect(buchungen()).toHaveLength(0);
+  });
+
+  it('nimmt beim Container dessen Bezeichnung', async () => {
+    putGeraet('g1');
+    putGeraet('c1', { bezeichnung: 'Ölsperren 1', kategorie: 'Container' });
+    putBestand('b1', 'g1', srf, 1);
+    await updateGeraetBestand('ffnd', 'b1', { art: 'container', containerId: 'c1' });
+    expect(bestand('b1')).toMatchObject({
+      lagerortKey: 'container|c1',
+      lagerort: { art: 'container', containerId: 'c1', container: 'Ölsperren 1' },
+    });
+  });
+
+  it('lehnt einen Lagerort ab, den der Artikel schon hat — nicht aber den eigenen', async () => {
+    putGeraet('g1');
+    putBestand('b1', 'g1', srf, 1);
+    putBestand('b2', 'g1', lager, 1);
+    await expect(updateGeraetBestand('ffnd', 'b1', lager)).rejects.toThrow(/exists/i);
+    await expect(
+      updateGeraetBestand('ffnd', 'b1', { ...srf, bemerkung: 'oben links' }),
+    ).resolves.toEqual({ id: 'b1' });
+    expect(bestand('b1')!.lagerort).toMatchObject({ bemerkung: 'oben links' });
+  });
+
+  it('lehnt einen unbekannten Lagerort und einen Container als eigenen Lagerort ab', async () => {
+    await expect(updateGeraetBestand('ffnd', 'fehlt', srf)).rejects.toThrow(/not found/i);
+    putGeraet('c1', { kategorie: 'Container' });
+    putBestand('b1', 'c1', srf, 1);
+    await expect(
+      updateGeraetBestand('ffnd', 'b1', { art: 'container', containerId: 'c1' }),
+    ).rejects.toThrow(/container/i);
+  });
+});
+
+describe('deleteGeraetBestand', () => {
+  it('löscht einen Lagerort und bucht den Restbestand aus', async () => {
+    putGeraet('g1', { bestandGesamt: 5, mindestbestand: 4 });
+    putBestand('b1', 'g1', srf, 2);
+    putBestand('b2', 'g1', lager, 3);
+    await expect(deleteGeraetBestand('ffnd', 'b1')).resolves.toEqual({
+      id: 'b1',
+      deleted: true,
+    });
+    expect(bestand('b1')).toBeUndefined();
+    expect(geraet('g1')!.bestandGesamt).toBe(3);
+    expect(sumOfBestaende('g1')).toBe(3);
+    expect(buchungen()).toEqual([
+      expect.objectContaining({
+        art: 'inventur',
+        menge: -2,
+        bestandId: 'b1',
+        bemerkung: 'Lagerort gelöscht: SRF · GR 2',
+      }),
+    ]);
+    // Das Ausbuchen unterschreitet den Mindestbestand — wie jede Buchung.
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('bucht bei leerem Lagerort nichts', async () => {
+    putGeraet('g1');
+    putBestand('b1', 'g1', srf, 0);
+    await deleteGeraetBestand('ffnd', 'b1');
+    expect(bestand('b1')).toBeUndefined();
+    expect(buchungen()).toHaveLength(0);
+  });
+
+  it('archiviert einen Lagerort, aus dem im Einsatz verbraucht wurde', async () => {
+    putGeraet('g1', { bestandGesamt: 2 });
+    putBestand('b1', 'g1', srf, 2);
+    fake.put(`${G}/geraetBuchung/v1`, {
+      geraetId: 'g1',
+      bestandId: 'b1',
+      art: 'verbrauch',
+      menge: -1,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+      createdAt: '2026-10-01T00:00:00.000Z',
+      createdBy: 'u2',
+    });
+    await expect(deleteGeraetBestand('ffnd', 'b1')).resolves.toEqual({
+      id: 'b1',
+      deleted: false,
+    });
+    expect(bestand('b1')).toMatchObject({ anzahl: 0, archiviert: true });
+    expect(geraet('g1')!.bestandGesamt).toBe(0);
+  });
+
+  it('lehnt einen unbekannten Lagerort ab', async () => {
+    await expect(deleteGeraetBestand('ffnd', 'fehlt')).rejects.toThrow(/not found/i);
   });
 });
 
@@ -854,6 +980,17 @@ describe('syncGeraetVerbrauch', () => {
       ['verbrauch', -3],
       ['storno', 3],
     ]);
+  });
+
+  it('holt einen archivierten Lagerort zurück, wenn dorthin zurückgebucht wird', async () => {
+    putEintrag('e1', {});
+    await syncGeraetVerbrauch('fc1', 'e1');
+    await deleteGeraetBestand('ffnd', 'b1');
+    expect(bestand('b1')).toMatchObject({ archiviert: true, anzahl: 0 });
+    fake.docs.delete(`${E}/e1`);
+    await syncGeraetVerbrauch('fc1', 'e1');
+    expect(bestand('b1')!.anzahl).toBe(3);
+    expect(bestand('b1')).not.toHaveProperty('archiviert');
   });
 
   it('bucht bei einem nur zugeordneten Gerät nichts ab', async () => {

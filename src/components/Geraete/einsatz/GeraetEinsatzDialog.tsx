@@ -10,6 +10,9 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -97,6 +100,12 @@ function placeholderGeraet(entry: GeraetEinsatz): Geraet {
 /**
  * Gerät zuordnen oder Material verbrauchen.
  *
+ * Beim Erfassen lassen sich mehrere Artikel nacheinander anklicken, die Liste
+ * bleibt dafür offen. Ein einzelner Artikel zeigt Lagerort, Menge und
+ * Stunden; mehrere werden mit den Vorgaben erfasst — Menge 1, Verbrauch vom
+ * vorbelegten Lagerort — und bei Bedarf danach je Eintrag ergänzt. Im Einsatz
+ * zählt, dass alles schnell drin ist.
+ *
  * Gespeichert wird lokal (`addDocLocal`/`updateDocLocal`), der Dialog schließt
  * sofort — auch offline. Das Abbuchen vom Lager stößt `geraetEinsatzWrites`
  * an; bis der Server es bestätigt, zeigt die Liste „noch nicht gebucht".
@@ -117,12 +126,14 @@ export default function GeraetEinsatzDialog({
 
   // Beim Bearbeiten gilt die Art des Eintrags, nicht der heutige Stand des
   // Artikels (`geraetForEntry`).
-  const [geraet, setGeraet] = useState<Geraet | null>(() => {
-    if (!entry) return null;
+  const [selected, setSelected] = useState<Geraet[]>(() => {
+    if (!entry) return [];
     const current = geraete.find((g) => g.id === entry.geraetId);
-    return current ? geraetForEntry(current, entry) : placeholderGeraet(entry);
+    return [current ? geraetForEntry(current, entry) : placeholderGeraet(entry)];
   });
-  const [inputValue, setInputValue] = useState(() => (geraet ? geraetOptionLabel(geraet) : ''));
+  const geraet = selected.length === 1 ? selected[0] : null;
+  const many = selected.length > 1;
+  const [inputValue, setInputValue] = useState('');
   const [bestandId, setBestandId] = useState(entry?.bestandId ?? '');
   const [menge, setMenge] = useState(() => (entry ? formatNumber(entry.menge) : ''));
   const [stunden, setStunden] = useState(() => formatNumber(entry?.stunden));
@@ -143,31 +154,31 @@ export default function GeraetEinsatzDialog({
     [bestaende],
   );
 
-  const selectGeraet = (next: Geraet | null) => {
-    setGeraet(next);
+  const defaultBestandOf = (g: Geraet): GeraetBestand | undefined =>
+    g.verbrauchsmaterial
+      ? pickDefaultBestand(bestaendeByGeraet.get(g.id) ?? [], vehicleNames, assignedIds)
+      : undefined;
+
+  const select = (next: Geraet[]) => {
+    setSelected(next);
     setError(null);
     setScanMessage(null);
-    if (!next) {
-      setBestandId('');
-      return;
-    }
-    setInputValue(geraetOptionLabel(next));
-    const defaultBestand = next.verbrauchsmaterial
-      ? pickDefaultBestand(bestaendeByGeraet.get(next.id) ?? [], vehicleNames, assignedIds)
-      : undefined;
-    setBestandId(defaultBestand?.id ?? '');
-    if (!usesHours(next) && !menge) setMenge('1');
+    if (next.length !== 1) return;
+    const [single] = next;
+    setBestandId(defaultBestandOf(single)?.id ?? '');
+    if (!usesHours(single) && !menge) setMenge('1');
   };
 
   const handleCode = (code: string) => {
     const matches = findGeraetByCode(geraete, code);
     if (matches.length === 1) {
-      selectGeraet(matches[0]);
+      const [match] = matches;
+      select(selected.some((g) => g.id === match.id) ? selected : [...selected, match]);
+      setInputValue('');
       return;
     }
     // Mehrere oder keiner: Der Code bleibt im Suchfeld stehen, die Auswahl
     // trifft der Benutzer.
-    setGeraet(null);
     setInputValue(code);
     setScanMessage(
       matches.length === 0 ? t('codeNotFound', { code }) : t('codeMultiple', { code }),
@@ -175,6 +186,25 @@ export default function GeraetEinsatzDialog({
   };
 
   const handleSave = () => {
+    if (many) {
+      const nowIso = new Date().toISOString();
+      for (const g of selected) {
+        addGeraetEinsatz(
+          firecallId,
+          buildGeraetEinsatzData({
+            geraet: g,
+            bestandId: defaultBestandOf(g)?.id,
+            menge: usesHours(g) ? undefined : 1,
+            bemerkung,
+            groupId,
+            nowIso,
+            createdBy,
+          }),
+        );
+      }
+      onClose();
+      return;
+    }
     const input = {
       geraet: geraet ?? undefined,
       bestandId: bestandId || undefined,
@@ -218,54 +248,65 @@ export default function GeraetEinsatzDialog({
               <Alert severity="info">{t('noArticles')}</Alert>
             )}
             <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-              <Autocomplete<Geraet>
-                fullWidth
-                disabled={editing}
-                options={geraete}
-                value={geraet}
-                inputValue={inputValue}
-                onInputChange={(_e, value, reason) => {
-                  // `reset` kommt beim Setzen des Werts — das Label setzt
-                  // `selectGeraet` selbst.
-                  if (reason !== 'reset') setInputValue(value);
-                }}
-                onChange={(_e, value) => selectGeraet(value)}
-                filterOptions={(options, state) => searchGeraete(options, state.inputValue)}
-                getOptionLabel={geraetOptionLabel}
-                isOptionEqualToValue={(a, b) => a.id === b.id}
-                noOptionsText={t('noOptions')}
-                renderOption={(props, option) => {
-                  const { key, ...rest } = props;
-                  const details = geraetOptionDetails(
-                    option,
-                    bestaendeByGeraet.get(option.id) ?? EMPTY_BESTAENDE,
-                  );
-                  return (
-                    <li key={key} {...rest}>
-                      <Box>
-                        <Typography variant="body2">{geraetOptionLabel(option)}</Typography>
-                        <Typography variant="caption" color="text.secondary" component="div">
-                          {option.verbrauchsmaterial
-                            ? t('optionConsumable', {
-                                bestand: option.bestandGesamt ?? 0,
-                                einheit: option.einheit ?? t('pieces'),
-                              })
-                            : t('optionDevice')}
-                          {details ? ` · ${details}` : ''}
-                        </Typography>
-                      </Box>
-                    </li>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label={t('article')}
-                    helperText={t('articleHint')}
-                    error={error === 'noGeraet'}
-                  />
-                )}
-              />
+              {editing ? (
+                <TextField
+                  fullWidth
+                  disabled
+                  label={t('article')}
+                  value={geraet ? geraetOptionLabel(geraet) : ''}
+                />
+              ) : (
+                <Autocomplete<Geraet, true>
+                  fullWidth
+                  multiple
+                  disableCloseOnSelect
+                  options={geraete}
+                  value={selected}
+                  inputValue={inputValue}
+                  onInputChange={(_e, value, reason) => {
+                    // Nach einer Auswahl bleibt der Suchbegriff stehen — so
+                    // lassen sich mehrere Treffer nacheinander anklicken.
+                    if (reason !== 'reset') setInputValue(value);
+                  }}
+                  onChange={(_e, value) => select(value)}
+                  filterOptions={(options, state) => searchGeraete(options, state.inputValue)}
+                  getOptionLabel={geraetOptionLabel}
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  noOptionsText={t('noOptions')}
+                  renderOption={(props, option) => {
+                    const { key, ...rest } = props;
+                    const details = geraetOptionDetails(
+                      option,
+                      bestaendeByGeraet.get(option.id) ?? EMPTY_BESTAENDE,
+                    );
+                    return (
+                      <li key={key} {...rest}>
+                        <Box>
+                          <Typography variant="body2">{geraetOptionLabel(option)}</Typography>
+                          <Typography variant="caption" color="text.secondary" component="div">
+                            {option.verbrauchsmaterial
+                              ? t('optionConsumable', {
+                                  bestand: option.bestandGesamt ?? 0,
+                                  einheit: option.einheit ?? t('pieces'),
+                                })
+                              : t('optionDevice')}
+                            {details ? ` · ${details}` : ''}
+                            {assignedIds.includes(option.id) ? ` · ${t('alreadyAssigned')}` : ''}
+                          </Typography>
+                        </Box>
+                      </li>
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={t('article')}
+                      helperText={t('articleHint')}
+                      error={error === 'noGeraet'}
+                    />
+                  )}
+                />
+              )}
               {!editing && (
                 <Tooltip title={t('scan')}>
                   <IconButton aria-label={t('scan')} onClick={() => setScanOpen(true)}>
@@ -276,6 +317,36 @@ export default function GeraetEinsatzDialog({
             </Stack>
 
             {scanMessage && <Alert severity="info">{scanMessage}</Alert>}
+
+            {many && (
+              <>
+                <Alert severity="info">{t('manyInfo', { count: selected.length })}</Alert>
+                <List dense disablePadding>
+                  {selected.map((g) => {
+                    const b = defaultBestandOf(g);
+                    return (
+                      <ListItem key={g.id} disableGutters>
+                        <ListItemText
+                          primary={geraetOptionLabel(g)}
+                          secondary={
+                            g.verbrauchsmaterial
+                              ? b
+                                ? t('manyConsumable', {
+                                    einheit: g.einheit ?? t('pieces'),
+                                    lagerort: formatLagerort(b.lagerort),
+                                  })
+                                : t('manyConsumableNoBestand', {
+                                    einheit: g.einheit ?? t('pieces'),
+                                  })
+                              : t('optionDevice')
+                          }
+                        />
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              </>
+            )}
 
             {geraet && (
               <Alert severity={geraet.verbrauchsmaterial ? 'warning' : 'info'}>
@@ -347,7 +418,7 @@ export default function GeraetEinsatzDialog({
         <DialogActions>
           <Button onClick={onClose}>{t('cancel')}</Button>
           <Button variant="contained" onClick={handleSave}>
-            {t('save')}
+            {many ? t('saveMany', { count: selected.length }) : t('save')}
           </Button>
         </DialogActions>
       </Dialog>

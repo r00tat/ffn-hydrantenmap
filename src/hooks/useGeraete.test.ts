@@ -120,6 +120,17 @@ describe('useGeraete', () => {
     ]);
   });
 
+  it('lässt archivierte Lagerorte in Liste und Gruppierung weg, nicht aber im Nachschlagen', () => {
+    mockCollections(
+      [geraet({ id: 'g1' })],
+      [bestand({ id: 'b1' }), bestand({ id: 'b2', archiviert: true, anzahl: 0 })],
+    );
+    const { result } = renderHook(() => useGeraete('ffnd'));
+    expect(result.current.bestaende.map((b) => b.id)).toEqual(['b1']);
+    expect(result.current.bestaendeByGeraet.get('g1')?.map((b) => b.id)).toEqual(['b1']);
+    expect(result.current.bestandById.get('b2')?.archiviert).toBe(true);
+  });
+
   it('meldet loading, solange eine der Sammlungen lädt', () => {
     mockCollections([], [], true);
     const { result } = renderHook(() => useGeraete('ffnd'));

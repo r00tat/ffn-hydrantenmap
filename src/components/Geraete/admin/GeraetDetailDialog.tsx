@@ -2,8 +2,11 @@
 
 import AddIcon from '@mui/icons-material/Add';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlined';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -28,7 +31,10 @@ import {
   type Geraet,
   type GeraetBestand,
 } from '../../../common/geraet';
+import ConfirmDialog from '../../dialogs/ConfirmDialog';
 import GeraetSteckbrief from '../GeraetSteckbrief';
+import { deleteGeraetBestand } from '../geraeteActions';
+import { callAction } from './actionResult';
 import BestandBookingDialog, { type BestandBookingMode } from './BestandBookingDialog';
 import LagerortDialog from './LagerortDialog';
 
@@ -51,7 +57,7 @@ export interface GeraetDetailDialogProps {
 /**
  * Ein Artikel mit seinem Bestand je Lagerort. Mitglieder sehen, wo was liegt;
  * Gruppen-Admin und Gerätemeister buchen hier Zugang, Umbuchung und Inventur
- * und legen weitere Lagerorte an.
+ * und legen Lagerorte an, ändern und löschen sie.
  */
 export default function GeraetDetailDialog({
   open,
@@ -72,7 +78,16 @@ export default function GeraetDetailDialog({
     mode: BestandBookingMode;
     bestand: GeraetBestand;
   }>();
-  const [lagerortOpen, setLagerortOpen] = useState(false);
+  /** `null`: neuer Lagerort; ein Bestand: diesen bearbeiten. */
+  const [lagerortDialog, setLagerortDialog] = useState<GeraetBestand | null>();
+  const [toDelete, setToDelete] = useState<GeraetBestand>();
+  const [error, setError] = useState<string>();
+
+  const handleDelete = async (bestand: GeraetBestand) => {
+    setError(undefined);
+    const outcome = await callAction(() => deleteGeraetBestand(groupId, bestand.id));
+    if (!outcome.ok) setError(t('errors.deleteFailed', { error: outcome.error }));
+  };
 
   const rows = useMemo(
     () =>
@@ -147,12 +162,18 @@ export default function GeraetDetailDialog({
             <Button
               size="small"
               startIcon={<AddIcon />}
-              onClick={() => setLagerortOpen(true)}
+              onClick={() => setLagerortDialog(null)}
             >
               {t('detail.newLagerort')}
             </Button>
           )}
         </Stack>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 1 }} onClose={() => setError(undefined)}>
+            {error}
+          </Alert>
+        )}
 
         {rows.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
@@ -191,6 +212,24 @@ export default function GeraetDetailDialog({
                       {actionButton('zugang', b, <AddCircleOutlineIcon fontSize="small" />)}
                       {actionButton('umbuchung', b, <SwapHorizIcon fontSize="small" />)}
                       {actionButton('inventur', b, <FactCheckIcon fontSize="small" />)}
+                      <Tooltip title={t('detail.editLagerort')}>
+                        <IconButton
+                          size="small"
+                          aria-label={t('detail.editLagerort')}
+                          onClick={() => setLagerortDialog(b)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={t('detail.deleteLagerort')}>
+                        <IconButton
+                          size="small"
+                          aria-label={t('detail.deleteLagerort')}
+                          onClick={() => setToDelete(b)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   )}
                 </TableRow>
@@ -219,15 +258,38 @@ export default function GeraetDetailDialog({
           onClose={() => setBooking(undefined)}
         />
       )}
-      {lagerortOpen && (
+      {lagerortDialog !== undefined && (
         <LagerortDialog
           open
           groupId={groupId}
           geraet={geraet}
+          bestand={lagerortDialog ?? undefined}
           existing={bestaende}
           allBestaende={allBestaende}
           containers={containers}
-          onClose={() => setLagerortOpen(false)}
+          onClose={() => setLagerortDialog(undefined)}
+        />
+      )}
+      {toDelete && (
+        <ConfirmDialog
+          title={t('detail.deleteLagerortTitle')}
+          text={[
+            t('detail.deleteLagerortText', {
+              lagerort: formatLagerort(toDelete.lagerort) || toDelete.lagerortKey,
+            }),
+            toDelete.anzahl !== 0
+              ? t('detail.deleteLagerortRest', { anzahl: toDelete.anzahl, einheit })
+              : undefined,
+            t('detail.deleteLagerortArchived'),
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          yes={tCommon('delete')}
+          no={tCommon('cancel')}
+          onConfirm={(confirmed) => {
+            if (confirmed) handleDelete(toDelete);
+            setToDelete(undefined);
+          }}
         />
       )}
     </Dialog>

@@ -13,6 +13,7 @@ import {
 } from '../../app/auth';
 import {
   deviationKey,
+  formatLagerort,
   GERAET_BESTAND_COLLECTION,
   GERAET_BUCHUNG_COLLECTION,
   GERAET_COLLECTION,
@@ -504,59 +505,184 @@ export async function createGeraetBestand(
   }
 
   const geraetRef = geraetCol(groupId).doc(geraetId);
-  const ref = bestandCol(groupId).doc();
-  const crossed = await firestore.runTransaction(async (tx: Transaction) => {
+  const { id, crossed } = await firestore.runTransaction(async (tx: Transaction) => {
     const snap = await tx.get(geraetRef);
     if (!snap.exists) throw notFound('geraet', geraetId);
-    if (place.containerId) {
-      // Die Bezeichnung kommt vom Container-Artikel, nicht aus dem Browser —
-      // und nur ein Artikel der Kategorie „Container" taugt als Lagerort.
-      if (place.containerId === geraetId) {
-        throw new ApiException('invalid lagerort: container cannot hold itself', {
-          status: 400,
-        });
-      }
-      const containerSnap = await tx.get(geraetCol(groupId).doc(place.containerId));
-      const container = containerSnap.data() as Partial<Geraet> | undefined;
-      if (!containerSnap.exists || !container || !isContainer(container)) {
-        throw new ApiException(`invalid lagerort: container ${place.containerId} not found`, {
-          status: 400,
-        });
-      }
-      place.container = trimmed(container.bezeichnung) ?? place.containerId;
-    }
-    const duplicate = await tx.get(
-      bestandCol(groupId)
-        .where('geraetId', '==', geraetId)
-        .where('lagerortKey', '==', key),
-    );
-    if (!duplicate.empty) {
+    await resolveContainer(tx, groupId, geraetId, place);
+    const duplicates = await findBestaendeByKey(tx, groupId, geraetId, key);
+    // Ein archivierter Lagerort mit demselben Schlüssel kommt zurück — ein
+    // zweiter daneben wäre beim nächsten Import nicht unterscheidbar.
+    const archived = duplicates.find((b) => b.archiviert === true);
+    if (duplicates.length > 0 && !archived) {
       throw new ApiException(`bestand ${key} exists for geraet ${geraetId}`, {
         status: 409,
       });
     }
     const geraet = geraetSnapshot(geraetId, snap.data());
+    const stamp = { updatedAt: actor.now, updatedBy: actor.uid };
 
-    tx.create(ref, {
-      geraetId,
-      lagerortKey: key,
-      lagerort: place,
-      anzahl: menge,
-      updatedAt: actor.now,
-      updatedBy: actor.uid,
-    });
-    if (menge === 0) return undefined;
+    let ref: DocumentReference;
+    let delta = menge;
+    if (archived) {
+      ref = bestandCol(groupId).doc(archived.id);
+      delta = clean(menge - (archived.anzahl ?? 0));
+      tx.update(ref, { lagerort: place, anzahl: menge, archiviert: FieldValue.delete(), ...stamp });
+    } else {
+      ref = bestandCol(groupId).doc();
+      tx.create(ref, { geraetId, lagerortKey: key, lagerort: place, anzahl: menge, ...stamp });
+    }
+    if (delta === 0) return { id: ref.id, crossed: undefined };
     tx.set(
       buchungCol(groupId).doc(),
-      buchungDoc({ geraetId, bestandId: ref.id, art: 'inventur', menge }, actor),
+      buchungDoc({ geraetId, bestandId: ref.id, art: 'inventur', menge: delta }, actor),
     );
-    const stock = stockPatch(geraet, menge, actor);
+    const stock = stockPatch(geraet, delta, actor);
     tx.update(geraetRef, stock.patch);
-    return stock.crossed;
+    return { id: ref.id, crossed: stock.crossed };
   });
 
   if (crossed) await notifyAfterCommit({ groupId, items: [crossed] });
-  return { id: ref.id };
+  return { id };
+}
+
+/**
+ * Setzt bei einem Container-Lagerort die Bezeichnung vom Container-Artikel —
+ * nicht aus dem Browser —, und nur ein Artikel der Kategorie „Container" taugt
+ * als Lagerort.
+ */
+async function resolveContainer(
+  tx: Transaction,
+  groupId: string,
+  geraetId: string,
+  place: GeraetLagerort,
+): Promise<void> {
+  if (!place.containerId) return;
+  if (place.containerId === geraetId) {
+    throw new ApiException('invalid lagerort: container cannot hold itself', { status: 400 });
+  }
+  const containerSnap = await tx.get(geraetCol(groupId).doc(place.containerId));
+  const container = containerSnap.data() as Partial<Geraet> | undefined;
+  if (!containerSnap.exists || !container || !isContainer(container)) {
+    throw new ApiException(`invalid lagerort: container ${place.containerId} not found`, {
+      status: 400,
+    });
+  }
+  place.container = trimmed(container.bezeichnung) ?? place.containerId;
+}
+
+async function findBestaendeByKey(
+  tx: Transaction,
+  groupId: string,
+  geraetId: string,
+  key: string,
+): Promise<GeraetBestand[]> {
+  const snap = await tx.get(
+    bestandCol(groupId).where('geraetId', '==', geraetId).where('lagerortKey', '==', key),
+  );
+  return snap.docs.map((d) => bestandSnapshot(d.id, d.data()));
+}
+
+/**
+ * Ändert den Lagerort eines Bestands — Menge und Buchungen bleiben, sie hängen
+ * an der ID. Der neue Schlüssel ist ab dann die Import-Identität: Führt Sybos
+ * den alten Lagerort weiter, legt der nächste Import ihn wieder an.
+ */
+export async function updateGeraetBestand(
+  groupId: string,
+  bestandId: string,
+  lagerort: GeraetLagerort,
+): Promise<{ id: string }> {
+  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const actor = actorOf(session);
+  assertSafeId(bestandId, 'bestandId');
+  const place = sanitizeLagerort(lagerort);
+  const key = lagerortKey(place);
+
+  const ref = bestandCol(groupId).doc(bestandId);
+  await firestore.runTransaction(async (tx: Transaction) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw notFound('bestand', bestandId);
+    const current = bestandSnapshot(bestandId, snap.data());
+    assertSafeId(current.geraetId, 'geraetId');
+    await resolveContainer(tx, groupId, current.geraetId, place);
+    const duplicates = await findBestaendeByKey(tx, groupId, current.geraetId, key);
+    if (duplicates.some((b) => b.id !== bestandId)) {
+      throw new ApiException(`bestand ${key} exists for geraet ${current.geraetId}`, {
+        status: 409,
+      });
+    }
+    tx.update(ref, {
+      lagerort: place,
+      lagerortKey: key,
+      updatedAt: actor.now,
+      updatedBy: actor.uid,
+    });
+  });
+  return { id: bestandId };
+}
+
+/**
+ * Löscht einen Lagerort. Ein Restbestand wird als Inventur ausgebucht, die
+ * Bemerkung nennt den Lagerort — die Buchung überdauert ihn.
+ *
+ * Hat ein Einsatz aus dem Lagerort verbraucht, wird er nur archiviert: Der
+ * Einsatz zeigt ihn weiter, und das Löschen des Verbrauchs bucht dorthin
+ * zurück (`syncGeraetVerbrauch` holt ihn dann zurück).
+ */
+export async function deleteGeraetBestand(
+  groupId: string,
+  bestandId: string,
+): Promise<{ id: string; deleted: boolean }> {
+  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const actor = actorOf(session);
+  assertSafeId(bestandId, 'bestandId');
+
+  const ref = bestandCol(groupId).doc(bestandId);
+  const { deleted, crossed } = await firestore.runTransaction(async (tx: Transaction) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw notFound('bestand', bestandId);
+    const current = bestandSnapshot(bestandId, snap.data());
+    assertSafeId(current.geraetId, 'geraetId');
+    const geraetRef = geraetCol(groupId).doc(current.geraetId);
+    const geraetSnap = await tx.get(geraetRef);
+    if (!geraetSnap.exists) throw notFound('geraet', current.geraetId);
+    const geraet = geraetSnapshot(current.geraetId, geraetSnap.data());
+    const bookings = await tx.get(buchungCol(groupId).where('bestandId', '==', bestandId));
+    const usedInFirecall = bookings.docs.some((d) => {
+      const art = (d.data() as GeraetBuchung).art;
+      return art === 'verbrauch' || art === 'storno';
+    });
+
+    const delta = clean(-(current.anzahl ?? 0));
+    let stockCrossed: NachbestellungItem | undefined;
+    if (delta !== 0) {
+      tx.set(
+        buchungCol(groupId).doc(),
+        buchungDoc(
+          {
+            geraetId: current.geraetId,
+            bestandId,
+            art: 'inventur',
+            menge: delta,
+            bemerkung: `Lagerort gelöscht: ${formatLagerort(current.lagerort)}`,
+          },
+          actor,
+        ),
+      );
+      const stock = stockPatch(geraet, delta, actor);
+      tx.update(geraetRef, stock.patch);
+      stockCrossed = stock.crossed;
+    }
+    if (usedInFirecall) {
+      tx.update(ref, { anzahl: 0, archiviert: true, updatedAt: actor.now, updatedBy: actor.uid });
+    } else {
+      tx.delete(ref);
+    }
+    return { deleted: !usedInFirecall, crossed: stockCrossed };
+  });
+
+  if (crossed) await notifyAfterCommit({ groupId, items: [crossed] });
+  return { id: bestandId, deleted };
 }
 
 export type BookGeraetBestandInput =
@@ -817,8 +943,11 @@ export async function syncGeraetVerbrauch(
     const totals = new Map<string, number>();
     for (const { bestandId, delta } of changes) {
       const b = bestaende.get(bestandId)!;
+      const anzahl = clean((b.anzahl ?? 0) + delta);
       tx.update(bestandCol(groupId).doc(bestandId), {
-        anzahl: clean((b.anzahl ?? 0) + delta),
+        anzahl,
+        // Was in einen archivierten Lagerort zurückkommt, muss sichtbar sein.
+        ...(b.archiviert && anzahl !== 0 ? { archiviert: FieldValue.delete() } : {}),
         updatedAt: actor.now,
         updatedBy: actor.uid,
       });
@@ -1134,7 +1263,7 @@ export async function importGeraete(
     push(b.geraetId, {
       kind: 'update',
       ref: bestandCol(groupId).doc(b.bestandId),
-      data: { anzahl: FieldValue.increment(delta), ...stamp },
+      data: { anzahl: FieldValue.increment(delta), archiviert: FieldValue.delete(), ...stamp },
     });
     book(b.geraetId, b.bestandId, 'import', delta);
     addDelta(b.geraetId, delta);
@@ -1152,7 +1281,7 @@ export async function importGeraete(
       push(d.geraetId, {
         kind: 'update',
         ref: bestandCol(groupId).doc(d.bestandId),
-        data: { anzahl: FieldValue.increment(delta), ...stamp },
+        data: { anzahl: FieldValue.increment(delta), archiviert: FieldValue.delete(), ...stamp },
       });
       book(d.geraetId, d.bestandId, 'inventur', delta);
     } else {

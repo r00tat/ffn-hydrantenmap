@@ -19,13 +19,18 @@ import {
   type GeraetBestand,
   type GeraetLagerort,
 } from '../../../common/geraet';
-import { createGeraetBestand } from '../geraeteActions';
+import { createGeraetBestand, updateGeraetBestand } from '../geraeteActions';
 import { callAction } from './actionResult';
 
 export interface LagerortDialogProps {
   open: boolean;
   groupId: string;
   geraet: Geraet;
+  /**
+   * Gesetzt: diesen Lagerort bearbeiten. Die Menge ändert sich dabei nicht —
+   * die bucht die Inventur.
+   */
+  bestand?: GeraetBestand;
   /** Die Lagerorte dieses Artikels — ein vorhandener darf nicht doppelt entstehen. */
   existing: GeraetBestand[];
   /** Alle Bestände der Gruppe, als Vorschläge für Fahrzeug und Standort. */
@@ -45,7 +50,7 @@ function distinct(values: (string | undefined)[]): string[] {
 
 /**
  * Einen weiteren Lagerort für einen Artikel anlegen, optional mit
- * Anfangsbestand (als Zugang gebucht). Fahrzeug und Standort schlagen die
+ * Anfangsbestand (als Inventur gebucht), oder einen vorhandenen ändern. Fahrzeug und Standort schlagen die
  * Namen vor, die es in der Gruppe schon gibt — sonst entstehen aus „SRF" und
  * „S R F" zwei Lagerorte. Ein Container wird aus den Container-Artikeln
  * gewählt und nicht getippt: Er ist in Sybos ein Artikel, kein Fahrzeug.
@@ -54,6 +59,7 @@ export default function LagerortDialog({
   open,
   groupId,
   geraet,
+  bestand,
   existing,
   allBestaende,
   containers,
@@ -62,13 +68,18 @@ export default function LagerortDialog({
   const t = useTranslations('geraete');
   const tCommon = useTranslations('common');
 
-  const [art, setArt] = useState<Art>('raum');
-  const [fahrzeug, setFahrzeug] = useState('');
-  const [laderaum, setLaderaum] = useState('');
-  const [standort, setStandort] = useState('');
-  const [raum, setRaum] = useState('');
-  const [container, setContainer] = useState<Geraet | null>(null);
-  const [bemerkung, setBemerkung] = useState('');
+  const initial = bestand?.lagerort;
+  const [art, setArt] = useState<Art>(
+    initial && initial.art !== 'set' ? initial.art : 'raum',
+  );
+  const [fahrzeug, setFahrzeug] = useState(initial?.fahrzeug ?? '');
+  const [laderaum, setLaderaum] = useState(initial?.laderaum ?? '');
+  const [standort, setStandort] = useState(initial?.standort ?? '');
+  const [raum, setRaum] = useState(initial?.raum ?? '');
+  const [container, setContainer] = useState<Geraet | null>(
+    () => containers.find((c) => c.id === initial?.containerId) ?? null,
+  );
+  const [bemerkung, setBemerkung] = useState(initial?.bemerkung ?? '');
   const [anzahl, setAnzahl] = useState('0');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -105,11 +116,11 @@ export default function LagerortDialog({
       return;
     }
     const key = lagerortKey(lagerort);
-    if (existing.some((b) => b.lagerortKey === key)) {
+    if (existing.some((b) => b.lagerortKey === key && b.id !== bestand?.id)) {
       setError(t('errors.lagerortExists'));
       return;
     }
-    const count = anzahl.trim() ? parseMenge(anzahl) : 0;
+    const count = bestand ? 0 : anzahl.trim() ? parseMenge(anzahl) : 0;
     if (count === undefined) {
       setError(t('errors.countInvalid'));
       return;
@@ -117,7 +128,9 @@ export default function LagerortDialog({
 
     setBusy(true);
     const outcome = await callAction(() =>
-      createGeraetBestand(groupId, geraet.id, lagerort, count),
+      bestand
+        ? updateGeraetBestand(groupId, bestand.id, lagerort)
+        : createGeraetBestand(groupId, geraet.id, lagerort, count),
     );
     setBusy(false);
     if (!outcome.ok) {
@@ -129,7 +142,7 @@ export default function LagerortDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{t('lagerort.title')}</DialogTitle>
+      <DialogTitle>{t(bestand ? 'lagerort.editTitle' : 'lagerort.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
@@ -204,14 +217,16 @@ export default function LagerortDialog({
             onChange={(e) => setBemerkung(e.target.value)}
             fullWidth
           />
-          <TextField
-            label={t('lagerort.anzahl')}
-            value={anzahl}
-            onChange={(e) => setAnzahl(e.target.value)}
-            type="number"
-            slotProps={{ htmlInput: { min: 0, step: 'any', inputMode: 'decimal' } }}
-            fullWidth
-          />
+          {!bestand && (
+            <TextField
+              label={t('lagerort.anzahl')}
+              value={anzahl}
+              onChange={(e) => setAnzahl(e.target.value)}
+              type="number"
+              slotProps={{ htmlInput: { min: 0, step: 'any', inputMode: 'decimal' } }}
+              fullWidth
+            />
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -219,7 +234,7 @@ export default function LagerortDialog({
           {tCommon('cancel')}
         </Button>
         <Button variant="contained" onClick={handleSave} disabled={busy}>
-          {tCommon('create')}
+          {tCommon(bestand ? 'save' : 'create')}
         </Button>
       </DialogActions>
     </Dialog>

@@ -38,8 +38,14 @@ export default function GeraetSteckbrief({ geraet, compact = false }: GeraetStec
     [t('materialTyp'), compact ? undefined : geraet.materialTyp],
     [t('hersteller'), join([geraet.hersteller, geraet.herstellerTyp], ' · ')],
     [t('seriennummer'), geraet.seriennummer],
-    [t('baujahr'), geraet.baujahr != null ? String(geraet.baujahr) : undefined],
+    [t('baujahr'), baujahrText(geraet)],
     [t('anschaffungsDatum'), compact ? undefined : date(geraet.anschaffungsDatum)],
+    [
+      t('verfuegbarVon'),
+      compact || geraet.verfuegbarVon === geraet.anschaffungsDatum
+        ? undefined
+        : date(geraet.verfuegbarVon),
+    ],
     [t('verfuegbarBis'), date(geraet.verfuegbarBis)],
     [
       t('lebensdauer'),
@@ -47,7 +53,20 @@ export default function GeraetSteckbrief({ geraet, compact = false }: GeraetStec
         ? undefined
         : join([String(geraet.lebensdauer), geraet.lebensdauerEinheit], ' '),
     ],
+    [
+      t('einkaufspreis'),
+      compact || geraet.einkaufspreis == null
+        ? undefined
+        : format.number(geraet.einkaufspreis, { style: 'currency', currency: 'EUR' }),
+    ],
     [t('besitzer'), compact ? undefined : geraet.besitzer],
+    [
+      t('versicherung'),
+      compact
+        ? undefined
+        : join([geraet.versicherung, geraet.polizzenummer && `${t('polizzenummer')} ${geraet.polizzenummer}`], ' · '),
+    ],
+    [t('kasko'), compact ? undefined : geraet.kasko],
     [t('kostenersatzRateId'), compact ? undefined : geraet.kostenersatzRateId],
     [t('bemerkung'), geraet.bemerkung, true],
     [t('zubehoer'), geraet.zubehoer, true],
@@ -73,4 +92,11 @@ export default function GeraetSteckbrief({ geraet, compact = false }: GeraetStec
       ))}
     </Stack>
   );
+}
+
+/** „05/2020", wenn der Herstellungs-Monat bekannt ist, sonst nur das Jahr. */
+function baujahrText(geraet: Geraet): string | undefined {
+  if (geraet.baujahr == null) return undefined;
+  if (geraet.baumonat == null) return String(geraet.baujahr);
+  return `${String(geraet.baumonat).padStart(2, '0')}/${geraet.baujahr}`;
 }

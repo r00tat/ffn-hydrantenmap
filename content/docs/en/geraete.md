@@ -16,10 +16,12 @@
 ### During an operation: assign equipment or consume supplies
 
 1. Open the "Equipment & supplies" section of the operation
-2. Search for the item — by name, inventory number, barcode, serial number, but also by type or class (e.g. "gas detector"). Below each match you see model, serial number and location, so items with the same name can be told apart; once selected, the dialog shows the master data from Sybos
+2. Search for the item and click it — by name, inventory number, barcode, serial number, but also by type or class (e.g. "gas detector"). Below each match you see model, serial number and location, so items with the same name can be told apart; once selected, the dialog shows the master data from Sybos
 3. For equipment, enter the quantity or hours — the stock does not change
 4. For consumables, enter the quantity and choose the location it was taken from
 5. Save — the entry shows up in the operation immediately
+
+Several items at once: the list stays open after a click, so you can pick more items right away. **"Record …"** adds all of them — equipment assigned, consumables with quantity 1 from the suggested location. Add quantity, hours or location afterwards via **Edit** on the entry if needed. Items already recorded for the operation are marked "already in this operation".
 
 :::info
 Without a connection the entry is stored on the device. Booking it off the stock happens as soon as the connection is back. Until then the entry is marked as "not yet booked".
@@ -36,6 +38,7 @@ The same list is also on the **operation overview** as the collapsible section "
 3. At the location, choose **Receipt** (supplies arrived), **Transfer** (e.g. from storage to the SRF) or **Stocktaking** (enter the counted value)
 4. On the item, set whether it is a **consumable** and, if needed, a **unit** and a **minimum stock**
 5. Add another location with **New storage location**. You can choose room, vehicle or **container**; containers are the items of the Sybos category "Container" and have to be imported first
+6. The pencil edits a location, the bin deletes it. Any remaining stock is booked out. If an operation used material from the location, it is only hidden so the operation still shows it
 
 ### Import from Sybos
 

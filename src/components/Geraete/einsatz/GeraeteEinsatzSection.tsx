@@ -21,7 +21,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   formatLagerort,
   GERAET_EINSATZ_COLLECTION,
-  type GeraetBestand,
   type GeraetEinsatz,
 } from '../../../common/geraet';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
@@ -66,7 +65,12 @@ export default function GeraeteEinsatzSection({ embedded = false }: { embedded?:
   // es) — Einsatz-Gäste sehen die Artikel nicht und buchen nie ab.
   const isGroupMember = !!groupId && (groups ?? []).includes(groupId);
 
-  const { geraete, bestaendeByGeraet, fromCache: geraeteFromCache } = useGeraete(groupId);
+  const {
+    geraete,
+    bestaendeByGeraet,
+    bestandById,
+    fromCache: geraeteFromCache,
+  } = useGeraete(groupId);
   const { entries, fromCache } = useGeraetEinsatz(firecallId);
   const { vehicles } = useVehicles();
   const pendingIds = usePendingDocIds(
@@ -82,14 +86,6 @@ export default function GeraeteEinsatzSection({ embedded = false }: { embedded?:
   );
 
   const assignedIds = useMemo(() => entries.map((e) => e.geraetId), [entries]);
-
-  const bestandById = useMemo(() => {
-    const map = new Map<string, GeraetBestand>();
-    for (const list of bestaendeByGeraet.values()) {
-      for (const b of list) map.set(b.id, b);
-    }
-    return map;
-  }, [bestaendeByGeraet]);
 
   const geraetById = useMemo(() => new Map(geraete.map((g) => [g.id, g])), [geraete]);
 

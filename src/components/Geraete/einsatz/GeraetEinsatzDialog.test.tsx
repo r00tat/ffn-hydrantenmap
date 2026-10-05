@@ -222,6 +222,64 @@ describe('GeraetEinsatzDialog', () => {
     expect('menge' in data).toBe(false);
   });
 
+  it('erfasst mehrere Artikel in einem Zug mit Standardwerten', async () => {
+    const { onClose } = renderDialog();
+    const user = await pickArticle('binde', /Bindevlies/);
+    const input = screen.getByRole('combobox', { name: /Artikel/ });
+    await user.clear(input);
+    await user.type(input, 'tauch');
+    await user.click(await screen.findByRole('option', { name: /Tauchpumpe/ }));
+    await user.clear(input);
+    await user.type(input, 'strom');
+    await user.click(await screen.findByRole('option', { name: /Stromaggregat/ }));
+
+    expect(screen.getByText(/3 Artikel werden erfasst/)).toBeInTheDocument();
+    expect(screen.getByText('1 Stk von SRF · GR 2')).toBeInTheDocument();
+    // Einzelfelder gibt es erst wieder beim Bearbeiten je Eintrag.
+    expect(screen.queryByRole('combobox', { name: 'Lagerort' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Menge/ })).toBeNull();
+
+    await user.type(screen.getByRole('textbox', { name: 'Bemerkung' }), 'Ölspur');
+    await user.click(screen.getByRole('button', { name: '3 erfassen' }));
+
+    expect(mocks.add).toHaveBeenCalledTimes(3);
+    const data = mocks.add.mock.calls.map((c) => c[1] as Omit<GeraetEinsatz, 'id'>);
+    expect(data[0]).toMatchObject({
+      geraetId: 'vlies',
+      art: 'verbraucht',
+      bestandId: 'srf',
+      menge: 1,
+      bemerkung: 'Ölspur',
+    });
+    expect(data[1]).toMatchObject({ geraetId: 'pumpe', art: 'zugeordnet', menge: 1 });
+    expect(data[2]).toMatchObject({ geraetId: 'aggregat', art: 'zugeordnet' });
+    expect('stunden' in data[2]).toBe(false);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('nimmt einen abgewählten Artikel wieder heraus und zeigt dann die Einzelfelder', async () => {
+    renderDialog();
+    const user = await pickArticle('binde', /Bindevlies/);
+    const input = screen.getByRole('combobox', { name: /Artikel/ });
+    await user.clear(input);
+    await user.type(input, 'tauch');
+    await user.click(await screen.findByRole('option', { name: /Tauchpumpe/ }));
+    // Ein zweiter Klick auf die Option wählt sie wieder ab.
+    await user.click(await screen.findByRole('option', { name: /Tauchpumpe/ }));
+    expect(screen.getByRole('textbox', { name: /Menge/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(mocks.add).toHaveBeenCalledTimes(1);
+  });
+
+  it('kennzeichnet Artikel, die schon im Einsatz erfasst sind', async () => {
+    renderDialog({ assignedIds: ['pumpe'] });
+    const user = userEvent.setup();
+    await user.type(screen.getByRole('combobox', { name: /Artikel/ }), 'tauch');
+    expect(await screen.findByRole('option', { name: /Tauchpumpe/ })).toHaveTextContent(
+      'bereits im Einsatz',
+    );
+  });
+
   it('ohne Artikel wird nicht gespeichert', async () => {
     const user = userEvent.setup();
     const { onClose } = renderDialog();
@@ -236,7 +294,8 @@ describe('GeraetEinsatzDialog', () => {
     renderDialog();
     await user.click(screen.getByRole('button', { name: 'Barcode scannen' }));
     await user.click(screen.getByRole('button', { name: 'Scan liefern', hidden: true }));
-    expect(screen.getByRole('combobox', { name: /Artikel/ })).toHaveValue('Tauchpumpe (4711)');
+    expect(screen.getByRole('button', { name: 'Tauchpumpe (4711)' })).toBeInTheDocument();
+    expect(screen.getByText(/wird dem Einsatz zugeordnet/)).toBeInTheDocument();
   });
 
   it('meldet einen Scan ohne Treffer', async () => {
@@ -264,7 +323,7 @@ describe('GeraetEinsatzDialog', () => {
     };
     renderDialog({ entry });
 
-    expect(screen.getByRole('combobox', { name: /Artikel/ })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: 'Artikel' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'Lagerort' })).toHaveTextContent(
       'Feuerwehrhaus · Lager',
     );

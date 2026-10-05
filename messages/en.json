@@ -3881,7 +3881,12 @@
       "zubehoer": "Accessories",
       "anschaffungsDatum": "Purchased",
       "verfuegbarBis": "Available until",
-      "lebensdauer": "Service life"
+      "lebensdauer": "Service life",
+      "verfuegbarVon": "Available from",
+      "einkaufspreis": "Purchase price",
+      "versicherung": "Liability insurance",
+      "polizzenummer": "Policy",
+      "kasko": "Comprehensive insurance"
     },
     "verwendungsnachweis": {
       "none": "not recorded",
@@ -3902,7 +3907,8 @@
       "zielRequired": "Please choose a target location.",
       "lagerortRequired": "Please enter a vehicle, container or site.",
       "lagerortExists": "This item already has this storage location.",
-      "saveFailed": "Saving failed: {error}"
+      "saveFailed": "Saving failed: {error}",
+      "deleteFailed": "Delete failed: {error}"
     },
     "detail": {
       "bestandGesamt": "Total stock",
@@ -3911,7 +3917,13 @@
       "newLagerort": "Location",
       "noBestand": "No storage location yet.",
       "lagerort": "Storage location",
-      "anzahl": "Quantity"
+      "anzahl": "Quantity",
+      "editLagerort": "Edit storage location",
+      "deleteLagerort": "Delete storage location",
+      "deleteLagerortTitle": "Delete storage location?",
+      "deleteLagerortText": "“{lagerort}” will be deleted.",
+      "deleteLagerortRest": "The remaining stock of {anzahl} {einheit} is booked out as a stocktake.",
+      "deleteLagerortArchived": "If an operation used material from it, it is only hidden so the operation still shows it."
     },
     "booking": {
       "title": {
@@ -3939,7 +3951,8 @@
       "anzahl": "Initial stock",
       "artContainer": "Container",
       "container": "Container",
-      "noContainer": "No containers recorded. Containers are articles of the Sybos category “Container” – import them first, then pick one here."
+      "noContainer": "No containers recorded. Containers are articles of the Sybos category “Container” – import them first, then pick one here.",
+      "editTitle": "Edit storage location"
     },
     "import": {
       "open": "Import",
@@ -4036,7 +4049,12 @@
         "invalidMenge": "Please enter a valid quantity.",
         "invalidStunden": "Please enter valid hours.",
         "noBestand": "Please choose a storage location."
-      }
+      },
+      "alreadyAssigned": "already in this operation",
+      "manyInfo": "{count} articles will be recorded: devices assigned, consumables with quantity 1 from the preselected location. Quantity, hours and location can be changed per entry afterwards.",
+      "manyConsumable": "1 {einheit} from {lagerort}",
+      "manyConsumableNoBestand": "1 {einheit}, no storage location – not booked",
+      "saveMany": "Record {count}"
     },
     "scanner": {
       "title": "Scan barcode",

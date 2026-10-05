@@ -62,6 +62,7 @@ vi.mock('../../../hooks/useGeraete', () => ({
     geraete: groupId ? [vlies] : [],
     bestaende: groupId ? [srfBestand] : [],
     bestaendeByGeraet: new Map(groupId ? [['vlies', [srfBestand]]] : []),
+    bestandById: new Map(groupId ? [['srf', srfBestand]] : []),
     loading: false,
     fromCache: false,
   }),

@@ -5,9 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Geraet, GeraetBestand } from '../../../common/geraet';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
-const { createGeraetBestand } = vi.hoisted(() => ({ createGeraetBestand: vi.fn() }));
+const { createGeraetBestand, updateGeraetBestand } = vi.hoisted(() => ({
+  createGeraetBestand: vi.fn(),
+  updateGeraetBestand: vi.fn(),
+}));
 
-vi.mock('../geraeteActions', () => ({ createGeraetBestand }));
+vi.mock('../geraeteActions', () => ({ createGeraetBestand, updateGeraetBestand }));
 
 import LagerortDialog from './LagerortDialog';
 
@@ -42,6 +45,7 @@ describe('LagerortDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createGeraetBestand.mockResolvedValue({ id: 'neu' });
+    updateGeraetBestand.mockResolvedValue({ id: 'b1' });
   });
 
   function render() {
@@ -136,4 +140,68 @@ describe('LagerortDialog', () => {
       await screen.findByText('Bitte Fahrzeug, Container bzw. Standort angeben.'),
     ).toBeInTheDocument();
   });
+
+  describe('bearbeiten', () => {
+    const srf: GeraetBestand = {
+      id: 'b2',
+      geraetId: 'g1',
+      lagerortKey: 'fahrzeug|srf|gr 2',
+      lagerort: { art: 'fahrzeug', fahrzeug: 'SRF', laderaum: 'GR 2', bemerkung: 'oben' },
+      anzahl: 2,
+    };
+
+    function renderEdit(bestand: GeraetBestand) {
+      return renderWithIntl(
+        <LagerortDialog
+          open
+          groupId="ffnd"
+          geraet={geraet}
+          bestand={bestand}
+          existing={[lager, srf]}
+          allBestaende={[lager, srf]}
+          containers={containers}
+          onClose={onClose}
+        />,
+      );
+    }
+
+    it('zeigt den Lagerort vorbefüllt, ohne Anfangsbestand, und speichert die Änderung', async () => {
+      const user = userEvent.setup();
+      renderEdit(srf);
+      expect(screen.getByText('Lagerort bearbeiten')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Anfangsbestand')).toBeNull();
+      const laderaum = screen.getByLabelText('Laderaum');
+      expect(laderaum).toHaveValue('GR 2');
+      await user.clear(laderaum);
+      await user.type(laderaum, 'GR 3');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(updateGeraetBestand).toHaveBeenCalledWith('ffnd', 'b2', {
+          art: 'fahrzeug',
+          fahrzeug: 'SRF',
+          laderaum: 'GR 3',
+          bemerkung: 'oben',
+        }),
+      );
+      expect(createGeraetBestand).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('lehnt einen anderen vorhandenen Lagerort ab', async () => {
+      const user = userEvent.setup();
+      renderEdit(lager);
+      const standort = screen.getByLabelText(/^Standort/);
+      expect(standort).toHaveValue('Feuerwehrhaus');
+      await user.click(screen.getByLabelText('Art'));
+      await user.click(screen.getByRole('option', { name: 'Fahrzeug' }));
+      await user.type(screen.getByLabelText(/^Fahrzeug/), 'SRF');
+      await user.type(screen.getByLabelText('Laderaum'), 'GR 2');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      expect(
+        await screen.findByText('Diesen Lagerort gibt es für den Artikel schon.'),
+      ).toBeInTheDocument();
+      expect(updateGeraetBestand).not.toHaveBeenCalled();
+    });
+  });
 });
+
