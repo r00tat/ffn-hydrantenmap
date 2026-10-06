@@ -3023,7 +3023,13 @@
     "kostenersatzTooltip": "Kostenersatz-Berechnungen",
     "fahrtenRecorded": "{count, plural, one {# Fahrt} other {# Fahrten}} im Fahrtenbuch",
     "deleteTitle": "Einsatz {name} {date} löschen",
-    "deleteConfirm": "Einsatz {name} {date} wirklich löschen?"
+    "deleteConfirm": "Einsatz {name} {date} wirklich löschen?",
+    "search": "Einsätze durchsuchen",
+    "searchPlaceholder": "Titel, Datum, Beschreibung …",
+    "clearSearch": "Suche löschen",
+    "noSearchResults": "Keine Einsätze zu „{query}“ gefunden.",
+    "withoutDate": "Ohne Datum",
+    "yearCount": "{count, plural, one {# Einsatz} other {# Einsätze}}"
   },
   "backup": {
     "exportTooltip": "Einsatz als Sicherung herunterladen",

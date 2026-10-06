@@ -1,12 +1,18 @@
 'use client';
 
 import AddIcon from '@mui/icons-material/Add';
+import ClearIcon from '@mui/icons-material/Clear';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import SearchIcon from '@mui/icons-material/Search';
 import ShareIcon from '@mui/icons-material/Share';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import Accordion from '@mui/material/Accordion';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -20,7 +26,9 @@ import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
+import InputAdornment from '@mui/material/InputAdornment';
 import Select from '@mui/material/Select';
+import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, where } from 'firebase/firestore';
@@ -28,7 +36,7 @@ import { useTranslations } from 'next-intl';
 import { setDocLocal } from '../../lib/firestoreClient';
 import FirecallLink from '../site/FirecallLink';
 import useFirecallNavigate from '../../hooks/useFirecallNavigate';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
 import OfflineListHint from '../site/OfflineListHint';
@@ -45,6 +53,13 @@ import { firestore } from '../firebase/firebase';
 import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
 import { KostenersatzList } from '../Kostenersatz';
 import { useAuditLog } from '../../hooks/useAuditLog';
+import {
+  filterFirecalls,
+  FirecallYearGroup,
+  groupFirecallsByYear,
+} from './einsaetzeList';
+
+const yearKey = (group: FirecallYearGroup) => String(group.year ?? 'none');
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -291,6 +306,23 @@ export default function Einsaetze() {
     filterFn,
   });
 
+  const [search, setSearch] = useState('');
+  // Nur was der Benutzer selbst auf- oder zugeklappt hat. Ohne Eintrag gilt:
+  // das neueste Jahr offen, ältere zu — während einer Suche alle offen,
+  // damit die Treffer nicht in zugeklappten Jahren verschwinden.
+  const [expandedOverrides, setExpandedOverrides] = useState<
+    Record<string, boolean>
+  >({});
+  const searching = search.trim() !== '';
+  const changeSearch = useCallback((value: string) => {
+    setSearch(value);
+    setExpandedOverrides({});
+  }, []);
+  const yearGroups = useMemo(
+    () => groupFirecallsByYear(filterFirecalls(einsaetze, search)),
+    [einsaetze, search]
+  );
+
   if (!isAuthorized) {
     return <></>;
   }
@@ -298,9 +330,46 @@ export default function Einsaetze() {
   return (
     <>
       <Box sx={{ p: 2, m: 2 }}>
-        <Typography variant="h4" gutterBottom>
-          {t('einsaetze.title')}
-        </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+            mb: 2,
+          }}
+        >
+          <Typography variant="h4">{t('einsaetze.title')}</Typography>
+          <TextField
+            size="small"
+            value={search}
+            onChange={(e) => changeSearch(e.target.value)}
+            placeholder={t('einsaetze.searchPlaceholder')}
+            sx={{ width: { xs: '100%', sm: 320 } }}
+            slotProps={{
+              htmlInput: { 'aria-label': t('einsaetze.search') },
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+                endAdornment: searching ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      aria-label={t('einsaetze.clearSearch')}
+                      onClick={() => changeSearch('')}
+                    >
+                      <ClearIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ) : undefined,
+              },
+            }}
+          />
+        </Box>
         <Grid container spacing={2}>
           <Grid size={{ xs: 6 }}>
             <FirecallImport />
@@ -332,14 +401,51 @@ export default function Einsaetze() {
               empty={einsaetze.length === 0}
             />
           </Grid>
-          {einsaetze.map((einsatz) => (
-            <EinsatzCard
-              einsatz={einsatz}
-              key={einsatz.id}
-              firecallId={firecallId}
-            />
-          ))}
         </Grid>
+        {searching && yearGroups.length === 0 && einsaetze.length > 0 && (
+          <Typography color="text.secondary" sx={{ mt: 2 }}>
+            {t('einsaetze.noSearchResults', { query: search.trim() })}
+          </Typography>
+        )}
+        {yearGroups.map((group, index) => {
+          const key = yearKey(group);
+          const expanded = expandedOverrides[key] ?? (searching || index === 0);
+          return (
+            <Accordion
+              key={key}
+              expanded={expanded}
+              onChange={(_, isExpanded) =>
+                setExpandedOverrides((prev) => ({ ...prev, [key]: isExpanded }))
+              }
+              slotProps={{ transition: { unmountOnExit: true } }}
+              sx={{ mt: 2 }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="h6" component="span" sx={{ mr: 2 }}>
+                  {group.year ?? t('einsaetze.withoutDate')}
+                </Typography>
+                <Typography
+                  component="span"
+                  color="text.secondary"
+                  sx={{ alignSelf: 'center' }}
+                >
+                  {t('einsaetze.yearCount', { count: group.firecalls.length })}
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Grid container spacing={2}>
+                  {group.firecalls.map((einsatz) => (
+                    <EinsatzCard
+                      einsatz={einsatz}
+                      key={einsatz.id}
+                      firecallId={firecallId}
+                    />
+                  ))}
+                </Grid>
+              </AccordionDetails>
+            </Accordion>
+          );
+        })}
       </Box>
       <Fab
         color="primary"
