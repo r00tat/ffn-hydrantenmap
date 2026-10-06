@@ -3023,7 +3023,13 @@
     "kostenersatzTooltip": "Cost recovery calculations",
     "fahrtenRecorded": "{count, plural, one {# trip} other {# trips}} in the logbook",
     "deleteTitle": "Delete operation {name} {date}",
-    "deleteConfirm": "Really delete operation {name} {date}?"
+    "deleteConfirm": "Really delete operation {name} {date}?",
+    "search": "Search operations",
+    "searchPlaceholder": "Title, date, description …",
+    "clearSearch": "Clear search",
+    "noSearchResults": "No operations found for “{query}”.",
+    "withoutDate": "No date",
+    "yearCount": "{count, plural, one {# operation} other {# operations}}"
   },
   "backup": {
     "exportTooltip": "Download the Einsatz as a backup",
