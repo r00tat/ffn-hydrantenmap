@@ -15,6 +15,7 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(() => ({})),
   where: vi.fn(() => ({})),
   onSnapshot: onSnapshotMock,
+  waitForPendingWrites: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../components/firebase/firebase', () => ({ db: {}, firestore: {} }));
@@ -77,7 +78,7 @@ describe('useFirecallSwitcher', () => {
     expect(onSnapshotMock).toHaveBeenCalled();
   });
 
-  it('faengt einen Fehler des Listeners ab, statt ihn abzuwerfen', () => {
+  it('faengt einen Fehler des Listeners ab, statt ihn abzuwerfen', async () => {
     // Ohne Fehler-Callback wirft `onSnapshot` die Ablehnung als unbehandelte
     // Promise-Ablehnung — genau die Meldungen, die im logcat auftauchten.
     const onError = vi.fn();
@@ -99,7 +100,10 @@ describe('useFirecallSwitcher', () => {
           result.current.setFirecallId?.('einsatz-1');
         }),
       ).not.toThrow();
-      expect(warn).toHaveBeenCalled();
+      // Eine Ablehnung wird nach den offenen Schreibvorgängen einmal
+      // wiederholt (offline angelegter Einsatz); erst die zweite ist echt.
+      await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+      expect(onSnapshotMock).toHaveBeenCalledTimes(2);
     } finally {
       warn.mockRestore();
     }

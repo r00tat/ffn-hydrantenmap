@@ -19,6 +19,7 @@ import {
 } from '../components/firebase/firestore';
 import { ATS_FUNKTION } from '../common/vehicle-utils';
 import useFirebaseLogin from './useFirebaseLogin';
+import { subscribeRetryingAfterPendingWrites } from '../lib/snapshotRetry';
 
 export const defaultFirecall: Firecall = {
   id: 'unknown',
@@ -118,20 +119,31 @@ export function useFirecallSwitcher(): Pick<FirecallContextType, 'firecall' | 's
       };
       unsetFirecall();
     } else {
-      const unsubscribe = onSnapshot(
-        doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
-        (docSnapshot) => {
-          if (docSnapshot.exists()) {
-            const fc: Firecall = {
-              id: docSnapshot.id,
-              ...docSnapshot.data(),
-            } as Firecall;
-            setFirecall(fc);
-            console.log(`selected firecall ${fc.id} ${fc.name} ${fc.date}: ${JSON.stringify(fc)}`);
-          } else {
-            console.warn(`firecall with id ${firecallId} not found!`);
-          }
-        },
+      // Ein offline angelegter Einsatz fehlt nach dem Reconnect auf dem
+      // Server, bis sein Schreibvorgang durch ist — die Leseregel lehnt bis
+      // dahin ab. Deshalb nach den offenen Schreibvorgängen neu anmelden
+      // (siehe `snapshotRetry.ts`).
+      const unsubscribe = subscribeRetryingAfterPendingWrites(
+        firestore,
+        (handleError) =>
+          onSnapshot(
+            doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
+            (docSnapshot) => {
+              if (docSnapshot.exists()) {
+                const fc: Firecall = {
+                  id: docSnapshot.id,
+                  ...docSnapshot.data(),
+                } as Firecall;
+                setFirecall(fc);
+                console.log(
+                  `selected firecall ${fc.id} ${fc.name} ${fc.date}: ${JSON.stringify(fc)}`,
+                );
+              } else {
+                console.warn(`firecall with id ${firecallId} not found!`);
+              }
+            },
+            handleError,
+          ),
         // Ohne diesen Zweig wirft `onSnapshot` die Ablehnung als unbehandelte
         // Promise-Ablehnung — sie landet dann im globalen Reporter statt hier.
         (err) => {

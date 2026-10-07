@@ -146,6 +146,22 @@ Einzelheiten und je Eintrag „Erneut versuchen" (setzt denselben Schreibvorgang
 noch einmal ab; scheitert er wieder, steht er wieder in der Liste) und
 „Verwerfen".
 
+## Abgelehnte Listener bei offline angelegtem Einsatz
+
+Die Regeln aller Untersammlungen eines Einsatzes (`item`, `layer`, `diary` …)
+lesen die Gruppe per `get()` am Einsatzdokument. Ein offline angelegter Einsatz
+existiert auf dem Server aber erst, wenn sein Schreibvorgang übertragen ist.
+Beim Reconnect laufen Listen- und Schreibverbindung parallel an: Kommt der
+Listener zuerst an, lehnt der Server ihn mit `permission-denied` ab, und das SDK
+beendet ihn endgültig. Die Karte bliebe auf dem Stand vor dem Reconnect stehen —
+was danach online angelegt wird, erschiene erst nach einem Neustart.
+
+`subscribeRetryingAfterPendingWrites` (`src/lib/snapshotRetry.ts`) meldet einen
+abgelehnten Listener deshalb **einmal** neu an, sobald `waitForPendingWrites`
+die offenen Schreibvorgänge bestätigt. `useFirestoreQuery` und der Listener auf
+das gewählte Einsatzdokument (`useFirecallSwitcher`) nutzen das. Eine zweite
+Ablehnung ist echt und wird gemeldet; endlos wiederholt wird nicht.
+
 ## Synchronisations-Symbol am Eintrag
 
 Im Einsatztagebuch und an der Druckabfrage zeigt ein kleines Wolkensymbol, dass
