@@ -2,12 +2,17 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { onSnapshotMock, unsubscribeMock } = vi.hoisted(() => ({
-  onSnapshotMock: vi.fn(),
-  unsubscribeMock: vi.fn(),
-}));
+const { onSnapshotMock, unsubscribeMock, waitForPendingWritesMock } =
+  vi.hoisted(() => ({
+    onSnapshotMock: vi.fn(),
+    unsubscribeMock: vi.fn(),
+    waitForPendingWritesMock: vi.fn(),
+  }));
 
-vi.mock('firebase/firestore', () => ({ onSnapshot: onSnapshotMock }));
+vi.mock('firebase/firestore', () => ({
+  onSnapshot: onSnapshotMock,
+  waitForPendingWrites: waitForPendingWritesMock,
+}));
 
 const { useFirestoreQuery } = await import('./useFirestoreQuery');
 
@@ -81,6 +86,24 @@ describe('useFirestoreQuery', () => {
 
     expect(onSnapshotMock).toHaveBeenCalledTimes(2);
     expect(unsubscribeMock).toHaveBeenCalledTimes(1);
+  });
+
+  // Offline angelegter Einsatz: Der Listener auf seine Elemente kommt nach dem
+  // Reconnect vor dem Einsatzdokument beim Server an und wird abgelehnt. Ohne
+  // neues Abonnement blieb die Karte auf dem Stand vor dem Reconnect stehen.
+  it('subscribes again after pending writes when permission is denied', async () => {
+    waitForPendingWritesMock.mockResolvedValue(undefined);
+    onSnapshotMock.mockImplementationOnce((_q, next, onError) => {
+      next(snapshot);
+      onError(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+      return unsubscribeMock;
+    });
+
+    const { result } = renderHook(() => useFirestoreQuery<Layer>(query));
+
+    await vi.waitFor(() => expect(onSnapshotMock).toHaveBeenCalledTimes(2));
+    expect(result.current.error).toBeUndefined();
+    expect(result.current.records.map((l) => l.id)).toEqual(['a', 'b']);
   });
 
   it('reports fromCache from the snapshot metadata', () => {

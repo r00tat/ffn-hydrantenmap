@@ -2,6 +2,7 @@
 
 import { onSnapshot, Query, QuerySnapshot } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
+import { subscribeRetryingAfterPendingWrites } from '../lib/snapshotRetry';
 
 /**
  * Represents the return value of the `useFirestoreQuery` hook.
@@ -86,9 +87,18 @@ export const useFirestoreQuery = <T>(
     // Die Optionen nur, wenn sie gebraucht werden: Metadaten-Änderungen
     // (etwa `hasPendingWrites`) lösen sonst bei jedem Schreibvorgang einen
     // zusätzlichen Render der ganzen Liste aus.
-    const unsubscribe = includeMetadataChanges
-      ? onSnapshot(query, { includeMetadataChanges: true }, next, onError)
-      : onSnapshot(query, next, onError);
+    // Ein `permission-denied` kann bei einem offline angelegten Einsatz nur
+    // daran liegen, dass das Einsatzdokument noch nicht übertragen ist — der
+    // Listener wird dann nach den offenen Schreibvorgängen neu angemeldet
+    // (siehe `snapshotRetry.ts`). Bis dahin bleibt der letzte Stand stehen.
+    const unsubscribe = subscribeRetryingAfterPendingWrites(
+      query.firestore,
+      (handleError) =>
+        includeMetadataChanges
+          ? onSnapshot(query, { includeMetadataChanges: true }, next, handleError)
+          : onSnapshot(query, next, handleError),
+      onError
+    );
 
     return () => unsubscribe();
   }, [query, includeMetadataChanges]);
