@@ -69,6 +69,7 @@ function offlineAuthState(cached: OfflineAuthSnapshot): Partial<LoginData> {
     groups: cached.groups,
     groupAdmin: cached.groupAdmin,
     fahrtenbuchGeraetemeister: cached.fahrtenbuchGeraetemeister,
+    bekleidungswart: cached.bekleidungswart,
     firecall: cached.firecall,
     firecallWrite: cached.firecallWrite,
     email: cached.email,
@@ -169,6 +170,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     ? (session.user.fahrtenbuchGeraetemeister ??
       loginStatus.fahrtenbuchGeraetemeister)
     : loginStatus.fahrtenbuchGeraetemeister;
+  const derivedBekleidungswart = hasSessionAuth
+    ? (session.user.bekleidungswart ?? loginStatus.bekleidungswart)
+    : loginStatus.bekleidungswart;
   // Wie der Gerätemeister: Die Rolle steht nur in der Session, nicht in den
   // Token-Claims — der Firestore-Fallback unten kennt sie deshalb nicht.
   const derivedGroupAdmin = hasSessionAuth
@@ -225,6 +229,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           // Sitzung später nicht mehr (offline), bleiben sie so erhalten.
           groupAdmin: session.user.groupAdmin,
           fahrtenbuchGeraetemeister: session.user.fahrtenbuchGeraetemeister,
+          bekleidungswart: session.user.bekleidungswart,
           isRefreshing: false,
         }));
       } else {
@@ -370,6 +375,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
                   groups: [],
                   groupAdmin: undefined,
                   fahrtenbuchGeraetemeister: undefined,
+                  bekleidungswart: undefined,
                   firecall: undefined,
                   firecallWrite: undefined,
                   myGroups: [],
@@ -427,6 +433,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
                   groups: [],
                   groupAdmin: undefined,
                   fahrtenbuchGeraetemeister: undefined,
+                  bekleidungswart: undefined,
                   offlineAuth: false,
                 }
               : {}),
@@ -480,6 +487,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       groups: derivedGroups ?? [],
       groupAdmin: derivedGroupAdmin,
       fahrtenbuchGeraetemeister: derivedGeraetemeister,
+      bekleidungswart: derivedBekleidungswart,
       firecall: derivedFirecall,
       firecallWrite: derivedFirecallWrite,
       expiresAt: sessionUser.firecallExpiresAt,
@@ -499,6 +507,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     derivedGroups,
     derivedGroupAdmin,
     derivedGeraetemeister,
+    derivedBekleidungswart,
     derivedFirecall,
     derivedFirecallWrite,
     myGroups,
@@ -693,6 +702,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     firecall: derivedFirecall,
     firecallWrite: derivedFirecallWrite,
     fahrtenbuchGeraetemeister: derivedGeraetemeister,
+    bekleidungswart: derivedBekleidungswart,
     groupAdmin: derivedGroupAdmin,
     myGroups,
     refresh,

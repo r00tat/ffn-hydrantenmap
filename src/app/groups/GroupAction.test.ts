@@ -176,6 +176,48 @@ describe('updateGroupAction — Gruppen-Admins', () => {
     expect(roleBatchSetMock).not.toHaveBeenCalled();
   });
 
+  it('nimmt einem ausscheidenden Mitglied die Bekleidungswart-Rolle', async () => {
+    usersGetMock.mockResolvedValue({
+      docs: [
+        userDoc('u1', { groups: ['ffnd'], bekleidungswart: ['ffnd', 'other'] }),
+      ],
+    });
+
+    await updateGroupAction(GROUP, [], []);
+
+    expect(roleBatchSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'u1' }),
+      { bekleidungswart: { remove: 'ffnd' } },
+      { merge: true },
+    );
+    expect(roleBatchCommitMock).toHaveBeenCalled();
+  });
+
+  it('räumt eine schlafende Bekleidungswart-Rolle eines Nicht-Mitglieds ab und invalidiert die Session', async () => {
+    usersGetMock.mockResolvedValue({
+      docs: [userDoc('u1', { groups: [], bekleidungswart: ['ffnd'] })],
+    });
+
+    await updateGroupAction(GROUP, [], []);
+
+    expect(roleBatchSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'u1' }),
+      { bekleidungswart: { remove: 'ffnd' } },
+      { merge: true },
+    );
+    expect(invalidateMock).toHaveBeenCalledWith('u1');
+  });
+
+  it('lässt die Bekleidungswart-Rolle eines bleibenden Mitglieds unangetastet', async () => {
+    usersGetMock.mockResolvedValue({
+      docs: [userDoc('u1', { groups: ['ffnd'], bekleidungswart: ['ffnd'] })],
+    });
+
+    await updateGroupAction(GROUP, ['u1'], []);
+
+    expect(roleBatchSetMock).not.toHaveBeenCalled();
+  });
+
   it('invalidiert den Session-Cache jedes berührten Benutzers', async () => {
     usersGetMock.mockResolvedValue({
       docs: [

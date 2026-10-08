@@ -41,6 +41,7 @@ export const APP_SHELL_PAGES: readonly string[] = [
   '/fahrtenbuch/statistik',
   '/fahrzeuge',
   '/geraete',
+  '/bekleidung',
   '/kennzeichen',
   '/rettungskarten',
   '/blaulicht-sms',

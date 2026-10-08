@@ -19,6 +19,13 @@ export interface FirebaseUserInfo {
    */
   fahrtenbuchGeraetemeister?: string[];
   /**
+   * Gruppen, in denen dieser Benutzer Bekleidungswart ist: Er verwaltet dort
+   * Bekleidung, Ausgabe, Rücknahme und Wäsche. Steht wie
+   * `fahrtenbuchGeraetemeister` am Benutzerdokument; nur das Admin SDK
+   * schreibt hier.
+   */
+  bekleidungswart?: string[];
+  /**
    * Gruppen, in denen dieser Benutzer Gruppen-Admin ist: Er darf dort alle
    * gruppenbezogenen Admin-Tätigkeiten übernehmen und schließt damit die
    * Gerätemeister-Rolle ein.

@@ -432,6 +432,54 @@ service cloud.firestore {
         allow read: if fahrtenbuchMember();
         allow create, update, delete: if false;
       }
+
+      // Bekleidung: nur Bekleidungswart, Gruppen-Admin oder Admin. Die Rollen
+      // stehen nicht im Token, darum liest die Regel das Benutzerdokument.
+      // Geschrieben wird ausschließlich über Server Actions (docs/bekleidung.md).
+      // Anders als bei den Geräten liest ein einfaches Mitglied hier nichts:
+      // Größen und Ausgaben je Person sind keine Gruppenöffentlichkeit.
+      function bekleidungReader() {
+        // fahrtenbuchMember() prüft authorizedUser() und damit
+        // request.auth != null, bevor bekleidungRole() die uid braucht.
+        return adminUser() || (fahrtenbuchMember() && bekleidungRole());
+      }
+
+      function bekleidungRole() {
+        let user = get(/databases/$(database)/documents/user/$(request.auth.uid)).data;
+        return groupId in user.get('bekleidungswart', [])
+          || groupId in user.get('groupAdmin', []);
+      }
+
+      match /bekleidungArtikel/{doc} {
+        allow read: if bekleidungReader();
+        allow create, update, delete: if false;
+      }
+
+      match /bekleidungStueck/{doc} {
+        allow read: if bekleidungReader();
+        allow create, update, delete: if false;
+      }
+
+      match /bekleidungBestand/{doc} {
+        allow read: if bekleidungReader();
+        allow create, update, delete: if false;
+      }
+
+      match /bekleidungAusgabe/{doc} {
+        allow read: if bekleidungReader();
+        allow create, update, delete: if false;
+      }
+
+      match /bekleidungWaesche/{doc} {
+        allow read: if bekleidungReader();
+        allow create, update, delete: if false;
+      }
+
+      // Sperre des einmaligen Imports (`bekleidungMeta/import`). Rein
+      // serverseitig; der Catch-all unten lässt nur Admins lesen.
+      match /bekleidungMeta/{doc} {
+        allow read, write: if false;
+      }
     }
 
     // Der Token ist die Dokument-ID und damit das gesamte Geheimnis des
