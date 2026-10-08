@@ -673,6 +673,25 @@ describe('Bestand, den der Export nicht kennt', () => {
     expect(plan.deviations).toEqual([]);
   });
 
+  it('setzt den Lagerort „ohne Lagerort" beim Import nicht auf 0', () => {
+    const plan = planGeraetImport([parsed('1001', [{ lagerortKey: LAGER, anzahl: 5 }])], {
+      geraete: [geraet({ id: '1001' })],
+      bestaende: [
+        bestand({ id: 'b1', geraetId: '1001', anzahl: 5 }),
+        bestand({
+          id: 'b2',
+          geraetId: '1001',
+          lagerortKey: 'unbestimmt',
+          lagerort: { art: 'unbestimmt' },
+          anzahl: 3,
+        }),
+      ],
+      hasBookingsSinceImport: () => true,
+    });
+    expect(plan.bestandUpdate).toEqual([]);
+    expect(plan.deviations).toEqual([]);
+  });
+
   it('lässt ohne Lagerort-Spalten jeden Bestand unangetastet', () => {
     const plan = planGeraetImport(
       [parsed('1001', [])],

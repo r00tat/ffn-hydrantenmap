@@ -69,8 +69,10 @@ export default function LagerortDialog({
   const tCommon = useTranslations('common');
 
   const initial = bestand?.lagerort;
+  // „ohne Lagerort" bearbeiten heißt, ihm einen echten Platz zu geben — der
+  // Dialog beginnt dann wie bei einem neuen Lagerort mit „Raum".
   const [art, setArt] = useState<Art>(
-    initial && initial.art !== 'set' ? initial.art : 'raum',
+    initial && initial.art !== 'set' && initial.art !== 'unbestimmt' ? initial.art : 'raum',
   );
   const [fahrzeug, setFahrzeug] = useState(initial?.fahrzeug ?? '');
   const [laderaum, setLaderaum] = useState(initial?.laderaum ?? '');

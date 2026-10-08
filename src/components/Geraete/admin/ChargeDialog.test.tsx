@@ -2,7 +2,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GERAET_CHARGE_MAX_TEXT, type GeraetCharge } from '../../../common/geraet';
+import {
+  GERAET_CHARGE_MAX_TEXT,
+  type GeraetBestand,
+  type GeraetCharge,
+} from '../../../common/geraet';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
 const { saveGeraetCharge } = vi.hoisted(() => ({ saveGeraetCharge: vi.fn() }));
@@ -42,9 +46,90 @@ describe('ChargeDialog', () => {
         einkaufsDatum: '',
         ablaufDatum: '2027-05-01',
         kommentar: '',
-      }),
+      }, []),
     );
     expect(onClose).toHaveBeenCalled();
+  });
+
+  describe('Menge beim Anlegen', () => {
+    const srf: GeraetBestand = {
+      id: 'b1',
+      geraetId: 'g1',
+      lagerortKey: 'fahrzeug|srf|gr 2',
+      lagerort: { art: 'fahrzeug', fahrzeug: 'SRF', laderaum: 'GR 2' },
+      anzahl: 4,
+    };
+    const ohne: GeraetBestand = {
+      id: 'bu',
+      geraetId: 'g1',
+      lagerortKey: 'unbestimmt',
+      lagerort: { art: 'unbestimmt' },
+      anzahl: 1,
+    };
+
+    function renderNew(bestaende: GeraetBestand[]) {
+      renderWithIntl(
+        <ChargeDialog
+          open
+          groupId="ffnd"
+          geraetId="g1"
+          bestaende={bestaende}
+          einheit="Sack"
+          onClose={onClose}
+        />,
+      );
+    }
+
+    it('bucht die Mengen je Lagerort und ohne Lagerort als Zugang', async () => {
+      const user = userEvent.setup();
+      renderNew([srf]);
+      await user.type(screen.getByLabelText('SRF · GR 2'), '3');
+      await user.type(screen.getByLabelText('ohne Lagerort'), '2');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(saveGeraetCharge).toHaveBeenCalledWith('ffnd', 'g1', expect.any(Object), [
+          { bestandId: 'b1', menge: 3 },
+          { bestandId: null, menge: 2 },
+        ]),
+      );
+    });
+
+    it('nimmt einen vorhandenen Lagerort „ohne Lagerort" und keine zweite Zeile', async () => {
+      const user = userEvent.setup();
+      renderNew([srf, ohne]);
+      expect(screen.getAllByLabelText('ohne Lagerort')).toHaveLength(1);
+      await user.type(screen.getByLabelText('ohne Lagerort'), '5');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(saveGeraetCharge).toHaveBeenCalledWith('ffnd', 'g1', expect.any(Object), [
+          { bestandId: 'bu', menge: 5 },
+        ]),
+      );
+    });
+
+    it('meldet eine ungültige Menge und speichert nicht', async () => {
+      const user = userEvent.setup();
+      renderNew([srf]);
+      await user.type(screen.getByLabelText('SRF · GR 2'), 'abc');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      expect(screen.getByText('Bitte eine Zahl ab 0 angeben.')).toBeInTheDocument();
+      expect(saveGeraetCharge).not.toHaveBeenCalled();
+    });
+
+    it('zeigt beim Bearbeiten keine Mengen', () => {
+      renderWithIntl(
+        <ChargeDialog
+          open
+          groupId="ffnd"
+          geraetId="g1"
+          charge={charge}
+          bestaende={[srf]}
+          onClose={onClose}
+        />,
+      );
+      expect(screen.queryByLabelText('SRF · GR 2')).toBeNull();
+      expect(screen.queryByLabelText('ohne Lagerort')).toBeNull();
+    });
   });
 
   it('begrenzt die Textfelder auf die Höchstlänge', () => {

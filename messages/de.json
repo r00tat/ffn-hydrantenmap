@@ -4117,6 +4117,11 @@
       "archiveOnlyEmpty": "Archivieren geht nur ohne Bestand – sonst ausbuchen.",
       "chip": "{label}: {menge, number}",
       "ohneCharge": "ohne Charge: {menge, number}",
+      "zugang": {
+        "title": "Menge (Zugang)",
+        "hint": "Optional: die gelieferte Menge je Lagerort. Sie wird als Zugang gebucht. Ist der Platz noch offen, „ohne Lagerort“ nehmen und später umbuchen.",
+        "ohneLagerort": "ohne Lagerort"
+      },
       "aufteilen": "Auf Chargen aufteilen",
       "negative": "Negativer Bestand bei einer Charge oder ohne Charge – bitte per Inventur oder Aufteilung korrigieren.",
       "split": {

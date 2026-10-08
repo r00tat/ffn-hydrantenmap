@@ -601,11 +601,13 @@ export function planGeraetImport(
     // In der Datei nicht mehr vorhandene Lagerorte: Der Bestand dort ist 0.
     // Nicht, wenn die Datei gar keine Lagerorte trägt, und nie bei einem
     // Container — den gibt es nur in der App, Sybos führt ihn nicht als
-    // Lagerort, und er fehlte in jeder Datei.
+    // Lagerort, und er fehlte in jeder Datei. Dasselbe gilt für „ohne
+    // Lagerort": Ware, deren Platz in Sybos noch gar nicht steht.
     if (!withBestand) continue;
     for (const bestand of current) {
       if (seen.has(bestand.lagerortKey)) continue;
-      if (bestand.lagerort?.art === 'container') continue;
+      const art = bestand.lagerort?.art;
+      if (art === 'container' || art === 'unbestimmt') continue;
       classifyChange(plan, booked, geraetId, bestand, 0);
     }
   }

@@ -559,6 +559,8 @@ export default function GeraetDetailDialog({
           groupId={groupId}
           geraetId={geraet.id}
           charge={chargeDialog ?? undefined}
+          bestaende={bestaende}
+          einheit={geraet.einheit}
           onClose={() => setChargeDialog(undefined)}
         />
       )}

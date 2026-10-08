@@ -71,7 +71,15 @@ export const GERAET_MATERIAL_TYPEN: GeraetMaterialTyp[] = [
  */
 export type GeraetEinheitVerwendungsnachweis = 'stk' | 'h';
 
-export type GeraetLagerortArt = 'fahrzeug' | 'raum' | 'container' | 'set';
+/**
+ * `unbestimmt` = „ohne Lagerort": Ware, die schon da ist, deren Platz aber
+ * noch niemand festgelegt hat — etwa eine neue Charge, die gerade geliefert
+ * wurde. Den Lagerort gibt es nur in der App, je Artikel höchstens einmal.
+ */
+export type GeraetLagerortArt = 'fahrzeug' | 'raum' | 'container' | 'set' | 'unbestimmt';
+
+/** Der Lagerort „ohne Lagerort" — gleich für jeden Artikel. */
+export const GERAET_LAGERORT_UNBESTIMMT: GeraetLagerort = { art: 'unbestimmt' };
 
 /**
  * Die Kategorie, unter der Sybos Rollcontainer, Paletten und Kisten führt.
@@ -420,6 +428,8 @@ export function lagerortKey(l: GeraetLagerort): string {
       return ['raum', normalizePart(l.standort), normalizePart(l.raum)].join('|');
     case 'container':
       return ['container', normalizePart(l.containerId ?? l.container)].join('|');
+    case 'unbestimmt':
+      return 'unbestimmt';
     default:
       return 'set';
   }
@@ -447,7 +457,9 @@ export function formatLagerort(l: GeraetLagerort): string {
         ? [l.standort, l.raum]
         : l.art === 'container'
           ? [l.container]
-          : ['Teil eines Set-Artikels'];
+          : l.art === 'unbestimmt'
+            ? ['ohne Lagerort']
+            : ['Teil eines Set-Artikels'];
   return parts
     .map((p) => (p ?? '').trim())
     .filter(Boolean)

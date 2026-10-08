@@ -1701,6 +1701,76 @@ describe('Chargen', () => {
     });
   });
 
+  describe('saveGeraetCharge mit Zugang', () => {
+    const unbestimmt = () =>
+      fake
+        .list(`${G}/geraetBestand`)
+        .find((b) => (b as { lagerortKey?: string }).lagerortKey === 'unbestimmt') as
+        | Record<string, unknown>
+        | undefined;
+
+    it('bucht die Mengen als Zugang je Lagerort und ohne Lagerort', async () => {
+      putGeraet('g1', { bestandGesamt: 5 });
+      putChargenBestand('b1', srf, 5);
+      const { id } = await saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'L1' }, [
+        { bestandId: 'b1', menge: 3 },
+        { bestandId: null, menge: 2 },
+      ]);
+      expect(bestand('b1')).toMatchObject({ anzahl: 8, chargen: { [id]: 3 } });
+      expect(unbestimmt()).toMatchObject({
+        geraetId: 'g1',
+        lagerort: { art: 'unbestimmt' },
+        anzahl: 2,
+        chargen: { [id]: 2 },
+      });
+      expect(geraet('g1')!.bestandGesamt).toBe(10);
+      expect(buchungen().map((b) => [b.art, b.menge, (b as { chargeId?: string }).chargeId]))
+        .toEqual([
+          ['zugang', 3, id],
+          ['zugang', 2, id],
+        ]);
+    });
+
+    it('nimmt den vorhandenen Lagerort „ohne Lagerort" wieder', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 4 });
+      putChargenBestand('bu', { art: 'unbestimmt' }, 4, { cA: 4 });
+      const { id } = await saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'L2' }, [
+        { bestandId: null, menge: 1 },
+      ]);
+      expect(bestand('bu')).toMatchObject({ anzahl: 5, chargen: { cA: 4, [id]: 1 } });
+      expect(fake.list(`${G}/geraetBestand`)).toHaveLength(1);
+    });
+
+    it('lehnt ungültige Zugänge ab und schreibt nichts', async () => {
+      putGeraet('g1', { chargen: [chargeA] });
+      putGeraet('g2');
+      putChargenBestand('b1', srf, 0);
+      putBestand('b2', 'g2', lager, 0);
+      const cases: [unknown, number | RegExp][] = [
+        [[{ bestandId: 'b1', menge: 0 }], 400],
+        [[{ bestandId: 'b1', menge: -1 }], 400],
+        [[{ bestandId: 'b2', menge: 1 }], 400],
+        [[{ bestandId: 'b1', menge: 1 }, { bestandId: 'b1', menge: 1 }], 400],
+        [[{ bestandId: null, menge: 1 }, { bestandId: null, menge: 1 }], 400],
+        [[{ bestandId: 'a/b', menge: 1 }], 400],
+        [[{ bestandId: 'weg', menge: 1 }], /not found/],
+        ['kaputt', 400],
+      ];
+      for (const [zugaenge, expected] of cases) {
+        const call = saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'x' }, zugaenge as never);
+        if (expected instanceof RegExp) await expect(call).rejects.toThrow(expected);
+        else await expect(call).rejects.toMatchObject({ status: expected });
+      }
+      // Beim Ändern einer Charge gibt es keinen Zugang.
+      await expect(
+        saveGeraetCharge('ffnd', 'g1', { id: 'cA' }, [{ bestandId: 'b1', menge: 1 }]),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(chargenOf('g1')).toEqual([chargeA]);
+      expect(bestand('b1')!.anzahl).toBe(0);
+      expect(buchungen()).toHaveLength(0);
+    });
+  });
+
   describe('Größengrenzen', () => {
     const long = 'x'.repeat(GERAET_CHARGE_MAX_TEXT + 1);
 

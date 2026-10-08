@@ -421,6 +421,27 @@ Ausbuchen) höchstens `GERAET_CHARGE_MAX_TEXT` = 500 Zeichen, je Artikel
 höchstens `GERAET_CHARGEN_MAX` = 200 Chargen samt archivierten; darüber lehnt
 der Server mit 400 ab, die Dialoge begrenzen die Felder schon bei der Eingabe.
 
+**Menge gleich beim Anlegen.** Wer eine neue Lieferung erfasst, will die Charge
+und ihre Menge in einem Schritt eintragen, nicht erst anlegen und dann je
+Lagerort einen Zugang buchen. Der Dialog „Neue Charge“ zeigt deshalb je Lagerort
+des Artikels ein Mengenfeld, dazu „ohne Lagerort“. Jede Menge ist ein **Zugang**
+auf die neue Charge (`saveGeraetCharge` mit `zugaenge`): Charge, Bestände,
+Buchungen und `bestandGesamt` werden in einer Transaktion geschrieben. Eine
+Charge, deren Zugang danach scheitert, bliebe sonst ohne Menge stehen.
+Vorhandenen Bestand ordnet weiterhin „Aufteilen“ zu. Zwei Bedeutungen in einem
+Feld führten zu stillen Doppelzählungen. Beim Ändern einer Charge gibt es keinen
+Zugang (400).
+
+**„Ohne Lagerort“ ist ein eigener Lagerort** (`art: 'unbestimmt'`,
+`lagerortKey` `unbestimmt`, `GERAET_LAGERORT_UNBESTIMMT`), je Artikel höchstens
+einer. Er wird beim ersten Zugang angelegt, ein archivierter wird wieder
+aufgenommen. Die Menge liegt damit an einem echten `geraetBestand`, und
+`bestandGesamt`, Mindestbestand und Abbuchung im Einsatz rechnen ohne
+Sonderfall. Eine Charge „ohne Bestandszeile“ bräche genau das. Sybos kennt den
+Lagerort nicht, deshalb setzt der Import ihn so wenig auf 0 wie einen Container.
+An den richtigen Platz kommt die Ware per Umbuchung. Alternativ bekommt der
+Lagerort „ohne Lagerort“ über „Lagerort bearbeiten“ einen echten Platz.
+
 | Vorgang | Wirkung auf die Chargen |
 | --- | --- |
 | Zugang | mit vorhandener oder in derselben Transaktion neu angelegter Charge: `anzahl` und Anteil der Charge steigen; ohne Charge wächst nur der Rest |

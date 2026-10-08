@@ -4117,6 +4117,11 @@
       "archiveOnlyEmpty": "Only a batch without stock can be archived – write it off otherwise.",
       "chip": "{label}: {menge, number}",
       "ohneCharge": "without batch: {menge, number}",
+      "zugang": {
+        "title": "Quantity (receipt)",
+        "hint": "Optional: the delivered quantity per storage location, booked as a receipt. If the place is still open, use “no storage location” and transfer it later.",
+        "ohneLagerort": "no storage location"
+      },
       "aufteilen": "Split into batches",
       "negative": "Negative stock in a batch or without batch – please correct it with a stocktake or a split.",
       "split": {

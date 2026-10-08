@@ -21,6 +21,7 @@ import {
   GERAET_CHARGEN_MAX,
   GERAET_COLLECTION,
   GERAET_EINSATZ_COLLECTION,
+  GERAET_LAGERORT_UNBESTIMMT,
   GERAET_MATERIAL_TYPEN,
   GERAET_SET_COLLECTION,
   isContainer,
@@ -783,6 +784,39 @@ function chargeNotFound(geraetId: string, chargeId: string): ApiException {
 }
 
 /**
+ * Ein Zugang beim Anlegen einer Charge: `bestandId` ist ein Lagerort des
+ * Artikels, `null` der Lagerort „ohne Lagerort" (wird bei Bedarf angelegt).
+ */
+export interface GeraetChargeZugang {
+  bestandId: string | null;
+  menge: number;
+}
+
+/**
+ * Prüft die Zugänge aus dem Browser: Menge größer 0, jeder Lagerort höchstens
+ * einmal — zwei Zeilen für denselben Ort wären ein Tippfehler, keine Absicht.
+ */
+function sanitizeChargeZugaenge(input: unknown): GeraetChargeZugang[] {
+  if (input === undefined || input === null) return [];
+  if (!Array.isArray(input)) {
+    throw new ApiException('invalid zugaenge', { status: 400 });
+  }
+  const seen = new Set<string | null>();
+  return input.map((raw) => {
+    const { bestandId, menge } = (raw ?? {}) as Partial<GeraetChargeZugang>;
+    if (bestandId !== null) assertSafeId(bestandId, 'bestandId');
+    if (!isValidMenge(menge) || menge <= 0) {
+      throw new ApiException('invalid zugang menge', { status: 400 });
+    }
+    if (seen.has(bestandId)) {
+      throw new ApiException('invalid zugaenge: duplicate bestand', { status: 400 });
+    }
+    seen.add(bestandId);
+    return { bestandId, menge };
+  });
+}
+
+/**
  * Legt eine Charge an einem Verbrauchsmaterial an oder ändert sie.
  *
  * Die Chargen liegen als Array am Artikel; geschrieben wird in einer
@@ -790,23 +824,62 @@ function chargeNotFound(geraetId: string, chargeId: string): ApiException {
  * (oder ein Zugang mit neuer Charge) einander nicht überschreiben. Beim
  * Ändern ersetzt die Eingabe alle pflegbaren Felder — der Dialog schickt die
  * ganze Charge; Archiv-Kennzeichen und Ersteller bleiben.
+ *
+ * Beim Anlegen kann gleich die gelieferte Menge mitkommen (`zugaenge`): je
+ * Lagerort ein Zugang auf die neue Charge, in derselben Transaktion — eine
+ * Charge ohne Menge, deren Zugang danach scheitert, bliebe sonst halb stehen.
+ * Ohne Lagerort landet die Menge am Lagerort „ohne Lagerort"; von dort wird
+ * sie später umgebucht. Beim Ändern gibt es keinen Zugang (400).
  */
 export async function saveGeraetCharge(
   groupId: string,
   geraetId: string,
   input: GeraetChargeInput,
+  zugaenge?: GeraetChargeZugang[],
 ): Promise<{ id: string }> {
   const session = await actionFahrtenbuchManagerRequired(groupId);
   const actor = actorOf(session);
   assertSafeId(geraetId, 'geraetId');
   const { id: chargeId, fields } = sanitizeChargeInput(input);
+  const zugangList = sanitizeChargeZugaenge(zugaenge);
+  if (chargeId !== undefined && zugangList.length > 0) {
+    throw new ApiException('invalid zugaenge: only for a new charge', { status: 400 });
+  }
 
   const ref = geraetCol(groupId).doc(geraetId);
-  return firestore.runTransaction(async (tx: Transaction) => {
+  const { id, crossed } = await firestore.runTransaction(async (tx: Transaction) => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw notFound('geraet', geraetId);
     const geraet = geraetSnapshot(geraetId, snap.data());
     assertConsumable(geraet);
+
+    // Erst alles lesen, dann schreiben — Firestore verlangt die Reihenfolge.
+    const targets: { ref: DocumentReference; bestand?: GeraetBestand; menge: number }[] = [];
+    for (const zugang of zugangList) {
+      if (zugang.bestandId === null) {
+        const found = await findBestaendeByKey(
+          tx,
+          groupId,
+          geraetId,
+          lagerortKey(GERAET_LAGERORT_UNBESTIMMT),
+        );
+        const existing = found.find((b) => b.archiviert !== true) ?? found[0];
+        targets.push({
+          ref: existing ? bestandCol(groupId).doc(existing.id) : bestandCol(groupId).doc(),
+          bestand: existing,
+          menge: zugang.menge,
+        });
+        continue;
+      }
+      const bestandRef = bestandCol(groupId).doc(zugang.bestandId);
+      const bestandSnap = await tx.get(bestandRef);
+      if (!bestandSnap.exists) throw notFound('bestand', zugang.bestandId);
+      const bestand = bestandSnapshot(bestandSnap.id, bestandSnap.data());
+      if (bestand.geraetId !== geraetId || bestand.archiviert === true) {
+        throw new ApiException('invalid zugang: bestand of another geraet', { status: 400 });
+      }
+      targets.push({ ref: bestandRef, bestand, menge: zugang.menge });
+    }
 
     const chargen = [...(geraet.chargen ?? [])];
     let id: string;
@@ -828,9 +901,57 @@ export async function saveGeraetCharge(
       });
       id = chargeId;
     }
-    tx.update(ref, { chargen, updatedAt: actor.now, updatedBy: actor.uid });
-    return { id };
+
+    const stamp = { updatedAt: actor.now, updatedBy: actor.uid };
+    let delta = 0;
+    for (const target of targets) {
+      const { bestand, menge } = target;
+      if (!bestand) {
+        const place = GERAET_LAGERORT_UNBESTIMMT;
+        tx.create(target.ref, {
+          geraetId,
+          lagerortKey: lagerortKey(place),
+          lagerort: place,
+          anzahl: menge,
+          chargen: { [id]: menge },
+          ...stamp,
+        });
+        delta += menge;
+      } else if (bestand.archiviert === true) {
+        // Ein archivierter „ohne Lagerort" kommt zurück, wie beim Anlegen
+        // eines Lagerorts — sein alter Rest zählt nicht mehr.
+        tx.update(target.ref, {
+          anzahl: menge,
+          chargen: { [id]: menge },
+          archiviert: FieldValue.delete(),
+          ...stamp,
+        });
+        delta += menge - (bestand.anzahl ?? 0);
+      } else {
+        tx.update(target.ref, {
+          anzahl: clean((bestand.anzahl ?? 0) + menge),
+          chargen: chargenValue(applyChargeDelta(bestand.chargen, id, menge)),
+          ...stamp,
+        });
+        delta += menge;
+      }
+      tx.set(
+        buchungCol(groupId).doc(),
+        buchungDoc({ geraetId, bestandId: target.ref.id, art: 'zugang', menge, chargeId: id }, actor),
+      );
+    }
+
+    if (targets.length === 0) {
+      tx.update(ref, { chargen, ...stamp });
+      return { id, crossed: undefined };
+    }
+    const stock = stockPatch(geraet, clean(delta), actor);
+    tx.update(ref, { ...stock.patch, chargen });
+    return { id, crossed: stock.crossed };
   });
+
+  if (crossed) await notifyAfterCommit({ groupId, items: [crossed] });
+  return { id };
 }
 
 /**
