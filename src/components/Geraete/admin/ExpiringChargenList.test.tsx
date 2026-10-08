@@ -15,7 +15,7 @@ const geraet: Geraet = {
   bestandGesamt: 10,
   active: true,
   chargen: [
-    { id: 'c1', losNummer: 'A1', ablaufDatum: '2026-09-30', createdAt: '', createdBy: '' },
+    { id: 'c1', produktionsNummer: 'A1', ablaufDatum: '2026-09-30', createdAt: '', createdBy: '' },
     { id: 'c2', bezeichnung: 'Lieferung Mai', ablaufDatum: '2026-11-15', createdAt: '', createdBy: '' },
     { id: 'c3', bezeichnung: 'Frisch', ablaufDatum: '2029-01-01', createdAt: '', createdBy: '' },
   ],
@@ -55,14 +55,14 @@ describe('ExpiringChargenList', () => {
       />,
     );
     expect(screen.getAllByText('Ölbindemittel')).toHaveLength(2);
-    expect(screen.getByText('Los A1')).toBeInTheDocument();
+    expect(screen.getByText('LOT A1')).toBeInTheDocument();
     expect(screen.getByText('Lieferung Mai')).toBeInTheDocument();
     expect(screen.queryByText('Frisch')).toBeNull();
     expect(screen.getByText('abgelaufen')).toBeInTheDocument();
     expect(screen.getByText('läuft bald ab')).toBeInTheDocument();
     expect(screen.getByText('4 Sack')).toBeInTheDocument();
     expect(screen.getByText(/SRF/)).toBeInTheDocument();
-    await user.click(screen.getByText('Los A1'));
+    await user.click(screen.getByText('LOT A1'));
     expect(onOpen).toHaveBeenCalledWith('g1');
   });
 

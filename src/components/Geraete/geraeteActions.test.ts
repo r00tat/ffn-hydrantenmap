@@ -1585,19 +1585,19 @@ describe('deleteGeraetSet', () => {
 describe('Chargen', () => {
   const chargeA = {
     id: 'cA',
-    losNummer: 'A',
+    produktionsNummer: 'A',
     ablaufDatum: '2026-12-01',
     createdAt: '2026-01-01T00:00:00.000Z',
     createdBy: 'u0',
   };
   const chargeB = {
     id: 'cB',
-    losNummer: 'B',
+    produktionsNummer: 'B',
     ablaufDatum: '2027-06-01',
     createdAt: '2026-01-01T00:00:00.000Z',
     createdBy: 'u0',
   };
-  const chargeAlt = { ...chargeB, id: 'cX', losNummer: 'X', archiviert: true };
+  const chargeAlt = { ...chargeB, id: 'cX', produktionsNummer: 'X', archiviert: true };
 
   function putChargenBestand(
     id: string,
@@ -1644,7 +1644,7 @@ describe('Chargen', () => {
     it('legt eine Charge an, trimmt Texte und verwirft ungültige Daten', async () => {
       putGeraet('g1');
       const { id } = await saveGeraetCharge('ffnd', 'g1', {
-        losNummer: ' L-17 ',
+        produktionsNummer: ' L-17 ',
         bezeichnung: '  ',
         ablaufDatum: '2027-02-30',
         einkaufsDatum: '2026-10-01',
@@ -1655,7 +1655,7 @@ describe('Chargen', () => {
       expect(chargenOf('g1')).toEqual([
         {
           id,
-          losNummer: 'L-17',
+          produktionsNummer: 'L-17',
           einkaufsDatum: '2026-10-01',
           createdAt: expect.any(String),
           createdBy: 'u1',
@@ -1668,14 +1668,14 @@ describe('Chargen', () => {
       putGeraet('g1', { chargen: [chargeA, chargeB] });
       await saveGeraetCharge('ffnd', 'g1', {
         id: 'cA',
-        losNummer: 'A2',
+        produktionsNummer: 'A2',
         kommentar: 'nachgezählt',
         createdBy: 'boese',
       } as never);
       expect(chargenOf('g1')).toEqual([
         {
           id: 'cA',
-          losNummer: 'A2',
+          produktionsNummer: 'A2',
           kommentar: 'nachgezählt',
           createdAt: chargeA.createdAt,
           createdBy: 'u0',
@@ -1687,16 +1687,16 @@ describe('Chargen', () => {
     it('lehnt unbekannte Chargen, Geräte ohne Verbrauch und fremde Artikel ab', async () => {
       putGeraet('g1', { chargen: [chargeA] });
       putGeraet('g2', { verbrauchsmaterial: false });
-      await expect(saveGeraetCharge('ffnd', 'g1', { id: 'weg', losNummer: 'x' })).rejects.toThrow(
+      await expect(saveGeraetCharge('ffnd', 'g1', { id: 'weg', produktionsNummer: 'x' })).rejects.toThrow(
         /not found/,
       );
-      await expect(saveGeraetCharge('ffnd', 'g2', { losNummer: 'x' })).rejects.toThrow();
-      await expect(saveGeraetCharge('ffnd', 'fehlt', { losNummer: 'x' })).rejects.toThrow(
+      await expect(saveGeraetCharge('ffnd', 'g2', { produktionsNummer: 'x' })).rejects.toThrow();
+      await expect(saveGeraetCharge('ffnd', 'fehlt', { produktionsNummer: 'x' })).rejects.toThrow(
         /not found/,
       );
-      await expect(saveGeraetCharge('ffnd', 'a/b', { losNummer: 'x' })).rejects.toThrow();
+      await expect(saveGeraetCharge('ffnd', 'a/b', { produktionsNummer: 'x' })).rejects.toThrow();
       managerGuard.mockRejectedValueOnce(new Error('forbidden'));
-      await expect(saveGeraetCharge('ffnd', 'g1', { losNummer: 'x' })).rejects.toThrow('forbidden');
+      await expect(saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'x' })).rejects.toThrow('forbidden');
       expect(chargenOf('g1')).toEqual([chargeA]);
     });
   });
@@ -1706,7 +1706,7 @@ describe('Chargen', () => {
 
     it('lehnt zu lange Texte einer Charge ab', async () => {
       putGeraet('g1', { chargen: [chargeA] });
-      for (const field of ['bezeichnung', 'losNummer', 'produktionsNummer', 'kommentar']) {
+      for (const field of ['bezeichnung', 'produktionsNummer', 'kommentar']) {
         await expect(saveGeraetCharge('ffnd', 'g1', { [field]: long })).rejects.toMatchObject({
           status: 400,
         });
@@ -1723,7 +1723,7 @@ describe('Chargen', () => {
       }));
       putGeraet('g1', { chargen: full });
       putChargenBestand('b1', srf, 0);
-      await expect(saveGeraetCharge('ffnd', 'g1', { losNummer: 'neu' })).rejects.toMatchObject({
+      await expect(saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'neu' })).rejects.toMatchObject({
         status: 400,
       });
       await expect(
@@ -1731,11 +1731,11 @@ describe('Chargen', () => {
           art: 'zugang',
           bestandId: 'b1',
           menge: 1,
-          neueCharge: { losNummer: 'neu' },
+          neueCharge: { produktionsNummer: 'neu' },
         }),
       ).rejects.toMatchObject({ status: 400 });
       // Ändern einer vorhandenen Charge bleibt möglich.
-      await saveGeraetCharge('ffnd', 'g1', { id: 'c1', losNummer: 'geändert' });
+      await saveGeraetCharge('ffnd', 'g1', { id: 'c1', produktionsNummer: 'geändert' });
       expect(chargenOf('g1')).toHaveLength(GERAET_CHARGEN_MAX);
       expect(buchungen()).toHaveLength(0);
     });
@@ -1748,7 +1748,7 @@ describe('Chargen', () => {
           art: 'zugang',
           bestandId: 'b1',
           menge: 1,
-          neueCharge: { losNummer: long },
+          neueCharge: { produktionsNummer: long },
         }),
       ).rejects.toMatchObject({ status: 400 });
     });
@@ -1808,7 +1808,7 @@ describe('Chargen', () => {
         ['inventur', -2, 'b2', 'cA'],
       ]);
       expect((buchungen()[0] as { bemerkung?: string }).bemerkung).toBe(
-        'Charge ausgebucht: Los A – abgelaufen',
+        'Charge ausgebucht: LOT A – abgelaufen',
       );
       expect(notifyMock).toHaveBeenCalledOnce();
     });
@@ -1848,7 +1848,7 @@ describe('Chargen', () => {
           art: 'aufteilung',
           menge: 0,
           bestandId: 'b1',
-          bemerkung: 'Los A: 0→25, ohne Charge: 40→15',
+          bemerkung: 'LOT A: 0→25, ohne Charge: 40→15',
         }),
       ]);
 
@@ -1888,10 +1888,10 @@ describe('Chargen', () => {
         art: 'zugang',
         bestandId: 'b2',
         menge: 5,
-        neueCharge: { losNummer: ' L1 ', ablaufDatum: '2027-01-01' },
+        neueCharge: { produktionsNummer: ' L1 ', ablaufDatum: '2027-01-01' },
       });
       const neu = chargenOf('g1')[3];
-      expect(neu).toMatchObject({ losNummer: 'L1', ablaufDatum: '2027-01-01', createdBy: 'u1' });
+      expect(neu).toMatchObject({ produktionsNummer: 'L1', ablaufDatum: '2027-01-01', createdBy: 'u1' });
       expect(bestand('b2')).toMatchObject({ anzahl: 5, chargen: { [neu.id as string]: 5 } });
       expect(geraet('g1')!.bestandGesamt).toBe(15);
       expect(buchungen()).toEqual([

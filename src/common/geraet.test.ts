@@ -183,17 +183,17 @@ describe('formatCharge', () => {
 
   it('zeigt die Bezeichnung', () => {
     expect(
-      formatCharge({ ...base, bezeichnung: 'Lieferung März', losNummer: 'L-7' }),
+      formatCharge({ ...base, bezeichnung: 'Lieferung März', produktionsNummer: 'L-7' }),
     ).toBe('Lieferung März');
   });
 
-  it('zeigt ohne Bezeichnung die Los-Nummer', () => {
-    expect(formatCharge({ ...base, losNummer: 'L-7', ablaufDatum: '2027-03-01' })).toBe(
-      'Los L-7',
+  it('zeigt ohne Bezeichnung die LOT', () => {
+    expect(formatCharge({ ...base, produktionsNummer: 'L-7', ablaufDatum: '2027-03-01' })).toBe(
+      'LOT L-7',
     );
   });
 
-  it('zeigt ohne Los-Nummer das Ablaufdatum', () => {
+  it('zeigt ohne LOT das Ablaufdatum', () => {
     expect(formatCharge({ ...base, ablaufDatum: '2027-03-01' })).toBe('2027-03-01');
   });
 

@@ -46,8 +46,8 @@ const vlies: Geraet = {
   einheit: 'Sack',
   bestandGesamt: 10,
   chargen: [
-    { id: 'c1', losNummer: '4711', createdAt: '', createdBy: '' },
-    { id: 'c0', losNummer: '0815', archiviert: true, createdAt: '', createdBy: '' },
+    { id: 'c1', produktionsNummer: '4711', createdAt: '', createdBy: '' },
+    { id: 'c0', produktionsNummer: '0815', archiviert: true, createdAt: '', createdBy: '' },
   ],
   active: true,
   createdAt: '',
@@ -286,7 +286,7 @@ describe('GeraeteEinsatzSection', () => {
       ];
       render(<GeraeteEinsatzSection />);
       expect(
-        screen.getByText(/Los 4711: 2, Los 0815: 1, weg: 1, ohne Charge: 2/),
+        screen.getByText(/LOT 4711: 2, LOT 0815: 1, weg: 1, ohne Charge: 2/),
       ).toBeInTheDocument();
       expect(screen.queryByText('Charge prüfen')).toBeNull();
     });

@@ -91,7 +91,7 @@ export default function BestandBookingDialog({
   const [chargeChoice, setChargeChoice] = useState('');
   const [neueCharge, setNeueCharge] = useState({
     bezeichnung: '',
-    losNummer: '',
+    produktionsNummer: '',
     ablaufDatum: '',
   });
   const [perCharge, setPerCharge] = useState(false);
@@ -262,7 +262,7 @@ export default function BestandBookingDialog({
           )}
           {showZugangCharge && chargeChoice === NEW_CHARGE && (
             <>
-              {(['bezeichnung', 'losNummer', 'ablaufDatum'] as const).map((name) => (
+              {(['bezeichnung', 'produktionsNummer', 'ablaufDatum'] as const).map((name) => (
                 <TextField
                   key={name}
                   label={t(`chargen.fields.${name}`)}

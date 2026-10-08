@@ -177,7 +177,7 @@ describe('BestandBookingDialog', () => {
     const mitChargen: Geraet = {
       ...geraet,
       chargen: [
-        { id: 'c1', losNummer: 'A1', ablaufDatum: '2027-01-31', createdAt: '', createdBy: '' },
+        { id: 'c1', produktionsNummer: 'A1', ablaufDatum: '2027-01-31', createdAt: '', createdBy: '' },
         { id: 'c2', bezeichnung: 'Lieferung Mai', createdAt: '', createdBy: '' },
         { id: 'c3', bezeichnung: 'Alt', archiviert: true, createdAt: '', createdBy: '' },
       ],
@@ -226,7 +226,7 @@ describe('BestandBookingDialog', () => {
       renderChargen('zugang', geraet, lager);
       await user.click(screen.getByRole('combobox', { name: 'Charge' }));
       await user.click(screen.getByRole('option', { name: 'Neue Charge…' }));
-      await user.type(screen.getByLabelText('Los-Nr.'), 'L-9');
+      await user.type(screen.getByLabelText('LOT / Chargennummer'), 'L-9');
       await user.type(screen.getByLabelText('Ablaufdatum'), '2028-02-29');
       await user.type(screen.getByLabelText('Menge'), '4');
       await user.click(screen.getByRole('button', { name: 'Buchen' }));
@@ -236,7 +236,7 @@ describe('BestandBookingDialog', () => {
           bestandId: 'b-lager',
           menge: 4,
           bemerkung: undefined,
-          neueCharge: { losNummer: 'L-9', ablaufDatum: '2028-02-29' },
+          neueCharge: { produktionsNummer: 'L-9', ablaufDatum: '2028-02-29' },
         }),
       );
     });
@@ -253,7 +253,7 @@ describe('BestandBookingDialog', () => {
         'automatisch (älteste zuerst)',
       );
       await user.click(screen.getByRole('combobox', { name: 'Charge' }));
-      await user.click(screen.getByRole('option', { name: /Los A1/ }));
+      await user.click(screen.getByRole('option', { name: /LOT A1/ }));
       await user.type(screen.getByLabelText('Menge'), '1');
       await user.click(screen.getByRole('button', { name: 'Buchen' }));
       await waitFor(() =>
@@ -278,7 +278,7 @@ describe('BestandBookingDialog', () => {
       renderChargen('inventur');
       await user.click(screen.getByRole('switch', { name: 'je Charge zählen' }));
       expect(screen.queryByLabelText('Gezählter Bestand')).toBeNull();
-      expect(screen.getByLabelText('Los A1')).toHaveValue(2);
+      expect(screen.getByLabelText('LOT A1')).toHaveValue(2);
       expect(screen.getByLabelText('ohne Charge')).toHaveValue(4);
       await user.type(screen.getByLabelText('Lieferung Mai'), '3');
       const ohne = screen.getByLabelText('ohne Charge');
@@ -301,7 +301,7 @@ describe('BestandBookingDialog', () => {
       const user = userEvent.setup();
       renderChargen('inventur', mitChargen, { ...lager, chargen: { c1: -2 } });
       await user.click(screen.getByRole('switch', { name: 'je Charge zählen' }));
-      expect(screen.getByLabelText('Los A1')).toHaveValue(0);
+      expect(screen.getByLabelText('LOT A1')).toHaveValue(0);
       expect(screen.getByLabelText('ohne Charge')).toHaveValue(8);
       await user.click(screen.getByRole('button', { name: 'Buchen' }));
       await waitFor(() =>
@@ -321,7 +321,7 @@ describe('BestandBookingDialog', () => {
       renderChargen('zugang', geraet, lager);
       await user.click(screen.getByRole('combobox', { name: 'Charge' }));
       await user.click(screen.getByRole('option', { name: 'Neue Charge…' }));
-      for (const label of ['Bezeichnung', 'Los-Nr.']) {
+      for (const label of ['Bezeichnung', 'LOT / Chargennummer']) {
         expect(screen.getByLabelText(label)).toHaveAttribute(
           'maxlength',
           String(GERAET_CHARGE_MAX_TEXT),

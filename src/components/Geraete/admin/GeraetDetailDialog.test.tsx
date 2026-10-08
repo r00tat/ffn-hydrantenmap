@@ -176,7 +176,7 @@ describe('GeraetDetailDialog', () => {
     const mitChargen: Geraet = {
       ...geraet,
       chargen: [
-        { id: 'c1', losNummer: 'A1', ablaufDatum: '2020-01-31', createdAt: '', createdBy: '' },
+        { id: 'c1', produktionsNummer: 'A1', ablaufDatum: '2020-01-31', createdAt: '', createdBy: '' },
         { id: 'c2', bezeichnung: 'Lieferung Mai', createdAt: '', createdBy: '' },
         { id: 'c3', bezeichnung: 'Alt', archiviert: true, createdAt: '', createdBy: '' },
       ],
@@ -190,7 +190,7 @@ describe('GeraetDetailDialog', () => {
     it('zeigt die aktiven Chargen mit Ablaufstatus und Gesamtmenge', () => {
       renderChargen();
       expect(screen.getByRole('heading', { name: 'Chargen' })).toBeInTheDocument();
-      const row = screen.getByRole('row', { name: /^Los A1/ });
+      const row = screen.getByRole('row', { name: /^LOT A1/ });
       expect(row).toHaveTextContent('A1');
       expect(row).toHaveTextContent('abgelaufen');
       expect(row).toHaveTextContent('2');
@@ -213,7 +213,7 @@ describe('GeraetDetailDialog', () => {
 
     it('zeigt am Lagerort die Menge je Charge und ohne Charge', () => {
       renderChargen();
-      expect(screen.getByText('Los A1: 2')).toBeInTheDocument();
+      expect(screen.getByText('LOT A1: 2')).toBeInTheDocument();
       expect(screen.getByText('ohne Charge: 4')).toBeInTheDocument();
     });
 
@@ -223,12 +223,18 @@ describe('GeraetDetailDialog', () => {
       expect(screen.getByText(/Negativer Bestand bei einer Charge/)).toBeInTheDocument();
     });
 
+    it('zeigt an einem nicht aufgeteilten Lagerort ohne Bestand keine Chargen-Chips', () => {
+      renderChargen(true, { ...srf, anzahl: -3, chargen: undefined });
+      expect(screen.queryByText(/ohne Charge/)).toBeNull();
+      expect(screen.queryByText(/Negativer Bestand bei einer Charge/)).toBeNull();
+    });
+
     it('öffnet den Dialog zum Anlegen und Bearbeiten', async () => {
       const user = userEvent.setup();
       renderChargen();
       await user.click(screen.getByRole('button', { name: 'Charge anlegen' }));
       expect(screen.getByText('Charge-Dialog neu')).toBeInTheDocument();
-      const row = screen.getByRole('row', { name: /^Los A1/ });
+      const row = screen.getByRole('row', { name: /^LOT A1/ });
       await user.click(within(row).getByRole('button', { name: 'Charge bearbeiten' }));
       expect(screen.getByText('Charge-Dialog c1')).toBeInTheDocument();
     });
@@ -236,9 +242,9 @@ describe('GeraetDetailDialog', () => {
     it('bucht eine Charge nach Rückfrage mit Bemerkung aus', async () => {
       const user = userEvent.setup();
       renderChargen();
-      const row = screen.getByRole('row', { name: /^Los A1/ });
+      const row = screen.getByRole('row', { name: /^LOT A1/ });
       await user.click(within(row).getByRole('button', { name: 'Ausbuchen' }));
-      expect(screen.getByText(/„Los A1“ \(2 Sack\)/)).toBeInTheDocument();
+      expect(screen.getByText(/„LOT A1“ \(2 Sack\)/)).toBeInTheDocument();
       expect(screen.getByLabelText('Bemerkung')).toHaveAttribute(
         'maxlength',
         String(GERAET_CHARGE_MAX_TEXT),
@@ -257,7 +263,7 @@ describe('GeraetDetailDialog', () => {
     it('archiviert nur eine Charge ohne Bestand', async () => {
       const user = userEvent.setup();
       renderChargen();
-      const withStock = screen.getByRole('row', { name: /^Los A1/ });
+      const withStock = screen.getByRole('row', { name: /^LOT A1/ });
       expect(within(withStock).getByRole('button', { name: 'Archivieren' })).toBeDisabled();
       const empty = screen.getByRole('row', { name: /^Lieferung Mai/ });
       await user.click(within(empty).getByRole('button', { name: 'Archivieren' }));
@@ -276,7 +282,7 @@ describe('GeraetDetailDialog', () => {
       expect(screen.queryByRole('button', { name: 'Charge anlegen' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Ausbuchen' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Auf Chargen aufteilen' })).toBeNull();
-      expect(screen.getByText('Los A1: 2')).toBeInTheDocument();
+      expect(screen.getByText('LOT A1: 2')).toBeInTheDocument();
     });
   });
 });

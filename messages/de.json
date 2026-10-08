@@ -4092,15 +4092,14 @@
       "dialogTitleEdit": "Charge bearbeiten",
       "fields": {
         "bezeichnung": "Bezeichnung",
-        "losNummer": "Los-Nr.",
-        "produktionsNummer": "Produktionsnummer",
+        "produktionsNummer": "LOT / Chargennummer",
         "einkaufsDatum": "Einkaufsdatum",
         "ablaufDatum": "Ablaufdatum",
         "kommentar": "Kommentar"
       },
       "columns": {
         "charge": "Charge",
-        "los": "Los-Nr.",
+        "lot": "LOT",
         "ablauf": "Ablauf",
         "menge": "Menge gesamt"
       },

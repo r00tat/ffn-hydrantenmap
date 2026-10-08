@@ -79,7 +79,7 @@ function geraet(id: string, ablaufDatum: string) {
     verbrauchsmaterial: true,
     einheit: 'Stk',
     chargen: [
-      { id: `c-${id}`, losNummer: 'L1', ablaufDatum, createdAt: '', createdBy: '' },
+      { id: `c-${id}`, produktionsNummer: 'L1', ablaufDatum, createdAt: '', createdBy: '' },
     ],
   };
 }

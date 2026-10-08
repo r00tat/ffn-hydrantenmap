@@ -713,7 +713,6 @@ export type GeraetChargeInput = Partial<
 
 const CHARGE_TEXT_FIELDS = [
   'bezeichnung',
-  'losNummer',
   'produktionsNummer',
   'kommentar',
 ] as const satisfies readonly (keyof GeraetCharge)[];

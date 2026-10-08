@@ -118,14 +118,16 @@ export interface GeraetLagerort {
 /**
  * Eine Charge (Los) eines Verbrauchsmaterials, als Eintrag in `Geraet.chargen`.
  * Archivierte Chargen bleiben im Array, damit Einsatz-Einträge und Buchungen
- * ihre Los-Nummer weiter anzeigen.
+ * ihre LOT weiter anzeigen.
  */
 export interface GeraetCharge {
   id: string;
   /** Eigene Bezeichnung, z. B. „Lieferung März". */
   bezeichnung?: string;
-  /** Los-Nummer des Herstellers. */
-  losNummer?: string;
+  /**
+   * LOT des Herstellers — Produktions- bzw. Chargennummer. Eine eigene
+   * Los-Nummer gibt es nicht, auf der Verpackung steht dafür „LOT".
+   */
   produktionsNummer?: string;
   /** Einkaufs-Datum (`YYYY-MM-DD`). */
   einkaufsDatum?: string;
@@ -139,7 +141,7 @@ export interface GeraetCharge {
 }
 
 /**
- * Höchstlänge der Texte einer Charge (Bezeichnung, Los-Nr., Produktionsnummer,
+ * Höchstlänge der Texte einer Charge (Bezeichnung, LOT,
  * Kommentar) und der Bemerkung beim Ausbuchen — die Chargen liegen als Array
  * im Artikel-Dokument, das nicht beliebig wachsen darf.
  */
@@ -158,14 +160,14 @@ export interface GeraetChargeTeil {
 }
 
 /**
- * Anzeige einer Charge: Bezeichnung, sonst „Los <Nummer>", sonst das
+ * Anzeige einer Charge: Bezeichnung, sonst „LOT <Nummer>", sonst das
  * Ablaufdatum, sonst die ID.
  */
 export function formatCharge(c: GeraetCharge): string {
   const bezeichnung = c.bezeichnung?.trim();
   if (bezeichnung) return bezeichnung;
-  const los = c.losNummer?.trim();
-  if (los) return `Los ${los}`;
+  const lot = c.produktionsNummer?.trim();
+  if (lot) return `LOT ${lot}`;
   const ablauf = c.ablaufDatum?.trim();
   if (ablauf) return ablauf;
   return c.id;

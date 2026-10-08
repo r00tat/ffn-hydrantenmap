@@ -4092,15 +4092,14 @@
       "dialogTitleEdit": "Edit batch",
       "fields": {
         "bezeichnung": "Name",
-        "losNummer": "Lot no.",
-        "produktionsNummer": "Production number",
+        "produktionsNummer": "LOT / batch number",
         "einkaufsDatum": "Purchase date",
         "ablaufDatum": "Expiry date",
         "kommentar": "Comment"
       },
       "columns": {
         "charge": "Batch",
-        "los": "Lot no.",
+        "lot": "LOT",
         "ablauf": "Expiry",
         "menge": "Total quantity"
       },

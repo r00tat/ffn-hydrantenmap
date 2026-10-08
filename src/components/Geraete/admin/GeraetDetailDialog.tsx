@@ -195,12 +195,15 @@ export default function GeraetDetailDialog({
   /**
    * Die Töpfe eines Lagerorts als Chips — nur, wenn der Artikel Chargen hat
    * oder der Lagerort schon aufgeteilt ist. Ein negativer Topf ist ein
-   * Hinweis auf eine Inventur oder Aufteilung.
+   * Hinweis auf eine Inventur oder Aufteilung. Ein nicht aufgeteilter
+   * Lagerort ohne Bestand bekommt keinen Chip: „ohne Charge: -3“ wiederholte
+   * nur die rote Anzahl und sähe aus wie ein Fehler der Chargen.
    */
   const renderPots = (b: GeraetBestand) => {
     if (!consumable) return null;
     const hasMap = Object.keys(b.chargen ?? {}).length > 0;
     if (allChargen.length === 0 && !hasMap) return null;
+    if (!hasMap && b.anzahl <= 0) return null;
     const byId = new Map(allChargen.map((c) => [c.id, c]));
     const pots = chargePots(b, allChargen);
     const negative = pots.some((p) => p.menge < 0);
@@ -265,7 +268,7 @@ export default function GeraetDetailDialog({
           <TableHead>
             <TableRow>
               <TableCell>{t('chargen.columns.charge')}</TableCell>
-              <TableCell>{t('chargen.columns.los')}</TableCell>
+              <TableCell>{t('chargen.columns.lot')}</TableCell>
               <TableCell>{t('chargen.columns.ablauf')}</TableCell>
               <TableCell align="right">{t('chargen.columns.menge')}</TableCell>
               {canManage && <TableCell align="right">{tCommon('actions')}</TableCell>}
@@ -288,7 +291,7 @@ export default function GeraetDetailDialog({
                       </Typography>
                     )}
                   </TableCell>
-                  <TableCell>{c.losNummer ?? ''}</TableCell>
+                  <TableCell>{c.produktionsNummer ?? ''}</TableCell>
                   <TableCell sx={{ color: expiryColor(status), whiteSpace: 'nowrap' }}>
                     {formatIsoDate(format, c.ablaufDatum)}
                     {status !== 'ok' && !c.archiviert && (

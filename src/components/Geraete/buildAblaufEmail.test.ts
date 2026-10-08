@@ -34,7 +34,7 @@ const lager = bestand('b2', { art: 'raum', standort: 'Feuerwehrhaus', raum: 'Lag
 
 const abgelaufen: ExpiringCharge = {
   geraet,
-  charge: charge({ id: 'c1', losNummer: 'L-42', ablaufDatum: '2026-09-30' }),
+  charge: charge({ id: 'c1', produktionsNummer: 'L-42', ablaufDatum: '2026-09-30' }),
   status: 'abgelaufen',
   menge: 3,
   jeBestand: [
@@ -90,7 +90,7 @@ describe('buildAblaufEmail', () => {
   it('listet Artikel, Charge, Ablaufdatum, Status, Menge und Lagerorte im Text', () => {
     const { text } = buildAblaufEmail({ ...base, items: [abgelaufen, bald] });
     expect(text).toContain('Bindemittel <Öl>');
-    expect(text).toContain('Los L-42');
+    expect(text).toContain('LOT L-42');
     expect(text).toContain('30.09.2026');
     expect(text).toContain('abgelaufen');
     expect(text).toContain('3 Sack');
@@ -108,7 +108,7 @@ describe('buildAblaufEmail', () => {
     expect(html).toContain('Bindemittel &lt;Öl&gt;');
     expect(html).not.toContain('<Öl>');
     expect(html).toContain('<table');
-    expect(html).toContain('Los-Nr.');
+    expect(html).toContain('>LOT</th>');
     expect(html).toContain('href="https://karte.example.at/geraete"');
   });
 

@@ -568,9 +568,9 @@ describe('GeraetEinsatzDialog mit Sets', () => {
 });
 
 describe('GeraetEinsatzDialog mit Chargen', () => {
-  const charge = (id: string, losNummer: string, ablaufDatum: string) => ({
+  const charge = (id: string, produktionsNummer: string, ablaufDatum: string) => ({
     id,
-    losNummer,
+    produktionsNummer,
     ablaufDatum,
     createdAt: '',
     createdBy: '',
@@ -624,16 +624,16 @@ describe('GeraetEinsatzDialog mit Chargen', () => {
     renderChargen();
     const user = await pickArticle('ölbinde', /Ölbindetuch/);
 
-    expect(screen.getByRole('textbox', { name: 'Los A' })).toHaveValue('1');
-    expect(screen.getByRole('textbox', { name: 'Los B' })).toHaveValue('0');
+    expect(screen.getByRole('textbox', { name: 'LOT A' })).toHaveValue('1');
+    expect(screen.getByRole('textbox', { name: 'LOT B' })).toHaveValue('0');
     expect(screen.getByRole('textbox', { name: 'ohne Charge' })).toHaveValue('0');
     expect(screen.getByText(/abgelaufen 01\.01\.2000/)).toBeInTheDocument();
 
     const menge = screen.getByRole('textbox', { name: /Menge/ });
     await user.clear(menge);
     await user.type(menge, '4');
-    expect(screen.getByRole('textbox', { name: 'Los A' })).toHaveValue('2');
-    expect(screen.getByRole('textbox', { name: 'Los B' })).toHaveValue('2');
+    expect(screen.getByRole('textbox', { name: 'LOT A' })).toHaveValue('2');
+    expect(screen.getByRole('textbox', { name: 'LOT B' })).toHaveValue('2');
 
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(lastAdd()).toMatchObject({
@@ -650,7 +650,7 @@ describe('GeraetEinsatzDialog mit Chargen', () => {
   it('speichert nur, wenn die Summe der Chargen der Menge entspricht', async () => {
     renderChargen();
     const user = await pickArticle('ölbinde', /Ölbindetuch/);
-    const losA = screen.getByRole('textbox', { name: 'Los A' });
+    const losA = screen.getByRole('textbox', { name: 'LOT A' });
     await user.clear(losA);
     await user.type(losA, '0');
     expect(screen.getByText(/Summe der Chargen \(0\) entspricht nicht der Menge \(1\)/)).toBeInTheDocument();
@@ -675,7 +675,7 @@ describe('GeraetEinsatzDialog mit Chargen', () => {
     await user.click(
       within(screen.getByRole('listbox')).getByRole('option', { name: /Feuerwehrhaus · Lager/ }),
     );
-    expect(screen.queryByRole('textbox', { name: 'Los B' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'LOT B' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(lastAdd()).toMatchObject({
       bestandId: 'lager',
@@ -701,13 +701,13 @@ describe('GeraetEinsatzDialog mit Chargen', () => {
       createdAt: '2026-10-04T10:00:00.000Z',
       createdBy: 'erika.musterfrau@example.com',
     };
-    // Am Lager liegen nach der Buchung noch 4 von Los B; vorher gab es dort
+    // Am Lager liegen nach der Buchung noch 4 von LOT B; vorher gab es dort
     // auch 1 Stück ohne Charge — mehrere Töpfe.
     const nachBuchung = new Map(withChargen);
     nachBuchung.set('tuch', [srf, { ...lager, anzahl: 5, chargen: { c2: 4 } }]);
     renderChargen({ entry, bestaendeByGeraet: nachBuchung });
 
-    expect(screen.getByRole('textbox', { name: 'Los B' })).toHaveValue('2');
+    expect(screen.getByRole('textbox', { name: 'LOT B' })).toHaveValue('2');
     expect(screen.getByRole('textbox', { name: 'ohne Charge' })).toHaveValue('0');
     expect(screen.getByText(/6 verfügbar/)).toBeInTheDocument();
 

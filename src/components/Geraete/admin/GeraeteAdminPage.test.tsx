@@ -87,7 +87,7 @@ const vliesSrf: GeraetBestand = {
 const vliesMitCharge: Geraet = {
   ...vlies,
   chargen: [
-    { id: 'c1', losNummer: 'A1', ablaufDatum: '2000-01-31', createdAt: '', createdBy: '' },
+    { id: 'c1', produktionsNummer: 'A1', ablaufDatum: '2000-01-31', createdAt: '', createdBy: '' },
   ],
 };
 const vliesSrfMitCharge: GeraetBestand = { ...vliesSrf, chargen: { c1: 3 } };
@@ -176,9 +176,9 @@ describe('GeraeteAdminPage', () => {
     renderWithIntl(<GeraeteAdminPage />);
     await user.click(screen.getByRole('tab', { name: 'Läuft bald ab (1)' }));
     expect(screen.queryByText('Rettungsschere')).not.toBeInTheDocument();
-    expect(screen.getByText('Los A1')).toBeInTheDocument();
+    expect(screen.getByText('LOT A1')).toBeInTheDocument();
     expect(screen.getByText('3 Sack')).toBeInTheDocument();
-    await user.click(screen.getByText('Los A1'));
+    await user.click(screen.getByText('LOT A1'));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Bindevlies Economy')).toBeInTheDocument();
   });

@@ -19,7 +19,7 @@ const geraet: Geraet = {
   bestandGesamt: 10,
   active: true,
   chargen: [
-    { id: 'c1', losNummer: 'A1', ablaufDatum: '2027-01-31', createdAt: '', createdBy: '' },
+    { id: 'c1', produktionsNummer: 'A1', ablaufDatum: '2027-01-31', createdAt: '', createdBy: '' },
     { id: 'c2', bezeichnung: 'Lieferung Mai', createdAt: '', createdBy: '' },
     { id: 'c3', bezeichnung: 'Alt', archiviert: true, createdAt: '', createdBy: '' },
   ],
@@ -54,7 +54,7 @@ describe('ChargeSplitDialog', () => {
 
   it('zeigt ein Feld je aktiver Charge, vorbelegt, und den Rest ohne Charge', () => {
     render();
-    expect(screen.getByLabelText('Los A1')).toHaveValue(4);
+    expect(screen.getByLabelText('LOT A1')).toHaveValue(4);
     expect(screen.getByLabelText('Lieferung Mai')).toHaveValue(null);
     expect(screen.queryByLabelText('Alt')).toBeNull();
     expect(screen.getByText('ohne Charge: 6')).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('ChargeSplitDialog', () => {
   it('sperrt Speichern bei einer ungültigen Menge', async () => {
     const user = userEvent.setup();
     render();
-    const field = screen.getByLabelText('Los A1');
+    const field = screen.getByLabelText('LOT A1');
     await user.clear(field);
     await user.type(field, '-1');
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();

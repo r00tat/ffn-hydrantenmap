@@ -452,7 +452,7 @@ describe('Chargen beim Verbrauch', () => {
   const deleted = Symbol('deleted');
   const charge = (id: string, ablaufDatum?: string, archiviert?: boolean) => ({
     id,
-    losNummer: id.toUpperCase(),
+    produktionsNummer: id.toUpperCase(),
     ablaufDatum,
     archiviert,
     createdAt: '',

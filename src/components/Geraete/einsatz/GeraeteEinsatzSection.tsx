@@ -151,7 +151,7 @@ export default function GeraeteEinsatzSection({ embedded = false }: { embedded?:
     return b ? formatLagerort(b.lagerort) : t('lagerortUnknown');
   };
 
-  // Die gebuchten Chargen, z. B. „Los 4711: 2, ohne Charge: 1". Auch
+  // Die gebuchten Chargen, z. B. „LOT 4711: 2, ohne Charge: 1". Auch
   // archivierte Chargen stehen am Artikel; eine unbekannte zeigt ihre ID.
   const chargenText = (entry: GeraetEinsatz): string | undefined => {
     if (entry.art !== 'verbraucht' || !entry.chargen?.length) return undefined;

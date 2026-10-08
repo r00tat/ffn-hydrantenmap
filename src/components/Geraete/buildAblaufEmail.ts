@@ -72,8 +72,8 @@ function statusLabel(item: ExpiringCharge): string {
   return item.status === 'abgelaufen' ? 'abgelaufen' : 'läuft bald ab';
 }
 
-function losNummer(item: ExpiringCharge): string {
-  return item.charge.losNummer?.trim() ?? '';
+function lot(item: ExpiringCharge): string {
+  return item.charge.produktionsNummer?.trim() ?? '';
 }
 
 function lagerorte(item: ExpiringCharge): string[] {
@@ -107,7 +107,7 @@ function buildHtml(items: ExpiringCharge[], groupName: string | undefined, link:
   const heading = groupName?.trim()
     ? `Ablaufende Chargen — ${escapeHtml(groupName.trim())}`
     : 'Ablaufende Chargen';
-  const head = ['Artikel', 'Charge', 'Los-Nr.', 'Ablaufdatum', 'Status', 'Menge', 'Lagerorte']
+  const head = ['Artikel', 'Charge', 'LOT', 'Ablaufdatum', 'Status', 'Menge', 'Lagerorte']
     .map(th)
     .join('');
   const rows = items
@@ -118,7 +118,7 @@ function buildHtml(items: ExpiringCharge[], groupName: string | undefined, link:
         `<tr style="${style}">` +
         td(item.geraet.bezeichnung) +
         td(formatCharge(item.charge)) +
-        td(losNummer(item)) +
+        td(lot(item)) +
         td(formatDate(item.charge.ablaufDatum)) +
         td(statusLabel(item)) +
         td(withUnit(item.menge, item.geraet.einheit), true) +
@@ -146,9 +146,10 @@ function buildText(items: ExpiringCharge[], groupName: string | undefined, link:
   // Ein Block je Charge statt Textspalten: Spalten aus Leerzeichen brechen auf
   // einem Telefon zusammen.
   for (const item of items) {
-    const los = losNummer(item);
+    const lotNumber = lot(item);
     const charge = formatCharge(item.charge);
-    const chargeText = los && !charge.includes(los) ? `${charge} (Los ${los})` : charge;
+    const chargeText =
+      lotNumber && !charge.includes(lotNumber) ? `${charge} (LOT ${lotNumber})` : charge;
     lines.push(
       `- ${item.geraet.bezeichnung} — ${chargeText}`,
       `  Ablauf ${formatDate(item.charge.ablaufDatum)} (${statusLabel(item)}), Menge ${withUnit(

@@ -16,7 +16,6 @@ import { callAction } from './actionResult';
 
 const FIELDS = [
   'bezeichnung',
-  'losNummer',
   'produktionsNummer',
   'einkaufsDatum',
   'ablaufDatum',

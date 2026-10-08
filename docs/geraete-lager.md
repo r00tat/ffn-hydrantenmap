@@ -347,9 +347,15 @@ Set-Einträge unter dem kopierten Namen.
 ## Chargen
 
 Zu einem Verbrauchsartikel kann es mehrere Chargen geben — Lieferungen mit
-eigenem Einkaufs- und Ablaufdatum, Los- und Produktionsnummer, Bezeichnung und
-Kommentar. Die Frage, um die es geht: Wie viel von der Charge, die im März
-abläuft, liegt noch auf dem SRF?
+eigenem Einkaufs- und Ablaufdatum, LOT, Bezeichnung und Kommentar. Die Frage,
+um die es geht: Wie viel von der Charge, die im März abläuft, liegt noch auf
+dem SRF?
+
+**Nur ein Nummernfeld: LOT.** Auf der Verpackung steht „LOT", gemeint ist die
+Produktions- bzw. Chargennummer des Herstellers. Eine eigene Los-Nummer daneben
+gibt es nicht; ein zweites Feld führte nur dazu, dass dieselbe Nummer mal hier,
+mal dort steht. Gespeichert wird sie im Feld `produktionsNummer`, angezeigt als
+„LOT / Chargennummer", in der Kurzform als „LOT 4711".
 
 ### Modell: Aufteilung im Lagerort
 
@@ -362,6 +368,12 @@ Charge** = `anzahl` − Σ `chargen`. Der Rest wird nur berechnet
 rechnen unverändert darüber und wissen von Chargen nichts. Eine Charge mit
 Menge 0 fällt aus der Map, eine leere Map wird gelöscht statt als `{}` stehen
 zu bleiben.
+
+**Negativer Bestand ohne Aufteilung.** Ein Lagerort kann negativ werden, wenn im
+Einsatz mehr verbraucht wird, als gebucht war — das galt schon vor den Chargen.
+Ist der Lagerort nicht aufgeteilt, zeigt die Pflege-Seite dafür keinen Chip
+„ohne Charge: -3": Er wiederholte nur die rote Anzahl und sähe aus wie ein
+Fehler der Chargen. Korrigiert wird so ein Bestand per Inventur.
 
 **Warum keine eigene Bestandszeile je Charge.** Naheliegend wäre ein
 `geraetBestand` je Lagerort und Charge. Das bräche alles, was am Bestand hängt:
@@ -420,7 +432,7 @@ der Server mit 400 ab, die Dialoge begrenzen die Felder schon bei der Eingabe.
 | Lagerort löschen | der Restbestand wird je Topf als Inventur ausgebucht |
 
 Eine archivierte Charge bleibt im Array, damit Einsatz-Einträge und Buchungen
-ihre Los-Nummer weiter anzeigen. Bebuchen lässt sie sich nicht mehr, nur
+ihre LOT weiter anzeigen. Bebuchen lässt sie sich nicht mehr, nur
 leeren: Ein Zugang darauf holte sie still zurück, ohne dass sie in den Listen
 wieder auftaucht.
 
@@ -582,7 +594,7 @@ zwei Wegen. Steht er schon auf 0, bleibt er, wie er ist.
 - Chargen im Sybos-Import und im Rückschreiben, im Sybos-Übertrag und im
   Einsatz-Ausdruck. Der Eintrag trägt seine Charge; das Nachziehen ist ein
   eigener Schritt.
-- Die Los-Nummer per Scan (GS1-Barcode) erfassen.
+- Die LOT per Scan (GS1-Barcode) erfassen.
 - Der Wert von `Kategorie` im Lagerartikel-Export ist noch nicht bekannt; die
   Vorbelegung von `verbrauchsmaterial` greift erst, wenn er „verbrauch" oder
   „lagerartikel" enthält.
