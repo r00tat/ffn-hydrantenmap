@@ -6,6 +6,8 @@
  * rufen das hier innerhalb ihrer Transaktion auf.
  */
 
+import type { GeraetChargeTeil } from './geraet';
+
 export interface StockState {
   bestandGesamt: number;
   mindestbestand?: number;
@@ -21,7 +23,7 @@ export interface StockResult {
 }
 
 /** Rundet Gleitkommareste weg (0,1 + 0,2 ≠ 0,3). */
-function clean(value: number): number {
+export function clean(value: number): number {
   // `|| 0` macht aus -0 eine 0.
   return Math.round(value * 1e9) / 1e9 || 0;
 }
@@ -65,12 +67,31 @@ export function applyStockDelta(
 export interface VerbrauchTarget {
   bestandId: string;
   menge: number;
+  /**
+   * Aufteilung der Menge auf Chargen. Ohne Angabe geht alles auf den Rest
+   * ohne Charge.
+   */
+  teile?: GeraetChargeTeil[];
 }
 
 export interface VerbrauchBooking {
   bestandId: string;
   /** Wie gebucht: Verbrauch negativ, Storno positiv. */
   menge: number;
+  /** Fehlt bei alten Buchungen — sie zählen als Rest ohne Charge. */
+  chargeId?: string | null;
+}
+
+export interface VerbrauchChange {
+  bestandId: string;
+  /** `null` = Rest ohne Charge. */
+  chargeId: string | null;
+  delta: number;
+}
+
+/** Schlüssel eines Topfs: Lagerort und Charge. */
+function potKey(bestandId: string, chargeId: string | null): string {
+  return JSON.stringify([bestandId, chargeId]);
 }
 
 /**
@@ -78,38 +99,50 @@ export interface VerbrauchBooking {
  *
  * `target` ist der Soll-Zustand des Eintrags (`null`, wenn er gelöscht oder
  * kein Verbrauch mehr ist), `booked` alle bisherigen Buchungen mit dessen
- * `einsatzEintragId`. Das Ergebnis ist je Lagerort die noch fehlende Menge —
- * ein zweiter Aufruf nach dem Buchen liefert deshalb nichts (Idempotenz), und
- * Mengen- oder Lagerortwechsel werden zur Differenz- bzw. Umbuchung.
+ * `einsatzEintragId`. Das Ergebnis ist je Topf — Lagerort und Charge — die
+ * noch fehlende Menge. Ein zweiter Aufruf nach dem Buchen liefert deshalb
+ * nichts (Idempotenz), und Mengen-, Lagerort- oder Chargenwechsel werden zur
+ * Differenz- bzw. Umbuchung. Alte Buchungen ohne Charge zählen als Rest ohne
+ * Charge.
  *
- * Reihenfolge: zuerst der Ziel-Lagerort, dann die übrigen in der Reihenfolge
- * ihrer ersten Buchung.
+ * Reihenfolge: zuerst die Teile des Ziels (in der Reihenfolge von `teile`),
+ * dann die übrigen Töpfe in der Reihenfolge ihrer ersten Buchung.
  */
 export function reconcileVerbrauch(
   target: VerbrauchTarget | null,
   booked: VerbrauchBooking[],
-): { bestandId: string; delta: number }[] {
+): VerbrauchChange[] {
+  const pots = new Map<string, { bestandId: string; chargeId: string | null }>();
   const desired = new Map<string, number>();
+  const addPot = (bestandId: string, chargeId: string | null): string => {
+    const key = potKey(bestandId, chargeId);
+    if (!pots.has(key)) pots.set(key, { bestandId, chargeId });
+    return key;
+  };
+
   if (target && Number.isFinite(target.menge) && target.menge > 0) {
-    desired.set(target.bestandId, -target.menge);
+    const teile = target.teile ?? [{ chargeId: null, menge: target.menge }];
+    for (const teil of teile) {
+      if (!Number.isFinite(teil.menge) || teil.menge === 0) continue;
+      const key = addPot(target.bestandId, teil.chargeId ?? null);
+      desired.set(key, (desired.get(key) ?? 0) - teil.menge);
+    }
+  } else if (target) {
+    // Kein Verbrauch mehr am Ziel — der Lagerort kommt trotzdem zuerst.
+    addPot(target.bestandId, null);
   }
 
   const current = new Map<string, number>();
   for (const b of booked) {
     if (!Number.isFinite(b.menge)) continue;
-    current.set(b.bestandId, (current.get(b.bestandId) ?? 0) + b.menge);
+    const key = addPot(b.bestandId, b.chargeId ?? null);
+    current.set(key, (current.get(key) ?? 0) + b.menge);
   }
 
-  const order: string[] = [];
-  if (target) order.push(target.bestandId);
-  for (const id of current.keys()) {
-    if (!order.includes(id)) order.push(id);
-  }
-
-  const result: { bestandId: string; delta: number }[] = [];
-  for (const bestandId of order) {
-    const delta = clean((desired.get(bestandId) ?? 0) - (current.get(bestandId) ?? 0));
-    if (delta !== 0) result.push({ bestandId, delta });
+  const result: VerbrauchChange[] = [];
+  for (const [key, { bestandId, chargeId }] of pots) {
+    const delta = clean((desired.get(key) ?? 0) - (current.get(key) ?? 0));
+    if (delta !== 0) result.push({ bestandId, chargeId, delta });
   }
   return result;
 }
@@ -158,6 +191,8 @@ export function capVerbrauchTarget(
   bookable: boolean,
 ): VerbrauchTarget | null {
   if (!target || bookable) return target;
+  // Begrenzt wird je Lagerort über alle Chargen; die Aufteilung entfällt
+  // dabei, alles geht auf den Rest ohne Charge.
   const alreadyBooked = -booked
     .filter((b) => b.bestandId === target.bestandId && Number.isFinite(b.menge))
     .reduce((sum, b) => sum + b.menge, 0);

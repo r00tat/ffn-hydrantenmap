@@ -115,6 +115,62 @@ export interface GeraetLagerort {
   vehicleId?: string;
 }
 
+/**
+ * Eine Charge (Los) eines Verbrauchsmaterials, als Eintrag in `Geraet.chargen`.
+ * Archivierte Chargen bleiben im Array, damit Einsatz-Einträge und Buchungen
+ * ihre Los-Nummer weiter anzeigen.
+ */
+export interface GeraetCharge {
+  id: string;
+  /** Eigene Bezeichnung, z. B. „Lieferung März". */
+  bezeichnung?: string;
+  /** Los-Nummer des Herstellers. */
+  losNummer?: string;
+  produktionsNummer?: string;
+  /** Einkaufs-Datum (`YYYY-MM-DD`). */
+  einkaufsDatum?: string;
+  /** Ablauf-Datum (`YYYY-MM-DD`) — bestimmt die FEFO-Reihenfolge. */
+  ablaufDatum?: string;
+  kommentar?: string;
+  /** Ausgeblendet in Listen und Auswahl, bleibt aber lesbar. */
+  archiviert?: boolean;
+  createdAt: string;
+  createdBy: string;
+}
+
+/**
+ * Höchstlänge der Texte einer Charge (Bezeichnung, Los-Nr., Produktionsnummer,
+ * Kommentar) und der Bemerkung beim Ausbuchen — die Chargen liegen als Array
+ * im Artikel-Dokument, das nicht beliebig wachsen darf.
+ */
+export const GERAET_CHARGE_MAX_TEXT = 500;
+
+/** Höchstzahl der Chargen eines Artikels, archivierte mitgezählt. */
+export const GERAET_CHARGEN_MAX = 200;
+
+/** Vorlauf in Tagen, ab dem eine Charge als „läuft bald ab" gilt. */
+export const GERAET_ABLAUF_VORLAUF_TAGE = 60;
+
+/** Ein Teil eines Verbrauchs: `chargeId: null` = Rest ohne Charge. */
+export interface GeraetChargeTeil {
+  chargeId: string | null;
+  menge: number;
+}
+
+/**
+ * Anzeige einer Charge: Bezeichnung, sonst „Los <Nummer>", sonst das
+ * Ablaufdatum, sonst die ID.
+ */
+export function formatCharge(c: GeraetCharge): string {
+  const bezeichnung = c.bezeichnung?.trim();
+  if (bezeichnung) return bezeichnung;
+  const los = c.losNummer?.trim();
+  if (los) return `Los ${los}`;
+  const ablauf = c.ablaufDatum?.trim();
+  if (ablauf) return ablauf;
+  return c.id;
+}
+
 /** Stammdaten: `groups/{groupId}/geraet/{id}`. `id` = Sybos-ID beim Import. */
 export interface Geraet {
   id: string;
@@ -175,6 +231,13 @@ export interface Geraet {
   bestandGesamt: number;
   /** Gesetzt beim Unterschreiten, gelöscht beim Wiederauffüllen (ISO). */
   nachbestellenSeit?: string;
+  /**
+   * Chargen des Verbrauchsmaterials (samt archivierten). Der Import fasst sie
+   * nicht an.
+   */
+  chargen?: GeraetCharge[];
+  /** Vorlauf der Ablaufwarnung in Tagen, ohne Angabe `GERAET_ABLAUF_VORLAUF_TAGE`. */
+  ablaufVorlaufTage?: number;
   /** Kostenersatz-Position, z. B. „12.05". */
   kostenersatzRateId?: string;
   /**
@@ -199,6 +262,12 @@ export interface GeraetBestand {
   /** Darf negativ werden: Die Realität geht vor. */
   anzahl: number;
   /**
+   * Aufteilung auf Chargen: chargeId → Menge. Einträge mit 0 werden entfernt.
+   * `anzahl` bleibt die Summe und die Wahrheit; der Rest ohne Charge
+   * (`anzahl` − Σ) wird nur berechnet, nie gespeichert.
+   */
+  chargen?: Record<string, number>;
+  /**
    * Gelöschter Lagerort, auf den noch ein Verbrauch im Einsatz zeigt. Er
    * bleibt lesbar, damit der Einsatz seinen Lagerort zeigt und ein Storno
    * zurückbuchen kann; in Listen und Auswahl fehlt er.
@@ -214,7 +283,9 @@ export type GeraetBuchungArt =
   | 'umbuchung'
   | 'inventur'
   | 'import'
-  | 'storno';
+  | 'storno'
+  /** Zuordnung zu Chargen ohne Mengenänderung (`menge: 0`). */
+  | 'aufteilung';
 
 export const GERAET_BUCHUNG_ARTEN: GeraetBuchungArt[] = [
   'verbrauch',
@@ -223,6 +294,7 @@ export const GERAET_BUCHUNG_ARTEN: GeraetBuchungArt[] = [
   'inventur',
   'import',
   'storno',
+  'aufteilung',
 ];
 
 /** Protokoll: `groups/{groupId}/geraetBuchung/{id}`. */
@@ -233,6 +305,8 @@ export interface GeraetBuchung {
   art: GeraetBuchungArt;
   /** Vorzeichenbehaftet: Verbrauch negativ, Zugang positiv. */
   menge: number;
+  /** Die Charge, die bewegt wurde — fehlt sie, der Rest ohne Charge. */
+  chargeId?: string;
   /** Bei Umbuchung: der Ziel-Lagerort. */
   zielBestandId?: string;
   firecallId?: string;
@@ -261,6 +335,13 @@ export interface GeraetEinsatz {
   bestandId?: string;
   /** Stück. */
   menge?: number;
+  /**
+   * Bei Verbrauch: die Aufteilung der Menge auf Chargen. Σ `menge` muss
+   * `menge` ergeben, sonst bucht der Abgleich alles auf den Rest ohne Charge.
+   */
+  chargen?: GeraetChargeTeil[];
+  /** Die Aufteilung auf Chargen wurde von Hand bestätigt. */
+  chargenGeprueft?: boolean;
   /** Bei `einheitVerwendungsnachweis === 'h'`. */
   stunden?: number;
   zeitpunkt: string;

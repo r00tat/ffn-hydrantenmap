@@ -96,6 +96,46 @@ describe('GeraetEditDialog', () => {
     );
   });
 
+  it('speichert den Vorlauf der Ablaufwarnung', async () => {
+    const user = userEvent.setup();
+    render(vlies({ ablaufVorlaufTage: 30 }));
+    const vorlauf = screen.getByLabelText('Vorlauf Ablaufwarnung (Tage)');
+    expect(vorlauf).toHaveValue(30);
+    await user.clear(vorlauf);
+    await user.type(vorlauf, '90');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(saveGeraet).toHaveBeenCalledWith(
+        'ffnd',
+        expect.objectContaining({ ablaufVorlaufTage: 90 }),
+      ),
+    );
+  });
+
+  it('löscht den Vorlauf, wenn das Feld leer ist', async () => {
+    const user = userEvent.setup();
+    render(vlies({ ablaufVorlaufTage: 30 }));
+    await user.clear(screen.getByLabelText('Vorlauf Ablaufwarnung (Tage)'));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(saveGeraet).toHaveBeenCalledWith(
+        'ffnd',
+        expect.objectContaining({ ablaufVorlaufTage: null }),
+      ),
+    );
+  });
+
+  it('lehnt einen ungültigen Vorlauf ab', async () => {
+    const user = userEvent.setup();
+    render(vlies());
+    await user.type(screen.getByLabelText('Vorlauf Ablaufwarnung (Tage)'), '1.5');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByText('Ungültiger Wert bei „Vorlauf Ablaufwarnung (Tage)“.'),
+    ).toBeInTheDocument();
+    expect(saveGeraet).not.toHaveBeenCalled();
+  });
+
   it('löscht den Mindestbestand, wenn der Artikel kein Verbrauchsmaterial mehr ist', async () => {
     const user = userEvent.setup();
     render(vlies());

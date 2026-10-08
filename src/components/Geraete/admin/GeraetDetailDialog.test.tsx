@@ -1,17 +1,44 @@
 // @vitest-environment jsdom
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Geraet, GeraetBestand } from '../../../common/geraet';
+import {
+  GERAET_CHARGE_MAX_TEXT,
+  type Geraet,
+  type GeraetBestand,
+} from '../../../common/geraet';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
-const { deleteGeraetBestand, saveGeraet, lagerortDialogProps } = vi.hoisted(() => ({
+const {
+  deleteGeraetBestand,
+  saveGeraet,
+  archiveGeraetCharge,
+  ausbuchenGeraetCharge,
+  lagerortDialogProps,
+} = vi.hoisted(() => ({
   deleteGeraetBestand: vi.fn(),
   saveGeraet: vi.fn(),
+  archiveGeraetCharge: vi.fn(),
+  ausbuchenGeraetCharge: vi.fn(),
   lagerortDialogProps: vi.fn(),
 }));
 
-vi.mock('../geraeteActions', () => ({ deleteGeraetBestand, saveGeraet }));
+vi.mock('../geraeteActions', () => ({
+  deleteGeraetBestand,
+  saveGeraet,
+  archiveGeraetCharge,
+  ausbuchenGeraetCharge,
+}));
+vi.mock('./ChargeDialog', () => ({
+  default: (props: { charge?: { id: string } }) => (
+    <div>Charge-Dialog {props.charge ? props.charge.id : 'neu'}</div>
+  ),
+}));
+vi.mock('./ChargeSplitDialog', () => ({
+  default: (props: { bestand: GeraetBestand }) => (
+    <div>Aufteilen-Dialog {props.bestand.id}</div>
+  ),
+}));
 vi.mock('./BestandBookingDialog', () => ({ default: () => null }));
 vi.mock('./LagerortDialog', () => ({
   default: (props: { bestand?: GeraetBestand }) => {
@@ -43,14 +70,18 @@ const srf: GeraetBestand = {
   anzahl: 2,
 };
 
-function render(canManage = true, item: Geraet = geraet) {
+function render(
+  canManage = true,
+  item: Geraet = geraet,
+  bestaende: GeraetBestand[] = [srf],
+) {
   return renderWithIntl(
     <GeraetDetailDialog
       open
       groupId="ffnd"
       geraet={item}
-      bestaende={[srf]}
-      allBestaende={[srf]}
+      bestaende={bestaende}
+      allBestaende={bestaende}
       containers={[]}
       canManage={canManage}
       onClose={vi.fn()}
@@ -64,6 +95,8 @@ describe('GeraetDetailDialog', () => {
     vi.clearAllMocks();
     deleteGeraetBestand.mockResolvedValue({ id: 'b1', deleted: true });
     saveGeraet.mockResolvedValue({ id: 'g1' });
+    archiveGeraetCharge.mockResolvedValue({ id: 'c2' });
+    ausbuchenGeraetCharge.mockResolvedValue({ id: 'c1', bookings: 1 });
   });
 
   it('öffnet den Lagerort-Dialog zum Bearbeiten', async () => {
@@ -136,6 +169,114 @@ describe('GeraetDetailDialog', () => {
       render(false);
       expect(screen.queryByRole('switch')).toBeNull();
       expect(screen.getByText('Verbrauchsmaterial')).toBeInTheDocument();
+    });
+  });
+
+  describe('Chargen', () => {
+    const mitChargen: Geraet = {
+      ...geraet,
+      chargen: [
+        { id: 'c1', losNummer: 'A1', ablaufDatum: '2020-01-31', createdAt: '', createdBy: '' },
+        { id: 'c2', bezeichnung: 'Lieferung Mai', createdAt: '', createdBy: '' },
+        { id: 'c3', bezeichnung: 'Alt', archiviert: true, createdAt: '', createdBy: '' },
+      ],
+    };
+    const srfMitChargen: GeraetBestand = { ...srf, anzahl: 6, chargen: { c1: 2 } };
+
+    function renderChargen(canManage = true, bestand: GeraetBestand = srfMitChargen) {
+      return render(canManage, mitChargen, [bestand]);
+    }
+
+    it('zeigt die aktiven Chargen mit Ablaufstatus und Gesamtmenge', () => {
+      renderChargen();
+      expect(screen.getByRole('heading', { name: 'Chargen' })).toBeInTheDocument();
+      const row = screen.getByRole('row', { name: /^Los A1/ });
+      expect(row).toHaveTextContent('A1');
+      expect(row).toHaveTextContent('abgelaufen');
+      expect(row).toHaveTextContent('2');
+      expect(screen.getByRole('row', { name: /^Lieferung Mai/ })).toBeInTheDocument();
+      expect(screen.queryByText('Alt')).toBeNull();
+    });
+
+    it('zeigt archivierte Chargen nur auf Wunsch', async () => {
+      const user = userEvent.setup();
+      renderChargen();
+      await user.click(screen.getByRole('switch', { name: 'archivierte anzeigen' }));
+      expect(screen.getByText('Alt')).toBeInTheDocument();
+      expect(screen.getByText('archiviert')).toBeInTheDocument();
+    });
+
+    it('gibt es bei einem Gerät nicht', () => {
+      render(true, { ...mitChargen, verbrauchsmaterial: false }, [srf]);
+      expect(screen.queryByRole('heading', { name: 'Chargen' })).toBeNull();
+    });
+
+    it('zeigt am Lagerort die Menge je Charge und ohne Charge', () => {
+      renderChargen();
+      expect(screen.getByText('Los A1: 2')).toBeInTheDocument();
+      expect(screen.getByText('ohne Charge: 4')).toBeInTheDocument();
+    });
+
+    it('warnt bei negativem Rest ohne Charge', () => {
+      renderChargen(true, { ...srfMitChargen, anzahl: 1 });
+      expect(screen.getByText('ohne Charge: -1')).toBeInTheDocument();
+      expect(screen.getByText(/Negativer Bestand bei einer Charge/)).toBeInTheDocument();
+    });
+
+    it('öffnet den Dialog zum Anlegen und Bearbeiten', async () => {
+      const user = userEvent.setup();
+      renderChargen();
+      await user.click(screen.getByRole('button', { name: 'Charge anlegen' }));
+      expect(screen.getByText('Charge-Dialog neu')).toBeInTheDocument();
+      const row = screen.getByRole('row', { name: /^Los A1/ });
+      await user.click(within(row).getByRole('button', { name: 'Charge bearbeiten' }));
+      expect(screen.getByText('Charge-Dialog c1')).toBeInTheDocument();
+    });
+
+    it('bucht eine Charge nach Rückfrage mit Bemerkung aus', async () => {
+      const user = userEvent.setup();
+      renderChargen();
+      const row = screen.getByRole('row', { name: /^Los A1/ });
+      await user.click(within(row).getByRole('button', { name: 'Ausbuchen' }));
+      expect(screen.getByText(/„Los A1“ \(2 Sack\)/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Bemerkung')).toHaveAttribute(
+        'maxlength',
+        String(GERAET_CHARGE_MAX_TEXT),
+      );
+      await user.type(screen.getByLabelText('Bemerkung'), 'abgelaufen');
+      await user.click(
+        within(screen.getByRole('dialog', { name: 'Charge ausbuchen?' })).getByRole('button', {
+          name: 'Ausbuchen',
+        }),
+      );
+      await waitFor(() =>
+        expect(ausbuchenGeraetCharge).toHaveBeenCalledWith('ffnd', 'g1', 'c1', 'abgelaufen'),
+      );
+    });
+
+    it('archiviert nur eine Charge ohne Bestand', async () => {
+      const user = userEvent.setup();
+      renderChargen();
+      const withStock = screen.getByRole('row', { name: /^Los A1/ });
+      expect(within(withStock).getByRole('button', { name: 'Archivieren' })).toBeDisabled();
+      const empty = screen.getByRole('row', { name: /^Lieferung Mai/ });
+      await user.click(within(empty).getByRole('button', { name: 'Archivieren' }));
+      await waitFor(() => expect(archiveGeraetCharge).toHaveBeenCalledWith('ffnd', 'g1', 'c2'));
+    });
+
+    it('öffnet das Aufteilen eines Lagerorts', async () => {
+      const user = userEvent.setup();
+      renderChargen();
+      await user.click(screen.getByRole('button', { name: 'Auf Chargen aufteilen' }));
+      expect(screen.getByText('Aufteilen-Dialog b1')).toBeInTheDocument();
+    });
+
+    it('ohne Pflegerecht keine Aktionen an den Chargen', () => {
+      renderChargen(false);
+      expect(screen.queryByRole('button', { name: 'Charge anlegen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Ausbuchen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Auf Chargen aufteilen' })).toBeNull();
+      expect(screen.getByText('Los A1: 2')).toBeInTheDocument();
     });
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Geraet, GeraetBestand, GeraetEinsatz } from '../../../common/geraet';
 import {
   buildGeraetEinsatzData,
+  bestandForEdit,
   buildGeraetEinsatzUpdate,
   einsatzArtFor,
   findGeraetByCode,
@@ -302,6 +303,8 @@ describe('buildGeraetEinsatzUpdate', () => {
       menge: 5,
       stunden: deleted,
       bemerkung: deleted,
+      chargen: deleted,
+      chargenGeprueft: deleted,
       gebucht: false,
     });
   });
@@ -316,6 +319,8 @@ describe('buildGeraetEinsatzUpdate', () => {
       menge: deleted,
       stunden: 3,
       bemerkung: 'x',
+      chargen: deleted,
+      chargenGeprueft: deleted,
     });
   });
 });
@@ -365,6 +370,8 @@ describe('geraetForEntry', () => {
       menge: 5,
       stunden: 'DELETE',
       bemerkung: 'nachgetragen',
+      chargen: 'DELETE',
+      chargenGeprueft: 'DELETE',
       gebucht: false,
     });
   });
@@ -438,5 +445,214 @@ describe('Container am Einsatz', () => {
     const container = bestand({ id: 'container', anzahl: 2, lagerort: imContainer });
     expect(pickDefaultBestand([lager, container], [], ['c1'])?.id).toBe('container');
     expect(pickDefaultBestand([lager, container], [])?.id).toBe('lager');
+  });
+});
+
+describe('Chargen beim Verbrauch', () => {
+  const deleted = Symbol('deleted');
+  const charge = (id: string, ablaufDatum?: string, archiviert?: boolean) => ({
+    id,
+    losNummer: id.toUpperCase(),
+    ablaufDatum,
+    archiviert,
+    createdAt: '',
+    createdBy: '',
+  });
+  const mitChargen = geraet({
+    verbrauchsmaterial: true,
+    chargen: [charge('c1', '2026-12-01'), charge('c2', '2027-06-01')],
+  });
+  const base = { groupId: 'ffnd', nowIso: '2026-10-08T10:00:00.000Z', createdBy: 'u' };
+
+  it('teilt ohne Angabe nach FEFO auf und verlangt eine Prüfung, wenn mehrere Töpfe Bestand haben', () => {
+    const b = bestand({ anzahl: 10, chargen: { c1: 2, c2: 5 } });
+    const data = buildGeraetEinsatzData({
+      ...base,
+      geraet: mitChargen,
+      bestandId: 'b1',
+      bestand: b,
+      menge: 4,
+    });
+    expect(data.chargen).toEqual([
+      { chargeId: 'c1', menge: 2 },
+      { chargeId: 'c2', menge: 2 },
+    ]);
+    expect(data.chargenGeprueft).toBe(false);
+  });
+
+  it('ein einziger Topf mit Bestand gilt als geprüft', () => {
+    const b = bestand({ anzahl: 5, chargen: { c2: 5 } });
+    const data = buildGeraetEinsatzData({
+      ...base,
+      geraet: mitChargen,
+      bestandId: 'b1',
+      bestand: b,
+      menge: 3,
+    });
+    expect(data.chargen).toEqual([{ chargeId: 'c2', menge: 3 }]);
+    expect(data.chargenGeprueft).toBe(true);
+  });
+
+  it('übernimmt eine angegebene Aufteilung als geprüft', () => {
+    const b = bestand({ anzahl: 10, chargen: { c1: 2, c2: 5 } });
+    const chargen = [
+      { chargeId: 'c2', menge: 3 },
+      { chargeId: null, menge: 1 },
+    ];
+    const data = buildGeraetEinsatzData({
+      ...base,
+      geraet: mitChargen,
+      bestandId: 'b1',
+      bestand: b,
+      menge: 4,
+      chargen,
+    });
+    expect(data.chargen).toEqual(chargen);
+    expect(data.chargenGeprueft).toBe(true);
+  });
+
+  it('ein Bestand mit Aufteilung zählt auch, wenn alle Chargen archiviert sind', () => {
+    const archiviert = geraet({ verbrauchsmaterial: true, chargen: [charge('c1', undefined, true)] });
+    const data = buildGeraetEinsatzData({
+      ...base,
+      geraet: archiviert,
+      bestandId: 'b1',
+      bestand: bestand({ anzahl: 3, chargen: { c1: 3 } }),
+      menge: 1,
+    });
+    expect(data.chargen).toEqual([{ chargeId: 'c1', menge: 1 }]);
+    expect(data.chargenGeprueft).toBe(true);
+  });
+
+  it('ohne Chargen am Artikel, ohne Bestand oder bei einer Zuordnung keine Felder', () => {
+    const ohne = buildGeraetEinsatzData({
+      ...base,
+      geraet: geraet({ verbrauchsmaterial: true }),
+      bestandId: 'b1',
+      bestand: bestand({ anzahl: 3 }),
+      menge: 1,
+    });
+    expect('chargen' in ohne).toBe(false);
+    expect('chargenGeprueft' in ohne).toBe(false);
+
+    const ohneBestand = buildGeraetEinsatzData({
+      ...base,
+      geraet: mitChargen,
+      menge: 1,
+    });
+    expect('chargen' in ohneBestand).toBe(false);
+
+    const zuordnung = buildGeraetEinsatzData({
+      ...base,
+      geraet: { ...mitChargen, verbrauchsmaterial: false },
+      bestand: bestand({ anzahl: 3, chargen: { c1: 3 } }),
+      menge: 1,
+    });
+    expect('chargen' in zuordnung).toBe(false);
+  });
+
+  it('Änderung: setzt die Aufteilung neu', () => {
+    const patch = buildGeraetEinsatzUpdate(
+      {
+        geraet: mitChargen,
+        bestandId: 'b1',
+        bestand: bestand({ anzahl: 10, chargen: { c1: 2, c2: 5 } }),
+        menge: 3,
+      },
+      () => deleted,
+    );
+    expect(patch.chargen).toEqual([
+      { chargeId: 'c1', menge: 2 },
+      { chargeId: 'c2', menge: 1 },
+    ]);
+    expect(patch.chargenGeprueft).toBe(false);
+  });
+
+  it('Änderung: eine angegebene Aufteilung gilt als geprüft', () => {
+    const patch = buildGeraetEinsatzUpdate(
+      {
+        geraet: mitChargen,
+        bestandId: 'b1',
+        bestand: bestand({ anzahl: 10, chargen: { c1: 2, c2: 5 } }),
+        menge: 3,
+        chargen: [{ chargeId: 'c2', menge: 3 }],
+      },
+      () => deleted,
+    );
+    expect(patch.chargen).toEqual([{ chargeId: 'c2', menge: 3 }]);
+    expect(patch.chargenGeprueft).toBe(true);
+  });
+
+  it('Änderung mit unbekanntem, aber unverändertem Lagerort lässt die Aufteilung stehen', () => {
+    const patch = buildGeraetEinsatzUpdate(
+      { geraet: mitChargen, bestandId: 'b1', entryBestandId: 'b1', menge: 3, bemerkung: 'x' },
+      () => deleted,
+    );
+    expect('chargen' in patch).toBe(false);
+    expect('chargenGeprueft' in patch).toBe(false);
+    expect(patch.bemerkung).toBe('x');
+  });
+
+  it('Änderung auf einen anderen, unbekannten Lagerort löscht die Aufteilung', () => {
+    const patch = buildGeraetEinsatzUpdate(
+      { geraet: mitChargen, bestandId: 'b2', entryBestandId: 'b1', menge: 3 },
+      () => deleted,
+    );
+    expect(patch.chargen).toBe(deleted);
+    expect(patch.chargenGeprueft).toBe(deleted);
+  });
+
+  it('Änderung ohne Chargen löscht beide Felder', () => {
+    const patch = buildGeraetEinsatzUpdate(
+      { geraet: geraet({ verbrauchsmaterial: true }), bestandId: 'b1', menge: 3 },
+      () => deleted,
+    );
+    expect(patch.chargen).toBe(deleted);
+    expect(patch.chargenGeprueft).toBe(deleted);
+  });
+});
+
+describe('bestandForEdit', () => {
+  const entry = (overrides: Partial<GeraetEinsatz> = {}): GeraetEinsatz => ({
+    id: 'e1',
+    groupId: 'ffnd',
+    geraetId: 'g1',
+    geraetName: 'Bindevlies',
+    art: 'verbraucht',
+    bestandId: 'b1',
+    menge: 3,
+    gebucht: true,
+    zeitpunkt: '',
+    createdAt: '',
+    createdBy: '',
+    ...overrides,
+  });
+
+  it('rechnet den schon gebuchten Verbrauch des Eintrags wieder dazu', () => {
+    const b = bestand({ anzahl: 4, chargen: { c1: 1 } });
+    expect(
+      bestandForEdit(
+        b,
+        entry({
+          chargen: [
+            { chargeId: 'c1', menge: 2 },
+            { chargeId: null, menge: 1 },
+          ],
+        }),
+      ),
+    ).toMatchObject({ anzahl: 7, chargen: { c1: 3 } });
+  });
+
+  it('ein Verbrauch ohne Aufteilung wurde vom Rest gebucht', () => {
+    const b = bestand({ anzahl: 4, chargen: { c1: 1 } });
+    expect(bestandForEdit(b, entry())).toMatchObject({ anzahl: 7, chargen: { c1: 1 } });
+  });
+
+  it('nicht gebucht, anderer Lagerort oder neuer Eintrag: unverändert', () => {
+    const b = bestand({ anzahl: 4 });
+    expect(bestandForEdit(b, entry({ gebucht: false }))).toBe(b);
+    expect(bestandForEdit(b, entry({ bestandId: 'b2' }))).toBe(b);
+    expect(bestandForEdit(b, undefined)).toBe(b);
+    expect(bestandForEdit(undefined, entry())).toBeUndefined();
   });
 });

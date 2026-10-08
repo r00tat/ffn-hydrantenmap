@@ -56,6 +56,18 @@ variable "weekly_report_paused" {
   default     = false
 }
 
+variable "ablauf_report_schedule" {
+  description = "Cron expression of the weekly mail about expired and expiring consumable batches (Chargen)"
+  type        = string
+  default     = "0 7 * * 1"
+}
+
+variable "ablauf_report_paused" {
+  description = "Job exists but does not run. Default in dev, so that two environments never mail the same distribution list."
+  type        = bool
+  default     = false
+}
+
 variable "ueberwachung_schedule" {
   description = "Cron expression of the breathing apparatus monitoring sweep. This is the safety net under the Cloud Tasks schedule, not the primary path — see docs/atemschutzueberwachung.md."
   type        = string

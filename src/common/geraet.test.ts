@@ -6,6 +6,7 @@ import {
   GERAET_EINSATZ_COLLECTION,
   GERAET_MAX_MENGE,
   deviationKey,
+  formatCharge,
   formatLagerort,
   isBelowMinimum,
   isContainer,
@@ -174,5 +175,29 @@ describe('Container als Lagerort', () => {
     expect(isContainer({ kategorie: ' container ' })).toBe(true);
     expect(isContainer({ kategorie: 'Gerät' })).toBe(false);
     expect(isContainer({})).toBe(false);
+  });
+});
+
+describe('formatCharge', () => {
+  const base = { id: 'c1', createdAt: '2026-01-01T00:00:00Z', createdBy: 'u1' };
+
+  it('zeigt die Bezeichnung', () => {
+    expect(
+      formatCharge({ ...base, bezeichnung: 'Lieferung März', losNummer: 'L-7' }),
+    ).toBe('Lieferung März');
+  });
+
+  it('zeigt ohne Bezeichnung die Los-Nummer', () => {
+    expect(formatCharge({ ...base, losNummer: 'L-7', ablaufDatum: '2027-03-01' })).toBe(
+      'Los L-7',
+    );
+  });
+
+  it('zeigt ohne Los-Nummer das Ablaufdatum', () => {
+    expect(formatCharge({ ...base, ablaufDatum: '2027-03-01' })).toBe('2027-03-01');
+  });
+
+  it('zeigt sonst die ID', () => {
+    expect(formatCharge({ ...base, bezeichnung: '  ' })).toBe('c1');
   });
 });

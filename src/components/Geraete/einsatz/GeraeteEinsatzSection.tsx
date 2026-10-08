@@ -24,6 +24,7 @@ import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  formatCharge,
   formatLagerort,
   GERAET_EINSATZ_COLLECTION,
   type GeraetEinsatz,
@@ -150,12 +151,33 @@ export default function GeraeteEinsatzSection({ embedded = false }: { embedded?:
     return b ? formatLagerort(b.lagerort) : t('lagerortUnknown');
   };
 
+  // Die gebuchten Chargen, z. B. „Los 4711: 2, ohne Charge: 1". Auch
+  // archivierte Chargen stehen am Artikel; eine unbekannte zeigt ihre ID.
+  const chargenText = (entry: GeraetEinsatz): string | undefined => {
+    if (entry.art !== 'verbraucht' || !entry.chargen?.length) return undefined;
+    const chargen = geraetById.get(entry.geraetId)?.chargen ?? [];
+    return entry.chargen
+      .map((teil) => {
+        const charge =
+          teil.chargeId === null ? undefined : chargen.find((c) => c.id === teil.chargeId);
+        const label =
+          teil.chargeId === null
+            ? t('chargeNone')
+            : charge
+              ? formatCharge(charge)
+              : teil.chargeId;
+        return t('chargePart', { label, menge: teil.menge });
+      })
+      .join(', ');
+  };
+
   const renderEntry = (entry: GeraetEinsatz, nested = false) => {
     const amount = amountText(entry);
     const lagerort = lagerortText(entry);
     const secondary = [
       amount,
       lagerort,
+      chargenText(entry),
       entry.zeitpunkt
         ? format.dateTime(new Date(entry.zeitpunkt), {
             dateStyle: 'short',
@@ -208,6 +230,20 @@ export default function GeraeteEinsatzSection({ embedded = false }: { embedded?:
                     icon={<HourglassEmptyIcon />}
                     label={t('notBooked')}
                   />
+                </Tooltip>
+              )}
+              {entry.art === 'verbraucht' && entry.chargenGeprueft === false && (
+                <Tooltip title={t('chargeCheckHint')} describeChild>
+                  {canWrite ? (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      label={t('chargeCheck')}
+                      onClick={() => setDialog({ mode: 'edit', entry })}
+                    />
+                  ) : (
+                    <Chip size="small" color="warning" label={t('chargeCheck')} />
+                  )}
                 </Tooltip>
               )}
               {pendingIds.has(entry.id) && <PendingSyncIcon />}
@@ -333,6 +369,7 @@ export default function GeraeteEinsatzSection({ embedded = false }: { embedded?:
           groupId={groupId}
           geraete={geraete}
           bestaendeByGeraet={bestaendeByGeraet}
+          bestandById={bestandById}
           vehicleNames={vehicleNames}
           assignedIds={assignedIds}
           createdBy={email ?? uid ?? ''}

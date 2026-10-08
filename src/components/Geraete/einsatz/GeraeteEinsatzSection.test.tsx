@@ -45,6 +45,10 @@ const vlies: Geraet = {
   verbrauchsmaterial: true,
   einheit: 'Sack',
   bestandGesamt: 10,
+  chargen: [
+    { id: 'c1', losNummer: '4711', createdAt: '', createdBy: '' },
+    { id: 'c0', losNummer: '0815', archiviert: true, createdAt: '', createdBy: '' },
+  ],
   active: true,
   createdAt: '',
   createdBy: '',
@@ -262,6 +266,49 @@ describe('GeraeteEinsatzSection', () => {
       state.canWrite = false;
       render(<GeraeteEinsatzSection />);
       expect(state.resync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Chargen', () => {
+    it('zeigt die gebuchten Chargen in der Zeile, auch archivierte und unbekannte', () => {
+      state.entries = [
+        {
+          ...verbrauch,
+          menge: 6,
+          chargen: [
+            { chargeId: 'c1', menge: 2 },
+            { chargeId: 'c0', menge: 1 },
+            { chargeId: 'weg', menge: 1 },
+            { chargeId: null, menge: 2 },
+          ],
+          chargenGeprueft: true,
+        },
+      ];
+      render(<GeraeteEinsatzSection />);
+      expect(
+        screen.getByText(/Los 4711: 2, Los 0815: 1, weg: 1, ohne Charge: 2/),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Charge prüfen')).toBeNull();
+    });
+
+    it('„Charge prüfen" öffnet den Eintrag zum Bearbeiten', async () => {
+      const user = userEvent.setup();
+      state.entries = [
+        { ...verbrauch, chargen: [{ chargeId: 'c1', menge: 2 }], chargenGeprueft: false },
+      ];
+      render(<GeraeteEinsatzSection />);
+      await user.click(screen.getByRole('button', { name: 'Charge prüfen' }));
+      expect(screen.getByText('Dialog bearbeiten e1')).toBeInTheDocument();
+    });
+
+    it('ohne Schreibrecht ist „Charge prüfen" nur ein Hinweis', () => {
+      state.canWrite = false;
+      state.entries = [
+        { ...verbrauch, chargen: [{ chargeId: 'c1', menge: 2 }], chargenGeprueft: false },
+      ];
+      render(<GeraeteEinsatzSection />);
+      expect(screen.getByText('Charge prüfen')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Charge prüfen' })).toBeNull();
     });
   });
 

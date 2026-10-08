@@ -3843,7 +3843,8 @@
     "tabs": {
       "list": "Items ({count})",
       "reorder": "To reorder ({count})",
-      "sets": "Sets ({count})"
+      "sets": "Sets ({count})",
+      "expiring": "Expiring soon ({count})"
     },
     "filters": {
       "search": "Search (name, inventory no., barcode)",
@@ -3915,7 +3916,9 @@
       "herstellerTyp": "Model",
       "baumonat": "Month of manufacture",
       "lebensdauerEinheit": "Service life in",
-      "barcodesHint": "Separate several with commas"
+      "barcodesHint": "Separate several with commas",
+      "ablaufVorlaufTage": "Expiry warning lead time (days)",
+      "ablaufVorlaufTageHint": "A batch counts as “expires soon” this many days before expiry. Empty: 60."
     },
     "verwendungsnachweis": {
       "none": "not recorded",
@@ -4080,6 +4083,66 @@
         "codeCollision": "The code “{value}” already belongs to the article “{name}”.",
         "codeCollisionSet": "The code “{value}” already belongs to the set “{name}”."
       }
+    },
+    "chargen": {
+      "title": "Batches",
+      "new": "Add batch",
+      "edit": "Edit batch",
+      "dialogTitleNew": "New batch",
+      "dialogTitleEdit": "Edit batch",
+      "fields": {
+        "bezeichnung": "Name",
+        "losNummer": "Lot no.",
+        "produktionsNummer": "Production number",
+        "einkaufsDatum": "Purchase date",
+        "ablaufDatum": "Expiry date",
+        "kommentar": "Comment"
+      },
+      "columns": {
+        "charge": "Batch",
+        "los": "Lot no.",
+        "ablauf": "Expiry",
+        "menge": "Total quantity"
+      },
+      "empty": "No batch recorded yet.",
+      "showArchived": "show archived",
+      "archived": "archived",
+      "status": {
+        "abgelaufen": "expired",
+        "bald": "expires soon"
+      },
+      "ausbuchen": "Write off",
+      "ausbuchenTitle": "Write off batch?",
+      "ausbuchenText": "The stock of “{charge}” ({menge, number} {einheit}) is written off as a stocktake at all storage locations, and the batch is archived.",
+      "archivieren": "Archive",
+      "archiveOnlyEmpty": "Only a batch without stock can be archived – write it off otherwise.",
+      "chip": "{label}: {menge, number}",
+      "ohneCharge": "without batch: {menge, number}",
+      "aufteilen": "Split into batches",
+      "negative": "Negative stock in a batch or without batch – please correct it with a stocktake or a split.",
+      "split": {
+        "title": "Split into batches",
+        "hint": "Assign the stock at this storage location to batches. Whatever is not assigned stays “without batch”.",
+        "rest": "without batch: {menge, number}",
+        "restNegative": "More is assigned to batches than is in stock ({anzahl, number}).",
+        "noChargen": "The article has no active batch. Add one first."
+      },
+      "booking": {
+        "charge": "Batch",
+        "none": "without batch",
+        "neu": "New batch…",
+        "auto": "automatic (oldest first)",
+        "ablauf": "expires {datum}",
+        "jeCharge": "count per batch"
+      },
+      "expiring": {
+        "hint": "Batches in stock that have expired or expire soon – sorted by expiry date.",
+        "menge": "{menge, number} {einheit}"
+      },
+      "errors": {
+        "archiveFailed": "Archiving failed: {error}",
+        "ausbuchenFailed": "Write-off failed: {error}"
+      }
     }
   },
   "geraetEinsatz": {
@@ -4153,7 +4216,18 @@
         "inactive": "inactive – not created",
         "noBestand": "no storage location – not created"
       },
-      "setCodeFound": "Set “{name}” added."
+      "setCodeFound": "Set “{name}” added.",
+      "chargen": {
+        "title": "Split across batches",
+        "hint": "Several batches are stored at this location. Prefilled by expiry date – first expiring, first out.",
+        "none": "no batch",
+        "available": "{menge, number} available",
+        "expired": "expired {datum}",
+        "expiresSoon": "expires {datum}",
+        "expires": "Expiry {datum}",
+        "sumMismatch": "The sum of the batches ({summe, number}) does not match the quantity ({menge, number}).",
+        "invalid": "Please enter a valid quantity for each batch."
+      }
     },
     "scanner": {
       "title": "Scan barcode",
@@ -4176,6 +4250,10 @@
       "removeText": "All {count} entries of the set “{name}” will be removed. Consumed supplies are booked back to stock.",
       "expand": "Expand",
       "collapse": "Collapse"
-    }
+    },
+    "chargeCheck": "Check batch",
+    "chargeCheckHint": "The batch was chosen automatically by expiry date. Please check it in the entry and save.",
+    "chargeNone": "no batch",
+    "chargePart": "{label}: {menge, number}"
   }
 }

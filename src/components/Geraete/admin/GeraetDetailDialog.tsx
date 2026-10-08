@@ -2,9 +2,12 @@
 
 import AddIcon from '@mui/icons-material/Add';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlined';
+import ArchiveIcon from '@mui/icons-material/Archive';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
+import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutlined';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -18,6 +21,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -28,16 +32,35 @@ import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState, type ReactNode } from 'react';
 import {
+  formatCharge,
   formatLagerort,
+  GERAET_ABLAUF_VORLAUF_TAGE,
+  GERAET_CHARGE_MAX_TEXT,
   isBelowMinimum,
   type Geraet,
   type GeraetBestand,
+  type GeraetCharge,
 } from '../../../common/geraet';
+import {
+  activeChargen,
+  chargePots,
+  chargeTotals,
+  expiryStatus,
+  sortFefo,
+} from '../../../common/geraetCharge';
 import ConfirmDialog from '../../dialogs/ConfirmDialog';
 import GeraetSteckbrief from '../GeraetSteckbrief';
-import { deleteGeraetBestand, saveGeraet } from '../geraeteActions';
+import {
+  archiveGeraetCharge,
+  ausbuchenGeraetCharge,
+  deleteGeraetBestand,
+  saveGeraet,
+} from '../geraeteActions';
 import { callAction } from './actionResult';
 import BestandBookingDialog, { type BestandBookingMode } from './BestandBookingDialog';
+import ChargeDialog from './ChargeDialog';
+import { expiryColor, formatIsoDate, localTodayIso } from './chargeFormat';
+import ChargeSplitDialog from './ChargeSplitDialog';
 import LagerortDialog from './LagerortDialog';
 
 export interface GeraetDetailDialogProps {
@@ -87,6 +110,40 @@ export default function GeraetDetailDialog({
   const [toDelete, setToDelete] = useState<GeraetBestand>();
   const [error, setError] = useState<string>();
   const [savingConsumable, setSavingConsumable] = useState(false);
+  /** `null`: neue Charge; eine Charge: diese bearbeiten. */
+  const [chargeDialog, setChargeDialog] = useState<GeraetCharge | null>();
+  const [toAusbuchen, setToAusbuchen] = useState<GeraetCharge>();
+  const [ausbuchenNote, setAusbuchenNote] = useState('');
+  const [splitBestand, setSplitBestand] = useState<GeraetBestand>();
+  const [showArchived, setShowArchived] = useState(false);
+  const [chargeBusy, setChargeBusy] = useState(false);
+
+  const consumable = !!geraet.verbrauchsmaterial;
+  const allChargen = useMemo(() => sortFefo(geraet.chargen ?? []), [geraet.chargen]);
+  const hasArchived = allChargen.some((c) => c.archiviert);
+  const shownChargen = showArchived ? allChargen : activeChargen({ chargen: allChargen });
+  const totals = useMemo(() => chargeTotals(geraet, bestaende), [geraet, bestaende]);
+  const today = localTodayIso();
+  const vorlauf = geraet.ablaufVorlaufTage ?? GERAET_ABLAUF_VORLAUF_TAGE;
+  const canSplit = consumable && activeChargen(geraet).length > 0;
+
+  const handleArchive = async (charge: GeraetCharge) => {
+    setError(undefined);
+    setChargeBusy(true);
+    const outcome = await callAction(() => archiveGeraetCharge(groupId, geraet.id, charge.id));
+    setChargeBusy(false);
+    if (!outcome.ok) setError(t('chargen.errors.archiveFailed', { error: outcome.error }));
+  };
+
+  const handleAusbuchen = async (charge: GeraetCharge, note: string) => {
+    setError(undefined);
+    setChargeBusy(true);
+    const outcome = await callAction(() =>
+      ausbuchenGeraetCharge(groupId, geraet.id, charge.id, note.trim() || undefined),
+    );
+    setChargeBusy(false);
+    if (!outcome.ok) setError(t('chargen.errors.ausbuchenFailed', { error: outcome.error }));
+  };
 
   const handleConsumable = async (verbrauchsmaterial: boolean) => {
     setError(undefined);
@@ -133,6 +190,177 @@ export default function GeraetDetailDialog({
         {icon}
       </IconButton>
     </Tooltip>
+  );
+
+  /**
+   * Die Töpfe eines Lagerorts als Chips — nur, wenn der Artikel Chargen hat
+   * oder der Lagerort schon aufgeteilt ist. Ein negativer Topf ist ein
+   * Hinweis auf eine Inventur oder Aufteilung.
+   */
+  const renderPots = (b: GeraetBestand) => {
+    if (!consumable) return null;
+    const hasMap = Object.keys(b.chargen ?? {}).length > 0;
+    if (allChargen.length === 0 && !hasMap) return null;
+    const byId = new Map(allChargen.map((c) => [c.id, c]));
+    const pots = chargePots(b, allChargen);
+    const negative = pots.some((p) => p.menge < 0);
+    return (
+      <>
+        <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap', mt: 0.5 }}>
+          {pots.map((p) => {
+            const charge = p.chargeId ? byId.get(p.chargeId) : undefined;
+            const label = charge
+              ? t('chargen.chip', { label: formatCharge(charge), menge: p.menge })
+              : t('chargen.ohneCharge', { menge: p.menge });
+            return (
+              <Chip
+                key={p.chargeId ?? ''}
+                size="small"
+                variant="outlined"
+                color={p.menge < 0 ? 'error' : 'default'}
+                label={label}
+              />
+            );
+          })}
+        </Stack>
+        {negative && (
+          <Typography variant="caption" color="error" component="div">
+            {t('chargen.negative')}
+          </Typography>
+        )}
+      </>
+    );
+  };
+
+  const renderChargen = () => (
+    <Box sx={{ mt: 3 }}>
+      <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          {t('chargen.title')}
+        </Typography>
+        {hasArchived && (
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+              />
+            }
+            label={t('chargen.showArchived')}
+          />
+        )}
+        {canManage && (
+          <Button size="small" startIcon={<AddIcon />} onClick={() => setChargeDialog(null)}>
+            {t('chargen.new')}
+          </Button>
+        )}
+      </Stack>
+      {shownChargen.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          {t('chargen.empty')}
+        </Typography>
+      ) : (
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>{t('chargen.columns.charge')}</TableCell>
+              <TableCell>{t('chargen.columns.los')}</TableCell>
+              <TableCell>{t('chargen.columns.ablauf')}</TableCell>
+              <TableCell align="right">{t('chargen.columns.menge')}</TableCell>
+              {canManage && <TableCell align="right">{tCommon('actions')}</TableCell>}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {shownChargen.map((c) => {
+              const total = totals.get(c.id) ?? 0;
+              const status = expiryStatus(c, today, vorlauf);
+              return (
+                <TableRow key={c.id}>
+                  <TableCell>
+                    {formatCharge(c)}
+                    {c.archiviert && (
+                      <Chip size="small" label={t('chargen.archived')} sx={{ ml: 1 }} />
+                    )}
+                    {c.kommentar && (
+                      <Typography variant="caption" color="text.secondary" component="div">
+                        {c.kommentar}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>{c.losNummer ?? ''}</TableCell>
+                  <TableCell sx={{ color: expiryColor(status), whiteSpace: 'nowrap' }}>
+                    {formatIsoDate(format, c.ablaufDatum)}
+                    {status !== 'ok' && !c.archiviert && (
+                      <Chip
+                        size="small"
+                        color={status === 'abgelaufen' ? 'error' : 'warning'}
+                        label={t(`chargen.status.${status}`)}
+                        sx={{ ml: 1 }}
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={total < 0 ? { color: 'error.main' } : undefined}
+                  >
+                    {total}
+                  </TableCell>
+                  {canManage && (
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                      {!c.archiviert && (
+                        <>
+                          <Tooltip title={t('chargen.edit')}>
+                            <IconButton
+                              size="small"
+                              aria-label={t('chargen.edit')}
+                              onClick={() => setChargeDialog(c)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title={t('chargen.ausbuchen')}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                aria-label={t('chargen.ausbuchen')}
+                                disabled={chargeBusy}
+                                onClick={() => {
+                                  setAusbuchenNote('');
+                                  setToAusbuchen(c);
+                                }}
+                              >
+                                <RemoveCircleOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip
+                            title={
+                              total === 0 ? t('chargen.archivieren') : t('chargen.archiveOnlyEmpty')
+                            }
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                aria-label={t('chargen.archivieren')}
+                                disabled={chargeBusy || total !== 0}
+                                onClick={() => handleArchive(c)}
+                              >
+                                <ArchiveIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </>
+                      )}
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </Box>
   );
 
   return (
@@ -238,6 +466,7 @@ export default function GeraetDetailDialog({
                         {b.lagerort.bemerkung}
                       </Typography>
                     )}
+                    {renderPots(b)}
                   </TableCell>
                   <TableCell
                     align="right"
@@ -250,6 +479,17 @@ export default function GeraetDetailDialog({
                       {actionButton('zugang', b, <AddCircleOutlineIcon fontSize="small" />)}
                       {actionButton('umbuchung', b, <SwapHorizIcon fontSize="small" />)}
                       {actionButton('inventur', b, <FactCheckIcon fontSize="small" />)}
+                      {canSplit && (
+                        <Tooltip title={t('chargen.aufteilen')}>
+                          <IconButton
+                            size="small"
+                            aria-label={t('chargen.aufteilen')}
+                            onClick={() => setSplitBestand(b)}
+                          >
+                            <CallSplitIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Tooltip title={t('detail.editLagerort')}>
                         <IconButton
                           size="small"
@@ -275,6 +515,8 @@ export default function GeraetDetailDialog({
             </TableBody>
           </Table>
         )}
+
+        {consumable && renderChargen()}
       </DialogContent>
       <DialogActions>
         {canManage && (
@@ -307,6 +549,64 @@ export default function GeraetDetailDialog({
           containers={containers}
           onClose={() => setLagerortDialog(undefined)}
         />
+      )}
+      {chargeDialog !== undefined && (
+        <ChargeDialog
+          open
+          groupId={groupId}
+          geraetId={geraet.id}
+          charge={chargeDialog ?? undefined}
+          onClose={() => setChargeDialog(undefined)}
+        />
+      )}
+      {splitBestand && (
+        <ChargeSplitDialog
+          open
+          groupId={groupId}
+          geraet={geraet}
+          bestand={splitBestand}
+          onClose={() => setSplitBestand(undefined)}
+        />
+      )}
+      {toAusbuchen && (
+        <Dialog
+          open
+          onClose={() => setToAusbuchen(undefined)}
+          aria-labelledby="charge-ausbuchen-title"
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle id="charge-ausbuchen-title">{t('chargen.ausbuchenTitle')}</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              {t('chargen.ausbuchenText', {
+                charge: formatCharge(toAusbuchen),
+                menge: totals.get(toAusbuchen.id) ?? 0,
+                einheit,
+              })}
+            </Typography>
+            <TextField
+              label={t('fields.bemerkung')}
+              value={ausbuchenNote}
+              onChange={(e) => setAusbuchenNote(e.target.value)}
+              slotProps={{ htmlInput: { maxLength: GERAET_CHARGE_MAX_TEXT } }}
+              fullWidth
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setToAusbuchen(undefined)}>{tCommon('cancel')}</Button>
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={() => {
+                handleAusbuchen(toAusbuchen, ausbuchenNote);
+                setToAusbuchen(undefined);
+              }}
+            >
+              {t('chargen.ausbuchen')}
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
       {toDelete && (
         <ConfirmDialog

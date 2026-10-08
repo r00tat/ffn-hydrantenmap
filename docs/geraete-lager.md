@@ -11,9 +11,12 @@ verbraucht wird, soll automatisch aus dem Lager ausgebucht werden).
 | Typen, Sammlungsnamen, `lagerortKey`, `formatLagerort` | [`src/common/geraet.ts`](../src/common/geraet.ts) |
 | Bestandslogik (rein, ohne Firestore) | [`src/common/geraetBestandLogic.ts`](../src/common/geraetBestandLogic.ts) |
 | Sets: Prüfung, Code-Suche, Auflösen im Einsatz (rein) | [`src/common/geraetSet.ts`](../src/common/geraetSet.ts) |
+| Chargen: Töpfe, FEFO, Kürzen, Ablaufstatus (rein) | [`src/common/geraetCharge.ts`](../src/common/geraetCharge.ts) |
 | Sybos-Import: Parser und Plan | [`src/common/geraetImport.ts`](../src/common/geraetImport.ts) |
 | Server Actions | [`src/components/Geraete/geraeteActions.ts`](../src/components/Geraete/geraeteActions.ts) |
 | Nachbestellmail | [`src/components/Geraete/notifyNachbestellung.ts`](../src/components/Geraete/notifyNachbestellung.ts) |
+| Ablauf-Sammelmail: Text und Versand je Gruppe | [`buildAblaufEmail.ts`](../src/components/Geraete/buildAblaufEmail.ts), [`sendAblaufReports.ts`](../src/components/Geraete/sendAblaufReports.ts) |
+| Ablauf-Sammelmail: Endpoint für Cloud Scheduler | [`src/app/api/geraete/ablauf-report/route.ts`](../src/app/api/geraete/ablauf-report/route.ts) |
 | Verbrauch nachholen (Offline-Warteschlange) | [`src/components/Geraete/geraetVerbrauchQueue.ts`](../src/components/Geraete/geraetVerbrauchQueue.ts) |
 | Pflege-Seite | `/geraete` |
 | Abschnitt im Einsatz | `/einsatz/<id>/geraete` |
@@ -22,11 +25,11 @@ verbraucht wird, soll automatisch aus dem Lager ausgebucht werden).
 
 | Sammlung | Inhalt | Schreibt |
 | --- | --- | --- |
-| `groups/{groupId}/geraet/{id}` | Stammdaten je Artikel, `id` = Sybos-`ID` bzw. generiert | nur Server Actions |
-| `groups/{groupId}/geraetBestand/{id}` | Bestand je Artikel **und** Lagerort (`lagerort`, `lagerortKey`, `anzahl`) | nur Server Actions |
-| `groups/{groupId}/geraetBuchung/{id}` | Protokoll jeder Bestandsänderung, `menge` vorzeichenbehaftet | nur Server Actions |
+| `groups/{groupId}/geraet/{id}` | Stammdaten je Artikel, `id` = Sybos-`ID` bzw. generiert; bei Verbrauchsmaterial die Chargen (`chargen`, samt archivierten) und `ablaufVorlaufTage` | nur Server Actions |
+| `groups/{groupId}/geraetBestand/{id}` | Bestand je Artikel **und** Lagerort (`lagerort`, `lagerortKey`, `anzahl`), Aufteilung auf Chargen als Map `chargen` (Charge-ID → Menge) | nur Server Actions |
+| `groups/{groupId}/geraetBuchung/{id}` | Protokoll jeder Bestandsänderung, `menge` vorzeichenbehaftet, `chargeId` der bewegten Charge (fehlt = ohne Charge); Art `aufteilung` mit Menge 0 | nur Server Actions |
 | `groups/{groupId}/geraetSet/{id}` | Set: Name, Codes, Inhalte (`geraetId`, `menge`, fester `bestandId`), optional `sybosSetArtikelId` | nur Server Actions |
-| `call/{firecallId}/geraetEinsatz/{id}` | Zuordnung oder Verbrauch im Einsatz; aus einem Set mit `setId`, `setName`, `setZuordnungId` | Client (lokal, auch offline) |
+| `call/{firecallId}/geraetEinsatz/{id}` | Zuordnung oder Verbrauch im Einsatz; aus einem Set mit `setId`, `setName`, `setZuordnungId`; beim Verbrauch die Aufteilung `chargen` (`{chargeId, menge}[]`, `chargeId: null` = ohne Charge) und `chargenGeprueft` | Client (lokal, auch offline) |
 
 Die Feldnamen sind deutsch wie im übrigen Datenmodell (`bezeichnung`,
 `bestandGesamt`, `mindestbestand`, `nachbestellenSeit`, `anzahl`, `menge`).
@@ -341,9 +344,166 @@ Zeile änderbar.
 Gruppenmitgliedschaft nichts. Sie erfassen einzelne Artikel und sehen bestehende
 Set-Einträge unter dem kopierten Namen.
 
+## Chargen
+
+Zu einem Verbrauchsartikel kann es mehrere Chargen geben — Lieferungen mit
+eigenem Einkaufs- und Ablaufdatum, Los- und Produktionsnummer, Bezeichnung und
+Kommentar. Die Frage, um die es geht: Wie viel von der Charge, die im März
+abläuft, liegt noch auf dem SRF?
+
+### Modell: Aufteilung im Lagerort
+
+Die Stammdaten einer Charge stehen als Array am Artikel (`geraet.chargen`), die
+Mengen als Map am Bestand (`geraetBestand.chargen`: Charge-ID → Menge). Ein
+Lagerort ist damit in **Töpfe** geteilt: je Charge einer, dazu der **Rest ohne
+Charge** = `anzahl` − Σ `chargen`. Der Rest wird nur berechnet
+(`restOhneCharge`, `chargePots`), nie gespeichert. `anzahl` bleibt die Summe
+**und** die Wahrheit; `bestandGesamt`, Mindestbestand und Nachbestellmail
+rechnen unverändert darüber und wissen von Chargen nichts. Eine Charge mit
+Menge 0 fällt aus der Map, eine leere Map wird gelöscht statt als `{}` stehen
+zu bleiben.
+
+**Warum keine eigene Bestandszeile je Charge.** Naheliegend wäre ein
+`geraetBestand` je Lagerort und Charge. Das bräche alles, was am Bestand hängt:
+
+- `geraetId` + `lagerortKey` ist die Import-Identität — Sybos liefert eine Zeile
+  je Lagerort, nicht je Charge, und könnte sie nicht mehr zuordnen.
+- `reconcileVerbrauch` gleicht je `bestandId` ab, ein Einsatz-Eintrag zeigt auf
+  genau einen Bestand.
+- Sets halten einen festen `bestandId`.
+- Löschen und Archivieren eines Lagerorts arbeiten je Bestand.
+
+Die Aufteilung im Dokument lässt das alles stehen; was sich ändert, ist nur,
+*welcher Teil* von `anzahl` sich bewegt.
+
+**Warum nicht bloß Information.** Chargen ohne Abbuchen wären schnell gebaut,
+aber nach dem ersten Einsatz stimmten die Mengen je Charge nicht mehr, und die
+Frage von oben ließe sich nicht beantworten. Verbrauch, Umbuchung, Inventur und
+Ausbuchen bewegen deshalb echte Mengen je Charge, jede Buchung trägt ihre
+`chargeId`.
+
+**Nur Verbrauchsmaterial.** Ein Gerät (Kupplungsschlüssel, Gasmessgerät) hat
+keine Lose und wird nicht abgebucht; die Server Actions lehnen eine
+Chargenangabe dort mit 400 ab. Wird ein Artikel vom Verbrauchsmaterial wieder
+zum Gerät, bleiben seine Chargen gespeichert und werden nur nicht mehr
+angezeigt — kein Datenverlust, falls es ein Irrtum war. Der Import fasst
+`chargen` und `ablaufVorlaufTage` nie an, wie die übrigen App-Felder.
+
+**FEFO** (first expired, first out) ist die Reihenfolge überall dort, wo die App
+selbst eine Charge wählt (`sortFefo`): nach Ablaufdatum aufsteigend, Chargen
+ohne Ablaufdatum danach (nach Einkaufsdatum, dann ID), der Rest ohne Charge
+zuletzt. Wer Material nimmt, soll das zuerst ablaufende nehmen.
+
+### Pflege
+
+Im Detaildialog eines Verbrauchsartikels (Abschnitt „Chargen“) stehen die
+Chargen in FEFO-Reihenfolge mit Ablauf (farbig nach `expiryStatus`) und Menge;
+jede Bestandszeile zeigt ihre Töpfe als Chips, ein negativer Topf ist markiert.
+Angelegt und geändert wird eine Charge über `saveGeraetCharge` — **je Charge in
+einer Transaktion** auf dem Artikel, nicht als ganzes Array aus dem
+Bearbeiten-Dialog: Das überschriebe eine Charge, die ein Zugang gerade
+angelegt hat. Daten nur als `YYYY-MM-DD`, sonst verworfen — ein falsches
+Ablaufdatum brächte die FEFO-Reihenfolge durcheinander. Weil die Chargen im
+Artikel-Dokument liegen, sind sie begrenzt: Texte (und die Bemerkung beim
+Ausbuchen) höchstens `GERAET_CHARGE_MAX_TEXT` = 500 Zeichen, je Artikel
+höchstens `GERAET_CHARGEN_MAX` = 200 Chargen samt archivierten; darüber lehnt
+der Server mit 400 ab, die Dialoge begrenzen die Felder schon bei der Eingabe.
+
+| Vorgang | Wirkung auf die Chargen |
+| --- | --- |
+| Zugang | mit vorhandener oder in derselben Transaktion neu angelegter Charge: `anzahl` und Anteil der Charge steigen; ohne Charge wächst nur der Rest |
+| Aufteilen (`aufteilenGeraetBestand`) | ordnet vorhandenen Bestand Chargen zu, **ohne** `anzahl` zu ändern — für die Ware, die vor den Chargen da war. Mehr als `anzahl` lässt sich nicht zuordnen. Protokolliert als Buchung `aufteilung` mit Menge 0, die Bemerkung nennt je Topf vorher → nachher |
+| Umbuchung | mit Charge wandert deren Anteil mit; ohne wird am Quell-Lagerort nach FEFO verteilt (`allocateFefo`) — wer ins Fahrzeug umlagert, nimmt die zuerst ablaufende Ware. Je bewegtem Topf eine Buchung. Eine ausdrücklich gewählte Charge lässt sich nur bis zu ihrem Bestand am Quell-Lagerort umbuchen, sonst 400 — der Überhang bliebe dort als negativer Topf zurück |
+| Inventur | wahlweise je Charge gezählt (plus Rest ohne Charge): setzt Aufteilung und `anzahl`, je geändertem Topf eine Buchung. Ohne Zählung je Charge wird die Aufteilung gekürzt (siehe unten) |
+| Charge ausbuchen (`ausbuchenGeraetCharge`) | abgelaufen, zurückgerufen, entsorgt: je Lagerort mit Bestand eine Inventur-Buchung mit `chargeId`, danach archiviert — in einer Transaktion. Ein negativer Topf wird nur aus der Aufteilung entfernt, ohne Buchung und ohne `anzahl` zu ändern — er ist keine Ware, die ausgebucht werden könnte |
+| Archivieren (`archiveGeraetCharge`) | nur, wenn an keinem Lagerort mehr etwas von ihr liegt — sonst verschwände Bestand aus den Listen, der physisch noch im Lager steht |
+| Lagerort löschen | der Restbestand wird je Topf als Inventur ausgebucht |
+
+Eine archivierte Charge bleibt im Array, damit Einsatz-Einträge und Buchungen
+ihre Los-Nummer weiter anzeigen. Bebuchen lässt sie sich nicht mehr, nur
+leeren: Ein Zugang darauf holte sie still zurück, ohne dass sie in den Listen
+wieder auftaucht.
+
+### Im Einsatz: FEFO im Client
+
+Beim Verbrauch entscheidet die Zahl der Töpfe mit Bestand am gewählten Lagerort
+(`needsChargeChoice`):
+
+- **Ein Topf** → die Charge wird ohne Rückfrage genommen.
+- **Mehrere** → der Einzeldialog zeigt ein Mengenfeld je Topf, vorbelegt nach
+  FEFO; Speichern geht erst, wenn die Summe der Menge entspricht. Ändert sich
+  Menge oder Lagerort, rechnet die Vorbelegung neu, solange niemand die Felder
+  angefasst hat. Beim Bearbeiten zählt der schon gebuchte Verbrauch des Eintrags
+  wieder zum Bestand (`bestandForEdit`), sonst fehlte die gerade verbrauchte
+  Charge in der Auswahl.
+- **Schnellwege** (Mehrfachauswahl, Set) fragen nicht nach: Die Aufteilung kommt
+  aus `allocateFefo`, und gab es mehrere Töpfe, steht der Eintrag mit
+  `chargenGeprueft: false` da. Die Liste zeigt dann den Chip „Charge prüfen“, ein
+  Klick öffnet den Einzeldialog. Im Einsatz zählt, dass alles schnell drin ist —
+  die Charge lässt sich danach in Ruhe richtigstellen.
+
+**Warum FEFO im Client und nicht im Abgleich.** Der Eintrag trägt seine
+Aufteilung selbst (`geraetEinsatz.chargen`). `syncGeraetVerbrauch` bucht nur
+nach, was dasteht, und bleibt dadurch deterministisch und idempotent: Würde der
+Server bei jedem Lauf neu nach FEFO verteilen, wanderte ein Verbrauch beim
+zweiten Lauf oder nach einem Zugang auf eine andere Charge. Der Client kennt
+Artikel und Bestand ohnehin aus dem Cache, die Vorbelegung geht also auch
+offline.
+
+`reconcileVerbrauch` gleicht dafür je **Topf** (`bestandId`, `chargeId`) ab statt
+je Lagerort; ein Chargenwechsel ohne Mengenänderung wird zur Rückbuchung auf der
+einen und Abbuchung auf der anderen Charge. Alte Buchungen ohne `chargeId`
+zählen als Rest ohne Charge. Ist die Aufteilung eines Eintrags nicht stimmig
+(`validChargenTeile`: Summe ungleich der Menge, eine Charge nicht vom Artikel,
+ein Topf doppelt), verwirft der Abgleich sie, bucht alles auf den Rest ohne
+Charge und loggt das — lieber stimmt die Summe am Lagerort als eine erfundene
+Charge. Eine archivierte Charge gilt dabei noch als gültig, weil der Eintrag
+älter sein kann als das Archivieren. Mehrere Töpfe desselben Lagerorts werden an
+einer Arbeitskopie gesammelt und mit einem Schreibvorgang geschrieben; zwei
+Updates aus demselben Snapshot überschrieben einander.
+
+### Import und Kürzen
+
+Sybos kennt keine Chargen; der Import setzt nur `anzahl`. Sinkt `anzahl` ohne
+Chargenangabe — Import, Inventur ohne Zählung je Charge —, schrumpft die
+Aufteilung mit (`shrinkChargen`): zuerst der Rest ohne Charge, soweit positiv,
+danach die Chargen in FEFO-Reihenfolge, keine unter 0, und liegt die Map dann
+noch darüber, auch Einträge zu unbekannten Chargen. Sonst läge mehr auf
+Chargen, als am Lagerort ist. Steigt `anzahl`, wächst nur der Rest.
+
+Bekannte Unschärfe: Der Import rechnet die neue Aufteilung vom gelesenen Stand
+aus, ändert `anzahl` selbst aber per `increment`. Läuft gleichzeitig ein
+Verbrauch, kann die Aufteilung um diesen abweichen — die Summe stimmt, und die
+nächste Inventur je Charge bringt die Töpfe wieder in Ordnung.
+
+### Ablaufwarnung
+
+Eine Charge ist **abgelaufen** vor ihrem Ablaufdatum und läuft **bald ab** bis
+einschließlich heute plus Vorlauf (`expiryStatus`). Der Vorlauf steht je Artikel
+in `ablaufVorlaufTage`, ohne Angabe 60 Tage — Löschschaummittel hat andere
+Fristen als Bindemittel.
+
+- **Auf der Pflege-Seite** listet der Reiter „Läuft bald ab“ alle nicht
+  archivierten Chargen aktiver Verbrauchsartikel mit Bestand, die abgelaufen
+  sind oder bald ablaufen (`expiringChargen`), nach Ablaufdatum sortiert. Der
+  Reiter verschwindet, sobald nichts mehr abläuft.
+- **Per Mail** schickt Cloud Scheduler jeden Montag um 07:00 (Europe/Vienna)
+  einen POST an `/api/geraete/ablauf-report` (`cronRequired`, derselbe Invoker
+  wie der Wochenbericht des Fahrtenbuchs). Je Gruppe geht eine Sammelmail an
+  die Mängel-E-Mail — dieselben Empfänger wie die Nachbestellmail —, **nur wenn
+  die Liste nicht leer ist**. „Heute“ ist der Kalendertag in Wien. Die Mail
+  nennt je Charge Artikel, Ablaufdatum und Menge je Lagerort samt Link auf
+  `/geraete`. Ein Route Handler und keine Server Action, weil der Aufrufer ein
+  Zeitplan mit OIDC-Token ist. Bei einem Teilerfolg antwortet der Endpoint mit
+  200, damit die Wiederholung des Schedulers keiner Gruppe die Mail doppelt
+  schickt.
+- In **dev** ist der Job pausiert (`ablauf_report_paused`), wie der
+  Wochenbericht: Beide Umgebungen schrieben sonst an dieselbe Verteilerliste.
+
 ## Berechtigungen
 
-Pflege — Artikel anlegen und ändern, Zugang, Umbuchung, Inventur, Import, Sets — dürfen
+Pflege — Artikel anlegen und ändern, Zugang, Umbuchung, Inventur, Import, Sets,
+Chargen — dürfen
 **Gruppen-Admin und Gerätemeister** der Gruppe
 (`actionFahrtenbuchManagerRequired(groupId)`, plus `assertTenantGroup`). Der
 Gerätemeister pflegt schon Fahrzeuge und Personen im Fahrtenbuch; die Beladung
@@ -417,6 +577,12 @@ zwei Wegen. Steht er schon auf 0, bleibt er, wie er ist.
 - Ein Rückschreiben nach Sybos. Der Bestand in Sybos wird von Hand nachgeführt.
 - Sets aus dem Sybos-Export ableiten (die Zuordnung steht nicht darin), Sets im
   Einsatz anlegen oder ändern, Sets im Set.
+- Chargen bei Geräten — nur Verbrauchsmaterial wird abgebucht, ein Gerät hat
+  keine Lose.
+- Chargen im Sybos-Import und im Rückschreiben, im Sybos-Übertrag und im
+  Einsatz-Ausdruck. Der Eintrag trägt seine Charge; das Nachziehen ist ein
+  eigener Schritt.
+- Die Los-Nummer per Scan (GS1-Barcode) erfassen.
 - Der Wert von `Kategorie` im Lagerartikel-Export ist noch nicht bekannt; die
   Vorbelegung von `verbrauchsmaterial` greift erst, wenn er „verbrauch" oder
   „lagerartikel" enthält.

@@ -2,7 +2,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Geraet, GeraetBestand } from '../../../common/geraet';
+import {
+  GERAET_CHARGE_MAX_TEXT,
+  type Geraet,
+  type GeraetBestand,
+} from '../../../common/geraet';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
 const { bookGeraetBestand } = vi.hoisted(() => ({ bookGeraetBestand: vi.fn() }));
@@ -167,6 +171,168 @@ describe('BestandBookingDialog', () => {
         bemerkung: undefined,
       }),
     );
+  });
+
+  describe('Chargen', () => {
+    const mitChargen: Geraet = {
+      ...geraet,
+      chargen: [
+        { id: 'c1', losNummer: 'A1', ablaufDatum: '2027-01-31', createdAt: '', createdBy: '' },
+        { id: 'c2', bezeichnung: 'Lieferung Mai', createdAt: '', createdBy: '' },
+        { id: 'c3', bezeichnung: 'Alt', archiviert: true, createdAt: '', createdBy: '' },
+      ],
+    };
+    const lagerMitChargen: GeraetBestand = { ...lager, chargen: { c1: 2 } };
+
+    function renderChargen(
+      mode: BestandBookingMode,
+      item: Geraet = mitChargen,
+      bestand: GeraetBestand = lagerMitChargen,
+    ) {
+      return renderWithIntl(
+        <BestandBookingDialog
+          open
+          groupId="ffnd"
+          geraet={item}
+          bestand={bestand}
+          bestaende={[bestand, srf]}
+          mode={mode}
+          onClose={onClose}
+        />,
+      );
+    }
+
+    it('bucht einen Zugang auf eine vorhandene Charge', async () => {
+      const user = userEvent.setup();
+      renderChargen('zugang');
+      await user.click(screen.getByRole('combobox', { name: 'Charge' }));
+      expect(screen.queryByRole('option', { name: /Alt/ })).toBeNull();
+      await user.click(screen.getByRole('option', { name: /Lieferung Mai/ }));
+      await user.type(screen.getByLabelText('Menge'), '3');
+      await user.click(screen.getByRole('button', { name: 'Buchen' }));
+      await waitFor(() =>
+        expect(bookGeraetBestand).toHaveBeenCalledWith('ffnd', {
+          art: 'zugang',
+          bestandId: 'b-lager',
+          menge: 3,
+          bemerkung: undefined,
+          chargeId: 'c2',
+        }),
+      );
+    });
+
+    it('bucht einen Zugang mit einer neuen Charge', async () => {
+      const user = userEvent.setup();
+      renderChargen('zugang', geraet, lager);
+      await user.click(screen.getByRole('combobox', { name: 'Charge' }));
+      await user.click(screen.getByRole('option', { name: 'Neue Charge…' }));
+      await user.type(screen.getByLabelText('Los-Nr.'), 'L-9');
+      await user.type(screen.getByLabelText('Ablaufdatum'), '2028-02-29');
+      await user.type(screen.getByLabelText('Menge'), '4');
+      await user.click(screen.getByRole('button', { name: 'Buchen' }));
+      await waitFor(() =>
+        expect(bookGeraetBestand).toHaveBeenCalledWith('ffnd', {
+          art: 'zugang',
+          bestandId: 'b-lager',
+          menge: 4,
+          bemerkung: undefined,
+          neueCharge: { losNummer: 'L-9', ablaufDatum: '2028-02-29' },
+        }),
+      );
+    });
+
+    it('bietet bei einem Gerät keine Charge an', () => {
+      renderChargen('zugang', { ...geraet, verbrauchsmaterial: false }, lager);
+      expect(screen.queryByRole('combobox', { name: 'Charge' })).toBeNull();
+    });
+
+    it('bucht eine Umbuchung automatisch oder mit gewählter Charge', async () => {
+      const user = userEvent.setup();
+      renderChargen('umbuchung');
+      expect(screen.getByRole('combobox', { name: 'Charge' })).toHaveTextContent(
+        'automatisch (älteste zuerst)',
+      );
+      await user.click(screen.getByRole('combobox', { name: 'Charge' }));
+      await user.click(screen.getByRole('option', { name: /Los A1/ }));
+      await user.type(screen.getByLabelText('Menge'), '1');
+      await user.click(screen.getByRole('button', { name: 'Buchen' }));
+      await waitFor(() =>
+        expect(bookGeraetBestand).toHaveBeenCalledWith('ffnd', {
+          art: 'umbuchung',
+          bestandId: 'b-lager',
+          zielBestandId: 'b-srf',
+          menge: 1,
+          bemerkung: undefined,
+          chargeId: 'c1',
+        }),
+      );
+    });
+
+    it('ohne aktive Chargen keine Auswahl bei der Umbuchung', () => {
+      renderChargen('umbuchung', geraet, lager);
+      expect(screen.queryByRole('combobox', { name: 'Charge' })).toBeNull();
+    });
+
+    it('zählt bei der Inventur je Charge', async () => {
+      const user = userEvent.setup();
+      renderChargen('inventur');
+      await user.click(screen.getByRole('switch', { name: 'je Charge zählen' }));
+      expect(screen.queryByLabelText('Gezählter Bestand')).toBeNull();
+      expect(screen.getByLabelText('Los A1')).toHaveValue(2);
+      expect(screen.getByLabelText('ohne Charge')).toHaveValue(4);
+      await user.type(screen.getByLabelText('Lieferung Mai'), '3');
+      const ohne = screen.getByLabelText('ohne Charge');
+      await user.clear(ohne);
+      await user.type(ohne, '1');
+      await user.click(screen.getByRole('button', { name: 'Buchen' }));
+      await waitFor(() =>
+        expect(bookGeraetBestand).toHaveBeenCalledWith('ffnd', {
+          art: 'inventur',
+          bestandId: 'b-lager',
+          istWert: 6,
+          bemerkung: undefined,
+          istWertJeCharge: { c1: 2, c2: 3 },
+          istWertOhneCharge: 1,
+        }),
+      );
+    });
+
+    it('belegt eine negative Charge bei der Zählung mit 0 vor', async () => {
+      const user = userEvent.setup();
+      renderChargen('inventur', mitChargen, { ...lager, chargen: { c1: -2 } });
+      await user.click(screen.getByRole('switch', { name: 'je Charge zählen' }));
+      expect(screen.getByLabelText('Los A1')).toHaveValue(0);
+      expect(screen.getByLabelText('ohne Charge')).toHaveValue(8);
+      await user.click(screen.getByRole('button', { name: 'Buchen' }));
+      await waitFor(() =>
+        expect(bookGeraetBestand).toHaveBeenCalledWith('ffnd', {
+          art: 'inventur',
+          bestandId: 'b-lager',
+          istWert: 8,
+          bemerkung: undefined,
+          istWertJeCharge: {},
+          istWertOhneCharge: 8,
+        }),
+      );
+    });
+
+    it('begrenzt die Texte einer neuen Charge', async () => {
+      const user = userEvent.setup();
+      renderChargen('zugang', geraet, lager);
+      await user.click(screen.getByRole('combobox', { name: 'Charge' }));
+      await user.click(screen.getByRole('option', { name: 'Neue Charge…' }));
+      for (const label of ['Bezeichnung', 'Los-Nr.']) {
+        expect(screen.getByLabelText(label)).toHaveAttribute(
+          'maxlength',
+          String(GERAET_CHARGE_MAX_TEXT),
+        );
+      }
+    });
+
+    it('bietet die Zählung je Charge nur an, wenn es Chargen gibt', () => {
+      renderChargen('inventur', geraet, lager);
+      expect(screen.queryByRole('switch', { name: 'je Charge zählen' })).toBeNull();
+    });
   });
 
   it('zeigt einen Fehler der Action', async () => {

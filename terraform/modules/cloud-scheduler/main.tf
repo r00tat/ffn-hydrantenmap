@@ -69,6 +69,47 @@ resource "google_cloud_scheduler_job" "fahrtenbuch_weekly_report" {
 }
 
 
+# Die Sammelmail zu abgelaufenen und bald ablaufenden Chargen von
+# Verbrauchsmaterial (Geräte & Material), einmal pro Woche je Gruppe an die
+# Mängel-Empfänger — siehe docs/geraete-lager.md.
+#
+# Derselbe Invoker wie der Wochenbericht: Er steht schon auf CRON_INVOKER_EMAILS
+# und hat run.invoker; ein eigenes Konto hieße ein weiterer Eintrag in der
+# Allowlist ohne Gewinn. Pausierbar wie der Wochenbericht, weil auch diese Mail
+# an die gemeinsame Verteilerliste geht.
+resource "google_cloud_scheduler_job" "geraete_ablauf_report" {
+  project     = var.project
+  region      = var.run_region
+  name        = "geraete-ablauf-report${var.name_suffix}"
+  description = "Sammelmail zu ablaufenden Chargen je Gruppe"
+  schedule    = var.ablauf_report_schedule
+  time_zone   = "Europe/Vienna"
+  paused      = var.ablauf_report_paused
+
+  # Wie beim Wochenbericht: Der Endpoint antwortet bei Teilerfolg mit 200, eine
+  # Wiederholung greift nur, wenn keine Gruppe eine Mail bekommen hat.
+  retry_config {
+    retry_count = 2
+  }
+
+  http_target {
+    http_method = "POST"
+    uri         = "${var.service_url}/api/geraete/ablauf-report"
+
+    headers = {
+      "Content-Type" = "application/json"
+    }
+
+    # Leerer Body: Das Datum „heute" rechnet die App in Europe/Vienna.
+    body = base64encode("{}")
+
+    oidc_token {
+      service_account_email = google_service_account.fahrtenbuch_report_invoker.email
+      audience              = var.service_url
+    }
+  }
+}
+
 # Die Warteschlange für die Termine der Atemschutzüberwachung.
 #
 # Sie ist der **Hauptweg** der Warnungen: Sobald ein Trupp abmarschiert ist,

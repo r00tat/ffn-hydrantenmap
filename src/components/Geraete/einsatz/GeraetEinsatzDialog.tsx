@@ -20,15 +20,26 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { deleteField } from 'firebase/firestore';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
+  formatCharge,
   formatLagerort,
   type Geraet,
   type GeraetBestand,
+  type GeraetCharge,
+  type GeraetChargeTeil,
   type GeraetEinsatz,
   type GeraetSet,
 } from '../../../common/geraet';
+import { clean } from '../../../common/geraetBestandLogic';
+import {
+  allocateFefo,
+  chargePots,
+  expiryStatus,
+  needsChargeChoice,
+  type ChargePot,
+} from '../../../common/geraetCharge';
 import {
   expandSetForEinsatz,
   findByCode,
@@ -39,6 +50,7 @@ import GeraetSteckbrief from '../GeraetSteckbrief';
 import GeraetScanDialog from './GeraetScanDialog';
 import GeraetSetPreview, { type SetPreviewField, type SetPreviewGroup } from './GeraetSetPreview';
 import {
+  bestandForEdit,
   buildGeraetEinsatzData,
   buildGeraetEinsatzUpdate,
   einsatzArtFor,
@@ -60,6 +72,11 @@ export interface GeraetEinsatzDialogProps {
   groupId: string;
   geraete: Geraet[];
   bestaendeByGeraet: Map<string, GeraetBestand[]>;
+  /**
+   * Jeder Bestand nach ID, auch archivierte — damit ein Verbrauch von einem
+   * archivierten Lagerort beim Bearbeiten seine Chargen behält.
+   */
+  bestandById?: Map<string, GeraetBestand>;
   /** Namen der Einsatzmittel — für die Vorbelegung des Lagerorts. */
   vehicleNames: string[];
   /**
@@ -80,8 +97,20 @@ export interface GeraetEinsatzDialogProps {
 const EMPTY_BESTAENDE: GeraetBestand[] = [];
 const EMPTY_IDS: string[] = [];
 const EMPTY_SETS: GeraetSet[] = [];
+const EMPTY_CHARGEN: GeraetCharge[] = [];
 
 type RowValues = Record<SetPreviewField, string>;
+
+/** Schlüssel eines Chargen-Felds; der Rest ohne Charge hat keine ID. */
+const NO_CHARGE_KEY = '';
+
+function potKey(chargeId: string | null): string {
+  return chargeId ?? NO_CHARGE_KEY;
+}
+
+function chargeInputsFrom(teile: GeraetChargeTeil[]): Record<string, string> {
+  return Object.fromEntries(teile.map((t) => [potKey(t.chargeId), formatNumber(t.menge)]));
+}
 
 function pickKey(pick: EinsatzPick): string {
   return pick.kind === 'set' ? `set:${pick.set.id}` : `geraet:${pick.geraet.id}`;
@@ -145,6 +174,7 @@ export default function GeraetEinsatzDialog({
   groupId,
   geraete,
   bestaendeByGeraet,
+  bestandById,
   vehicleNames,
   assignedIds = EMPTY_IDS,
   createdBy,
@@ -152,6 +182,7 @@ export default function GeraetEinsatzDialog({
   sets = EMPTY_SETS,
 }: GeraetEinsatzDialogProps) {
   const t = useTranslations('geraetEinsatz.dialog');
+  const format = useFormatter();
   const editing = !!entry;
 
   // Beim Bearbeiten gilt die Art des Eintrags, nicht der heutige Stand des
@@ -182,6 +213,12 @@ export default function GeraetEinsatzDialog({
   const [menge, setMenge] = useState(() => (entry ? formatNumber(entry.menge) : ''));
   const [stunden, setStunden] = useState(() => formatNumber(entry?.stunden));
   const [bemerkung, setBemerkung] = useState(entry?.bemerkung ?? '');
+  // Mengen je Charge, sobald sie von Hand geändert wurden (oder aus dem
+  // bearbeiteten Eintrag stammen). `null`: Vorbelegung nach FEFO, die mit
+  // Menge und Lagerort mitgeht.
+  const [chargeInputs, setChargeInputs] = useState<Record<string, string> | null>(() =>
+    entry?.chargen?.length ? chargeInputsFrom(entry.chargen) : null,
+  );
   const [error, setError] = useState<GeraetEinsatzValidationError | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
@@ -213,6 +250,58 @@ export default function GeraetEinsatzDialog({
       ),
     [bestaende],
   );
+
+  // Chargen: nur bei Verbrauch und mehr als einem Topf mit Bestand am
+  // gewählten Lagerort. Beim Bearbeiten zählt der schon gebuchte Verbrauch
+  // des Eintrags wieder zum Bestand (`bestandForEdit`).
+  const chargenOfGeraet = geraet?.chargen ?? EMPTY_CHARGEN;
+  const currentBestand = bestandForEdit(
+    bestaende.find((b) => b.id === bestandId) ??
+      (bestandId ? bestandById?.get(bestandId) : undefined),
+    entry,
+  );
+  const showCharges =
+    !!geraet?.verbrauchsmaterial &&
+    !hours &&
+    !!currentBestand &&
+    needsChargeChoice(currentBestand, chargenOfGeraet);
+  const parsedMenge = parseNumber(menge);
+  const mengeValid = typeof parsedMenge === 'number' && Number.isFinite(parsedMenge);
+  const chargeValues: Record<string, string> =
+    chargeInputs ??
+    (showCharges && currentBestand && mengeValid && parsedMenge > 0
+      ? chargeInputsFrom(allocateFefo(currentBestand, chargenOfGeraet, parsedMenge))
+      : {});
+  const chargeValueOf = (pot: ChargePot) => chargeValues[potKey(pot.chargeId)] ?? '0';
+  const shownPots: ChargePot[] =
+    showCharges && currentBestand
+      ? chargePots(currentBestand, chargenOfGeraet).filter(
+          (p) => p.menge > 0 || (parseNumber(chargeValueOf(p)) ?? 0) !== 0,
+        )
+      : [];
+  const chargeParts = shownPots.map((p) => ({
+    chargeId: p.chargeId,
+    menge: parseNumber(chargeValueOf(p)) ?? 0,
+  }));
+  const chargeInputInvalid = chargeParts.some((p) => !Number.isFinite(p.menge) || p.menge < 0);
+  const chargeSum = clean(chargeParts.reduce((sum, p) => sum + (p.menge || 0), 0));
+  const chargeMismatch =
+    showCharges && mengeValid && (chargeInputInvalid || chargeSum !== clean(parsedMenge));
+
+  const chargeById = (id: string): GeraetCharge | undefined =>
+    chargenOfGeraet.find((c) => c.id === id);
+
+  const formatDate = (isoDate: string) =>
+    format.dateTime(new Date(`${isoDate.slice(0, 10)}T00:00:00Z`), {
+      dateStyle: 'medium',
+      timeZone: 'UTC',
+    });
+
+  const changeChargeInput = (pot: ChargePot, value: string) =>
+    setChargeInputs({ ...chargeValues, [potKey(pot.chargeId)]: value });
+
+  const bestandOf = (g: Geraet, id?: string): GeraetBestand | undefined =>
+    id ? (bestaendeByGeraet.get(g.id) ?? EMPTY_BESTAENDE).find((b) => b.id === id) : undefined;
 
   const defaultBestandOf = (g: Geraet): GeraetBestand | undefined =>
     g.verbrauchsmaterial
@@ -297,6 +386,7 @@ export default function GeraetEinsatzDialog({
     setError(null);
     setRowErrors({});
     setScanMessage(null);
+    setChargeInputs(null);
     if (next.length !== 1 || next[0].kind !== 'geraet') return;
     const single = next[0].geraet;
     setBestandId(defaultBestandOf(single)?.id ?? '');
@@ -336,6 +426,8 @@ export default function GeraetEinsatzDialog({
         const input = {
           geraet: row.geraet,
           bestandId: row.bestandId || undefined,
+          // Schnellweg: Chargen nach FEFO, bei mehreren Töpfen „Charge prüfen".
+          bestand: bestandOf(row.geraet, row.bestandId),
           menge: hours ? undefined : parseNumber(row.menge),
           stunden: hours ? parseNumber(row.stunden) : undefined,
           bemerkung,
@@ -377,11 +469,14 @@ export default function GeraetEinsatzDialog({
     if (many) {
       const nowIso = new Date().toISOString();
       for (const g of selected) {
+        const bestand = defaultBestandOf(g);
         addGeraetEinsatz(
           firecallId,
           buildGeraetEinsatzData({
             geraet: g,
-            bestandId: defaultBestandOf(g)?.id,
+            bestandId: bestand?.id,
+            // Schnellweg: Chargen nach FEFO, bei mehreren Töpfen „Charge prüfen".
+            bestand,
             menge: usesHours(g) ? undefined : 1,
             bemerkung,
             groupId,
@@ -396,20 +491,27 @@ export default function GeraetEinsatzDialog({
     const input = {
       geraet: geraet ?? undefined,
       bestandId: bestandId || undefined,
-      menge: hours ? undefined : parseNumber(menge),
+      menge: hours ? undefined : parsedMenge,
       stunden: hours ? parseNumber(stunden) : undefined,
       bemerkung,
+      bestand: currentBestand,
+      // Mit Feldern gilt, was dasteht (ohne leere Töpfe); ohne Felder wählt
+      // die Logik den einzigen Topf.
+      chargen: showCharges ? chargeParts.filter((p) => p.menge !== 0) : undefined,
     };
     const validation = validateGeraetEinsatzInput(input, bestaende.length);
     if (validation || !geraet) {
       setError(validation ?? 'noGeraet');
       return;
     }
+    if (chargeMismatch) return;
     if (entry) {
       updateGeraetEinsatz(
         firecallId,
         entry,
-        buildGeraetEinsatzUpdate({ ...input, geraet }, () => deleteField()),
+        buildGeraetEinsatzUpdate({ ...input, geraet, entryBestandId: entry.bestandId }, () =>
+          deleteField(),
+        ),
       );
     } else {
       addGeraetEinsatz(
@@ -586,7 +688,11 @@ export default function GeraetEinsatzDialog({
                   select
                   label={t('lagerort')}
                   value={bestandId}
-                  onChange={(e) => setBestandId(e.target.value)}
+                  onChange={(e) => {
+                    setBestandId(e.target.value);
+                    // Die Chargen eines anderen Lagerorts sind andere Töpfe.
+                    setChargeInputs(null);
+                  }}
                   error={error === 'noBestand'}
                   fullWidth
                 >
@@ -627,6 +733,80 @@ export default function GeraetEinsatzDialog({
                 />
               ))}
 
+            {showCharges && (
+              <Box>
+                <Typography variant="subtitle2">{t('chargen.title')}</Typography>
+                <Typography variant="caption" color="text.secondary" component="div">
+                  {t('chargen.hint')}
+                </Typography>
+                <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+                  {shownPots.map((pot) => {
+                    const charge = pot.chargeId ? chargeById(pot.chargeId) : undefined;
+                    const label =
+                      pot.chargeId === null
+                        ? t('chargen.none')
+                        : charge
+                          ? formatCharge(charge)
+                          : pot.chargeId;
+                    const status = charge?.ablaufDatum
+                      ? expiryStatus(
+                          charge,
+                          new Date().toISOString(),
+                          geraet?.ablaufVorlaufTage,
+                        )
+                      : undefined;
+                    return (
+                      <TextField
+                        key={potKey(pot.chargeId)}
+                        size="small"
+                        label={label}
+                        value={chargeValueOf(pot)}
+                        onChange={(e) => changeChargeInput(pot, e.target.value)}
+                        error={chargeMismatch}
+                        slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+                        helperText={
+                          <>
+                            {charge?.ablaufDatum && (
+                              <Box
+                                component="span"
+                                sx={{
+                                  color:
+                                    status === 'abgelaufen'
+                                      ? 'error.main'
+                                      : status === 'bald'
+                                        ? 'warning.main'
+                                        : undefined,
+                                }}
+                              >
+                                {t(
+                                  status === 'abgelaufen'
+                                    ? 'chargen.expired'
+                                    : status === 'bald'
+                                      ? 'chargen.expiresSoon'
+                                      : 'chargen.expires',
+                                  { datum: formatDate(charge.ablaufDatum) },
+                                )}
+                                {' · '}
+                              </Box>
+                            )}
+                            {t('chargen.available', { menge: pot.menge })}
+                          </>
+                        }
+                        fullWidth
+                      />
+                    );
+                  })}
+                </Stack>
+                {chargeMismatch && (
+                  <Alert severity="error" sx={{ mt: 1.5 }}>
+                    {chargeInputInvalid
+                      ? t('chargen.invalid')
+                      : t('chargen.sumMismatch', { summe: chargeSum, menge: parsedMenge })}
+                  </Alert>
+                )}
+              </Box>
+            )}
+
             <TextField
               label={t('bemerkung')}
               value={bemerkung}
@@ -641,7 +821,11 @@ export default function GeraetEinsatzDialog({
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>{t('cancel')}</Button>
-          <Button variant="contained" onClick={handleSave}>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={!withSets && !many && chargeMismatch}
+          >
             {withSets
               ? t('saveMany', { count: previewCount })
               : many

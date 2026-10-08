@@ -29,6 +29,7 @@ import {
   type Geraet,
   type GeraetBestand,
 } from '../../../common/geraet';
+import { expiringChargen } from '../../../common/geraetCharge';
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useGeraete from '../../../hooks/useGeraete';
@@ -38,6 +39,8 @@ import OfflineListHint from '../../site/OfflineListHint';
 import OnlineOnly from '../../site/OnlineOnly';
 import { setGeraeteVerbrauchsmaterial } from '../geraeteActions';
 import { callAction } from './actionResult';
+import { localTodayIso } from './chargeFormat';
+import ExpiringChargenList from './ExpiringChargenList';
 import GeraetDetailDialog from './GeraetDetailDialog';
 import GeraetEditDialog from './GeraetEditDialog';
 import GeraeteImportDialog from './GeraeteImportDialog';
@@ -54,7 +57,7 @@ import {
 /** Seitengröße der Artikelliste — der Geräte-Export allein hat über 700 Artikel. */
 const PAGE_SIZE = 100;
 
-type View = 'list' | 'reorder' | 'sets';
+type View = 'list' | 'reorder' | 'expiring' | 'sets';
 
 /** Die Lagerorte eines Artikels als kurze Zeile: zwei Orte, dann „+N". */
 function lagerortSummary(bestaende: GeraetBestand[] | undefined): string {
@@ -114,6 +117,13 @@ export default function GeraeteAdminPage() {
     [geraete, bestaendeByGeraet, filter],
   );
   const reorder = useMemo(() => reorderList(geraete), [geraete]);
+  const today = localTodayIso();
+  const expiring = useMemo(
+    () => expiringChargen(geraete, bestaende, today),
+    [geraete, bestaende, today],
+  );
+  // Der Reiter „Läuft bald ab" verschwindet, sobald nichts mehr abläuft.
+  const activeView: View = view === 'expiring' && expiring.length === 0 ? 'list' : view;
 
   const detail = detailId ? geraete.find((g) => g.id === detailId) : undefined;
 
@@ -274,20 +284,23 @@ export default function GeraeteAdminPage() {
       )}
 
       <Tabs
-        value={view}
+        value={activeView}
         onChange={(_, value: View) => setView(value)}
         variant="scrollable"
         sx={{ mb: 2 }}
       >
         <Tab value="list" label={t('tabs.list', { count: filtered.length })} />
         <Tab value="reorder" label={t('tabs.reorder', { count: reorder.length })} />
+        {expiring.length > 0 && (
+          <Tab value="expiring" label={t('tabs.expiring', { count: expiring.length })} />
+        )}
         <Tab value="sets" label={t('tabs.sets', { count: sets.length })} />
       </Tabs>
 
       {loading && <LinearProgress sx={{ mb: 2 }} />}
       <OfflineListHint fromCache={fromCache} empty={geraete.length === 0} />
 
-      {view === 'list' && (
+      {activeView === 'list' && (
         <>
           <Stack
             direction={{ xs: 'column', md: 'row' }}
@@ -425,7 +438,7 @@ export default function GeraeteAdminPage() {
         </>
       )}
 
-      {view === 'reorder' && (
+      {activeView === 'reorder' && (
         <>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             {t('reorder.hint')}
@@ -462,7 +475,11 @@ export default function GeraeteAdminPage() {
         </>
       )}
 
-      {view === 'sets' && groupId && (
+      {activeView === 'expiring' && (
+        <ExpiringChargenList entries={expiring} onOpen={(id) => setDetailId(id)} />
+      )}
+
+      {activeView === 'sets' && groupId && (
         <GeraetSetsTab
           groupId={groupId}
           canManage={canManage}
