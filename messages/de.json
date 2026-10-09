@@ -4456,7 +4456,7 @@
       "inactiveName": "{name} (inaktiv)",
       "openCount": "{count} offen",
       "noneOpen": "nichts offen",
-      "deactivateUnused": "Neue Personen ohne offene Ausgabe inaktiv anlegen ({count})"
+      "activateWithOpen": "Neue Personen mit offener Ausgabe aktiv anlegen ({count})"
     },
     "scanner": {
       "title": "Tag scannen",

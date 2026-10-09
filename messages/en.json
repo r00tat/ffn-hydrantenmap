@@ -4456,7 +4456,7 @@
       "inactiveName": "{name} (inactive)",
       "openCount": "{count} open",
       "noneOpen": "nothing open",
-      "deactivateUnused": "Create new people without open issues as inactive ({count})"
+      "activateWithOpen": "Create new people with open issues as active ({count})"
     },
     "scanner": {
       "title": "Scan tag",

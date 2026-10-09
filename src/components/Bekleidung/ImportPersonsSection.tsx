@@ -24,7 +24,9 @@ export const importPersonName = (p: Pick<PreviewPerson, 'vorname' | 'nachname'>)
   `${p.vorname} ${p.nachname}`.trim();
 
 /**
- * Vorbelegung je Person: zugeordnet → die Person, neu → neu anlegen.
+ * Vorbelegung je Person: zugeordnet → die Person, neu → neu anlegen, und
+ * zwar **inaktiv**: Das Excel reicht Jahre zurück, wer heute dabei ist, steht
+ * fast immer schon im Fahrtenbuch. Aktivieren geht danach jederzeit.
  * Unsichere Treffer (ähnliche Schreibweise oder mehrere gleichnamige
  * Personen) bleiben bewusst offen: Ein vorgewählter Kandidat würde leicht
  * übersehen und hängte die Ausgaben der falschen Person an.
@@ -33,7 +35,7 @@ export function defaultPersonChoices(preview: ImportPreview): Record<string, str
   const choices: Record<string, string> = {};
   for (const p of preview.persons) {
     if (p.match.status === 'matched' && p.match.personId) choices[p.key] = p.match.personId;
-    else if (p.match.status !== 'uncertain') choices[p.key] = CREATE_PERSON;
+    else if (p.match.status !== 'uncertain') choices[p.key] = CREATE_PERSON_INACTIVE;
   }
   return choices;
 }
@@ -66,16 +68,15 @@ export function personDecisions(
 }
 
 /**
- * Neu anzulegende Personen ohne offene Ausgabe, die noch aktiv angelegt
- * würden. Wer nichts mehr ausgefasst hat, ist meist nicht mehr dabei — der
- * Vorschlag bleibt aber eine bewusste Entscheidung, keine Vorbelegung.
+ * Neu anzulegende Personen mit offener Ausgabe, die noch inaktiv angelegt
+ * würden. Wer noch etwas ausgefasst hat, ist vermutlich weiter dabei.
  */
-export function inactiveCandidates(
+export function activeCandidates(
   preview: ImportPreview,
   choices: Record<string, string>,
 ): string[] {
   return preview.persons
-    .filter((p) => p.openCount === 0 && choices[p.key] === CREATE_PERSON)
+    .filter((p) => p.openCount > 0 && choices[p.key] === CREATE_PERSON_INACTIVE)
     .map((p) => p.key);
 }
 
@@ -99,17 +100,17 @@ export default function ImportPersonsSection({
     if (!person) return id;
     return person.active === false ? t('import.inactiveName', { name: person.name }) : person.name;
   };
-  const toDeactivate = inactiveCandidates(preview, choices);
+  const toActivate = activeCandidates(preview, choices);
 
   return (
     <>
-      {toDeactivate.length > 0 && (
+      {toActivate.length > 0 && (
         <Button
           size="small"
           sx={{ alignSelf: 'flex-start' }}
-          onClick={() => toDeactivate.forEach((key) => onChange(key, CREATE_PERSON_INACTIVE))}
+          onClick={() => toActivate.forEach((key) => onChange(key, CREATE_PERSON))}
         >
-          {t('import.deactivateUnused', { count: toDeactivate.length })}
+          {t('import.activateWithOpen', { count: toActivate.length })}
         </Button>
       )}
       {GROUPS.map((group) => {

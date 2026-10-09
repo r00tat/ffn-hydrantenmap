@@ -118,12 +118,13 @@ describe('BekleidungImportDialog', () => {
       persons: {
         'max mustermann': { personId: 'p1' },
         'erika musterfrau': { create: 'Erika Musterfrau', active: false },
-        'moritz muster': { create: 'Moritz Muster' },
+        // neue Personen sind inaktiv vorbelegt
+        'moritz muster': { create: 'Moritz Muster', active: false },
       },
     });
   });
 
-  it('stellt neue Personen ohne offene Ausgabe gesammelt auf inaktiv', async () => {
+  it('stellt neue Personen mit offener Ausgabe gesammelt auf aktiv', async () => {
     previewBekleidungImport.mockResolvedValue({
       ...preview,
       persons: [
@@ -138,7 +139,7 @@ describe('BekleidungImportDialog', () => {
     await upload(user);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Neue Personen ohne offene Ausgabe inaktiv anlegen (1)' }),
+      await screen.findByRole('button', { name: 'Neue Personen mit offener Ausgabe aktiv anlegen (1)' }),
     );
     await user.click(screen.getByRole('button', { name: 'Importieren' }));
     expect(importBekleidung).toHaveBeenCalledWith('ffnd', 'QkFTRTY0', {
@@ -187,7 +188,7 @@ describe('BekleidungImportDialog', () => {
 describe('defaultPersonChoices', () => {
   it('belegt nur eindeutige Fälle vor, unsichere bleiben offen', () => {
     const choices = defaultPersonChoices(preview);
-    expect(choices).toEqual({ 'max mustermann': 'p1', 'moritz muster': '__new__' });
+    expect(choices).toEqual({ 'max mustermann': 'p1', 'moritz muster': '__new_inactive__' });
     expect(openPersonChoices(preview, choices)).toBe(1);
     expect(openPersonChoices(preview, { ...choices, 'erika musterfrau': 'p2' })).toBe(0);
   });
