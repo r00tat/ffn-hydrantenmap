@@ -8,6 +8,8 @@
  * Die Feldnamen sind persistiert und bleiben deutsch.
  */
 
+import type { FirecallArt } from './firecallArt';
+
 /** Subcollections unter `groups/{groupId}`. */
 export const GERAET_COLLECTION = 'geraet';
 export const GERAET_BESTAND_COLLECTION = 'geraetBestand';
@@ -288,16 +290,43 @@ export interface GeraetBestand {
 }
 
 export type GeraetBuchungArt =
+  /** Abbuchung, meist aus dem Einsatz (negativ). */
   | 'verbrauch'
+  /** Zugang an einem Lagerort (positiv). */
   | 'zugang'
+  /** Umbuchung von `bestandId` nach `zielBestandId`. */
   | 'umbuchung'
+  /** Korrektur auf einen gezählten Ist-Wert. */
   | 'inventur'
+  /** Bestandsänderung durch den Sybos-Import. */
   | 'import'
+  /** Rücknahme eines Verbrauchs (positiv). */
   | 'storno'
   /** Zuordnung zu Chargen ohne Mengenänderung (`menge: 0`). */
-  | 'aufteilung';
+  | 'aufteilung'
+  /** Protokoll: Artikel neu angelegt (`menge: 0`). */
+  | 'angelegt'
+  /** Protokoll: Stammdaten des Artikels geändert, siehe `aenderungen` (`menge: 0`). */
+  | 'stammdaten'
+  /** Protokoll: Artikel deaktiviert statt gelöscht (`menge: 0`). */
+  | 'archiviert'
+  /** Protokoll: Charge angelegt, geändert oder archiviert, mit `chargeId` (`menge: 0`). */
+  | 'charge'
+  /** Protokoll: Lagerort angelegt, geändert oder gelöscht (`menge: 0`). */
+  | 'lagerort'
+  /** Protokoll: Set-Zugehörigkeit des Artikels geändert (`menge: 0`). */
+  | 'set'
+  /** Protokoll: Gerät einem Einsatz zugeordnet (`menge: 0`). */
+  | 'zuordnung'
+  /** Protokoll: Zuordnung zum Einsatz entfernt (`menge: 0`). */
+  | 'zuordnungEnde';
 
-export const GERAET_BUCHUNG_ARTEN: GeraetBuchungArt[] = [
+/**
+ * Die Arten, die eine Menge bewegen. Nur sie zählen für Bestand, Verbrauch
+ * und die Frage, ob ein Artikel schon gebucht wurde; alle übrigen Arten sind
+ * reine Protokolleinträge mit `menge: 0`.
+ */
+export const GERAET_BESTAND_BUCHUNG_ARTEN: readonly GeraetBuchungArt[] = [
   'verbrauch',
   'zugang',
   'umbuchung',
@@ -307,19 +336,52 @@ export const GERAET_BUCHUNG_ARTEN: GeraetBuchungArt[] = [
   'aufteilung',
 ];
 
+export const GERAET_BUCHUNG_ARTEN: GeraetBuchungArt[] = [
+  ...GERAET_BESTAND_BUCHUNG_ARTEN,
+  'angelegt',
+  'stammdaten',
+  'archiviert',
+  'charge',
+  'lagerort',
+  'set',
+  'zuordnung',
+  'zuordnungEnde',
+];
+
+/** Bewegt eine Buchung dieser Art Bestand (und ist kein reiner Protokolleintrag)? */
+export function isBestandBuchung(art: GeraetBuchungArt | undefined): boolean {
+  return art !== undefined && GERAET_BESTAND_BUCHUNG_ARTEN.includes(art);
+}
+
+/** Eine geänderte Angabe in einem Protokolleintrag, als Text festgehalten. */
+export interface GeraetFeldAenderung {
+  /** Persistierter Feldname, z. B. `mindestbestand`. */
+  feld: string;
+  /** Formatiert für die Anzeige; fehlt = leer. */
+  vorher?: string;
+  nachher?: string;
+}
+
 /** Protokoll: `groups/{groupId}/geraetBuchung/{id}`. */
 export interface GeraetBuchung {
   id: string;
   geraetId: string;
-  bestandId: string;
+  /** Der Lagerort. Fehlt bei Protokolleinträgen ohne Lagerort (Stammdaten). */
+  bestandId?: string;
   art: GeraetBuchungArt;
-  /** Vorzeichenbehaftet: Verbrauch negativ, Zugang positiv. */
+  /** Vorzeichenbehaftet: Verbrauch negativ, Zugang positiv; Protokoll `0`. */
   menge: number;
   /** Die Charge, die bewegt wurde — fehlt sie, der Rest ohne Charge. */
   chargeId?: string;
   /** Bei Umbuchung: der Ziel-Lagerort. */
   zielBestandId?: string;
   firecallId?: string;
+  /** Name des Einsatzes zum Buchungszeitpunkt. */
+  firecallName?: string;
+  /** Art des Einsatzes zum Buchungszeitpunkt. */
+  firecallArt?: FirecallArt;
+  /** `formatLagerort` des Lagerorts zum Buchungszeitpunkt. */
+  lagerortText?: string;
   /**
    * Bei Verbrauch/Storno aus dem Einsatz: der `geraetEinsatz`-Eintrag. Über
    * die Summe aller Buchungen mit dieser ID gleicht der Server den Bestand
@@ -327,8 +389,12 @@ export interface GeraetBuchung {
    */
   einsatzEintragId?: string;
   bemerkung?: string;
+  /** Bei Protokolleinträgen: die geänderten Felder mit Wert davor und danach. */
+  aenderungen?: GeraetFeldAenderung[];
   createdAt: string;
   createdBy: string;
+  /** Anzeigename des Erfassers zum Buchungszeitpunkt (Name, sonst E-Mail). */
+  createdByName?: string;
 }
 
 export type GeraetEinsatzArt = 'zugeordnet' | 'verbraucht';

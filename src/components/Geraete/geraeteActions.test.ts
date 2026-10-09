@@ -588,6 +588,49 @@ describe('deleteGeraet', () => {
     expect(geraet('g1')!.active).toBe(false);
     expect(bestand('b1')).toBeDefined();
   });
+
+  it('löscht einen Artikel, der neben dem Import nur Protokolleinträge hat', async () => {
+    putGeraet('g1', { bestandGesamt: 3 });
+    putBestand('b1', 'g1', srf, 3);
+    fake.put(`${G}/geraetBuchung/k1`, { geraetId: 'g1', bestandId: 'b1', art: 'import', menge: 3 });
+    fake.put(`${G}/geraetBuchung/k2`, {
+      geraetId: 'g1',
+      art: 'stammdaten',
+      menge: 0,
+      aenderungen: [{ feld: 'mindestbestand', vorher: '2', nachher: '5' }],
+    });
+    fake.put(`${G}/geraetBuchung/k3`, { geraetId: 'g1', bestandId: 'b1', art: 'lagerort', menge: 0 });
+    await expect(deleteGeraet('ffnd', 'g1')).resolves.toEqual({ id: 'g1', deleted: true });
+    expect(geraet('g1')).toBeUndefined();
+    expect(bestand('b1')).toBeUndefined();
+    expect(buchungen()).toHaveLength(0);
+  });
+});
+
+describe('createdByName an der Buchung', () => {
+  it('schreibt den Namen des Erfassers', async () => {
+    putGeraet('g1');
+    await createGeraetBestand('ffnd', 'g1', srf, 4);
+    expect(buchungen()).toEqual([
+      expect.objectContaining({ createdBy: 'u1', createdByName: 'Max Mustermann' }),
+    ]);
+  });
+
+  it('nimmt ohne Namen die E-Mail', async () => {
+    managerGuard.mockResolvedValue({
+      user: { id: 'u1', email: 'max@example.org', groups: ['ffnd'] },
+    });
+    putGeraet('g1');
+    await createGeraetBestand('ffnd', 'g1', srf, 4);
+    expect(buchungen()[0]).toMatchObject({ createdByName: 'max@example.org' });
+  });
+
+  it('lässt das Feld ohne Namen und E-Mail weg', async () => {
+    managerGuard.mockResolvedValue({ user: { id: 'u1', groups: ['ffnd'] } });
+    putGeraet('g1');
+    await createGeraetBestand('ffnd', 'g1', srf, 4);
+    expect(buchungen()[0]).not.toHaveProperty('createdByName');
+  });
 });
 
 describe('createGeraetBestand', () => {
@@ -933,6 +976,22 @@ describe('syncGeraetVerbrauch', () => {
       requireGroupMember: true,
     });
     expect(buchungen()).toHaveLength(0);
+  });
+
+  it('übergeht Protokolleinträge mit derselben einsatzEintragId', async () => {
+    putEintrag('e1', {});
+    fake.put(`${G}/geraetBuchung/p1`, {
+      geraetId: 'g1',
+      art: 'zuordnung',
+      menge: 0,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+    });
+    await syncGeraetVerbrauch('fc1', 'e1');
+    expect(bestand('b1')!.anzahl).toBe(1);
+    expect(buchungen().filter((b) => b.art === 'verbrauch')).toEqual([
+      expect.objectContaining({ bestandId: 'b1', menge: -3, createdByName: 'Max Mustermann' }),
+    ]);
   });
 
   describe('erwarteter Stand des Eintrags', () => {

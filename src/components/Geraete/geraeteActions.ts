@@ -24,6 +24,7 @@ import {
   GERAET_LAGERORT_UNBESTIMMT,
   GERAET_MATERIAL_TYPEN,
   GERAET_SET_COLLECTION,
+  isBestandBuchung,
   isContainer,
   isValidMenge,
   lagerortKey,
@@ -105,11 +106,17 @@ type Session = Awaited<ReturnType<typeof actionUserRequired>>;
 
 interface Actor {
   uid: string;
+  /** Anzeigename für das Protokoll: Name, sonst E-Mail, sonst leer. */
+  name: string;
   now: string;
 }
 
 function actorOf(session: Session): Actor {
-  return { uid: session.user.id, now: new Date().toISOString() };
+  return {
+    uid: session.user.id,
+    name: session.user.name ?? session.user.email ?? '',
+    now: new Date().toISOString(),
+  };
 }
 
 function groupRef(groupId: string) {
@@ -229,7 +236,7 @@ function stockPatch(geraet: Geraet, delta: number, actor: Actor): StockPatch {
   };
 }
 
-type NewBuchung = Omit<GeraetBuchung, 'id' | 'createdAt' | 'createdBy'>;
+type NewBuchung = Omit<GeraetBuchung, 'id' | 'createdAt' | 'createdBy' | 'createdByName'>;
 
 function buchungDoc(input: NewBuchung, actor: Actor): Omit<GeraetBuchung, 'id'> {
   return compact({
@@ -237,6 +244,8 @@ function buchungDoc(input: NewBuchung, actor: Actor): Omit<GeraetBuchung, 'id'> 
     bemerkung: trimmed(input.bemerkung),
     createdAt: actor.now,
     createdBy: actor.uid,
+    // Ohne Namen kein leerer Text — die Anzeige zeigt dann „—".
+    createdByName: trimmed(actor.name),
   });
 }
 
@@ -661,9 +670,11 @@ export async function setGeraeteVerbrauchsmaterial(
 /**
  * Löscht einen Artikel — oder deaktiviert ihn, wenn er schon gebucht wurde.
  *
- * Eine Buchung ist Protokoll und bleibt; ihr Artikel muss dafür lesbar
+ * Eine Mengenbuchung ist Protokoll und bleibt; ihr Artikel muss dafür lesbar
  * bleiben. Import-Buchungen zählen nicht: Sie sind nur die Herkunft des
- * Anfangsbestands und gehen mit dem Artikel.
+ * Anfangsbestands und gehen mit dem Artikel. Ebenso reine Protokolleinträge
+ * ohne Menge (Stammdaten, Chargen, Lagerorte …): Sie beschreiben nur den
+ * Artikel selbst und werden mit ihm gelöscht.
  */
 export async function deleteGeraet(
   groupId: string,
@@ -678,9 +689,10 @@ export async function deleteGeraet(
   if (!snap.exists) throw notFound('geraet', geraetId);
 
   const bookings = await buchungCol(groupId).where('geraetId', '==', geraetId).get();
-  const hasRealBookings = bookings.docs.some(
-    (d) => (d.data() as GeraetBuchung).art !== 'import',
-  );
+  const hasRealBookings = bookings.docs.some((d) => {
+    const art = (d.data() as GeraetBuchung).art;
+    return isBestandBuchung(art) && art !== 'import';
+  });
   if (hasRealBookings) {
     await ref.update({ active: false, updatedAt: actor.now, updatedBy: actor.uid });
     return { id: geraetId, deleted: false };
@@ -1845,9 +1857,16 @@ export async function syncGeraetVerbrauch(
     const bookedSnap = await tx.get(
       buchungCol(groupId).where('einsatzEintragId', '==', einsatzEintragId),
     );
+    // Nur Verbrauch und Storno: Unter derselben `einsatzEintragId` liegen auch
+    // Protokolleinträge der Zuordnung, die keinen Bestand bewegen.
     const booked = bookedSnap.docs
       .map((d) => d.data() as GeraetBuchung)
-      .filter((b) => b.firecallId === firecallId);
+      .filter(
+        (b): b is GeraetBuchung & { bestandId: string } =>
+          b.firecallId === firecallId &&
+          (b.art === 'verbrauch' || b.art === 'storno') &&
+          typeof b.bestandId === 'string',
+      );
 
     const bookedMengen = booked.map((b) => ({
       bestandId: b.bestandId,
@@ -2049,7 +2068,9 @@ async function prepareImport(groupId: string, fileBase64: unknown): Promise<Impo
     const snap = await buchungCol(groupId).where('createdAt', '>', since).get();
     bookings = snap.docs
       .map((d) => d.data() as GeraetBuchung)
-      .filter((b) => b.art !== 'import');
+      // Protokolleinträge ohne Menge (z. B. Stammdaten aus dem Import selbst)
+      // sind keine Buchung, die der Import überschreiben würde.
+      .filter((b) => isBestandBuchung(b.art) && b.art !== 'import');
   }
   const bookedSince = new Set<string>();
   for (const b of bookings) {

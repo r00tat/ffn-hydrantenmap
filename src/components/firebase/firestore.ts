@@ -7,6 +7,9 @@
 import type { EinsatzmittelKategorie } from '../../common/vehicle-utils';
 import type { Hydrant } from '../../common/gis-objects';
 import type { SampleRateSpec } from '../../hooks/radiacode/types';
+import type { FirecallArt } from '../../common/firecallArt';
+
+export { FIRECALL_ARTEN, type FirecallArt } from '../../common/firecallArt';
 
 /**
  * collection names
@@ -584,6 +587,11 @@ export interface Firecall {
   lat?: number;
   lng?: number;
   group?: string;
+  /**
+   * Art des Einsatzes: Einsatz, Übung oder sonstiger Anlass. Fehlt das Feld
+   * (alle älteren Einsätze), gilt `einsatz`.
+   */
+  art?: FirecallArt;
   /**
    * Gecachte Route zum Einsatzort für das Fahrtenbuch — Hin- und Rückweg
    * getrennt (siehe firecallRoute.ts). Ältere Dokumente tragen hier ein
