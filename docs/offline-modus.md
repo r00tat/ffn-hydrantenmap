@@ -180,7 +180,7 @@ Jede Server Action im Client-Pfad gehört deshalb in eine von drei Gruppen:
 
 | Gruppe | Beispiele | Verhalten offline |
 | --- | --- | --- |
-| Nachholen | `planeUeberwachungWarnung`, `syncGeraetVerbrauch` (Verbrauch von Material im Einsatz abbuchen), Anhänge am Einsatz und an Elementen | Warteschlange, beim Reconnect abgearbeitet |
+| Nachholen | `planeUeberwachungWarnung`, `syncGeraetVerbrauch` (Verbrauch von Material im Einsatz abbuchen), `syncGeraetZuordnung` (Zuordnung eines Geräts im Einsatz in der Historie protokollieren), Anhänge am Einsatz und an Elementen | Warteschlange, beim Reconnect abgearbeitet |
 | Firestore lesen | Atemschutz-Gerätebestand (`useAtemschutzGeraete`), Geräte & Material (`useGeraete`) | liest ohnehin aus dem Cache |
 | Nur online | KI-Assistent, Verrechnung (`runTransaction`), Blaulicht-SMS-Import und Duplikatsprüfung, Mail-Versand, PDF über den Server, Fahrtenbuch, Mängel, Drive-Fotos, Downloads und KI-Zusammenfassung im Sybos-Übertrag, Verwaltung | erkennbar deaktiviert, mit Hinweis |
 

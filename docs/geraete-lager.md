@@ -533,6 +533,126 @@ Fristen als Bindemittel.
 - In **dev** ist der Job pausiert (`ablauf_report_paused`), wie der
   Wochenbericht: Beide Umgebungen schrieben sonst an dieselbe Verteilerliste.
 
+## Historie je Artikel
+
+Im Detail eines Artikels steht ein zugeklappter Bereich „Historie": was von wem
+wann geändert wurde — Verbrauch, Zugang, Umbuchung, Inventur, Änderungen an
+Stammdaten, Chargen, Lagerorten und Sets, dazu die Zuordnung zu einem Einsatz.
+
+### Warum `geraetBuchung` und keine neue Sammlung
+
+Das Protokoll ist `geraetBuchung`, erweitert um Arten ohne Mengenänderung. Eine
+zweite Sammlung hieße zwei Abfragen, die man für die Anzeige zeitlich
+zusammenmischen müsste, einen zweiten Index und zwei Stellen für die
+Berechtigung. So ist es eine Abfrage (`geraetId`, absteigend nach `createdAt`),
+und die bestehenden Buchungen sind schon Historie — ohne Migration.
+
+### Mengenarten gegen Protokollarten
+
+| Gruppe | Arten | `menge` |
+| --- | --- | --- |
+| Menge | `verbrauch`, `zugang`, `umbuchung`, `inventur`, `import`, `storno`, `aufteilung` | echt |
+| Protokoll | `stammdaten`, `angelegt`, `archiviert`, `charge`, `lagerort`, `set`, `zuordnung`, `zuordnungEnde` | `0` |
+
+`isBestandBuchung(art)` (in `src/common/geraet.ts`) trennt die beiden. **Jede
+Stelle, die Buchungen auswertet, muss darauf filtern**, sonst zählt ein
+Protokolleintrag als Bewegung: `deleteGeraet` (was als „echte Buchung" das
+Löschen verhindert, sind Mengenarten außer `import`; Protokolleinträge allein
+verhindern es nicht und werden mitgelöscht), `syncGeraetVerbrauch` (summiert nur
+`verbrauch`/`storno`) und `previewGeraetImport` (Abweichungen nur gegen
+Mengenbuchungen). Wer eine neue Auswertung baut, filtert ebenfalls. `bestandId`
+ist deshalb optional: Ein Stammdateneintrag hat keinen Lagerort.
+
+### Werte als Text
+
+Änderungen stehen als `aenderungen: { feld, vorher?, nachher? }[]` am Eintrag.
+Die Werte sind schon beim Schreiben Text (`formatFeldwert` in
+`src/common/geraetProtokoll.ts`: Zahlen wie sie sind, Booleans „ja"/„nein",
+Arrays mit „, " verbunden, ein Lagerort über `formatLagerort`). Das Protokoll
+soll lesbar bleiben, auch wenn sich ein Feld später vom Text zur Zahl oder zum
+Objekt wandelt — ein gespeicherter Typ würde sonst jede Anzeige an die
+Datenmodell-Geschichte binden. `undefined`, `null` und `''` gelten als gleich
+„leer", und `diffFields` liefert nur echte Unterschiede: Ein Speichern ohne
+Änderung schreibt **keinen** Eintrag. Ein fehlender Schlüssel `vorher` heißt
+„war leer".
+
+### Zum Schreibzeitpunkt festgehalten
+
+Vier Angaben stehen als Kopie am Eintrag, nicht als Verweis:
+
+- `createdByName` (Anzeigename, sonst E-Mail): Die Sammlung `user` darf jeder nur
+  für sich selbst lesen; das Protokoll könnte fremde Namen sonst nicht auflösen.
+- `firecallName` und `firecallArt`: Ein Einsatz kann umbenannt oder gelöscht
+  werden, das Protokoll soll weiter sagen, wofür verbraucht wurde und ob es eine
+  Übung war.
+- `lagerortText`: Ein Lagerort kann umbenannt oder gelöscht werden.
+
+Ältere Einträge haben diese Felder nicht und zeigen „—"; sie werden nicht
+nachgetragen.
+
+### Welche Aktion schreibt was
+
+| Aktion | Eintrag |
+| --- | --- |
+| `saveGeraet` (neu) / Import (neu) | `angelegt`, gesetzte Felder als Änderungen |
+| `saveGeraet` (geändert), `setGeraeteVerbrauchsmaterial`, Import mit geänderten Stammdaten | `stammdaten` mit Diff über `STAMMDATEN_FIELDS` |
+| `deleteGeraet`, wenn nur deaktiviert | `archiviert` |
+| Charge anlegen, ändern, archivieren | `charge` mit `chargeId`, `bemerkung` „angelegt"/„geändert"/„archiviert" (zusätzlich zu den Zugangsbuchungen) |
+| Lagerort anlegen, ändern, löschen ohne Bestand | `lagerort` |
+| `saveGeraetSet`, `deleteGeraetSet` | `set` |
+| `syncGeraetVerbrauch` | `verbrauch`/`storno` wie bisher, jetzt mit Einsatzname und -art |
+| `syncGeraetZuordnung` | `zuordnung`, `zuordnungEnde` |
+
+Mengenbuchungen (Zugang, Umbuchung, Inventur) schreiben wie bisher; neu ist an
+ihnen nur `createdByName` und `lagerortText`.
+
+### Sets
+
+Das Set ist kein Artikel mit eigener Historie, sondern Zugehörigkeit.
+`setMembershipEntries` schreibt je Artikel, der in ein Set kommt oder aus ihm
+fällt, einen Eintrag `set` („Set „X": hinzugefügt/entfernt/gelöscht"), und
+einen am gebundenen Set-Artikel (`sybosSetArtikelId`), wenn die Bindung wechselt.
+Eine Änderung nur am Namen, an den Codes oder an der Menge eines Inhalts ist
+keine Änderung der Zugehörigkeit und schreibt nichts.
+
+### Zuordnung von Geräten: über die Warteschlange
+
+Eine Zuordnung (`geraetEinsatz` mit `art: 'zugeordnet'`) wird lokal geschrieben,
+also auch offline. Das Protokoll kann deshalb nicht im Dialog entstehen:
+`syncGeraetZuordnung(firecallId, einsatzEintragId)` ist wie
+`syncGeraetVerbrauch` eine „nachholen"-Action, angestoßen über
+`geraetZuordnungQueue.ts` (Typ `syncGeraetZuordnung`, Schlüssel je Einsatz und
+Eintrag) nach dem Anlegen und Löschen eines Zuordnungseintrags.
+
+Sie ist ein **Abgleich**: Sie liest den Eintrag und die bisherigen Protokolle
+`zuordnung`/`zuordnungEnde` mit dieser Eintrags-ID und schreibt nur, was fehlt —
+`zuordnung`, wenn der Eintrag besteht und der letzte Protokolleintrag keine
+`zuordnung` ist, `zuordnungEnde` (mit dem Artikel der früheren Buchung), wenn der
+Eintrag weg ist und der letzte eine `zuordnung` war, sonst nichts. Ein doppelt
+abgearbeiteter Aufruf schreibt darum nichts doppelt, und für das Entfernen
+braucht es keinen eigenen Typ in der Warteschlange.
+
+**Grenze:** Wird ein Gerät offline zugeordnet und vor dem Abgleich wieder
+entfernt, sieht der Server nie einen Eintrag — es entsteht keine `zuordnung` und
+keine `zuordnungEnde`.
+
+### Anzeige
+
+`GeraetHistory` lädt erst beim ersten Aufklappen, 50 Einträge je Seite, „Mehr
+laden" holt die nächste (`startAfter`). Die Abfrage `geraetId ==` mit
+`orderBy createdAt desc` braucht den zusammengesetzten Index auf `geraetBuchung`
+(`geraetId` aufsteigend, `createdAt` absteigend) in
+`firebase/{dev,prod}/firestore.indexes.json`. Fehlt er in einer Umgebung, schlägt
+die Abfrage dort mit einem Fehler fest und die Historie bleibt leer.
+
+### Art am Einsatz
+
+Damit das Protokoll Übungen vom Ernstfall trennt, hat ein Einsatz eine `art`
+(`FirecallArt` in `src/common/firecallArt.ts`: `einsatz`, `uebung`, `sonstiges`);
+fehlt sie, gilt `einsatz`. Sie wird im Dialog zum Anlegen und Bearbeiten des
+Einsatzes gewählt; die Einsatzliste zeigt bei Übung und Sonstiges einen Chip.
+Verbrauch, Storno und Zuordnung übernehmen sie als `firecallArt` in den Eintrag.
+
 ## Berechtigungen
 
 Pflege — Artikel anlegen und ändern, Zugang, Umbuchung, Inventur, Import, Sets,
