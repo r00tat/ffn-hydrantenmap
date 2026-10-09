@@ -1890,6 +1890,7 @@
   },
   "firecall": {
     "fields": {
+      "art": "Art",
       "name": "Bezeichnung",
       "description": "Beschreibung",
       "fw": "Feuerwehr",
@@ -4259,5 +4260,10 @@
     "chargeCheckHint": "Die Charge wurde automatisch nach Ablaufdatum gewählt. Bitte im Eintrag prüfen und speichern.",
     "chargeNone": "ohne Charge",
     "chargePart": "{label}: {menge, number}"
+  },
+  "firecallArt": {
+    "einsatz": "Einsatz",
+    "uebung": "Übung",
+    "sonstiges": "Sonstiges"
   }
 }

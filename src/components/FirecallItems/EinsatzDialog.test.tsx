@@ -303,3 +303,55 @@ describe('EinsatzDialog without connection', () => {
     );
   });
 });
+
+describe('EinsatzDialog Art', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    addDocMock.mockReturnValue({ id: 'new-firecall-id' });
+    getBlaulichtSmsAlarmsMock.mockResolvedValue([]);
+    getFirecallsByAlarmIdsMock.mockResolvedValue({});
+  });
+
+  const clickSave = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(
+      await screen.findByRole('button', {
+        name: /hinzufügen|speichern|aktualisieren/i,
+      }),
+    );
+  };
+
+  it('defaults to Einsatz and saves art einsatz for a new firecall', async () => {
+    const user = userEvent.setup();
+    render(<EinsatzDialog onClose={vi.fn()} />);
+    expect(screen.getByRole('combobox', { name: 'Art' })).toHaveTextContent(
+      'Einsatz',
+    );
+    await clickSave(user);
+    await waitFor(() => expect(addDocMock).toHaveBeenCalledTimes(1));
+    const payload = addDocMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(payload.art).toBe('einsatz');
+  });
+
+  it('saves art uebung when selected', async () => {
+    const user = userEvent.setup();
+    render(<EinsatzDialog onClose={vi.fn()} />);
+    await user.click(screen.getByRole('combobox', { name: 'Art' }));
+    await user.click(await screen.findByRole('option', { name: 'Übung' }));
+    await clickSave(user);
+    await waitFor(() => expect(addDocMock).toHaveBeenCalledTimes(1));
+    const payload = addDocMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(payload.art).toBe('uebung');
+  });
+
+  it('prefills the stored art when editing', async () => {
+    render(
+      <EinsatzDialog
+        einsatz={{ ...einsatzFromAlarm, id: 'fc-1', art: 'sonstiges' }}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Art' })).toHaveTextContent(
+      'Sonstiges',
+    );
+  });
+});

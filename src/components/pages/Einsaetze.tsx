@@ -134,6 +134,14 @@ function EinsatzCard({
               {einsatz.name} {einsatz.fw}{' '}
               {firecallId === einsatz.id ? t('einsaetze.active') : ''}
             </FirecallLink>
+            {einsatz.art && einsatz.art !== 'einsatz' && (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={t(`firecallArt.${einsatz.art}`)}
+                sx={{ ml: 1, verticalAlign: 'middle' }}
+              />
+            )}
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
             {formatTimestamp(einsatz.date)}

@@ -1890,6 +1890,7 @@
   },
   "firecall": {
     "fields": {
+      "art": "Type",
       "name": "Name",
       "description": "Description",
       "fw": "Fire department",
@@ -4259,5 +4260,10 @@
     "chargeCheckHint": "The batch was chosen automatically by expiry date. Please check it in the entry and save.",
     "chargeNone": "no batch",
     "chargePart": "{label}: {menge, number}"
+  },
+  "firecallArt": {
+    "einsatz": "Operation",
+    "uebung": "Exercise",
+    "sonstiges": "Other"
   }
 }
