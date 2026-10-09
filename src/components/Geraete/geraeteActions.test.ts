@@ -157,6 +157,8 @@ const fake = vi.hoisted(() => {
 
   const firestore = {
     collection: (name: string) => collectionRef(name),
+    getAll: (...refs: { get: () => Promise<FakeSnap> }[]) =>
+      Promise.all(refs.map((r) => r.get())),
     batch() {
       const writes: Write[] = [];
       return {
@@ -288,6 +290,7 @@ import {
   saveGeraetSet,
   setGeraeteVerbrauchsmaterial,
   syncGeraetVerbrauch,
+  syncGeraetZuordnung,
   updateGeraetBestand,
 } from './geraeteActions';
 
@@ -1662,6 +1665,17 @@ describe('deleteGeraetSet', () => {
   it('meldet ein unbekanntes Set mit 404', async () => {
     await expect(deleteGeraetSet('ffnd', 'weg')).rejects.toThrow(/not found/);
   });
+
+  it('protokolliert nur an Artikeln, die es noch gibt', async () => {
+    putGeraet('besen', { bezeichnung: 'Besen', verbrauchsmaterial: false });
+    putSet('s1', {
+      inhalt: [{ geraetId: 'besen' }, { geraetId: 'geloescht' }],
+      sybosSetArtikelId: 'kiste-weg',
+    });
+    await deleteGeraetSet('ffnd', 's1');
+    expect(geraetSet('s1')).toBeUndefined();
+    expect(alleBuchungen().map((b) => [b.geraetId, b.art])).toEqual([['besen', 'set']]);
+  });
 });
 
 // --- Chargen ----------------------------------------------------------------
@@ -2751,5 +2765,168 @@ describe('Historie: Protokolleinträge je Action', () => {
       // Händisch gepflegte Felder setzt der Import nicht — kein Eintrag dazu.
       expect(aenderungen.some((a) => a.feld === 'mindestbestand')).toBe(false);
     });
+  });
+});
+
+describe('syncGeraetZuordnung', () => {
+  const E = 'call/fc1/geraetEinsatz';
+
+  function putZuordnung(id: string, data: Record<string, unknown> = {}) {
+    fake.put(`${E}/${id}`, {
+      groupId: 'ffnd',
+      geraetId: 'pumpe',
+      geraetName: 'Tauchpumpe',
+      art: 'zugeordnet',
+      zeitpunkt: '2026-10-04T10:00:00.000Z',
+      createdAt: '2026-10-04T10:00:00.000Z',
+      createdBy: 'u2',
+      ...data,
+    });
+  }
+
+  const zuordnungen = () =>
+    alleBuchungen()
+      .filter((b) => b.art === 'zuordnung' || b.art === 'zuordnungEnde')
+      .sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
+
+  beforeEach(() => {
+    putGeraet('pumpe', { bezeichnung: 'Tauchpumpe', verbrauchsmaterial: false });
+  });
+
+  it('prüft die Einsatzberechtigung mit Schreibrecht und Gruppenmitgliedschaft', async () => {
+    firecallGuard.mockRejectedValue(new Error('not authorized'));
+    putZuordnung('e1');
+    await expect(syncGeraetZuordnung('fc1', 'e1')).rejects.toThrow('not authorized');
+    expect(firecallGuard).toHaveBeenCalledWith('fc1', {
+      requireWrite: true,
+      requireGroupMember: true,
+    });
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('protokolliert die Zuordnung mit Name und Art des Einsatzes', async () => {
+    firecallGuard.mockResolvedValue({
+      id: 'fc1',
+      name: 'Herbstübung',
+      group: 'ffnd',
+      art: 'uebung',
+    });
+    putZuordnung('e1', { bemerkung: '  am Keller  ' });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: 'zuordnung' });
+    expect(zuordnungen()).toEqual([
+      expect.objectContaining({
+        geraetId: 'pumpe',
+        art: 'zuordnung',
+        menge: 0,
+        firecallId: 'fc1',
+        firecallName: 'Herbstübung',
+        firecallArt: 'uebung',
+        einsatzEintragId: 'e1',
+        bemerkung: 'am Keller',
+        createdBy: 'u1',
+        createdByName: 'Max Mustermann',
+      }),
+    ]);
+    expect(zuordnungen()[0].bestandId).toBeUndefined();
+  });
+
+  it('nimmt ohne Art am Einsatz „einsatz" an', async () => {
+    putZuordnung('e1');
+    await syncGeraetZuordnung('fc1', 'e1');
+    expect(zuordnungen()[0]).toMatchObject({ firecallName: 'Ölspur B50', firecallArt: 'einsatz' });
+  });
+
+  it('schreibt beim zweiten Aufruf nichts (idempotent)', async () => {
+    putZuordnung('e1');
+    await syncGeraetZuordnung('fc1', 'e1');
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(zuordnungen()).toHaveLength(1);
+  });
+
+  it('protokolliert nach dem Löschen das Ende mit dem Artikel der früheren Zuordnung', async () => {
+    putZuordnung('e1');
+    await syncGeraetZuordnung('fc1', 'e1');
+    fake.docs.delete(`${E}/e1`);
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({
+      written: 'zuordnungEnde',
+    });
+    expect(zuordnungen().map((b) => [b.art, b.geraetId])).toEqual([
+      ['zuordnung', 'pumpe'],
+      ['zuordnungEnde', 'pumpe'],
+    ]);
+    expect(zuordnungen()[1]).toMatchObject({
+      menge: 0,
+      firecallId: 'fc1',
+      firecallName: 'Ölspur B50',
+      firecallArt: 'einsatz',
+      einsatzEintragId: 'e1',
+    });
+    // Ein weiterer Aufruf ändert nichts mehr.
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(zuordnungen()).toHaveLength(2);
+  });
+
+  it('nimmt die zeitlich letzte Protokollart, nicht die zuletzt gelesene', async () => {
+    putZuordnung('e1');
+    fake.put(`${G}/geraetBuchung/a`, {
+      geraetId: 'pumpe',
+      art: 'zuordnungEnde',
+      menge: 0,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+      createdAt: '2026-10-04T12:00:00.000Z',
+      createdBy: 'u1',
+    });
+    fake.put(`${G}/geraetBuchung/b`, {
+      geraetId: 'pumpe',
+      art: 'zuordnung',
+      menge: 0,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+      createdAt: '2026-10-04T11:00:00.000Z',
+      createdBy: 'u1',
+    });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: 'zuordnung' });
+  });
+
+  it('ein gelöschter Eintrag ohne frühere Zuordnung schreibt nichts', async () => {
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('ein Verbrauch schreibt keine Zuordnung', async () => {
+    putZuordnung('e1', { art: 'verbraucht', bestandId: 'b1', menge: 1 });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('übergeht Verbrauchsbuchungen mit derselben einsatzEintragId', async () => {
+    fake.put(`${G}/geraetBuchung/v1`, {
+      geraetId: 'pumpe',
+      bestandId: 'b1',
+      art: 'verbrauch',
+      menge: -1,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+      createdAt: '2026-10-04T11:00:00.000Z',
+      createdBy: 'u1',
+    });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+  });
+
+  it('lehnt einen Eintrag einer fremden Gruppe ab', async () => {
+    putZuordnung('e1', { groupId: 'andere' });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).rejects.toThrow(/not to the firecall group/);
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('schreibt für einen unbekannten Artikel nichts', async () => {
+    putZuordnung('e1', { geraetId: 'weg' });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('weist unsichere IDs ab', async () => {
+    await expect(syncGeraetZuordnung('fc1', 'a/b')).rejects.toThrow(/invalid einsatzEintragId/);
   });
 });

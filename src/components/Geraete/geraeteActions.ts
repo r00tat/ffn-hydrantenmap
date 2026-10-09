@@ -1449,9 +1449,21 @@ export async function deleteGeraetSet(
   const snap = await ref.get();
   if (!snap.exists) throw notFound('geraetSet', setId);
   const set = snap.data() as GeraetSet;
+  const entries = setMembershipEntries(set.name, set, undefined);
+  // Wie in `saveGeraetSet`: Ein inzwischen gelöschter Artikel bekommt keinen
+  // verwaisten Eintrag. Die IDs stammen aus dem gespeicherten Set; geprüft
+  // wird trotzdem, bevor sie Teil eines Pfads werden.
+  const ids = [...new Set(entries.map((e) => e.geraetId))];
+  for (const id of ids) assertSafeId(id, 'geraetId');
+  const articleSnaps =
+    ids.length > 0
+      ? await firestore.getAll(...ids.map((id) => geraetCol(groupId).doc(id)))
+      : [];
+  const known = new Set(articleSnaps.filter((s) => s.exists).map((s) => s.id));
   const batch = firestore.batch();
   batch.delete(ref);
-  for (const entry of setMembershipEntries(set.name, set, undefined)) {
+  for (const entry of entries) {
+    if (!known.has(entry.geraetId)) continue;
     batch.set(
       buchungCol(groupId).doc(),
       protokollDoc({ geraetId: entry.geraetId, art: 'set', bemerkung: entry.bemerkung }, actor),
@@ -2306,6 +2318,107 @@ export async function syncGeraetVerbrauch(
     });
   }
   return { deltas };
+}
+
+/**
+ * Protokolliert die Zuordnung eines Geräts im Einsatz in der Historie des
+ * Artikels — eine „nachholen"-Action wie `syncGeraetVerbrauch`, über die
+ * Warteschlange `geraetZuordnungQueue.ts` angestoßen nach dem Anlegen und
+ * Löschen eines Eintrags mit `art: 'zugeordnet'`.
+ *
+ * Sie liest den Eintrag am Server und die bisherigen Protokolleinträge
+ * `zuordnung`/`zuordnungEnde` mit seiner ID und schreibt nur, was fehlt:
+ * - Eintrag zugeordnet, zuletzt nicht `zuordnung` → `zuordnung`.
+ * - Eintrag weg (oder kein Zuordnungseintrag mehr), zuletzt `zuordnung` →
+ *   `zuordnungEnde` mit dem Artikel der früheren Buchung.
+ * Darum idempotent, und ein Erwartungsstand wie beim Verbrauch ist unnötig:
+ * Sieht der Server den Eintrag noch nicht, schreibt er nichts; der
+ * nächste Aufruf holt es nach. Offline zugeordnet und vor dem Abgleich
+ * wieder entfernt ergibt keinen Eintrag.
+ *
+ * Gruppe und Berechtigung wie bei `syncGeraetVerbrauch`.
+ */
+export async function syncGeraetZuordnung(
+  firecallId: string,
+  einsatzEintragId: string,
+): Promise<{ written: 'zuordnung' | 'zuordnungEnde' | null }> {
+  const firecall = await actionUserAuthorizedForFirecall(firecallId, {
+    requireWrite: true,
+    requireGroupMember: true,
+  });
+  const session = await actionUserRequired();
+  const actor = actorOf(session);
+  assertSafeId(einsatzEintragId, 'einsatzEintragId');
+  const groupId = firecall.group;
+  if (!groupId) {
+    throw new ApiException(`firecall ${firecallId} has no group`, { status: 400 });
+  }
+
+  const entryRef = firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId)
+    .collection(GERAET_EINSATZ_COLLECTION)
+    .doc(einsatzEintragId);
+
+  const written = await firestore.runTransaction(async (tx: Transaction) => {
+    const entrySnap = await tx.get(entryRef);
+    const entry = entrySnap.exists ? (entrySnap.data() as GeraetEinsatz) : undefined;
+    if (entry && entry.groupId !== groupId) {
+      throw new ApiException(
+        `geraetEinsatz ${einsatzEintragId} belongs to group ${entry.groupId}, not to the firecall group`,
+        { status: 403 },
+      );
+    }
+
+    const bookedSnap = await tx.get(
+      buchungCol(groupId).where('einsatzEintragId', '==', einsatzEintragId),
+    );
+    const last = bookedSnap.docs
+      .map((d) => d.data() as GeraetBuchung)
+      .filter(
+        (b) =>
+          b.firecallId === firecallId && (b.art === 'zuordnung' || b.art === 'zuordnungEnde'),
+      )
+      .sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''))
+      .at(-1);
+
+    const assigned = entry?.art === 'zugeordnet';
+    let art: 'zuordnung' | 'zuordnungEnde' | null = null;
+    let geraetId: string | undefined;
+    let bemerkung: string | undefined;
+    if (assigned && last?.art !== 'zuordnung') {
+      assertSafeId(entry.geraetId, 'geraetId');
+      // Kein Protokoll an einem Artikel, den es in der Gruppe nicht gibt.
+      const geraetSnap = await tx.get(geraetCol(groupId).doc(entry.geraetId));
+      if (geraetSnap.exists) {
+        art = 'zuordnung';
+        geraetId = entry.geraetId;
+        bemerkung = entry.bemerkung;
+      }
+    } else if (!assigned && last?.art === 'zuordnung') {
+      art = 'zuordnungEnde';
+      geraetId = last.geraetId;
+    }
+    if (!art || !geraetId) return null;
+
+    tx.set(
+      buchungCol(groupId).doc(),
+      protokollDoc(
+        {
+          geraetId,
+          art,
+          firecallId,
+          firecallName: trimmed(firecall.name),
+          firecallArt: firecall.art ?? 'einsatz',
+          einsatzEintragId,
+          bemerkung,
+        },
+        actor,
+      ),
+    );
+    return art;
+  });
+  return { written };
 }
 
 // --- Import ------------------------------------------------------------------
