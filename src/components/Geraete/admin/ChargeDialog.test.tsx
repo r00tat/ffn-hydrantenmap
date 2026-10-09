@@ -9,9 +9,12 @@ import {
 } from '../../../common/geraet';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
-const { saveGeraetCharge } = vi.hoisted(() => ({ saveGeraetCharge: vi.fn() }));
+const { saveGeraetCharge, korrigiereGeraetChargenBestand } = vi.hoisted(() => ({
+  saveGeraetCharge: vi.fn(),
+  korrigiereGeraetChargenBestand: vi.fn(),
+}));
 
-vi.mock('../geraeteActions', () => ({ saveGeraetCharge }));
+vi.mock('../geraeteActions', () => ({ saveGeraetCharge, korrigiereGeraetChargenBestand }));
 
 import ChargeDialog from './ChargeDialog';
 
@@ -30,6 +33,7 @@ describe('ChargeDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saveGeraetCharge.mockResolvedValue({ id: 'neu' });
+    korrigiereGeraetChargenBestand.mockResolvedValue({ bookings: 1 });
   });
 
   it('legt eine Charge an — alle Felder optional', async () => {
@@ -116,19 +120,112 @@ describe('ChargeDialog', () => {
       expect(saveGeraetCharge).not.toHaveBeenCalled();
     });
 
-    it('zeigt beim Bearbeiten keine Mengen', () => {
+  });
+
+  describe('Bestand beim Bearbeiten korrigieren', () => {
+    const srf: GeraetBestand = {
+      id: 'b1',
+      geraetId: 'g1',
+      lagerortKey: 'fahrzeug|srf|gr 2',
+      lagerort: { art: 'fahrzeug', fahrzeug: 'SRF', laderaum: 'GR 2' },
+      anzahl: 6,
+      chargen: { c1: 4 },
+    };
+    const lager: GeraetBestand = {
+      id: 'b2',
+      geraetId: 'g1',
+      lagerortKey: 'raum|feuerwehrhaus|lager',
+      lagerort: { art: 'raum', standort: 'Feuerwehrhaus', raum: 'Lager' },
+      anzahl: 2,
+    };
+
+    function renderEdit(bestaende: GeraetBestand[] = [srf, lager]) {
       renderWithIntl(
         <ChargeDialog
           open
           groupId="ffnd"
           geraetId="g1"
           charge={charge}
-          bestaende={[srf]}
+          bestaende={bestaende}
           onClose={onClose}
         />,
       );
-      expect(screen.queryByLabelText('SRF · GR 2')).toBeNull();
-      expect(screen.queryByLabelText('ohne Lagerort')).toBeNull();
+    }
+
+    it('zeigt die Menge der Charge je Lagerort vorbefüllt', () => {
+      renderEdit();
+      expect(screen.getByText('Bestand dieser Charge je Lagerort')).toBeInTheDocument();
+      expect(
+        screen.getByText('Gezählte Menge eintragen – die Differenz wird als Inventur gebucht.'),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('SRF · GR 2')).toHaveValue('4');
+      expect(screen.getByLabelText('Feuerwehrhaus · Lager')).toHaveValue('0');
+      expect(screen.getByLabelText('ohne Lagerort')).toHaveValue('0');
+    });
+
+    it('speichert die Charge und korrigiert nur die geänderten Zeilen', async () => {
+      const user = userEvent.setup();
+      renderEdit();
+      const srfField = screen.getByLabelText('SRF · GR 2');
+      await user.clear(srfField);
+      await user.type(srfField, '3');
+      const ohne = screen.getByLabelText('ohne Lagerort');
+      await user.clear(ohne);
+      await user.type(ohne, '2');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(korrigiereGeraetChargenBestand).toHaveBeenCalledWith(
+          'ffnd',
+          'g1',
+          [
+            { bestandId: 'b1', chargeId: 'c1', menge: 3 },
+            { bestandId: null, chargeId: 'c1', menge: 2 },
+          ],
+          'Korrektur Charge',
+        ),
+      );
+      expect(saveGeraetCharge).toHaveBeenCalledWith(
+        'ffnd',
+        'g1',
+        expect.objectContaining({ id: 'c1' }),
+      );
+      expect(saveGeraetCharge.mock.invocationCallOrder[0]).toBeLessThan(
+        korrigiereGeraetChargenBestand.mock.invocationCallOrder[0],
+      );
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('korrigiert nichts, wenn keine Menge geändert wurde', async () => {
+      const user = userEvent.setup();
+      renderEdit();
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(saveGeraetCharge).toHaveBeenCalled();
+      expect(korrigiereGeraetChargenBestand).not.toHaveBeenCalled();
+    });
+
+    it('meldet eine ungültige Menge und speichert nicht', async () => {
+      const user = userEvent.setup();
+      renderEdit();
+      const srfField = screen.getByLabelText('SRF · GR 2');
+      await user.clear(srfField);
+      await user.type(srfField, '-1');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      expect(screen.getByText('Bitte eine Zahl ab 0 angeben.')).toBeInTheDocument();
+      expect(saveGeraetCharge).not.toHaveBeenCalled();
+      expect(korrigiereGeraetChargenBestand).not.toHaveBeenCalled();
+    });
+
+    it('zeigt einen Fehler der Korrektur und bleibt offen', async () => {
+      korrigiereGeraetChargenBestand.mockRejectedValue(new Error('forbidden'));
+      const user = userEvent.setup();
+      renderEdit();
+      const srfField = screen.getByLabelText('SRF · GR 2');
+      await user.clear(srfField);
+      await user.type(srfField, '5');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      expect(await screen.findByText('Speichern fehlgeschlagen: forbidden')).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
     });
   });
 

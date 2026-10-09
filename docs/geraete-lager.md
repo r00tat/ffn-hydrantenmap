@@ -442,11 +442,29 @@ Lagerort nicht, deshalb setzt der Import ihn so wenig auf 0 wie einen Container.
 An den richtigen Platz kommt die Ware per Umbuchung. Alternativ bekommt der
 Lagerort „ohne Lagerort“ über „Lagerort bearbeiten“ einen echten Platz.
 
+**Bestand beim Bearbeiten korrigieren.** Beim Bearbeiten einer Charge steht je
+Lagerort die Menge dieser Charge (dazu „ohne Lagerort“), beim Bearbeiten eines
+Lagerorts je aktiver Charge die Menge und der Rest ohne Charge — vorbefüllt mit
+dem gespeicherten Stand. Eine geänderte Zahl ist der **gezählte Ist-Bestand**
+dieses Topfs: `korrigiereGeraetChargenBestand` bucht die Differenz als
+**Inventur** (je geändertem Topf eine Buchung, mit `chargeId`, beim Rest ohne;
+Bemerkung „Korrektur Charge“ bzw. „Korrektur Lagerort“), `anzahl` und
+`bestandGesamt` ändern sich mit, die Nachbestellmail greift wie bei jeder
+Inventur. Wer im Bearbeiten-Dialog eine Zahl ändert, hat nachgezählt und will,
+dass danach genau das dasteht — eine Aufteilung, die `anzahl` festhält,
+verschöbe die Differenz still in den Rest ohne Charge, und die Summe am
+Lagerort wäre falsch. Zum bloßen Zuordnen vorhandener Ware ohne
+Mengenänderung bleibt „Aufteilen“. Gesendet werden nur geänderte Zeilen, nach
+dem Speichern der Charge bzw. des Lagerorts; ein unveränderter negativer Rest
+bleibt stehen. „Ohne Lagerort“ lässt sich so korrigieren, ohne ihm einen
+Platz zu geben: Bleiben die Felder des Platzes leer, wird nur korrigiert.
+
 | Vorgang | Wirkung auf die Chargen |
 | --- | --- |
 | Zugang | mit vorhandener oder in derselben Transaktion neu angelegter Charge: `anzahl` und Anteil der Charge steigen; ohne Charge wächst nur der Rest |
 | Aufteilen (`aufteilenGeraetBestand`) | ordnet vorhandenen Bestand Chargen zu, **ohne** `anzahl` zu ändern — für die Ware, die vor den Chargen da war. Mehr als `anzahl` lässt sich nicht zuordnen. Protokolliert als Buchung `aufteilung` mit Menge 0, die Bemerkung nennt je Topf vorher → nachher |
 | Umbuchung | mit Charge wandert deren Anteil mit; ohne wird am Quell-Lagerort nach FEFO verteilt (`allocateFefo`) — wer ins Fahrzeug umlagert, nimmt die zuerst ablaufende Ware. Je bewegtem Topf eine Buchung. Eine ausdrücklich gewählte Charge lässt sich nur bis zu ihrem Bestand am Quell-Lagerort umbuchen, sonst 400 — der Überhang bliebe dort als negativer Topf zurück |
+| Korrektur beim Bearbeiten (`korrigiereGeraetChargenBestand`) | setzt je Topf (Lagerort + Charge oder Rest) die gezählte Menge; die Differenz ist eine Inventur-Buchung, `anzahl` und `bestandGesamt` ändern sich mit. „Ohne Lagerort“ wird bei Bedarf angelegt |
 | Inventur | wahlweise je Charge gezählt (plus Rest ohne Charge): setzt Aufteilung und `anzahl`, je geändertem Topf eine Buchung. Ohne Zählung je Charge wird die Aufteilung gekürzt (siehe unten) |
 | Charge ausbuchen (`ausbuchenGeraetCharge`) | abgelaufen, zurückgerufen, entsorgt: je Lagerort mit Bestand eine Inventur-Buchung mit `chargeId`, danach archiviert — in einer Transaktion. Ein negativer Topf wird nur aus der Aufteilung entfernt, ohne Buchung und ohne `anzahl` zu ändern — er ist keine Ware, die ausgebucht werden könnte |
 | Archivieren (`archiveGeraetCharge`) | nur, wenn an keinem Lagerort mehr etwas von ihr liegt — sonst verschwände Bestand aus den Listen, der physisch noch im Lager steht |

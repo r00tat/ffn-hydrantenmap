@@ -1820,6 +1820,197 @@ export async function aufteilenGeraetBestand(
   return compact({ id: bestandId, buchungId });
 }
 
+/**
+ * Eine Zeile der Korrektur: die **gezählte** Menge der Charge `chargeId`
+ * (`null` = Rest ohne Charge) am Lagerort `bestandId` (`null` = „ohne
+ * Lagerort", wird bei Bedarf angelegt).
+ */
+export interface GeraetChargenKorrektur {
+  bestandId: string | null;
+  chargeId: string | null;
+  menge: number;
+}
+
+/**
+ * Prüft die Korrekturzeilen aus dem Browser: Menge ab 0, gültige IDs, jeder
+ * Topf (Lagerort + Charge) höchstens einmal — zwei Zählungen für denselben
+ * Topf widersprächen einander.
+ */
+function sanitizeChargenKorrektur(input: unknown): GeraetChargenKorrektur[] {
+  if (!Array.isArray(input)) {
+    throw new ApiException('invalid korrektur', { status: 400 });
+  }
+  const seen = new Set<string>();
+  return input.map((raw) => {
+    const { bestandId, chargeId, menge } = (raw ?? {}) as Partial<GeraetChargenKorrektur>;
+    if (bestandId !== null) assertSafeId(bestandId, 'bestandId');
+    if (chargeId !== null) assertSafeId(chargeId, 'chargeId');
+    if (!isValidMenge(menge)) {
+      throw new ApiException('invalid korrektur menge', { status: 400 });
+    }
+    const key = JSON.stringify([bestandId, chargeId]);
+    if (seen.has(key)) {
+      throw new ApiException('invalid korrektur: duplicate pot', { status: 400 });
+    }
+    seen.add(key);
+    return { bestandId, chargeId, menge };
+  });
+}
+
+/**
+ * Korrigiert den Bestand je Charge und Lagerort aus den Bearbeiten-Dialogen
+ * (Charge bzw. Lagerort). Jede Zeile ist der **gezählte Ist-Bestand** eines
+ * Topfs; die Differenz zum gespeicherten Stand wird als Inventur gebucht — je
+ * geändertem Topf eine Buchung (mit `chargeId`, beim Rest ohne). `anzahl` und
+ * `bestandGesamt` ändern sich mit, anders als beim Aufteilen
+ * (`aufteilenGeraetBestand`), das vorhandene Ware nur zuordnet.
+ *
+ * `bestandId: null` meint den Lagerort „ohne Lagerort" — angelegt oder wieder
+ * aufgenommen wie beim Zugang mit neuer Charge (`saveGeraetCharge`). Alles in
+ * einer Transaktion, die Nachbestellmail erst nach dem Commit.
+ */
+export async function korrigiereGeraetChargenBestand(
+  groupId: string,
+  geraetId: string,
+  rows: GeraetChargenKorrektur[],
+  bemerkung?: string,
+): Promise<{ bookings: number }> {
+  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const actor = actorOf(session);
+  assertSafeId(geraetId, 'geraetId');
+  const rowList = sanitizeChargenKorrektur(rows);
+  const note = limitedText(bemerkung, 'bemerkung');
+  if (rowList.length === 0) return { bookings: 0 };
+
+  const ref = geraetCol(groupId).doc(geraetId);
+  const { bookings, crossed } = await firestore.runTransaction(async (tx: Transaction) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw notFound('geraet', geraetId);
+    const geraet = geraetSnapshot(geraetId, snap.data());
+    assertConsumable(geraet);
+    for (const row of rowList) {
+      if (row.chargeId !== null) activeChargeOf(geraet, row.chargeId);
+    }
+
+    // Erst alles lesen, dann schreiben. Je Lagerort eine Arbeitskopie, an der
+    // mehrere Töpfe nacheinander geändert werden.
+    interface Work {
+      ref: DocumentReference;
+      /** Fehlt, wenn „ohne Lagerort" neu angelegt wird. */
+      bestand?: GeraetBestand;
+      /** Ein archivierter „ohne Lagerort" kommt zurück; sein alter Rest zählt nicht. */
+      revive: boolean;
+      anzahl: number;
+      chargen: Record<string, number>;
+      changed: boolean;
+    }
+    const works = new Map<string | null, Work>();
+    for (const row of rowList) {
+      if (works.has(row.bestandId)) continue;
+      if (row.bestandId === null) {
+        const found = await findBestaendeByKey(
+          tx,
+          groupId,
+          geraetId,
+          lagerortKey(GERAET_LAGERORT_UNBESTIMMT),
+        );
+        const existing = found.find((b) => b.archiviert !== true) ?? found[0];
+        const revive = existing?.archiviert === true;
+        works.set(null, {
+          ref: existing ? bestandCol(groupId).doc(existing.id) : bestandCol(groupId).doc(),
+          bestand: existing,
+          revive,
+          anzahl: existing && !revive ? (existing.anzahl ?? 0) : 0,
+          chargen: existing && !revive ? { ...(existing.chargen ?? {}) } : {},
+          changed: false,
+        });
+        continue;
+      }
+      const bestandRef = bestandCol(groupId).doc(row.bestandId);
+      const bestandSnap = await tx.get(bestandRef);
+      if (!bestandSnap.exists) throw notFound('bestand', row.bestandId);
+      const bestand = bestandSnapshot(bestandSnap.id, bestandSnap.data());
+      if (bestand.geraetId !== geraetId || bestand.archiviert === true) {
+        throw new ApiException('invalid korrektur: bestand of another geraet or archived', {
+          status: 400,
+        });
+      }
+      works.set(row.bestandId, {
+        ref: bestandRef,
+        bestand,
+        revive: false,
+        anzahl: bestand.anzahl ?? 0,
+        chargen: { ...(bestand.chargen ?? {}) },
+        changed: false,
+      });
+    }
+
+    let bookings = 0;
+    for (const row of rowList) {
+      const work = works.get(row.bestandId)!;
+      const current =
+        row.chargeId === null
+          ? restOhneCharge({ anzahl: work.anzahl, chargen: work.chargen })
+          : (work.chargen[row.chargeId] ?? 0);
+      const delta = clean(row.menge - current);
+      if (delta === 0) continue;
+      work.anzahl = clean(work.anzahl + delta);
+      if (row.chargeId !== null) {
+        work.chargen = applyChargeDelta(work.chargen, row.chargeId, delta);
+      }
+      work.changed = true;
+      bookings++;
+      tx.set(
+        buchungCol(groupId).doc(),
+        buchungDoc(
+          {
+            geraetId,
+            bestandId: work.ref.id,
+            art: 'inventur',
+            menge: delta,
+            chargeId: row.chargeId ?? undefined,
+            bemerkung: note,
+            lagerortText: lagerortTextOf(work.bestand?.lagerort ?? GERAET_LAGERORT_UNBESTIMMT),
+          },
+          actor,
+        ),
+      );
+    }
+    if (bookings === 0) return { bookings, crossed: undefined };
+
+    const stamp = { updatedAt: actor.now, updatedBy: actor.uid };
+    let total = 0;
+    for (const work of works.values()) {
+      if (!work.changed) continue;
+      total += work.anzahl - (work.bestand?.anzahl ?? 0);
+      if (!work.bestand) {
+        const place = GERAET_LAGERORT_UNBESTIMMT;
+        tx.create(work.ref, {
+          geraetId,
+          lagerortKey: lagerortKey(place),
+          lagerort: place,
+          anzahl: work.anzahl,
+          ...(Object.keys(work.chargen).length > 0 ? { chargen: work.chargen } : {}),
+          ...stamp,
+        });
+      } else {
+        tx.update(work.ref, {
+          anzahl: work.anzahl,
+          chargen: chargenValue(work.chargen),
+          ...(work.revive ? { archiviert: FieldValue.delete() } : {}),
+          ...stamp,
+        });
+      }
+    }
+    const stock = stockPatch(geraet, clean(total), actor);
+    tx.update(ref, stock.patch);
+    return { bookings, crossed: stock.crossed };
+  });
+
+  if (crossed) await notifyAfterCommit({ groupId, items: [crossed] });
+  return { bookings };
+}
+
 export type BookGeraetBestandInput =
   | {
       art: 'zugang';

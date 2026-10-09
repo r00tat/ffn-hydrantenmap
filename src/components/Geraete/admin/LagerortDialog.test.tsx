@@ -5,12 +5,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Geraet, GeraetBestand } from '../../../common/geraet';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
-const { createGeraetBestand, updateGeraetBestand } = vi.hoisted(() => ({
-  createGeraetBestand: vi.fn(),
-  updateGeraetBestand: vi.fn(),
-}));
+const { createGeraetBestand, updateGeraetBestand, korrigiereGeraetChargenBestand } = vi.hoisted(
+  () => ({
+    createGeraetBestand: vi.fn(),
+    updateGeraetBestand: vi.fn(),
+    korrigiereGeraetChargenBestand: vi.fn(),
+  }),
+);
 
-vi.mock('../geraeteActions', () => ({ createGeraetBestand, updateGeraetBestand }));
+vi.mock('../geraeteActions', () => ({
+  createGeraetBestand,
+  updateGeraetBestand,
+  korrigiereGeraetChargenBestand,
+}));
 
 import LagerortDialog from './LagerortDialog';
 
@@ -46,6 +53,7 @@ describe('LagerortDialog', () => {
     vi.clearAllMocks();
     createGeraetBestand.mockResolvedValue({ id: 'neu' });
     updateGeraetBestand.mockResolvedValue({ id: 'b1' });
+    korrigiereGeraetChargenBestand.mockResolvedValue({ bookings: 1 });
   });
 
   function render() {
@@ -203,5 +211,139 @@ describe('LagerortDialog', () => {
       expect(updateGeraetBestand).not.toHaveBeenCalled();
     });
   });
-});
 
+  describe('Chargen beim Bearbeiten korrigieren', () => {
+    const chargeA = {
+      id: 'cA',
+      produktionsNummer: 'A',
+      ablaufDatum: '2026-12-01',
+      createdAt: '',
+      createdBy: '',
+    };
+    const chargeB = {
+      id: 'cB',
+      bezeichnung: 'Lieferung Mai',
+      ablaufDatum: '2027-06-01',
+      createdAt: '',
+      createdBy: '',
+    };
+    const chargeAlt = { ...chargeB, id: 'cX', bezeichnung: 'Alt', archiviert: true };
+    const mitChargen: Geraet = { ...geraet, chargen: [chargeB, chargeA, chargeAlt] };
+    const bestand: GeraetBestand = { ...lager, anzahl: 10, chargen: { cA: 4, cB: 3 } };
+    const ohneLagerort: GeraetBestand = {
+      id: 'bu',
+      geraetId: 'g1',
+      lagerortKey: 'unbestimmt',
+      lagerort: { art: 'unbestimmt' },
+      anzahl: 2,
+      chargen: { cA: 1 },
+    };
+
+    function renderEdit(item: Geraet, b: GeraetBestand) {
+      return renderWithIntl(
+        <LagerortDialog
+          open
+          groupId="ffnd"
+          geraet={item}
+          bestand={b}
+          existing={[lager, ohneLagerort]}
+          allBestaende={[lager, ohneLagerort]}
+          containers={containers}
+          onClose={onClose}
+        />,
+      );
+    }
+
+    it('zeigt je aktiver Charge und ohne Charge die Menge vorbefüllt', () => {
+      renderEdit(mitChargen, bestand);
+      expect(screen.getByText('Chargen an diesem Lagerort')).toBeInTheDocument();
+      expect(
+        screen.getByText('Gezählte Menge eintragen – die Differenz wird als Inventur gebucht.'),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('LOT A')).toHaveValue('4');
+      expect(screen.getByLabelText('Lieferung Mai')).toHaveValue('3');
+      expect(screen.getByLabelText('ohne Charge')).toHaveValue('3');
+      expect(screen.queryByLabelText('Alt')).toBeNull();
+    });
+
+    it('speichert den Lagerort und korrigiert nur die geänderten Töpfe', async () => {
+      const user = userEvent.setup();
+      renderEdit(mitChargen, bestand);
+      const a = screen.getByLabelText('LOT A');
+      await user.clear(a);
+      await user.type(a, '6');
+      const rest = screen.getByLabelText('ohne Charge');
+      await user.clear(rest);
+      await user.type(rest, '0');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(korrigiereGeraetChargenBestand).toHaveBeenCalledWith(
+          'ffnd',
+          'g1',
+          [
+            { bestandId: 'b1', chargeId: 'cA', menge: 6 },
+            { bestandId: 'b1', chargeId: null, menge: 0 },
+          ],
+          'Korrektur Lagerort',
+        ),
+      );
+      expect(updateGeraetBestand).toHaveBeenCalledWith('ffnd', 'b1', lager.lagerort);
+      expect(updateGeraetBestand.mock.invocationCallOrder[0]).toBeLessThan(
+        korrigiereGeraetChargenBestand.mock.invocationCallOrder[0],
+      );
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('korrigiert nichts ohne Änderung, auch bei negativem Rest', async () => {
+      const user = userEvent.setup();
+      renderEdit(mitChargen, { ...bestand, anzahl: 5 });
+      expect(screen.getByLabelText('ohne Charge')).toHaveValue('-2');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(updateGeraetBestand).toHaveBeenCalled();
+      expect(korrigiereGeraetChargenBestand).not.toHaveBeenCalled();
+    });
+
+    it('meldet eine ungültige Menge und speichert nicht', async () => {
+      const user = userEvent.setup();
+      renderEdit(mitChargen, bestand);
+      const a = screen.getByLabelText('LOT A');
+      await user.clear(a);
+      await user.type(a, 'x');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      expect(await screen.findByText('Bitte eine Zahl ab 0 angeben.')).toBeInTheDocument();
+      expect(updateGeraetBestand).not.toHaveBeenCalled();
+      expect(korrigiereGeraetChargenBestand).not.toHaveBeenCalled();
+    });
+
+    it('korrigiert „ohne Lagerort", ohne einen Platz zu verlangen', async () => {
+      const user = userEvent.setup();
+      renderEdit(mitChargen, ohneLagerort);
+      expect(screen.getByLabelText('LOT A')).toHaveValue('1');
+      expect(screen.getByLabelText('ohne Charge')).toHaveValue('1');
+      const a = screen.getByLabelText('LOT A');
+      await user.clear(a);
+      await user.type(a, '2');
+      await user.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(korrigiereGeraetChargenBestand).toHaveBeenCalledWith(
+          'ffnd',
+          'g1',
+          [{ bestandId: 'bu', chargeId: 'cA', menge: 2 }],
+          'Korrektur Lagerort',
+        ),
+      );
+      expect(updateGeraetBestand).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('zeigt keine Chargen bei einem Gerät oder ohne aktive Charge', () => {
+      const { unmount } = renderEdit({ ...mitChargen, verbrauchsmaterial: false }, bestand);
+      expect(screen.queryByText('Chargen an diesem Lagerort')).toBeNull();
+      expect(screen.queryByLabelText('ohne Charge')).toBeNull();
+      unmount();
+      renderEdit({ ...geraet, chargen: [chargeAlt] }, bestand);
+      expect(screen.queryByText('Chargen an diesem Lagerort')).toBeNull();
+    });
+  });
+});

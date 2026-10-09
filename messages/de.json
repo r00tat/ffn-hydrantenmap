@@ -4147,6 +4147,12 @@
       "errors": {
         "archiveFailed": "Archivieren fehlgeschlagen: {error}",
         "ausbuchenFailed": "Ausbuchen fehlgeschlagen: {error}"
+      },
+      "korrektur": {
+        "titleCharge": "Bestand dieser Charge je Lagerort",
+        "titleLagerort": "Chargen an diesem Lagerort",
+        "hint": "Gezählte Menge eintragen – die Differenz wird als Inventur gebucht.",
+        "ohneCharge": "ohne Charge"
       }
     },
     "historie": {

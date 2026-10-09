@@ -4147,6 +4147,12 @@
       "errors": {
         "archiveFailed": "Archiving failed: {error}",
         "ausbuchenFailed": "Write-off failed: {error}"
+      },
+      "korrektur": {
+        "titleCharge": "Stock of this batch per location",
+        "titleLagerort": "Batches at this location",
+        "hint": "Enter the counted quantity – the difference is booked as a stocktake.",
+        "ohneCharge": "without batch"
       }
     },
     "historie": {
