@@ -4153,6 +4153,7 @@
       "title": "Historie",
       "empty": "Noch keine Einträge",
       "loadMore": "Mehr laden",
+      "retry": "Erneut versuchen",
       "error": "Historie konnte nicht geladen werden: {error}",
       "unknownUser": "—",
       "arten": {

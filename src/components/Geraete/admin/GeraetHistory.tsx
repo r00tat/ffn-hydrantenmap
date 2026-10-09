@@ -36,6 +36,7 @@ import {
   type GeraetBestand,
   type GeraetBuchung,
 } from '../../../common/geraet';
+import OfflineListHint from '../../site/OfflineListHint';
 import { firestore } from '../../firebase/firebase';
 import { GROUP_COLLECTION_ID } from '../../firebase/firestore';
 
@@ -66,6 +67,7 @@ export default function GeraetHistory({ groupId, geraet, bestaende }: GeraetHist
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot>();
   const [hasMore, setHasMore] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -96,19 +98,32 @@ export default function GeraetHistory({ groupId, geraet, bestaende }: GeraetHist
         setEntries((prev) => (after ? [...prev, ...page] : page));
         setLastDoc(snap.docs[snap.docs.length - 1]);
         setHasMore(snap.docs.length === HISTORY_PAGE_SIZE);
+        setFromCache(snap.metadata.fromCache);
+        setLoaded(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
-        setLoaded(true);
         setLoading(false);
       }
     },
     [groupId, geraet.id],
   );
 
+  // Jedes Aufklappen liest ab der ersten Seite neu: Bearbeitungen im Dialog
+  // schreiben neue Einträge, eine zugeklappt behaltene Liste wäre veraltet.
+  // Ein Fehlschlag lässt `loaded` aus, damit „Erneut versuchen" greift.
   useEffect(() => {
-    if (expanded && !loaded && !loading) void loadPage();
-  }, [expanded, loaded, loading, loadPage]);
+    if (!expanded) {
+      setEntries([]);
+      setLastDoc(undefined);
+      setHasMore(false);
+      setLoaded(false);
+      setFromCache(false);
+      setError(undefined);
+      return;
+    }
+    if (!loaded && !loading && !error) void loadPage();
+  }, [expanded, loaded, loading, error, loadPage]);
 
   const lagerortOf = (bestandId?: string) => {
     const b = bestandId ? bestandById.get(bestandId) : undefined;
@@ -202,11 +217,22 @@ export default function GeraetHistory({ groupId, geraet, bestaende }: GeraetHist
       </AccordionSummary>
       <AccordionDetails>
         {error && (
-          <Alert severity="error" sx={{ mb: 1 }}>
+          <Alert
+            severity="error"
+            sx={{ mb: 1 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => loadPage()}>
+                {t('retry')}
+              </Button>
+            }
+          >
             {t('error', { error })}
           </Alert>
         )}
-        {loaded && !error && entries.length === 0 && (
+        {loaded && !error && (
+          <OfflineListHint fromCache={fromCache} empty={entries.length === 0} />
+        )}
+        {loaded && !error && !fromCache && entries.length === 0 && (
           <Typography variant="body2" color="text.secondary">
             {t('empty')}
           </Typography>

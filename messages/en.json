@@ -4153,6 +4153,7 @@
       "title": "History",
       "empty": "No entries yet",
       "loadMore": "Load more",
+      "retry": "Try again",
       "error": "Could not load history: {error}",
       "unknownUser": "—",
       "arten": {

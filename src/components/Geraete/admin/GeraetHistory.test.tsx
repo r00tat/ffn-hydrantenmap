@@ -12,6 +12,10 @@ const { getDocs, startAfter, where, limit } = vi.hoisted(() => ({
   limit: vi.fn((n: number) => ({ limit: n })),
 }));
 
+const connectivity = vi.hoisted(() => ({ status: 'online' as string }));
+vi.mock('../../../hooks/useConnectivity', () => ({
+  default: () => ({ status: connectivity.status }),
+}));
 vi.mock('../../firebase/firebase', () => ({ default: {}, firestore: {} }));
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((...path: unknown[]) => ({ path })),
@@ -63,8 +67,9 @@ function buchung(id: string, data: Partial<GeraetBuchung>): GeraetBuchung {
   };
 }
 
-function snapshot(entries: GeraetBuchung[]) {
+function snapshot(entries: GeraetBuchung[], fromCache = false) {
   return {
+    metadata: { fromCache },
     docs: entries.map((e) => {
       const { id, ...data } = e;
       return { id, data: () => data };
@@ -79,6 +84,7 @@ async function expand() {
 describe('GeraetHistory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    connectivity.status = 'online';
   });
 
   it('lädt nichts, solange der Bereich zugeklappt ist', () => {
@@ -178,5 +184,56 @@ describe('GeraetHistory', () => {
     await expand();
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText(/kaputt/)).toBeInTheDocument();
+  });
+
+  it('lädt beim erneuten Aufklappen von der ersten Seite neu', async () => {
+    getDocs
+      .mockResolvedValueOnce(snapshot([buchung('a', { createdByName: 'Alt' })]))
+      .mockResolvedValueOnce(snapshot([buchung('b', { createdByName: 'Neu' })]));
+    renderWithIntl(<GeraetHistory groupId="grp" geraet={geraet} bestaende={bestaende} />);
+    await expand();
+    await screen.findByText('Alt');
+
+    await expand();
+    await waitFor(() => expect(screen.queryByText('Alt')).not.toBeInTheDocument());
+    await expand();
+
+    expect(await screen.findByText('Neu')).toBeInTheDocument();
+    expect(screen.queryByText('Alt')).not.toBeInTheDocument();
+    expect(getDocs).toHaveBeenCalledTimes(2);
+  });
+
+  it('bietet nach einem Fehler „Erneut versuchen" an', async () => {
+    getDocs
+      .mockRejectedValueOnce(new Error('kaputt'))
+      .mockResolvedValueOnce(snapshot([buchung('a', { createdByName: 'Wieder da' })]));
+    renderWithIntl(<GeraetHistory groupId="grp" geraet={geraet} bestaende={bestaende} />);
+    await expand();
+    const alert = await screen.findByRole('alert');
+    expect(getDocs).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Erneut versuchen' }));
+
+    expect(await screen.findByText('Wieder da')).toBeInTheDocument();
+    expect(getDocs).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('kennzeichnet eine leere Liste aus dem Cache offline statt „Noch keine Einträge"', async () => {
+    connectivity.status = 'offline';
+    getDocs.mockResolvedValueOnce(snapshot([], true));
+    renderWithIntl(<GeraetHistory groupId="grp" geraet={geraet} bestaende={bestaende} />);
+    await expand();
+    expect(await screen.findByText(/Offline/)).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Einträge')).not.toBeInTheDocument();
+  });
+
+  it('kennzeichnet eine gefüllte Liste aus dem Cache offline als unvollständig', async () => {
+    connectivity.status = 'offline';
+    getDocs.mockResolvedValueOnce(snapshot([buchung('a', { createdByName: 'Cache' })], true));
+    renderWithIntl(<GeraetHistory groupId="grp" geraet={geraet} bestaende={bestaende} />);
+    await expand();
+    expect(await screen.findByText('Cache')).toBeInTheDocument();
+    expect(screen.getByText(/evtl\. unvollständig/)).toBeInTheDocument();
   });
 });
