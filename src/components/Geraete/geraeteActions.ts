@@ -35,6 +35,7 @@ import {
   type GeraetCharge,
   type GeraetChargeTeil,
   type GeraetEinsatz,
+  type GeraetFeldAenderung,
   type GeraetLagerort,
   type GeraetSet,
   type GeraetSetItem,
@@ -57,6 +58,7 @@ import {
   validChargenTeile,
 } from '../../common/geraetCharge';
 import {
+  GERAET_IMPORT_FIELDS,
   GERAET_IMPORT_MAX_BYTES,
   parseGeraetExport,
   planGeraetImport,
@@ -64,6 +66,7 @@ import {
   type ParsedGeraet,
   type ParsedGeraetBestand,
 } from '../../common/geraetImport';
+import { diffFields } from '../../common/geraetProtokoll';
 import {
   normalizeSetCodes,
   validateGeraetSet,
@@ -247,6 +250,42 @@ function buchungDoc(input: NewBuchung, actor: Actor): Omit<GeraetBuchung, 'id'> 
     // Ohne Namen kein leerer Text — die Anzeige zeigt dann „—".
     createdByName: trimmed(actor.name),
   });
+}
+
+/** Ein Protokolleintrag ohne Mengenänderung (`menge: 0`). */
+function protokollDoc(
+  input: Omit<NewBuchung, 'menge'>,
+  actor: Actor,
+): Omit<GeraetBuchung, 'id'> {
+  return buchungDoc({ ...input, menge: 0 }, actor);
+}
+
+/**
+ * Der Lagerort als Text zum Buchungszeitpunkt — die Historie bleibt lesbar,
+ * auch wenn der Lagerort später umbenannt oder gelöscht wird.
+ */
+function lagerortTextOf(lagerort: GeraetLagerort | undefined): string | undefined {
+  return lagerort ? trimmed(formatLagerort(lagerort)) : undefined;
+}
+
+/** Protokollierte Angaben eines Lagerorts: das Ziel (formatiert) und die Bemerkung. */
+const LAGERORT_LOG_FIELDS = ['lagerort', 'bemerkung'] as const;
+
+type LagerortLog = { lagerort?: GeraetLagerort; bemerkung?: string };
+
+function lagerortLog(lagerort: GeraetLagerort | undefined): LagerortLog {
+  return { lagerort, bemerkung: lagerort?.bemerkung };
+}
+
+function diffLagerort(
+  before: GeraetLagerort | undefined,
+  after: GeraetLagerort | undefined,
+): GeraetFeldAenderung[] {
+  return diffFields<LagerortLog>(
+    before ? lagerortLog(before) : undefined,
+    lagerortLog(after),
+    LAGERORT_LOG_FIELDS,
+  );
 }
 
 /**
@@ -449,6 +488,27 @@ const TEXT_FIELDS = [
 const DATE_FIELDS = ['anschaffungsDatum', 'verfuegbarVon', 'verfuegbarBis'] as const satisfies
   readonly (keyof Geraet)[];
 
+/**
+ * Die Stammdaten, deren Änderung protokolliert wird: alles, was `geraetPatch`
+ * schreibt — ohne die berechneten Felder und die Zeitstempel.
+ */
+const STAMMDATEN_FIELDS = [
+  'bezeichnung',
+  ...TEXT_FIELDS,
+  'materialTyp',
+  'einheitVerwendungsnachweis',
+  'barcodes',
+  'baujahr',
+  ...DATE_FIELDS,
+  'baumonat',
+  'lebensdauer',
+  'einkaufspreis',
+  'mindestbestand',
+  'ablaufVorlaufTage',
+  'verbrauchsmaterial',
+  'active',
+] as const satisfies readonly (keyof Geraet)[];
+
 /** `YYYY-MM-DD` und ein echtes Datum — sonst `undefined` (löschen). */
 function isoDate(value: unknown): string | undefined {
   const text = trimmed(value);
@@ -567,19 +627,31 @@ export async function saveGeraet(
     const ref = geraetCol(groupId).doc();
     const min = patch.mindestbestand as number | undefined;
     const stock = applyStockDelta({ bestandGesamt: 0, mindestbestand: min }, 0, actor.now);
-    await ref.set(
-      compact({
-        verbrauchsmaterial: false,
-        active: true,
-        ...patch,
-        bestandGesamt: 0,
-        nachbestellenSeit: stock.nachbestellenSeit ?? undefined,
-        createdAt: actor.now,
-        createdBy: actor.uid,
-        updatedAt: actor.now,
-        updatedBy: actor.uid,
-      }),
+    const data = compact({
+      verbrauchsmaterial: false,
+      active: true,
+      ...patch,
+      bestandGesamt: 0,
+      nachbestellenSeit: stock.nachbestellenSeit ?? undefined,
+      createdAt: actor.now,
+      createdBy: actor.uid,
+      updatedAt: actor.now,
+      updatedBy: actor.uid,
+    });
+    const batch = firestore.batch();
+    batch.set(ref, data);
+    batch.set(
+      buchungCol(groupId).doc(),
+      protokollDoc(
+        {
+          geraetId: ref.id,
+          art: 'angelegt',
+          aenderungen: diffFields<Geraet>(undefined, data as Partial<Geraet>, STAMMDATEN_FIELDS),
+        },
+        actor,
+      ),
     );
+    await batch.commit();
     return { id: ref.id };
   }
 
@@ -592,8 +664,10 @@ export async function saveGeraet(
     const current = geraetSnapshot(id, snap.data());
 
     const patch: Record<string, unknown> = {};
+    const after: Record<string, unknown> = { ...current };
     for (const [key, value] of Object.entries(geraetPatch(input))) {
       patch[key] = value === undefined ? FieldValue.delete() : value;
+      after[key] = value;
     }
     if (Object.prototype.hasOwnProperty.call(input, 'mindestbestand')) {
       const min = geraetPatch({ mindestbestand: input.mindestbestand }).mindestbestand as
@@ -613,6 +687,13 @@ export async function saveGeraet(
     patch.updatedAt = actor.now;
     patch.updatedBy = actor.uid;
     tx.update(ref, patch);
+    const aenderungen = diffFields<Geraet>(current, after as Partial<Geraet>, STAMMDATEN_FIELDS);
+    if (aenderungen.length > 0) {
+      tx.set(
+        buchungCol(groupId).doc(),
+        protokollDoc({ geraetId: id, art: 'stammdaten', aenderungen }, actor),
+      );
+    }
   });
   return { id };
 }
@@ -659,9 +740,33 @@ export async function setGeraeteVerbrauchsmaterial(
     patch.mindestbestand = FieldValue.delete();
     patch.nachbestellenSeit = FieldValue.delete();
   }
-  for (let i = 0; i < changed.length; i += BATCH_LIMIT) {
+  // Je Artikel zwei Schreibvorgänge: das Update und sein Protokolleintrag.
+  const perBatch = Math.floor(BATCH_LIMIT / 2);
+  for (let i = 0; i < changed.length; i += perBatch) {
     const batch = firestore.batch();
-    for (const snap of changed.slice(i, i + BATCH_LIMIT)) batch.update(snap.ref, patch);
+    for (const snap of changed.slice(i, i + perBatch)) {
+      const before = snap.data() as Partial<Geraet>;
+      const after: Partial<Geraet> = {
+        verbrauchsmaterial,
+        mindestbestand: verbrauchsmaterial ? before.mindestbestand : undefined,
+      };
+      batch.update(snap.ref, patch);
+      batch.set(
+        buchungCol(groupId).doc(),
+        protokollDoc(
+          {
+            geraetId: snap.id,
+            art: 'stammdaten',
+            aenderungen: diffFields<Geraet>(
+              { verbrauchsmaterial: !!before.verbrauchsmaterial, mindestbestand: before.mindestbestand },
+              after,
+              ['verbrauchsmaterial', 'mindestbestand'],
+            ),
+          },
+          actor,
+        ),
+      );
+    }
     await batch.commit();
   }
   return { updated: changed.length };
@@ -694,7 +799,22 @@ export async function deleteGeraet(
     return isBestandBuchung(art) && art !== 'import';
   });
   if (hasRealBookings) {
-    await ref.update({ active: false, updatedAt: actor.now, updatedBy: actor.uid });
+    const current = snap.data() as Partial<Geraet>;
+    const aenderungen = diffFields<Geraet>(
+      { active: current.active !== false },
+      { active: false },
+      ['active'],
+    );
+    const batch = firestore.batch();
+    batch.update(ref, { active: false, updatedAt: actor.now, updatedBy: actor.uid });
+    // Schon deaktiviert: nichts Neues zu protokollieren.
+    if (aenderungen.length > 0) {
+      batch.set(
+        buchungCol(groupId).doc(),
+        protokollDoc({ geraetId, art: 'archiviert', aenderungen }, actor),
+      );
+    }
+    await batch.commit();
     return { id: geraetId, deleted: false };
   }
 
@@ -737,6 +857,15 @@ type ChargeFields = Pick<
   GeraetCharge,
   (typeof CHARGE_TEXT_FIELDS)[number] | (typeof CHARGE_DATE_FIELDS)[number]
 >;
+
+/** Die protokollierten Angaben einer Charge, in Anzeige-Reihenfolge. */
+const CHARGE_LOG_FIELDS = [
+  'bezeichnung',
+  'produktionsNummer',
+  'einkaufsDatum',
+  'ablaufDatum',
+  'kommentar',
+] as const satisfies readonly (keyof ChargeFields)[];
 
 /** Ein getrimmter Text bis `GERAET_CHARGE_MAX_TEXT` Zeichen, sonst 400. */
 function limitedText(value: unknown, what: string): string | undefined {
@@ -895,11 +1024,13 @@ export async function saveGeraetCharge(
 
     const chargen = [...(geraet.chargen ?? [])];
     let id: string;
+    let aenderungen: GeraetFeldAenderung[];
     if (chargeId === undefined) {
       assertChargeCapacity(chargen);
       const charge = newCharge(fields, actor);
       chargen.push(charge);
       id = charge.id;
+      aenderungen = diffFields<ChargeFields>(undefined, fields, CHARGE_LOG_FIELDS);
     } else {
       const index = chargen.findIndex((c) => c.id === chargeId);
       if (index < 0) throw chargeNotFound(geraetId, chargeId);
@@ -912,6 +1043,23 @@ export async function saveGeraetCharge(
         createdBy: old.createdBy,
       });
       id = chargeId;
+      aenderungen = diffFields<ChargeFields>(old, fields, CHARGE_LOG_FIELDS);
+    }
+    // Neu angelegt immer, geändert nur bei einem echten Unterschied.
+    if (chargeId === undefined || aenderungen.length > 0) {
+      tx.set(
+        buchungCol(groupId).doc(),
+        protokollDoc(
+          {
+            geraetId,
+            art: 'charge',
+            chargeId: id,
+            bemerkung: chargeId === undefined ? 'angelegt' : 'geändert',
+            aenderungen: aenderungen.length > 0 ? aenderungen : undefined,
+          },
+          actor,
+        ),
+      );
     }
 
     const stamp = { updatedAt: actor.now, updatedBy: actor.uid };
@@ -949,7 +1097,17 @@ export async function saveGeraetCharge(
       }
       tx.set(
         buchungCol(groupId).doc(),
-        buchungDoc({ geraetId, bestandId: target.ref.id, art: 'zugang', menge, chargeId: id }, actor),
+        buchungDoc(
+          {
+            geraetId,
+            bestandId: target.ref.id,
+            art: 'zugang',
+            menge,
+            chargeId: id,
+            lagerortText: lagerortTextOf(bestand?.lagerort ?? GERAET_LAGERORT_UNBESTIMMT),
+          },
+          actor,
+        ),
       );
     }
 
@@ -988,7 +1146,8 @@ export async function archiveGeraetCharge(
     if (!snap.exists) throw notFound('geraet', geraetId);
     const geraet = geraetSnapshot(geraetId, snap.data());
     const chargen = geraet.chargen ?? [];
-    if (!chargen.some((c) => c.id === chargeId)) throw chargeNotFound(geraetId, chargeId);
+    const charge = chargen.find((c) => c.id === chargeId);
+    if (!charge) throw chargeNotFound(geraetId, chargeId);
 
     const bestaende = await tx.get(bestandCol(groupId).where('geraetId', '==', geraetId));
     const withStock = bestaende.docs
@@ -1005,6 +1164,12 @@ export async function archiveGeraetCharge(
       updatedAt: actor.now,
       updatedBy: actor.uid,
     });
+    if (!charge.archiviert) {
+      tx.set(
+        buchungCol(groupId).doc(),
+        protokollDoc({ geraetId, art: 'charge', chargeId, bemerkung: 'archiviert' }, actor),
+      );
+    }
   });
   return { id: chargeId };
 }
@@ -1065,7 +1230,15 @@ export async function ausbuchenGeraetCharge(
       tx.set(
         buchungCol(groupId).doc(),
         buchungDoc(
-          { geraetId, bestandId: b.id, art: 'inventur', menge: -menge, chargeId, bemerkung: text },
+          {
+            geraetId,
+            bestandId: b.id,
+            art: 'inventur',
+            menge: -menge,
+            chargeId,
+            bemerkung: text,
+            lagerortText: lagerortTextOf(b.lagerort),
+          },
           actor,
         ),
       );
@@ -1081,6 +1254,12 @@ export async function ausbuchenGeraetCharge(
       stockCrossed = stock.crossed;
     }
     tx.update(ref, patch);
+    if (!charge.archiviert) {
+      tx.set(
+        buchungCol(groupId).doc(),
+        protokollDoc({ geraetId, art: 'charge', chargeId, bemerkung: 'archiviert' }, actor),
+      );
+    }
     return { bookings: count, crossed: stockCrossed };
   });
 
@@ -1133,6 +1312,47 @@ function sanitizeSetInput(input: unknown): GeraetSetInput {
   };
 }
 
+type SetMembership = Pick<GeraetSet, 'inhalt' | 'sybosSetArtikelId'>;
+
+/**
+ * Die Protokolleinträge einer Änderung der Set-Zugehörigkeit: je Artikel, der
+ * hinzukommt oder wegfällt, und am gebundenen Set-Artikel. `after` fehlt beim
+ * Löschen des Sets. Eine Änderung nur am Namen, an Codes oder am Lagerort
+ * eines Inhalts ist keine Änderung der Zugehörigkeit.
+ */
+function setMembershipEntries(
+  name: string,
+  before: SetMembership | undefined,
+  after: SetMembership | undefined,
+): { geraetId: string; bemerkung: string }[] {
+  const text = (what: string) => `Set „${name}": ${what}`;
+  const beforeIds = new Set((before?.inhalt ?? []).map((i) => i.geraetId));
+  const afterIds = new Set((after?.inhalt ?? []).map((i) => i.geraetId));
+  const entries: { geraetId: string; bemerkung: string }[] = [];
+  const boundBefore = before?.sybosSetArtikelId;
+  const boundAfter = after?.sybosSetArtikelId;
+
+  if (!after) {
+    for (const id of beforeIds) entries.push({ geraetId: id, bemerkung: text('gelöscht') });
+    if (boundBefore) entries.push({ geraetId: boundBefore, bemerkung: text('gelöscht') });
+    return entries;
+  }
+
+  const added = [...afterIds].filter((id) => !beforeIds.has(id));
+  const removed = [...beforeIds].filter((id) => !afterIds.has(id));
+  for (const id of added) entries.push({ geraetId: id, bemerkung: text('hinzugefügt') });
+  for (const id of removed) entries.push({ geraetId: id, bemerkung: text('entfernt') });
+  if (boundBefore !== boundAfter) {
+    if (boundAfter) entries.push({ geraetId: boundAfter, bemerkung: text('verknüpft') });
+    if (boundBefore) {
+      entries.push({ geraetId: boundBefore, bemerkung: text('Verknüpfung gelöst') });
+    }
+  } else if (boundAfter && (added.length > 0 || removed.length > 0)) {
+    entries.push({ geraetId: boundAfter, bemerkung: text('Inhalt geändert') });
+  }
+  return entries;
+}
+
 /**
  * Legt ein Set an oder ändert es.
  *
@@ -1178,9 +1398,13 @@ export async function saveGeraetSet(
     updatedAt: actor.now,
     updatedBy: actor.uid,
   };
+  // Das Set und die Protokolleinträge in einem Batch: höchstens 2 × 200
+  // Inhalte plus Set-Artikel — unter dem Limit.
+  const batch = firestore.batch();
+  const ref = id === undefined ? setCol(groupId).doc() : setCol(groupId).doc(id);
   if (id === undefined) {
-    const ref = setCol(groupId).doc();
-    await ref.set(
+    batch.set(
+      ref,
       compact({
         ...fields,
         sybosSetArtikelId: clean.sybosSetArtikelId,
@@ -1189,16 +1413,25 @@ export async function saveGeraetSet(
         createdBy: actor.uid,
       }),
     );
-    return { id: ref.id };
-  }
-  await setCol(groupId)
-    .doc(id)
-    .update({
+  } else {
+    batch.update(ref, {
       ...fields,
       sybosSetArtikelId: clean.sybosSetArtikelId ?? FieldValue.delete(),
       bemerkung: clean.bemerkung ?? FieldValue.delete(),
     });
-  return { id };
+  }
+  const known = new Set(geraete.map((g) => g.id));
+  const before = id === undefined ? undefined : sets.find((s) => s.id === id);
+  for (const entry of setMembershipEntries(clean.name, before, clean)) {
+    // Ein inzwischen gelöschter Artikel bekommt keinen verwaisten Eintrag.
+    if (!known.has(entry.geraetId)) continue;
+    batch.set(
+      buchungCol(groupId).doc(),
+      protokollDoc({ geraetId: entry.geraetId, art: 'set', bemerkung: entry.bemerkung }, actor),
+    );
+  }
+  await batch.commit();
+  return { id: ref.id };
 }
 
 /**
@@ -1209,11 +1442,22 @@ export async function deleteGeraetSet(
   groupId: string,
   setId: string,
 ): Promise<{ id: string }> {
-  await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const actor = actorOf(session);
   assertSafeId(setId, 'setId');
   const ref = setCol(groupId).doc(setId);
-  if (!(await ref.get()).exists) throw notFound('geraetSet', setId);
-  await ref.delete();
+  const snap = await ref.get();
+  if (!snap.exists) throw notFound('geraetSet', setId);
+  const set = snap.data() as GeraetSet;
+  const batch = firestore.batch();
+  batch.delete(ref);
+  for (const entry of setMembershipEntries(set.name, set, undefined)) {
+    batch.set(
+      buchungCol(groupId).doc(),
+      protokollDoc({ geraetId: entry.geraetId, art: 'set', bemerkung: entry.bemerkung }, actor),
+    );
+  }
+  await batch.commit();
   return { id: setId };
 }
 
@@ -1221,7 +1465,9 @@ export async function deleteGeraetSet(
 
 /**
  * Legt einen Lagerort für einen Artikel an. Eine Anfangsmenge wird als
- * `inventur` gebucht — sie ist ein gezählter Ist-Wert.
+ * `inventur` gebucht — sie ist ein gezählter Ist-Wert. Das Anlegen selbst
+ * steht immer als Protokolleintrag `lagerort` in der Historie, auch mit
+ * Anfangsmenge: So sieht jeder Lagerort gleich aus.
  */
 export async function createGeraetBestand(
   groupId: string,
@@ -1266,10 +1512,28 @@ export async function createGeraetBestand(
       ref = bestandCol(groupId).doc();
       tx.create(ref, { geraetId, lagerortKey: key, lagerort: place, anzahl: menge, ...stamp });
     }
+    const lagerortText = lagerortTextOf(place);
+    tx.set(
+      buchungCol(groupId).doc(),
+      protokollDoc(
+        {
+          geraetId,
+          bestandId: ref.id,
+          art: 'lagerort',
+          bemerkung: 'angelegt',
+          lagerortText,
+          aenderungen: diffLagerort(undefined, place),
+        },
+        actor,
+      ),
+    );
     if (delta === 0) return { id: ref.id, crossed: undefined };
     tx.set(
       buchungCol(groupId).doc(),
-      buchungDoc({ geraetId, bestandId: ref.id, art: 'inventur', menge: delta }, actor),
+      buchungDoc(
+        { geraetId, bestandId: ref.id, art: 'inventur', menge: delta, lagerortText },
+        actor,
+      ),
     );
     const stock = stockPatch(geraet, delta, actor);
     tx.update(geraetRef, stock.patch);
@@ -1352,6 +1616,23 @@ export async function updateGeraetBestand(
       updatedAt: actor.now,
       updatedBy: actor.uid,
     });
+    const aenderungen = diffLagerort(current.lagerort, place);
+    if (aenderungen.length > 0) {
+      tx.set(
+        buchungCol(groupId).doc(),
+        protokollDoc(
+          {
+            geraetId: current.geraetId,
+            bestandId,
+            art: 'lagerort',
+            bemerkung: 'geändert',
+            lagerortText: lagerortTextOf(place),
+            aenderungen,
+          },
+          actor,
+        ),
+      );
+    }
   });
   return { id: bestandId };
 }
@@ -1391,6 +1672,7 @@ export async function deleteGeraetBestand(
     });
 
     const delta = clean(-(current.anzahl ?? 0));
+    const lagerortText = lagerortTextOf(current.lagerort);
     let stockCrossed: NachbestellungItem | undefined;
     if (delta !== 0) {
       const bemerkung = `Lagerort gelöscht: ${formatLagerort(current.lagerort)}`;
@@ -1406,6 +1688,7 @@ export async function deleteGeraetBestand(
               menge: clean(-pot.menge),
               chargeId: pot.chargeId ?? undefined,
               bemerkung,
+              lagerortText,
             },
             actor,
           ),
@@ -1426,6 +1709,21 @@ export async function deleteGeraetBestand(
     } else {
       tx.delete(ref);
     }
+    // Auch archiviert gilt der Lagerort als gelöscht — er fehlt in den Listen.
+    tx.set(
+      buchungCol(groupId).doc(),
+      protokollDoc(
+        {
+          geraetId: current.geraetId,
+          bestandId,
+          art: 'lagerort',
+          bemerkung: 'gelöscht',
+          lagerortText,
+          aenderungen: diffLagerort(current.lagerort, undefined),
+        },
+        actor,
+      ),
+    );
     return { deleted: !usedInFirecall, crossed: stockCrossed };
   });
 
@@ -1500,6 +1798,7 @@ export async function aufteilenGeraetBestand(
           art: 'aufteilung',
           menge: 0,
           bemerkung: changes.join(', '),
+          lagerortText: lagerortTextOf(current.lagerort),
         },
         actor,
       ),
@@ -1658,7 +1957,12 @@ export async function bookGeraetBestand(
       if (chargeId !== undefined) activeChargeOf(geraet, chargeId);
 
       const stamp = { updatedAt: actor.now, updatedBy: actor.uid };
-      const base = { geraetId: source.geraetId, bestandId: source.id, bemerkung: input.bemerkung };
+      const base = {
+        geraetId: source.geraetId,
+        bestandId: source.id,
+        bemerkung: input.bemerkung,
+        lagerortText: lagerortTextOf(source.lagerort),
+      };
       // Die erste Buchung trägt die ID, die zurückgegeben wird.
       let firstBuchung = true;
       const writeBuchung = (data: NewBuchung) => {
@@ -1959,7 +2263,10 @@ export async function syncGeraetVerbrauch(
             menge: delta,
             chargeId: chargeId ?? undefined,
             firecallId,
+            firecallName: trimmed(firecall.name),
+            firecallArt: firecall.art ?? 'einsatz',
             einsatzEintragId,
+            lagerortText: lagerortTextOf(b.lagerort),
           },
           actor,
         ),
@@ -2208,14 +2515,36 @@ export async function importGeraete(
   const rejected = new Set<string>();
   const created = new Set<string>();
 
-  const book = (geraetId: string, bestandId: string, art: GeraetBuchungArt, menge: number) => {
+  const book = (
+    geraetId: string,
+    bestandId: string,
+    art: GeraetBuchungArt,
+    menge: number,
+    lagerort: GeraetLagerort | undefined,
+  ) => {
     if (menge === 0) return;
     push(geraetId, {
       kind: 'set',
       ref: buchungCol(groupId).doc(),
-      data: buchungDoc({ geraetId, bestandId, art, menge }, actor),
+      data: buchungDoc(
+        { geraetId, bestandId, art, menge, lagerortText: lagerortTextOf(lagerort) },
+        actor,
+      ),
     });
     summary.bookings += 1;
+  };
+  /** Protokolleintrag zu den Stammdaten — gezählt wird er nicht als Buchung. */
+  const logStammdaten = (
+    geraetId: string,
+    art: 'angelegt' | 'stammdaten',
+    aenderungen: GeraetFeldAenderung[],
+  ) => {
+    if (aenderungen.length === 0) return;
+    push(geraetId, {
+      kind: 'set',
+      ref: buchungCol(groupId).doc(),
+      data: protokollDoc({ geraetId, art, aenderungen }, actor),
+    });
   };
   const createBestand = (
     geraetId: string,
@@ -2235,7 +2564,7 @@ export async function importGeraete(
         ...stamp,
       },
     });
-    book(geraetId, ref.id, art, anzahl);
+    book(geraetId, ref.id, art, anzahl, b.lagerort);
   };
 
   /**
@@ -2273,20 +2602,25 @@ export async function importGeraete(
     created.add(id);
     summary.created += 1;
     const bestandGesamt = clean(artikel.bestaende.reduce((s, b) => s + b.anzahl, 0));
-    push(id, {
-      kind: 'set',
-      ref: geraetCol(groupId).doc(id),
-      data: compact({
-        ...artikel.stammdaten,
-        externeId: id,
-        verbrauchsmaterial: artikel.suggestedConsumable,
-        bestandGesamt,
-        importedAt: actor.now,
-        createdAt: actor.now,
-        createdBy: actor.uid,
-        ...stamp,
-      }),
+    const data = compact({
+      ...artikel.stammdaten,
+      externeId: id,
+      verbrauchsmaterial: artikel.suggestedConsumable,
+      bestandGesamt,
+      importedAt: actor.now,
+      createdAt: actor.now,
+      createdBy: actor.uid,
+      ...stamp,
     });
+    push(id, { kind: 'set', ref: geraetCol(groupId).doc(id), data });
+    logStammdaten(
+      id,
+      'angelegt',
+      diffFields<Geraet>(undefined, data as Partial<Geraet>, [
+        ...GERAET_IMPORT_FIELDS,
+        'verbrauchsmaterial',
+      ]),
+    );
   }
 
   for (const b of plan.bestandCreate) {
@@ -2308,7 +2642,7 @@ export async function importGeraete(
         ...stamp,
       },
     });
-    book(b.geraetId, b.bestandId, 'import', delta);
+    book(b.geraetId, b.bestandId, 'import', delta, bestaendeById.get(b.bestandId)?.lagerort);
     addDelta(b.geraetId, delta);
     summary.bestandUpdated += 1;
   }
@@ -2331,7 +2665,7 @@ export async function importGeraete(
           ...stamp,
         },
       });
-      book(d.geraetId, d.bestandId, 'inventur', delta);
+      book(d.geraetId, d.bestandId, 'inventur', delta, bestaendeById.get(d.bestandId)?.lagerort);
     } else {
       const parsedBestand = parsedByGeraetId
         .get(d.geraetId)
@@ -2355,7 +2689,17 @@ export async function importGeraete(
     const update = updatesById.get(geraetId);
     if (update) {
       Object.assign(patch, compact({ ...update.stammdaten }), stamp);
-      for (const field of update.removedFields) patch[field] = FieldValue.delete();
+      const after: Record<string, unknown> = { ...geraet, ...update.stammdaten };
+      for (const field of update.removedFields) {
+        patch[field] = FieldValue.delete();
+        after[field] = undefined;
+      }
+      // Nur die Felder, die der Import setzt — händisch gepflegte bleiben.
+      logStammdaten(
+        geraetId,
+        'stammdaten',
+        diffFields<Geraet>(geraet, after as Partial<Geraet>, GERAET_IMPORT_FIELDS),
+      );
     }
     if (!rejected.has(geraetId)) patch.importedAt = actor.now;
 

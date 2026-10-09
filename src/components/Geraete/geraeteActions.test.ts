@@ -266,7 +266,9 @@ import {
   deviationKey,
   GERAET_CHARGE_MAX_TEXT,
   GERAET_CHARGEN_MAX,
+  isBestandBuchung,
   lagerortKey,
+  type GeraetBuchungArt,
   type GeraetLagerort,
 } from '../../common/geraet';
 import { GERAET_EXPORT_COLUMNS } from '../../common/geraetImport';
@@ -318,18 +320,41 @@ function putBestand(id: string, geraetId: string, lagerort: GeraetLagerort, anza
   });
 }
 
+type BuchungRow = {
+  id: string;
+  art: string;
+  menge: number;
+  bestandId: string;
+  geraetId: string;
+  zielBestandId?: string;
+  einsatzEintragId?: string;
+  firecallId?: string;
+  firecallName?: string;
+  firecallArt?: string;
+  chargeId?: string;
+  bemerkung?: string;
+  lagerortText?: string;
+  aenderungen?: { feld: string; vorher?: string; nachher?: string }[];
+  createdBy: string;
+};
+
+/** Alle Einträge in `geraetBuchung`, Mengenbuchungen und Protokoll. */
+function alleBuchungen() {
+  return fake.list(`${G}/geraetBuchung`) as unknown as BuchungRow[];
+}
+
+/** Nur die Buchungen, die eine Menge bewegen. */
 function buchungen() {
-  return fake.list(`${G}/geraetBuchung`) as unknown as {
-    id: string;
-    art: string;
-    menge: number;
-    bestandId: string;
-    geraetId: string;
-    zielBestandId?: string;
-    einsatzEintragId?: string;
-    firecallId?: string;
-    createdBy: string;
-  }[];
+  return alleBuchungen().filter((b) => isBestandBuchung(b.art as GeraetBuchungArt));
+}
+
+/** Nur die Protokolleinträge ohne Menge (Stammdaten, Chargen, Lagerorte …). */
+function protokoll(geraetId?: string) {
+  return alleBuchungen().filter(
+    (b) =>
+      !isBestandBuchung(b.art as GeraetBuchungArt) &&
+      (geraetId === undefined || b.geraetId === geraetId),
+  );
 }
 
 function geraet(id: string) {
@@ -576,7 +601,7 @@ describe('deleteGeraet', () => {
     await expect(deleteGeraet('ffnd', 'g1')).resolves.toEqual({ id: 'g1', deleted: true });
     expect(geraet('g1')).toBeUndefined();
     expect(bestand('b1')).toBeUndefined();
-    expect(buchungen()).toHaveLength(0);
+    expect(alleBuchungen()).toHaveLength(0);
     expect(bestand('b2')).toBeDefined();
   });
 
@@ -603,7 +628,7 @@ describe('deleteGeraet', () => {
     await expect(deleteGeraet('ffnd', 'g1')).resolves.toEqual({ id: 'g1', deleted: true });
     expect(geraet('g1')).toBeUndefined();
     expect(bestand('b1')).toBeUndefined();
-    expect(buchungen()).toHaveLength(0);
+    expect(alleBuchungen()).toHaveLength(0);
   });
 });
 
@@ -2294,5 +2319,437 @@ describe('Chargen', () => {
       deviationKey({ geraetId: '100', lagerortKey: lagerortKey(srf) }),
     ]);
     expect(bestand('b1')).toMatchObject({ anzahl: 1, chargen: { cA: 1 } });
+  });
+});
+
+// --- Historie ----------------------------------------------------------------
+
+describe('Historie: Protokolleinträge je Action', () => {
+  const lotA = {
+    id: 'cA',
+    produktionsNummer: 'A',
+    ablaufDatum: '2026-12-01',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    createdBy: 'u0',
+  };
+
+  describe('saveGeraet', () => {
+    it('protokolliert das Anlegen mit den gesetzten Feldern', async () => {
+      const { id } = await saveGeraet('ffnd', {
+        bezeichnung: 'Bindevlies',
+        verbrauchsmaterial: true,
+        mindestbestand: 5,
+      });
+      expect(protokoll(id)).toEqual([
+        expect.objectContaining({
+          art: 'angelegt',
+          menge: 0,
+          geraetId: id,
+          createdBy: 'u1',
+          createdByName: 'Max Mustermann',
+        }),
+      ]);
+      const [entry] = protokoll(id);
+      expect(entry).not.toHaveProperty('bestandId');
+      expect(entry.aenderungen).toEqual(
+        expect.arrayContaining([
+          { feld: 'bezeichnung', nachher: 'Bindevlies' },
+          { feld: 'verbrauchsmaterial', nachher: 'ja' },
+          { feld: 'mindestbestand', nachher: '5' },
+          { feld: 'active', nachher: 'ja' },
+        ]),
+      );
+    });
+
+    it('protokolliert geänderte Stammdaten als Diff', async () => {
+      putGeraet('g1', { mindestbestand: 2, bemerkung: 'alt', einheit: 'Sack' });
+      await saveGeraet('ffnd', { id: 'g1', mindestbestand: 5, bemerkung: '', einheit: 'Sack' });
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'stammdaten',
+          menge: 0,
+          aenderungen: [
+            { feld: 'bemerkung', vorher: 'alt' },
+            { feld: 'mindestbestand', vorher: '2', nachher: '5' },
+          ],
+        }),
+      ]);
+    });
+
+    it('schreibt ohne Änderung keinen Eintrag', async () => {
+      putGeraet('g1', { einheit: 'Sack' });
+      await saveGeraet('ffnd', { id: 'g1', einheit: ' Sack ', bezeichnung: 'Bindevlies Economy' });
+      expect(protokoll()).toHaveLength(0);
+    });
+  });
+
+  describe('setGeraeteVerbrauchsmaterial', () => {
+    it('protokolliert nur Artikel, deren Flag sich ändert', async () => {
+      putGeraet('g1', { verbrauchsmaterial: false });
+      putGeraet('g2', { verbrauchsmaterial: true });
+      await setGeraeteVerbrauchsmaterial('ffnd', ['g1', 'g2'], true);
+      expect(protokoll()).toEqual([
+        expect.objectContaining({
+          art: 'stammdaten',
+          geraetId: 'g1',
+          aenderungen: [{ feld: 'verbrauchsmaterial', vorher: 'nein', nachher: 'ja' }],
+        }),
+      ]);
+    });
+
+    it('nennt beim Abschalten auch den weggefallenen Mindestbestand', async () => {
+      putGeraet('g1', { mindestbestand: 4 });
+      await setGeraeteVerbrauchsmaterial('ffnd', ['g1'], false);
+      expect(protokoll('g1')[0].aenderungen).toEqual([
+        { feld: 'verbrauchsmaterial', vorher: 'ja', nachher: 'nein' },
+        { feld: 'mindestbestand', vorher: '4' },
+      ]);
+    });
+  });
+
+  describe('deleteGeraet', () => {
+    it('protokolliert das Deaktivieren', async () => {
+      putGeraet('g1', { bestandGesamt: 2 });
+      putBestand('b1', 'g1', srf, 2);
+      fake.put(`${G}/geraetBuchung/k1`, { geraetId: 'g1', bestandId: 'b1', art: 'zugang', menge: 2 });
+      await deleteGeraet('ffnd', 'g1');
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'archiviert',
+          menge: 0,
+          aenderungen: [{ feld: 'active', vorher: 'ja', nachher: 'nein' }],
+        }),
+      ]);
+    });
+
+    it('lässt beim Löschen keinen Eintrag zurück', async () => {
+      putGeraet('g1');
+      await deleteGeraet('ffnd', 'g1');
+      expect(alleBuchungen()).toHaveLength(0);
+    });
+  });
+
+  describe('Chargen', () => {
+    it('protokolliert das Anlegen samt Zugang mit Lagerort-Text', async () => {
+      putGeraet('g1', { bestandGesamt: 1 });
+      putBestand('b1', 'g1', srf, 1);
+      const { id } = await saveGeraetCharge(
+        'ffnd',
+        'g1',
+        { produktionsNummer: 'L1', ablaufDatum: '2027-01-31' },
+        [
+          { bestandId: 'b1', menge: 3 },
+          { bestandId: null, menge: 2 },
+        ],
+      );
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'charge',
+          menge: 0,
+          chargeId: id,
+          bemerkung: 'angelegt',
+          aenderungen: [
+            { feld: 'produktionsNummer', nachher: 'L1' },
+            { feld: 'ablaufDatum', nachher: '2027-01-31' },
+          ],
+        }),
+      ]);
+      expect(buchungen().map((b) => [b.art, b.menge, b.lagerortText])).toEqual([
+        ['zugang', 3, 'SRF · GR 2'],
+        ['zugang', 2, 'ohne Lagerort'],
+      ]);
+    });
+
+    it('protokolliert das Ändern als Diff und ohne Änderung nichts', async () => {
+      putGeraet('g1', { chargen: [lotA] });
+      await saveGeraetCharge('ffnd', 'g1', { id: 'cA', produktionsNummer: 'A', ablaufDatum: '2026-12-01' });
+      expect(protokoll()).toHaveLength(0);
+      await saveGeraetCharge('ffnd', 'g1', {
+        id: 'cA',
+        produktionsNummer: 'A2',
+        ablaufDatum: '2026-12-01',
+      });
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'charge',
+          chargeId: 'cA',
+          bemerkung: 'geändert',
+          aenderungen: [{ feld: 'produktionsNummer', vorher: 'A', nachher: 'A2' }],
+        }),
+      ]);
+    });
+
+    it('protokolliert das Archivieren', async () => {
+      putGeraet('g1', { chargen: [lotA] });
+      await archiveGeraetCharge('ffnd', 'g1', 'cA');
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({ art: 'charge', chargeId: 'cA', bemerkung: 'archiviert', menge: 0 }),
+      ]);
+    });
+
+    it('protokolliert das Ausbuchen als Archivieren, die Inventur mit Lagerort-Text', async () => {
+      putGeraet('g1', { chargen: [lotA], bestandGesamt: 4 });
+      putBestand('b1', 'g1', srf, 4);
+      fake.put(`${G}/geraetBestand/b1`, { ...bestand('b1')!, chargen: { cA: 4 } });
+      await ausbuchenGeraetCharge('ffnd', 'g1', 'cA');
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({ art: 'charge', chargeId: 'cA', bemerkung: 'archiviert' }),
+      ]);
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'inventur', menge: -4, lagerortText: 'SRF · GR 2' }),
+      ]);
+    });
+  });
+
+  describe('Lagerorte', () => {
+    it('protokolliert das Anlegen ohne Menge', async () => {
+      putGeraet('g1');
+      const { id } = await createGeraetBestand('ffnd', 'g1', { ...srf, bemerkung: 'oben' });
+      expect(buchungen()).toHaveLength(0);
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'lagerort',
+          menge: 0,
+          bestandId: id,
+          bemerkung: 'angelegt',
+          lagerortText: 'SRF · GR 2',
+          aenderungen: [
+            { feld: 'lagerort', nachher: 'SRF · GR 2' },
+            { feld: 'bemerkung', nachher: 'oben' },
+          ],
+        }),
+      ]);
+    });
+
+    it('protokolliert das Anlegen mit Menge zusätzlich zur Inventur', async () => {
+      putGeraet('g1');
+      await createGeraetBestand('ffnd', 'g1', srf, 4);
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'inventur', menge: 4, lagerortText: 'SRF · GR 2' }),
+      ]);
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({ art: 'lagerort', bemerkung: 'angelegt' }),
+      ]);
+    });
+
+    it('protokolliert das Ändern als Diff und ohne Änderung nichts', async () => {
+      putGeraet('g1', { bestandGesamt: 3 });
+      putBestand('b1', 'g1', srf, 3);
+      await updateGeraetBestand('ffnd', 'b1', { ...srf });
+      expect(protokoll()).toHaveLength(0);
+      await updateGeraetBestand('ffnd', 'b1', { ...lager, bemerkung: 'Regal 3' });
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'lagerort',
+          menge: 0,
+          bestandId: 'b1',
+          bemerkung: 'geändert',
+          lagerortText: 'Feuerwehrhaus · Lager',
+          aenderungen: [
+            { feld: 'lagerort', vorher: 'SRF · GR 2', nachher: 'Feuerwehrhaus · Lager' },
+            { feld: 'bemerkung', nachher: 'Regal 3' },
+          ],
+        }),
+      ]);
+    });
+
+    it('protokolliert das Löschen samt Ausbuchung mit Lagerort-Text', async () => {
+      putGeraet('g1', { bestandGesamt: 2 });
+      putBestand('b1', 'g1', srf, 2);
+      await deleteGeraetBestand('ffnd', 'b1');
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'inventur', menge: -2, lagerortText: 'SRF · GR 2' }),
+      ]);
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'lagerort',
+          bestandId: 'b1',
+          bemerkung: 'gelöscht',
+          lagerortText: 'SRF · GR 2',
+          aenderungen: [{ feld: 'lagerort', vorher: 'SRF · GR 2' }],
+        }),
+      ]);
+    });
+
+    it('protokolliert auch das Archivieren eines im Einsatz genutzten Lagerorts', async () => {
+      putGeraet('g1');
+      putBestand('b1', 'g1', srf, 0);
+      fake.put(`${G}/geraetBuchung/v1`, {
+        geraetId: 'g1',
+        bestandId: 'b1',
+        art: 'verbrauch',
+        menge: -1,
+        firecallId: 'fc1',
+      });
+      await deleteGeraetBestand('ffnd', 'b1');
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({ art: 'lagerort', bemerkung: 'gelöscht' }),
+      ]);
+    });
+  });
+
+  describe('Bestandsbuchungen', () => {
+    it('schreibt den Lagerort-Text an Zugang und Umbuchung', async () => {
+      putGeraet('g1', { bestandGesamt: 4 });
+      putBestand('b1', 'g1', srf, 1);
+      putBestand('b2', 'g1', lager, 3);
+      await bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b2', menge: 1 });
+      await bookGeraetBestand('ffnd', {
+        art: 'umbuchung',
+        bestandId: 'b1',
+        zielBestandId: 'b2',
+        menge: 1,
+      });
+      expect(buchungen().map((b) => [b.art, b.lagerortText])).toEqual([
+        ['zugang', 'Feuerwehrhaus · Lager'],
+        ['umbuchung', 'SRF · GR 2'],
+      ]);
+      expect(protokoll()).toHaveLength(0);
+    });
+
+    it('schreibt den Lagerort-Text an die Aufteilung', async () => {
+      putGeraet('g1', { chargen: [lotA], bestandGesamt: 3 });
+      putBestand('b1', 'g1', srf, 3);
+      await aufteilenGeraetBestand('ffnd', 'b1', { cA: 2 });
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'aufteilung', lagerortText: 'SRF · GR 2' }),
+      ]);
+    });
+  });
+
+  describe('syncGeraetVerbrauch', () => {
+    beforeEach(() => {
+      putGeraet('g1', { bestandGesamt: 4 });
+      putBestand('b1', 'g1', srf, 4);
+      fake.put('call/fc1/geraetEinsatz/e1', {
+        groupId: 'ffnd',
+        geraetId: 'g1',
+        geraetName: 'Bindevlies Economy',
+        art: 'verbraucht',
+        bestandId: 'b1',
+        menge: 1,
+      });
+    });
+
+    it('schreibt Name und Art des Einsatzes samt Lagerort-Text', async () => {
+      await syncGeraetVerbrauch('fc1', 'e1');
+      expect(buchungen()).toEqual([
+        expect.objectContaining({
+          art: 'verbrauch',
+          firecallId: 'fc1',
+          firecallName: 'Ölspur B50',
+          firecallArt: 'einsatz',
+          lagerortText: 'SRF · GR 2',
+        }),
+      ]);
+    });
+
+    it('übernimmt die Art einer Übung', async () => {
+      firecallGuard.mockResolvedValue({ id: 'fc1', name: 'Herbstübung', group: 'ffnd', art: 'uebung' });
+      await syncGeraetVerbrauch('fc1', 'e1');
+      expect(buchungen()[0]).toMatchObject({ firecallName: 'Herbstübung', firecallArt: 'uebung' });
+    });
+  });
+
+  describe('Sets', () => {
+    beforeEach(putSetArtikel);
+
+    const setEntries = () =>
+      protokoll()
+        .filter((b) => b.art === 'set')
+        .map((b) => [b.geraetId, b.bemerkung])
+        .sort();
+
+    it('protokolliert beim Anlegen jeden Artikel und den Set-Artikel', async () => {
+      await saveGeraetSet('ffnd', { ...validSet, sybosSetArtikelId: 'kiste' });
+      expect(setEntries()).toEqual([
+        ['besen', 'Set „Ölspur": hinzugefügt'],
+        ['binder', 'Set „Ölspur": hinzugefügt'],
+        ['kiste', 'Set „Ölspur": verknüpft'],
+      ]);
+      expect(protokoll().every((b) => b.menge === 0)).toBe(true);
+    });
+
+    it('protokolliert beim Ändern nur hinzugekommene und entfernte Artikel', async () => {
+      putSet('s1', { inhalt: [{ geraetId: 'besen' }, { geraetId: 'pumpe' }] });
+      await saveGeraetSet('ffnd', { ...validSet, id: 's1' });
+      expect(setEntries()).toEqual([
+        ['binder', 'Set „Ölspur": hinzugefügt'],
+        ['pumpe', 'Set „Ölspur": entfernt'],
+      ]);
+    });
+
+    it('protokolliert ohne geänderten Inhalt nichts', async () => {
+      putSet('s1', { inhalt: validSet.inhalt });
+      await saveGeraetSet('ffnd', { ...validSet, id: 's1', active: false });
+      expect(protokoll()).toHaveLength(0);
+    });
+
+    it('protokolliert am gebundenen Set-Artikel die Änderung des Inhalts', async () => {
+      putSet('s1', { inhalt: [{ geraetId: 'besen' }], sybosSetArtikelId: 'kiste' });
+      await saveGeraetSet('ffnd', { ...validSet, id: 's1', sybosSetArtikelId: 'kiste' });
+      expect(setEntries()).toEqual([
+        ['binder', 'Set „Ölspur": hinzugefügt'],
+        ['kiste', 'Set „Ölspur": Inhalt geändert'],
+      ]);
+    });
+
+    it('protokolliert beim Löschen jeden Artikel und den Set-Artikel', async () => {
+      putSet('s1', { inhalt: [{ geraetId: 'besen' }, { geraetId: 'binder' }], sybosSetArtikelId: 'kiste' });
+      await deleteGeraetSet('ffnd', 's1');
+      expect(setEntries()).toEqual([
+        ['besen', 'Set „Ölspur": gelöscht'],
+        ['binder', 'Set „Ölspur": gelöscht'],
+        ['kiste', 'Set „Ölspur": gelöscht'],
+      ]);
+    });
+  });
+
+  describe('importGeraete', () => {
+    it('protokolliert neue Artikel als angelegt', async () => {
+      await importGeraete(
+        'ffnd',
+        file([{ id: '100', bezeichnung: 'Bindevlies', lagerort: srf, anzahl: 3 }]),
+        [],
+      );
+      expect(protokoll('100')).toEqual([
+        expect.objectContaining({ art: 'angelegt', menge: 0, geraetId: '100' }),
+      ]);
+      expect(protokoll('100')[0].aenderungen).toEqual(
+        expect.arrayContaining([{ feld: 'bezeichnung', nachher: 'Bindevlies' }]),
+      );
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'import', menge: 3, lagerortText: 'SRF · GR 2' }),
+      ]);
+    });
+
+    it('protokolliert geänderte Stammdaten, unveränderte Artikel nicht', async () => {
+      putGeraet('100', {
+        externeId: '100',
+        bezeichnung: 'Alt',
+        bemerkung: 'weg damit',
+        mindestbestand: 5,
+        importedAt: '2026-09-01T00:00:00.000Z',
+      });
+      putGeraet('200', {
+        externeId: '200',
+        bezeichnung: 'Artikel 200',
+        materialTyp: 'Massenartikel',
+        kategorie: 'Gerät',
+        importedAt: '2026-09-01T00:00:00.000Z',
+      });
+      await importGeraete('ffnd', file([{ id: '100', bezeichnung: 'Neu' }, { id: '200' }]), []);
+      expect(protokoll('200')).toHaveLength(0);
+      expect(protokoll('100')).toEqual([expect.objectContaining({ art: 'stammdaten', menge: 0 })]);
+      const aenderungen = protokoll('100')[0].aenderungen!;
+      expect(aenderungen).toEqual(
+        expect.arrayContaining([
+          { feld: 'bezeichnung', vorher: 'Alt', nachher: 'Neu' },
+          { feld: 'bemerkung', vorher: 'weg damit' },
+        ]),
+      );
+      // Händisch gepflegte Felder setzt der Import nicht — kein Eintrag dazu.
+      expect(aenderungen.some((a) => a.feld === 'mindestbestand')).toBe(false);
+    });
   });
 });
