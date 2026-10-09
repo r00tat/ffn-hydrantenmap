@@ -29,6 +29,7 @@ vi.mock('../geraeteActions', () => ({
   archiveGeraetCharge,
   ausbuchenGeraetCharge,
 }));
+vi.mock('./GeraetHistory', () => ({ default: () => null }));
 vi.mock('./ChargeDialog', () => ({
   default: (props: { charge?: { id: string } }) => (
     <div>Charge-Dialog {props.charge ? props.charge.id : 'neu'}</div>

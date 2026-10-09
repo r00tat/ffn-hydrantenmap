@@ -179,6 +179,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "geraetBuchung",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "geraetId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

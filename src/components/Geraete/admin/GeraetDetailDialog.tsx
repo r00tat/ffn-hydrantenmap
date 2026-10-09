@@ -61,6 +61,7 @@ import BestandBookingDialog, { type BestandBookingMode } from './BestandBookingD
 import ChargeDialog from './ChargeDialog';
 import { expiryColor, formatIsoDate, localTodayIso } from './chargeFormat';
 import ChargeSplitDialog from './ChargeSplitDialog';
+import GeraetHistory from './GeraetHistory';
 import LagerortDialog from './LagerortDialog';
 
 export interface GeraetDetailDialogProps {
@@ -520,6 +521,8 @@ export default function GeraetDetailDialog({
         )}
 
         {consumable && renderChargen()}
+
+        <GeraetHistory groupId={groupId} geraet={geraet} bestaende={bestaende} />
       </DialogContent>
       <DialogActions>
         {canManage && (

@@ -27,6 +27,7 @@ vi.mock('../../../hooks/useOnline', () => ({ default: () => true }));
 vi.mock('../../../hooks/useConnectivity', () => ({
   default: () => ({ status: 'online' }),
 }));
+vi.mock('./GeraetHistory', () => ({ default: () => null }));
 vi.mock('../geraeteActions', () => ({
   saveGeraet: vi.fn(),
   deleteGeraet: vi.fn(),
