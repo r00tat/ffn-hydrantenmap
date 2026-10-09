@@ -4451,7 +4451,12 @@
       "result": "{artikel} Artikel, {stuecke} Stücke, {ausgaben} Ausgaben, {personsCreated} neue Personen",
       "previewFailed": "Vorschau fehlgeschlagen: {error}",
       "openChoices": "{count, plural, one {Noch # unsichere Zuordnung offen.} other {Noch # unsichere Zuordnungen offen.}}",
-      "chooseOption": "Bitte wählen"
+      "chooseOption": "Bitte wählen",
+      "createNewInactive": "Neu anlegen (inaktiv)",
+      "inactiveName": "{name} (inaktiv)",
+      "openCount": "{count} offen",
+      "noneOpen": "nichts offen",
+      "deactivateUnused": "Neue Personen ohne offene Ausgabe inaktiv anlegen ({count})"
     },
     "scanner": {
       "title": "Tag scannen",

@@ -329,6 +329,15 @@ describe('buildImportPreview', () => {
     expect(preview.persons.some((p) => p.nachname.startsWith('Tasche'))).toBe(false);
   });
 
+  it('zählt je Person die Ausgaben, die nach dem Import offen bleiben', () => {
+    const byKey = Object.fromEntries(preview.persons.map((p) => [p.key, p]));
+    expect(byKey['erika musterfrau'].openCount).toBe(1);
+    expect(byKey['max mustermann'].openCount).toBe(1);
+    // offener Block, aber Status „nicht da" — der Import schließt ihn
+    expect(byKey['hans beispiel'].openCount).toBe(0);
+    expect(byKey['anna a'].openCount).toBe(0);
+  });
+
   it('listet doppelte Tag-Nummern über beide Blätter', () => {
     const extra: ImportRow = { ...einsatz[0], sheet: 'dienst', rowNumber: 99, ausgaben: [] };
     const withDup = buildImportPreview(einsatz, [extra], persons);
@@ -396,9 +405,28 @@ describe('buildImportPlan', () => {
 
   it('legt nur neu zu erstellende, verwendete Personen an', () => {
     expect(plan.personsToCreate).toEqual(
-      expect.arrayContaining([{ key: 'hans beispiel', name: 'Hans Beispiel' }]),
+      expect.arrayContaining([{ key: 'hans beispiel', name: 'Hans Beispiel', active: true }]),
     );
     expect(plan.personsToCreate.some((p) => p.key === 'max mustermann')).toBe(false);
+  });
+
+  it('legt eine Person auf Wunsch inaktiv an', () => {
+    const inactive = buildImportPlan(
+      preview,
+      {
+        ...decisions,
+        persons: {
+          ...decisions.persons,
+          'hans beispiel': { create: 'Hans Beispiel', active: false },
+        },
+      },
+      today,
+    );
+    expect(inactive.personsToCreate).toContainEqual({
+      key: 'hans beispiel',
+      name: 'Hans Beispiel',
+      active: false,
+    });
   });
 
   it('erzeugt je Zeile eines Einzelartikels ein Stück, auch private', () => {

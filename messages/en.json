@@ -4451,7 +4451,12 @@
       "result": "{artikel} articles, {stuecke} items, {ausgaben} issues, {personsCreated} new people",
       "previewFailed": "Preview failed: {error}",
       "openChoices": "{count, plural, one {# uncertain match still open.} other {# uncertain matches still open.}}",
-      "chooseOption": "Please choose"
+      "chooseOption": "Please choose",
+      "createNewInactive": "Create new (inactive)",
+      "inactiveName": "{name} (inactive)",
+      "openCount": "{count} open",
+      "noneOpen": "nothing open",
+      "deactivateUnused": "Create new people without open issues as inactive ({count})"
     },
     "scanner": {
       "title": "Scan tag",

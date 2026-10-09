@@ -1109,6 +1109,35 @@ describe('importBekleidung', () => {
     expect(hemdAusgabe.stueckId).toBeUndefined();
   });
 
+  it('legt eine Person auf Wunsch inaktiv an', async () => {
+    clearBekleidung();
+    ok(
+      await importBekleidung('ffnd', workbook(), {
+        ...decisions,
+        persons: {
+          ...decisions.persons,
+          'erika musterfrau': { create: 'Erika Beispiel', active: false },
+        },
+      })
+    );
+    const erika = list('person').find((p) => p.name === 'Erika Beispiel')!;
+    expect(erika).toMatchObject({ active: false, createdBy: 'u1' });
+  });
+
+  it('lehnt einen ungültigen Aktiv-Wert ab', async () => {
+    clearBekleidung();
+    await failsWith(
+      importBekleidung('ffnd', workbook(), {
+        ...decisions,
+        persons: {
+          ...decisions.persons,
+          'erika musterfrau': { create: 'Erika Beispiel', active: 'nein' as unknown as boolean },
+        },
+      })
+    );
+    expect(list('bekleidungArtikel')).toHaveLength(0);
+  });
+
   it('setzt nach Erfolg die Importsperre auf „done" mit Zählern', async () => {
     clearBekleidung();
     ok(await importBekleidung('ffnd', workbook(), decisions));

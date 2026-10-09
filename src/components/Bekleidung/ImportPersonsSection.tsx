@@ -4,6 +4,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
+import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -14,6 +15,8 @@ import type { FahrtenbuchPerson } from '../../common/fahrtenbuch';
 
 /** Auswahlwert „neu anlegen" im Personen-Select. */
 export const CREATE_PERSON = '__new__';
+/** Auswahlwert „neu anlegen, aber inaktiv" — ehemalige Mitglieder. */
+export const CREATE_PERSON_INACTIVE = '__new_inactive__';
 
 type PreviewPerson = ImportPreview['persons'][number];
 
@@ -53,9 +56,27 @@ export function personDecisions(
     const choice = choices[p.key];
     if (!choice) continue;
     decisions[p.key] =
-      choice === CREATE_PERSON ? { create: importPersonName(p) } : { personId: choice };
+      choice === CREATE_PERSON
+        ? { create: importPersonName(p) }
+        : choice === CREATE_PERSON_INACTIVE
+          ? { create: importPersonName(p), active: false }
+          : { personId: choice };
   }
   return decisions;
+}
+
+/**
+ * Neu anzulegende Personen ohne offene Ausgabe, die noch aktiv angelegt
+ * würden. Wer nichts mehr ausgefasst hat, ist meist nicht mehr dabei — der
+ * Vorschlag bleibt aber eine bewusste Entscheidung, keine Vorbelegung.
+ */
+export function inactiveCandidates(
+  preview: ImportPreview,
+  choices: Record<string, string>,
+): string[] {
+  return preview.persons
+    .filter((p) => p.openCount === 0 && choices[p.key] === CREATE_PERSON)
+    .map((p) => p.key);
 }
 
 const GROUPS = ['uncertain', 'new', 'matched'] as const;
@@ -73,10 +94,24 @@ export default function ImportPersonsSection({
   onChange: (key: string, value: string) => void;
 }) {
   const t = useTranslations('bekleidung');
-  const nameOf = (id: string) => persons.find((p) => p.id === id)?.name ?? id;
+  const nameOf = (id: string) => {
+    const person = persons.find((p) => p.id === id);
+    if (!person) return id;
+    return person.active === false ? t('import.inactiveName', { name: person.name }) : person.name;
+  };
+  const toDeactivate = inactiveCandidates(preview, choices);
 
   return (
     <>
+      {toDeactivate.length > 0 && (
+        <Button
+          size="small"
+          sx={{ alignSelf: 'flex-start' }}
+          onClick={() => toDeactivate.forEach((key) => onChange(key, CREATE_PERSON_INACTIVE))}
+        >
+          {t('import.deactivateUnused', { count: toDeactivate.length })}
+        </Button>
+      )}
       {GROUPS.map((group) => {
         const list = preview.persons.filter((p) => p.match.status === group);
         if (list.length === 0) return null;
@@ -102,6 +137,11 @@ export default function ImportPersonsSection({
                       sx={{ alignItems: { sm: 'center' } }}
                     >
                       <Typography sx={{ flexGrow: 1 }}>{importPersonName(p)}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {p.openCount > 0
+                          ? t('import.openCount', { count: p.openCount })
+                          : t('import.noneOpen')}
+                      </Typography>
                       <TextField
                         select
                         size="small"
@@ -115,6 +155,9 @@ export default function ImportPersonsSection({
                           {t('import.chooseOption')}
                         </MenuItem>
                         <MenuItem value={CREATE_PERSON}>{t('import.createNew')}</MenuItem>
+                        <MenuItem value={CREATE_PERSON_INACTIVE}>
+                          {t('import.createNewInactive')}
+                        </MenuItem>
                         {options.map((id) => (
                           <MenuItem key={id} value={id}>
                             {t('import.useExisting', { name: nameOf(id) })}

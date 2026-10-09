@@ -173,6 +173,19 @@ Dienstbekleidung):
   unsichere Person einen Kandidaten oder „neu anlegen" hat. Der Server lehnt
   ein „neu anlegen" ab, dessen Name es in der Gruppe schon gibt oder das im
   selben Import zweimal vorkommt (`personExists`).
+- **Ehemalige Mitglieder:** Das Excel reicht Jahre zurück, viele Namen sind
+  nicht mehr aktiv. Der Abgleich läuft deshalb gegen **alle** Personen der
+  Gruppe, auch die im Fahrtenbuch schon inaktiven; die Auswahl kennzeichnet
+  sie mit „(inaktiv)". Eine fehlende Person lässt sich als „neu anlegen
+  (inaktiv)" anlegen (`{ create, active: false }`). Als Entscheidungshilfe
+  zeigt die Vorschau je Person, wie viele Ausgaben nach dem Import offen
+  bleiben (`openCount`, nach derselben Regel wie der Plan: nur der letzte offene
+  Block einer Zeile mit Status „ausgegeben"). Ein Knopf stellt alle neuen
+  Personen **ohne** offene Ausgabe gesammelt auf inaktiv. Das ist bewusst keine
+  Vorbelegung: Eine inaktive Person kann nichts mehr ausgefasst bekommen
+  (`personInactive`), und reaktivieren darf nur der Gruppen-Admin im
+  Fahrtenbuch, nicht der Bekleidungswart. Offene Ausgaben an inaktive Personen
+  übernimmt der Import unverändert; zurücknehmen geht bei ihnen weiterhin.
 - **Leere Größe** wird `–` (`GROESSE_UNBEKANNT`): Ohne Größe hätte das Stück
   kein gültiges Pflichtfeld und der Mengenbestand keine Dokument-ID.
 - **Datum als ISO-Zeitstempel** (`2023-11-20T00:00:00.000Z`) gilt als

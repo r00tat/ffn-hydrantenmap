@@ -26,9 +26,9 @@ const preview: ImportPreview = {
     { key: 'dienst|polo|', kategorie: 'dienst', bezeichnung: 'Poloshirt', fuehrung: 'einzeln', rowCount: 2 },
   ],
   persons: [
-    { key: 'max mustermann', vorname: 'Max', nachname: 'Mustermann', match: { status: 'matched', personId: 'p1', candidates: ['p1'] } },
-    { key: 'erika musterfrau', vorname: 'Erika', nachname: 'Musterfrau', match: { status: 'uncertain', candidates: ['p2', 'p3'] } },
-    { key: 'moritz muster', vorname: 'Moritz', nachname: 'Muster', match: { status: 'new', candidates: [] } },
+    { key: 'max mustermann', vorname: 'Max', nachname: 'Mustermann', openCount: 2, match: { status: 'matched', personId: 'p1', candidates: ['p1'] } },
+    { key: 'erika musterfrau', vorname: 'Erika', nachname: 'Musterfrau', openCount: 1, match: { status: 'uncertain', candidates: ['p2', 'p3'] } },
+    { key: 'moritz muster', vorname: 'Moritz', nachname: 'Muster', openCount: 0, match: { status: 'new', candidates: [] } },
   ],
   duplicateTags: [
     { tagNummer: '1001', rowNumbers: [{ sheet: 'einsatz', rowNumber: 4 }, { sheet: 'einsatz', rowNumber: 9 }] },
@@ -93,6 +93,62 @@ describe('BekleidungImportDialog', () => {
     expect(
       await screen.findByText(/2 Artikel, 5 Stücke, 3 Ausgaben, 1 neue Personen/),
     ).toBeInTheDocument();
+  });
+
+  it('legt Personen auf Wunsch inaktiv an und kennzeichnet inaktive Personen', async () => {
+    previewBekleidungImport.mockResolvedValue(preview);
+    importBekleidung.mockResolvedValue({ artikel: 2, stuecke: 5, ausgaben: 3, personsCreated: 2 });
+    const user = userEvent.setup();
+    renderDialog();
+    await upload(user);
+
+    // offene Ausgaben je Person als Entscheidungshilfe
+    expect(await screen.findByText('2 offen')).toBeInTheDocument();
+    expect(screen.getByText('nichts offen')).toBeInTheDocument();
+
+    // bestehende inaktive Person ist gekennzeichnet
+    await user.click(screen.getByRole('combobox', { name: 'Erika Musterfrau' }));
+    const listbox = within(screen.getByRole('listbox'));
+    expect(listbox.getByRole('option', { name: 'Erika Mustermann (inaktiv)' })).toBeInTheDocument();
+    await user.click(listbox.getByRole('option', { name: 'Neu anlegen (inaktiv)' }));
+
+    await user.click(screen.getByRole('button', { name: 'Importieren' }));
+    expect(importBekleidung).toHaveBeenCalledWith('ffnd', 'QkFTRTY0', {
+      fuehrung: { 'einsatz|jacke|': 'einzeln', 'dienst|polo|': 'einzeln' },
+      persons: {
+        'max mustermann': { personId: 'p1' },
+        'erika musterfrau': { create: 'Erika Musterfrau', active: false },
+        'moritz muster': { create: 'Moritz Muster' },
+      },
+    });
+  });
+
+  it('stellt neue Personen ohne offene Ausgabe gesammelt auf inaktiv', async () => {
+    previewBekleidungImport.mockResolvedValue({
+      ...preview,
+      persons: [
+        preview.persons[0],
+        preview.persons[2],
+        { key: 'lisa muster', vorname: 'Lisa', nachname: 'Muster', openCount: 1, match: { status: 'new', candidates: [] } },
+      ],
+    });
+    importBekleidung.mockResolvedValue({ artikel: 2, stuecke: 5, ausgaben: 3, personsCreated: 2 });
+    const user = userEvent.setup();
+    renderDialog();
+    await upload(user);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Neue Personen ohne offene Ausgabe inaktiv anlegen (1)' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Importieren' }));
+    expect(importBekleidung).toHaveBeenCalledWith('ffnd', 'QkFTRTY0', {
+      fuehrung: { 'einsatz|jacke|': 'einzeln', 'dienst|polo|': 'einzeln' },
+      persons: {
+        'max mustermann': { personId: 'p1' },
+        'moritz muster': { create: 'Moritz Muster', active: false },
+        'lisa muster': { create: 'Lisa Muster' },
+      },
+    });
   });
 
   it('meldet einen nicht leeren Bestand verständlich', async () => {

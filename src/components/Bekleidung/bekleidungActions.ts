@@ -885,10 +885,10 @@ async function loadPersons(groupId: string): Promise<{ id: string; name: string 
   }));
 }
 
-function newPersonDoc(name: string, actor: Actor) {
+function newPersonDoc(name: string, actor: Actor, active = true) {
   return {
     name,
-    active: true,
+    active,
     blaulichtSmsRecipientId: '',
     phone: '',
     email: '',
@@ -1081,7 +1081,11 @@ function sanitizeDecisions(
       const nameKey = normalizePersonName(name);
       if (takenNames.has(nameKey)) throw conflict('personExists');
       takenNames.add(nameKey);
-      persons[key] = { create: name };
+      const active = (value as { active?: unknown }).active;
+      if (active !== undefined && typeof active !== 'boolean') {
+        throw badRequest('invalid person active');
+      }
+      persons[key] = active === false ? { create: name, active: false } : { create: name };
     } else {
       throw badRequest('invalid person decision');
     }
@@ -1136,7 +1140,7 @@ async function importBekleidungImpl(
   for (const p of plan.personsToCreate) {
     const ref = personCol(groupId).doc();
     personIdByKey.set(p.key, ref.id);
-    writes.push({ ref, data: newPersonDoc(p.name, actor) });
+    writes.push({ ref, data: newPersonDoc(p.name, actor, p.active) });
   }
   const personIdOf = (key: string) => {
     const id = personIdByKey.get(key);

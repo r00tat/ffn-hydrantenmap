@@ -346,8 +346,18 @@ export function artikelKey(
 export interface ImportPreview {
   rows: ImportRow[];
   artikel: ImportArtikelProposal[];
-  /** key = normalizePersonName(`${vorname} ${nachname}`) */
-  persons: { key: string; nachname: string; vorname: string; match: PersonMatch }[];
+  /**
+   * key = normalizePersonName(`${vorname} ${nachname}`). `openCount` zählt
+   * die Ausgaben, die nach dem Import offen bleiben — wer keine hat, ist oft
+   * nicht mehr aktiv.
+   */
+  persons: {
+    key: string;
+    nachname: string;
+    vorname: string;
+    openCount: number;
+    match: PersonMatch;
+  }[];
   duplicateTags: {
     tagNummer: string;
     rowNumbers: { sheet: BekleidungKategorie; rowNumber: number }[];
@@ -361,6 +371,19 @@ const personKeyOf = (block: ImportAusgabeBlock) =>
 const rowArtikelKey = (row: ImportRow) => artikelKey(row.sheet, row.art, row.hersteller);
 
 const isOpen = (block: ImportAusgabeBlock) => !block.zurueckAm;
+
+/**
+ * Welcher Block bleibt offen? Nur bei Status „ausgegeben", und dann nur
+ * der letzte offene. Alle anderen offenen Blöcke schließt der Import.
+ * Liefert -1, wenn keiner offen bleibt.
+ */
+function keepOpenIndex(row: ImportRow): number {
+  if (row.status !== 'ausgegeben') return -1;
+  for (let index = row.ausgaben.length - 1; index >= 0; index--) {
+    if (isOpen(row.ausgaben[index])) return index;
+  }
+  return -1;
+}
 
 const STATUS_LABEL: Record<BekleidungStatus, string> = {
   lager: 'Lager',
@@ -404,9 +427,12 @@ export function buildImportPreview(
         key,
         nachname: block.nachname,
         vorname: block.vorname,
+        openCount: 0,
         match: matchPersonName(block.nachname, block.vorname, persons),
       });
     }
+    const open = keepOpenIndex(row);
+    if (open >= 0) personMap.get(personKeyOf(row.ausgaben[open]))!.openCount += 1;
   }
 
   const tags = new Map<string, { sheet: BekleidungKategorie; rowNumber: number }[]>();
@@ -448,13 +474,16 @@ export function buildImportPreview(
 export interface ImportDecisions {
   /** artikelKey → Führung */
   fuehrung: Record<string, BekleidungFuehrung>;
-  /** person key → bestehende Person oder neu anzulegender Name */
-  persons: Record<string, { personId: string } | { create: string }>;
+  /**
+   * person key → bestehende Person oder neu anzulegender Name. Ohne
+   * `active` wird die neue Person aktiv angelegt.
+   */
+  persons: Record<string, { personId: string } | { create: string; active?: boolean }>;
 }
 
 export interface ImportPlan {
   artikel: (Omit<BekleidungArtikel, keyof Stamps | 'id'> & { key: string })[];
-  personsToCreate: { key: string; name: string }[];
+  personsToCreate: { key: string; name: string; active: boolean }[];
   stuecke: (Omit<
     BekleidungStueck,
     keyof Stamps | 'id' | 'artikelId' | 'personId' | 'ausgabeId'
@@ -513,7 +542,7 @@ export function buildImportPlan(
       }
       if ('create' in decision) {
         const name = collapse(decision.create) || collapse(`${block.vorname} ${block.nachname}`);
-        personsToCreate.push({ key, name });
+        personsToCreate.push({ key, name, active: decision.active !== false });
       }
     }
   }
@@ -528,15 +557,7 @@ export function buildImportPlan(
     const fuehrung = fuehrungOf.get(key) ?? 'menge';
     const bemerkungen = [...row.bemerkungen];
 
-    // Welcher Block bleibt offen? Nur bei Status „ausgegeben", und dann nur
-    // der letzte offene. Alle anderen offenen Blöcke schließt der Import.
-    const openIndexes = row.ausgaben
-      .map((block, index) => (isOpen(block) ? index : -1))
-      .filter((index) => index >= 0);
-    const keepOpen =
-      row.status === 'ausgegeben' && openIndexes.length > 0
-        ? openIndexes[openIndexes.length - 1]
-        : -1;
+    const keepOpen = keepOpenIndex(row);
 
     const tempId = `${row.sheet}-${row.rowNumber}`;
     const rowAusgaben: PlanAusgabe[] = row.ausgaben.map((block, index) => {
