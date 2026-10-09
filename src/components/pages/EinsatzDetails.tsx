@@ -7,6 +7,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
@@ -70,6 +71,7 @@ const KOSTENERSATZ_SECTION_ID = 'kostenersatz-section';
 export default function EinsatzDetails() {
   const t = useTranslations('einsatzDetails');
   const tCommon = useTranslations('common');
+  const tArt = useTranslations('firecallArt');
   const tFahrtenbuch = useTranslations('fahrtenbuch');
   const tGeraete = useTranslations('geraetEinsatz');
   const firecallId = useFirecallId();
@@ -249,8 +251,16 @@ export default function EinsatzDetails() {
 
   return (
     <Box sx={{ p: 2, m: 2 }}>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom component="div">
         {firecall.name}
+        {firecall.art && firecall.art !== 'einsatz' && (
+          <Chip
+            size="small"
+            variant="outlined"
+            label={tArt(firecall.art)}
+            sx={{ ml: 1, verticalAlign: 'middle' }}
+          />
+        )}
       </Typography>
 
       {/* Action buttons */}

@@ -365,6 +365,8 @@ describe('GeraetEinsatzDialog', () => {
       menge: 4,
       stunden: 'DELETE',
       bemerkung: 'DELETE',
+      chargen: 'DELETE',
+      chargenGeprueft: 'DELETE',
       gebucht: false,
     });
   });
@@ -397,6 +399,8 @@ describe('GeraetEinsatzDialog', () => {
       menge: 5,
       stunden: 'DELETE',
       bemerkung: 'nachgetragen',
+      chargen: 'DELETE',
+      chargenGeprueft: 'DELETE',
       gebucht: false,
     });
   });
@@ -560,5 +564,259 @@ describe('GeraetEinsatzDialog mit Sets', () => {
     const options = await screen.findAllByRole('option');
     expect(options).toHaveLength(1);
     expect(options[0]).toHaveTextContent('Ölspur-Kiste');
+  });
+});
+
+describe('GeraetEinsatzDialog mit Chargen', () => {
+  const charge = (id: string, produktionsNummer: string, ablaufDatum: string) => ({
+    id,
+    produktionsNummer,
+    ablaufDatum,
+    createdAt: '',
+    createdBy: '',
+  });
+  const tuch = geraet({
+    id: 'tuch',
+    bezeichnung: 'Ölbindetuch',
+    verbrauchsmaterial: true,
+    einheit: 'Stk',
+    bestandGesamt: 9,
+    chargen: [charge('c2', 'B', '2099-06-01'), charge('c1', 'A', '2000-01-01')],
+  });
+  const srf: GeraetBestand = {
+    id: 'srf',
+    geraetId: 'tuch',
+    lagerortKey: 'fahrzeug|srf|gr 2',
+    lagerort: { art: 'fahrzeug', fahrzeug: 'SRF', laderaum: 'GR 2' },
+    anzahl: 5,
+    chargen: { c1: 2, c2: 2 },
+  };
+  const lager: GeraetBestand = {
+    id: 'lager',
+    geraetId: 'tuch',
+    lagerortKey: 'raum|feuerwehrhaus|lager',
+    lagerort: { art: 'raum', standort: 'Feuerwehrhaus', raum: 'Lager' },
+    anzahl: 4,
+    chargen: { c2: 4 },
+  };
+  const withChargen = new Map<string, GeraetBestand[]>([
+    ...bestaende,
+    ['tuch', [srf, lager]],
+  ]);
+
+  function renderChargen(props: Partial<Parameters<typeof GeraetEinsatzDialog>[0]> = {}) {
+    return renderDialog({
+      geraete: [vlies, pumpe, aggregat, tuch],
+      bestaendeByGeraet: withChargen,
+      ...props,
+    });
+  }
+
+  function lastAdd() {
+    return mocks.add.mock.calls[mocks.add.mock.calls.length - 1][1] as Omit<GeraetEinsatz, 'id'>;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('zeigt bei mehreren Töpfen je Charge ein Feld, vorbelegt nach FEFO', async () => {
+    renderChargen();
+    const user = await pickArticle('ölbinde', /Ölbindetuch/);
+
+    expect(screen.getByRole('textbox', { name: 'LOT A' })).toHaveValue('1');
+    expect(screen.getByRole('textbox', { name: 'LOT B' })).toHaveValue('0');
+    expect(screen.getByRole('textbox', { name: 'ohne Charge' })).toHaveValue('0');
+    expect(screen.getByText(/abgelaufen 01\.01\.2000/)).toBeInTheDocument();
+
+    const menge = screen.getByRole('textbox', { name: /Menge/ });
+    await user.clear(menge);
+    await user.type(menge, '4');
+    expect(screen.getByRole('textbox', { name: 'LOT A' })).toHaveValue('2');
+    expect(screen.getByRole('textbox', { name: 'LOT B' })).toHaveValue('2');
+
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(lastAdd()).toMatchObject({
+      bestandId: 'srf',
+      menge: 4,
+      chargen: [
+        { chargeId: 'c1', menge: 2 },
+        { chargeId: 'c2', menge: 2 },
+      ],
+      chargenGeprueft: true,
+    });
+  });
+
+  it('speichert nur, wenn die Summe der Chargen der Menge entspricht', async () => {
+    renderChargen();
+    const user = await pickArticle('ölbinde', /Ölbindetuch/);
+    const losA = screen.getByRole('textbox', { name: 'LOT A' });
+    await user.clear(losA);
+    await user.type(losA, '0');
+    expect(screen.getByText(/Summe der Chargen \(0\) entspricht nicht der Menge \(1\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+
+    const ohne = screen.getByRole('textbox', { name: 'ohne Charge' });
+    await user.clear(ohne);
+    await user.type(ohne, '1');
+    // Die Eingabe bleibt, auch wenn sich die Menge ändert.
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(lastAdd()).toMatchObject({
+      chargen: [{ chargeId: null, menge: 1 }],
+      chargenGeprueft: true,
+    });
+  });
+
+  it('bei einem einzigen Topf keine Felder, die Charge wird automatisch gewählt', async () => {
+    renderChargen();
+    const user = await pickArticle('ölbinde', /Ölbindetuch/);
+    await user.click(screen.getByRole('combobox', { name: 'Lagerort' }));
+    await user.click(
+      within(screen.getByRole('listbox')).getByRole('option', { name: /Feuerwehrhaus · Lager/ }),
+    );
+    expect(screen.queryByRole('textbox', { name: 'LOT B' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(lastAdd()).toMatchObject({
+      bestandId: 'lager',
+      chargen: [{ chargeId: 'c2', menge: 1 }],
+      chargenGeprueft: true,
+    });
+  });
+
+  it('übernimmt beim Bearbeiten die Aufteilung des Eintrags und rechnet seinen Verbrauch zum Bestand', async () => {
+    const user = userEvent.setup();
+    const entry: GeraetEinsatz = {
+      id: 'e1',
+      groupId: 'ffnd',
+      geraetId: 'tuch',
+      geraetName: 'Ölbindetuch',
+      art: 'verbraucht',
+      bestandId: 'lager',
+      menge: 2,
+      chargen: [{ chargeId: 'c2', menge: 2 }],
+      chargenGeprueft: false,
+      gebucht: true,
+      zeitpunkt: '2026-10-04T10:00:00.000Z',
+      createdAt: '2026-10-04T10:00:00.000Z',
+      createdBy: 'erika.musterfrau@example.com',
+    };
+    // Am Lager liegen nach der Buchung noch 4 von LOT B; vorher gab es dort
+    // auch 1 Stück ohne Charge — mehrere Töpfe.
+    const nachBuchung = new Map(withChargen);
+    nachBuchung.set('tuch', [srf, { ...lager, anzahl: 5, chargen: { c2: 4 } }]);
+    renderChargen({ entry, bestaendeByGeraet: nachBuchung });
+
+    expect(screen.getByRole('textbox', { name: 'LOT B' })).toHaveValue('2');
+    expect(screen.getByRole('textbox', { name: 'ohne Charge' })).toHaveValue('0');
+    expect(screen.getByText(/6 verfügbar/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(mocks.update).toHaveBeenCalledWith(
+      'fc1',
+      entry,
+      expect.objectContaining({
+        chargen: [{ chargeId: 'c2', menge: 2 }],
+        chargenGeprueft: true,
+      }),
+    );
+  });
+
+  it('ein archivierter Lagerort wird über bestandById gefunden — nur die Bemerkung geändert, Aufteilung bleibt', async () => {
+    const user = userEvent.setup();
+    const archiv: GeraetBestand = { ...lager, id: 'archiv', archiviert: true, anzahl: 0, chargen: {} };
+    const entry: GeraetEinsatz = {
+      id: 'e3',
+      groupId: 'ffnd',
+      geraetId: 'tuch',
+      geraetName: 'Ölbindetuch',
+      art: 'verbraucht',
+      bestandId: 'archiv',
+      menge: 2,
+      chargen: [{ chargeId: 'c2', menge: 2 }],
+      chargenGeprueft: true,
+      gebucht: true,
+      zeitpunkt: '2026-10-04T10:00:00.000Z',
+      createdAt: '2026-10-04T10:00:00.000Z',
+      createdBy: 'erika.musterfrau@example.com',
+    };
+    renderChargen({ entry, bestandById: new Map([['archiv', archiv]]) });
+    await user.type(screen.getByRole('textbox', { name: 'Bemerkung' }), 'x');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(mocks.update).toHaveBeenCalledWith(
+      'fc1',
+      entry,
+      expect.objectContaining({ chargen: [{ chargeId: 'c2', menge: 2 }], chargenGeprueft: true }),
+    );
+  });
+
+  it('ohne auffindbaren Lagerort bleibt die Aufteilung beim Bearbeiten unangetastet', async () => {
+    const user = userEvent.setup();
+    const entry: GeraetEinsatz = {
+      id: 'e4',
+      groupId: 'ffnd',
+      geraetId: 'tuch',
+      geraetName: 'Ölbindetuch',
+      art: 'verbraucht',
+      bestandId: 'weg',
+      menge: 2,
+      chargen: [{ chargeId: 'c2', menge: 2 }],
+      chargenGeprueft: true,
+      gebucht: true,
+      zeitpunkt: '2026-10-04T10:00:00.000Z',
+      createdAt: '2026-10-04T10:00:00.000Z',
+      createdBy: 'erika.musterfrau@example.com',
+    };
+    renderChargen({ entry });
+    await user.type(screen.getByRole('textbox', { name: 'Bemerkung' }), 'x');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    const patch = mocks.update.mock.calls[0][2] as Record<string, unknown>;
+    expect('chargen' in patch).toBe(false);
+    expect('chargenGeprueft' in patch).toBe(false);
+  });
+
+  it('Mehrfachauswahl belegt nach FEFO vor und verlangt eine Prüfung', async () => {
+    renderChargen();
+    const user = await pickArticle('ölbinde', /Ölbindetuch/);
+    const input = screen.getByRole('combobox', { name: /Artikel/ });
+    await user.clear(input);
+    await user.type(input, 'tauch');
+    await user.click(await screen.findByRole('option', { name: /Tauchpumpe/ }));
+    await user.click(screen.getByRole('button', { name: '2 erfassen' }));
+    expect(mocks.add.mock.calls[0][1]).toMatchObject({
+      geraetId: 'tuch',
+      bestandId: 'srf',
+      chargen: [{ chargeId: 'c1', menge: 1 }],
+      chargenGeprueft: false,
+    });
+    expect('chargen' in (mocks.add.mock.calls[1][1] as object)).toBe(false);
+  });
+
+  it('ein Set belegt nach FEFO vor und verlangt eine Prüfung', async () => {
+    const set: GeraetSet = {
+      id: 'oel',
+      name: 'Ölspur',
+      codes: [],
+      inhalt: [{ geraetId: 'tuch', menge: 3, bestandId: 'srf' }],
+      active: true,
+      createdAt: '',
+      createdBy: '',
+      updatedAt: '',
+      updatedBy: '',
+    };
+    renderChargen({ sets: [set] });
+    const user = await pickArticle('ölspur', /^Ölspur Set/);
+    await user.click(screen.getByRole('button', { name: '1 erfassen' }));
+    expect(lastAdd()).toMatchObject({
+      geraetId: 'tuch',
+      bestandId: 'srf',
+      menge: 3,
+      chargen: [
+        { chargeId: 'c1', menge: 2 },
+        { chargeId: 'c2', menge: 1 },
+      ],
+      chargenGeprueft: false,
+      setId: 'oel',
+    });
   });
 });

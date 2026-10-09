@@ -27,6 +27,7 @@ vi.mock('../../../hooks/useOnline', () => ({ default: () => true }));
 vi.mock('../../../hooks/useConnectivity', () => ({
   default: () => ({ status: 'online' }),
 }));
+vi.mock('./GeraetHistory', () => ({ default: () => null }));
 vi.mock('../geraeteActions', () => ({
   saveGeraet: vi.fn(),
   deleteGeraet: vi.fn(),
@@ -37,6 +38,10 @@ vi.mock('../geraeteActions', () => ({
   setGeraeteVerbrauchsmaterial,
   saveGeraetSet: vi.fn(),
   deleteGeraetSet: vi.fn(),
+  saveGeraetCharge: vi.fn(),
+  archiveGeraetCharge: vi.fn(),
+  ausbuchenGeraetCharge: vi.fn(),
+  aufteilenGeraetBestand: vi.fn(),
 }));
 
 import GeraeteAdminPage from './GeraeteAdminPage';
@@ -80,7 +85,15 @@ const vliesSrf: GeraetBestand = {
   anzahl: 4,
 };
 
-function setup({ manager }: { manager: boolean }) {
+const vliesMitCharge: Geraet = {
+  ...vlies,
+  chargen: [
+    { id: 'c1', produktionsNummer: 'A1', ablaufDatum: '2000-01-31', createdAt: '', createdBy: '' },
+  ],
+};
+const vliesSrfMitCharge: GeraetBestand = { ...vliesSrf, chargen: { c1: 3 } };
+
+function setup({ manager, chargen = false }: { manager: boolean; chargen?: boolean }) {
   useFirebaseLogin.mockReturnValue({
     isAuthorized: true,
     isAdmin: false,
@@ -93,10 +106,12 @@ function setup({ manager }: { manager: boolean }) {
     groupId: 'ffnd',
     setGroupId: vi.fn(),
   });
+  const item = chargen ? vliesMitCharge : vlies;
+  const bestand = chargen ? vliesSrfMitCharge : vliesSrf;
   useGeraete.mockReturnValue({
-    geraete: [vlies, schere],
-    bestaende: [vliesSrf],
-    bestaendeByGeraet: new Map([['vlies', [vliesSrf]]]),
+    geraete: [item, schere],
+    bestaende: [bestand],
+    bestaendeByGeraet: new Map([['vlies', [bestand]]]),
     loading: false,
     fromCache: false,
   });
@@ -154,6 +169,25 @@ describe('GeraeteAdminPage', () => {
     expect(screen.getByText('Bindevlies Economy')).toBeInTheDocument();
     expect(screen.queryByText('Rettungsschere')).not.toBeInTheDocument();
     expect(screen.getByText(/Bestand 4 Sack · Mindestbestand 10/)).toBeInTheDocument();
+  });
+
+  it('zeigt unter „Läuft bald ab" die ablaufenden Chargen und öffnet den Artikel', async () => {
+    setup({ manager: false, chargen: true });
+    const user = userEvent.setup();
+    renderWithIntl(<GeraeteAdminPage />);
+    await user.click(screen.getByRole('tab', { name: 'Läuft bald ab (1)' }));
+    expect(screen.queryByText('Rettungsschere')).not.toBeInTheDocument();
+    expect(screen.getByText('LOT A1')).toBeInTheDocument();
+    expect(screen.getByText('3 Sack')).toBeInTheDocument();
+    await user.click(screen.getByText('LOT A1'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Bindevlies Economy')).toBeInTheDocument();
+  });
+
+  it('blendet „Läuft bald ab" aus, wenn nichts abläuft', () => {
+    setup({ manager: false });
+    renderWithIntl(<GeraeteAdminPage />);
+    expect(screen.queryByRole('tab', { name: /Läuft bald ab/ })).not.toBeInTheDocument();
   });
 
   it('zeigt die Sets der Gruppe im Reiter „Sets"', async () => {

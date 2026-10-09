@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   offline: false,
   plan: vi.fn(async () => 'scheduled'),
+  zuordnung: vi.fn(async (..._args: unknown[]) => ({ written: 'zuordnung' })),
   upload: vi.fn(),
   updateDocLocal: vi.fn(),
   waitForFirestoreSync: vi.fn(async () => true),
@@ -54,6 +55,7 @@ vi.mock('../components/Atemschutz/ueberwachungTaskAction', () => ({
 // Die Server Action zieht `server-only` nach, das unter Vitest wirft.
 vi.mock('../components/Geraete/geraeteActions', () => ({
   syncGeraetVerbrauch: vi.fn(),
+  syncGeraetZuordnung: (...args: unknown[]) => mocks.zuordnung(...args),
 }));
 
 type Queue = typeof import('./offlineQueue');
@@ -67,6 +69,7 @@ beforeEach(async () => {
   mocks.offline = true;
   mocks.order = [];
   mocks.plan.mockClear();
+  mocks.zuordnung.mockClear();
   mocks.upload.mockReset();
   mocks.updateDocLocal.mockReset();
   mocks.waitForFirestoreSync.mockClear();
@@ -123,6 +126,21 @@ describe('offlineQueueHandlers', () => {
     expect(mocks.plan).not.toHaveBeenCalled();
     const [entry] = await queue.getQueuedEntries();
     expect(entry.attempts).toBe(0);
+  });
+
+  it('registriert den Handler der Gerätezuordnung über den Seiteneffekt-Import', async () => {
+    const { queueGeraetZuordnungSync, GERAET_ZUORDNUNG_QUEUE_TYPE } = await import(
+      '../components/Geraete/geraetZuordnungQueue'
+    );
+    await queueGeraetZuordnungSync('fc1', 'e1');
+    const [entry] = await queue.getQueuedEntries();
+    expect(entry.type).toBe(GERAET_ZUORDNUNG_QUEUE_TYPE);
+
+    mocks.offline = false;
+    await queue.processQueue();
+
+    expect(mocks.zuordnung).toHaveBeenCalledWith('fc1', 'e1');
+    expect(await queue.getQueuedEntries()).toHaveLength(0);
   });
 
   it('lädt einen eingereihten Upload hoch und trägt die Referenz ins Zielfeld ein', async () => {

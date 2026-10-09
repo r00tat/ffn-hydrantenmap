@@ -17,6 +17,10 @@ import {
   isGeraetVerbrauchQueued,
   queueGeraetVerbrauchSync,
 } from '../geraetVerbrauchQueue';
+import {
+  enqueueGeraetZuordnungSync,
+  queueGeraetZuordnungSync,
+} from '../geraetZuordnungQueue';
 import { isPendingBooking } from './geraetEinsatzLogic';
 
 /**
@@ -28,7 +32,8 @@ import { isPendingBooking } from './geraetEinsatzLogic';
  * Anlegen, Ändern und Löschen eines Verbrauchs gleicht `syncGeraetVerbrauch`
  * den Bestand mit dem Eintrag ab — online sofort, offline über die
  * Warteschlange beim Reconnect. Der Abgleich ist idempotent, ein doppelter
- * Aufruf schadet nicht.
+ * Aufruf schadet nicht. Ebenso protokolliert `syncGeraetZuordnung` nach dem
+ * Anlegen und Löschen einer Zuordnung den Eintrag in der Historie des Artikels.
  *
  * Jedes Anlegen und Ändern setzt `syncRev` neu; der Abgleich nimmt ihn (oder
  * „gelöscht") als Erwartung mit. Sieht der Server einen älteren Stand, lehnt
@@ -61,7 +66,7 @@ export function nextSyncRev(now = Date.now()): number {
 }
 
 /**
- * Stößt den Abgleich an, ohne dass der Aufrufer wartet.
+ * Führt einen Abgleich aus, ohne dass der Aufrufer wartet.
  *
  * Online wird erst auf die Übertragung der lokalen Schreibvorgänge gewartet:
  * Der Server liest den Eintrag per Admin SDK. Läuft die Zeit dabei ab, oder
@@ -70,6 +75,28 @@ export function nextSyncRev(now = Date.now()): number {
  * die Warteschlange — sie wiederholt mit wachsendem Abstand und meldet am
  * Ende in der Fehlerliste. Verloren geht er so nicht.
  */
+async function runSyncOrEnqueue(
+  what: string,
+  run: () => Promise<unknown>,
+  enqueueSync: () => Promise<void>,
+): Promise<void> {
+  try {
+    if (!isOffline() && !(await waitForFirestoreSync())) {
+      await enqueueSync();
+      return;
+    }
+    try {
+      await run();
+    } catch (err) {
+      console.warn(`geraetEinsatz: ${what} failed, queued`, err);
+      await enqueueSync();
+    }
+  } catch (err: unknown) {
+    console.warn(`geraetEinsatz: ${what} could not be queued`, err);
+  }
+}
+
+/** Stößt den Abgleich des Verbrauchs an (siehe `runSyncOrEnqueue`). */
 export function requestVerbrauchSync(
   firecallId: string,
   entryId: string,
@@ -77,22 +104,23 @@ export function requestVerbrauchSync(
 ): void {
   const key = `${firecallId}/${entryId}`;
   inFlight.add(key);
-  void (async () => {
-    if (!isOffline() && !(await waitForFirestoreSync())) {
-      await enqueueGeraetVerbrauchSync(firecallId, entryId, expect);
-      return;
-    }
-    try {
-      await queueGeraetVerbrauchSync(firecallId, entryId, expect);
-    } catch (err) {
-      console.warn(`geraetEinsatz: sync of ${firecallId}/${entryId} failed, queued`, err);
-      await enqueueGeraetVerbrauchSync(firecallId, entryId, expect);
-    }
-  })()
-    .catch((err: unknown) => {
-      console.warn(`geraetEinsatz: sync of ${firecallId}/${entryId} could not be queued`, err);
-    })
-    .finally(() => inFlight.delete(key));
+  void runSyncOrEnqueue(
+    `sync of ${key}`,
+    () => queueGeraetVerbrauchSync(firecallId, entryId, expect),
+    () => enqueueGeraetVerbrauchSync(firecallId, entryId, expect),
+  ).finally(() => inFlight.delete(key));
+}
+
+/**
+ * Stößt das Protokoll einer Zuordnung an. Ohne Erwartung: Die Action liest
+ * den aktuellen Stand und schreibt nur, was fehlt.
+ */
+function requestZuordnungSync(firecallId: string, entryId: string): void {
+  void runSyncOrEnqueue(
+    `zuordnung log of ${firecallId}/${entryId}`,
+    () => queueGeraetZuordnungSync(firecallId, entryId),
+    () => enqueueGeraetZuordnungSync(firecallId, entryId),
+  );
 }
 
 /**
@@ -122,6 +150,7 @@ export function addGeraetEinsatz(
   const syncRev = nextSyncRev();
   const ref = addDocLocal(entryCollection(firecallId), { ...data, syncRev });
   if (data.art === 'verbraucht') requestVerbrauchSync(firecallId, ref.id, { syncRev });
+  if (data.art === 'zugeordnet') requestZuordnungSync(firecallId, ref.id);
   return ref.id;
 }
 
@@ -140,11 +169,13 @@ export function updateGeraetEinsatz(
 
 /**
  * Löscht den Eintrag. Ein Verbrauch wird beim Abgleich zurückgebucht: Ohne
- * Eintrag ist das Ziel „nichts verbraucht".
+ * Eintrag ist das Ziel „nichts verbraucht". Bei einer Zuordnung kommt das
+ * Ende der Zuordnung ins Protokoll.
  */
 export function deleteGeraetEinsatz(firecallId: string, entry: GeraetEinsatz): void {
   deleteDocLocal(entryDoc(firecallId, entry.id));
   if (entry.art === 'verbraucht') {
     requestVerbrauchSync(firecallId, entry.id, { deleted: true });
   }
+  if (entry.art === 'zugeordnet') requestZuordnungSync(firecallId, entry.id);
 }

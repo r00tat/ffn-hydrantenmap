@@ -1890,6 +1890,7 @@
   },
   "firecall": {
     "fields": {
+      "art": "Art",
       "name": "Bezeichnung",
       "description": "Beschreibung",
       "fw": "Feuerwehr",
@@ -3843,7 +3844,8 @@
     "tabs": {
       "list": "Artikel ({count})",
       "reorder": "Nachzubestellen ({count})",
-      "sets": "Sets ({count})"
+      "sets": "Sets ({count})",
+      "expiring": "Läuft bald ab ({count})"
     },
     "filters": {
       "search": "Suche (Bezeichnung, Inventar-Nr., Barcode)",
@@ -3915,7 +3917,9 @@
       "herstellerTyp": "Typ",
       "baumonat": "Herstellungs-Monat",
       "lebensdauerEinheit": "Lebensdauer in",
-      "barcodesHint": "Mehrere durch Komma getrennt"
+      "barcodesHint": "Mehrere durch Komma getrennt",
+      "ablaufVorlaufTage": "Vorlauf Ablaufwarnung (Tage)",
+      "ablaufVorlaufTageHint": "Ab so vielen Tagen vor dem Ablauf gilt eine Charge als „läuft bald ab“. Leer: 60."
     },
     "verwendungsnachweis": {
       "none": "nicht erfasst",
@@ -4080,6 +4084,143 @@
         "codeCollision": "Der Code „{value}“ gehört schon zum Artikel „{name}“.",
         "codeCollisionSet": "Der Code „{value}“ gehört schon zum Set „{name}“."
       }
+    },
+    "chargen": {
+      "title": "Chargen",
+      "new": "Charge anlegen",
+      "edit": "Charge bearbeiten",
+      "dialogTitleNew": "Neue Charge",
+      "dialogTitleEdit": "Charge bearbeiten",
+      "fields": {
+        "bezeichnung": "Bezeichnung",
+        "produktionsNummer": "LOT / Chargennummer",
+        "einkaufsDatum": "Einkaufsdatum",
+        "ablaufDatum": "Ablaufdatum",
+        "kommentar": "Kommentar"
+      },
+      "columns": {
+        "charge": "Charge",
+        "lot": "LOT",
+        "ablauf": "Ablauf",
+        "menge": "Menge gesamt"
+      },
+      "empty": "Noch keine Charge erfasst.",
+      "showArchived": "archivierte anzeigen",
+      "archived": "archiviert",
+      "status": {
+        "abgelaufen": "abgelaufen",
+        "bald": "läuft bald ab"
+      },
+      "ausbuchen": "Ausbuchen",
+      "ausbuchenTitle": "Charge ausbuchen?",
+      "ausbuchenText": "Der Bestand von „{charge}“ ({menge, number} {einheit}) wird an allen Lagerorten als Inventur ausgebucht, die Charge wird archiviert.",
+      "archivieren": "Archivieren",
+      "archiveOnlyEmpty": "Archivieren geht nur ohne Bestand – sonst ausbuchen.",
+      "chip": "{label}: {menge, number}",
+      "ohneCharge": "ohne Charge: {menge, number}",
+      "zugang": {
+        "title": "Menge (Zugang)",
+        "hint": "Optional: die gelieferte Menge je Lagerort. Sie wird als Zugang gebucht. Ist der Platz noch offen, „ohne Lagerort“ nehmen und später umbuchen.",
+        "ohneLagerort": "ohne Lagerort"
+      },
+      "aufteilen": "Auf Chargen aufteilen",
+      "negative": "Negativer Bestand bei einer Charge oder ohne Charge – bitte per Inventur oder Aufteilung korrigieren.",
+      "split": {
+        "title": "Auf Chargen aufteilen",
+        "hint": "Ordne den Bestand an diesem Lagerort den Chargen zu. Was keiner Charge zugeordnet ist, bleibt „ohne Charge“.",
+        "rest": "ohne Charge: {menge, number}",
+        "restNegative": "Den Chargen ist mehr zugeordnet als vorhanden ({anzahl, number}).",
+        "noChargen": "Der Artikel hat keine aktive Charge. Lege zuerst eine an."
+      },
+      "booking": {
+        "charge": "Charge",
+        "none": "ohne Charge",
+        "neu": "Neue Charge…",
+        "auto": "automatisch (älteste zuerst)",
+        "ablauf": "Ablauf {datum}",
+        "jeCharge": "je Charge zählen"
+      },
+      "expiring": {
+        "hint": "Chargen mit Bestand, die abgelaufen sind oder bald ablaufen – sortiert nach Ablaufdatum.",
+        "menge": "{menge, number} {einheit}"
+      },
+      "errors": {
+        "archiveFailed": "Archivieren fehlgeschlagen: {error}",
+        "ausbuchenFailed": "Ausbuchen fehlgeschlagen: {error}"
+      },
+      "korrektur": {
+        "titleCharge": "Bestand dieser Charge je Lagerort",
+        "titleLagerort": "Chargen an diesem Lagerort",
+        "hint": "Gezählte Menge eintragen – die Differenz wird als Inventur gebucht.",
+        "ohneCharge": "ohne Charge"
+      }
+    },
+    "historie": {
+      "title": "Historie",
+      "empty": "Noch keine Einträge",
+      "loadMore": "Mehr laden",
+      "retry": "Erneut versuchen",
+      "error": "Historie konnte nicht geladen werden: {error}",
+      "unknownUser": "—",
+      "arten": {
+        "verbrauch": "Verbrauch",
+        "zugang": "Zugang",
+        "umbuchung": "Umbuchung",
+        "inventur": "Inventur",
+        "import": "Import",
+        "storno": "Storno",
+        "aufteilung": "Aufteilung",
+        "angelegt": "Angelegt",
+        "stammdaten": "Stammdaten",
+        "archiviert": "Archiviert",
+        "charge": "Charge",
+        "lagerort": "Lagerort",
+        "set": "Set",
+        "zuordnung": "Zugeordnet",
+        "zuordnungEnde": "Zuordnung beendet"
+      },
+      "felder": {
+        "bezeichnung": "Bezeichnung",
+        "kategorie": "Kategorie",
+        "klasse1": "Klasse 1",
+        "klasse2": "Klasse 2",
+        "klasse3": "Klasse 3",
+        "inventarNr": "Inventar-Nr.",
+        "zusatzInventarNr": "Zusatz-Inventar-Nr.",
+        "seriennummer": "Seriennummer",
+        "hersteller": "Hersteller",
+        "herstellerTyp": "Typ",
+        "besitzer": "Besitzer",
+        "bemerkung": "Bemerkung",
+        "einheit": "Einheit",
+        "kostenersatzRateId": "Kostenersatz-Position",
+        "vorlage": "Vorlage",
+        "zubehoer": "Zubehör",
+        "lebensdauerEinheit": "Lebensdauer in",
+        "versicherung": "Haftpflicht-Versicherung",
+        "polizzenummer": "Polizze",
+        "kasko": "Kasko",
+        "materialTyp": "Material-Typ",
+        "einheitVerwendungsnachweis": "Verwendungsnachweis in",
+        "barcodes": "Barcodes",
+        "baujahr": "Baujahr",
+        "anschaffungsDatum": "Anschaffung",
+        "verfuegbarVon": "Verfügbar von",
+        "verfuegbarBis": "Verfügbar bis",
+        "baumonat": "Herstellungs-Monat",
+        "lebensdauer": "Lebensdauer",
+        "einkaufspreis": "Einkaufspreis",
+        "mindestbestand": "Mindestbestand",
+        "ablaufVorlaufTage": "Vorlauf Ablaufwarnung (Tage)",
+        "verbrauchsmaterial": "Verbrauchsmaterial",
+        "active": "Aktiv",
+        "produktionsNummer": "LOT / Chargennummer",
+        "einkaufsDatum": "Einkaufsdatum",
+        "ablaufDatum": "Ablaufdatum",
+        "kommentar": "Kommentar",
+        "externeId": "Sybos-ID",
+        "lagerort": "Lagerort"
+      }
     }
   },
   "geraetEinsatz": {
@@ -4153,7 +4294,18 @@
         "inactive": "inaktiv – wird nicht angelegt",
         "noBestand": "kein Lagerort erfasst – wird nicht angelegt"
       },
-      "setCodeFound": "Set „{name}“ übernommen."
+      "setCodeFound": "Set „{name}“ übernommen.",
+      "chargen": {
+        "title": "Aufteilung auf Chargen",
+        "hint": "An diesem Lagerort liegen mehrere Chargen. Vorbelegt nach Ablaufdatum – was zuerst abläuft, zuerst.",
+        "none": "ohne Charge",
+        "available": "{menge, number} verfügbar",
+        "expired": "abgelaufen {datum}",
+        "expiresSoon": "läuft ab {datum}",
+        "expires": "Ablauf {datum}",
+        "sumMismatch": "Die Summe der Chargen ({summe, number}) entspricht nicht der Menge ({menge, number}).",
+        "invalid": "Bitte je Charge eine gültige Menge angeben."
+      }
     },
     "scanner": {
       "title": "Barcode scannen",
@@ -4176,6 +4328,15 @@
       "removeText": "Alle {count} Einträge des Sets „{name}“ werden entfernt. Verbrauchtes Material wird ins Lager zurückgebucht.",
       "expand": "Aufklappen",
       "collapse": "Zuklappen"
-    }
+    },
+    "chargeCheck": "Charge prüfen",
+    "chargeCheckHint": "Die Charge wurde automatisch nach Ablaufdatum gewählt. Bitte im Eintrag prüfen und speichern.",
+    "chargeNone": "ohne Charge",
+    "chargePart": "{label}: {menge, number}"
+  },
+  "firecallArt": {
+    "einsatz": "Einsatz",
+    "uebung": "Übung",
+    "sonstiges": "Sonstiges"
   }
 }

@@ -28,9 +28,9 @@ export interface NotifyNachbestellungArgs {
  * Die Mängel-Empfänger der Gruppe (`FahrtenbuchConfig.mangelEmails`), auf
  * brauchbare Adressen eingeschränkt — dieselbe Vorsicht wie in
  * `notifyMangel.ts`: Eine kaputte Adresse darf die Mail an die übrigen nicht
- * verhindern.
+ * verhindern. Auch von der Ablauf-Sammelmail (`sendAblaufReports`) genutzt.
  */
-async function recipients(groupId: string): Promise<string[]> {
+export async function mangelRecipients(groupId: string): Promise<string[]> {
   const doc = await firestore
     .collection(FAHRTENBUCH_CONFIG_COLLECTION_ID)
     .doc(groupId)
@@ -44,12 +44,13 @@ async function recipients(groupId: string): Promise<string[]> {
     .filter((value) => isValidEmail(value));
 }
 
-async function groupName(groupId: string): Promise<string | undefined> {
+/** Der Gruppenname für die Mail — schmückend; ein Lesefehler ergibt `undefined`. */
+export async function loadGroupName(groupId: string): Promise<string | undefined> {
   try {
     const doc = await firestore.collection(GROUP_COLLECTION_ID).doc(groupId).get();
     return (doc.data() as Group | undefined)?.name;
   } catch (err) {
-    console.warn('notifyNachbestellung: Gruppenname nicht lesbar', err, { groupId });
+    console.warn('Geraete: Gruppenname nicht lesbar', err, { groupId });
     return undefined;
   }
 }
@@ -74,7 +75,7 @@ export async function notifyNachbestellung({
 }: NotifyNachbestellungArgs): Promise<boolean> {
   if (items.length === 0) return false;
   try {
-    const [to, ...cc] = await recipients(groupId);
+    const [to, ...cc] = await mangelRecipients(groupId);
     if (!to) return false;
 
     const from = mailSender();
@@ -83,7 +84,7 @@ export async function notifyNachbestellung({
     const { raw } = buildNachbestellungEmail({
       items,
       groupId,
-      groupName: await groupName(groupId),
+      groupName: await loadGroupName(groupId),
       firecallName,
       appBaseUrl: await getBaseUrl(),
       from,

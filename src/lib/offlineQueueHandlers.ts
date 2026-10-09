@@ -7,6 +7,8 @@ import app, { firestore } from '../components/firebase/firebase';
 import '../components/Atemschutz/ueberwachungWarnungQueue';
 // Registriert den Handler des Materialverbrauchs im Einsatz (Abbuchen vom Lager).
 import '../components/Geraete/geraetVerbrauchQueue';
+// Registriert den Handler des Protokolls der Gerätezuordnung im Einsatz.
+import '../components/Geraete/geraetZuordnungQueue';
 import { ensureFreshAuth } from '../hooks/auth/ensureFreshAuth';
 import { updateDocLocal } from './firestoreClient';
 import { waitForFirestoreSync } from './firestoreSync';

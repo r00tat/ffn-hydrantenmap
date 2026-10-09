@@ -187,6 +187,10 @@ module "cloud_scheduler" {
   # den Job von Hand auslösen oder `dryRun` verwenden.
   weekly_report_paused = true
 
+  # Aus demselben Grund pausiert: Auch die Ablauf-Sammelmail der Chargen geht
+  # an die Mängel-Empfänger.
+  ablauf_report_paused = true
+
 }
 
 # Die Allowlist oben wird aus Zeichenketten gebaut, weil eine Referenz auf das

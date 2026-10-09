@@ -102,7 +102,7 @@ describe('applyStockDelta', () => {
 describe('reconcileVerbrauch', () => {
   it('bucht einen neuen Verbrauch ab', () => {
     expect(reconcileVerbrauch({ bestandId: 'b1', menge: 3 }, [])).toEqual([
-      { bestandId: 'b1', delta: -3 },
+      { bestandId: 'b1', chargeId: null, delta: -3 },
     ]);
   });
 
@@ -119,12 +119,12 @@ describe('reconcileVerbrauch', () => {
       reconcileVerbrauch({ bestandId: 'b1', menge: 5 }, [
         { bestandId: 'b1', menge: -3 },
       ]),
-    ).toEqual([{ bestandId: 'b1', delta: -2 }]);
+    ).toEqual([{ bestandId: 'b1', chargeId: null, delta: -2 }]);
     expect(
       reconcileVerbrauch({ bestandId: 'b1', menge: 1 }, [
         { bestandId: 'b1', menge: -3 },
       ]),
-    ).toEqual([{ bestandId: 'b1', delta: 2 }]);
+    ).toEqual([{ bestandId: 'b1', chargeId: null, delta: 2 }]);
   });
 
   it('bucht beim Wechsel des Lagerorts um', () => {
@@ -133,8 +133,8 @@ describe('reconcileVerbrauch', () => {
         { bestandId: 'b1', menge: -3 },
       ]),
     ).toEqual([
-      { bestandId: 'b2', delta: -3 },
-      { bestandId: 'b1', delta: 3 },
+      { bestandId: 'b2', chargeId: null, delta: -3 },
+      { bestandId: 'b1', chargeId: null, delta: 3 },
     ]);
   });
 
@@ -144,7 +144,7 @@ describe('reconcileVerbrauch', () => {
         { bestandId: 'b1', menge: -3 },
         { bestandId: 'b1', menge: -2 },
       ]),
-    ).toEqual([{ bestandId: 'b1', delta: 5 }]);
+    ).toEqual([{ bestandId: 'b1', chargeId: null, delta: 5 }]);
   });
 
   it('summiert frühere Korrekturen mit', () => {
@@ -163,7 +163,7 @@ describe('reconcileVerbrauch', () => {
       reconcileVerbrauch({ bestandId: 'b1', menge: Number.NaN }, [
         { bestandId: 'b1', menge: -2 },
       ]),
-    ).toEqual([{ bestandId: 'b1', delta: 2 }]);
+    ).toEqual([{ bestandId: 'b1', chargeId: null, delta: 2 }]);
   });
 
   it('rechnet Kommazahlen ohne Rundungsrest', () => {
@@ -173,6 +173,115 @@ describe('reconcileVerbrauch', () => {
         { bestandId: 'b1', menge: -0.2 },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('reconcileVerbrauch mit Chargen', () => {
+  it('bucht die Teile je Charge ab', () => {
+    expect(
+      reconcileVerbrauch(
+        {
+          bestandId: 'b1',
+          menge: 5,
+          teile: [
+            { chargeId: 'c1', menge: 3 },
+            { chargeId: null, menge: 2 },
+          ],
+        },
+        [],
+      ),
+    ).toEqual([
+      { bestandId: 'b1', chargeId: 'c1', delta: -3 },
+      { bestandId: 'b1', chargeId: null, delta: -2 },
+    ]);
+  });
+
+  it('bucht beim Chargenwechsel gleicher Menge um', () => {
+    expect(
+      reconcileVerbrauch({ bestandId: 'b1', menge: 3, teile: [{ chargeId: 'c2', menge: 3 }] }, [
+        { bestandId: 'b1', menge: -3, chargeId: 'c1' },
+      ]),
+    ).toEqual([
+      { bestandId: 'b1', chargeId: 'c2', delta: -3 },
+      { bestandId: 'b1', chargeId: 'c1', delta: 3 },
+    ]);
+  });
+
+  it('bucht nur die Differenz einer geänderten Aufteilung', () => {
+    expect(
+      reconcileVerbrauch(
+        {
+          bestandId: 'b1',
+          menge: 5,
+          teile: [
+            { chargeId: 'c1', menge: 1 },
+            { chargeId: 'c2', menge: 4 },
+          ],
+        },
+        [
+          { bestandId: 'b1', menge: -3, chargeId: 'c1' },
+          { bestandId: 'b1', menge: -2, chargeId: 'c2' },
+        ],
+      ),
+    ).toEqual([
+      { bestandId: 'b1', chargeId: 'c1', delta: 2 },
+      { bestandId: 'b1', chargeId: 'c2', delta: -2 },
+    ]);
+  });
+
+  it('storniert einen gelöschten Verbrauch je Charge', () => {
+    expect(
+      reconcileVerbrauch(null, [
+        { bestandId: 'b1', menge: -3, chargeId: 'c1' },
+        { bestandId: 'b1', menge: -2 },
+        { bestandId: 'b1', menge: -1, chargeId: 'c1' },
+      ]),
+    ).toEqual([
+      { bestandId: 'b1', chargeId: 'c1', delta: 4 },
+      { bestandId: 'b1', chargeId: null, delta: 2 },
+    ]);
+  });
+
+  it('zählt alte Buchungen ohne Charge als Rest ohne Charge', () => {
+    expect(
+      reconcileVerbrauch(
+        {
+          bestandId: 'b1',
+          menge: 3,
+          teile: [
+            { chargeId: null, menge: 1 },
+            { chargeId: 'c1', menge: 2 },
+          ],
+        },
+        [{ bestandId: 'b1', menge: -3 }],
+      ),
+    ).toEqual([
+      { bestandId: 'b1', chargeId: null, delta: 2 },
+      { bestandId: 'b1', chargeId: 'c1', delta: -2 },
+    ]);
+  });
+
+  it('ist nach dem Buchen idempotent', () => {
+    const target = {
+      bestandId: 'b1',
+      menge: 5,
+      teile: [
+        { chargeId: 'c1', menge: 3 },
+        { chargeId: null, menge: 2 },
+        { chargeId: 'c2', menge: 0 },
+      ],
+    };
+    const first = reconcileVerbrauch(target, [{ bestandId: 'b0', menge: -4, chargeId: 'c9' }]);
+    const booked = [
+      { bestandId: 'b0', menge: -4, chargeId: 'c9' },
+      ...first.map((c) => ({ bestandId: c.bestandId, menge: c.delta, chargeId: c.chargeId })),
+    ];
+    expect(first).toEqual([
+      { bestandId: 'b1', chargeId: 'c1', delta: -3 },
+      { bestandId: 'b1', chargeId: null, delta: -2 },
+      { bestandId: 'b0', chargeId: 'c9', delta: 4 },
+    ]);
+    expect(reconcileVerbrauch(target, booked)).toEqual([]);
   });
 });
 
@@ -230,10 +339,37 @@ describe('capVerbrauchTarget', () => {
     });
   });
 
+  it('summiert das Gebuchte über alle Chargen des Lagerorts', () => {
+    const booked = [
+      { bestandId: 'b1', menge: -2, chargeId: 'c1' },
+      { bestandId: 'b1', menge: -1 },
+    ];
+    expect(capVerbrauchTarget({ bestandId: 'b1', menge: 8 }, booked, false)).toEqual({
+      bestandId: 'b1',
+      menge: 3,
+    });
+  });
+
+  it('behält die Teile eines buchbaren Artikels, verwirft sie beim Begrenzen', () => {
+    const teile = [{ chargeId: 'c1', menge: 5 }];
+    expect(capVerbrauchTarget({ bestandId: 'b1', menge: 5, teile }, [], true)).toEqual({
+      bestandId: 'b1',
+      menge: 5,
+      teile,
+    });
+    expect(
+      capVerbrauchTarget(
+        { bestandId: 'b1', menge: 5, teile },
+        [{ bestandId: 'b1', menge: -5, chargeId: 'c1' }],
+        false,
+      ),
+    ).toEqual({ bestandId: 'b1', menge: 5 });
+  });
+
   it('bucht bei einem Lagerortwechsel nur zurück', () => {
     const booked = [{ bestandId: 'b1', menge: -3 }];
     const capped = capVerbrauchTarget({ bestandId: 'b2', menge: 3 }, booked, false);
     expect(capped).toBeNull();
-    expect(reconcileVerbrauch(capped, booked)).toEqual([{ bestandId: 'b1', delta: 3 }]);
+    expect(reconcileVerbrauch(capped, booked)).toEqual([{ bestandId: 'b1', chargeId: null, delta: 3 }]);
   });
 });

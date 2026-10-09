@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useState, type ReactNode } from 'react';
 import {
+  GERAET_ABLAUF_VORLAUF_TAGE,
   GERAET_MATERIAL_TYPEN,
   type Geraet,
   type GeraetEinheitVerwendungsnachweis,
@@ -125,6 +126,9 @@ export default function GeraetEditDialog({
   const [mindestbestand, setMindestbestand] = useState(
     geraet?.mindestbestand != null ? String(geraet.mindestbestand) : '',
   );
+  const [vorlauf, setVorlauf] = useState(
+    geraet?.ablaufVorlaufTage != null ? String(geraet.ablaufVorlaufTage) : '',
+  );
   const [nachweis, setNachweis] = useState<Nachweis>(
     geraet?.einheitVerwendungsnachweis ?? '',
   );
@@ -188,6 +192,14 @@ export default function GeraetEditDialog({
         return;
       }
     }
+    let vorlaufTage: number | undefined;
+    if (verbrauchsmaterial && vorlauf.trim()) {
+      vorlaufTage = Number(vorlauf.replace(',', '.'));
+      if (!Number.isInteger(vorlaufTage) || vorlaufTage < 0 || vorlaufTage > 3650) {
+        setError(t('errors.fieldInvalid', { field: t('fields.ablaufVorlaufTage') }));
+        return;
+      }
+    }
 
     setBusy(true);
     // `saveGeraet` ändert nur übergebene Felder: ein leerer Text löscht das
@@ -206,6 +218,8 @@ export default function GeraetEditDialog({
       // Der Mindestbestand gilt nur für Verbrauchsmaterial — ein Gerät wird
       // nicht nachbestellt. `null` löscht ihn samt Nachbestellmarke.
       mindestbestand: verbrauchsmaterial && min !== undefined ? min : null,
+      // Ohne Angabe (oder bei einem Gerät) gilt der Standard-Vorlauf.
+      ablaufVorlaufTage: verbrauchsmaterial && vorlaufTage !== undefined ? vorlaufTage : null,
       einheitVerwendungsnachweis: nachweis,
       active,
     };
@@ -269,6 +283,21 @@ export default function GeraetEditDialog({
                 fullWidth
               />
             </Row>
+            {verbrauchsmaterial && (
+              <TextField
+                label={t('fields.ablaufVorlaufTage')}
+                helperText={t('fields.ablaufVorlaufTageHint')}
+                value={vorlauf}
+                onChange={(e) => setVorlauf(e.target.value)}
+                type="number"
+                placeholder={String(GERAET_ABLAUF_VORLAUF_TAGE)}
+                slotProps={{
+                  htmlInput: { min: 0, max: 3650, step: 1, inputMode: 'numeric' },
+                  inputLabel: { shrink: true },
+                }}
+                fullWidth
+              />
+            )}
             <Row>
               <TextField
                 select

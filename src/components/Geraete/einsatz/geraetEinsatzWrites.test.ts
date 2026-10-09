@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   waitForFirestoreSync: vi.fn(async () => true),
   queueSync: vi.fn(async (..._args: unknown[]): Promise<'done' | 'queued'> => 'done'),
   enqueueSync: vi.fn(async (..._args: unknown[]) => undefined),
+  queueZuordnung: vi.fn(async (..._args: unknown[]): Promise<'done' | 'queued'> => 'done'),
+  enqueueZuordnung: vi.fn(async (..._args: unknown[]) => undefined),
   queued: new Set<string>(),
 }));
 
@@ -32,6 +34,11 @@ vi.mock('../geraetVerbrauchQueue', () => ({
   enqueueGeraetVerbrauchSync: mocks.enqueueSync,
   isGeraetVerbrauchQueued: (firecallId: string, entryId: string) =>
     mocks.queued.has(`${firecallId}/${entryId}`),
+}));
+
+vi.mock('../geraetZuordnungQueue', () => ({
+  queueGeraetZuordnungSync: mocks.queueZuordnung,
+  enqueueGeraetZuordnungSync: mocks.enqueueZuordnung,
 }));
 
 import {
@@ -71,6 +78,7 @@ describe('geraetEinsatzWrites', () => {
     vi.clearAllMocks();
     mocks.waitForFirestoreSync.mockResolvedValue(true);
     mocks.queueSync.mockResolvedValue('done');
+    mocks.queueZuordnung.mockResolvedValue('done');
     mocks.queued.clear();
   });
 
@@ -130,10 +138,45 @@ describe('geraetEinsatzWrites', () => {
     expect(nextSyncRev(b + 5000)).toBe(b + 5000);
   });
 
-  it('eine Zuordnung braucht keinen Abgleich', async () => {
+  it('eine Zuordnung braucht keinen Verbrauchsabgleich, wird aber protokolliert', async () => {
     addGeraetEinsatz('fc1', zuordnung);
     await flush();
     expect(mocks.queueSync).not.toHaveBeenCalled();
+    expect(mocks.waitForFirestoreSync).toHaveBeenCalled();
+    expect(mocks.queueZuordnung).toHaveBeenCalledWith('fc1', 'new-entry');
+  });
+
+  it('ein Verbrauch stößt kein Zuordnungsprotokoll an', async () => {
+    addGeraetEinsatz('fc1', verbrauch);
+    deleteGeraetEinsatz('fc1', { id: 'e2', ...verbrauch });
+    await flush();
+    expect(mocks.queueZuordnung).not.toHaveBeenCalled();
+  });
+
+  it('reiht das Zuordnungsprotokoll offline direkt ein', async () => {
+    mocks.offline = true;
+    addGeraetEinsatz('fc1', zuordnung);
+    await flush();
+    expect(mocks.waitForFirestoreSync).not.toHaveBeenCalled();
+    expect(mocks.queueZuordnung).toHaveBeenCalledWith('fc1', 'new-entry');
+  });
+
+  it('reiht das Zuordnungsprotokoll ein, wenn Firestore online nicht rechtzeitig überträgt', async () => {
+    mocks.waitForFirestoreSync.mockResolvedValue(false);
+    addGeraetEinsatz('fc1', zuordnung);
+    await flush();
+    expect(mocks.queueZuordnung).not.toHaveBeenCalled();
+    expect(mocks.enqueueZuordnung).toHaveBeenCalledWith('fc1', 'new-entry');
+  });
+
+  it('reiht das Zuordnungsprotokoll ein, wenn der Aufruf scheitert', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mocks.queueZuordnung.mockRejectedValueOnce(new Error('ABORTED'));
+    expect(() => addGeraetEinsatz('fc1', zuordnung)).not.toThrow();
+    await flush();
+    expect(mocks.enqueueZuordnung).toHaveBeenCalledWith('fc1', 'new-entry');
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('ändert lokal mit neuem Stand und gleicht einen Verbrauch neu ab', async () => {
@@ -161,10 +204,11 @@ describe('geraetEinsatzWrites', () => {
     expect(mocks.queueSync).toHaveBeenCalledWith('fc1', 'e2', { deleted: true });
   });
 
-  it('Löschen einer Zuordnung ohne Abgleich', async () => {
+  it('Löschen einer Zuordnung ohne Verbrauchsabgleich, aber mit Protokoll', async () => {
     deleteGeraetEinsatz('fc1', { id: 'e3', ...zuordnung });
     await flush();
     expect(mocks.queueSync).not.toHaveBeenCalled();
+    expect(mocks.queueZuordnung).toHaveBeenCalledWith('fc1', 'e3');
   });
 
   it('ein nicht einreihbarer Abgleich wirft nicht in den Dialog', async () => {

@@ -1890,6 +1890,7 @@
   },
   "firecall": {
     "fields": {
+      "art": "Type",
       "name": "Name",
       "description": "Description",
       "fw": "Fire department",
@@ -3843,7 +3844,8 @@
     "tabs": {
       "list": "Items ({count})",
       "reorder": "To reorder ({count})",
-      "sets": "Sets ({count})"
+      "sets": "Sets ({count})",
+      "expiring": "Expiring soon ({count})"
     },
     "filters": {
       "search": "Search (name, inventory no., barcode)",
@@ -3915,7 +3917,9 @@
       "herstellerTyp": "Model",
       "baumonat": "Month of manufacture",
       "lebensdauerEinheit": "Service life in",
-      "barcodesHint": "Separate several with commas"
+      "barcodesHint": "Separate several with commas",
+      "ablaufVorlaufTage": "Expiry warning lead time (days)",
+      "ablaufVorlaufTageHint": "A batch counts as “expires soon” this many days before expiry. Empty: 60."
     },
     "verwendungsnachweis": {
       "none": "not recorded",
@@ -4080,6 +4084,143 @@
         "codeCollision": "The code “{value}” already belongs to the article “{name}”.",
         "codeCollisionSet": "The code “{value}” already belongs to the set “{name}”."
       }
+    },
+    "chargen": {
+      "title": "Batches",
+      "new": "Add batch",
+      "edit": "Edit batch",
+      "dialogTitleNew": "New batch",
+      "dialogTitleEdit": "Edit batch",
+      "fields": {
+        "bezeichnung": "Name",
+        "produktionsNummer": "LOT / batch number",
+        "einkaufsDatum": "Purchase date",
+        "ablaufDatum": "Expiry date",
+        "kommentar": "Comment"
+      },
+      "columns": {
+        "charge": "Batch",
+        "lot": "LOT",
+        "ablauf": "Expiry",
+        "menge": "Total quantity"
+      },
+      "empty": "No batch recorded yet.",
+      "showArchived": "show archived",
+      "archived": "archived",
+      "status": {
+        "abgelaufen": "expired",
+        "bald": "expires soon"
+      },
+      "ausbuchen": "Write off",
+      "ausbuchenTitle": "Write off batch?",
+      "ausbuchenText": "The stock of “{charge}” ({menge, number} {einheit}) is written off as a stocktake at all storage locations, and the batch is archived.",
+      "archivieren": "Archive",
+      "archiveOnlyEmpty": "Only a batch without stock can be archived – write it off otherwise.",
+      "chip": "{label}: {menge, number}",
+      "ohneCharge": "without batch: {menge, number}",
+      "zugang": {
+        "title": "Quantity (receipt)",
+        "hint": "Optional: the delivered quantity per storage location, booked as a receipt. If the place is still open, use “no storage location” and transfer it later.",
+        "ohneLagerort": "no storage location"
+      },
+      "aufteilen": "Split into batches",
+      "negative": "Negative stock in a batch or without batch – please correct it with a stocktake or a split.",
+      "split": {
+        "title": "Split into batches",
+        "hint": "Assign the stock at this storage location to batches. Whatever is not assigned stays “without batch”.",
+        "rest": "without batch: {menge, number}",
+        "restNegative": "More is assigned to batches than is in stock ({anzahl, number}).",
+        "noChargen": "The article has no active batch. Add one first."
+      },
+      "booking": {
+        "charge": "Batch",
+        "none": "without batch",
+        "neu": "New batch…",
+        "auto": "automatic (oldest first)",
+        "ablauf": "expires {datum}",
+        "jeCharge": "count per batch"
+      },
+      "expiring": {
+        "hint": "Batches in stock that have expired or expire soon – sorted by expiry date.",
+        "menge": "{menge, number} {einheit}"
+      },
+      "errors": {
+        "archiveFailed": "Archiving failed: {error}",
+        "ausbuchenFailed": "Write-off failed: {error}"
+      },
+      "korrektur": {
+        "titleCharge": "Stock of this batch per location",
+        "titleLagerort": "Batches at this location",
+        "hint": "Enter the counted quantity – the difference is booked as a stocktake.",
+        "ohneCharge": "without batch"
+      }
+    },
+    "historie": {
+      "title": "History",
+      "empty": "No entries yet",
+      "loadMore": "Load more",
+      "retry": "Try again",
+      "error": "Could not load history: {error}",
+      "unknownUser": "—",
+      "arten": {
+        "verbrauch": "Consumption",
+        "zugang": "Receipt",
+        "umbuchung": "Transfer",
+        "inventur": "Stocktake",
+        "import": "Import",
+        "storno": "Reversal",
+        "aufteilung": "Split",
+        "angelegt": "Created",
+        "stammdaten": "Master data",
+        "archiviert": "Archived",
+        "charge": "Batch",
+        "lagerort": "Storage location",
+        "set": "Set",
+        "zuordnung": "Assigned",
+        "zuordnungEnde": "Assignment ended"
+      },
+      "felder": {
+        "bezeichnung": "Name",
+        "kategorie": "Category",
+        "klasse1": "Class 1",
+        "klasse2": "Class 2",
+        "klasse3": "Class 3",
+        "inventarNr": "Inventory no.",
+        "zusatzInventarNr": "Additional inventory no.",
+        "seriennummer": "Serial number",
+        "hersteller": "Manufacturer",
+        "herstellerTyp": "Model",
+        "besitzer": "Owner",
+        "bemerkung": "Remark",
+        "einheit": "Unit",
+        "kostenersatzRateId": "Cost recovery item",
+        "vorlage": "Template",
+        "zubehoer": "Accessories",
+        "lebensdauerEinheit": "Service life in",
+        "versicherung": "Liability insurance",
+        "polizzenummer": "Policy",
+        "kasko": "Comprehensive insurance",
+        "materialTyp": "Material type",
+        "einheitVerwendungsnachweis": "Usage recorded in",
+        "barcodes": "Barcodes",
+        "baujahr": "Year of manufacture",
+        "anschaffungsDatum": "Purchased",
+        "verfuegbarVon": "Available from",
+        "verfuegbarBis": "Available until",
+        "baumonat": "Month of manufacture",
+        "lebensdauer": "Service life",
+        "einkaufspreis": "Purchase price",
+        "mindestbestand": "Minimum stock",
+        "ablaufVorlaufTage": "Expiry warning lead time (days)",
+        "verbrauchsmaterial": "Consumable",
+        "active": "Active",
+        "produktionsNummer": "LOT / batch number",
+        "einkaufsDatum": "Purchase date",
+        "ablaufDatum": "Expiry date",
+        "kommentar": "Comment",
+        "externeId": "Sybos ID",
+        "lagerort": "Storage location"
+      }
     }
   },
   "geraetEinsatz": {
@@ -4153,7 +4294,18 @@
         "inactive": "inactive – not created",
         "noBestand": "no storage location – not created"
       },
-      "setCodeFound": "Set “{name}” added."
+      "setCodeFound": "Set “{name}” added.",
+      "chargen": {
+        "title": "Split across batches",
+        "hint": "Several batches are stored at this location. Prefilled by expiry date – first expiring, first out.",
+        "none": "no batch",
+        "available": "{menge, number} available",
+        "expired": "expired {datum}",
+        "expiresSoon": "expires {datum}",
+        "expires": "Expiry {datum}",
+        "sumMismatch": "The sum of the batches ({summe, number}) does not match the quantity ({menge, number}).",
+        "invalid": "Please enter a valid quantity for each batch."
+      }
     },
     "scanner": {
       "title": "Scan barcode",
@@ -4176,6 +4328,15 @@
       "removeText": "All {count} entries of the set “{name}” will be removed. Consumed supplies are booked back to stock.",
       "expand": "Expand",
       "collapse": "Collapse"
-    }
+    },
+    "chargeCheck": "Check batch",
+    "chargeCheckHint": "The batch was chosen automatically by expiry date. Please check it in the entry and save.",
+    "chargeNone": "no batch",
+    "chargePart": "{label}: {menge, number}"
+  },
+  "firecallArt": {
+    "einsatz": "Operation",
+    "uebung": "Exercise",
+    "sonstiges": "Other"
   }
 }

@@ -157,6 +157,8 @@ const fake = vi.hoisted(() => {
 
   const firestore = {
     collection: (name: string) => collectionRef(name),
+    getAll: (...refs: { get: () => Promise<FakeSnap> }[]) =>
+      Promise.all(refs.map((r) => r.get())),
     batch() {
       const writes: Write[] = [];
       return {
@@ -262,20 +264,34 @@ vi.mock('../../common/xlsx', () => ({
     JSON.parse(Buffer.from(data).toString('utf-8')) as string[][],
 }));
 
-import { deviationKey, lagerortKey, type GeraetLagerort } from '../../common/geraet';
+import {
+  deviationKey,
+  GERAET_CHARGE_MAX_TEXT,
+  GERAET_CHARGEN_MAX,
+  isBestandBuchung,
+  lagerortKey,
+  type GeraetBuchungArt,
+  type GeraetLagerort,
+} from '../../common/geraet';
 import { GERAET_EXPORT_COLUMNS } from '../../common/geraetImport';
 import {
+  archiveGeraetCharge,
+  aufteilenGeraetBestand,
+  ausbuchenGeraetCharge,
   bookGeraetBestand,
   createGeraetBestand,
   deleteGeraet,
   deleteGeraetBestand,
   deleteGeraetSet,
   importGeraete,
+  korrigiereGeraetChargenBestand,
   previewGeraetImport,
   saveGeraet,
+  saveGeraetCharge,
   saveGeraetSet,
   setGeraeteVerbrauchsmaterial,
   syncGeraetVerbrauch,
+  syncGeraetZuordnung,
   updateGeraetBestand,
 } from './geraeteActions';
 
@@ -308,18 +324,41 @@ function putBestand(id: string, geraetId: string, lagerort: GeraetLagerort, anza
   });
 }
 
+type BuchungRow = {
+  id: string;
+  art: string;
+  menge: number;
+  bestandId: string;
+  geraetId: string;
+  zielBestandId?: string;
+  einsatzEintragId?: string;
+  firecallId?: string;
+  firecallName?: string;
+  firecallArt?: string;
+  chargeId?: string;
+  bemerkung?: string;
+  lagerortText?: string;
+  aenderungen?: { feld: string; vorher?: string; nachher?: string }[];
+  createdBy: string;
+};
+
+/** Alle Einträge in `geraetBuchung`, Mengenbuchungen und Protokoll. */
+function alleBuchungen() {
+  return fake.list(`${G}/geraetBuchung`) as unknown as BuchungRow[];
+}
+
+/** Nur die Buchungen, die eine Menge bewegen. */
 function buchungen() {
-  return fake.list(`${G}/geraetBuchung`) as unknown as {
-    id: string;
-    art: string;
-    menge: number;
-    bestandId: string;
-    geraetId: string;
-    zielBestandId?: string;
-    einsatzEintragId?: string;
-    firecallId?: string;
-    createdBy: string;
-  }[];
+  return alleBuchungen().filter((b) => isBestandBuchung(b.art as GeraetBuchungArt));
+}
+
+/** Nur die Protokolleinträge ohne Menge (Stammdaten, Chargen, Lagerorte …). */
+function protokoll(geraetId?: string) {
+  return alleBuchungen().filter(
+    (b) =>
+      !isBestandBuchung(b.art as GeraetBuchungArt) &&
+      (geraetId === undefined || b.geraetId === geraetId),
+  );
 }
 
 function geraet(id: string) {
@@ -359,6 +398,10 @@ describe('Guards der Pflege-Actions', () => {
     ],
     ['updateGeraetBestand', () => updateGeraetBestand('ffnd', 'b1', lager)],
     ['deleteGeraetBestand', () => deleteGeraetBestand('ffnd', 'b1')],
+    [
+      'korrigiereGeraetChargenBestand',
+      () => korrigiereGeraetChargenBestand('ffnd', 'g1', [{ bestandId: 'b1', chargeId: null, menge: 0 }]),
+    ],
     ['previewGeraetImport', () => previewGeraetImport('ffnd', '')],
     ['importGeraete', () => importGeraete('ffnd', '', [])],
   ])('%s verlangt Gruppen-Admin oder Gerätemeister', async (_name, call) => {
@@ -566,7 +609,7 @@ describe('deleteGeraet', () => {
     await expect(deleteGeraet('ffnd', 'g1')).resolves.toEqual({ id: 'g1', deleted: true });
     expect(geraet('g1')).toBeUndefined();
     expect(bestand('b1')).toBeUndefined();
-    expect(buchungen()).toHaveLength(0);
+    expect(alleBuchungen()).toHaveLength(0);
     expect(bestand('b2')).toBeDefined();
   });
 
@@ -577,6 +620,49 @@ describe('deleteGeraet', () => {
     await expect(deleteGeraet('ffnd', 'g1')).resolves.toEqual({ id: 'g1', deleted: false });
     expect(geraet('g1')!.active).toBe(false);
     expect(bestand('b1')).toBeDefined();
+  });
+
+  it('löscht einen Artikel, der neben dem Import nur Protokolleinträge hat', async () => {
+    putGeraet('g1', { bestandGesamt: 3 });
+    putBestand('b1', 'g1', srf, 3);
+    fake.put(`${G}/geraetBuchung/k1`, { geraetId: 'g1', bestandId: 'b1', art: 'import', menge: 3 });
+    fake.put(`${G}/geraetBuchung/k2`, {
+      geraetId: 'g1',
+      art: 'stammdaten',
+      menge: 0,
+      aenderungen: [{ feld: 'mindestbestand', vorher: '2', nachher: '5' }],
+    });
+    fake.put(`${G}/geraetBuchung/k3`, { geraetId: 'g1', bestandId: 'b1', art: 'lagerort', menge: 0 });
+    await expect(deleteGeraet('ffnd', 'g1')).resolves.toEqual({ id: 'g1', deleted: true });
+    expect(geraet('g1')).toBeUndefined();
+    expect(bestand('b1')).toBeUndefined();
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+});
+
+describe('createdByName an der Buchung', () => {
+  it('schreibt den Namen des Erfassers', async () => {
+    putGeraet('g1');
+    await createGeraetBestand('ffnd', 'g1', srf, 4);
+    expect(buchungen()).toEqual([
+      expect.objectContaining({ createdBy: 'u1', createdByName: 'Max Mustermann' }),
+    ]);
+  });
+
+  it('nimmt ohne Namen die E-Mail', async () => {
+    managerGuard.mockResolvedValue({
+      user: { id: 'u1', email: 'max@example.org', groups: ['ffnd'] },
+    });
+    putGeraet('g1');
+    await createGeraetBestand('ffnd', 'g1', srf, 4);
+    expect(buchungen()[0]).toMatchObject({ createdByName: 'max@example.org' });
+  });
+
+  it('lässt das Feld ohne Namen und E-Mail weg', async () => {
+    managerGuard.mockResolvedValue({ user: { id: 'u1', groups: ['ffnd'] } });
+    putGeraet('g1');
+    await createGeraetBestand('ffnd', 'g1', srf, 4);
+    expect(buchungen()[0]).not.toHaveProperty('createdByName');
   });
 });
 
@@ -923,6 +1009,22 @@ describe('syncGeraetVerbrauch', () => {
       requireGroupMember: true,
     });
     expect(buchungen()).toHaveLength(0);
+  });
+
+  it('übergeht Protokolleinträge mit derselben einsatzEintragId', async () => {
+    putEintrag('e1', {});
+    fake.put(`${G}/geraetBuchung/p1`, {
+      geraetId: 'g1',
+      art: 'zuordnung',
+      menge: 0,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+    });
+    await syncGeraetVerbrauch('fc1', 'e1');
+    expect(bestand('b1')!.anzahl).toBe(1);
+    expect(buchungen().filter((b) => b.art === 'verbrauch')).toEqual([
+      expect.objectContaining({ bestandId: 'b1', menge: -3, createdByName: 'Max Mustermann' }),
+    ]);
   });
 
   describe('erwarteter Stand des Eintrags', () => {
@@ -1567,5 +1669,1452 @@ describe('deleteGeraetSet', () => {
 
   it('meldet ein unbekanntes Set mit 404', async () => {
     await expect(deleteGeraetSet('ffnd', 'weg')).rejects.toThrow(/not found/);
+  });
+
+  it('protokolliert nur an Artikeln, die es noch gibt', async () => {
+    putGeraet('besen', { bezeichnung: 'Besen', verbrauchsmaterial: false });
+    putSet('s1', {
+      inhalt: [{ geraetId: 'besen' }, { geraetId: 'geloescht' }],
+      sybosSetArtikelId: 'kiste-weg',
+    });
+    await deleteGeraetSet('ffnd', 's1');
+    expect(geraetSet('s1')).toBeUndefined();
+    expect(alleBuchungen().map((b) => [b.geraetId, b.art])).toEqual([['besen', 'set']]);
+  });
+});
+
+// --- Chargen ----------------------------------------------------------------
+
+describe('Chargen', () => {
+  const chargeA = {
+    id: 'cA',
+    produktionsNummer: 'A',
+    ablaufDatum: '2026-12-01',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    createdBy: 'u0',
+  };
+  const chargeB = {
+    id: 'cB',
+    produktionsNummer: 'B',
+    ablaufDatum: '2027-06-01',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    createdBy: 'u0',
+  };
+  const chargeAlt = { ...chargeB, id: 'cX', produktionsNummer: 'X', archiviert: true };
+
+  function putChargenBestand(
+    id: string,
+    lagerort: GeraetLagerort,
+    anzahl: number,
+    chargen?: Record<string, number>,
+  ) {
+    putBestand(id, 'g1', lagerort, anzahl);
+    if (chargen) fake.put(`${G}/geraetBestand/${id}`, { ...bestand(id)!, chargen });
+  }
+
+  function chargenOf(geraetId: string) {
+    return geraet(geraetId)!.chargen as Record<string, unknown>[];
+  }
+
+  describe('saveGeraet', () => {
+    it('ignoriert chargen und prüft ablaufVorlaufTage', async () => {
+      putGeraet('g1', { chargen: [chargeA] });
+      await saveGeraet('ffnd', { id: 'g1', chargen: [], ablaufVorlaufTage: 30 } as never);
+      expect(geraet('g1')!.chargen).toEqual([chargeA]);
+      expect(geraet('g1')!.ablaufVorlaufTage).toBe(30);
+
+      await saveGeraet('ffnd', { id: 'g1', ablaufVorlaufTage: 1.5 });
+      expect(geraet('g1')).not.toHaveProperty('ablaufVorlaufTage');
+      await saveGeraet('ffnd', { id: 'g1', ablaufVorlaufTage: 0 });
+      expect(geraet('g1')!.ablaufVorlaufTage).toBe(0);
+      await saveGeraet('ffnd', { id: 'g1', ablaufVorlaufTage: 3651 });
+      expect(geraet('g1')).not.toHaveProperty('ablaufVorlaufTage');
+      await saveGeraet('ffnd', { id: 'g1', ablaufVorlaufTage: 10 });
+      await saveGeraet('ffnd', { id: 'g1', ablaufVorlaufTage: null });
+      expect(geraet('g1')).not.toHaveProperty('ablaufVorlaufTage');
+
+      const { id } = await saveGeraet('ffnd', {
+        bezeichnung: 'Neu',
+        chargen: [chargeA],
+        ablaufVorlaufTage: -1,
+      } as never);
+      expect(geraet(id)).not.toHaveProperty('chargen');
+      expect(geraet(id)).not.toHaveProperty('ablaufVorlaufTage');
+    });
+  });
+
+  describe('saveGeraetCharge', () => {
+    it('legt eine Charge an, trimmt Texte und verwirft ungültige Daten', async () => {
+      putGeraet('g1');
+      const { id } = await saveGeraetCharge('ffnd', 'g1', {
+        produktionsNummer: ' L-17 ',
+        bezeichnung: '  ',
+        ablaufDatum: '2027-02-30',
+        einkaufsDatum: '2026-10-01',
+        archiviert: true,
+        createdBy: 'boese',
+      } as never);
+      expect(id).toEqual(expect.any(String));
+      expect(chargenOf('g1')).toEqual([
+        {
+          id,
+          produktionsNummer: 'L-17',
+          einkaufsDatum: '2026-10-01',
+          createdAt: expect.any(String),
+          createdBy: 'u1',
+        },
+      ]);
+      expect(geraet('g1')!.updatedBy).toBe('u1');
+    });
+
+    it('ändert eine bestehende Charge und behält Archiv und Ersteller', async () => {
+      putGeraet('g1', { chargen: [chargeA, chargeB] });
+      await saveGeraetCharge('ffnd', 'g1', {
+        id: 'cA',
+        produktionsNummer: 'A2',
+        kommentar: 'nachgezählt',
+        createdBy: 'boese',
+      } as never);
+      expect(chargenOf('g1')).toEqual([
+        {
+          id: 'cA',
+          produktionsNummer: 'A2',
+          kommentar: 'nachgezählt',
+          createdAt: chargeA.createdAt,
+          createdBy: 'u0',
+        },
+        chargeB,
+      ]);
+    });
+
+    it('lehnt unbekannte Chargen, Geräte ohne Verbrauch und fremde Artikel ab', async () => {
+      putGeraet('g1', { chargen: [chargeA] });
+      putGeraet('g2', { verbrauchsmaterial: false });
+      await expect(saveGeraetCharge('ffnd', 'g1', { id: 'weg', produktionsNummer: 'x' })).rejects.toThrow(
+        /not found/,
+      );
+      await expect(saveGeraetCharge('ffnd', 'g2', { produktionsNummer: 'x' })).rejects.toThrow();
+      await expect(saveGeraetCharge('ffnd', 'fehlt', { produktionsNummer: 'x' })).rejects.toThrow(
+        /not found/,
+      );
+      await expect(saveGeraetCharge('ffnd', 'a/b', { produktionsNummer: 'x' })).rejects.toThrow();
+      managerGuard.mockRejectedValueOnce(new Error('forbidden'));
+      await expect(saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'x' })).rejects.toThrow('forbidden');
+      expect(chargenOf('g1')).toEqual([chargeA]);
+    });
+  });
+
+  describe('saveGeraetCharge mit Zugang', () => {
+    const unbestimmt = () =>
+      fake
+        .list(`${G}/geraetBestand`)
+        .find((b) => (b as { lagerortKey?: string }).lagerortKey === 'unbestimmt') as
+        | Record<string, unknown>
+        | undefined;
+
+    it('bucht die Mengen als Zugang je Lagerort und ohne Lagerort', async () => {
+      putGeraet('g1', { bestandGesamt: 5 });
+      putChargenBestand('b1', srf, 5);
+      const { id } = await saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'L1' }, [
+        { bestandId: 'b1', menge: 3 },
+        { bestandId: null, menge: 2 },
+      ]);
+      expect(bestand('b1')).toMatchObject({ anzahl: 8, chargen: { [id]: 3 } });
+      expect(unbestimmt()).toMatchObject({
+        geraetId: 'g1',
+        lagerort: { art: 'unbestimmt' },
+        anzahl: 2,
+        chargen: { [id]: 2 },
+      });
+      expect(geraet('g1')!.bestandGesamt).toBe(10);
+      expect(buchungen().map((b) => [b.art, b.menge, (b as { chargeId?: string }).chargeId]))
+        .toEqual([
+          ['zugang', 3, id],
+          ['zugang', 2, id],
+        ]);
+    });
+
+    it('nimmt den vorhandenen Lagerort „ohne Lagerort" wieder', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 4 });
+      putChargenBestand('bu', { art: 'unbestimmt' }, 4, { cA: 4 });
+      const { id } = await saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'L2' }, [
+        { bestandId: null, menge: 1 },
+      ]);
+      expect(bestand('bu')).toMatchObject({ anzahl: 5, chargen: { cA: 4, [id]: 1 } });
+      expect(fake.list(`${G}/geraetBestand`)).toHaveLength(1);
+    });
+
+    it('lehnt ungültige Zugänge ab und schreibt nichts', async () => {
+      putGeraet('g1', { chargen: [chargeA] });
+      putGeraet('g2');
+      putChargenBestand('b1', srf, 0);
+      putBestand('b2', 'g2', lager, 0);
+      const cases: [unknown, number | RegExp][] = [
+        [[{ bestandId: 'b1', menge: 0 }], 400],
+        [[{ bestandId: 'b1', menge: -1 }], 400],
+        [[{ bestandId: 'b2', menge: 1 }], 400],
+        [[{ bestandId: 'b1', menge: 1 }, { bestandId: 'b1', menge: 1 }], 400],
+        [[{ bestandId: null, menge: 1 }, { bestandId: null, menge: 1 }], 400],
+        [[{ bestandId: 'a/b', menge: 1 }], 400],
+        [[{ bestandId: 'weg', menge: 1 }], /not found/],
+        ['kaputt', 400],
+      ];
+      for (const [zugaenge, expected] of cases) {
+        const call = saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'x' }, zugaenge as never);
+        if (expected instanceof RegExp) await expect(call).rejects.toThrow(expected);
+        else await expect(call).rejects.toMatchObject({ status: expected });
+      }
+      // Beim Ändern einer Charge gibt es keinen Zugang.
+      await expect(
+        saveGeraetCharge('ffnd', 'g1', { id: 'cA' }, [{ bestandId: 'b1', menge: 1 }]),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(chargenOf('g1')).toEqual([chargeA]);
+      expect(bestand('b1')!.anzahl).toBe(0);
+      expect(buchungen()).toHaveLength(0);
+    });
+  });
+
+  describe('korrigiereGeraetChargenBestand', () => {
+    const unbestimmt = () =>
+      fake
+        .list(`${G}/geraetBestand`)
+        .find((b) => (b as { lagerortKey?: string }).lagerortKey === 'unbestimmt') as
+        | (Record<string, unknown> & { id?: string })
+        | undefined;
+
+    function rows() {
+      return buchungen().map((b) => [b.art, b.bestandId, b.menge, b.chargeId, b.bemerkung]);
+    }
+
+    it('setzt die gezählte Menge einer Charge und bucht die Differenz als Inventur', async () => {
+      putGeraet('g1', { chargen: [chargeA, chargeB], bestandGesamt: 15 });
+      putChargenBestand('b1', srf, 10, { cA: 4, cB: 2 });
+      putChargenBestand('b2', lager, 5, { cA: 5 });
+      const result = await korrigiereGeraetChargenBestand(
+        'ffnd',
+        'g1',
+        [
+          { bestandId: 'b1', chargeId: 'cA', menge: 6 },
+          { bestandId: 'b2', chargeId: 'cA', menge: 2 },
+        ],
+        'Korrektur Charge',
+      );
+      expect(result).toEqual({ bookings: 2 });
+      expect(bestand('b1')).toMatchObject({ anzahl: 12, chargen: { cA: 6, cB: 2 } });
+      expect(bestand('b2')).toMatchObject({ anzahl: 2, chargen: { cA: 2 } });
+      expect(geraet('g1')!.bestandGesamt).toBe(14);
+      expect(sumOfBestaende('g1')).toBe(14);
+      expect(rows()).toEqual([
+        ['inventur', 'b1', 2, 'cA', 'Korrektur Charge'],
+        ['inventur', 'b2', -3, 'cA', 'Korrektur Charge'],
+      ]);
+      expect(buchungen()[0].lagerortText).toEqual(expect.any(String));
+    });
+
+    it('leert eine Charge und entfernt die leere Aufteilung', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 3 });
+      putChargenBestand('b1', srf, 3, { cA: 3 });
+      await korrigiereGeraetChargenBestand('ffnd', 'g1', [
+        { bestandId: 'b1', chargeId: 'cA', menge: 0 },
+      ]);
+      expect(bestand('b1')!.anzahl).toBe(0);
+      expect(bestand('b1')).not.toHaveProperty('chargen');
+      expect(geraet('g1')!.bestandGesamt).toBe(0);
+    });
+
+    it('korrigiert den Rest ohne Charge ohne chargeId an der Buchung', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 10 });
+      putChargenBestand('b1', srf, 10, { cA: 4 });
+      await korrigiereGeraetChargenBestand(
+        'ffnd',
+        'g1',
+        [
+          { bestandId: 'b1', chargeId: null, menge: 2 },
+          { bestandId: 'b1', chargeId: 'cA', menge: 5 },
+        ],
+        'Korrektur Lagerort',
+      );
+      expect(bestand('b1')).toMatchObject({ anzahl: 7, chargen: { cA: 5 } });
+      expect(geraet('g1')!.bestandGesamt).toBe(7);
+      expect(rows()).toEqual([
+        ['inventur', 'b1', -4, undefined, 'Korrektur Lagerort'],
+        ['inventur', 'b1', 1, 'cA', 'Korrektur Lagerort'],
+      ]);
+    });
+
+    it('legt „ohne Lagerort" an, wenn bestandId null ist', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 0 });
+      await korrigiereGeraetChargenBestand('ffnd', 'g1', [
+        { bestandId: null, chargeId: 'cA', menge: 3 },
+      ]);
+      expect(unbestimmt()).toMatchObject({
+        geraetId: 'g1',
+        lagerort: { art: 'unbestimmt' },
+        anzahl: 3,
+        chargen: { cA: 3 },
+      });
+      expect(geraet('g1')!.bestandGesamt).toBe(3);
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'inventur', menge: 3, chargeId: 'cA' }),
+      ]);
+    });
+
+    it('nimmt einen vorhandenen „ohne Lagerort"', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 2 });
+      putChargenBestand('bu', { art: 'unbestimmt' }, 2, { cA: 2 });
+      await korrigiereGeraetChargenBestand('ffnd', 'g1', [
+        { bestandId: null, chargeId: 'cA', menge: 5 },
+      ]);
+      expect(bestand('bu')).toMatchObject({ anzahl: 5, chargen: { cA: 5 } });
+      expect(fake.list(`${G}/geraetBestand`)).toHaveLength(1);
+      expect(geraet('g1')!.bestandGesamt).toBe(5);
+    });
+
+    it('bucht nichts für unveränderte Zeilen', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 5 });
+      putChargenBestand('b1', srf, 5, { cA: 3 });
+      const before = JSON.stringify(bestand('b1'));
+      const result = await korrigiereGeraetChargenBestand('ffnd', 'g1', [
+        { bestandId: 'b1', chargeId: 'cA', menge: 3 },
+        { bestandId: 'b1', chargeId: null, menge: 2 },
+      ]);
+      expect(result).toEqual({ bookings: 0 });
+      expect(JSON.stringify(bestand('b1'))).toBe(before);
+      expect(geraet('g1')!.bestandGesamt).toBe(5);
+      expect(buchungen()).toHaveLength(0);
+      expect(unbestimmt()).toBeUndefined();
+    });
+
+    it('lehnt ungültige Zeilen ab und schreibt nichts', async () => {
+      putGeraet('g1', { chargen: [chargeA, chargeAlt], bestandGesamt: 3 });
+      putGeraet('g2');
+      putGeraet('g3', { verbrauchsmaterial: false });
+      putChargenBestand('b1', srf, 3, { cA: 3 });
+      putBestand('b2', 'g2', lager, 0);
+      putBestand('b3', 'g1', lager, 0);
+      fake.put(`${G}/geraetBestand/b3`, { ...bestand('b3')!, archiviert: true });
+      const cases: [unknown, number | RegExp][] = [
+        [[{ bestandId: 'b1', chargeId: 'cA', menge: -1 }], 400],
+        [[{ bestandId: 'b1', chargeId: 'cA', menge: 'x' }], 400],
+        [[{ bestandId: 'b1', chargeId: 'weg', menge: 1 }], 400],
+        [[{ bestandId: 'b1', chargeId: 'cX', menge: 1 }], 400],
+        [[{ bestandId: 'b2', chargeId: 'cA', menge: 1 }], 400],
+        [[{ bestandId: 'b3', chargeId: 'cA', menge: 1 }], 400],
+        [
+          [
+            { bestandId: 'b1', chargeId: 'cA', menge: 1 },
+            { bestandId: 'b1', chargeId: 'cA', menge: 2 },
+          ],
+          400,
+        ],
+        [
+          [
+            { bestandId: null, chargeId: null, menge: 1 },
+            { bestandId: null, chargeId: null, menge: 2 },
+          ],
+          400,
+        ],
+        [[{ bestandId: 'a/b', chargeId: 'cA', menge: 1 }], 400],
+        [[{ bestandId: 'weg', chargeId: 'cA', menge: 1 }], 404],
+        ['kaputt', 400],
+      ];
+      for (const [input, expected] of cases) {
+        const call = korrigiereGeraetChargenBestand('ffnd', 'g1', input as never);
+        if (expected instanceof RegExp) await expect(call).rejects.toThrow(expected);
+        else await expect(call).rejects.toMatchObject({ status: expected });
+      }
+      await expect(
+        korrigiereGeraetChargenBestand('ffnd', 'g3', [{ bestandId: null, chargeId: null, menge: 1 }]),
+      ).rejects.toMatchObject({ status: 400 });
+      await expect(
+        korrigiereGeraetChargenBestand('ffnd', 'fehlt', [{ bestandId: null, chargeId: null, menge: 1 }]),
+      ).rejects.toMatchObject({ status: 404 });
+      managerGuard.mockRejectedValueOnce(new Error('forbidden'));
+      await expect(
+        korrigiereGeraetChargenBestand('ffnd', 'g1', [{ bestandId: 'b1', chargeId: 'cA', menge: 1 }]),
+      ).rejects.toThrow('forbidden');
+      expect(bestand('b1')).toMatchObject({ anzahl: 3, chargen: { cA: 3 } });
+      expect(geraet('g1')!.bestandGesamt).toBe(3);
+      expect(buchungen()).toHaveLength(0);
+      expect(unbestimmt()).toBeUndefined();
+    });
+
+    it('meldet das Unterschreiten des Mindestbestands nach dem Commit', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 6, mindestbestand: 5 });
+      putChargenBestand('b1', srf, 6, { cA: 6 });
+      notifyMock.mockImplementation(async () => {
+        expect(geraet('g1')!.bestandGesamt).toBe(2);
+        return true;
+      });
+      await korrigiereGeraetChargenBestand('ffnd', 'g1', [
+        { bestandId: 'b1', chargeId: 'cA', menge: 2 },
+      ]);
+      expect(geraet('g1')!.nachbestellenSeit).toEqual(expect.any(String));
+      expect(notifyMock).toHaveBeenCalledWith({
+        groupId: 'ffnd',
+        items: [expect.objectContaining({ geraetId: 'g1', bestandGesamt: 2, mindestbestand: 5 })],
+      });
+    });
+  });
+
+  describe('Größengrenzen', () => {
+    const long = 'x'.repeat(GERAET_CHARGE_MAX_TEXT + 1);
+
+    it('lehnt zu lange Texte einer Charge ab', async () => {
+      putGeraet('g1', { chargen: [chargeA] });
+      for (const field of ['bezeichnung', 'produktionsNummer', 'kommentar']) {
+        await expect(saveGeraetCharge('ffnd', 'g1', { [field]: long })).rejects.toMatchObject({
+          status: 400,
+        });
+      }
+      await saveGeraetCharge('ffnd', 'g1', { kommentar: 'x'.repeat(GERAET_CHARGE_MAX_TEXT) });
+      expect(chargenOf('g1')).toHaveLength(2);
+    });
+
+    it('lehnt mehr als die Höchstzahl an Chargen ab, auch über einen Zugang', async () => {
+      const full = Array.from({ length: GERAET_CHARGEN_MAX }, (_, i) => ({
+        ...chargeA,
+        id: `c${i}`,
+        archiviert: i % 2 === 0,
+      }));
+      putGeraet('g1', { chargen: full });
+      putChargenBestand('b1', srf, 0);
+      await expect(saveGeraetCharge('ffnd', 'g1', { produktionsNummer: 'neu' })).rejects.toMatchObject({
+        status: 400,
+      });
+      await expect(
+        bookGeraetBestand('ffnd', {
+          art: 'zugang',
+          bestandId: 'b1',
+          menge: 1,
+          neueCharge: { produktionsNummer: 'neu' },
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+      // Ändern einer vorhandenen Charge bleibt möglich.
+      await saveGeraetCharge('ffnd', 'g1', { id: 'c1', produktionsNummer: 'geändert' });
+      expect(chargenOf('g1')).toHaveLength(GERAET_CHARGEN_MAX);
+      expect(buchungen()).toHaveLength(0);
+    });
+
+    it('lehnt zu lange Texte einer neuen Charge im Zugang ab', async () => {
+      putGeraet('g1');
+      putChargenBestand('b1', srf, 0);
+      await expect(
+        bookGeraetBestand('ffnd', {
+          art: 'zugang',
+          bestandId: 'b1',
+          menge: 1,
+          neueCharge: { produktionsNummer: long },
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('lehnt eine zu lange Bemerkung beim Ausbuchen ab', async () => {
+      putGeraet('g1', { chargen: [chargeA], bestandGesamt: 2 });
+      putChargenBestand('b1', srf, 2, { cA: 2 });
+      await expect(ausbuchenGeraetCharge('ffnd', 'g1', 'cA', long)).rejects.toMatchObject({
+        status: 400,
+      });
+      expect(bestand('b1')!.anzahl).toBe(2);
+      expect(buchungen()).toHaveLength(0);
+    });
+  });
+
+  describe('archiveGeraetCharge', () => {
+    it('lehnt das Archivieren mit Bestand ab und archiviert sonst', async () => {
+      putGeraet('g1', { chargen: [chargeA, chargeB] });
+      putChargenBestand('b1', srf, 5, { cA: 2 });
+      putChargenBestand('b2', lager, 3, { cB: 0 });
+      await expect(archiveGeraetCharge('ffnd', 'g1', 'cA')).rejects.toMatchObject({
+        status: 409,
+      });
+      await archiveGeraetCharge('ffnd', 'g1', 'cB');
+      expect(chargenOf('g1')).toEqual([chargeA, { ...chargeB, archiviert: true }]);
+    });
+
+    it('zählt archivierte Lagerorte nicht', async () => {
+      putGeraet('g1', { chargen: [chargeA] });
+      putChargenBestand('b1', srf, 2, { cA: 2 });
+      fake.put(`${G}/geraetBestand/b1`, { ...bestand('b1')!, archiviert: true });
+      await archiveGeraetCharge('ffnd', 'g1', 'cA');
+      expect(chargenOf('g1')[0].archiviert).toBe(true);
+    });
+
+    it('meldet eine unbekannte Charge mit 404', async () => {
+      putGeraet('g1', { chargen: [chargeA] });
+      await expect(archiveGeraetCharge('ffnd', 'g1', 'weg')).rejects.toThrow(/not found/);
+    });
+  });
+
+  describe('ausbuchenGeraetCharge', () => {
+    it('bucht die Charge an allen Lagerorten aus und archiviert sie', async () => {
+      putGeraet('g1', { chargen: [chargeA, chargeB], bestandGesamt: 12, mindestbestand: 8 });
+      putChargenBestand('b1', srf, 10, { cA: 4, cB: 6 });
+      putChargenBestand('b2', lager, 2, { cA: 2 });
+      await ausbuchenGeraetCharge('ffnd', 'g1', 'cA', ' abgelaufen ');
+      expect(bestand('b1')).toMatchObject({ anzahl: 6, chargen: { cB: 6 } });
+      expect(bestand('b2')!.anzahl).toBe(0);
+      expect(bestand('b2')).not.toHaveProperty('chargen');
+      expect(geraet('g1')!.bestandGesamt).toBe(6);
+      expect(chargenOf('g1')[0]).toMatchObject({ id: 'cA', archiviert: true });
+      expect(
+        buchungen().map((b) => [b.art, b.menge, b.bestandId, (b as { chargeId?: string }).chargeId]),
+      ).toEqual([
+        ['inventur', -4, 'b1', 'cA'],
+        ['inventur', -2, 'b2', 'cA'],
+      ]);
+      expect((buchungen()[0] as { bemerkung?: string }).bemerkung).toBe(
+        'Charge ausgebucht: LOT A – abgelaufen',
+      );
+      expect(notifyMock).toHaveBeenCalledOnce();
+    });
+
+    it('entfernt einen negativen Topf nur, ohne Buchung und ohne Mengenänderung', async () => {
+      putGeraet('g1', { chargen: [chargeA, chargeB], bestandGesamt: 10 });
+      putChargenBestand('b1', srf, 10, { cA: -2, cB: 3 });
+      await ausbuchenGeraetCharge('ffnd', 'g1', 'cA');
+      expect(bestand('b1')!.anzahl).toBe(10);
+      expect(bestand('b1')!.chargen).toEqual({ cB: 3 });
+      expect(buchungen()).toHaveLength(0);
+      expect(geraet('g1')!.bestandGesamt).toBe(10);
+      expect(chargenOf('g1')[0]).toMatchObject({ id: 'cA', archiviert: true });
+    });
+
+    it('archiviert eine Charge ohne Bestand ohne Buchung', async () => {
+      putGeraet('g1', { chargen: [chargeA] });
+      putChargenBestand('b1', srf, 3);
+      await ausbuchenGeraetCharge('ffnd', 'g1', 'cA');
+      expect(buchungen()).toHaveLength(0);
+      expect(chargenOf('g1')[0].archiviert).toBe(true);
+    });
+  });
+
+  describe('aufteilenGeraetBestand', () => {
+    beforeEach(() => {
+      putGeraet('g1', { chargen: [chargeA, chargeB, chargeAlt], bestandGesamt: 40 });
+      putChargenBestand('b1', srf, 40);
+    });
+
+    it('setzt die Aufteilung und bucht sie ohne Mengenänderung', async () => {
+      await aufteilenGeraetBestand('ffnd', 'b1', { cA: 25 });
+      expect(bestand('b1')).toMatchObject({ anzahl: 40, chargen: { cA: 25 } });
+      expect(geraet('g1')!.bestandGesamt).toBe(40);
+      expect(buchungen()).toEqual([
+        expect.objectContaining({
+          art: 'aufteilung',
+          menge: 0,
+          bestandId: 'b1',
+          bemerkung: 'LOT A: 0→25, ohne Charge: 40→15',
+        }),
+      ]);
+
+      await aufteilenGeraetBestand('ffnd', 'b1', { cA: 0, cB: 10 });
+      expect(bestand('b1')!.chargen).toEqual({ cB: 10 });
+      await aufteilenGeraetBestand('ffnd', 'b1', {});
+      expect(bestand('b1')).not.toHaveProperty('chargen');
+    });
+
+    it('lehnt zu große, negative, fremde und archivierte Mengen ab', async () => {
+      await expect(aufteilenGeraetBestand('ffnd', 'b1', { cA: 30, cB: 11 })).rejects.toThrow();
+      await expect(aufteilenGeraetBestand('ffnd', 'b1', { cA: -1 })).rejects.toThrow();
+      await expect(aufteilenGeraetBestand('ffnd', 'b1', { fremd: 1 })).rejects.toThrow();
+      await expect(aufteilenGeraetBestand('ffnd', 'b1', { cX: 1 })).rejects.toThrow();
+      await expect(
+        aufteilenGeraetBestand('ffnd', 'b1', { cA: Number.NaN }),
+      ).rejects.toThrow();
+      expect(bestand('b1')).not.toHaveProperty('chargen');
+      expect(buchungen()).toHaveLength(0);
+    });
+
+    it('lehnt ein Gerät ohne Verbrauchsmaterial ab', async () => {
+      putGeraet('g1', { chargen: [chargeA], verbrauchsmaterial: false });
+      await expect(aufteilenGeraetBestand('ffnd', 'b1', { cA: 1 })).rejects.toThrow();
+    });
+  });
+
+  describe('bookGeraetBestand', () => {
+    beforeEach(() => {
+      putGeraet('g1', { chargen: [chargeA, chargeB, chargeAlt], bestandGesamt: 10 });
+      putChargenBestand('b1', srf, 10, { cA: 4, cB: 6 });
+      putChargenBestand('b2', lager, 0);
+    });
+
+    it('bucht einen Zugang mit neuer Charge in einer Transaktion', async () => {
+      await bookGeraetBestand('ffnd', {
+        art: 'zugang',
+        bestandId: 'b2',
+        menge: 5,
+        neueCharge: { produktionsNummer: ' L1 ', ablaufDatum: '2027-01-01' },
+      });
+      const neu = chargenOf('g1')[3];
+      expect(neu).toMatchObject({ produktionsNummer: 'L1', ablaufDatum: '2027-01-01', createdBy: 'u1' });
+      expect(bestand('b2')).toMatchObject({ anzahl: 5, chargen: { [neu.id as string]: 5 } });
+      expect(geraet('g1')!.bestandGesamt).toBe(15);
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'zugang', menge: 5, chargeId: neu.id }),
+      ]);
+    });
+
+    it('bucht einen Zugang auf eine vorhandene Charge', async () => {
+      await bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: 2, chargeId: 'cA' });
+      expect(bestand('b1')).toMatchObject({ anzahl: 12, chargen: { cA: 6, cB: 6 } });
+      expect(buchungen()).toEqual([expect.objectContaining({ chargeId: 'cA', menge: 2 })]);
+    });
+
+    it('lehnt archivierte, unbekannte und Chargen an Geräten ab', async () => {
+      await expect(
+        bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: 2, chargeId: 'cX' }),
+      ).rejects.toThrow();
+      await expect(
+        bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: 2, chargeId: 'weg' }),
+      ).rejects.toThrow();
+      putGeraet('g1', { chargen: [chargeA], verbrauchsmaterial: false });
+      await expect(
+        bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b1', menge: 2, chargeId: 'cA' }),
+      ).rejects.toMatchObject({ status: 400 });
+      await expect(
+        bookGeraetBestand('ffnd', {
+          art: 'inventur',
+          bestandId: 'b1',
+          istWert: 0,
+          istWertJeCharge: {},
+          istWertOhneCharge: 0,
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(buchungen()).toHaveLength(0);
+    });
+
+    it('bucht eine Umbuchung einer Charge samt Anteil', async () => {
+      const { buchungId } = await bookGeraetBestand('ffnd', {
+        art: 'umbuchung',
+        bestandId: 'b1',
+        zielBestandId: 'b2',
+        menge: 3,
+        chargeId: 'cB',
+      });
+      expect(bestand('b1')).toMatchObject({ anzahl: 7, chargen: { cA: 4, cB: 3 } });
+      expect(bestand('b2')).toMatchObject({ anzahl: 3, chargen: { cB: 3 } });
+      expect(buchungen()).toEqual([
+        expect.objectContaining({
+          id: buchungId,
+          art: 'umbuchung',
+          menge: -3,
+          chargeId: 'cB',
+          zielBestandId: 'b2',
+        }),
+      ]);
+      expect(geraet('g1')!.bestandGesamt).toBe(10);
+    });
+
+    it('lehnt eine Umbuchung über den Bestand der gewählten Charge ab', async () => {
+      await expect(
+        bookGeraetBestand('ffnd', {
+          art: 'umbuchung',
+          bestandId: 'b1',
+          zielBestandId: 'b2',
+          menge: 5,
+          chargeId: 'cA',
+        }),
+      ).rejects.toMatchObject({ status: 400, message: 'umbuchung exceeds charge stock' });
+      // Fehlt die Charge am Quell-Lagerort, zählt sie als 0.
+      putChargenBestand('b2', lager, 3);
+      await expect(
+        bookGeraetBestand('ffnd', {
+          art: 'umbuchung',
+          bestandId: 'b2',
+          zielBestandId: 'b1',
+          menge: 1,
+          chargeId: 'cA',
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(bestand('b1')).toMatchObject({ anzahl: 10, chargen: { cA: 4, cB: 6 } });
+      expect(buchungen()).toHaveLength(0);
+    });
+
+    it('verteilt eine Umbuchung ohne Charge nach FEFO', async () => {
+      const { buchungId } = await bookGeraetBestand('ffnd', {
+        art: 'umbuchung',
+        bestandId: 'b1',
+        zielBestandId: 'b2',
+        menge: 5,
+      });
+      expect(bestand('b1')).toMatchObject({ anzahl: 5, chargen: { cB: 5 } });
+      expect(bestand('b2')).toMatchObject({ anzahl: 5, chargen: { cA: 4, cB: 1 } });
+      const list = buchungen();
+      expect(list.map((b) => [b.menge, (b as { chargeId?: string }).chargeId])).toEqual([
+        [-4, 'cA'],
+        [-1, 'cB'],
+      ]);
+      expect(list[0].id).toBe(buchungId);
+    });
+
+    it('setzt bei der Inventur je Charge Aufteilung und Ist-Wert', async () => {
+      await bookGeraetBestand('ffnd', {
+        art: 'inventur',
+        bestandId: 'b1',
+        istWert: 999,
+        istWertJeCharge: { cA: 4, cB: 2 },
+        istWertOhneCharge: 1,
+      });
+      expect(bestand('b1')).toMatchObject({ anzahl: 7, chargen: { cA: 4, cB: 2 } });
+      expect(geraet('g1')!.bestandGesamt).toBe(7);
+      expect(
+        buchungen().map((b) => [b.art, b.menge, (b as { chargeId?: string }).chargeId]),
+      ).toEqual([
+        ['inventur', -4, 'cB'],
+        ['inventur', 1, undefined],
+      ]);
+    });
+
+    it('lehnt eine Inventur mit archivierter Charge ab', async () => {
+      await expect(
+        bookGeraetBestand('ffnd', {
+          art: 'inventur',
+          bestandId: 'b1',
+          istWert: 0,
+          istWertJeCharge: { cX: 1 },
+          istWertOhneCharge: 0,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('verkleinert bei der Inventur ohne Chargen die Aufteilung', async () => {
+      await bookGeraetBestand('ffnd', { art: 'inventur', bestandId: 'b1', istWert: 5 });
+      expect(bestand('b1')).toMatchObject({ anzahl: 5, chargen: { cB: 5 } });
+      expect(buchungen()).toEqual([expect.objectContaining({ art: 'inventur', menge: -5 })]);
+      expect(buchungen()[0]).not.toHaveProperty('chargeId');
+    });
+  });
+
+  it('deleteGeraetBestand bucht den Restbestand je Topf aus', async () => {
+    putGeraet('g1', { chargen: [chargeA], bestandGesamt: 10 });
+    putChargenBestand('b1', srf, 10, { cA: 4 });
+    await deleteGeraetBestand('ffnd', 'b1');
+    expect(geraet('g1')!.bestandGesamt).toBe(0);
+    expect(
+      buchungen().map((b) => [
+        b.menge,
+        (b as { chargeId?: string }).chargeId,
+        (b as { bemerkung?: string }).bemerkung,
+      ]),
+    ).toEqual([
+      [-4, 'cA', 'Lagerort gelöscht: SRF · GR 2'],
+      [-6, undefined, 'Lagerort gelöscht: SRF · GR 2'],
+    ]);
+  });
+
+  describe('syncGeraetVerbrauch', () => {
+    const E = 'call/fc1/geraetEinsatz';
+    function putEintrag(id: string, data: Record<string, unknown>) {
+      fake.put(`${E}/${id}`, {
+        groupId: 'ffnd',
+        geraetId: 'g1',
+        geraetName: 'Bindevlies Economy',
+        art: 'verbraucht',
+        bestandId: 'b1',
+        menge: 5,
+        zeitpunkt: '2026-10-04T10:00:00.000Z',
+        createdAt: '2026-10-04T10:00:00.000Z',
+        createdBy: 'u2',
+        ...data,
+      });
+    }
+
+    beforeEach(() => {
+      putGeraet('g1', { chargen: [chargeA, chargeB], bestandGesamt: 10 });
+      putChargenBestand('b1', srf, 10, { cA: 4, cB: 6 });
+    });
+
+    it('bucht zwei Teile am selben Lagerort in einem Schreibvorgang', async () => {
+      putEintrag('e1', {
+        chargen: [
+          { chargeId: 'cA', menge: 4 },
+          { chargeId: 'cB', menge: 1 },
+        ],
+      });
+      await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 2 });
+      expect(bestand('b1')).toMatchObject({ anzahl: 5, chargen: { cB: 5 } });
+      expect(geraet('g1')!.bestandGesamt).toBe(5);
+      expect(
+        buchungen().map((b) => [b.art, b.menge, (b as { chargeId?: string }).chargeId]),
+      ).toEqual([
+        ['verbrauch', -4, 'cA'],
+        ['verbrauch', -1, 'cB'],
+      ]);
+
+      // Idempotent.
+      await expect(syncGeraetVerbrauch('fc1', 'e1')).resolves.toEqual({ deltas: 0 });
+
+      // Chargenwechsel: alles aus B.
+      putEintrag('e1', { chargen: [{ chargeId: 'cB', menge: 5 }] });
+      await syncGeraetVerbrauch('fc1', 'e1');
+      expect(bestand('b1')).toMatchObject({ anzahl: 5, chargen: { cA: 4, cB: 1 } });
+      expect(geraet('g1')!.bestandGesamt).toBe(5);
+
+      // Löschen storniert je Charge.
+      fake.docs.delete(`${E}/e1`);
+      await syncGeraetVerbrauch('fc1', 'e1');
+      expect(bestand('b1')).toMatchObject({ anzahl: 10, chargen: { cA: 4, cB: 6 } });
+    });
+
+    it('bucht eine unstimmige Aufteilung auf den Rest ohne Charge', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      putEintrag('e1', { menge: 3, chargen: [{ chargeId: 'cA', menge: 1 }] });
+      await syncGeraetVerbrauch('fc1', 'e1');
+      expect(bestand('b1')).toMatchObject({ anzahl: 7, chargen: { cA: 4, cB: 6 } });
+      expect(buchungen()).toHaveLength(1);
+      expect(buchungen()[0]).not.toHaveProperty('chargeId');
+      expect(warn).toHaveBeenCalled();
+    });
+
+    it('nimmt eine archivierte Charge des Artikels an', async () => {
+      putGeraet('g1', { chargen: [chargeA, { ...chargeB, archiviert: true }], bestandGesamt: 10 });
+      putEintrag('e1', { menge: 2, chargen: [{ chargeId: 'cB', menge: 2 }] });
+      await syncGeraetVerbrauch('fc1', 'e1');
+      expect(bestand('b1')).toMatchObject({ anzahl: 8, chargen: { cA: 4, cB: 4 } });
+    });
+  });
+
+  it('importGeraete verkleinert die Aufteilung, wenn die Anzahl sinkt', async () => {
+    putGeraet('100', {
+      externeId: '100',
+      bezeichnung: 'Artikel 100',
+      chargen: [chargeA, chargeB],
+      bestandGesamt: 8,
+      importedAt: '2026-09-01T00:00:00.000Z',
+    });
+    fake.put(`${G}/geraetBestand/b1`, {
+      geraetId: '100',
+      lagerort: srf,
+      lagerortKey: lagerortKey(srf),
+      anzahl: 8,
+      chargen: { cA: 3, cB: 5 },
+    });
+    await importGeraete('ffnd', file([{ id: '100', lagerort: srf, anzahl: 4 }]), []);
+    expect(bestand('b1')).toMatchObject({ anzahl: 4, chargen: { cB: 4 } });
+    expect(geraet('100')!.chargen).toEqual([chargeA, chargeB]);
+  });
+
+  it('importGeraete verkleinert die Aufteilung auch bei zugestimmter Abweichung', async () => {
+    putGeraet('100', {
+      externeId: '100',
+      bezeichnung: 'Artikel 100',
+      chargen: [chargeA],
+      bestandGesamt: 3,
+      importedAt: '2026-09-01T00:00:00.000Z',
+    });
+    fake.put(`${G}/geraetBestand/b1`, {
+      geraetId: '100',
+      lagerort: srf,
+      lagerortKey: lagerortKey(srf),
+      anzahl: 3,
+      chargen: { cA: 3 },
+    });
+    fake.put(`${G}/geraetBuchung/k1`, {
+      geraetId: '100',
+      bestandId: 'b1',
+      art: 'verbrauch',
+      menge: -1,
+      createdAt: '2026-09-15T00:00:00.000Z',
+    });
+    await importGeraete('ffnd', file([{ id: '100', lagerort: srf, anzahl: 1 }]), [
+      deviationKey({ geraetId: '100', lagerortKey: lagerortKey(srf) }),
+    ]);
+    expect(bestand('b1')).toMatchObject({ anzahl: 1, chargen: { cA: 1 } });
+  });
+});
+
+// --- Historie ----------------------------------------------------------------
+
+describe('Historie: Protokolleinträge je Action', () => {
+  const lotA = {
+    id: 'cA',
+    produktionsNummer: 'A',
+    ablaufDatum: '2026-12-01',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    createdBy: 'u0',
+  };
+
+  describe('saveGeraet', () => {
+    it('protokolliert das Anlegen mit den gesetzten Feldern', async () => {
+      const { id } = await saveGeraet('ffnd', {
+        bezeichnung: 'Bindevlies',
+        verbrauchsmaterial: true,
+        mindestbestand: 5,
+      });
+      expect(protokoll(id)).toEqual([
+        expect.objectContaining({
+          art: 'angelegt',
+          menge: 0,
+          geraetId: id,
+          createdBy: 'u1',
+          createdByName: 'Max Mustermann',
+        }),
+      ]);
+      const [entry] = protokoll(id);
+      expect(entry).not.toHaveProperty('bestandId');
+      expect(entry.aenderungen).toEqual(
+        expect.arrayContaining([
+          { feld: 'bezeichnung', nachher: 'Bindevlies' },
+          { feld: 'verbrauchsmaterial', nachher: 'ja' },
+          { feld: 'mindestbestand', nachher: '5' },
+          { feld: 'active', nachher: 'ja' },
+        ]),
+      );
+    });
+
+    it('protokolliert geänderte Stammdaten als Diff', async () => {
+      putGeraet('g1', { mindestbestand: 2, bemerkung: 'alt', einheit: 'Sack' });
+      await saveGeraet('ffnd', { id: 'g1', mindestbestand: 5, bemerkung: '', einheit: 'Sack' });
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'stammdaten',
+          menge: 0,
+          aenderungen: [
+            { feld: 'bemerkung', vorher: 'alt' },
+            { feld: 'mindestbestand', vorher: '2', nachher: '5' },
+          ],
+        }),
+      ]);
+    });
+
+    it('schreibt ohne Änderung keinen Eintrag', async () => {
+      putGeraet('g1', { einheit: 'Sack' });
+      await saveGeraet('ffnd', { id: 'g1', einheit: ' Sack ', bezeichnung: 'Bindevlies Economy' });
+      expect(protokoll()).toHaveLength(0);
+    });
+  });
+
+  describe('setGeraeteVerbrauchsmaterial', () => {
+    it('protokolliert nur Artikel, deren Flag sich ändert', async () => {
+      putGeraet('g1', { verbrauchsmaterial: false });
+      putGeraet('g2', { verbrauchsmaterial: true });
+      await setGeraeteVerbrauchsmaterial('ffnd', ['g1', 'g2'], true);
+      expect(protokoll()).toEqual([
+        expect.objectContaining({
+          art: 'stammdaten',
+          geraetId: 'g1',
+          aenderungen: [{ feld: 'verbrauchsmaterial', vorher: 'nein', nachher: 'ja' }],
+        }),
+      ]);
+    });
+
+    it('nennt beim Abschalten auch den weggefallenen Mindestbestand', async () => {
+      putGeraet('g1', { mindestbestand: 4 });
+      await setGeraeteVerbrauchsmaterial('ffnd', ['g1'], false);
+      expect(protokoll('g1')[0].aenderungen).toEqual([
+        { feld: 'verbrauchsmaterial', vorher: 'ja', nachher: 'nein' },
+        { feld: 'mindestbestand', vorher: '4' },
+      ]);
+    });
+  });
+
+  describe('deleteGeraet', () => {
+    it('protokolliert das Deaktivieren', async () => {
+      putGeraet('g1', { bestandGesamt: 2 });
+      putBestand('b1', 'g1', srf, 2);
+      fake.put(`${G}/geraetBuchung/k1`, { geraetId: 'g1', bestandId: 'b1', art: 'zugang', menge: 2 });
+      await deleteGeraet('ffnd', 'g1');
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'archiviert',
+          menge: 0,
+          aenderungen: [{ feld: 'active', vorher: 'ja', nachher: 'nein' }],
+        }),
+      ]);
+    });
+
+    it('lässt beim Löschen keinen Eintrag zurück', async () => {
+      putGeraet('g1');
+      await deleteGeraet('ffnd', 'g1');
+      expect(alleBuchungen()).toHaveLength(0);
+    });
+  });
+
+  describe('Chargen', () => {
+    it('protokolliert das Anlegen samt Zugang mit Lagerort-Text', async () => {
+      putGeraet('g1', { bestandGesamt: 1 });
+      putBestand('b1', 'g1', srf, 1);
+      const { id } = await saveGeraetCharge(
+        'ffnd',
+        'g1',
+        { produktionsNummer: 'L1', ablaufDatum: '2027-01-31' },
+        [
+          { bestandId: 'b1', menge: 3 },
+          { bestandId: null, menge: 2 },
+        ],
+      );
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'charge',
+          menge: 0,
+          chargeId: id,
+          bemerkung: 'angelegt',
+          aenderungen: [
+            { feld: 'produktionsNummer', nachher: 'L1' },
+            { feld: 'ablaufDatum', nachher: '2027-01-31' },
+          ],
+        }),
+      ]);
+      expect(buchungen().map((b) => [b.art, b.menge, b.lagerortText])).toEqual([
+        ['zugang', 3, 'SRF · GR 2'],
+        ['zugang', 2, 'ohne Lagerort'],
+      ]);
+    });
+
+    it('protokolliert das Ändern als Diff und ohne Änderung nichts', async () => {
+      putGeraet('g1', { chargen: [lotA] });
+      await saveGeraetCharge('ffnd', 'g1', { id: 'cA', produktionsNummer: 'A', ablaufDatum: '2026-12-01' });
+      expect(protokoll()).toHaveLength(0);
+      await saveGeraetCharge('ffnd', 'g1', {
+        id: 'cA',
+        produktionsNummer: 'A2',
+        ablaufDatum: '2026-12-01',
+      });
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'charge',
+          chargeId: 'cA',
+          bemerkung: 'geändert',
+          aenderungen: [{ feld: 'produktionsNummer', vorher: 'A', nachher: 'A2' }],
+        }),
+      ]);
+    });
+
+    it('protokolliert das Archivieren', async () => {
+      putGeraet('g1', { chargen: [lotA] });
+      await archiveGeraetCharge('ffnd', 'g1', 'cA');
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({ art: 'charge', chargeId: 'cA', bemerkung: 'archiviert', menge: 0 }),
+      ]);
+    });
+
+    it('protokolliert das Ausbuchen als Archivieren, die Inventur mit Lagerort-Text', async () => {
+      putGeraet('g1', { chargen: [lotA], bestandGesamt: 4 });
+      putBestand('b1', 'g1', srf, 4);
+      fake.put(`${G}/geraetBestand/b1`, { ...bestand('b1')!, chargen: { cA: 4 } });
+      await ausbuchenGeraetCharge('ffnd', 'g1', 'cA');
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({ art: 'charge', chargeId: 'cA', bemerkung: 'archiviert' }),
+      ]);
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'inventur', menge: -4, lagerortText: 'SRF · GR 2' }),
+      ]);
+    });
+  });
+
+  describe('Lagerorte', () => {
+    it('protokolliert das Anlegen ohne Menge', async () => {
+      putGeraet('g1');
+      const { id } = await createGeraetBestand('ffnd', 'g1', { ...srf, bemerkung: 'oben' });
+      expect(buchungen()).toHaveLength(0);
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'lagerort',
+          menge: 0,
+          bestandId: id,
+          bemerkung: 'angelegt',
+          lagerortText: 'SRF · GR 2',
+          aenderungen: [
+            { feld: 'lagerort', nachher: 'SRF · GR 2' },
+            { feld: 'bemerkung', nachher: 'oben' },
+          ],
+        }),
+      ]);
+    });
+
+    it('protokolliert das Anlegen mit Menge zusätzlich zur Inventur', async () => {
+      putGeraet('g1');
+      await createGeraetBestand('ffnd', 'g1', srf, 4);
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'inventur', menge: 4, lagerortText: 'SRF · GR 2' }),
+      ]);
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({ art: 'lagerort', bemerkung: 'angelegt' }),
+      ]);
+    });
+
+    it('protokolliert das Ändern als Diff und ohne Änderung nichts', async () => {
+      putGeraet('g1', { bestandGesamt: 3 });
+      putBestand('b1', 'g1', srf, 3);
+      await updateGeraetBestand('ffnd', 'b1', { ...srf });
+      expect(protokoll()).toHaveLength(0);
+      await updateGeraetBestand('ffnd', 'b1', { ...lager, bemerkung: 'Regal 3' });
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'lagerort',
+          menge: 0,
+          bestandId: 'b1',
+          bemerkung: 'geändert',
+          lagerortText: 'Feuerwehrhaus · Lager',
+          aenderungen: [
+            { feld: 'lagerort', vorher: 'SRF · GR 2', nachher: 'Feuerwehrhaus · Lager' },
+            { feld: 'bemerkung', nachher: 'Regal 3' },
+          ],
+        }),
+      ]);
+    });
+
+    it('protokolliert das Löschen samt Ausbuchung mit Lagerort-Text', async () => {
+      putGeraet('g1', { bestandGesamt: 2 });
+      putBestand('b1', 'g1', srf, 2);
+      await deleteGeraetBestand('ffnd', 'b1');
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'inventur', menge: -2, lagerortText: 'SRF · GR 2' }),
+      ]);
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({
+          art: 'lagerort',
+          bestandId: 'b1',
+          bemerkung: 'gelöscht',
+          lagerortText: 'SRF · GR 2',
+          aenderungen: [{ feld: 'lagerort', vorher: 'SRF · GR 2' }],
+        }),
+      ]);
+    });
+
+    it('protokolliert auch das Archivieren eines im Einsatz genutzten Lagerorts', async () => {
+      putGeraet('g1');
+      putBestand('b1', 'g1', srf, 0);
+      fake.put(`${G}/geraetBuchung/v1`, {
+        geraetId: 'g1',
+        bestandId: 'b1',
+        art: 'verbrauch',
+        menge: -1,
+        firecallId: 'fc1',
+      });
+      await deleteGeraetBestand('ffnd', 'b1');
+      expect(protokoll('g1')).toEqual([
+        expect.objectContaining({ art: 'lagerort', bemerkung: 'gelöscht' }),
+      ]);
+    });
+  });
+
+  describe('Bestandsbuchungen', () => {
+    it('schreibt den Lagerort-Text an Zugang und Umbuchung', async () => {
+      putGeraet('g1', { bestandGesamt: 4 });
+      putBestand('b1', 'g1', srf, 1);
+      putBestand('b2', 'g1', lager, 3);
+      await bookGeraetBestand('ffnd', { art: 'zugang', bestandId: 'b2', menge: 1 });
+      await bookGeraetBestand('ffnd', {
+        art: 'umbuchung',
+        bestandId: 'b1',
+        zielBestandId: 'b2',
+        menge: 1,
+      });
+      expect(buchungen().map((b) => [b.art, b.lagerortText])).toEqual([
+        ['zugang', 'Feuerwehrhaus · Lager'],
+        ['umbuchung', 'SRF · GR 2'],
+      ]);
+      expect(protokoll()).toHaveLength(0);
+    });
+
+    it('schreibt den Lagerort-Text an die Aufteilung', async () => {
+      putGeraet('g1', { chargen: [lotA], bestandGesamt: 3 });
+      putBestand('b1', 'g1', srf, 3);
+      await aufteilenGeraetBestand('ffnd', 'b1', { cA: 2 });
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'aufteilung', lagerortText: 'SRF · GR 2' }),
+      ]);
+    });
+  });
+
+  describe('syncGeraetVerbrauch', () => {
+    beforeEach(() => {
+      putGeraet('g1', { bestandGesamt: 4 });
+      putBestand('b1', 'g1', srf, 4);
+      fake.put('call/fc1/geraetEinsatz/e1', {
+        groupId: 'ffnd',
+        geraetId: 'g1',
+        geraetName: 'Bindevlies Economy',
+        art: 'verbraucht',
+        bestandId: 'b1',
+        menge: 1,
+      });
+    });
+
+    it('schreibt Name und Art des Einsatzes samt Lagerort-Text', async () => {
+      await syncGeraetVerbrauch('fc1', 'e1');
+      expect(buchungen()).toEqual([
+        expect.objectContaining({
+          art: 'verbrauch',
+          firecallId: 'fc1',
+          firecallName: 'Ölspur B50',
+          firecallArt: 'einsatz',
+          lagerortText: 'SRF · GR 2',
+        }),
+      ]);
+    });
+
+    it('übernimmt die Art einer Übung', async () => {
+      firecallGuard.mockResolvedValue({ id: 'fc1', name: 'Herbstübung', group: 'ffnd', art: 'uebung' });
+      await syncGeraetVerbrauch('fc1', 'e1');
+      expect(buchungen()[0]).toMatchObject({ firecallName: 'Herbstübung', firecallArt: 'uebung' });
+    });
+  });
+
+  describe('Sets', () => {
+    beforeEach(putSetArtikel);
+
+    const setEntries = () =>
+      protokoll()
+        .filter((b) => b.art === 'set')
+        .map((b) => [b.geraetId, b.bemerkung])
+        .sort();
+
+    it('protokolliert beim Anlegen jeden Artikel und den Set-Artikel', async () => {
+      await saveGeraetSet('ffnd', { ...validSet, sybosSetArtikelId: 'kiste' });
+      expect(setEntries()).toEqual([
+        ['besen', 'Set „Ölspur": hinzugefügt'],
+        ['binder', 'Set „Ölspur": hinzugefügt'],
+        ['kiste', 'Set „Ölspur": verknüpft'],
+      ]);
+      expect(protokoll().every((b) => b.menge === 0)).toBe(true);
+    });
+
+    it('protokolliert beim Ändern nur hinzugekommene und entfernte Artikel', async () => {
+      putSet('s1', { inhalt: [{ geraetId: 'besen' }, { geraetId: 'pumpe' }] });
+      await saveGeraetSet('ffnd', { ...validSet, id: 's1' });
+      expect(setEntries()).toEqual([
+        ['binder', 'Set „Ölspur": hinzugefügt'],
+        ['pumpe', 'Set „Ölspur": entfernt'],
+      ]);
+    });
+
+    it('protokolliert ohne geänderten Inhalt nichts', async () => {
+      putSet('s1', { inhalt: validSet.inhalt });
+      await saveGeraetSet('ffnd', { ...validSet, id: 's1', active: false });
+      expect(protokoll()).toHaveLength(0);
+    });
+
+    it('protokolliert am gebundenen Set-Artikel die Änderung des Inhalts', async () => {
+      putSet('s1', { inhalt: [{ geraetId: 'besen' }], sybosSetArtikelId: 'kiste' });
+      await saveGeraetSet('ffnd', { ...validSet, id: 's1', sybosSetArtikelId: 'kiste' });
+      expect(setEntries()).toEqual([
+        ['binder', 'Set „Ölspur": hinzugefügt'],
+        ['kiste', 'Set „Ölspur": Inhalt geändert'],
+      ]);
+    });
+
+    it('protokolliert beim Löschen jeden Artikel und den Set-Artikel', async () => {
+      putSet('s1', { inhalt: [{ geraetId: 'besen' }, { geraetId: 'binder' }], sybosSetArtikelId: 'kiste' });
+      await deleteGeraetSet('ffnd', 's1');
+      expect(setEntries()).toEqual([
+        ['besen', 'Set „Ölspur": gelöscht'],
+        ['binder', 'Set „Ölspur": gelöscht'],
+        ['kiste', 'Set „Ölspur": gelöscht'],
+      ]);
+    });
+  });
+
+  describe('importGeraete', () => {
+    it('protokolliert neue Artikel als angelegt', async () => {
+      await importGeraete(
+        'ffnd',
+        file([{ id: '100', bezeichnung: 'Bindevlies', lagerort: srf, anzahl: 3 }]),
+        [],
+      );
+      expect(protokoll('100')).toEqual([
+        expect.objectContaining({ art: 'angelegt', menge: 0, geraetId: '100' }),
+      ]);
+      expect(protokoll('100')[0].aenderungen).toEqual(
+        expect.arrayContaining([{ feld: 'bezeichnung', nachher: 'Bindevlies' }]),
+      );
+      expect(buchungen()).toEqual([
+        expect.objectContaining({ art: 'import', menge: 3, lagerortText: 'SRF · GR 2' }),
+      ]);
+    });
+
+    it('protokolliert geänderte Stammdaten, unveränderte Artikel nicht', async () => {
+      putGeraet('100', {
+        externeId: '100',
+        bezeichnung: 'Alt',
+        bemerkung: 'weg damit',
+        mindestbestand: 5,
+        importedAt: '2026-09-01T00:00:00.000Z',
+      });
+      putGeraet('200', {
+        externeId: '200',
+        bezeichnung: 'Artikel 200',
+        materialTyp: 'Massenartikel',
+        kategorie: 'Gerät',
+        importedAt: '2026-09-01T00:00:00.000Z',
+      });
+      await importGeraete('ffnd', file([{ id: '100', bezeichnung: 'Neu' }, { id: '200' }]), []);
+      expect(protokoll('200')).toHaveLength(0);
+      expect(protokoll('100')).toEqual([expect.objectContaining({ art: 'stammdaten', menge: 0 })]);
+      const aenderungen = protokoll('100')[0].aenderungen!;
+      expect(aenderungen).toEqual(
+        expect.arrayContaining([
+          { feld: 'bezeichnung', vorher: 'Alt', nachher: 'Neu' },
+          { feld: 'bemerkung', vorher: 'weg damit' },
+        ]),
+      );
+      // Händisch gepflegte Felder setzt der Import nicht — kein Eintrag dazu.
+      expect(aenderungen.some((a) => a.feld === 'mindestbestand')).toBe(false);
+    });
+  });
+});
+
+describe('syncGeraetZuordnung', () => {
+  const E = 'call/fc1/geraetEinsatz';
+
+  function putZuordnung(id: string, data: Record<string, unknown> = {}) {
+    fake.put(`${E}/${id}`, {
+      groupId: 'ffnd',
+      geraetId: 'pumpe',
+      geraetName: 'Tauchpumpe',
+      art: 'zugeordnet',
+      zeitpunkt: '2026-10-04T10:00:00.000Z',
+      createdAt: '2026-10-04T10:00:00.000Z',
+      createdBy: 'u2',
+      ...data,
+    });
+  }
+
+  const zuordnungen = () =>
+    alleBuchungen()
+      .filter((b) => b.art === 'zuordnung' || b.art === 'zuordnungEnde')
+      .sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
+
+  beforeEach(() => {
+    putGeraet('pumpe', { bezeichnung: 'Tauchpumpe', verbrauchsmaterial: false });
+  });
+
+  it('prüft die Einsatzberechtigung mit Schreibrecht und Gruppenmitgliedschaft', async () => {
+    firecallGuard.mockRejectedValue(new Error('not authorized'));
+    putZuordnung('e1');
+    await expect(syncGeraetZuordnung('fc1', 'e1')).rejects.toThrow('not authorized');
+    expect(firecallGuard).toHaveBeenCalledWith('fc1', {
+      requireWrite: true,
+      requireGroupMember: true,
+    });
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('protokolliert die Zuordnung mit Name und Art des Einsatzes', async () => {
+    firecallGuard.mockResolvedValue({
+      id: 'fc1',
+      name: 'Herbstübung',
+      group: 'ffnd',
+      art: 'uebung',
+    });
+    putZuordnung('e1', { bemerkung: '  am Keller  ' });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: 'zuordnung' });
+    expect(zuordnungen()).toEqual([
+      expect.objectContaining({
+        geraetId: 'pumpe',
+        art: 'zuordnung',
+        menge: 0,
+        firecallId: 'fc1',
+        firecallName: 'Herbstübung',
+        firecallArt: 'uebung',
+        einsatzEintragId: 'e1',
+        bemerkung: 'am Keller',
+        createdBy: 'u1',
+        createdByName: 'Max Mustermann',
+      }),
+    ]);
+    expect(zuordnungen()[0].bestandId).toBeUndefined();
+  });
+
+  it('nimmt ohne Art am Einsatz „einsatz" an', async () => {
+    putZuordnung('e1');
+    await syncGeraetZuordnung('fc1', 'e1');
+    expect(zuordnungen()[0]).toMatchObject({ firecallName: 'Ölspur B50', firecallArt: 'einsatz' });
+  });
+
+  it('schreibt beim zweiten Aufruf nichts (idempotent)', async () => {
+    putZuordnung('e1');
+    await syncGeraetZuordnung('fc1', 'e1');
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(zuordnungen()).toHaveLength(1);
+  });
+
+  it('protokolliert nach dem Löschen das Ende mit dem Artikel der früheren Zuordnung', async () => {
+    putZuordnung('e1');
+    await syncGeraetZuordnung('fc1', 'e1');
+    fake.docs.delete(`${E}/e1`);
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({
+      written: 'zuordnungEnde',
+    });
+    expect(zuordnungen().map((b) => [b.art, b.geraetId])).toEqual([
+      ['zuordnung', 'pumpe'],
+      ['zuordnungEnde', 'pumpe'],
+    ]);
+    expect(zuordnungen()[1]).toMatchObject({
+      menge: 0,
+      firecallId: 'fc1',
+      firecallName: 'Ölspur B50',
+      firecallArt: 'einsatz',
+      einsatzEintragId: 'e1',
+    });
+    // Ein weiterer Aufruf ändert nichts mehr.
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(zuordnungen()).toHaveLength(2);
+  });
+
+  it('nimmt die zeitlich letzte Protokollart, nicht die zuletzt gelesene', async () => {
+    putZuordnung('e1');
+    fake.put(`${G}/geraetBuchung/a`, {
+      geraetId: 'pumpe',
+      art: 'zuordnungEnde',
+      menge: 0,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+      createdAt: '2026-10-04T12:00:00.000Z',
+      createdBy: 'u1',
+    });
+    fake.put(`${G}/geraetBuchung/b`, {
+      geraetId: 'pumpe',
+      art: 'zuordnung',
+      menge: 0,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+      createdAt: '2026-10-04T11:00:00.000Z',
+      createdBy: 'u1',
+    });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: 'zuordnung' });
+  });
+
+  it('ein gelöschter Eintrag ohne frühere Zuordnung schreibt nichts', async () => {
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('ein Verbrauch schreibt keine Zuordnung', async () => {
+    putZuordnung('e1', { art: 'verbraucht', bestandId: 'b1', menge: 1 });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('übergeht Verbrauchsbuchungen mit derselben einsatzEintragId', async () => {
+    fake.put(`${G}/geraetBuchung/v1`, {
+      geraetId: 'pumpe',
+      bestandId: 'b1',
+      art: 'verbrauch',
+      menge: -1,
+      firecallId: 'fc1',
+      einsatzEintragId: 'e1',
+      createdAt: '2026-10-04T11:00:00.000Z',
+      createdBy: 'u1',
+    });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+  });
+
+  it('lehnt einen Eintrag einer fremden Gruppe ab', async () => {
+    putZuordnung('e1', { groupId: 'andere' });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).rejects.toThrow(/not to the firecall group/);
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('schreibt für einen unbekannten Artikel nichts', async () => {
+    putZuordnung('e1', { geraetId: 'weg' });
+    await expect(syncGeraetZuordnung('fc1', 'e1')).resolves.toEqual({ written: null });
+    expect(alleBuchungen()).toHaveLength(0);
+  });
+
+  it('weist unsichere IDs ab', async () => {
+    await expect(syncGeraetZuordnung('fc1', 'a/b')).rejects.toThrow(/invalid einsatzEintragId/);
   });
 });

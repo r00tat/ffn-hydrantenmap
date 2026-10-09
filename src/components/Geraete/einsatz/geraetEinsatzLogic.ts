@@ -3,10 +3,18 @@ import {
   GERAET_MAX_MENGE,
   type Geraet,
   type GeraetBestand,
+  type GeraetChargeTeil,
   type GeraetEinsatz,
   type GeraetEinsatzArt,
   type GeraetLagerort,
 } from '../../../common/geraet';
+import { clean } from '../../../common/geraetBestandLogic';
+import {
+  activeChargen,
+  allocateFefo,
+  applyChargeDelta,
+  needsChargeChoice,
+} from '../../../common/geraetCharge';
 
 /**
  * Reine Logik des Einsatz-Abschnitts „Geräte & Material": Suche, Vorbelegung
@@ -169,6 +177,13 @@ export interface GeraetEinsatzInput {
   menge?: number;
   stunden?: number;
   bemerkung?: string;
+  /**
+   * Bei Verbrauch: der Lagerort hinter `bestandId`. Nur mit ihm lässt sich
+   * die Menge auf Chargen aufteilen.
+   */
+  bestand?: GeraetBestand;
+  /** Von Hand angegebene Aufteilung auf Chargen (Einzeldialog). */
+  chargen?: GeraetChargeTeil[];
 }
 
 export type GeraetEinsatzValidationError =
@@ -255,6 +270,50 @@ function relevantFields(input: GeraetEinsatzInput & { geraet: Geraet }) {
 }
 
 /**
+ * Die Aufteilung eines Verbrauchs auf Chargen — nur, wenn der Artikel
+ * Chargen führt oder der Lagerort schon aufgeteilt ist. Eine angegebene
+ * Aufteilung (Einzeldialog) gilt als geprüft; sonst wird nach FEFO
+ * vorbelegt, und geprüft ist sie nur, wenn es ohnehin nur einen Topf gab.
+ */
+function chargenFields(
+  input: GeraetEinsatzInput & { geraet: Geraet },
+  fields: ReturnType<typeof relevantFields>,
+): { chargen: GeraetChargeTeil[]; chargenGeprueft: boolean } | undefined {
+  const { geraet, bestand } = input;
+  if (!geraet.verbrauchsmaterial || !fields.bestandId || !bestand) return undefined;
+  if (fields.menge === undefined) return undefined;
+  const hasMap = Object.keys(bestand.chargen ?? {}).length > 0;
+  if (activeChargen(geraet).length === 0 && !hasMap) return undefined;
+  if (input.chargen) return { chargen: input.chargen, chargenGeprueft: true };
+  const chargen = geraet.chargen ?? [];
+  return {
+    chargen: allocateFefo(bestand, chargen, fields.menge),
+    chargenGeprueft: !needsChargeChoice(bestand, chargen),
+  };
+}
+
+/**
+ * Der Lagerort, wie ihn das Bearbeiten eines Verbrauchs sieht: Ist der
+ * Eintrag schon von diesem Lagerort abgebucht, zählt seine Menge wieder zum
+ * Bestand — sonst fehlte die gerade verbrauchte Charge in der Auswahl. Ohne
+ * gültige Aufteilung hat der Server vom Rest ohne Charge gebucht.
+ */
+export function bestandForEdit(
+  bestand: GeraetBestand | undefined,
+  entry: GeraetEinsatz | undefined,
+): GeraetBestand | undefined {
+  if (!bestand || !entry || entry.art !== 'verbraucht' || entry.gebucht !== true) return bestand;
+  if (entry.bestandId !== bestand.id || typeof entry.menge !== 'number') return bestand;
+  let chargen = bestand.chargen ?? {};
+  const teile = entry.chargen ?? [];
+  const sum = teile.reduce((s, t) => s + (Number.isFinite(t.menge) ? t.menge : 0), 0);
+  if (teile.length > 0 && clean(sum) === clean(entry.menge)) {
+    for (const teil of teile) chargen = applyChargeDelta(chargen, teil.chargeId, teil.menge);
+  }
+  return { ...bestand, anzahl: clean((bestand.anzahl ?? 0) + entry.menge), chargen };
+}
+
+/**
  * Der neue Eintrag unter `call/{firecallId}/geraetEinsatz`. Ohne
  * `undefined`-Felder — Firestore lehnt sie ab.
  */
@@ -280,6 +339,11 @@ export function buildGeraetEinsatzData(
   if (fields.menge !== undefined) data.menge = fields.menge;
   if (fields.stunden !== undefined) data.stunden = fields.stunden;
   if (fields.bemerkung !== undefined) data.bemerkung = fields.bemerkung;
+  const chargen = chargenFields(input, fields);
+  if (chargen) {
+    data.chargen = chargen.chargen;
+    data.chargenGeprueft = chargen.chargenGeprueft;
+  }
   return data;
 }
 
@@ -289,13 +353,30 @@ export function buildGeraetEinsatzData(
  * zum Abgleich am Server wieder als nicht gebucht.
  */
 export function buildGeraetEinsatzUpdate<D>(
-  input: GeraetEinsatzInput & { geraet: Geraet },
+  input: GeraetEinsatzInput & {
+    geraet: Geraet;
+    /** Der bisherige Lagerort des Eintrags. */
+    entryBestandId?: string;
+  },
   deleteValue: () => D,
-): Record<string, string | number | boolean | D> {
+): Record<string, string | number | boolean | GeraetChargeTeil[] | D> {
   const fields = relevantFields(input);
-  const patch: Record<string, string | number | boolean | D> = {};
+  const patch: Record<string, string | number | boolean | GeraetChargeTeil[] | D> = {};
   for (const [key, value] of Object.entries(fields)) {
     patch[key] = value === undefined ? deleteValue() : value;
+  }
+  // Ein Lagerort, der sich nicht nachschlagen lässt, aber unverändert ist:
+  // Die Aufteilung bleibt, wie sie ist. Sonst wanderte schon beim Ändern der
+  // Bemerkung die Buchung auf „ohne Charge".
+  const keepChargen =
+    input.geraet.verbrauchsmaterial &&
+    !input.bestand &&
+    !!fields.bestandId &&
+    fields.bestandId === input.entryBestandId;
+  if (!keepChargen) {
+    const chargen = chargenFields(input, fields);
+    patch.chargen = chargen ? chargen.chargen : deleteValue();
+    patch.chargenGeprueft = chargen ? chargen.chargenGeprueft : deleteValue();
   }
   if (input.geraet.verbrauchsmaterial) patch.gebucht = false;
   return patch;

@@ -25,6 +25,7 @@ import { addDocLocal, setDocLocal } from '../../lib/firestoreClient';
 import { StorageReference } from 'firebase/storage';
 import { useCallback, useEffect, useState } from 'react';
 import { GeoPositionObject } from '../../common/geo';
+import { FIRECALL_ARTEN, FirecallArt } from '../../common/firecallArt';
 import { parseTimestamp } from '../../common/time-format';
 import { defaultPosition } from '../../hooks/constants';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -279,11 +280,14 @@ export default function EinsatzDialog({
         );
       } else {
         //save new
-        const firecallData = buildNewFirecallPayload(fc, {
-          user: email,
-          lat: position.lat,
-          lng: position.lng,
-        });
+        const firecallData = buildNewFirecallPayload(
+          { ...fc, art: fc.art ?? 'einsatz' },
+          {
+            user: email,
+            lat: position.lat,
+            lng: position.lng,
+          },
+        );
         const newDoc = addDocLocal(
           collection(firestore, FIRECALL_COLLECTION_ID),
           firecallData
@@ -443,6 +447,29 @@ export default function EinsatzDialog({
           value={einsatz.name}
           required
         />
+        <FormControl fullWidth variant="standard" margin="dense">
+          <InputLabel id="firecall-art-label">
+            {t('firecall.fields.art')}
+          </InputLabel>
+          <Select
+            labelId="firecall-art-label"
+            id="firecall-art"
+            value={einsatz.art ?? 'einsatz'}
+            label={t('firecall.fields.art')}
+            onChange={(e) =>
+              setEinsatz((prev) => ({
+                ...prev,
+                art: e.target.value as FirecallArt,
+              }))
+            }
+          >
+            {FIRECALL_ARTEN.map((art) => (
+              <MenuItem key={art} value={art}>
+                {t(`firecallArt.${art}`)}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <FormControl fullWidth variant="standard">
           <InputLabel id="firecall-group-label">
             {t('firecall.fields.group')}
