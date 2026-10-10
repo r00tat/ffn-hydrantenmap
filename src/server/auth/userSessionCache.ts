@@ -4,6 +4,8 @@ export interface CacheableUserData {
   groups: string[];
   /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
   fahrtenbuchGeraetemeister?: string[];
+  /** Gruppen, in denen der Benutzer Bekleidungswart ist. */
+  bekleidungswart?: string[];
   /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
   groupAdmin?: string[];
   firecall?: string;

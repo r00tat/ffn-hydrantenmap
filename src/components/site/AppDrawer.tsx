@@ -11,6 +11,7 @@ import BugReportIcon from '@mui/icons-material/BugReport';
 import BuildIcon from '@mui/icons-material/Build';
 import CarCrashIcon from '@mui/icons-material/CarCrash';
 import ChatIcon from '@mui/icons-material/Chat';
+import CheckroomIcon from '@mui/icons-material/Checkroom';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -66,6 +67,7 @@ import { usePathname } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
+import { hasAnyBekleidungRole } from '../../common/bekleidungPermissions';
 import { hasAnyGroupAdminRole } from '../../common/groupPermissions';
 import { hasAnyFahrtenbuchManagerRole } from '../Fahrtenbuch/managerPermissions';
 import { useBugReport } from '../bugReport/BugReportProvider';
@@ -88,6 +90,8 @@ interface DrawerLink {
    * Gerätemeister, der mit der Atemschutz-Ausrüstung nichts zu tun hat.
    */
   groupAdminOnly?: boolean;
+  /** Sichtbar für Admins, Gruppen-Admins und Bekleidungswarte. */
+  bekleidung?: boolean;
   signedInOnly?: boolean;
   /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
   einsatzSection?: string;
@@ -188,13 +192,19 @@ export default function AppDrawer({
     },
     [setIsOpen],
   );
-  const { isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin } =
-    useFirebaseLogin();
+  const {
+    isAdmin,
+    isSignedIn,
+    fahrtenbuchGeraetemeister,
+    groupAdmin,
+    bekleidungswart,
+  } = useFirebaseLogin();
   const firecallId = useFirecallId();
   const pathname = usePathname();
   const t = useTranslations('drawer');
   const tGeraete = useTranslations('geraete');
   const tGeraetEinsatz = useTranslations('geraetEinsatz');
+  const tBekleidung = useTranslations('bekleidung');
   const bugReport = useBugReport();
 
   /** Immer ohne Aufklappen erreichbar. */
@@ -376,6 +386,15 @@ export default function AppDrawer({
           text: tGeraete('title'),
           icon: <Inventory2Icon />,
           href: '/geraete',
+        },
+        {
+          // Neben den Geräten: Bekleidung ist ebenfalls Lagerarbeit ohne
+          // Einsatzbezug. Nur für Bekleidungswart, Gruppen-Admin und Admin —
+          // anders als die Geräte lesen einfache Mitglieder hier nichts.
+          text: tBekleidung('title'),
+          icon: <CheckroomIcon />,
+          href: '/bekleidung',
+          bekleidung: true,
         },
       ],
     },
@@ -586,8 +605,10 @@ export default function AppDrawer({
           groupAdmin,
         })) &&
       (!item.groupAdminOnly || hasAnyGroupAdminRole({ isAdmin, groupAdmin })) &&
+      (!item.bekleidung ||
+        hasAnyBekleidungRole({ isAdmin, groupAdmin, bekleidungswart })) &&
       (isSignedIn || !item.signedInOnly),
-    [isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin],
+    [isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin, bekleidungswart],
   );
 
   const renderLink = (item: DrawerLink, groupText?: string) => {

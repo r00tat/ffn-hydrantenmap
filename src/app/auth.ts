@@ -64,6 +64,8 @@ declare module 'next-auth' {
       groups: string[];
       /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
       fahrtenbuchGeraetemeister?: string[];
+      /** Gruppen, in denen der Benutzer Bekleidungswart ist. */
+      bekleidungswart?: string[];
       /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
       groupAdmin?: string[];
       /** Einsatz-Gast: der einzige Einsatz, auf den dieser Benutzer Zugriff hat. */
@@ -164,6 +166,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.groups = userData.groups;
           session.user.fahrtenbuchGeraetemeister =
             userData.fahrtenbuchGeraetemeister;
+          session.user.bekleidungswart = userData.bekleidungswart;
           session.user.groupAdmin = userData.groupAdmin;
           session.user.firecall = userData.firecall;
           session.user.firecallWrite = userData.firecallWrite;

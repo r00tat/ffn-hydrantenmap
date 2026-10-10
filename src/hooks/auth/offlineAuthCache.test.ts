@@ -21,6 +21,7 @@ function data(overrides: Partial<OfflineAuthData> = {}): OfflineAuthData {
     groups: ['ffnd', 'allUsers'],
     groupAdmin: ['ffnd'],
     fahrtenbuchGeraetemeister: [],
+    bekleidungswart: ['ffnd'],
     myGroups: [{ id: 'ffnd', name: 'FF Neusiedl' }],
     ...overrides,
   };
@@ -37,6 +38,7 @@ describe('offlineAuthCache', () => {
     expect(loaded?.isAuthorized).toBe(true);
     expect(loaded?.groups).toEqual(['ffnd', 'allUsers']);
     expect(loaded?.groupAdmin).toEqual(['ffnd']);
+    expect(loaded?.bekleidungswart).toEqual(['ffnd']);
     expect(loaded?.myGroups).toEqual([{ id: 'ffnd', name: 'FF Neusiedl' }]);
     expect(loaded?.savedAt).toBe(NOW);
   });

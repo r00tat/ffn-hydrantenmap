@@ -18,6 +18,8 @@ export interface AutoProvisionedUser {
   groups: string[];
   /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
   fahrtenbuchGeraetemeister?: string[];
+  /** Gruppen, in denen der Benutzer Bekleidungswart ist. */
+  bekleidungswart?: string[];
   /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
   groupAdmin?: string[];
   firecall?: string;
@@ -130,6 +132,7 @@ export async function getUserSessionData(
       isAdmin: !!userData.isAdmin,
       groups: uniqueArray(['allUsers', ...(userData.groups || [])]),
       fahrtenbuchGeraetemeister: userData.fahrtenbuchGeraetemeister ?? [],
+      bekleidungswart: userData.bekleidungswart ?? [],
       groupAdmin: userData.groupAdmin ?? [],
       firecall: userData.firecall,
       firecallWrite: guestCanWrite(userData),
