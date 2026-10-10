@@ -33,11 +33,14 @@ import {
   BEKLEIDUNG_IMPORT_MAX_BYTES,
   buildImportPlan,
   buildImportPreview,
+  findTagCollisions,
+  importRowRef,
   parseBekleidungSheet,
   SHEET_DIENST,
   SHEET_EINSATZ,
   type ImportDecisions,
   type ImportPreview,
+  type ImportRowDecision,
 } from '../../common/bekleidungImport';
 import { FAHRTENBUCH_PERSON_COLLECTION_ID } from '../../common/fahrtenbuch';
 import { normalizePersonName } from '../../common/personNameMatch';
@@ -1055,9 +1058,52 @@ async function rollbackImport(groupId: string, refs: DocumentReference[]): Promi
   }
 }
 
+const IMPORT_STATUS: BekleidungStatus[] = ['lager', 'ausgegeben', 'ausgeschieden', 'nicht_auffindbar'];
+
+/**
+ * Bereinigung je Zeile prüfen: nur Zeilen der Datei, gültiger Status,
+ * Block-Index als Zahl, Tag-Nummer als Text oder `null`. Ob der Block offen
+ * ist, prüft `buildImportPlan`; ob eine Tag-Nummer doppelt bleibt, der Aufrufer.
+ */
+function sanitizeRowDecisions(
+  raw: unknown,
+  preview: ImportPreview,
+): Record<string, ImportRowDecision> {
+  if (raw === undefined) return {};
+  if (!raw || typeof raw !== 'object') throw badRequest('invalid row decisions');
+  const refs = new Set(preview.rows.map(importRowRef));
+  const rows: Record<string, ImportRowDecision> = {};
+  for (const [ref, value] of Object.entries(raw)) {
+    if (!refs.has(ref)) throw badRequest(`unknownRow:${ref}`);
+    if (!value || typeof value !== 'object') throw badRequest('invalid row decision');
+    const { status, keepOpen, tagNummer } = value as Record<string, unknown>;
+    const decision: ImportRowDecision = {};
+    if (status !== undefined) {
+      assertOneOf(status, IMPORT_STATUS, 'status');
+      decision.status = status;
+    }
+    if (keepOpen !== undefined) {
+      if (!Number.isInteger(keepOpen) || (keepOpen as number) < 0) {
+        throw badRequest('invalid keepOpen');
+      }
+      decision.keepOpen = keepOpen as number;
+    }
+    if (tagNummer === null) {
+      decision.tagNummer = null;
+    } else if (tagNummer !== undefined) {
+      if (typeof tagNummer !== 'string') throw badRequest('invalid tagNummer');
+      // Leer heißt: ohne Tag-Nummer führen.
+      decision.tagNummer = text(tagNummer, 100) || null;
+    }
+    rows[ref] = decision;
+  }
+  return rows;
+}
+
 function sanitizeDecisions(
   decisions: ImportDecisions,
   groupPersons: { id: string; name: string }[],
+  preview: ImportPreview,
 ): ImportDecisions {
   if (!decisions || typeof decisions !== 'object') throw badRequest('invalid decisions');
   const personIds = new Set(groupPersons.map((p) => p.id));
@@ -1090,7 +1136,9 @@ function sanitizeDecisions(
       throw badRequest('invalid person decision');
     }
   }
-  return { fuehrung, persons };
+  const rows = sanitizeRowDecisions(decisions.rows, preview);
+  if (findTagCollisions(preview, rows).length > 0) throw conflict('tagExists');
+  return { fuehrung, persons, rows };
 }
 
 /**
@@ -1122,7 +1170,7 @@ async function importBekleidungImpl(
 
   await precheckImport(groupId);
   const { preview, persons } = await prepareImport(groupId, fileBase64);
-  const clean = sanitizeDecisions(decisions, persons);
+  const clean = sanitizeDecisions(decisions, persons, preview);
 
   let plan;
   try {

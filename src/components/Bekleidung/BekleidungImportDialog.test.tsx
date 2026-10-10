@@ -2,7 +2,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ImportPreview } from '../../common/bekleidungImport';
+import type { ImportPreview, ImportRow } from '../../common/bekleidungImport';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import { sampleData } from './bekleidungFixtures';
 
@@ -84,6 +84,7 @@ describe('BekleidungImportDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Importieren' }));
     expect(importBekleidung).toHaveBeenCalledWith('ffnd', 'QkFTRTY0', {
       fuehrung: { 'einsatz|jacke|': 'einzeln', 'dienst|polo|': 'menge' },
+      rows: { 'einsatz:9': { tagNummer: null } },
       persons: {
         'max mustermann': { personId: 'p1' },
         'erika musterfrau': { create: 'Erika Musterfrau' },
@@ -115,6 +116,7 @@ describe('BekleidungImportDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Importieren' }));
     expect(importBekleidung).toHaveBeenCalledWith('ffnd', 'QkFTRTY0', {
       fuehrung: { 'einsatz|jacke|': 'einzeln', 'dienst|polo|': 'einzeln' },
+      rows: { 'einsatz:9': { tagNummer: null } },
       persons: {
         'max mustermann': { personId: 'p1' },
         'erika musterfrau': { create: 'Erika Musterfrau', active: false },
@@ -144,12 +146,129 @@ describe('BekleidungImportDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Importieren' }));
     expect(importBekleidung).toHaveBeenCalledWith('ffnd', 'QkFTRTY0', {
       fuehrung: { 'einsatz|jacke|': 'einzeln', 'dienst|polo|': 'einzeln' },
+      rows: { 'einsatz:9': { tagNummer: null } },
       persons: {
         'max mustermann': { personId: 'p1' },
         'moritz muster': { create: 'Moritz Muster', active: false },
         'lisa muster': { create: 'Lisa Muster' },
       },
     });
+  });
+
+  it('bereinigt doppelte Tag-Nummern und Statuskonflikte in der Vorschau', async () => {
+    const base: ImportRow = {
+      sheet: 'einsatz',
+      rowNumber: 4,
+      hersteller: 'Texport',
+      art: 'Einsatzjacke',
+      tagNummer: '1001',
+      eigentum: 'feuerwehr',
+      groesse: 'M',
+      status: 'lager',
+      waschgaengeAltbestand: 0,
+      bemerkungen: [],
+      ausgaben: [],
+    };
+    const block = (vorname: string, nachname: string, ausgegebenAm: string) => ({
+      vorname,
+      nachname,
+      ausgegebenAm,
+      datumUnbekannt: false,
+    });
+    const rows: ImportRow[] = [
+      base,
+      { ...base, rowNumber: 9, groesse: 'L' },
+      {
+        ...base,
+        rowNumber: 12,
+        tagNummer: '2002',
+        status: 'ausgegeben',
+        ausgaben: [block('Max', 'Mustermann', '2020-01-01'), block('Moritz', 'Muster', '2022-05-01')],
+      },
+    ];
+    previewBekleidungImport.mockResolvedValue({
+      ...preview,
+      rows,
+      persons: [preview.persons[0], preview.persons[2]],
+      duplicateTags: [
+        { tagNummer: '1001', rowNumbers: [{ sheet: 'einsatz', rowNumber: 4 }, { sheet: 'einsatz', rowNumber: 9 }] },
+      ],
+      statusConflicts: [{ sheet: 'einsatz', rowNumber: 12, message: '2 offene Ausgaben — nur die letzte bleibt offen' }],
+    });
+    importBekleidung.mockResolvedValue({ artikel: 2, stuecke: 3, ausgaben: 2, personsCreated: 1 });
+    const user = userEvent.setup();
+    renderDialog();
+    await upload(user);
+
+    // Vorbelegt: Zeile 4 behält die Nummer, Zeile 9 ohne
+    await user.click(await screen.findByText('Doppelte Tag-Nummern (1)'));
+    const tag9 = screen.getByRole('textbox', { name: 'Tag-Nummer Einsatzbekleidung Zeile 9' });
+    expect(screen.getByRole('textbox', { name: 'Tag-Nummer Einsatzbekleidung Zeile 4' })).toHaveValue('1001');
+    expect(tag9).toHaveValue('');
+
+    // Dieselbe Nummer sperrt den Import
+    await user.type(tag9, '1001');
+    expect(screen.getByText('Tag-Nummer 1001 ist noch doppelt.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Importieren' })).toBeDisabled();
+    await user.clear(tag9);
+    await user.type(tag9, '1003');
+    expect(screen.getByRole('button', { name: 'Importieren' })).toBeEnabled();
+
+    // Statuskonflikt: die frühere Ausgabe offen lassen
+    await user.click(screen.getByText('Statuskonflikte (1)'));
+    await user.click(screen.getByRole('combobox', { name: 'Offen bei Einsatzbekleidung Zeile 12' }));
+    await user.click(screen.getByRole('option', { name: 'Max Mustermann (seit 2020-01-01)' }));
+
+    await user.click(screen.getByRole('button', { name: 'Importieren' }));
+    expect(importBekleidung).toHaveBeenCalledWith(
+      'ffnd',
+      'QkFTRTY0',
+      expect.objectContaining({
+        rows: {
+          'einsatz:9': { tagNummer: '1003' },
+          'einsatz:12': { keepOpen: 0 },
+        },
+      }),
+    );
+  });
+
+  it('ändert den Status einer Zeile', async () => {
+    const row: ImportRow = {
+      sheet: 'dienst',
+      rowNumber: 7,
+      hersteller: 'Fa. X',
+      art: 'Poloshirt',
+      eigentum: 'feuerwehr',
+      groesse: 'L',
+      status: 'ausgegeben',
+      waschgaengeAltbestand: 0,
+      bemerkungen: [],
+      ausgaben: [],
+    };
+    previewBekleidungImport.mockResolvedValue({
+      ...preview,
+      rows: [row],
+      persons: [preview.persons[0]],
+      duplicateTags: [],
+      statusConflicts: [{ sheet: 'dienst', rowNumber: 7, message: 'Status ausgegeben, aber keine offene Ausgabe' }],
+    });
+    importBekleidung.mockResolvedValue({ artikel: 1, stuecke: 0, ausgaben: 0, personsCreated: 0 });
+    const user = userEvent.setup();
+    renderDialog();
+    await upload(user);
+
+    await user.click(await screen.findByText('Statuskonflikte (1)'));
+    expect(screen.getByText('ausgegeben ohne Person')).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Status Dienstbekleidung Zeile 7' }));
+    await user.click(screen.getByRole('option', { name: 'Lager' }));
+    expect(screen.queryByText('ausgegeben ohne Person')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Importieren' }));
+    expect(importBekleidung).toHaveBeenCalledWith(
+      'ffnd',
+      'QkFTRTY0',
+      expect.objectContaining({ rows: { 'dienst:7': { status: 'lager' } } }),
+    );
   });
 
   it('meldet einen nicht leeren Bestand verständlich', async () => {

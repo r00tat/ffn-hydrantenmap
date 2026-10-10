@@ -4,6 +4,9 @@ import {
   artikelKey,
   buildImportPlan,
   buildImportPreview,
+  defaultRowDecisions,
+  findTagCollisions,
+  importRowRef,
   parseBekleidungSheet,
   type ImportDecisions,
   type ImportRow,
@@ -603,5 +606,97 @@ describe('Review-Nachträge', () => {
     expect(plan.ausgaben[0].eigentum).toBe('privat');
     expect(plan.ausgaben[1].eigentum).toBeUndefined();
     expect(plan.bestand).toEqual([]);
+  });
+});
+
+describe('Bereinigung in der Vorschau', () => {
+  const einsatz = parseBekleidungSheet(einsatzGrid, 'einsatz');
+  const dienst = parseBekleidungSheet(dienstGrid, 'dienst');
+  // Zweite Jacke mit derselben Tag-Nummer wie Zeile 3, im Lager
+  const dup: ImportRow = { ...einsatz[0], rowNumber: 99, status: 'lager', ausgaben: [] };
+  const preview = buildImportPreview([...einsatz, dup], dienst, persons);
+  const allPersons: ImportDecisions['persons'] = Object.fromEntries(
+    preview.persons.map((p) => [
+      p.key,
+      p.match.personId ? { personId: p.match.personId } : { create: `${p.vorname} ${p.nachname}` },
+    ]),
+  );
+  const today = '2026-10-10';
+  const planWith = (rows: ImportDecisions['rows'], fuehrung: ImportDecisions['fuehrung'] = {}) =>
+    buildImportPlan(preview, { fuehrung, persons: allPersons, rows }, today);
+  const stueckOf = (plan: ReturnType<typeof planWith>, rowNumber: number) =>
+    plan.stuecke.find((s) => s.tempId === `einsatz-${rowNumber}`)!;
+
+  it('belegt doppelte Tag-Nummern vor: die erste Zeile behält sie, die übrigen keine', () => {
+    expect(importRowRef(dup)).toBe('einsatz:99');
+    expect(defaultRowDecisions(preview)).toEqual({ 'einsatz:99': { tagNummer: null } });
+    expect(findTagCollisions(preview, defaultRowDecisions(preview))).toEqual([]);
+  });
+
+  it('findet Tag-Nummern, die nach der Bereinigung noch doppelt sind', () => {
+    expect(findTagCollisions(preview, {})).toEqual(['22081702']);
+    // neue Nummer, die schon eine andere Zeile trägt
+    expect(findTagCollisions(preview, { 'einsatz:99': { tagNummer: '30030030' } })).toEqual([
+      '30030030',
+    ]);
+    expect(findTagCollisions(preview, { 'einsatz:99': { tagNummer: ' 4711 ' } })).toEqual([]);
+  });
+
+  it('übernimmt eine neue Tag-Nummer und vermerkt den Wert aus dem Excel', () => {
+    const stueck = stueckOf(planWith({ 'einsatz:99': { tagNummer: '4711' } }), 99);
+    expect(stueck.tagNummer).toBe('4711');
+    expect(stueck.bemerkung).toMatch(/Tag-Nummer beim Import geändert \(Excel: 22081702\)/);
+  });
+
+  it('führt ein Stück auf Wunsch ohne Tag-Nummer', () => {
+    const plan = planWith(defaultRowDecisions(preview));
+    expect(stueckOf(plan, 99).tagNummer).toBeUndefined();
+    expect(stueckOf(plan, 99).bemerkung).toMatch(/Tag-Nummer 22081702 beim Import entfernt/);
+    expect(stueckOf(plan, 3).tagNummer).toBe('22081702');
+  });
+
+  it('ändert den Status und hält dann die offene Ausgabe', () => {
+    const plan = planWith(
+      { 'einsatz:7': { status: 'ausgegeben' } },
+      { 'einsatz|hose|texport': 'einzeln' },
+    );
+    const stueck = stueckOf(plan, 7);
+    expect(stueck).toMatchObject({ status: 'ausgegeben', personKey: 'hans beispiel' });
+    expect(stueck.bemerkung).toMatch(/Status beim Import geändert \(Excel: nicht auffindbar\)/);
+    const open = plan.ausgaben.filter((a) => a.stueckTempId === 'einsatz-7' && !a.zurueckAm);
+    expect(open).toHaveLength(1);
+  });
+
+  it('wählt, welche von mehreren offenen Ausgaben offen bleibt', () => {
+    const grid = [
+      DIENST_HEADER,
+      pad(
+        [
+          'Fa. X', 'Poloshirt', '', '', 'L', '', 'ausgegeben',
+          'Mustermann', 'Max', '45000', '',
+          'Musterfrau', 'Erika', '45250', '',
+        ],
+        DIENST_HEADER.length,
+      ),
+    ];
+    const rows = parseBekleidungSheet(grid, 'dienst');
+    const p2 = buildImportPreview([], rows, persons);
+    const decisions = (keepOpen?: number): ImportDecisions => ({
+      fuehrung: {},
+      persons: { 'max mustermann': { personId: 'p-max' }, 'erika musterfrau': { personId: 'p-erika' } },
+      rows: keepOpen === undefined ? {} : { 'dienst:2': { keepOpen } },
+    });
+    const openOf = (plan: ReturnType<typeof buildImportPlan>) =>
+      plan.ausgaben.filter((a) => !a.zurueckAm).map((a) => a.personKey);
+    expect(openOf(buildImportPlan(p2, decisions(), today))).toEqual(['erika musterfrau']);
+    expect(openOf(buildImportPlan(p2, decisions(0), today))).toEqual(['max mustermann']);
+    // nur ein offener Block darf offen bleiben
+    expect(() =>
+      buildImportPlan(
+        buildImportPreview(einsatz, [], persons),
+        { fuehrung: {}, persons: allPersons, rows: { 'einsatz:3': { keepOpen: 0 } } },
+        today,
+      ),
+    ).toThrow(/keepOpen/);
   });
 });

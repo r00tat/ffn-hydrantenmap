@@ -273,6 +273,7 @@ import {
   BEKLEIDUNG_IMPORT_MAX_BYTES,
   SHEET_DIENST,
   SHEET_EINSATZ,
+  type ImportDecisions,
 } from '../../common/bekleidungImport';
 import {
   adjustBestand,
@@ -1135,6 +1136,49 @@ describe('importBekleidung', () => {
         },
       })
     );
+    expect(list('bekleidungArtikel')).toHaveLength(0);
+  });
+
+  it('übernimmt die Bereinigung je Zeile', async () => {
+    clearBekleidung();
+    ok(
+      await importBekleidung('ffnd', workbook(), {
+        ...decisions,
+        rows: { 'einsatz:4': { tagNummer: '4711', status: 'ausgeschieden' } },
+      })
+    );
+    const stueck = list('bekleidungStueck').find((s) => s.tagNummer === '4711')!;
+    expect(stueck).toMatchObject({ status: 'ausgeschieden' });
+    expect(stueck.bemerkung).toMatch(/Excel: 22081703/);
+  });
+
+  it('lehnt eine Bereinigung ab, die eine Tag-Nummer doppelt vergibt', async () => {
+    clearBekleidung();
+    await failsWith(
+      importBekleidung('ffnd', workbook(), {
+        ...decisions,
+        rows: { 'einsatz:4': { tagNummer: '22081702' } },
+      }),
+      'tagExists'
+    );
+    expect(list('bekleidungArtikel')).toHaveLength(0);
+  });
+
+  it('lehnt ungültige Zeilen-Entscheidungen ab', async () => {
+    for (const rows of [
+      { 'einsatz:4': { status: 'kaputt' } },
+      { 'einsatz:77': { status: 'lager' } },
+      { 'einsatz:4': { keepOpen: -1 } },
+      { 'einsatz:4': { tagNummer: 42 } },
+    ]) {
+      clearBekleidung();
+      await failsWith(
+        importBekleidung('ffnd', workbook(), {
+          ...decisions,
+          rows: rows as unknown as ImportDecisions['rows'],
+        })
+      );
+    }
     expect(list('bekleidungArtikel')).toHaveLength(0);
   });
 

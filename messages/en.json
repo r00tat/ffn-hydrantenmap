@@ -4443,7 +4443,7 @@
       "createNew": "Create new",
       "useExisting": "{name}",
       "duplicatesSection": "Duplicate tag numbers ({count})",
-      "duplicatesHint": "The first row keeps the tag number, the others get a note.",
+      "duplicatesHint": "By default the first row keeps the tag number and the others are kept without one. Enter a new number or leave the field empty. Every change is noted on the item with the value from the spreadsheet.",
       "conflictsSection": "Status conflicts ({count})",
       "row": "{sheet} row {row}",
       "submit": "Import",
@@ -4456,7 +4456,15 @@
       "inactiveName": "{name} (inactive)",
       "openCount": "{count} open",
       "noneOpen": "nothing open",
-      "activateWithOpen": "Create new people with open issues as active ({count})"
+      "activateWithOpen": "Create new people with open issues as active ({count})",
+      "tagLabel": "Tag number {row}",
+      "noTag": "no tag number",
+      "statusLabel": "Status {row}",
+      "keepOpenLabel": "Open with {row}",
+      "keepOpenOption": "{name} (since {date})",
+      "issuedWithoutPerson": "issued without a person",
+      "lastPerson": "last: {name}",
+      "tagCollisions": "{count, plural, one {Tag number {tags} is still duplicated.} other {Tag numbers {tags} are still duplicated.}}"
     },
     "scanner": {
       "title": "Scan tag",

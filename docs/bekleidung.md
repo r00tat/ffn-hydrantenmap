@@ -150,8 +150,13 @@ Dienstbekleidung):
 - **Tag-Spalte:** Zahl oder alphanumerischer Code (mindestens vier Ziffern, keine
   Leerzeichen) ist eine Tag-Nummer; „Feuerwehr" oder leer heißt keine Nummer;
   „Eigen" heißt keine Nummer und Privateigentum; anderer Text wird Bemerkung.
-- **Doppelte Tag-Nummern** (11 Nummern in 24 Zeilen): Das erste Stück behält die
-  Nummer, die anderen bekommen „Tag-Nummer doppelt: …" in die Bemerkung.
+- **Doppelte Tag-Nummern** (11 Nummern in 24 Zeilen) bereinigt man in der
+  Vorschau: Je betroffene Zeile steht ein Feld mit der Tag-Nummer. Vorbelegt
+  behält die erste Zeile die Nummer, die übrigen sind leer, also ohne Nummer
+  (`defaultRowDecisions`). Eine neue Nummer lässt sich eintragen; solange eine
+  Nummer — auch gegen eine andere Zeile der Datei — doppelt bleibt, ist der
+  Import gesperrt (`findTagCollisions`, im Browser und noch einmal am Server:
+  `tagExists`).
 - **Status** wird vereinheitlicht; „Reinigung" und „bestellen!" werden `lager`
   mit dem Originaltext in der Bemerkung, „nicht da" wird `nicht_auffindbar`.
 - **Freitext in der Namensspalte** ohne Vorname und Datum („Tasche abgerissen –
@@ -159,12 +164,20 @@ Dienstbekleidung):
 - **Datum:** „nicht bekannt" ergibt eine Ausgabe ohne Datum; Jahreszahlen allein
   und unplausible Jahre (Tippfehler wie 0263) gelten als unbekannt mit
   Bemerkung; Text in „zurück am" heißt zurückgegeben, Datum unbekannt.
-- **Widersprüche** zwischen Status und Ausgabeblöcken (92 Zeilen) zeigt die
-  Vorschau an. Ein offener Block bei einem Stück, das nicht ausgegeben ist, wird
-  mit dem Importdatum geschlossen; bei mehreren offenen Blöcken bleibt nur der
-  letzte offen. Ein Stück mit Status „ausgegeben" ohne offenen Block bleibt
-  ausgegeben, aber ohne Person — Rücknahme und Statuswechsel kommen damit
-  zurecht.
+- **Widersprüche** zwischen Status und Ausgabeblöcken (92 Zeilen) bereinigt man
+  ebenfalls in der Vorschau: je Zeile den Status und, bei „ausgegeben", welcher
+  offene Block offen bleibt. Ohne Eingriff gilt: Ein offener Block bei einem
+  Stück, das nicht ausgegeben ist, wird mit dem Importdatum geschlossen; bei
+  mehreren offenen Blöcken bleibt nur der letzte offen. Ein Stück mit Status
+  „ausgegeben" ohne offenen Block bleibt ausgegeben, aber ohne Person —
+  Rücknahme und Statuswechsel kommen damit zurecht.
+- **Entscheidungen je Zeile** gehen als `rows` (Schlüssel `importRowRef`,
+  z. B. `einsatz:12`) an den Server; er nimmt nur Zeilen der Datei an. Jede
+  Abweichung vom Excel steht als Bemerkung am Stück bzw. an der Ausgabe
+  („Status beim Import geändert (Excel: …)", „Tag-Nummer … beim Import
+  entfernt"), damit sich später nachvollziehen lässt, was die Liste sagte. Die
+  Zahl der offenen Ausgaben je Person in der Vorschau rechnet mit den Werten
+  aus dem Excel, nicht mit der Bereinigung.
 - **Personen** werden über Vor- und Nachname in beiden Reihenfolgen abgeglichen;
   fehlende legt der Import nach Bestätigung an. Unsichere Treffer — ähnliche
   Schreibweise (Abstand ≤ 2) oder mehrere gleichnamige Personen — sind

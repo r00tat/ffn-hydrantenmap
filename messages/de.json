@@ -4443,7 +4443,7 @@
       "createNew": "Neu anlegen",
       "useExisting": "{name}",
       "duplicatesSection": "Doppelte Tag-Nummern ({count})",
-      "duplicatesHint": "Die erste Zeile behält die Tag-Nummer, die übrigen bekommen einen Vermerk.",
+      "duplicatesHint": "Vorbelegt behält die erste Zeile die Tag-Nummer, die übrigen werden ohne Nummer geführt. Trag eine neue Nummer ein oder lass das Feld leer. Jede Änderung wird mit dem Wert aus dem Excel am Stück vermerkt.",
       "conflictsSection": "Statuskonflikte ({count})",
       "row": "{sheet} Zeile {row}",
       "submit": "Importieren",
@@ -4456,7 +4456,15 @@
       "inactiveName": "{name} (inaktiv)",
       "openCount": "{count} offen",
       "noneOpen": "nichts offen",
-      "activateWithOpen": "Neue Personen mit offener Ausgabe aktiv anlegen ({count})"
+      "activateWithOpen": "Neue Personen mit offener Ausgabe aktiv anlegen ({count})",
+      "tagLabel": "Tag-Nummer {row}",
+      "noTag": "ohne Tag-Nummer",
+      "statusLabel": "Status {row}",
+      "keepOpenLabel": "Offen bei {row}",
+      "keepOpenOption": "{name} (seit {date})",
+      "issuedWithoutPerson": "ausgegeben ohne Person",
+      "lastPerson": "zuletzt: {name}",
+      "tagCollisions": "{count, plural, one {Tag-Nummer {tags} ist noch doppelt.} other {Tag-Nummern {tags} sind noch doppelt.}}"
     },
     "scanner": {
       "title": "Tag scannen",

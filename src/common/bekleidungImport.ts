@@ -377,8 +377,16 @@ const isOpen = (block: ImportAusgabeBlock) => !block.zurueckAm;
  * der letzte offene. Alle anderen offenen Blöcke schließt der Import.
  * Liefert -1, wenn keiner offen bleibt.
  */
-function keepOpenIndex(row: ImportRow): number {
+function keepOpenIndex(row: ImportRow, chosen?: number): number {
   if (row.status !== 'ausgegeben') return -1;
+  if (chosen !== undefined) {
+    if (!row.ausgaben[chosen] || !isOpen(row.ausgaben[chosen])) {
+      throw new Error(
+        `Bekleidungsimport: keepOpen ${chosen} in ${importRowRef(row)} ist kein offener Block`,
+      );
+    }
+    return chosen;
+  }
   for (let index = row.ausgaben.length - 1; index >= 0; index--) {
     if (isOpen(row.ausgaben[index])) return index;
   }
@@ -471,9 +479,60 @@ export function buildImportPreview(
   };
 }
 
+/** Schlüssel einer Excel-Zeile für Entscheidungen: `einsatz:12`. */
+export const importRowRef = (row: Pick<ImportRow, 'sheet' | 'rowNumber'>) =>
+  `${row.sheet}:${row.rowNumber}`;
+
+/**
+ * Bereinigung einer Zeile in der Vorschau. Fehlende Felder lassen den Wert
+ * aus dem Excel stehen.
+ */
+export interface ImportRowDecision {
+  status?: BekleidungStatus;
+  /** Index des Ausgabeblocks, der offen bleibt (nur bei Status „ausgegeben"). */
+  keepOpen?: number;
+  /** neue Tag-Nummer; `null` = ohne Tag-Nummer führen */
+  tagNummer?: string | null;
+}
+
+/** Tag-Nummer einer Zeile nach der Bereinigung. */
+function effectiveTag(row: ImportRow, decision?: ImportRowDecision): string | undefined {
+  if (decision?.tagNummer === null) return undefined;
+  if (decision?.tagNummer !== undefined) return normalizeTagNummer(decision.tagNummer);
+  return row.tagNummer;
+}
+
+/**
+ * Vorbelegung der Bereinigung: Bei doppelten Tag-Nummern behält die erste
+ * Zeile die Nummer, die übrigen werden ohne Nummer geführt — dasselbe, was
+ * der Import ohne Entscheidung täte, nur sichtbar und änderbar.
+ */
+export function defaultRowDecisions(preview: ImportPreview): Record<string, ImportRowDecision> {
+  const rows: Record<string, ImportRowDecision> = {};
+  for (const d of preview.duplicateTags) {
+    for (const ref of d.rowNumbers.slice(1)) rows[importRowRef(ref)] = { tagNummer: null };
+  }
+  return rows;
+}
+
+/** Tag-Nummern, die nach der Bereinigung mehr als eine Zeile trägt. */
+export function findTagCollisions(
+  preview: ImportPreview,
+  rows: Record<string, ImportRowDecision>,
+): string[] {
+  const count = new Map<string, number>();
+  for (const row of preview.rows) {
+    const tag = effectiveTag(row, rows[importRowRef(row)]);
+    if (tag) count.set(tag, (count.get(tag) ?? 0) + 1);
+  }
+  return [...count.entries()].filter(([, n]) => n > 1).map(([tag]) => tag);
+}
+
 export interface ImportDecisions {
   /** artikelKey → Führung */
   fuehrung: Record<string, BekleidungFuehrung>;
+  /** importRowRef → Bereinigung der Zeile */
+  rows?: Record<string, ImportRowDecision>;
   /**
    * person key → bestehende Person oder neu anzulegender Name. Ohne
    * `active` wird die neue Person aktiv angelegt.
@@ -552,12 +611,28 @@ export function buildImportPlan(
   const bestand = new Map<string, { artikelKey: string; groesse: string; anzahl: number }>();
   const seenTags = new Set<string>();
 
-  for (const row of preview.rows) {
-    const key = rowArtikelKey(row);
+  for (const excelRow of preview.rows) {
+    const key = rowArtikelKey(excelRow);
     const fuehrung = fuehrungOf.get(key) ?? 'menge';
-    const bemerkungen = [...row.bemerkungen];
+    const bemerkungen = [...excelRow.bemerkungen];
 
-    const keepOpen = keepOpenIndex(row);
+    // Bereinigung aus der Vorschau anwenden und nachvollziehbar vermerken.
+    const decision = decisions.rows?.[importRowRef(excelRow)];
+    const row: ImportRow = {
+      ...excelRow,
+      status: decision?.status ?? excelRow.status,
+      tagNummer: effectiveTag(excelRow, decision),
+    };
+    if (row.status !== excelRow.status) {
+      bemerkungen.push(`Status beim Import geändert (Excel: ${STATUS_LABEL[excelRow.status]})`);
+    }
+    if (decision?.tagNummer === null && excelRow.tagNummer) {
+      bemerkungen.push(`Tag-Nummer ${excelRow.tagNummer} beim Import entfernt`);
+    } else if (row.tagNummer !== excelRow.tagNummer) {
+      bemerkungen.push(`Tag-Nummer beim Import geändert (Excel: ${excelRow.tagNummer ?? 'leer'})`);
+    }
+
+    const keepOpen = keepOpenIndex(row, decision?.keepOpen);
 
     const tempId = `${row.sheet}-${row.rowNumber}`;
     const rowAusgaben: PlanAusgabe[] = row.ausgaben.map((block, index) => {

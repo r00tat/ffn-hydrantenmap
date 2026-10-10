@@ -23,11 +23,14 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BekleidungFuehrung, BekleidungKategorie } from '../../common/bekleidung';
 import {
   BEKLEIDUNG_IMPORT_MAX_BYTES,
+  defaultRowDecisions,
+  findTagCollisions,
   type ImportPreview,
+  type ImportRowDecision,
 } from '../../common/bekleidungImport';
 import type { FahrtenbuchPerson } from '../../common/fahrtenbuch';
 import { callAction } from '../Geraete/admin/actionResult';
@@ -35,6 +38,7 @@ import { fileToBase64 } from '../Geraete/admin/fileToBase64';
 import OnlineOnly from '../site/OnlineOnly';
 import { importBekleidung, previewBekleidungImport } from './bekleidungActions';
 import { parseBekleidungError, useBekleidungErrorText } from './bekleidungErrors';
+import ImportCleanupSection from './ImportCleanupSection';
 import ImportPersonsSection, {
   defaultPersonChoices,
   openPersonChoices,
@@ -68,6 +72,7 @@ export default function BekleidungImportDialog({
   const [preview, setPreview] = useState<ImportPreview>();
   const [fuehrung, setFuehrung] = useState<Record<string, BekleidungFuehrung>>({});
   const [choices, setChoices] = useState<Record<string, string>>({});
+  const [rows, setRows] = useState<Record<string, ImportRowDecision>>({});
   const [result, setResult] = useState<ImportResult>();
 
   const showError = (raw: string) =>
@@ -98,6 +103,7 @@ export default function BekleidungImportDialog({
       setPreview(next);
       setFuehrung(Object.fromEntries(next.artikel.map((a) => [a.key, a.fuehrung])));
       setChoices(defaultPersonChoices(next));
+      setRows(defaultRowDecisions(next));
     } catch (err) {
       showError(String(err));
     } finally {
@@ -113,6 +119,7 @@ export default function BekleidungImportDialog({
       importBekleidung(groupId, fileBase64, {
         fuehrung,
         persons: personDecisions(preview, choices),
+        rows,
       }),
     );
     setBusy(false);
@@ -127,6 +134,10 @@ export default function BekleidungImportDialog({
 
   const sheetLabel = (sheet: BekleidungKategorie) => t(`kategorie.${sheet}`);
   const openChoices = preview ? openPersonChoices(preview, choices) : 0;
+  const collisions = useMemo(
+    () => (preview ? findTagCollisions(preview, rows) : []),
+    [preview, rows],
+  );
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
@@ -230,48 +241,26 @@ export default function BekleidungImportDialog({
               <Alert severity="warning">{t('import.openChoices', { count: openChoices })}</Alert>
             )}
 
-            {preview.duplicateTags.length > 0 && (
-              <Accordion disableGutters>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>
-                    {t('import.duplicatesSection', { count: preview.duplicateTags.length })}
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    {t('import.duplicatesHint')}
-                  </Typography>
-                  <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                    {preview.duplicateTags.map((d) => (
-                      <li key={d.tagNummer}>
-                        {d.tagNummer}:{' '}
-                        {d.rowNumbers
-                          .map((r) => t('import.row', { sheet: sheetLabel(r.sheet), row: r.rowNumber }))
-                          .join(', ')}
-                      </li>
-                    ))}
-                  </Box>
-                </AccordionDetails>
-              </Accordion>
-            )}
-
-            {preview.statusConflicts.length > 0 && (
-              <Accordion disableGutters>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>
-                    {t('import.conflictsSection', { count: preview.statusConflicts.length })}
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                    {preview.statusConflicts.map((c) => (
-                      <li key={`${c.sheet}-${c.rowNumber}`}>
-                        {t('import.row', { sheet: sheetLabel(c.sheet), row: c.rowNumber })}: {c.message}
-                      </li>
-                    ))}
-                  </Box>
-                </AccordionDetails>
-              </Accordion>
+            <ImportCleanupSection
+              preview={preview}
+              rows={rows}
+              collisions={collisions}
+              onChange={(ref, patch) =>
+                setRows((prev) => {
+                  const next = { ...prev[ref], ...patch };
+                  // Ohne „ausgegeben" bleibt ohnehin nichts offen.
+                  if (patch.status && patch.status !== 'ausgegeben') delete next.keepOpen;
+                  return { ...prev, [ref]: next };
+                })
+              }
+            />
+            {collisions.length > 0 && (
+              <Alert severity="warning">
+                {t('import.tagCollisions', {
+                  count: collisions.length,
+                  tags: collisions.join(', '),
+                })}
+              </Alert>
             )}
           </Stack>
         )}
@@ -280,7 +269,7 @@ export default function BekleidungImportDialog({
         <Button onClick={onClose}>{t('actions.close')}</Button>
         {preview && (
           <OnlineOnly>
-            <Button variant="contained" disabled={busy || openChoices > 0} onClick={handleImport}>
+            <Button variant="contained" disabled={busy || openChoices > 0 || collisions.length > 0} onClick={handleImport}>
               {t('import.submit')}
             </Button>
           </OnlineOnly>
