@@ -10,6 +10,7 @@ Stellen; dieses Dokument nennt sie und begründet die Bauform.
 | **Globaler Admin** | `user/{uid}.isAdmin` | alles, in jeder Gruppe, plus `/admin/*` und die Benutzerverwaltung | ein globaler Admin in `/users` |
 | **Gruppen-Admin** | `user/{uid}.groupAdmin: string[]` | alle administrativen Aufgaben *einer* Gruppe | ein globaler Admin in `/groups` |
 | **Gerätemeister** | `user/{uid}.fahrtenbuchGeraetemeister: string[]` | Fahrtenbuch einer Gruppe: jeden Eintrag korrigieren, Fahrzeuge und Personen pflegen; Geräte & Material der Gruppe pflegen (Artikel, Bestand, Import) | ein Admin **oder Gruppen-Admin** der Gruppe, im Einstellungen-Tab der Fahrtenbuch-Verwaltung |
+| **Bekleidungswart** | `user/{uid}.bekleidungswart: string[]` | Bekleidung einer Gruppe sehen und pflegen: Stücke, Lagerstand, Ausgabe, Wäsche, Import | ein Admin **oder Gruppen-Admin** der Gruppe, im Reiter „Einstellungen" auf `/bekleidung` |
 | **Gruppenmitglied** | `user/{uid}.groups: string[]` | Einsätze, Fahrtenbucheinträge und Mängel der Gruppe; Geräte & Material lesen, im Einsatz zuordnen und verbrauchen | ein globaler Admin in `/groups` oder `/users` |
 | **Einsatz-Gast** | `user/{uid}.firecall` | genau ein Einsatz, lesend oder schreibend, mit Ablauf | jedes Gruppenmitglied über den Share-Link |
 
@@ -27,6 +28,12 @@ Den Verbrauch im Einsatz bucht dagegen jeder mit Zugriff auf den Einsatz ab
 (`actionUserAuthorizedForFirecall`, plus Prüfung, dass der Artikel zur Gruppe
 des Einsatzes gehört). Hintergrund: [geraete-lager.md](geraete-lager.md).
 
+Auch der Bekleidungswart ist im Gruppen-Admin enthalten. Anders als bei
+Geräten & Material sieht ein einfaches Mitglied von der Bekleidung **nichts**:
+Größen und wer was hat sind keine Gruppenöffentlichkeit. Weil die Rolle nicht
+im Token steht, liest die Firestore-Regel dafür das Benutzerdokument
+(Hintergrund: [bekleidung.md](bekleidung.md)).
+
 ## Was der Gruppen-Admin bewusst nicht darf
 
 - **Benutzer freischalten oder Gruppen zuordnen.** Ein Benutzerdokument ist
@@ -40,7 +47,7 @@ des Einsatzes gehört). Hintergrund: [geraete-lager.md](geraete-lager.md).
 
 ## Warum die Gruppenrollen am Benutzerdokument stehen
 
-`groupAdmin` und `fahrtenbuchGeraetemeister` sind Listen von Gruppen-IDs am
+`groupAdmin`, `fahrtenbuchGeraetemeister` und `bekleidungswart` sind Listen von Gruppen-IDs am
 **Benutzerdokument**, nicht Listen von Benutzern am Gruppendokument. Grund ist
 der Leseweg: Am Benutzerdokument nehmen sie denselben Weg wie `isAdmin` und
 `groups` — über `getUserSessionData` in die Session und von dort in den
@@ -70,6 +77,7 @@ Gruppen-Admin schreibt dort nie direkt aus dem Client.
 | [`isGroupAdmin(groupId, user)`](../src/common/groupPermissions.ts) | Darf der Benutzer diese Gruppe administrieren? |
 | `hasAnyGroupAdminRole(user)` (dito) | Soll eine Verwaltungsseite überhaupt erreichbar sein? |
 | [`isFahrtenbuchManager(groupId, user)`](../src/components/Fahrtenbuch/managerPermissions.ts) | Darf er das Fahrtenbuch dieser Gruppe verwalten? |
+| [`isBekleidungswart(groupId, user)`](../src/common/bekleidungPermissions.ts) | Darf er die Bekleidung dieser Gruppe sehen und pflegen? |
 | [`assertTenantGroup(groupId)`](../src/app/groups/groupTypes.ts) | Ist die Gruppen-ID überhaupt ein Mandant? |
 
 Die Guards für Server Actions kommen alle aus [`src/app/auth.ts`](../src/app/auth.ts):
@@ -81,6 +89,7 @@ Die Guards für Server Actions kommen alle aus [`src/app/auth.ts`](../src/app/au
 | `actionGroupAdminRequired(groupId)` | globaler Admin **oder** Gruppen-Admin *mit Mitgliedschaft* |
 | `actionGroupMemberRequired(groupId)` | Mitglied der Gruppe (Fahrtenbuch) |
 | `actionFahrtenbuchManagerRequired(groupId)` | Admin, Gruppen-Admin oder Gerätemeister der Gruppe (Fahrtenbuch und Geräte & Material) |
+| `actionBekleidungswartRequired(groupId)` | Admin, Gruppen-Admin oder Bekleidungswart der Gruppe; liegt in [`bekleidungGuard.ts`](../src/components/Bekleidung/bekleidungGuard.ts), nicht in `auth.ts` (Importzyklus) |
 | `actionUserAuthorizedForFirecall(id)` | Zugriff auf diesen Einsatz (Mitglied oder Gast) |
 
 `actionGroupAdminRequired` liegt als Implementierung in
@@ -113,8 +122,8 @@ Berechtigungsgruppe und keine Feuerwehr. Dieselbe Sperre steht als
   Rollenänderung bis zum Ablauf wirkungslos — dieselbe Falle wie in
   `updateUser.ts`.
 - **Die Mitgliedschaft ist Voraussetzung.** Wer die Gruppe verlässt, verliert
-  in [`updateGroupAction`](../src/app/groups/GroupAction.ts) auch `groupAdmin`
-  und `fahrtenbuchGeraetemeister` für diese Gruppe. Ohne das bliebe eine
+  in [`updateGroupAction`](../src/app/groups/GroupAction.ts) auch `groupAdmin`,
+  `fahrtenbuchGeraetemeister` und `bekleidungswart` für diese Gruppe. Ohne das bliebe eine
   schlafende Rolle stehen, die beim Wiedereintritt unbemerkt wieder wirksam
   würde.
 

@@ -120,8 +120,20 @@ export async function updateGroupAction(
         !memberIds.has(user.id)
     )
     .map((user) => user.id);
+  const removeBekleidungswart = users
+    .filter(
+      (user) =>
+        (user.data().bekleidungswart || []).includes(groupId) &&
+        !memberIds.has(user.id)
+    )
+    .map((user) => user.id);
 
-  if (addAdmins.length || removeAdmins.length || removeGeraetemeister.length) {
+  if (
+    addAdmins.length ||
+    removeAdmins.length ||
+    removeGeraetemeister.length ||
+    removeBekleidungswart.length
+  ) {
     const roleBatch = firestore.batch();
     addAdmins.forEach((uid) =>
       roleBatch.set(
@@ -144,6 +156,13 @@ export async function updateGroupAction(
         { merge: true }
       )
     );
+    removeBekleidungswart.forEach((uid) =>
+      roleBatch.set(
+        userCollection.doc(uid),
+        { bekleidungswart: FieldValue.arrayRemove(groupId) },
+        { merge: true }
+      )
+    );
     await roleBatch.commit();
   }
 
@@ -155,6 +174,7 @@ export async function updateGroupAction(
     ...addAdmins,
     ...removeAdmins,
     ...removeGeraetemeister,
+    ...removeBekleidungswart,
   ].forEach((uid) => userSessionCache.invalidate(uid));
 
   // update claims for users

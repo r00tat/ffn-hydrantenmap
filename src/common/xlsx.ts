@@ -14,7 +14,69 @@ export function readXlsxSheet(
   sheetIndex = 1,
   maxPartBytes = XLSX_MAX_PART_BYTES,
 ): string[][] {
-  const sheetPath = `xl/worksheets/sheet${sheetIndex}.xml`;
+  return readSheetByPath(
+    data,
+    `xl/worksheets/sheet${sheetIndex}.xml`,
+    maxPartBytes,
+  );
+}
+
+/**
+ * Die Blätter einer Mappe in ihrer Reihenfolge, mit der Nummer der Datei
+ * (`xl/worksheets/sheet<index>.xml`), in der das Blatt liegt.
+ *
+ * Reihenfolge und Dateinummer fallen auseinander, sobald jemand Blätter
+ * verschiebt oder löscht. Deshalb wird über `xl/workbook.xml` (Name → r:id)
+ * und `xl/_rels/workbook.xml.rels` (r:id → Ziel) aufgelöst.
+ */
+export function listXlsxSheets(
+  data: Uint8Array,
+  maxPartBytes = XLSX_MAX_PART_BYTES,
+): { name: string; index: number }[] {
+  return readSheetPaths(data, maxPartBytes).flatMap(({ name, path }) => {
+    const index = /^xl\/worksheets\/sheet(\d+)\.xml$/.exec(path)?.[1];
+    return index ? [{ name, index: Number(index) }] : [];
+  });
+}
+
+/**
+ * Ein Blatt über seinen Namen lesen. Der Name muss exakt stimmen.
+ */
+export function readXlsxSheetByName(
+  data: Uint8Array,
+  name: string,
+  maxPartBytes = XLSX_MAX_PART_BYTES,
+): string[][] {
+  const sheet = readSheetPaths(data, maxPartBytes).find((s) => s.name === name);
+  if (!sheet) {
+    throw new Error(`xlsx: Blatt "${name}" nicht gefunden`);
+  }
+  return readSheetByPath(data, sheet.path, maxPartBytes);
+}
+
+/**
+ * Excel-Seriennummer (Tage seit dem 30.12.1899) in ein ISO-Datum
+ * `YYYY-MM-DD`. Ein Uhrzeitanteil wird abgeschnitten. Text, leere Werte und
+ * Zahlen ≤ 0 liefern `undefined` — die Auslegung („nicht bekannt") bleibt dem
+ * Aufrufer.
+ *
+ * Der Schalttag-Fehler von Excel (29.02.1900) betrifft nur Seriennummern
+ * unter 61 und spielt für reale Daten keine Rolle.
+ */
+export function excelSerialToIsoDate(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) return undefined;
+  const days = Math.floor(Number(trimmed));
+  if (!Number.isFinite(days) || days <= 0) return undefined;
+  const ms = Date.UTC(1899, 11, 30) + days * 24 * 60 * 60 * 1000;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+function readSheetByPath(
+  data: Uint8Array,
+  sheetPath: string,
+  maxPartBytes: number,
+): string[][] {
   const files = unzipParts(data, [sheetPath, SHARED_STRINGS_PATH], maxPartBytes);
 
   const sheetXml = files[sheetPath];
@@ -24,6 +86,64 @@ export function readXlsxSheet(
 
   const shared = readSharedStrings(files[SHARED_STRINGS_PATH]);
   return parseSheet(strFromU8(sheetXml), shared);
+}
+
+const WORKBOOK_PATH = 'xl/workbook.xml';
+const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels';
+
+/** Name und Pfad im Archiv je Blatt, in der Reihenfolge der Mappe. */
+function readSheetPaths(
+  data: Uint8Array,
+  maxPartBytes: number,
+): { name: string; path: string }[] {
+  const files = unzipParts(
+    data,
+    [WORKBOOK_PATH, WORKBOOK_RELS_PATH],
+    maxPartBytes,
+  );
+  const workbook = files[WORKBOOK_PATH];
+  if (!workbook) {
+    throw new Error(`xlsx: ${WORKBOOK_PATH} nicht gefunden`);
+  }
+  const rels = files[WORKBOOK_RELS_PATH];
+  if (!rels) {
+    throw new Error(`xlsx: ${WORKBOOK_RELS_PATH} nicht gefunden`);
+  }
+
+  const targets = new Map<string, string>();
+  for (const rel of strFromU8(rels).match(RELATIONSHIP_RE) ?? []) {
+    const id = attribute(rel, 'Id');
+    const target = attribute(rel, 'Target');
+    if (id && target) targets.set(id, resolveTarget(target));
+  }
+
+  const sheets: { name: string; path: string }[] = [];
+  for (const sheet of strFromU8(workbook).match(SHEET_RE) ?? []) {
+    const name = attribute(sheet, 'name');
+    const rid = attribute(sheet, 'r:id');
+    const path = rid ? targets.get(rid) : undefined;
+    if (name !== undefined && path) sheets.push({ name: decodeXml(name), path });
+  }
+  return sheets;
+}
+
+/**
+ * Ziel einer Relationship in einen Pfad im Archiv. Relative Ziele beziehen
+ * sich auf `xl/`, absolute beginnen mit `/`.
+ */
+function resolveTarget(target: string): string {
+  if (target.startsWith('/')) return target.slice(1);
+  const parts = ['xl'];
+  for (const part of target.split('/')) {
+    if (part === '..') parts.pop();
+    else if (part !== '.' && part !== '') parts.push(part);
+  }
+  return parts.join('/');
+}
+
+function attribute(xml: string, name: string): string | undefined {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\s${escaped}="([^"]*)"`).exec(xml)?.[1];
 }
 
 /**
@@ -101,6 +221,8 @@ const SI_RE = elementRe('si');
 const ROW_RE = elementRe('row');
 const CELL_RE = elementRe('c');
 const TEXT_RE = elementRe('t');
+const SHEET_RE = /<sheet\b[^>]*>/g;
+const RELATIONSHIP_RE = /<Relationship\b[^>]*>/g;
 
 /** Spaltenbuchstaben in einen Nullindex: A → 0, Z → 25, AA → 26. */
 export function columnIndex(ref: string): number {

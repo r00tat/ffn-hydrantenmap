@@ -1,6 +1,12 @@
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
-import { columnIndex, readXlsxSheet } from './xlsx';
+import {
+  columnIndex,
+  excelSerialToIsoDate,
+  listXlsxSheets,
+  readXlsxSheet,
+  readXlsxSheetByName,
+} from './xlsx';
 
 /** Baut eine XLSX-Datei mit einem Blatt aus rohem SpreadsheetML. */
 function xlsx(sheetXml: string, sharedStringsXml?: string): Uint8Array {
@@ -16,6 +22,146 @@ function xlsx(sheetXml: string, sharedStringsXml?: string): Uint8Array {
   }
   return zipSync(files);
 }
+
+interface WorkbookSheet {
+  name: string;
+  /** Dateinummer, z. B. 3 für `xl/worksheets/sheet3.xml`. */
+  file: number;
+  sheetXml: string;
+}
+
+/**
+ * Baut eine XLSX-Datei mit mehreren Blättern samt `xl/workbook.xml` und
+ * Relationships. Die Dateinummern dürfen von der Blattreihenfolge abweichen —
+ * so wie in echten Dateien, in denen Blätter verschoben wurden.
+ */
+function xlsxWorkbook(
+  sheets: WorkbookSheet[],
+  options: { absoluteTargets?: boolean; sharedStringsXml?: string } = {},
+): Uint8Array {
+  const files: Record<string, Uint8Array> = {};
+  const sheetEntries: string[] = [];
+  const rels: string[] = [];
+  sheets.forEach((sheet, i) => {
+    files[`xl/worksheets/sheet${sheet.file}.xml`] = strToU8(
+      `<?xml version="1.0"?><worksheet><sheetData>${sheet.sheetXml}</sheetData></worksheet>`,
+    );
+    const rid = `rId${i + 10}`;
+    sheetEntries.push(
+      `<sheet name="${sheet.name}" sheetId="${i + 1}" r:id="${rid}"/>`,
+    );
+    const target = options.absoluteTargets
+      ? `/xl/worksheets/sheet${sheet.file}.xml`
+      : `worksheets/sheet${sheet.file}.xml`;
+    rels.push(
+      `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="${target}"/>`,
+    );
+  });
+  rels.push(
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>`,
+  );
+  files['xl/workbook.xml'] = strToU8(
+    `<?xml version="1.0"?><workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetEntries.join('')}</sheets></workbook>`,
+  );
+  files['xl/_rels/workbook.xml.rels'] = strToU8(
+    `<?xml version="1.0"?><Relationships>${rels.join('')}</Relationships>`,
+  );
+  if (options.sharedStringsXml) {
+    files['xl/sharedStrings.xml'] = strToU8(
+      `<?xml version="1.0"?><sst>${options.sharedStringsXml}</sst>`,
+    );
+  }
+  return zipSync(files);
+}
+
+const cell = (ref: string, text: string) =>
+  `<c r="${ref}" t="inlineStr"><is><t>${text}</t></is></c>`;
+
+describe('listXlsxSheets', () => {
+  it('liefert die Blätter in Reihenfolge mit der Dateinummer aus den Relationships', () => {
+    const data = xlsxWorkbook([
+      { name: 'Übersicht', file: 2, sheetXml: '' },
+      { name: 'Bestandsliste Einsatzbekleidung', file: 5, sheetXml: '' },
+      { name: 'Bestandsliste Dienstbekleidung', file: 1, sheetXml: '' },
+    ]);
+    expect(listXlsxSheets(data)).toEqual([
+      { name: 'Übersicht', index: 2 },
+      { name: 'Bestandsliste Einsatzbekleidung', index: 5 },
+      { name: 'Bestandsliste Dienstbekleidung', index: 1 },
+    ]);
+  });
+
+  it('versteht absolute Ziele in den Relationships', () => {
+    const data = xlsxWorkbook(
+      [{ name: 'A', file: 3, sheetXml: '' }],
+      { absoluteTargets: true },
+    );
+    expect(listXlsxSheets(data)).toEqual([{ name: 'A', index: 3 }]);
+  });
+
+  it('entschlüsselt XML-Entities im Blattnamen', () => {
+    const data = xlsxWorkbook([{ name: 'Lager &amp; Ausgabe', file: 1, sheetXml: '' }]);
+    expect(listXlsxSheets(data)[0].name).toBe('Lager & Ausgabe');
+  });
+
+  it('wirft ohne workbook.xml', () => {
+    const data = xlsx(`<row r="1"><c r="A1"><v>1</v></c></row>`);
+    expect(() => listXlsxSheets(data)).toThrow(/workbook\.xml/);
+  });
+});
+
+describe('readXlsxSheetByName', () => {
+  const data = xlsxWorkbook(
+    [
+      { name: 'Erstes', file: 2, sheetXml: `<row r="1">${cell('A1', 'eins')}</row>` },
+      {
+        name: 'Zweites',
+        file: 1,
+        sheetXml: `<row r="1"><c r="A1" t="s"><v>0</v></c>${cell('B1', 'zwei')}</row>`,
+      },
+    ],
+    { sharedStringsXml: '<si><t>geteilt</t></si>' },
+  );
+
+  it('liest das Blatt über seinen Namen, nicht über die Position', () => {
+    expect(readXlsxSheetByName(data, 'Erstes')).toEqual([['eins']]);
+    expect(readXlsxSheetByName(data, 'Zweites')).toEqual([['geteilt', 'zwei']]);
+  });
+
+  it('wirft bei unbekanntem Blattnamen', () => {
+    expect(() => readXlsxSheetByName(data, 'Fehlt')).toThrow(
+      'xlsx: Blatt "Fehlt" nicht gefunden',
+    );
+  });
+
+  it('beachtet die Größengrenze', () => {
+    const big = xlsxWorkbook([
+      {
+        name: 'Groß',
+        file: 1,
+        sheetXml: `<row r="1">${cell('A1', 'x'.repeat(4096))}</row>`,
+      },
+    ]);
+    expect(() => readXlsxSheetByName(big, 'Groß', 1024)).toThrow(/zu groß/);
+  });
+});
+
+describe('excelSerialToIsoDate', () => {
+  it('wandelt Seriennummern in ISO-Daten', () => {
+    expect(excelSerialToIsoDate('45250')).toBe('2023-11-20');
+    expect(excelSerialToIsoDate('44378')).toBe('2021-07-01');
+    expect(excelSerialToIsoDate(' 44378.0 ')).toBe('2021-07-01');
+    // Uhrzeitanteil wird abgeschnitten
+    expect(excelSerialToIsoDate('45250.75')).toBe('2023-11-20');
+  });
+
+  it('liefert undefined für Text und leere Werte', () => {
+    expect(excelSerialToIsoDate('nicht bekannt')).toBeUndefined();
+    expect(excelSerialToIsoDate('')).toBeUndefined();
+    expect(excelSerialToIsoDate('0')).toBeUndefined();
+    expect(excelSerialToIsoDate('-5')).toBeUndefined();
+  });
+});
 
 describe('columnIndex', () => {
   it('rechnet Spaltenbuchstaben in einen Nullindex um', () => {

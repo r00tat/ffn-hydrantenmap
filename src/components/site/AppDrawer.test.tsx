@@ -12,6 +12,8 @@ const firebaseLoginMock = vi.fn<
     isAdmin: boolean;
     isSignedIn: boolean;
     fahrtenbuchGeraetemeister?: string[];
+    groupAdmin?: string[];
+    bekleidungswart?: string[];
   }
 >(() => ({ isAdmin: true, isSignedIn: true }));
 
@@ -230,6 +232,52 @@ describe('AppDrawer Berechtigungen', () => {
 
     await user.click(screen.getByText('Administration'));
     expect(screen.queryByText('Fahrtenbuch-Verwaltung')).toBeNull();
+  });
+
+  it('verbirgt die Bekleidung vor einem einfachen Mitglied', async () => {
+    pathnameMock.mockReturnValue('/');
+    firebaseLoginMock.mockReturnValue({
+      isAdmin: false,
+      isSignedIn: true,
+      fahrtenbuchGeraetemeister: ['ffnd'],
+    });
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(screen.getByText('Fahrzeuge'));
+    expect(screen.getByText('Geräte & Material')).toBeInTheDocument();
+    expect(screen.queryByText('Bekleidung')).toBeNull();
+  });
+
+  it('zeigt die Bekleidung einem Bekleidungswart', async () => {
+    pathnameMock.mockReturnValue('/');
+    firebaseLoginMock.mockReturnValue({
+      isAdmin: false,
+      isSignedIn: true,
+      bekleidungswart: ['ffnd'],
+    });
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(screen.getByText('Fahrzeuge'));
+    expect(screen.getByText('Bekleidung').closest('a')).toHaveAttribute(
+      'href',
+      '/bekleidung',
+    );
+  });
+
+  it('zeigt die Bekleidung einem Gruppen-Admin', async () => {
+    pathnameMock.mockReturnValue('/');
+    firebaseLoginMock.mockReturnValue({
+      isAdmin: false,
+      isSignedIn: true,
+      groupAdmin: ['ffnd'],
+    });
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(screen.getByText('Fahrzeuge'));
+    expect(screen.getByText('Bekleidung')).toBeInTheDocument();
   });
 
   it('zeigt den Profil-Eintrag nur angemeldet', async () => {

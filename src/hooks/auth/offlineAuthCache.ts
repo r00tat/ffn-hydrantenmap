@@ -43,6 +43,7 @@ export interface OfflineAuthData {
   groups: string[];
   groupAdmin?: string[];
   fahrtenbuchGeraetemeister?: string[];
+  bekleidungswart?: string[];
   firecall?: string;
   firecallWrite?: boolean;
   /**
