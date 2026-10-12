@@ -4364,7 +4364,10 @@
       "zugangLabel": "Zugang (Stück)",
       "korrekturLabel": "Gezählter Bestand",
       "current": "Aktuell im Lager: {count}",
-      "newSize": "Zugang"
+      "newSize": "Zugang",
+      "chargeRow": "Charge {charge}",
+      "noCharge": "ohne Charge",
+      "chargeHint": "Leer lassen, wenn der Artikel nicht nach Chargen geführt wird"
     },
     "personen": {
       "select": "Person wählen",
@@ -4392,7 +4395,10 @@
       "alreadyIssuedHint": "{stueck} ist noch an {person} ausgegeben.",
       "reissue": "Zurücknehmen und neu ausgeben",
       "stillIssuedChip": "noch ausgegeben an {person}",
-      "unknownPerson": "unbekannt"
+      "unknownPerson": "unbekannt",
+      "chargeOption": "{charge} ({count})",
+      "noCharge": "ohne Charge",
+      "chargeRequired": "Mehrere Chargen auf Lager – bitte wählen"
     },
     "ruecknahme": {
       "title": "Zurücknehmen",

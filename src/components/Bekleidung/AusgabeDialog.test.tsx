@@ -64,6 +64,73 @@ describe('AusgabeDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  async function addPolo(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('combobox', { name: 'Person' }));
+    await user.click(screen.getByRole('option', { name: 'Max Mustermann' }));
+    await user.click(screen.getByRole('button', { name: 'Mengenartikel hinzufügen' }));
+    await user.click(screen.getByRole('combobox', { name: 'Artikel' }));
+    await user.click(screen.getByRole('option', { name: 'Poloshirt' }));
+    await user.type(screen.getByRole('combobox', { name: 'Größe' }), 'M');
+  }
+
+  it('fragt nach der Charge, wenn mehrere auf Lager sind', async () => {
+    issue.mockResolvedValue({ ausgabeIds: ['x'] });
+    const user = userEvent.setup();
+    const view = sampleView();
+    view.bestand.push({
+      id: 'polo__M__c_BRAND',
+      artikelId: 'polo',
+      groesse: 'M',
+      charge: 'Brand',
+      anzahl: 3,
+      updatedAt: '',
+      updatedBy: '',
+    });
+    renderWithIntl(<AusgabeDialog open view={view} onClose={vi.fn()} />);
+    await addPolo(user);
+
+    expect(screen.getByRole('button', { name: 'Ausgeben' })).toBeDisabled();
+    await user.click(screen.getByRole('combobox', { name: 'Charge' }));
+    await user.click(screen.getByRole('option', { name: 'Brand (3)' }));
+    expect(screen.getByText('Im Lager: 3')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ausgeben' }));
+    expect(issue).toHaveBeenCalledWith(
+      'ffnd',
+      expect.objectContaining({
+        mengen: [{ artikelId: 'polo', groesse: 'M', charge: 'Brand', menge: 1 }],
+      }),
+    );
+  });
+
+  it('nimmt die einzige Charge auf Lager ohne Rückfrage', async () => {
+    issue.mockResolvedValue({ ausgabeIds: ['x'] });
+    const user = userEvent.setup();
+    const view = sampleView();
+    view.bestand = [
+      { ...view.bestand[0], anzahl: 0 },
+      {
+        id: 'polo__M__c_BRAND',
+        artikelId: 'polo',
+        groesse: 'M',
+        charge: 'Brand',
+        anzahl: 3,
+        updatedAt: '',
+        updatedBy: '',
+      },
+    ];
+    renderWithIntl(<AusgabeDialog open view={view} onClose={vi.fn()} />);
+    await addPolo(user);
+
+    expect(screen.queryByRole('combobox', { name: 'Charge' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ausgeben' }));
+    expect(issue).toHaveBeenCalledWith(
+      'ffnd',
+      expect.objectContaining({
+        mengen: [{ artikelId: 'polo', groesse: 'M', charge: 'Brand', menge: 1 }],
+      }),
+    );
+  });
+
   it('bietet bei einem noch ausgegebenen Stück Zurücknehmen und neu Ausgeben an', async () => {
     issue
       .mockResolvedValueOnce({ success: false, error: 'alreadyIssued:s2' })
@@ -94,9 +161,7 @@ describe('AusgabeDialog', () => {
     });
     expect(issue).toHaveBeenCalledTimes(2);
     expect(issue.mock.calls[1][1]).toMatchObject({ personId: 'p2', stueckIds: ['s2'] });
-    expect(returnItems.mock.invocationCallOrder[0]).toBeLessThan(
-      issue.mock.invocationCallOrder[1],
-    );
+    expect(returnItems.mock.invocationCallOrder[0]).toBeLessThan(issue.mock.invocationCallOrder[1]);
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -109,7 +174,9 @@ describe('AusgabeDialog', () => {
     await scan(user, '1001');
     await user.click(screen.getByRole('button', { name: 'Ausgeben' }));
     expect(
-      screen.getByText('Einsatzjacke · L · #1001 kann nicht ausgegeben werden (Status: ausgeschieden).'),
+      screen.getByText(
+        'Einsatzjacke · L · #1001 kann nicht ausgegeben werden (Status: ausgeschieden).',
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Zurücknehmen und neu ausgeben' }),

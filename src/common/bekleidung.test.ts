@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bestandDocId,
+  normalizeCharge,
   normalizeGroesse,
   normalizeTagNummer,
   totalWaschgaenge,
@@ -50,6 +51,15 @@ describe('bestandDocId', () => {
     expect(bestandDocId('a', 'm3')).toBe(bestandDocId('a', ' M3 '));
   });
 
+  it('trennt Chargen, ohne Charge bleibt die ID wie bisher', () => {
+    expect(bestandDocId('a', 'L', undefined)).toBe(bestandDocId('a', 'L'));
+    expect(bestandDocId('a', 'L', 'Brand - 2024')).not.toBe(bestandDocId('a', 'L'));
+    expect(bestandDocId('a', 'L', 'brand  - 2024')).toBe(bestandDocId('a', 'L', 'Brand - 2024'));
+    expect(bestandDocId('a', 'L', 'x/y')).not.toContain('/');
+    // Unterstriche in der Charge kollidieren nicht mit dem Trenner
+    expect(bestandDocId('a', 'L', 'c__x')).not.toBe(bestandDocId('a', 'L__c', 'x'));
+  });
+
   it('unterscheidet verschiedene Größen', () => {
     expect(bestandDocId('a', '52/54')).not.toBe(bestandDocId('a', '52-54'));
   });
@@ -63,9 +73,7 @@ describe('totalWaschgaenge', () => {
 
 describe('waschLimitState', () => {
   it('ist ok ohne Höchstzahl', () => {
-    expect(
-      waschLimitState({ waschgaenge: 100, waschgaengeAltbestand: 0 }, {}),
-    ).toBe('ok');
+    expect(waschLimitState({ waschgaenge: 100, waschgaengeAltbestand: 0 }, {})).toBe('ok');
   });
 
   it('ist near ab 90 % und reached ab der Höchstzahl', () => {
@@ -74,5 +82,13 @@ describe('waschLimitState', () => {
     expect(waschLimitState({ waschgaenge: 4, waschgaengeAltbestand: 5 }, artikel)).toBe('near');
     expect(waschLimitState({ waschgaenge: 2, waschgaengeAltbestand: 8 }, artikel)).toBe('reached');
     expect(waschLimitState({ waschgaenge: 12, waschgaengeAltbestand: 0 }, artikel)).toBe('reached');
+  });
+});
+
+describe('normalizeCharge', () => {
+  it('fasst Leerzeichen zusammen und liefert leer als undefined', () => {
+    expect(normalizeCharge('  Brand   - 2024 ')).toBe('Brand - 2024');
+    expect(normalizeCharge('   ')).toBeUndefined();
+    expect(normalizeCharge(undefined)).toBeUndefined();
   });
 });

@@ -1,11 +1,7 @@
 'use server';
 import 'server-only';
 
-import {
-  FieldValue,
-  type DocumentReference,
-  type Transaction,
-} from 'firebase-admin/firestore';
+import { FieldValue, type DocumentReference, type Transaction } from 'firebase-admin/firestore';
 import { ApiException } from '../../app/api/errors';
 import {
   BEKLEIDUNG_ARTIKEL_COLLECTION,
@@ -16,6 +12,7 @@ import {
   BEKLEIDUNG_STUECK_COLLECTION,
   BEKLEIDUNG_WAESCHE_COLLECTION,
   bestandDocId,
+  normalizeCharge,
   normalizeGroesse,
   normalizeTagNummer,
   type BekleidungArtikel,
@@ -141,9 +138,7 @@ function text(value: unknown, max = 500): string | undefined {
 
 /** Entfernt `undefined` — Firestore lehnt es ab. */
 function compact<T extends object>(value: T): T {
-  return Object.fromEntries(
-    Object.entries(value).filter(([, v]) => v !== undefined),
-  ) as T;
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
 /** Optionales Feld setzen oder — leer — löschen (für `update`). */
@@ -174,7 +169,11 @@ const FUEHRUNGEN: BekleidungFuehrung[] = ['einzeln', 'menge'];
 const EIGENTUM: BekleidungEigentum[] = ['feuerwehr', 'privat'];
 const PROGRAMME: WaschProgramm[] = ['standard', 'impraegnierung', 'sonstiges'];
 
-function assertOneOf<T extends string>(value: unknown, allowed: T[], what: string): asserts value is T {
+function assertOneOf<T extends string>(
+  value: unknown,
+  allowed: T[],
+  what: string,
+): asserts value is T {
   if (!allowed.includes(value as T)) throw badRequest(`invalid ${what}`);
 }
 
@@ -389,9 +388,7 @@ async function updateStueckImpl(
     if (!snap.exists) throw notFound('stueck', stueckId);
     const current = asStueck(snap.data());
     if (fields.tagNummer) {
-      const dup = await tx.get(
-        stueckCol(groupId).where('tagNummer', '==', fields.tagNummer),
-      );
+      const dup = await tx.get(stueckCol(groupId).where('tagNummer', '==', fields.tagNummer));
       if (dup.docs.some((d) => d.id !== stueckId)) {
         throw conflict(`tagExists:${fields.tagNummer}`);
       }
@@ -428,6 +425,8 @@ async function updateStueckImpl(
 export interface MengeLine {
   artikelId: string;
   groesse: string;
+  /** Charge des Bestands; leer = Bestand ohne Charge. */
+  charge?: string;
   menge: number;
 }
 
@@ -449,10 +448,7 @@ const MAX_ISSUE_MENGEN = 50;
  * „zurücknehmen und neu ausgeben"), ein ausgeschiedenes oder nicht
  * auffindbares mit `notAvailable:<id>:<status>`.
  */
-async function issueImpl(
-  groupId: string,
-  input: IssueInput,
-): Promise<{ ausgabeIds: string[] }> {
+async function issueImpl(groupId: string, input: IssueInput): Promise<{ ausgabeIds: string[] }> {
   const session = await actionBekleidungswartRequired(groupId);
   const actor = actorOf(session);
 
@@ -472,10 +468,17 @@ async function issueImpl(
     if (!groesse) throw badRequest('groesse required');
     if (!isPositiveInt(line.menge)) throw badRequest('invalid menge');
     const normalized = normalizeGroesse(groesse);
-    const id = bestandDocId(line.artikelId, normalized);
+    const charge = normalizeCharge(text(line.charge, 100));
+    const id = bestandDocId(line.artikelId, normalized, charge);
     const entry = mengen.get(id);
     if (entry) entry.menge += line.menge;
-    else mengen.set(id, { artikelId: line.artikelId, groesse: normalized, menge: line.menge });
+    else
+      mengen.set(id, {
+        artikelId: line.artikelId,
+        groesse: normalized,
+        charge,
+        menge: line.menge,
+      });
   }
   if (mengen.size > MAX_ISSUE_MENGEN) throw badRequest('too many mengen');
   if (stueckIds.length === 0 && mengen.size === 0) throw badRequest('nothingToIssue');
@@ -508,13 +511,13 @@ async function issueImpl(
         throw conflict('artikelNotMenge');
       }
       const bestandSnap = await tx.get(bestandCol(groupId).doc(id));
-      const anzahl = bestandSnap.exists
-        ? ((bestandSnap.data() as BekleidungBestand).anzahl ?? 0)
-        : 0;
+      const bestand = bestandSnap.exists ? (bestandSnap.data() as BekleidungBestand) : undefined;
+      const anzahl = bestand?.anzahl ?? 0;
       if (anzahl < line.menge) {
         throw conflict(`insufficientStock:${line.artikelId}:${line.groesse}`);
       }
-      bestaende.push({ id, line, anzahl });
+      // Die Schreibweise der vorhandenen Charge gewinnt über die Eingabe.
+      bestaende.push({ id, line: { ...line, charge: bestand?.charge ?? line.charge }, anzahl });
     }
 
     // --- schreiben ---
@@ -559,6 +562,7 @@ async function issueImpl(
           personId: input.personId,
           artikelId: line.artikelId,
           groesse: line.groesse,
+          charge: line.charge,
           menge: line.menge,
           ausgegebenAm: input.datum,
           bemerkung,
@@ -644,19 +648,29 @@ async function returnItemsImpl(groupId: string, input: ReturnInput): Promise<voi
     }
 
     // Zugang ins Lager je Bestandsdokument zusammenfassen.
-    const deltas = new Map<string, { artikelId: string; groesse: string; delta: number; anzahl: number }>();
+    // Eine Menge geht in die Charge zurück, aus der sie kam.
+    const deltas = new Map<
+      string,
+      { artikelId: string; groesse: string; charge?: string; delta: number; anzahl: number }
+    >();
     if (input.ziel === 'lager') {
       for (const { data, menge } of lines) {
         if (data.eigentum === 'privat') continue;
         const groesse = normalizeGroesse(data.groesse);
-        const id = bestandDocId(data.artikelId, groesse);
+        const charge = normalizeCharge(data.charge);
+        const id = bestandDocId(data.artikelId, groesse, charge);
         const entry = deltas.get(id);
         if (entry) entry.delta += menge;
-        else deltas.set(id, { artikelId: data.artikelId, groesse, delta: menge, anzahl: 0 });
+        else
+          deltas.set(id, { artikelId: data.artikelId, groesse, charge, delta: menge, anzahl: 0 });
       }
       for (const [id, entry] of deltas) {
         const snap = await tx.get(bestandCol(groupId).doc(id));
-        entry.anzahl = snap.exists ? ((snap.data() as BekleidungBestand).anzahl ?? 0) : 0;
+        if (snap.exists) {
+          const bestand = snap.data() as BekleidungBestand;
+          entry.anzahl = bestand.anzahl ?? 0;
+          entry.charge = bestand.charge ?? entry.charge;
+        }
       }
     }
 
@@ -703,12 +717,16 @@ async function returnItemsImpl(groupId: string, input: ReturnInput): Promise<voi
       }
     }
     for (const [id, entry] of deltas) {
-      tx.set(bestandCol(groupId).doc(id), {
-        artikelId: entry.artikelId,
-        groesse: entry.groesse,
-        anzahl: entry.anzahl + entry.delta,
-        ...updated,
-      });
+      tx.set(
+        bestandCol(groupId).doc(id),
+        compact({
+          artikelId: entry.artikelId,
+          groesse: entry.groesse,
+          charge: entry.charge,
+          anzahl: entry.anzahl + entry.delta,
+          ...updated,
+        }),
+      );
     }
   });
 }
@@ -760,9 +778,7 @@ async function setStueckStatusImpl(
     tx.update(ref, {
       status,
       ...CLEAR_ISSUE_FIELDS,
-      ...(!closesAusgabe && note
-        ? { bemerkung: joinBemerkung(stueck.bemerkung, note) }
-        : {}),
+      ...(!closesAusgabe && note ? { bemerkung: joinBemerkung(stueck.bemerkung, note) } : {}),
       ...updated,
     });
   });
@@ -771,13 +787,19 @@ async function setStueckStatusImpl(
 // --- Mengenbestand -----------------------------------------------------------
 
 /**
- * Zugang (`delta > 0`) oder Korrektur des Mengenbestands je Artikel und
- * Größe. Der Bestand fällt nie unter 0. Eine Bemerkung wird angenommen,
+ * Zugang (`delta > 0`) oder Korrektur des Mengenbestands je Artikel, Größe
+ * und Charge. Der Bestand fällt nie unter 0. Eine Bemerkung wird angenommen,
  * aber (noch) nicht gespeichert — es gibt kein Buchungsprotokoll.
  */
 async function adjustBestandImpl(
   groupId: string,
-  input: { artikelId: string; groesse: string; delta: number; bemerkung?: string },
+  input: {
+    artikelId: string;
+    groesse: string;
+    charge?: string;
+    delta: number;
+    bemerkung?: string;
+  },
 ): Promise<void> {
   const session = await actionBekleidungswartRequired(groupId);
   const actor = actorOf(session);
@@ -789,23 +811,28 @@ async function adjustBestandImpl(
   if (typeof input.delta !== 'number' || !Number.isInteger(input.delta) || input.delta === 0) {
     throw badRequest('invalid delta');
   }
-  const ref = bestandCol(groupId).doc(bestandDocId(input.artikelId, groesse));
+  const charge = normalizeCharge(text(input.charge, 100));
+  const ref = bestandCol(groupId).doc(bestandDocId(input.artikelId, groesse, charge));
 
   await firestore.runTransaction(async (tx: Transaction) => {
     const artikelSnap = await tx.get(artikelCol(groupId).doc(input.artikelId));
     if (!artikelSnap.exists) throw notFound('artikel', input.artikelId);
     if (asArtikel(artikelSnap.data()).fuehrung !== 'menge') throw conflict('artikelNotMenge');
     const snap = await tx.get(ref);
-    const anzahl = snap.exists ? ((snap.data() as BekleidungBestand).anzahl ?? 0) : 0;
-    const next = anzahl + input.delta;
+    const bestand = snap.exists ? (snap.data() as BekleidungBestand) : undefined;
+    const next = (bestand?.anzahl ?? 0) + input.delta;
     if (next < 0) throw conflict(`insufficientStock:${input.artikelId}:${groesse}`);
-    tx.set(ref, {
-      artikelId: input.artikelId,
-      groesse,
-      anzahl: next,
-      updatedAt: actor.now,
-      updatedBy: actor.uid,
-    });
+    tx.set(
+      ref,
+      compact({
+        artikelId: input.artikelId,
+        groesse,
+        charge: bestand?.charge ?? charge,
+        anzahl: next,
+        updatedAt: actor.now,
+        updatedBy: actor.uid,
+      }),
+    );
   });
 }
 
@@ -827,10 +854,7 @@ export interface WaescheInput {
   bemerkung?: string;
 }
 
-async function recordWaescheImpl(
-  groupId: string,
-  input: WaescheInput,
-): Promise<{ id: string }> {
+async function recordWaescheImpl(groupId: string, input: WaescheInput): Promise<{ id: string }> {
   const session = await actionBekleidungswartRequired(groupId);
   const actor = actorOf(session);
 
@@ -1058,7 +1082,12 @@ async function rollbackImport(groupId: string, refs: DocumentReference[]): Promi
   }
 }
 
-const IMPORT_STATUS: BekleidungStatus[] = ['lager', 'ausgegeben', 'ausgeschieden', 'nicht_auffindbar'];
+const IMPORT_STATUS: BekleidungStatus[] = [
+  'lager',
+  'ausgegeben',
+  'ausgeschieden',
+  'nicht_auffindbar',
+];
 
 /**
  * Bereinigung je Zeile prüfen: nur Zeilen der Datei, gültiger Status,
@@ -1258,14 +1287,15 @@ async function importBekleidungImpl(
   for (const b of plan.bestand) {
     const artikelId = artikelIdOf(b.artikelKey);
     writes.push({
-      ref: bestandCol(groupId).doc(bestandDocId(artikelId, b.groesse)),
-      data: {
+      ref: bestandCol(groupId).doc(bestandDocId(artikelId, b.groesse, b.charge)),
+      data: compact({
         artikelId,
         groesse: normalizeGroesse(b.groesse),
+        charge: b.charge,
         anzahl: b.anzahl,
         updatedAt: actor.now,
         updatedBy: actor.uid,
-      },
+      }),
     });
   }
 
@@ -1290,7 +1320,10 @@ async function importBekleidungImpl(
       counts,
     });
   } catch (err) {
-    await rollbackImport(groupId, writes.map((w) => w.ref));
+    await rollbackImport(
+      groupId,
+      writes.map((w) => w.ref),
+    );
     throw err;
   }
 
@@ -1323,9 +1356,7 @@ async function asResult<T>(run: () => Promise<T>): Promise<ActionResult<T>> {
   }
 }
 
-async function asVoidResult(
-  run: () => Promise<void>,
-): Promise<ActionResult<{ success: true }>> {
+async function asVoidResult(run: () => Promise<void>): Promise<ActionResult<{ success: true }>> {
   return asResult(async () => {
     await run();
     return { success: true as const };
@@ -1381,7 +1412,7 @@ export async function setStueckStatus(
 
 export async function adjustBestand(
   groupId: string,
-  input: { artikelId: string; groesse: string; delta: number; bemerkung?: string },
+  input: { artikelId: string; groesse: string; charge?: string; delta: number; bemerkung?: string },
 ): Promise<ActionResult<{ success: true }>> {
   return asVoidResult(() => adjustBestandImpl(groupId, input));
 }

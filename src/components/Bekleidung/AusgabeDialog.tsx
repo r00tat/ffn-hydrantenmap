@@ -19,7 +19,11 @@ import OnlineOnly from '../site/OnlineOnly';
 import { issue, returnItems } from './bekleidungActions';
 import { parseBekleidungError, useBekleidungErrorText } from './bekleidungErrors';
 import { stueckLabel, todayLocalDate, type BekleidungView } from './bekleidungUi';
-import MengeLinesEditor, { completeMengeLines, type MengeLineDraft } from './MengeLinesEditor';
+import MengeLinesEditor, {
+  completeMengeLines,
+  linesMissingCharge,
+  type MengeLineDraft,
+} from './MengeLinesEditor';
 import StueckCollector from './StueckCollector';
 
 export interface AusgabeDialogProps {
@@ -38,7 +42,12 @@ const acceptScanned = (s: BekleidungStueck) => s.status === 'lager' || s.status 
  * Ausgabe an eine Person: Stücke und Mengenartikel sammeln und auf einmal
  * buchen. Das Datum ist heute, rückdatierbar.
  */
-export default function AusgabeDialog({ open, view, initialPersonId, onClose }: AusgabeDialogProps) {
+export default function AusgabeDialog({
+  open,
+  view,
+  initialPersonId,
+  onClose,
+}: AusgabeDialogProps) {
   const t = useTranslations('bekleidung');
   const errorText = useBekleidungErrorText();
   const activePersons = useMemo(
@@ -68,8 +77,13 @@ export default function AusgabeDialog({ open, view, initialPersonId, onClose }: 
     artikelLabel: (id: string) => view.artikelById.get(id)?.bezeichnung ?? id,
   };
 
-  const mengen = completeMengeLines(lines);
-  const canSubmit = !!personId && !!datum && (stueckIds.length > 0 || mengen.length > 0) && !busy;
+  const mengen = completeMengeLines(lines, view.bestand);
+  const canSubmit =
+    !!personId &&
+    !!datum &&
+    (stueckIds.length > 0 || mengen.length > 0) &&
+    linesMissingCharge(lines, view.bestand) === 0 &&
+    !busy;
 
   const submit = async () => {
     setBusy(true);

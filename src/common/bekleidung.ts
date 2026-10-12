@@ -23,11 +23,7 @@ export const GROESSE_UNBEKANNT = '\u2013';
 export type BekleidungKategorie = 'einsatz' | 'dienst';
 /** `einzeln`: jedes Stück ist ein Dokument; `menge`: nur Anzahl je Größe. */
 export type BekleidungFuehrung = 'einzeln' | 'menge';
-export type BekleidungStatus =
-  | 'lager'
-  | 'ausgegeben'
-  | 'ausgeschieden'
-  | 'nicht_auffindbar';
+export type BekleidungStatus = 'lager' | 'ausgegeben' | 'ausgeschieden' | 'nicht_auffindbar';
 export type BekleidungEigentum = 'feuerwehr' | 'privat';
 export type WaschProgramm = 'standard' | 'impraegnierung' | 'sonstiges';
 
@@ -70,6 +66,8 @@ export interface BekleidungBestand {
   id?: string;
   artikelId: string;
   groesse: string;
+  /** Charge (Lieferung), z.B. „Brand - 2024". Leer = ohne Charge. */
+  charge?: string;
   anzahl: number;
   updatedAt: string;
   updatedBy: string;
@@ -81,6 +79,8 @@ export interface BekleidungAusgabe extends Stamps {
   stueckId?: string;
   artikelId: string;
   groesse: string;
+  /** Charge des Mengenbestands, aus dem die Menge kam. */
+  charge?: string;
   menge: number;
   /** Leer = Datum unbekannt (Import). */
   ausgegebenAm?: string;
@@ -112,12 +112,29 @@ export function normalizeGroesse(groesse: string): string {
   return groesse.trim().replace(/\s+/g, ' ').toUpperCase();
 }
 
+/** Charge als Text: Leerzeichen zusammengefasst, leer → `undefined`. */
+export function normalizeCharge(charge: string | undefined): string | undefined {
+  const value = charge?.trim().replace(/\s+/g, ' ');
+  return value || undefined;
+}
+
+/** Vergleichsschlüssel einer Charge: „brand" und „Brand" sind dieselbe. */
+export function chargeKey(charge: string | undefined): string {
+  return normalizeCharge(charge)?.toUpperCase() ?? '';
+}
+
 /**
- * Dokument-ID des Mengenbestands je Artikel und Größe. Die Größe wird
- * kodiert, weil „52/54" sonst einen Pfadtrenner enthielte.
+ * Dokument-ID des Mengenbestands je Artikel, Größe und Charge. Die Größe wird
+ * kodiert, weil „52/54" sonst einen Pfadtrenner enthielte. Ohne Charge bleibt
+ * die ID wie vor den Chargen; mit Charge folgt `__c_` und die kodierte Charge.
+ * Die kodierte Größe ist großgeschrieben, ein kleines „c" kommt in ihr nie vor;
+ * Unterstriche der Charge werden mitkodiert, damit sie nicht wie der Trenner
+ * aussehen.
  */
-export function bestandDocId(artikelId: string, groesse: string): string {
-  return `${artikelId}__${encodeURIComponent(normalizeGroesse(groesse))}`;
+export function bestandDocId(artikelId: string, groesse: string, charge?: string): string {
+  const base = `${artikelId}__${encodeURIComponent(normalizeGroesse(groesse))}`;
+  const key = chargeKey(charge);
+  return key ? `${base}__c_${encodeURIComponent(key).replace(/_/g, '%5F')}` : base;
 }
 
 /**

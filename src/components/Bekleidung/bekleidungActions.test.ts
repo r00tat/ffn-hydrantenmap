@@ -153,8 +153,7 @@ const fake = vi.hoisted(() => {
       id: path.split('/').pop()!,
       path,
       get: async () => snap(path),
-      set: async (data, opts) =>
-        commit([{ kind: 'set', path, data, merge: opts?.merge }]),
+      set: async (data, opts) => commit([{ kind: 'set', path, data, merge: opts?.merge }]),
       update: async (data) => commit([{ kind: 'update', path, data }]),
       delete: async () => commit([{ kind: 'delete', path }]),
       collection: (name) => collectionRef(`${path}/${name}`),
@@ -258,10 +257,7 @@ vi.mock('./bekleidungGuard', () => ({ actionBekleidungswartRequired: guard }));
 vi.mock('../../common/xlsx', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../common/xlsx')>()),
   readXlsxSheetByName: (data: Uint8Array, name: string) => {
-    const sheets = JSON.parse(Buffer.from(data).toString('utf-8')) as Record<
-      string,
-      string[][]
-    >;
+    const sheets = JSON.parse(Buffer.from(data).toString('utf-8')) as Record<string, string[][]>;
     if (!sheets[name]) throw new Error(`xlsx: Blatt "${name}" nicht gefunden`);
     return sheets[name];
   },
@@ -400,7 +396,7 @@ describe('Guard', () => {
     guard.mockRejectedValueOnce(new ApiException('forbidden', { status: 403 }));
     const before = fake.docs.size;
     await failsWith(
-      issue('ffnd', { personId: 'p1', datum: '2026-10-08', stueckIds: ['s1'], mengen: [] })
+      issue('ffnd', { personId: 'p1', datum: '2026-10-08', stueckIds: ['s1'], mengen: [] }),
     );
     expect(guard).toHaveBeenCalledWith('ffnd');
     expect(fake.docs.size).toBe(before);
@@ -441,13 +437,15 @@ describe('Guard', () => {
 
 describe('issue', () => {
   it('bucht Stück und Menge in einem Zug', async () => {
-    const { ausgabeIds } = ok(await issue('ffnd', {
-      personId: 'p1',
-      datum: '2026-10-08',
-      bemerkung: 'Neuaufnahme',
-      stueckIds: ['s1'],
-      mengen: [{ artikelId: 'polo', groesse: ' m ', menge: 2 }],
-    }));
+    const { ausgabeIds } = ok(
+      await issue('ffnd', {
+        personId: 'p1',
+        datum: '2026-10-08',
+        bemerkung: 'Neuaufnahme',
+        stueckIds: ['s1'],
+        mengen: [{ artikelId: 'polo', groesse: ' m ', menge: 2 }],
+      }),
+    );
     expect(ausgabeIds).toHaveLength(2);
 
     const stueck = get('bekleidungStueck/s1')!;
@@ -487,7 +485,7 @@ describe('issue', () => {
   it('lehnt ein schon ausgegebenes Stück ab', async () => {
     await failsWith(
       issue('ffnd', { personId: 'p1', datum: '2026-10-08', stueckIds: ['s1', 's2'], mengen: [] }),
-      'alreadyIssued:s2'
+      'alreadyIssued:s2',
     );
     expect(get('bekleidungStueck/s1')?.status).toBe('lager');
   });
@@ -495,7 +493,7 @@ describe('issue', () => {
   it('lehnt ein ausgegebenes Stück ohne Ausgabe (Import) ab', async () => {
     await failsWith(
       issue('ffnd', { personId: 'p1', datum: '2026-10-08', stueckIds: ['s3'], mengen: [] }),
-      'alreadyIssued:s3'
+      'alreadyIssued:s3',
     );
   });
 
@@ -524,7 +522,7 @@ describe('issue', () => {
         stueckIds: ['s1'],
         mengen: [{ artikelId: 'polo', groesse: 'M', menge: 6 }],
       }),
-      'insufficientStock:polo:M'
+      'insufficientStock:polo:M',
     );
     expect(list('bekleidungAusgabe')).toHaveLength(before);
     expect(get('bekleidungStueck/s1')?.status).toBe('lager');
@@ -539,54 +537,54 @@ describe('issue', () => {
         stueckIds: [],
         mengen: [{ artikelId: 'polo', groesse: 'XL', menge: 1 }],
       }),
-      'insufficientStock:polo:XL'
+      'insufficientStock:polo:XL',
     );
   });
 
   it('lehnt eine inaktive Person ab', async () => {
     await failsWith(
       issue('ffnd', { personId: 'p2', datum: '2026-10-08', stueckIds: ['s1'], mengen: [] }),
-      'personInactive'
+      'personInactive',
     );
   });
 
   it('lehnt eine Person einer fremden Gruppe ab', async () => {
     fake.put('groups/other/person/p9', { name: 'Hans Beispiel', active: true });
     await failsWith(
-      issue('ffnd', { personId: 'p9', datum: '2026-10-08', stueckIds: ['s1'], mengen: [] })
+      issue('ffnd', { personId: 'p9', datum: '2026-10-08', stueckIds: ['s1'], mengen: [] }),
     );
     expect(get('bekleidungStueck/s1')?.status).toBe('lager');
   });
 
   it('lehnt ein ungültiges Datum ab', async () => {
     await failsWith(
-      issue('ffnd', { personId: 'p1', datum: '8.10.2026', stueckIds: ['s1'], mengen: [] })
+      issue('ffnd', { personId: 'p1', datum: '8.10.2026', stueckIds: ['s1'], mengen: [] }),
     );
   });
 
   it('lehnt unsichere IDs ab', async () => {
     await failsWith(
-      issue('ffnd', { personId: 'p1', datum: '2026-10-08', stueckIds: ['../x'], mengen: [] })
+      issue('ffnd', { personId: 'p1', datum: '2026-10-08', stueckIds: ['../x'], mengen: [] }),
     );
   });
 });
 
 describe('returnItems', () => {
   it('teilt eine Teilrücknahme einer Menge auf und erhöht den Bestand', async () => {
-    ok(await returnItems('ffnd', {
-      datum: '2026-10-08',
-      bemerkung: 'zu klein',
-      ziel: 'lager',
-      stueckIds: [],
-      mengen: [{ ausgabeId: 'au2', menge: 2 }],
-    }));
+    ok(
+      await returnItems('ffnd', {
+        datum: '2026-10-08',
+        bemerkung: 'zu klein',
+        ziel: 'lager',
+        stueckIds: [],
+        mengen: [{ ausgabeId: 'au2', menge: 2 }],
+      }),
+    );
     const original = get('bekleidungAusgabe/au2')!;
     expect(original.menge).toBe(1);
     expect(original.zurueckAm).toBeUndefined();
 
-    const closed = list('bekleidungAusgabe').filter(
-      (a) => a.artikelId === 'polo' && a.zurueckAm,
-    );
+    const closed = list('bekleidungAusgabe').filter((a) => a.artikelId === 'polo' && a.zurueckAm);
     expect(closed).toHaveLength(1);
     expect(closed[0]).toMatchObject({
       personId: 'p1',
@@ -601,12 +599,14 @@ describe('returnItems', () => {
   });
 
   it('schließt eine vollständig zurückgenommene Menge', async () => {
-    ok(await returnItems('ffnd', {
-      datum: '2026-10-08',
-      ziel: 'ausgeschieden',
-      stueckIds: [],
-      mengen: [{ ausgabeId: 'au2', menge: 3 }],
-    }));
+    ok(
+      await returnItems('ffnd', {
+        datum: '2026-10-08',
+        ziel: 'ausgeschieden',
+        stueckIds: [],
+        mengen: [{ ausgabeId: 'au2', menge: 3 }],
+      }),
+    );
     expect(get('bekleidungAusgabe/au2')).toMatchObject({ menge: 3, zurueckAm: '2026-10-08' });
     // ausgeschieden: nicht zurück ins Lager
     expect(get(`bekleidungBestand/${bestandDocId('polo', 'M')}`)?.anzahl).toBe(5);
@@ -622,12 +622,17 @@ describe('returnItems', () => {
       quelle: 'import',
       ...STAMPS,
     });
-    ok(await returnItems('ffnd', {
-      datum: '2026-10-08',
-      ziel: 'lager',
-      stueckIds: [],
-      mengen: [{ ausgabeId: 'au4', menge: 2 }, { ausgabeId: 'au2', menge: 1 }],
-    }));
+    ok(
+      await returnItems('ffnd', {
+        datum: '2026-10-08',
+        ziel: 'lager',
+        stueckIds: [],
+        mengen: [
+          { ausgabeId: 'au4', menge: 2 },
+          { ausgabeId: 'au2', menge: 1 },
+        ],
+      }),
+    );
     expect(get('bekleidungAusgabe/au4')).toMatchObject({ zurueckAm: '2026-10-08', menge: 2 });
     // nur die Feuerwehr-Menge aus au2 kommt dazu
     expect(get(`bekleidungBestand/${bestandDocId('polo', 'M')}`)?.anzahl).toBe(6);
@@ -640,18 +645,20 @@ describe('returnItems', () => {
         ziel: 'lager',
         stueckIds: [],
         mengen: [{ ausgabeId: 'au2', menge: 4 }],
-      })
+      }),
     );
   });
 
   it('nimmt ein Stück als ausgeschieden zurück', async () => {
-    ok(await returnItems('ffnd', {
-      datum: '2026-10-08',
-      bemerkung: 'Riss',
-      ziel: 'ausgeschieden',
-      stueckIds: ['s2'],
-      mengen: [],
-    }));
+    ok(
+      await returnItems('ffnd', {
+        datum: '2026-10-08',
+        bemerkung: 'Riss',
+        ziel: 'ausgeschieden',
+        stueckIds: ['s2'],
+        mengen: [],
+      }),
+    );
     expect(get('bekleidungAusgabe/au1')).toMatchObject({
       zurueckAm: '2026-10-08',
       bemerkung: 'Riss',
@@ -664,14 +671,21 @@ describe('returnItems', () => {
   });
 
   it('nimmt ein ausgegebenes Stück ohne Ausgabe (Import) zurück', async () => {
-    ok(await returnItems('ffnd', { datum: '2026-10-08', ziel: 'lager', stueckIds: ['s3'], mengen: [] }));
+    ok(
+      await returnItems('ffnd', {
+        datum: '2026-10-08',
+        ziel: 'lager',
+        stueckIds: ['s3'],
+        mengen: [],
+      }),
+    );
     expect(get('bekleidungStueck/s3')?.status).toBe('lager');
   });
 
   it('lehnt ein Stück im Lager ab', async () => {
     await failsWith(
       returnItems('ffnd', { datum: '2026-10-08', ziel: 'lager', stueckIds: ['s1'], mengen: [] }),
-      'notIssued:s1'
+      'notIssued:s1',
     );
   });
 
@@ -692,7 +706,7 @@ describe('returnItems', () => {
         stueckIds: [],
         mengen: [{ ausgabeId: 'au3', menge: 1 }],
       }),
-      'notIssued:au3'
+      'notIssued:au3',
     );
   });
 });
@@ -716,19 +730,19 @@ describe('setStueckStatus', () => {
   });
 
   it('lehnt einen unbekannten Status ab', async () => {
-    await failsWith(
-      setStueckStatus('ffnd', 's1', 'ausgegeben' as never, '2026-10-08')
-    );
+    await failsWith(setStueckStatus('ffnd', 's1', 'ausgegeben' as never, '2026-10-08'));
   });
 });
 
 describe('recordWaesche', () => {
   it('zählt die Wäsche je Stück und setzt das letzte Datum', async () => {
-    const { id } = ok(await recordWaesche('ffnd', {
-      datum: '2026-10-08',
-      programm: 'impraegnierung',
-      stueckIds: ['s1', 's2', 's1'],
-    }));
+    const { id } = ok(
+      await recordWaesche('ffnd', {
+        datum: '2026-10-08',
+        programm: 'impraegnierung',
+        stueckIds: ['s1', 's2', 's1'],
+      }),
+    );
     expect(get(`bekleidungWaesche/${id}`)).toMatchObject({
       datum: '2026-10-08',
       programm: 'impraegnierung',
@@ -749,32 +763,34 @@ describe('recordWaesche', () => {
   it('verlangt bei „sonstiges" einen Text', async () => {
     await failsWith(
       recordWaesche('ffnd', { datum: '2026-10-08', programm: 'sonstiges', stueckIds: ['s1'] }),
-      'programmTextRequired'
+      'programmTextRequired',
     );
   });
 
   it('lehnt mehr als 200 Stücke ab', async () => {
     const ids = Array.from({ length: 201 }, (_, i) => `x${i}`);
     await failsWith(
-      recordWaesche('ffnd', { datum: '2026-10-08', programm: 'standard', stueckIds: ids })
+      recordWaesche('ffnd', { datum: '2026-10-08', programm: 'standard', stueckIds: ids }),
     );
   });
 
   it('lehnt ein unbekanntes Stück ab', async () => {
     await failsWith(
-      recordWaesche('ffnd', { datum: '2026-10-08', programm: 'standard', stueckIds: ['nope'] })
+      recordWaesche('ffnd', { datum: '2026-10-08', programm: 'standard', stueckIds: ['nope'] }),
     );
   });
 });
 
 describe('createStuecke / updateStueck', () => {
   it('legt mehrere Stücke ohne Tag-Nummer an', async () => {
-    const { ids } = ok(await createStuecke('ffnd', {
-      artikelId: 'jacke',
-      groesse: ' L ',
-      eigentum: 'feuerwehr',
-      anzahl: 3,
-    }));
+    const { ids } = ok(
+      await createStuecke('ffnd', {
+        artikelId: 'jacke',
+        groesse: ' L ',
+        eigentum: 'feuerwehr',
+        anzahl: 3,
+      }),
+    );
     expect(ids).toHaveLength(3);
     for (const id of ids) {
       expect(get(`bekleidungStueck/${id}`)).toMatchObject({
@@ -789,13 +805,15 @@ describe('createStuecke / updateStueck', () => {
   });
 
   it('normalisiert die Tag-Nummer und lehnt eine doppelte ab', async () => {
-    const { ids } = ok(await createStuecke('ffnd', {
-      artikelId: 'jacke',
-      groesse: 'L',
-      eigentum: 'feuerwehr',
-      tagNummer: ' 2000.0 ',
-      anzahl: 1,
-    }));
+    const { ids } = ok(
+      await createStuecke('ffnd', {
+        artikelId: 'jacke',
+        groesse: 'L',
+        eigentum: 'feuerwehr',
+        tagNummer: ' 2000.0 ',
+        anzahl: 1,
+      }),
+    );
     expect(get(`bekleidungStueck/${ids[0]}`)?.tagNummer).toBe('2000');
     await failsWith(
       createStuecke('ffnd', {
@@ -805,7 +823,7 @@ describe('createStuecke / updateStueck', () => {
         tagNummer: '1001',
         anzahl: 1,
       }),
-      'tagExists:1001'
+      'tagExists:1001',
     );
   });
 
@@ -817,27 +835,29 @@ describe('createStuecke / updateStueck', () => {
         eigentum: 'feuerwehr',
         tagNummer: '3000',
         anzahl: 2,
-      })
+      }),
     );
   });
 
   it('lehnt Stücke für einen Mengenartikel ab', async () => {
     await failsWith(
-      createStuecke('ffnd', { artikelId: 'polo', groesse: 'L', eigentum: 'feuerwehr', anzahl: 1 })
+      createStuecke('ffnd', { artikelId: 'polo', groesse: 'L', eigentum: 'feuerwehr', anzahl: 1 }),
     );
   });
 
   it('updateStueck lehnt eine fremde Tag-Nummer ab, behält die eigene', async () => {
     await failsWith(
       updateStueck('ffnd', 's1', { groesse: 'M3', eigentum: 'feuerwehr', tagNummer: '1002' }),
-      'tagExists:1002'
+      'tagExists:1002',
     );
-    ok(await updateStueck('ffnd', 's1', {
-      groesse: 'L3',
-      eigentum: 'privat',
-      tagNummer: '1001',
-      lagerort: 'Spind 4',
-    }));
+    ok(
+      await updateStueck('ffnd', 's1', {
+        groesse: 'L3',
+        eigentum: 'privat',
+        tagNummer: '1001',
+        lagerort: 'Spind 4',
+      }),
+    );
     expect(get('bekleidungStueck/s1')).toMatchObject({
       groesse: 'L3',
       eigentum: 'privat',
@@ -848,7 +868,9 @@ describe('createStuecke / updateStueck', () => {
   });
 
   it('updateStueck zieht eine geänderte Größe in der offenen Ausgabe nach', async () => {
-    ok(await updateStueck('ffnd', 's2', { groesse: 'L3', eigentum: 'feuerwehr', tagNummer: '1002' }));
+    ok(
+      await updateStueck('ffnd', 's2', { groesse: 'L3', eigentum: 'feuerwehr', tagNummer: '1002' }),
+    );
     expect(get('bekleidungStueck/s2')?.groesse).toBe('L3');
     expect(get('bekleidungAusgabe/au1')).toMatchObject({ groesse: 'L3', updatedBy: 'u1' });
   });
@@ -858,7 +880,9 @@ describe('createStuecke / updateStueck', () => {
       ...get('bekleidungAusgabe/au1'),
       zurueckAm: '2026-01-01',
     });
-    ok(await updateStueck('ffnd', 's2', { groesse: 'L3', eigentum: 'feuerwehr', tagNummer: '1002' }));
+    ok(
+      await updateStueck('ffnd', 's2', { groesse: 'L3', eigentum: 'feuerwehr', tagNummer: '1002' }),
+    );
     expect(get('bekleidungAusgabe/au1')?.groesse).toBe('M3');
   });
 
@@ -870,13 +894,15 @@ describe('createStuecke / updateStueck', () => {
 
 describe('saveArtikel', () => {
   it('legt einen Artikel an', async () => {
-    const { id } = ok(await saveArtikel('ffnd', undefined, {
-      kategorie: 'dienst',
-      bezeichnung: ' Hemd ',
-      hersteller: '',
-      fuehrung: 'menge',
-      aktiv: true,
-    }));
+    const { id } = ok(
+      await saveArtikel('ffnd', undefined, {
+        kategorie: 'dienst',
+        bezeichnung: ' Hemd ',
+        hersteller: '',
+        fuehrung: 'menge',
+        aktiv: true,
+      }),
+    );
     const doc = get(`bekleidungArtikel/${id}`)!;
     expect(doc).toMatchObject({
       kategorie: 'dienst',
@@ -896,7 +922,7 @@ describe('saveArtikel', () => {
         fuehrung: 'menge',
         aktiv: true,
       }),
-      'fuehrungLocked'
+      'fuehrungLocked',
     );
   });
 
@@ -908,17 +934,19 @@ describe('saveArtikel', () => {
         fuehrung: 'einzeln',
         aktiv: true,
       }),
-      'fuehrungLocked'
+      'fuehrungLocked',
     );
   });
 
   it('ändert einen Artikel ohne Führungswechsel', async () => {
-    ok(await saveArtikel('ffnd', 'jacke', {
-      kategorie: 'einsatz',
-      bezeichnung: 'Branddienst Jacke neu',
-      fuehrung: 'einzeln',
-      aktiv: false,
-    }));
+    ok(
+      await saveArtikel('ffnd', 'jacke', {
+        kategorie: 'einsatz',
+        bezeichnung: 'Branddienst Jacke neu',
+        fuehrung: 'einzeln',
+        aktiv: false,
+      }),
+    );
     const doc = get('bekleidungArtikel/jacke')!;
     expect(doc).toMatchObject({ bezeichnung: 'Branddienst Jacke neu', aktiv: false });
     expect(doc.maxWaschgaenge).toBeUndefined();
@@ -936,9 +964,93 @@ describe('adjustBestand', () => {
     });
     await failsWith(
       adjustBestand('ffnd', { artikelId: 'polo', groesse: 'M', delta: -6 }),
-      'insufficientStock:polo:M'
+      'insufficientStock:polo:M',
     );
     expect(get(`bekleidungBestand/${bestandDocId('polo', 'M')}`)?.anzahl).toBe(5);
+  });
+});
+
+describe('Chargen bei Mengenartikeln', () => {
+  const brandId = bestandDocId('polo', 'M', 'Brand');
+  beforeEach(() => {
+    fake.put(`${G}/bekleidungBestand/${brandId}`, {
+      artikelId: 'polo',
+      groesse: 'M',
+      charge: 'Brand',
+      anzahl: 2,
+      updatedAt: STAMPS.updatedAt,
+      updatedBy: 'u0',
+    });
+  });
+
+  it('gibt aus der gewählten Charge aus und vermerkt sie an der Ausgabe', async () => {
+    const { ausgabeIds } = ok(
+      await issue('ffnd', {
+        personId: 'p1',
+        datum: '2026-10-08',
+        stueckIds: [],
+        mengen: [{ artikelId: 'polo', groesse: 'M', charge: ' brand ', menge: 2 }],
+      }),
+    );
+    expect(get(`bekleidungAusgabe/${ausgabeIds[0]}`)).toMatchObject({ charge: 'Brand', menge: 2 });
+    expect(get(`bekleidungBestand/${brandId}`)?.anzahl).toBe(0);
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'M')}`)?.anzahl).toBe(5);
+  });
+
+  it('prüft den Bestand je Charge', async () => {
+    await failsWith(
+      issue('ffnd', {
+        personId: 'p1',
+        datum: '2026-10-08',
+        stueckIds: [],
+        mengen: [{ artikelId: 'polo', groesse: 'M', charge: 'Brand', menge: 3 }],
+      }),
+      'insufficientStock:polo:M',
+    );
+  });
+
+  it('bucht eine Rücknahme in dieselbe Charge zurück', async () => {
+    fake.put(`${G}/bekleidungAusgabe/au9`, {
+      personId: 'p1',
+      artikelId: 'polo',
+      groesse: 'M',
+      charge: 'Brand',
+      menge: 1,
+      quelle: 'app',
+      ...STAMPS,
+    });
+    ok(
+      await returnItems('ffnd', {
+        datum: '2026-10-08',
+        ziel: 'lager',
+        stueckIds: [],
+        mengen: [{ ausgabeId: 'au9', menge: 1 }],
+      }),
+    );
+    expect(get(`bekleidungBestand/${brandId}`)).toMatchObject({ charge: 'Brand', anzahl: 3 });
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'M')}`)?.anzahl).toBe(5);
+  });
+
+  it('korrigiert den Bestand einer Charge und legt eine neue an', async () => {
+    ok(
+      await adjustBestand('ffnd', {
+        artikelId: 'polo',
+        groesse: 'M',
+        charge: 'Technisch',
+        delta: 4,
+      }),
+    );
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'M', 'Technisch')}`)).toMatchObject({
+      artikelId: 'polo',
+      groesse: 'M',
+      charge: 'Technisch',
+      anzahl: 4,
+    });
+    ok(
+      await adjustBestand('ffnd', { artikelId: 'polo', groesse: 'M', charge: 'BRAND', delta: -2 }),
+    );
+    // Die Schreibweise der vorhandenen Charge bleibt.
+    expect(get(`bekleidungBestand/${brandId}`)).toMatchObject({ charge: 'Brand', anzahl: 0 });
   });
 });
 
@@ -962,12 +1074,26 @@ describe('createPersonForBekleidung', () => {
 
 const BLOCK = ['ausgegeben an', 'ausgegeben an', 'ausgegeben am', 'zurück am'];
 const EINSATZ_HEADER = [
-  'Hersteller', 'Art', 'Charge', 'Tag Nummer', 'Größe', 'Status aktuell', 'Waschgänge',
-  ...BLOCK, ...BLOCK,
+  'Hersteller',
+  'Art',
+  'Charge',
+  'Tag Nummer',
+  'Größe',
+  'Status aktuell',
+  'Waschgänge',
+  ...BLOCK,
+  ...BLOCK,
 ];
 const DIENST_HEADER = [
-  'Hersteller', 'Artikel', 'Charge', 'Tag Nummer', 'Größe', 'Bemerkung', 'Status aktuell',
-  ...BLOCK, ...BLOCK,
+  'Hersteller',
+  'Artikel',
+  'Charge',
+  'Tag Nummer',
+  'Größe',
+  'Bemerkung',
+  'Status aktuell',
+  ...BLOCK,
+  ...BLOCK,
 ];
 
 function pad(row: string[], length: number): string[] {
@@ -980,11 +1106,35 @@ function workbook(): string {
       ['Bestandsliste'],
       EINSATZ_HEADER,
       pad(
-        ['Texport', 'Jacke', '', '22081702', 'M3', 'ausgegeben', '5', 'Mustermann', 'Max', '45250', ''],
+        [
+          'Texport',
+          'Jacke',
+          '',
+          '22081702',
+          'M3',
+          'ausgegeben',
+          '5',
+          'Mustermann',
+          'Max',
+          '45250',
+          '',
+        ],
         EINSATZ_HEADER.length,
       ),
       pad(
-        ['Texport', 'Jacke', '', '22081703', 'L', 'lager', '', 'Musterfrau', 'Erika', '44378', '45250'],
+        [
+          'Texport',
+          'Jacke',
+          '',
+          '22081703',
+          'L',
+          'lager',
+          '',
+          'Musterfrau',
+          'Erika',
+          '44378',
+          '45250',
+        ],
         EINSATZ_HEADER.length,
       ),
     ],
@@ -1019,7 +1169,10 @@ describe('previewBekleidungImport', () => {
 
   it('lehnt eine zu große Datei ab', async () => {
     await failsWith(
-      previewBekleidungImport('ffnd', 'A'.repeat(Math.ceil((BEKLEIDUNG_IMPORT_MAX_BYTES * 4) / 3) + 8)),
+      previewBekleidungImport(
+        'ffnd',
+        'A'.repeat(Math.ceil((BEKLEIDUNG_IMPORT_MAX_BYTES * 4) / 3) + 8),
+      ),
       'fileTooLarge',
     );
   });
@@ -1044,16 +1197,14 @@ describe('importBekleidung', () => {
       importBekleidung('ffnd', workbook(), {
         ...decisions,
         persons: { ...decisions.persons, 'max mustermann': { personId: 'p9' } },
-      })
+      }),
     );
     expect(list('bekleidungArtikel')).toHaveLength(0);
   });
 
   it('lehnt fehlende Personen-Entscheidungen ab', async () => {
     clearBekleidung();
-    await failsWith(
-      importBekleidung('ffnd', workbook(), { fuehrung: {}, persons: {} })
-    );
+    await failsWith(importBekleidung('ffnd', workbook(), { fuehrung: {}, persons: {} }));
   });
 
   it('schreibt Artikel, Stücke, Bestand und Ausgaben verknüpft', async () => {
@@ -1119,7 +1270,7 @@ describe('importBekleidung', () => {
           ...decisions.persons,
           'erika musterfrau': { create: 'Erika Beispiel', active: false },
         },
-      })
+      }),
     );
     const erika = list('person').find((p) => p.name === 'Erika Beispiel')!;
     expect(erika).toMatchObject({ active: false, createdBy: 'u1' });
@@ -1134,7 +1285,7 @@ describe('importBekleidung', () => {
           ...decisions.persons,
           'erika musterfrau': { create: 'Erika Beispiel', active: 'nein' as unknown as boolean },
         },
-      })
+      }),
     );
     expect(list('bekleidungArtikel')).toHaveLength(0);
   });
@@ -1145,7 +1296,7 @@ describe('importBekleidung', () => {
       await importBekleidung('ffnd', workbook(), {
         ...decisions,
         rows: { 'einsatz:4': { tagNummer: '4711', status: 'ausgeschieden' } },
-      })
+      }),
     );
     const stueck = list('bekleidungStueck').find((s) => s.tagNummer === '4711')!;
     expect(stueck).toMatchObject({ status: 'ausgeschieden' });
@@ -1159,7 +1310,7 @@ describe('importBekleidung', () => {
         ...decisions,
         rows: { 'einsatz:4': { tagNummer: '22081702' } },
       }),
-      'tagExists'
+      'tagExists',
     );
     expect(list('bekleidungArtikel')).toHaveLength(0);
   });
@@ -1176,7 +1327,7 @@ describe('importBekleidung', () => {
         importBekleidung('ffnd', workbook(), {
           ...decisions,
           rows: rows as unknown as ImportDecisions['rows'],
-        })
+        }),
       );
     }
     expect(list('bekleidungArtikel')).toHaveLength(0);
@@ -1235,7 +1386,9 @@ describe('importBekleidung', () => {
 
   it('rollt bei einem Fehler beim Schreiben alles zurück und gibt die Sperre frei', async () => {
     clearBekleidung();
-    const personsBefore = list('person').map((p) => p.id).sort();
+    const personsBefore = list('person')
+      .map((p) => p.id)
+      .sort();
     fake.failBatchCommit(1);
     await expect(importBekleidung('ffnd', workbook(), decisions)).rejects.toThrow(
       /DEADLINE_EXCEEDED/,
@@ -1249,7 +1402,11 @@ describe('importBekleidung', () => {
     ]) {
       expect(list(col)).toEqual([]);
     }
-    expect(list('person').map((p) => p.id).sort()).toEqual(personsBefore);
+    expect(
+      list('person')
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(personsBefore);
     // danach geht ein neuer Versuch durch
     ok(await importBekleidung('ffnd', workbook(), decisions));
   });

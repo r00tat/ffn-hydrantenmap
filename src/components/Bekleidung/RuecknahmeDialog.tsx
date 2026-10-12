@@ -25,6 +25,7 @@ import { returnItems } from './bekleidungActions';
 import { useBekleidungErrorText } from './bekleidungErrors';
 import {
   findStueckByCode,
+  mengeLabel,
   personItems,
   stueckLabel,
   todayLocalDate,
@@ -71,7 +72,7 @@ export default function RuecknahmeDialog({
     if (view.stueckById.has(id)) return labelOf(id);
     const a = view.ausgaben.find((x) => x.id === id);
     if (!a) return id;
-    return `${view.artikelById.get(a.artikelId)?.bezeichnung ?? a.artikelId} · ${a.groesse}`;
+    return mengeLabel(a, view.artikelById);
   };
 
   const pieces = useMemo(
@@ -223,9 +224,7 @@ export default function RuecknahmeDialog({
               <Typography variant="subtitle2">{t('ruecknahme.mengen')}</Typography>
               {mengeAusgaben.map((a) => (
                 <Stack key={a.id} direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                  <Typography sx={{ flexGrow: 1 }}>
-                    {view.artikelById.get(a.artikelId)?.bezeichnung ?? a.artikelId} · {a.groesse}
-                  </Typography>
+                  <Typography sx={{ flexGrow: 1 }}>{mengeLabel(a, view.artikelById)}</Typography>
                   <TextField
                     size="small"
                     type="number"

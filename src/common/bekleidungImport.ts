@@ -10,6 +10,8 @@
  */
 import {
   GROESSE_UNBEKANNT,
+  chargeKey,
+  normalizeCharge,
   normalizeGroesse,
   normalizeTagNummer,
   type BekleidungArtikel,
@@ -21,11 +23,7 @@ import {
   type BekleidungStueck,
   type Stamps,
 } from './bekleidung';
-import {
-  matchPersonName,
-  normalizePersonName,
-  type PersonMatch,
-} from './personNameMatch';
+import { matchPersonName, normalizePersonName, type PersonMatch } from './personNameMatch';
 import { excelSerialToIsoDate } from './xlsx';
 
 export const SHEET_EINSATZ = 'Bestandsliste Einsatzbekleidung';
@@ -85,8 +83,7 @@ interface SheetColumns {
 const headerText = (value: string | undefined) =>
   (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 
-const collapse = (value: string | undefined) =>
-  (value ?? '').trim().replace(/\s+/g, ' ');
+const collapse = (value: string | undefined) => (value ?? '').trim().replace(/\s+/g, ' ');
 
 function mapColumns(header: string[]): SheetColumns {
   const normalized = header.map(headerText);
@@ -218,8 +215,7 @@ export function parseBekleidungSheet(
   for (let r = headerIndex + 1; r < grid.length; r++) {
     const cells = grid[r];
     if (cells.every((cell) => !cell || !cell.trim())) continue;
-    const cell = (index: number | undefined) =>
-      index === undefined ? '' : collapse(cells[index]);
+    const cell = (index: number | undefined) => (index === undefined ? '' : collapse(cells[index]));
 
     const bemerkungen: string[] = [];
 
@@ -543,24 +539,25 @@ export interface ImportDecisions {
 export interface ImportPlan {
   artikel: (Omit<BekleidungArtikel, keyof Stamps | 'id'> & { key: string })[];
   personsToCreate: { key: string; name: string; active: boolean }[];
-  stuecke: (Omit<
-    BekleidungStueck,
-    keyof Stamps | 'id' | 'artikelId' | 'personId' | 'ausgabeId'
-  > & { artikelKey: string; personKey?: string; tempId: string })[];
-  bestand: { artikelKey: string; groesse: string; anzahl: number }[];
+  stuecke: (Omit<BekleidungStueck, keyof Stamps | 'id' | 'artikelId' | 'personId' | 'ausgabeId'> & {
+    artikelKey: string;
+    personKey?: string;
+    tempId: string;
+  })[];
+  bestand: ImportBestand[];
   ausgaben: (Omit<
     BekleidungAusgabe,
     keyof Stamps | 'id' | 'personId' | 'stueckId' | 'artikelId'
   > & { artikelKey: string; personKey: string; stueckTempId?: string })[];
 }
 
+type ImportBestand = { artikelKey: string; groesse: string; charge?: string; anzahl: number };
+
 type PlanAusgabe = ImportPlan['ausgaben'][number];
 
 /** `undefined`-Felder weglassen — Firestore speichert sie nicht. */
 function compact<T extends object>(value: T): T {
-  return Object.fromEntries(
-    Object.entries(value).filter(([, v]) => v !== undefined),
-  ) as T;
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
 /**
@@ -608,7 +605,7 @@ export function buildImportPlan(
 
   const stuecke: ImportPlan['stuecke'] = [];
   const ausgaben: ImportPlan['ausgaben'] = [];
-  const bestand = new Map<string, { artikelKey: string; groesse: string; anzahl: number }>();
+  const bestand = new Map<string, ImportBestand>();
   const seenTags = new Set<string>();
 
   for (const excelRow of preview.rows) {
@@ -688,9 +685,12 @@ export function buildImportPlan(
     } else {
       // Mengenartikel: Lagerzeilen der Feuerwehr zählen zum Bestand.
       if (row.status === 'lager' && row.eigentum === 'feuerwehr') {
+        // Je Charge ein eigener Bestand; „brand" und „Brand" sind dieselbe.
         const groesse = normalizeGroesse(row.groesse);
-        const bestandKey = `${key}\u0000${groesse}`;
-        const entry = bestand.get(bestandKey) ?? { artikelKey: key, groesse, anzahl: 0 };
+        const bestandKey = `${key}\u0000${groesse}\u0000${chargeKey(row.charge)}`;
+        const entry =
+          bestand.get(bestandKey) ??
+          compact({ artikelKey: key, groesse, charge: normalizeCharge(row.charge), anzahl: 0 });
         entry.anzahl += 1;
         bestand.set(bestandKey, entry);
       }
@@ -701,7 +701,14 @@ export function buildImportPlan(
       const eigentum = row.eigentum === 'privat' ? ('privat' as const) : undefined;
       for (const a of rowAusgaben) {
         const bemerkung = [a.bemerkung, rowNote].filter(Boolean).join('; ');
-        ausgaben.push(compact({ ...a, bemerkung: bemerkung || undefined, eigentum }));
+        ausgaben.push(
+          compact({
+            ...a,
+            charge: normalizeCharge(row.charge),
+            bemerkung: bemerkung || undefined,
+            eigentum,
+          }),
+        );
       }
     }
   }

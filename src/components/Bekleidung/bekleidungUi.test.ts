@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type {
+  BekleidungArtikel,
   BekleidungAusgabe,
   BekleidungStueck,
   BekleidungWaesche,
 } from '../../common/bekleidung';
 import {
   buildStueckTimeline,
+  chargenInStock,
   daysBetween,
   findStueckByCode,
   knownSizes,
+  mengeLabel,
   personItems,
   stueckLabel,
   todayLocalDate,
@@ -61,17 +64,29 @@ describe('bekleidungUi', () => {
   });
 
   it('stueckLabel nennt Artikel, Größe und Tag', () => {
-    const artikel = new Map([
-      ['jacke', { id: 'jacke', bezeichnung: 'Einsatzjacke' } as never],
-    ]);
+    const artikel = new Map([['jacke', { id: 'jacke', bezeichnung: 'Einsatzjacke' } as never]]);
     expect(stueckLabel(stueck({ tagNummer: '1' }), artikel)).toBe('Einsatzjacke · L · #1');
     expect(stueckLabel(stueck({ artikelId: 'x' }), artikel)).toBe('x · L');
   });
 
   it('buildStueckTimeline sortiert neueste zuerst, ohne Datum zuletzt', () => {
     const waeschen: BekleidungWaesche[] = [
-      { id: 'w1', datum: '2026-02-01', programm: 'standard', stueckIds: ['s1'], createdAt: '', createdBy: '' },
-      { id: 'w2', datum: '2026-02-02', programm: 'standard', stueckIds: ['s2'], createdAt: '', createdBy: '' },
+      {
+        id: 'w1',
+        datum: '2026-02-01',
+        programm: 'standard',
+        stueckIds: ['s1'],
+        createdAt: '',
+        createdBy: '',
+      },
+      {
+        id: 'w2',
+        datum: '2026-02-02',
+        programm: 'standard',
+        stueckIds: ['s2'],
+        createdAt: '',
+        createdBy: '',
+      },
     ];
     const ausgaben = [
       ausgabe({ id: 'a1', stueckId: 's1', ausgegebenAm: '2026-01-01', zurueckAm: '2026-03-01' }),
@@ -100,5 +115,38 @@ describe('bekleidungUi', () => {
         [stueck({ artikelId: 'm', groesse: 'L' }), stueck({ artikelId: 'x', groesse: 'S' })],
       ),
     ).toEqual(['L', 'XL']);
+  });
+});
+
+describe('chargenInStock', () => {
+  const b = (groesse: string, anzahl: number, charge?: string) => ({
+    artikelId: 'h',
+    groesse,
+    charge,
+    anzahl,
+    updatedAt: '',
+    updatedBy: '',
+  });
+
+  it('liefert nur Chargen mit Bestand in der Größe, ohne Charge zuletzt', () => {
+    expect(
+      chargenInStock('h', ' 10 ', [
+        b('10', 2),
+        b('10', 3, 'Technisch'),
+        b('10', 1, 'Brand'),
+        b('10', 0, 'Alt'),
+        b('11', 4, 'Brand'),
+      ]),
+    ).toEqual([{ charge: 'Brand', anzahl: 1 }, { charge: 'Technisch', anzahl: 3 }, { anzahl: 2 }]);
+  });
+});
+
+describe('mengeLabel', () => {
+  it('nennt Artikel, Größe und Charge', () => {
+    const byId = new Map([['h', { id: 'h', bezeichnung: 'Handschuh' } as BekleidungArtikel]]);
+    expect(mengeLabel({ artikelId: 'h', groesse: '10', charge: 'Brand' }, byId)).toBe(
+      'Handschuh · 10 · Brand',
+    );
+    expect(mengeLabel({ artikelId: 'h', groesse: '10' }, byId)).toBe('Handschuh · 10');
   });
 });

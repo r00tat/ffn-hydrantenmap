@@ -4364,7 +4364,10 @@
       "zugangLabel": "Receipt (pieces)",
       "korrekturLabel": "Counted stock",
       "current": "Currently in stock: {count}",
-      "newSize": "Receipt"
+      "newSize": "Receipt",
+      "chargeRow": "Batch {charge}",
+      "noCharge": "no batch",
+      "chargeHint": "Leave empty if the item is not tracked by batch"
     },
     "personen": {
       "select": "Select person",
@@ -4392,7 +4395,10 @@
       "alreadyIssuedHint": "{stueck} is still issued to {person}.",
       "reissue": "Return and issue again",
       "stillIssuedChip": "still issued to {person}",
-      "unknownPerson": "unknown"
+      "unknownPerson": "unknown",
+      "chargeOption": "{charge} ({count})",
+      "noCharge": "no batch",
+      "chargeRequired": "Several batches in stock – please choose"
     },
     "ruecknahme": {
       "title": "Return",

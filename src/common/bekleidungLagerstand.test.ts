@@ -15,8 +15,22 @@ const stamps = {
 };
 
 const artikel: BekleidungArtikel[] = [
-  { ...stamps, id: 'jacke', kategorie: 'einsatz', bezeichnung: 'Jacke', fuehrung: 'einzeln', aktiv: true },
-  { ...stamps, id: 'polo', kategorie: 'dienst', bezeichnung: 'Polo', fuehrung: 'menge', aktiv: true },
+  {
+    ...stamps,
+    id: 'jacke',
+    kategorie: 'einsatz',
+    bezeichnung: 'Jacke',
+    fuehrung: 'einzeln',
+    aktiv: true,
+  },
+  {
+    ...stamps,
+    id: 'polo',
+    kategorie: 'dienst',
+    bezeichnung: 'Polo',
+    fuehrung: 'menge',
+    aktiv: true,
+  },
 ];
 
 function stueck(
@@ -70,9 +84,7 @@ describe('computeLagerstand', () => {
       [],
       [],
     );
-    expect(rows).toEqual([
-      { artikelId: 'jacke', groesse: 'M', imLager: 2, ausgegeben: 1 },
-    ]);
+    expect(rows).toEqual([{ artikelId: 'jacke', groesse: 'M', imLager: 2, ausgegeben: 1 }]);
   });
 
   it('zählt Mengenbestand und offene Mengen-Ausgaben, geschlossene nicht', () => {
@@ -108,10 +120,44 @@ describe('computeLagerstand', () => {
   });
 
   it('private Mengen-Ausgaben zählen nicht als ausgegeben', () => {
-    const rows = computeLagerstand(artikel, [], [], [
-      ausgabe('a1', 'L', 2),
-      ausgabe('a2', 'L', 1, { eigentum: 'privat' }),
-    ]);
+    const rows = computeLagerstand(
+      artikel,
+      [],
+      [],
+      [ausgabe('a1', 'L', 2), ausgabe('a2', 'L', 1, { eigentum: 'privat' })],
+    );
     expect(rows).toEqual([{ artikelId: 'polo', groesse: 'L', imLager: 0, ausgegeben: 2 }]);
+  });
+
+  it('teilt nach Chargen auf, sobald eine Charge vorkommt', () => {
+    const bestand: BekleidungBestand[] = [
+      { artikelId: 'polo', groesse: 'L', anzahl: 4, updatedAt: '', updatedBy: '' },
+      { artikelId: 'polo', groesse: 'L', charge: 'Brand', anzahl: 2, updatedAt: '', updatedBy: '' },
+    ];
+    const rows = computeLagerstand(
+      artikel,
+      [{ ...stueck('s1', 'M', 'lager'), charge: 'Technisch' }],
+      bestand,
+      [ausgabe('a1', 'L', 1, { charge: 'brand' })],
+    );
+    expect(rows).toEqual([
+      {
+        artikelId: 'jacke',
+        groesse: 'M',
+        imLager: 1,
+        ausgegeben: 0,
+        chargen: [{ charge: 'Technisch', imLager: 1, ausgegeben: 0 }],
+      },
+      {
+        artikelId: 'polo',
+        groesse: 'L',
+        imLager: 6,
+        ausgegeben: 1,
+        chargen: [
+          { charge: 'Brand', imLager: 2, ausgegeben: 1 },
+          { imLager: 4, ausgegeben: 0 },
+        ],
+      },
+    ]);
   });
 });

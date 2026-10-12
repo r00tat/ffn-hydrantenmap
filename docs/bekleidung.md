@@ -27,8 +27,8 @@ Actions** geschrieben.
 | --- | --- |
 | `bekleidungArtikel` | Artikeltyp: `kategorie` (`einsatz`/`dienst`), `bezeichnung`, `hersteller`, `fuehrung` (`einzeln`/`menge`), optional `maxWaschgaenge`, `aktiv` |
 | `bekleidungStueck` | Einzelstück eines Artikels mit `fuehrung: 'einzeln'`: `tagNummer` (optional, je Gruppe eindeutig), `groesse`, `charge`, `eigentum`, `status`, aktuelle Ausgabe (`personId`, `ausgabeId`, `ausgegebenAm`), Waschzähler |
-| `bekleidungBestand` | Lagerzahl je Artikel mit `fuehrung: 'menge'` und Größe; Dokument-ID aus Artikel und normalisierter Größe (`bestandDocId`) |
-| `bekleidungAusgabe` | Verlauf: eine Zeile je Ausgabe, offen solange `zurueckAm` fehlt |
+| `bekleidungBestand` | Lagerzahl je Artikel mit `fuehrung: 'menge'`, Größe und optional `charge`; Dokument-ID aus Artikel, normalisierter Größe und Charge (`bestandDocId`) |
+| `bekleidungAusgabe` | Verlauf: eine Zeile je Ausgabe, offen solange `zurueckAm` fehlt; bei Mengen die `charge`, aus der sie kam |
 | `bekleidungWaesche` | Waschgang: `datum`, `programm` (`standard`/`impraegnierung`/`sonstiges` mit `programmText`), `stueckIds` |
 
 Ausgegeben wird an die Personen der Gruppe aus dem Fahrtenbuch
@@ -52,6 +52,33 @@ haben keine Tag-Nummer, und manche Dienstbekleidung (A-Mantel) hat eine.
 Die Führung lässt sich nicht mehr ändern, sobald Stücke oder Bestand des
 Artikels existieren (`fuehrungLocked`) — die Daten passten sonst nicht mehr zum
 Modell.
+
+### Chargen bei Mengenartikeln
+
+Handschuhe gibt es in mehreren Lieferungen nebeneinander („Brand", „Brand -
+2024", „Technisch"), in jeder Größe mit eigener Anzahl. Jede Kombination aus
+Artikel, Größe und Charge ist ein **eigenes Bestandsdokument**:
+`bestandDocId(artikelId, groesse, charge)` hängt an die bisherige ID `__c_` und
+die kodierte, großgeschriebene Charge. Ohne Charge bleibt die ID wie vor den
+Chargen, vorhandener Bestand muss also nicht umgeschrieben werden. „brand" und
+„Brand" sind dieselbe Charge; gespeichert bleibt die Schreibweise des
+vorhandenen Bestands.
+
+- **Ausgabe:** Die Charge wird nur abgefragt, wenn in der Größe mehr als eine
+  Charge Bestand hat; sonst nimmt die Oberfläche die einzige. Die Ausgabe trägt
+  die Charge, eine Rücknahme bucht in dieselbe Charge zurück.
+- **Lagerstand:** Sobald in einer Zeile eine Charge vorkommt, folgt je Charge
+  eine eingerückte Zeile (`LagerstandRow.chargen`). Zugang und Korrektur gehen
+  dann je Charge, nicht über die Summenzeile.
+- **Import:** Die Spalte „Charge" bestimmt den Bestand und geht an die
+  Mengen-Ausgaben.
+
+Warum nicht wie bei den Geräten (Chargen als Aufteilung *in* einem
+Bestandsdokument, siehe [geraete-lager.md](geraete-lager.md))? Dort hängt die
+Zeile am Sybos-Import (`lagerortKey`), Sets und der idempotente Abgleich des
+Verbrauchs setzen eine Zeile je Artikel und Lagerort voraus. Nichts davon gibt
+es hier; getrennte Dokumente halten Ausgabe, Rücknahme und Korrektur bei
+derselben einfachen Transaktion auf genau ein Dokument.
 
 ### Eigentum
 

@@ -52,9 +52,21 @@ const einsatzGrid: string[][] = [
   // Zeile 3: ausgegeben, ein geschlossener und ein offener Block
   pad(
     [
-      'Texport', 'Jacke', '2023', '22081702.0', 'M3', 'Ausgegeben', '12',
-      'Mustermann', 'Max', '44378', '44927',
-      'Musterfrau', 'Erika', '45250', '',
+      'Texport',
+      'Jacke',
+      '2023',
+      '22081702.0',
+      'M3',
+      'Ausgegeben',
+      '12',
+      'Mustermann',
+      'Max',
+      '44378',
+      '44927',
+      'Musterfrau',
+      'Erika',
+      '45250',
+      '',
     ],
     EINSATZ_HEADER.length,
   ),
@@ -70,20 +82,50 @@ const einsatzGrid: string[][] = [
   // Zeile 7: nicht da, Textblock, Datum nicht bekannt
   pad(
     [
-      'Texport', 'Hose', '', '', '60 III-IV', 'nicht da', '',
-      'Tasche abgerissen - Kontrolle!!!', '', '', '',
-      'Beispiel', 'Hans', 'nicht bekannt', '',
+      'Texport',
+      'Hose',
+      '',
+      '',
+      '60 III-IV',
+      'nicht da',
+      '',
+      'Tasche abgerissen - Kontrolle!!!',
+      '',
+      '',
+      '',
+      'Beispiel',
+      'Hans',
+      'nicht bekannt',
+      '',
     ],
     EINSATZ_HEADER.length,
   ),
   // Zeile 8: vier Blöcke, alle geschlossen
   pad(
     [
-      'Texport', 'Jacke', '', '30030030', 'M3', 'lager', '3',
-      'A', 'Anna', '44000', '44100',
-      'B', 'Bert', '44200', '44300',
-      'C', 'Carl', '44400', '44500',
-      'D', 'Dora', '44600', '44700',
+      'Texport',
+      'Jacke',
+      '',
+      '30030030',
+      'M3',
+      'lager',
+      '3',
+      'A',
+      'Anna',
+      '44000',
+      '44100',
+      'B',
+      'Bert',
+      '44200',
+      '44300',
+      'C',
+      'Carl',
+      '44400',
+      '44500',
+      'D',
+      'Dora',
+      '44600',
+      '44700',
     ],
     EINSATZ_HEADER.length,
   ),
@@ -91,10 +133,7 @@ const einsatzGrid: string[][] = [
 
 const dienstGrid: string[][] = [
   DIENST_HEADER,
-  pad(
-    ['Fa. X', 'Poloshirt', '', '', 'm', 'Kragen fehlt', 'lager'],
-    DIENST_HEADER.length,
-  ),
+  pad(['Fa. X', 'Poloshirt', '', '', 'm', 'Kragen fehlt', 'lager'], DIENST_HEADER.length),
   pad(['Fa. X', 'Poloshirt', '', '', ' M ', '', 'Lager'], DIENST_HEADER.length),
   pad(
     ['Fa. X', 'Poloshirt', '', '', 'L', '', 'ausgegeben', 'Mustermann', 'Max', '45250', ''],
@@ -163,10 +202,7 @@ describe('parseBekleidungSheet (Einsatz)', () => {
       waschgaengeAltbestand: 0,
       charge: 'Brand - 2021',
     });
-    expect(rows[2].bemerkungen).toEqual([
-      'Status im Excel: Reinigung',
-      'Waschgänge: ausgeborgt',
-    ]);
+    expect(rows[2].bemerkungen).toEqual(['Status im Excel: Reinigung', 'Waschgänge: ausgeborgt']);
   });
 
   it('„nicht da", Textblock als Bemerkung, „nicht bekannt" als Datum', () => {
@@ -193,7 +229,10 @@ describe('parseBekleidungSheet (Eigenheiten der echten Datei)', () => {
   const grid = [
     EINSATZ_HEADER,
     // Zahlen in E-Schreibweise, Größe und Charge als Kommazahl
-    pad(['Texport', 'Jacke', '2020.0', '2.2081702E7', '6.0', 'lager', '12.0'], EINSATZ_HEADER.length),
+    pad(
+      ['Texport', 'Jacke', '2020.0', '2.2081702E7', '6.0', 'lager', '12.0'],
+      EINSATZ_HEADER.length,
+    ),
     // alphanumerische Tag-Nummern
     pad(['Texport', 'Jacke', '', '189WFI1200003', 'M3', 'lager'], EINSATZ_HEADER.length),
     pad(['Texport', 'Jacke', '', '7E97510003180001', 'M3', 'lager'], EINSATZ_HEADER.length),
@@ -202,10 +241,25 @@ describe('parseBekleidungSheet (Eigenheiten der echten Datei)', () => {
     // nur ein Jahr bzw. ein Tippfehler als Datum, zurück ohne Namen
     pad(
       [
-        'Fa. X', 'Hemd', '', '', 'M', 'ausgegeben', '',
-        'Mustermann', 'Max', '2020.0', '',
-        'Musterfrau', 'Erika', '11.09.0263', '01.02.2024',
-        '', '', '', '44927.0',
+        'Fa. X',
+        'Hemd',
+        '',
+        '',
+        'M',
+        'ausgegeben',
+        '',
+        'Mustermann',
+        'Max',
+        '2020.0',
+        '',
+        'Musterfrau',
+        'Erika',
+        '11.09.0263',
+        '01.02.2024',
+        '',
+        '',
+        '',
+        '44927.0',
       ],
       EINSATZ_HEADER.length,
     ),
@@ -286,9 +340,7 @@ describe('parseBekleidungSheet (Dienst)', () => {
   });
 
   it('wirft, wenn Pflichtspalten fehlen', () => {
-    expect(() => parseBekleidungSheet([['Hersteller', 'Tag Nummer']], 'dienst')).toThrow(
-      /Größe/,
-    );
+    expect(() => parseBekleidungSheet([['Hersteller', 'Tag Nummer']], 'dienst')).toThrow(/Größe/);
     expect(() => parseBekleidungSheet([['nichts']], 'dienst')).toThrow(/Tag Nummer/);
   });
 });
@@ -326,7 +378,10 @@ describe('buildImportPreview', () => {
     const byKey = Object.fromEntries(preview.persons.map((p) => [p.key, p]));
     expect(preview.persons.filter((p) => p.key === 'max mustermann')).toHaveLength(1);
     expect(byKey['max mustermann'].match).toMatchObject({ status: 'matched', personId: 'p-max' });
-    expect(byKey['erika musterfrau'].match).toMatchObject({ status: 'matched', personId: 'p-erika' });
+    expect(byKey['erika musterfrau'].match).toMatchObject({
+      status: 'matched',
+      personId: 'p-erika',
+    });
     expect(byKey['hans beispiel'].match.status).toBe('new');
     // Textblock ist keine Person
     expect(preview.persons.some((p) => p.nachname.startsWith('Tasche'))).toBe(false);
@@ -548,9 +603,7 @@ describe('buildImportPlan', () => {
   });
 
   it('wirft, wenn für eine verwendete Person keine Entscheidung vorliegt', () => {
-    expect(() => buildImportPlan(preview, { fuehrung: {}, persons: {} }, today)).toThrow(
-      /Person/,
-    );
+    expect(() => buildImportPlan(preview, { fuehrung: {}, persons: {} }, today)).toThrow(/Person/);
   });
 });
 
@@ -575,7 +628,19 @@ describe('Review-Nachträge', () => {
     const grid = [
       DIENST_HEADER,
       pad(
-        ['Fa. X', 'Poloshirt', '', '', 'L', '', 'ausgegeben', 'Mustermann', 'Max', '2023-11-20T00:00:00.000Z', ''],
+        [
+          'Fa. X',
+          'Poloshirt',
+          '',
+          '',
+          'L',
+          '',
+          'ausgegeben',
+          'Mustermann',
+          'Max',
+          '2023-11-20T00:00:00.000Z',
+          '',
+        ],
         DIENST_HEADER.length,
       ),
     ];
@@ -589,10 +654,25 @@ describe('Review-Nachträge', () => {
     const grid = [
       DIENST_HEADER,
       pad(
-        ['Fa. X', 'Poloshirt', '', 'Eigen', 'L', '', 'ausgegeben', 'Mustermann', 'Max', '45250', ''],
+        [
+          'Fa. X',
+          'Poloshirt',
+          '',
+          'Eigen',
+          'L',
+          '',
+          'ausgegeben',
+          'Mustermann',
+          'Max',
+          '45250',
+          '',
+        ],
         DIENST_HEADER.length,
       ),
-      pad(['Fa. X', 'Poloshirt', '', '', 'L', '', 'ausgegeben', 'Mustermann', 'Max', '45250', ''], DIENST_HEADER.length),
+      pad(
+        ['Fa. X', 'Poloshirt', '', '', 'L', '', 'ausgegeben', 'Mustermann', 'Max', '45250', ''],
+        DIENST_HEADER.length,
+      ),
       pad(['Fa. X', 'Poloshirt', '', 'Eigen', 'L', '', 'lager'], DIENST_HEADER.length),
     ];
     const rows = parseBekleidungSheet(grid, 'dienst');
@@ -606,6 +686,47 @@ describe('Review-Nachträge', () => {
     expect(plan.ausgaben[0].eigentum).toBe('privat');
     expect(plan.ausgaben[1].eigentum).toBeUndefined();
     expect(plan.bestand).toEqual([]);
+  });
+});
+
+describe('Chargen bei Mengenartikeln', () => {
+  it('zählt den Bestand je Charge und gibt die Charge an die Ausgabe weiter', () => {
+    const grid = [
+      DIENST_HEADER,
+      pad(['Fa. X', 'Handschuh', 'Brand', '', '10', '', 'lager'], DIENST_HEADER.length),
+      pad(['Fa. X', 'Handschuh', 'brand', '', '10', '', 'lager'], DIENST_HEADER.length),
+      pad(['Fa. X', 'Handschuh', 'Technisch', '', '10', '', 'lager'], DIENST_HEADER.length),
+      pad(['Fa. X', 'Handschuh', '', '', '10', '', 'lager'], DIENST_HEADER.length),
+      pad(
+        [
+          'Fa. X',
+          'Handschuh',
+          'Brand',
+          '',
+          '10',
+          '',
+          'ausgegeben',
+          'Mustermann',
+          'Max',
+          '45250',
+          '',
+        ],
+        DIENST_HEADER.length,
+      ),
+    ];
+    const rows = parseBekleidungSheet(grid, 'dienst');
+    const preview = buildImportPreview([], rows, []);
+    const plan = buildImportPlan(
+      preview,
+      { fuehrung: {}, persons: { 'max mustermann': { personId: 'p-max' } } },
+      '2026-10-08',
+    );
+    expect(plan.bestand).toEqual([
+      { artikelKey: 'dienst|handschuh|fa. x', groesse: '10', charge: 'Brand', anzahl: 2 },
+      { artikelKey: 'dienst|handschuh|fa. x', groesse: '10', charge: 'Technisch', anzahl: 1 },
+      { artikelKey: 'dienst|handschuh|fa. x', groesse: '10', anzahl: 1 },
+    ]);
+    expect(plan.ausgaben).toEqual([expect.objectContaining({ charge: 'Brand', menge: 1 })]);
   });
 });
 
@@ -672,9 +793,21 @@ describe('Bereinigung in der Vorschau', () => {
       DIENST_HEADER,
       pad(
         [
-          'Fa. X', 'Poloshirt', '', '', 'L', '', 'ausgegeben',
-          'Mustermann', 'Max', '45000', '',
-          'Musterfrau', 'Erika', '45250', '',
+          'Fa. X',
+          'Poloshirt',
+          '',
+          '',
+          'L',
+          '',
+          'ausgegeben',
+          'Mustermann',
+          'Max',
+          '45000',
+          '',
+          'Musterfrau',
+          'Erika',
+          '45250',
+          '',
         ],
         DIENST_HEADER.length,
       ),
@@ -683,7 +816,10 @@ describe('Bereinigung in der Vorschau', () => {
     const p2 = buildImportPreview([], rows, persons);
     const decisions = (keepOpen?: number): ImportDecisions => ({
       fuehrung: {},
-      persons: { 'max mustermann': { personId: 'p-max' }, 'erika musterfrau': { personId: 'p-erika' } },
+      persons: {
+        'max mustermann': { personId: 'p-max' },
+        'erika musterfrau': { personId: 'p-erika' },
+      },
       rows: keepOpen === undefined ? {} : { 'dienst:2': { keepOpen } },
     });
     const openOf = (plan: ReturnType<typeof buildImportPlan>) =>

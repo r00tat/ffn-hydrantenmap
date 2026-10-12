@@ -16,7 +16,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
-import { normalizeGroesse } from '../../common/bekleidung';
+import { bestandDocId, normalizeCharge } from '../../common/bekleidung';
 import { callAction } from '../Geraete/admin/actionResult';
 import OnlineOnly from '../site/OnlineOnly';
 import { adjustBestand } from './bekleidungActions';
@@ -25,21 +25,34 @@ import { knownSizes, type BekleidungView } from './bekleidungUi';
 
 type Mode = 'zugang' | 'korrektur';
 
+/** Bekannte Chargen eines Artikels, für die Auswahl beim Zugang. */
+function knownChargen(artikelId: string, view: BekleidungView): string[] {
+  const chargen = new Set<string>();
+  for (const b of view.bestand) {
+    const charge = normalizeCharge(b.charge);
+    if (b.artikelId === artikelId && charge) chargen.add(charge);
+  }
+  return [...chargen].sort(new Intl.Collator('de', { numeric: true }).compare);
+}
+
 /**
- * Zugang oder Korrektur eines Mengenbestands. Die Korrektur nimmt den
- * gezählten Bestand und bucht die Differenz — so muss niemand rechnen.
+ * Zugang oder Korrektur eines Mengenbestands je Charge. Die Korrektur nimmt
+ * den gezählten Bestand und bucht die Differenz — so muss niemand rechnen.
+ * `charge` als Prop legt die Charge fest; `''` heißt „ohne Charge".
  */
 export default function BestandAdjustDialog({
   open,
   view,
   artikelId: fixedArtikelId,
   groesse: fixedGroesse,
+  charge: fixedCharge,
   onClose,
 }: {
   open: boolean;
   view: BekleidungView;
   artikelId?: string;
   groesse?: string;
+  charge?: string;
   onClose: () => void;
 }) {
   const t = useTranslations('bekleidung');
@@ -50,19 +63,17 @@ export default function BestandAdjustDialog({
   );
   const [artikelId, setArtikelId] = useState(fixedArtikelId ?? '');
   const [groesse, setGroesse] = useState(fixedGroesse ?? '');
+  const [charge, setCharge] = useState(fixedCharge ?? '');
   const [mode, setMode] = useState<Mode>('zugang');
   const [value, setValue] = useState('');
   const [bemerkung, setBemerkung] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
+  const docId = artikelId && groesse.trim() ? bestandDocId(artikelId, groesse, charge) : '';
   const current =
-    view.bestand.find(
-      (b) =>
-        b.artikelId === artikelId &&
-        groesse.trim() &&
-        normalizeGroesse(b.groesse) === normalizeGroesse(groesse),
-    )?.anzahl ?? 0;
+    view.bestand.find((b) => docId && bestandDocId(b.artikelId, b.groesse, b.charge) === docId)
+      ?.anzahl ?? 0;
   const number = Number(value);
   const valid = value.trim() !== '' && Number.isInteger(number) && number >= 0;
   const delta = valid ? (mode === 'zugang' ? number : number - current) : 0;
@@ -75,6 +86,7 @@ export default function BestandAdjustDialog({
       adjustBestand(view.groupId, {
         artikelId,
         groesse: groesse.trim(),
+        ...(normalizeCharge(charge) ? { charge: normalizeCharge(charge) } : {}),
         delta,
         bemerkung: bemerkung.trim() || undefined,
       }),
@@ -118,9 +130,27 @@ export default function BestandAdjustDialog({
             onInputChange={(_, v) => setGroesse(v)}
             renderInput={(params) => <TextField {...params} label={t('fields.groesse')} />}
           />
+          <Autocomplete
+            freeSolo
+            disabled={fixedCharge !== undefined}
+            options={artikelId ? knownChargen(artikelId, view) : []}
+            inputValue={charge}
+            onInputChange={(_, v) => setCharge(v)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t('fields.charge')}
+                helperText={fixedCharge === undefined ? t('lagerstand.chargeHint') : undefined}
+              />
+            )}
+          />
           <Typography variant="body2">{t('lagerstand.current', { count: current })}</Typography>
           <RadioGroup row value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
-            <FormControlLabel value="zugang" control={<Radio />} label={t('lagerstand.modeZugang')} />
+            <FormControlLabel
+              value="zugang"
+              control={<Radio />}
+              label={t('lagerstand.modeZugang')}
+            />
             <FormControlLabel
               value="korrektur"
               control={<Radio />}

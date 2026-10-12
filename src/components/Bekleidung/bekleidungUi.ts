@@ -7,6 +7,9 @@
  */
 
 import {
+  chargeKey,
+  normalizeCharge,
+  normalizeGroesse,
   normalizeTagNummer,
   type BekleidungArtikel,
   type BekleidungAusgabe,
@@ -68,9 +71,7 @@ export function isoDateToDate(iso: string): Date {
 
 /** Ganze Tage zwischen zwei Kalenderdaten. */
 export function daysBetween(from: string, to: string): number {
-  return Math.round(
-    (isoDateToDate(to).getTime() - isoDateToDate(from).getTime()) / 86_400_000,
-  );
+  return Math.round((isoDateToDate(to).getTime() - isoDateToDate(from).getTime()) / 86_400_000);
 }
 
 /**
@@ -96,6 +97,15 @@ export function stueckLabel(
   return [artikel, stueck.groesse, stueck.tagNummer ? `#${stueck.tagNummer}` : undefined]
     .filter(Boolean)
     .join(' · ');
+}
+
+/** „Handschuh · 10 · Brand" — Mengen-Ausgabe mit Charge, falls bekannt. */
+export function mengeLabel(
+  ausgabe: Pick<BekleidungAusgabe, 'artikelId' | 'groesse' | 'charge'>,
+  artikelById: Map<string, BekleidungArtikel>,
+): string {
+  const artikel = artikelById.get(ausgabe.artikelId)?.bezeichnung ?? ausgabe.artikelId;
+  return [artikel, ausgabe.groesse, normalizeCharge(ausgabe.charge)].filter(Boolean).join(' · ');
 }
 
 export type TimelineEntry =
@@ -180,4 +190,29 @@ export function knownSizes(
   for (const b of bestand) if (b.artikelId === artikelId) sizes.add(b.groesse);
   for (const s of stuecke) if (s.artikelId === artikelId) sizes.add(s.groesse);
   return [...sizes].sort(new Intl.Collator('de', { numeric: true }).compare);
+}
+
+/**
+ * Chargen eines Mengenartikels mit Bestand in einer Größe, nach Name; Bestand
+ * ohne Charge zuletzt. Die Ausgabe fragt nur nach der Charge, wenn es mehr
+ * als eine gibt.
+ */
+export function chargenInStock(
+  artikelId: string,
+  groesse: string,
+  bestand: BekleidungBestand[],
+): { charge?: string; anzahl: number }[] {
+  const size = normalizeGroesse(groesse);
+  const collator = new Intl.Collator('de', { numeric: true });
+  return bestand
+    .filter(
+      (b) => b.artikelId === artikelId && normalizeGroesse(b.groesse) === size && b.anzahl > 0,
+    )
+    .map((b) => {
+      const charge = normalizeCharge(b.charge);
+      return charge ? { charge, anzahl: b.anzahl } : { anzahl: b.anzahl };
+    })
+    .sort((x, y) =>
+      !x.charge ? 1 : !y.charge ? -1 : collator.compare(chargeKey(x.charge), chargeKey(y.charge)),
+    );
 }

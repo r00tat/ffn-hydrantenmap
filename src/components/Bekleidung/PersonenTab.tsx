@@ -17,6 +17,7 @@ import OnlineOnly from '../site/OnlineOnly';
 import {
   daysBetween,
   isoDateToDate,
+  mengeLabel,
   personItems,
   stueckLabel,
   type BekleidungView,
@@ -56,17 +57,13 @@ export default function PersonenTab({
       const s = view.stueckById.get(a.stueckId);
       if (s) return stueckLabel(s, view.artikelById);
     }
-    const artikel = view.artikelById.get(a.artikelId)?.bezeichnung ?? a.artikelId;
-    return [artikel, a.groesse, a.stueckId ? undefined : t('personen.menge', { menge: a.menge })]
-      .filter(Boolean)
-      .join(' · ');
+    const base = mengeLabel(a, view.artikelById);
+    return a.stueckId ? base : `${base} · ${t('personen.menge', { menge: a.menge })}`;
   };
   // Privat: das Stück gehört der Person, bei Mengen trägt die Ausgabe selbst
   // das Eigentum (private Zeilen aus dem Import).
   const isPrivat = (a: BekleidungAusgabe) =>
-    a.stueckId
-      ? view.stueckById.get(a.stueckId)?.eigentum === 'privat'
-      : a.eigentum === 'privat';
+    a.stueckId ? view.stueckById.get(a.stueckId)?.eigentum === 'privat' : a.eigentum === 'privat';
 
   const primary = (a: BekleidungAusgabe) => (
     <Stack direction="row" spacing={1} component="span" sx={{ alignItems: 'center' }}>
@@ -77,7 +74,12 @@ export default function PersonenTab({
 
   return (
     <>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1}
+        useFlexGap
+        sx={{ mb: 2, flexWrap: 'wrap' }}
+      >
         <Autocomplete
           options={view.persons}
           value={person ?? null}
@@ -125,7 +127,11 @@ export default function PersonenTab({
                 <ListItem key={a.id} divider>
                   <ListItemText
                     primary={primary(a)}
-                    secondary={a.ausgegebenAm ? t('personen.seit', { date: date(a.ausgegebenAm) }) : t('personen.unknown')}
+                    secondary={
+                      a.ausgegebenAm
+                        ? t('personen.seit', { date: date(a.ausgegebenAm) })
+                        : t('personen.unknown')
+                    }
                     slotProps={{ primary: { component: 'div' } }}
                   />
                 </ListItem>
