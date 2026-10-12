@@ -26,6 +26,8 @@ const SIMPLE_CODES = [
   'forbidden',
   'mergeMismatch',
   'mergeTooLarge',
+  'hasWaeschen',
+  'convertTooLarge',
 ] as const;
 
 type SimpleCode = (typeof SIMPLE_CODES)[number];

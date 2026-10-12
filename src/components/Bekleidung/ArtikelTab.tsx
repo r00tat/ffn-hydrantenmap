@@ -2,6 +2,7 @@
 
 import AddIcon from '@mui/icons-material/Add';
 import MergeTypeIcon from '@mui/icons-material/MergeType';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -17,6 +18,7 @@ import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import type { BekleidungArtikel } from '../../common/bekleidung';
 import OnlineOnly from '../site/OnlineOnly';
+import ArtikelConvertDialog from './ArtikelConvertDialog';
 import ArtikelEditDialog from './ArtikelEditDialog';
 import ArtikelMergeDialog, { artikelLabel } from './ArtikelMergeDialog';
 import BekleidungImportDialog from './BekleidungImportDialog';
@@ -26,13 +28,15 @@ const collator = new Intl.Collator('de', { numeric: true });
 
 /**
  * Artikeltypen pflegen, inklusive inaktiver; Import aus dem Excel;
- * Schreibvarianten in einen gleichartigen Artikel zusammenführen.
+ * Schreibvarianten in einen gleichartigen Artikel zusammenführen; einen
+ * Einzelartikel auf Menge umstellen.
  */
 export default function ArtikelTab({ view }: { view: BekleidungView }) {
   const t = useTranslations('bekleidung');
   const [edit, setEdit] = useState<{ artikel?: BekleidungArtikel }>();
   const [importOpen, setImportOpen] = useState(false);
   const [mergeSource, setMergeSource] = useState<BekleidungArtikel>();
+  const [convertSource, setConvertSource] = useState<BekleidungArtikel>();
 
   const sorted = useMemo(
     () =>
@@ -81,19 +85,31 @@ export default function ArtikelTab({ view }: { view: BekleidungView }) {
               divider
               disablePadding
               secondaryAction={
-                mergeTargets(a).length > 0 ? (
-                  <OnlineOnly>
-                    <Tooltip title={t('artikel.merge')}>
-                      <IconButton
-                        edge="end"
-                        aria-label={t('artikel.mergeLabel', { name: artikelLabel(a) })}
-                        onClick={() => setMergeSource(a)}
-                      >
-                        <MergeTypeIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </OnlineOnly>
-                ) : undefined
+                <OnlineOnly>
+                  <Stack direction="row">
+                    {a.fuehrung === 'einzeln' && (pieceCount.get(a.id ?? '') ?? 0) > 0 && (
+                      <Tooltip title={t('artikel.convert')}>
+                        <IconButton
+                          aria-label={t('artikel.convertLabel', { name: artikelLabel(a) })}
+                          onClick={() => setConvertSource(a)}
+                        >
+                          <Inventory2Icon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {mergeTargets(a).length > 0 && (
+                      <Tooltip title={t('artikel.merge')}>
+                        <IconButton
+                          edge="end"
+                          aria-label={t('artikel.mergeLabel', { name: artikelLabel(a) })}
+                          onClick={() => setMergeSource(a)}
+                        >
+                          <MergeTypeIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Stack>
+                </OnlineOnly>
               }
             >
               <ListItemButton onClick={() => setEdit({ artikel: a })}>
@@ -139,6 +155,14 @@ export default function ArtikelTab({ view }: { view: BekleidungView }) {
           source={mergeSource}
           targets={mergeTargets(mergeSource)}
           onClose={() => setMergeSource(undefined)}
+        />
+      )}
+      {convertSource && (
+        <ArtikelConvertDialog
+          open
+          view={view}
+          artikel={convertSource}
+          onClose={() => setConvertSource(undefined)}
         />
       )}
       {importOpen && (

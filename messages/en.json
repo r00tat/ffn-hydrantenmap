@@ -4266,7 +4266,8 @@
       "close": "Close",
       "add": "Add",
       "remove": "Remove",
-      "showMore": "Show {count} more"
+      "showMore": "Show {count} more",
+      "details": "Details for {name}"
     },
     "kategorie": {
       "einsatz": "Turnout gear",
@@ -4324,7 +4325,8 @@
     "stuecke": {
       "empty": "No items found.",
       "noTag": "no tag",
-      "notFound": "No item with tag number \"{code}\"."
+      "notFound": "No item with tag number \"{code}\".",
+      "groupSummary": "{count, plural, one {# piece} other {# pieces}} · {lager} in stock · {ausgegeben} issued"
     },
     "detail": {
       "timeline": "History",
@@ -4367,7 +4369,8 @@
       "newSize": "Receipt",
       "chargeRow": "Batch {charge}",
       "noCharge": "no batch",
-      "chargeHint": "Leave empty if the item is not tracked by batch"
+      "chargeHint": "Leave empty if the item is not tracked by batch",
+      "sizeCount": "{count, plural, one {# size} other {# sizes}}"
     },
     "personen": {
       "select": "Select person",
@@ -4439,7 +4442,17 @@
       "mergeLabel": "Merge {name}",
       "mergeTitle": "Merge items",
       "mergeTarget": "Merge into",
-      "mergeHint": "{name} is absorbed into the chosen item: pieces, issues and stock move along, stock is added per size and batch. {name} is deleted afterwards."
+      "mergeHint": "{name} is absorbed into the chosen item: pieces, issues and stock move along, stock is added per size and batch. {name} is deleted afterwards.",
+      "convert": "Track as quantity",
+      "convertLabel": "Track as quantity {name}",
+      "convertTitle": "Track {name} as quantity",
+      "convertBestand": "{count, plural, one {# piece in stock becomes stock quantity.} other {# pieces in stock become stock quantity.}}",
+      "convertAusgaben": "{count, plural, one {# issue is kept as a quantity issue.} other {# issues are kept as quantity issues.}}",
+      "convertDropped": "{count, plural, one {# piece is dropped (private, retired or without a person).} other {# pieces are dropped (private, retired or without a person).}}",
+      "convertHint": "Tag numbers and wash counters of the pieces are lost. The change cannot be undone.",
+      "convertWaeschen": "Washes recorded in the app belong to the pieces and would be lost. An article with recorded washes stays tracked individually.",
+      "mergeAsCharge": "Use manufacturer as batch",
+      "mergeAsChargeHint": "Pieces, issues and stock without a batch get the manufacturer of their previous article as batch — including those of the target, whose manufacturer is then cleared."
     },
     "import": {
       "title": "Import from Excel",
@@ -4516,7 +4529,9 @@
       "importRunning": "An import is running right now. Please wait and reload the page.",
       "notAvailable": "{stueck} cannot be issued (status: {status}).",
       "mergeMismatch": "Items can only be merged with the same category and tracking.",
-      "mergeTooLarge": "Too many entries to merge in one step."
+      "mergeTooLarge": "Too many entries to merge in one step.",
+      "hasWaeschen": "Washes are recorded for pieces of this article — it stays tracked individually.",
+      "convertTooLarge": "The article has too many pieces to convert in one step."
     }
   },
   "geraetEinsatz": {

@@ -49,9 +49,10 @@ haben keine Tag-Nummer, und manche Dienstbekleidung (A-Mantel) hat eine.
   Teilrücknahme teilt den Ausgabe-Eintrag in einen geschlossenen und einen
   offenen.
 
-Die Führung lässt sich nicht mehr ändern, sobald Stücke oder Bestand des
-Artikels existieren (`fuehrungLocked`) — die Daten passten sonst nicht mehr zum
-Modell.
+Im Bearbeitungsdialog lässt sich die Führung nicht mehr ändern, sobald Stücke
+oder Bestand des Artikels existieren (`fuehrungLocked`) — die Daten passten
+sonst nicht mehr zum Modell. Von einzeln auf Menge geht es danach nur über die
+Umstellung, die die Daten mitnimmt (siehe „Von einzeln auf Menge umstellen").
 
 ### Chargen bei Mengenartikeln
 
@@ -251,9 +252,64 @@ Artikeltyp zusammenführen:
   hängt Stücke und Ausgaben um, addiert den Mengenbestand je Größe und Charge
   auf das Ziel und löscht die Quelle. Wäschen hängen an Stücken und bleiben
   unberührt. Nur bei gleicher Kategorie **und** Führung (`mergeMismatch`) —
-  ein Einzelstück lässt sich nicht in eine Lagerzahl verwandeln. Alles läuft
+  ein Einzelartikel wird vorher auf Menge umgestellt. Alles läuft
   in einer Transaktion, damit nichts halb umgehängt liegen bleibt; deshalb
   gibt es eine Obergrenze von 450 Schreibvorgängen (`mergeTooLarge`).
+
+Der Import trennt Artikeltypen nach Kategorie, Bezeichnung **und** Hersteller
+(`artikelKey`). Steht im Excel bei derselben A-Bluse dreimal ein anderer
+Hersteller-Wert, entstehen drei Artikeltypen, oft eigentlich Chargen. Beim
+Zusammenführen nach dem Import übernimmt die Option „Hersteller als Charge
+übernehmen“ (`chargeFromHersteller`, standardmäßig an) diese Unterscheidung. Jedes
+Stück, jede Ausgabe und jeder Bestand ohne eigene Charge erhält den Hersteller
+seines bisherigen Artikels als Charge. Das gilt auch für die Daten des Ziels.
+Dessen Hersteller entfällt danach, weil der Artikel jetzt mehrere umfasst. Der
+Bestand ohne Charge zieht dabei in das Dokument seiner Charge um. Eine schon
+vorhandene Charge bleibt. Bei Einzelartikeln trägt die anschließende
+Umstellung auf Menge die Charge der Stücke in den Bestand weiter.
+
+## Von einzeln auf Menge umstellen
+
+Der Import schlägt **einzeln** vor, sobald eine Zeile des Artikels eine
+Tag-Nummer trägt. Im Excel stehen aber auch bei A-Bluse oder A-Hose
+gelegentlich Nummern, und dann landet jedes Stück als eigenes Dokument. Damit
+das ohne erneuten Import (der einen leeren Bestand verlangt) zu beheben ist,
+stellt `convertArtikelToMenge` einen Einzelartikel um. Der Dialog im Reiter
+„Artikel“ rechnet mit `planConversionToMenge`, derselben Funktion wie der
+Server, und zeigt vorher die Zahlen:
+
+- **Lagerstück der Feuerwehr:** zählt als +1 Bestand in Größe und Charge.
+- **Ausgabe mit Stückbezug,** offen oder im Verlauf: verliert `stueckId`, bleibt
+  als Mengen-Ausgabe erhalten und übernimmt Charge und Eigentum des Stücks.
+- **Entfällt:** das private Lagerstück, das ausgeschiedene oder nicht
+  auffindbare Stück und das ausgegebene ohne Ausgabe (Import ohne Person). Als
+  Menge hat es keine Entsprechung.
+- **Geht verloren:** Tag-Nummern und Waschzähler samt Altbestand. Sind
+  Wäschen in der App erfasst (`waschgaenge > 0`), bricht die Umstellung ab
+  (`hasWaeschen`). Diese Wäschen stehen an den Stücken, ein stiller Verlust
+  wäre nicht zu erklären.
+
+Geschrieben wird in zwei Phasen. Zuerst gehen die Ausgaben in Batches zu 400.
+Das kann bei einem viel ausgegebenen Artikel mehr sein, als in eine
+Transaktion passt. Ein Abbruch in dieser Phase ist unschädlich: Der Artikel ist
+noch einzeln geführt, und ein zweiter Lauf schreibt dieselben Werte noch einmal.
+Danach laufen in einer Transaktion das Löschen der Stücke, der addierte Bestand
+und die neue Führung. Der Plan wird darin neu gerechnet, ein zwischenzeitlich
+ausgegebenes Stück zählt also richtig. Stücke und Bestand zusammen sind auf 450
+Schreibvorgänge begrenzt (`convertTooLarge`). Geprüft wird vor Phase 1, damit
+nichts halb umgestellt liegen bleibt.
+
+Zurück von Menge auf einzeln gibt es nicht: Aus einer Lagerzahl lässt sich
+keine Tag-Nummer gewinnen.
+
+## Lagerstand und Stückliste aufgeklappt
+
+Nach dem Import hat ein Artikel Dutzende Größen oder hunderte Stücke. Beide
+Reiter zeigen deshalb je Artikel eine Zeile mit den Summen und klappen die
+Details erst auf Klick auf. Im Lagerstand sind das die Größen samt Chargen, in
+der Stückliste die Stücke, je Artikel seitenweise zu 100. Engen Suche,
+Artikel- oder Personenfilter die Stückliste ein, sind die Treffer gleich
+aufgeklappt, denn wer sucht, will das Stück sehen.
 
 ## Bewusst nicht enthalten
 

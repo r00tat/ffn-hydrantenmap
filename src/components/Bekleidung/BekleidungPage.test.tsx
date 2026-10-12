@@ -86,7 +86,7 @@ describe('BekleidungPage', () => {
     }
     expect(screen.queryByRole('tab', { name: 'Einstellungen' })).not.toBeInTheDocument();
     expect(mocks.groupIds).toContain('ffnd');
-    expect(screen.getByText('1001')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Details zu Einsatzjacke' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Wäsche erfassen' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();

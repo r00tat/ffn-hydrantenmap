@@ -35,6 +35,10 @@ describe('StueckeTab', () => {
   it('zeigt die Stücke und öffnet nach dem Scan das Detail', async () => {
     const user = userEvent.setup();
     renderWithIntl(<StueckeTab view={sampleView()} />);
+    // Zugeklappt: eine Zeile je Artikel mit den Zahlen.
+    expect(screen.getByText('3 Stück · 2 im Lager · 1 ausgegeben')).toBeInTheDocument();
+    expect(screen.queryByText('1001')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Details zu Einsatzjacke' }));
     expect(screen.getByText('1001')).toBeInTheDocument();
     expect(screen.getByText('privat')).toBeInTheDocument();
 
@@ -44,5 +48,16 @@ describe('StueckeTab', () => {
       '1002{Enter}',
     );
     expect(screen.getByRole('dialog', { name: 'Einsatzjacke · M · #1002' })).toBeInTheDocument();
+  });
+});
+
+describe('StueckeTab mit Filter', () => {
+  it('klappt bei einer Suche die Treffer gleich auf', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StueckeTab view={sampleView()} />);
+    await user.type(screen.getByRole('searchbox', { name: 'Tag-Nummer suchen' }), '1003');
+    expect(screen.getByText('1003')).toBeInTheDocument();
+    expect(screen.queryByText('1001')).toBeNull();
+    expect(screen.getByText('1 Stück · 1 im Lager · 0 ausgegeben')).toBeInTheDocument();
   });
 });

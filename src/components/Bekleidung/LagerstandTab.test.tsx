@@ -15,44 +15,47 @@ function rowOf(text: string) {
   return screen.getAllByRole('row').filter((r) => within(r).queryByText(text));
 }
 
+const cells = (row: HTMLElement, count = 4) =>
+  within(row)
+    .getAllByRole('cell')
+    .slice(0, count)
+    .map((c) => c.textContent);
+
 describe('LagerstandTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     adjustBestand.mockResolvedValue({ success: true });
   });
 
-  it('zeigt die berechneten Zeilen je Kategorie', () => {
+  it('zeigt je Artikel eine Zeile und klappt die Größen auf', async () => {
+    const user = userEvent.setup();
     renderWithIntl(<LagerstandTab view={sampleView()} />);
     expect(screen.getByText('Einsatzbekleidung')).toBeInTheDocument();
     expect(screen.getByText('Dienstbekleidung')).toBeInTheDocument();
 
-    const jacken = rowOf('Einsatzjacke');
     // L: s1 im Lager; M: s2 ausgegeben; das private s3 zählt nicht.
-    expect(
-      jacken.map((r) =>
-        within(r)
-          .getAllByRole('cell')
-          .map((c) => c.textContent),
-      ),
-    ).toEqual([
-      ['Einsatzjacke', 'L', '1', '0', ''],
-      ['Einsatzjacke', 'M', '0', '1', ''],
-    ]);
-    const polo = rowOf('Poloshirt')[0];
-    expect(
-      within(polo)
-        .getAllByRole('cell')
-        .slice(0, 4)
-        .map((c) => c.textContent),
-    ).toEqual(['Poloshirt', 'M', '5', '2']);
+    expect(cells(rowOf('Einsatzjacke')[0])).toEqual(['Einsatzjacke', '2 Größen', '1', '1']);
+    expect(cells(rowOf('Poloshirt')[0])).toEqual(['Poloshirt', '1 Größe', '5', '2']);
+    expect(screen.queryByText('L')).toBeNull();
+
+    const toggle = screen.getByRole('button', { name: 'Details zu Einsatzjacke' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(cells(rowOf('L')[0])).toEqual(['', 'L', '1', '0']);
+    expect(cells(rowOf('M')[0])).toEqual(['', 'M', '0', '1']);
+
+    await user.click(toggle);
+    expect(screen.queryByText('L')).toBeNull();
   });
 
   it('bucht eine Korrektur als Differenz zum gezählten Bestand', async () => {
     const user = userEvent.setup();
     renderWithIntl(<LagerstandTab view={sampleView()} />);
-    await user.click(
-      within(rowOf('Poloshirt')[0]).getByRole('button', { name: 'Zugang/Korrektur' }),
-    );
+    // Korrigiert wird in der Größenzeile, nicht in der Artikelzeile.
+    expect(screen.queryByRole('button', { name: 'Zugang/Korrektur' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Details zu Poloshirt' }));
+    await user.click(within(rowOf('M')[0]).getByRole('button', { name: 'Zugang/Korrektur' }));
     expect(screen.getByText('Aktuell im Lager: 5')).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Korrektur (Ist-Bestand)' }));
     await user.type(screen.getByRole('spinbutton', { name: 'Gezählter Bestand' }), '3');
@@ -79,23 +82,15 @@ describe('LagerstandTab', () => {
     });
     renderWithIntl(<LagerstandTab view={view} />);
 
-    const polo = rowOf('Poloshirt')[0];
-    expect(
-      within(polo)
-        .getAllByRole('cell')
-        .slice(0, 4)
-        .map((c) => c.textContent),
-    ).toEqual(['Poloshirt', 'M', '8', '2']);
+    expect(cells(rowOf('Poloshirt')[0])).toEqual(['Poloshirt', '1 Größe', '8', '2']);
+    await user.click(screen.getByRole('button', { name: 'Details zu Poloshirt' }));
+    const size = rowOf('M')[0];
+    expect(cells(size)).toEqual(['', 'M', '8', '2']);
     const brand = rowOf('Charge Brand')[0];
-    expect(
-      within(brand)
-        .getAllByRole('cell')
-        .slice(0, 4)
-        .map((c) => c.textContent),
-    ).toEqual(['', 'Charge Brand', '3', '0']);
+    expect(cells(brand)).toEqual(['', 'Charge Brand', '3', '0']);
     expect(rowOf('ohne Charge')).toHaveLength(1);
-    // Korrigiert wird je Charge, nicht in der Summenzeile.
-    expect(within(polo).queryByRole('button', { name: 'Zugang/Korrektur' })).toBeNull();
+    // Korrigiert wird je Charge, nicht in der Summenzeile der Größe.
+    expect(within(size).queryByRole('button', { name: 'Zugang/Korrektur' })).toBeNull();
 
     await user.click(within(brand).getByRole('button', { name: 'Zugang/Korrektur' }));
     expect(screen.getByText('Aktuell im Lager: 3')).toBeInTheDocument();

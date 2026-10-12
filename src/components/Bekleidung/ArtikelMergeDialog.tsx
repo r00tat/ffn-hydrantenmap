@@ -2,10 +2,12 @@
 
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -25,6 +27,8 @@ export const artikelLabel = (a: BekleidungArtikel) =>
 /**
  * Einen Artikeltyp in einen gleichartigen (Kategorie und Führung) übernehmen.
  * Stücke, Ausgaben und Bestand wandern mit, der Artikel selbst wird gelöscht.
+ * Auf Wunsch bleibt der Hersteller als Charge erhalten — der Import legt
+ * Varianten mit eigenem Hersteller-Eintrag als eigene Artikeltypen an.
  */
 export default function ArtikelMergeDialog({
   open,
@@ -42,14 +46,23 @@ export default function ArtikelMergeDialog({
   const t = useTranslations('bekleidung');
   const errorText = useBekleidungErrorText();
   const [targetId, setTargetId] = useState('');
+  const [asCharge, setAsCharge] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+
+  const target = targets.find((a) => a.id === targetId);
+  /** Nur wenn ein Hersteller da ist, gibt es etwas als Charge zu übernehmen. */
+  const canUseCharge = !!(source.hersteller?.trim() || target?.hersteller?.trim());
 
   const submit = async () => {
     if (!source.id || !targetId) return;
     setBusy(true);
     setError(undefined);
-    const outcome = await callAction(() => mergeArtikel(groupId, targetId, [source.id!]));
+    const outcome = await callAction(() =>
+      mergeArtikel(groupId, targetId, [source.id!], {
+        chargeFromHersteller: canUseCharge && asCharge,
+      }),
+    );
     setBusy(false);
     if (!outcome.ok) {
       setError(errorText(outcome.error));
@@ -79,6 +92,19 @@ export default function ArtikelMergeDialog({
               </MenuItem>
             ))}
           </TextField>
+          {canUseCharge && (
+            <>
+              <FormControlLabel
+                control={
+                  <Checkbox checked={asCharge} onChange={(e) => setAsCharge(e.target.checked)} />
+                }
+                label={t('artikel.mergeAsCharge')}
+              />
+              <Typography variant="caption" color="text.secondary">
+                {t('artikel.mergeAsChargeHint')}
+              </Typography>
+            </>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>

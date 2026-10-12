@@ -4266,7 +4266,8 @@
       "close": "Schließen",
       "add": "Hinzufügen",
       "remove": "Entfernen",
-      "showMore": "{count} weitere anzeigen"
+      "showMore": "{count} weitere anzeigen",
+      "details": "Details zu {name}"
     },
     "kategorie": {
       "einsatz": "Einsatzbekleidung",
@@ -4324,7 +4325,8 @@
     "stuecke": {
       "empty": "Keine Stücke gefunden.",
       "noTag": "ohne Tag",
-      "notFound": "Kein Stück mit der Tag-Nummer „{code}“."
+      "notFound": "Kein Stück mit der Tag-Nummer „{code}“.",
+      "groupSummary": "{count} Stück · {lager} im Lager · {ausgegeben} ausgegeben"
     },
     "detail": {
       "timeline": "Verlauf",
@@ -4367,7 +4369,8 @@
       "newSize": "Zugang",
       "chargeRow": "Charge {charge}",
       "noCharge": "ohne Charge",
-      "chargeHint": "Leer lassen, wenn der Artikel nicht nach Chargen geführt wird"
+      "chargeHint": "Leer lassen, wenn der Artikel nicht nach Chargen geführt wird",
+      "sizeCount": "{count, plural, one {# Größe} other {# Größen}}"
     },
     "personen": {
       "select": "Person wählen",
@@ -4439,7 +4442,17 @@
       "mergeLabel": "Zusammenführen {name}",
       "mergeTitle": "Artikel zusammenführen",
       "mergeTarget": "Zusammenführen in",
-      "mergeHint": "{name} geht im gewählten Artikel auf: Stücke, Ausgaben und Bestand wandern mit, der Bestand wird je Größe und Charge addiert. {name} wird danach gelöscht."
+      "mergeHint": "{name} geht im gewählten Artikel auf: Stücke, Ausgaben und Bestand wandern mit, der Bestand wird je Größe und Charge addiert. {name} wird danach gelöscht.",
+      "convert": "Als Menge führen",
+      "convertLabel": "Als Menge führen {name}",
+      "convertTitle": "{name} als Menge führen",
+      "convertBestand": "{count, plural, one {# Stück im Lager wird Bestand.} other {# Stücke im Lager werden Bestand.}}",
+      "convertAusgaben": "{count, plural, one {# Ausgabe bleibt als Mengen-Ausgabe erhalten.} other {# Ausgaben bleiben als Mengen-Ausgaben erhalten.}}",
+      "convertDropped": "{count, plural, one {# Stück entfällt (privat, ausgeschieden oder ohne Person).} other {# Stücke entfallen (privat, ausgeschieden oder ohne Person).}}",
+      "convertHint": "Tag-Nummern und Waschzähler der Stücke gehen verloren. Die Umstellung lässt sich nicht rückgängig machen.",
+      "convertWaeschen": "In der App erfasste Wäschen hängen an den Stücken und gingen verloren. Ein Artikel mit erfassten Wäschen bleibt einzeln geführt.",
+      "mergeAsCharge": "Hersteller als Charge übernehmen",
+      "mergeAsChargeHint": "Stücke, Ausgaben und Bestand ohne Charge bekommen den Hersteller ihres bisherigen Artikels als Charge — auch die des Ziels, dessen Hersteller danach entfällt."
     },
     "import": {
       "title": "Import aus dem Excel",
@@ -4516,7 +4529,9 @@
       "importRunning": "Ein Import läuft gerade. Bitte warten und die Seite neu laden.",
       "notAvailable": "{stueck} kann nicht ausgegeben werden (Status: {status}).",
       "mergeMismatch": "Zusammenführen geht nur bei gleicher Kategorie und Führung.",
-      "mergeTooLarge": "Zu viele Einträge, um sie in einem Schritt zusammenzuführen."
+      "mergeTooLarge": "Zu viele Einträge, um sie in einem Schritt zusammenzuführen.",
+      "hasWaeschen": "Für Stücke dieses Artikels sind Wäschen erfasst — er bleibt einzeln geführt.",
+      "convertTooLarge": "Der Artikel hat zu viele Stücke, um ihn in einem Schritt umzustellen."
     }
   },
   "geraetEinsatz": {

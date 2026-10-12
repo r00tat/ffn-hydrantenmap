@@ -273,6 +273,7 @@ import {
 } from '../../common/bekleidungImport';
 import {
   adjustBestand,
+  convertArtikelToMenge,
   createPersonForBekleidung,
   createStuecke,
   importBekleidung,
@@ -430,6 +431,7 @@ describe('Guard', () => {
       previewBekleidungImport('ffnd', ''),
       importBekleidung('ffnd', '', { fuehrung: {}, persons: {} }),
       mergeArtikel('ffnd', 'polo', ['polo2']),
+      convertArtikelToMenge('ffnd', 'jacke'),
     ];
     for (const call of calls) await failsWith(call);
     expect(guard).toHaveBeenCalledTimes(calls.length);
@@ -965,6 +967,70 @@ describe('mergeArtikel', () => {
     expect(get('bekleidungArtikel/jacke2')).toBeUndefined();
   });
 
+  it('übernimmt auf Wunsch den Hersteller als Charge, auch beim Ziel', async () => {
+    fake.put(`${G}/bekleidungArtikel/polo`, {
+      kategorie: 'dienst',
+      bezeichnung: 'Polo',
+      hersteller: 'Fa Y',
+      fuehrung: 'menge',
+      aktiv: true,
+      ...STAMPS,
+    });
+    ok(await mergeArtikel('ffnd', 'polo', ['polo2'], { chargeFromHersteller: true }));
+
+    // Bestand ohne Charge wandert in die Charge seines Herstellers.
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'M')}`)).toBeUndefined();
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'M', 'Fa Y')}`)).toMatchObject({
+      charge: 'Fa Y',
+      anzahl: 5,
+    });
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'M', 'Fa X')}`)).toMatchObject({
+      charge: 'Fa X',
+      anzahl: 2,
+    });
+    // Eine vorhandene Charge bleibt.
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'L', 'Brand')}`)?.anzahl).toBe(4);
+    expect(get('bekleidungAusgabe/au7')).toMatchObject({ artikelId: 'polo', charge: 'Fa X' });
+    expect(get('bekleidungAusgabe/au2')?.charge).toBe('Fa Y');
+    // Das Ziel umfasst jetzt mehrere Hersteller.
+    expect(get('bekleidungArtikel/polo')?.hersteller).toBeUndefined();
+  });
+
+  it('setzt die Charge aus dem Hersteller an Stücken eines Einzelartikels', async () => {
+    fake.put(`${G}/bekleidungArtikel/jacke2`, {
+      kategorie: 'einsatz',
+      bezeichnung: 'Branddienst Jacke',
+      hersteller: 'Fa B',
+      fuehrung: 'einzeln',
+      aktiv: true,
+      ...STAMPS,
+    });
+    fake.put(`${G}/bekleidungStueck/s9`, {
+      artikelId: 'jacke2',
+      groesse: 'L',
+      eigentum: 'feuerwehr',
+      status: 'lager',
+      waschgaenge: 0,
+      waschgaengeAltbestand: 0,
+      ...STAMPS,
+    });
+    fake.put(`${G}/bekleidungStueck/s10`, {
+      artikelId: 'jacke2',
+      groesse: 'L',
+      charge: 'Alt',
+      eigentum: 'feuerwehr',
+      status: 'lager',
+      waschgaenge: 0,
+      waschgaengeAltbestand: 0,
+      ...STAMPS,
+    });
+    ok(await mergeArtikel('ffnd', 'jacke', ['jacke2'], { chargeFromHersteller: true }));
+    expect(get('bekleidungStueck/s9')).toMatchObject({ artikelId: 'jacke', charge: 'Fa B' });
+    expect(get('bekleidungStueck/s10')?.charge).toBe('Alt');
+    // Das Ziel hat keinen Hersteller: seine Stücke bleiben ohne Charge.
+    expect(get('bekleidungStueck/s1')?.charge).toBeUndefined();
+  });
+
   it('lehnt andere Kategorie oder Führung ab', async () => {
     await failsWith(mergeArtikel('ffnd', 'jacke', ['polo2']), 'mergeMismatch');
     expect(get('bekleidungArtikel/polo2')).toBeDefined();
@@ -989,6 +1055,69 @@ describe('mergeArtikel', () => {
     }
     await failsWith(mergeArtikel('ffnd', 'polo', ['polo2']), 'mergeTooLarge');
     expect(get('bekleidungArtikel/polo2')).toBeDefined();
+  });
+});
+
+describe('convertArtikelToMenge', () => {
+  const piece = {
+    artikelId: 'bluse',
+    groesse: '40',
+    eigentum: 'feuerwehr',
+    status: 'lager',
+    waschgaenge: 0,
+    waschgaengeAltbestand: 4,
+    ...STAMPS,
+  };
+  beforeEach(() => {
+    fake.put(`${G}/bekleidungArtikel/bluse`, {
+      kategorie: 'dienst',
+      bezeichnung: 'A-Bluse',
+      fuehrung: 'einzeln',
+      maxWaschgaenge: 30,
+      aktiv: true,
+      ...STAMPS,
+    });
+    fake.put(`${G}/bekleidungStueck/b1`, { ...piece, tagNummer: '7001' });
+    fake.put(`${G}/bekleidungStueck/b2`, { ...piece, charge: 'Alt' });
+    fake.put(`${G}/bekleidungStueck/b3`, {
+      ...piece,
+      status: 'ausgegeben',
+      personId: 'p1',
+      ausgabeId: 'ab3',
+      charge: 'Alt',
+    });
+    fake.put(`${G}/bekleidungStueck/b4`, { ...piece, status: 'ausgeschieden' });
+    fake.put(`${G}/bekleidungAusgabe/ab3`, {
+      personId: 'p1',
+      stueckId: 'b3',
+      artikelId: 'bluse',
+      groesse: '40',
+      menge: 1,
+      quelle: 'import',
+      ...STAMPS,
+    });
+  });
+
+  it('macht Lagerstücke zu Bestand, Ausgaben zu Mengen-Ausgaben und löscht die Stücke', async () => {
+    const result = ok(await convertArtikelToMenge('ffnd', 'bluse'));
+    expect(result).toEqual({ bestand: 2, ausgaben: 1, entfallen: 1 });
+    expect(get('bekleidungArtikel/bluse')).toMatchObject({ fuehrung: 'menge' });
+    expect(get('bekleidungArtikel/bluse')?.maxWaschgaenge).toBeUndefined();
+    expect(list('bekleidungStueck').some((x) => x.artikelId === 'bluse')).toBe(false);
+    expect(get(`bekleidungBestand/${bestandDocId('bluse', '40')}`)?.anzahl).toBe(1);
+    expect(get(`bekleidungBestand/${bestandDocId('bluse', '40', 'Alt')}`)).toMatchObject({
+      charge: 'Alt',
+      anzahl: 1,
+    });
+    const a = get('bekleidungAusgabe/ab3')!;
+    expect(a.stueckId).toBeUndefined();
+    expect(a).toMatchObject({ charge: 'Alt', artikelId: 'bluse', menge: 1 });
+  });
+
+  it('lehnt einen Mengenartikel und Stücke mit erfassten Wäschen ab', async () => {
+    await failsWith(convertArtikelToMenge('ffnd', 'polo'), 'artikelNotEinzeln');
+    await failsWith(convertArtikelToMenge('ffnd', 'jacke'), 'hasWaeschen');
+    expect(get('bekleidungStueck/s2')).toBeDefined();
   });
 });
 

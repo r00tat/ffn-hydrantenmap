@@ -16,8 +16,9 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import {
+  normalizeCharge,
   normalizeGroesse,
   normalizeTagNummer,
   totalWaschgaenge,
@@ -28,6 +29,7 @@ import {
 } from '../../common/bekleidung';
 import OnlineOnly from '../site/OnlineOnly';
 import BekleidungScanDialog from './BekleidungScanDialog';
+import ExpandToggle, { toggleKey } from './ExpandToggle';
 import { findStueckByCode, type BekleidungView } from './bekleidungUi';
 import StueckDetailDialog from './StueckDetailDialog';
 import StueckEditDialog from './StueckEditDialog';
@@ -78,20 +80,38 @@ export function filterStuecke(view: BekleidungView, filter: StueckFilter): Bekle
     );
 }
 
-/** Alle Einzelstücke mit Filtern, Suche nach Tag-Nummer und Scan. */
+/** Die gefilterten Stücke je Artikel, in der Sortierung von `filterStuecke`. */
+function groupByArtikel(stuecke: BekleidungStueck[]) {
+  const groups = new Map<string, BekleidungStueck[]>();
+  for (const s of stuecke) {
+    const list = groups.get(s.artikelId);
+    if (list) list.push(s);
+    else groups.set(s.artikelId, [s]);
+  }
+  return [...groups].map(([artikelId, list]) => ({ artikelId, stuecke: list }));
+}
+
+/**
+ * Alle Einzelstücke mit Filtern, Suche nach Tag-Nummer und Scan. Je Artikel
+ * eine Zeile mit den Zahlen, aufgeklappt die Stücke — nach dem Import hat ein
+ * Artikel schnell hundert Stücke. Engt die Suche, ein Artikel oder eine
+ * Person die Liste ein, sind die Treffer gleich aufgeklappt.
+ */
 export default function StueckeTab({ view }: { view: BekleidungView }) {
   const t = useTranslations('bekleidung');
   const [filter, setFilter] = useState<StueckFilter>(EMPTY_STUECK_FILTER);
-  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [limits, setLimits] = useState<Record<string, number>>({});
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [detailId, setDetailId] = useState<string>();
   const [edit, setEdit] = useState<{ stueck?: BekleidungStueck }>();
   const [scanOpen, setScanOpen] = useState(false);
   const [notFound, setNotFound] = useState<string>();
 
   const filtered = useMemo(() => filterStuecke(view, filter), [view, filter]);
+  const groups = useMemo(() => groupByArtikel(filtered), [filtered]);
+  const autoExpand = !!(filter.search.trim() || filter.artikelId || filter.personId);
   const sizes = useMemo(
-    () =>
-      [...new Set(view.stuecke.map((s) => normalizeGroesse(s.groesse)))].sort(collator.compare),
+    () => [...new Set(view.stuecke.map((s) => normalizeGroesse(s.groesse)))].sort(collator.compare),
     [view.stuecke],
   );
   const persons = useMemo(() => {
@@ -104,7 +124,7 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
 
   const update = (patch: Partial<StueckFilter>) => {
     setFilter((prev) => ({ ...prev, ...patch }));
-    setLimit(PAGE_SIZE);
+    setLimits({});
   };
 
   const handleCode = (code: string) => {
@@ -151,7 +171,11 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
           onChange={(e) => update({ search: e.target.value })}
           sx={{ minWidth: 180, flexGrow: 1 }}
         />
-        <Button variant="outlined" startIcon={<QrCodeScannerIcon />} onClick={() => setScanOpen(true)}>
+        <Button
+          variant="outlined"
+          startIcon={<QrCodeScannerIcon />}
+          onClick={() => setScanOpen(true)}
+        >
           {t('actions.scan')}
         </Button>
         <OnlineOnly>
@@ -173,7 +197,12 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
           (v) => update({ artikelId: v }),
           artikelOptions.map((a) => ({ value: a.id ?? '', label: a.bezeichnung })),
         )}
-        {select(t('fields.groesse'), filter.groesse, (v) => update({ groesse: v }), sizes.map((s) => ({ value: s, label: s })))}
+        {select(
+          t('fields.groesse'),
+          filter.groesse,
+          (v) => update({ groesse: v }),
+          sizes.map((s) => ({ value: s, label: s })),
+        )}
         {select(
           t('fields.status'),
           filter.status,
@@ -201,7 +230,6 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
             <TableHead>
               <TableRow>
                 <TableCell>{t('fields.tagNummer')}</TableCell>
-                <TableCell>{t('fields.artikel')}</TableCell>
                 <TableCell>{t('fields.groesse')}</TableCell>
                 <TableCell>{t('fields.status')}</TableCell>
                 <TableCell>{t('fields.person')}</TableCell>
@@ -209,47 +237,101 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filtered.slice(0, limit).map((s) => {
-                const artikel = view.artikelById.get(s.artikelId);
-                const limitState = waschLimitState(s, artikel);
+              {groups.map((group) => {
+                const artikel = view.artikelById.get(group.artikelId);
+                const name = artikel?.bezeichnung ?? group.artikelId;
+                const open = autoExpand || expanded.has(group.artikelId);
+                const toggle = () => setExpanded((prev) => toggleKey(prev, group.artikelId));
+                const limit = limits[group.artikelId] ?? PAGE_SIZE;
+                const count = (status: BekleidungStatus) =>
+                  group.stuecke.filter((s) => s.status === status).length;
                 return (
-                  <TableRow key={s.id} hover sx={{ cursor: 'pointer' }} onClick={() => setDetailId(s.id)}>
-                    <TableCell>{s.tagNummer ?? <em>{t('stuecke.noTag')}</em>}</TableCell>
-                    <TableCell>
-                      {artikel?.bezeichnung ?? s.artikelId}
-                      {s.eigentum === 'privat' && (
-                        <Chip size="small" variant="outlined" sx={{ ml: 1 }} label={t('eigentum.privat')} />
-                      )}
-                    </TableCell>
-                    <TableCell>{s.groesse}</TableCell>
-                    <TableCell>{t(`status.${s.status}`)}</TableCell>
-                    <TableCell>{(s.personId && view.personById.get(s.personId)?.name) ?? ''}</TableCell>
-                    <TableCell
-                      align="right"
-                      sx={{
-                        color:
-                          limitState === 'reached'
-                            ? 'error.main'
-                            : limitState === 'near'
-                              ? 'warning.main'
-                              : undefined,
-                      }}
+                  <Fragment key={group.artikelId}>
+                    <TableRow
+                      hover
+                      sx={{ cursor: autoExpand ? undefined : 'pointer', bgcolor: 'action.hover' }}
+                      onClick={autoExpand ? undefined : toggle}
                     >
-                      {totalWaschgaenge(s)}
-                      {artikel?.maxWaschgaenge ? ` / ${artikel.maxWaschgaenge}` : ''}
-                    </TableCell>
-                  </TableRow>
+                      <TableCell sx={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        {!autoExpand && (
+                          <ExpandToggle name={name} expanded={open} onToggle={toggle} />
+                        )}
+                        {name}
+                      </TableCell>
+                      <TableCell colSpan={4} sx={{ color: 'text.secondary' }}>
+                        {t('stuecke.groupSummary', {
+                          count: group.stuecke.length,
+                          lager: count('lager'),
+                          ausgegeben: count('ausgegeben'),
+                        })}
+                      </TableCell>
+                    </TableRow>
+                    {open &&
+                      group.stuecke.slice(0, limit).map((s) => {
+                        const limitState = waschLimitState(s, artikel);
+                        return (
+                          <TableRow
+                            key={s.id}
+                            hover
+                            sx={{ cursor: 'pointer' }}
+                            onClick={() => setDetailId(s.id)}
+                          >
+                            <TableCell sx={{ pl: 6 }}>
+                              {s.tagNummer ?? <em>{t('stuecke.noTag')}</em>}
+                              {s.eigentum === 'privat' && (
+                                <Chip
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ ml: 1 }}
+                                  label={t('eigentum.privat')}
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {[s.groesse, normalizeCharge(s.charge)].filter(Boolean).join(' · ')}
+                            </TableCell>
+                            <TableCell>{t(`status.${s.status}`)}</TableCell>
+                            <TableCell>
+                              {(s.personId && view.personById.get(s.personId)?.name) ?? ''}
+                            </TableCell>
+                            <TableCell
+                              align="right"
+                              sx={{
+                                color:
+                                  limitState === 'reached'
+                                    ? 'error.main'
+                                    : limitState === 'near'
+                                      ? 'warning.main'
+                                      : undefined,
+                              }}
+                            >
+                              {totalWaschgaenge(s)}
+                              {artikel?.maxWaschgaenge ? ` / ${artikel.maxWaschgaenge}` : ''}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    {open && group.stuecke.length > limit && (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          <Button
+                            onClick={() =>
+                              setLimits((prev) => ({
+                                ...prev,
+                                [group.artikelId]: limit + PAGE_SIZE,
+                              }))
+                            }
+                          >
+                            {t('actions.showMore', { count: group.stuecke.length - limit })}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
                 );
               })}
             </TableBody>
           </Table>
-        </Box>
-      )}
-      {filtered.length > limit && (
-        <Box sx={{ textAlign: 'center', mt: 2 }}>
-          <Button onClick={() => setLimit((l) => l + PAGE_SIZE)}>
-            {t('actions.showMore', { count: filtered.length - limit })}
-          </Button>
         </Box>
       )}
 
@@ -263,9 +345,18 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
         />
       )}
       {edit && (
-        <StueckEditDialog open view={view} stueck={edit.stueck} onClose={() => setEdit(undefined)} />
+        <StueckEditDialog
+          open
+          view={view}
+          stueck={edit.stueck}
+          onClose={() => setEdit(undefined)}
+        />
       )}
-      <BekleidungScanDialog open={scanOpen} onClose={() => setScanOpen(false)} onCode={handleCode} />
+      <BekleidungScanDialog
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onCode={handleCode}
+      />
     </>
   );
 }

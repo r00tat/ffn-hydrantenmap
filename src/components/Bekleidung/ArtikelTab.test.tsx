@@ -5,13 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import { jacke, makeArtikel, polo, sampleView } from './bekleidungFixtures';
 
-const { saveArtikel, mergeArtikel } = vi.hoisted(() => ({
+const { saveArtikel, mergeArtikel, convertArtikelToMenge } = vi.hoisted(() => ({
   saveArtikel: vi.fn(),
   mergeArtikel: vi.fn(),
+  convertArtikelToMenge: vi.fn(),
 }));
 vi.mock('./bekleidungActions', () => ({
   saveArtikel,
   mergeArtikel,
+  convertArtikelToMenge,
   previewBekleidungImport: vi.fn(),
   importBekleidung: vi.fn(),
 }));
@@ -77,8 +79,46 @@ describe('ArtikelTab', () => {
     await user.click(screen.getByRole('button', { name: 'Zusammenführen Poloshirt (Fa X)' }));
     await user.click(screen.getByRole('combobox', { name: 'Zusammenführen in' }));
     await user.click(screen.getByRole('option', { name: 'Poloshirt' }));
+    // Der Hersteller der Variante wird standardmäßig zur Charge.
+    const asCharge = screen.getByRole('checkbox', { name: 'Hersteller als Charge übernehmen' });
+    expect(asCharge).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Zusammenführen' }));
-    expect(mergeArtikel).toHaveBeenCalledWith('ffnd', 'polo', ['polo2']);
+    expect(mergeArtikel).toHaveBeenCalledWith('ffnd', 'polo', ['polo2'], {
+      chargeFromHersteller: true,
+    });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('stellt einen Einzelartikel nach Bestätigung auf Menge um', async () => {
+    convertArtikelToMenge.mockResolvedValue({ bestand: 1, ausgaben: 1, entfallen: 1 });
+    const user = userEvent.setup();
+    const view = sampleView();
+    for (const st of view.stuecke) st.waschgaenge = 0;
+    renderWithIntl(<ArtikelTab view={view} />);
+
+    // Mengenartikel lassen sich nicht umstellen.
+    expect(screen.queryByRole('button', { name: 'Als Menge führen Poloshirt' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Als Menge führen Einsatzjacke' }));
+    // s1 im Lager → Bestand, s2 mit Ausgabe → Mengen-Ausgabe, s3 privat → entfällt
+    expect(screen.getByText('1 Stück im Lager wird Bestand.')).toBeInTheDocument();
+    expect(
+      screen.getByText('2 Ausgaben bleiben als Mengen-Ausgaben erhalten.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('1 Stück entfällt (privat, ausgeschieden oder ohne Person).'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Als Menge führen' }));
+    expect(convertArtikelToMenge).toHaveBeenCalledWith('ffnd', 'jacke');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('sperrt die Umstellung, solange Wäschen in der App erfasst sind', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ArtikelTab view={sampleView()} />);
+    await user.click(screen.getByRole('button', { name: 'Als Menge führen Einsatzjacke' }));
+    expect(
+      screen.getByText(/In der App erfasste Wäschen hängen an den Stücken/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Als Menge führen' })).toBeDisabled();
   });
 });

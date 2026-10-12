@@ -40,6 +40,7 @@ import {
   type ImportPreview,
   type ImportRowDecision,
 } from '../../common/bekleidungImport';
+import { planConversionToMenge } from '../../common/bekleidungConvert';
 import { FAHRTENBUCH_PERSON_COLLECTION_ID } from '../../common/fahrtenbuch';
 import { normalizePersonName } from '../../common/personNameMatch';
 import { readXlsxSheetByName } from '../../common/xlsx';
@@ -427,6 +428,16 @@ const MAX_MERGE_SOURCES = 20;
 /** Firestore erlaubt 500 Schreibvorgänge je Transaktion; etwas Luft bleibt. */
 const MAX_MERGE_WRITES = 450;
 
+export interface MergeOptions {
+  /**
+   * Der Hersteller jedes beteiligten Artikels wird Charge seiner Stücke,
+   * Ausgaben und Bestände, die noch keine haben — auch beim Ziel, dessen
+   * Hersteller danach entfällt. So bleibt sichtbar, welche Variante ein Stück
+   * war, wenn der Import Varianten als eigene Artikeltypen angelegt hat.
+   */
+  chargeFromHersteller?: boolean;
+}
+
 /**
  * Führt Artikeltypen in einen zusammen — für Schreibvarianten, die nach dem
  * Import auffallen. Stücke und Ausgaben bekommen die neue `artikelId`, der
@@ -439,6 +450,7 @@ async function mergeArtikelImpl(
   groupId: string,
   targetId: string,
   sourceIdsRaw: string[],
+  options: MergeOptions = {},
 ): Promise<void> {
   const session = await actionBekleidungswartRequired(groupId);
   const actor = actorOf(session);
@@ -447,16 +459,18 @@ async function mergeArtikelImpl(
   const sourceIds = idList(sourceIdsRaw, 'sourceIds', MAX_MERGE_SOURCES);
   if (sourceIds.length === 0) throw badRequest('sourceIds required');
   if (sourceIds.includes(targetId)) throw badRequest('invalid sourceIds');
+  const chargeFromHersteller = options.chargeFromHersteller === true;
 
   await firestore.runTransaction(async (tx: Transaction) => {
     // --- lesen ---
     const targetSnap = await tx.get(artikelCol(groupId).doc(targetId));
     if (!targetSnap.exists) throw notFound('artikel', targetId);
     const target = asArtikel(targetSnap.data());
+    const targetCharge = chargeFromHersteller ? normalizeCharge(target.hersteller) : undefined;
 
-    const stuecke: string[] = [];
-    const ausgaben: string[] = [];
-    const sourceBestand: { id: string; data: BekleidungBestand }[] = [];
+    // Beteiligt sind die Quellen und — nur wenn es eine Charge bekommt — das Ziel.
+    const participants: { id: string; charge?: string; isTarget: boolean }[] = [];
+    if (targetCharge) participants.push({ id: targetId, charge: targetCharge, isTarget: true });
     for (const sourceId of sourceIds) {
       const snap = await tx.get(artikelCol(groupId).doc(sourceId));
       if (!snap.exists) throw notFound('artikel', sourceId);
@@ -464,48 +478,83 @@ async function mergeArtikelImpl(
       if (source.kategorie !== target.kategorie || source.fuehrung !== target.fuehrung) {
         throw conflict('mergeMismatch');
       }
-      const [s, a, b] = await Promise.all([
-        tx.get(stueckCol(groupId).where('artikelId', '==', sourceId)),
-        tx.get(ausgabeCol(groupId).where('artikelId', '==', sourceId)),
-        tx.get(bestandCol(groupId).where('artikelId', '==', sourceId)),
-      ]);
-      stuecke.push(...s.docs.map((d) => d.id));
-      ausgaben.push(...a.docs.map((d) => d.id));
-      sourceBestand.push(...b.docs.map((d) => ({ id: d.id, data: d.data() as BekleidungBestand })));
+      participants.push({
+        id: sourceId,
+        charge: chargeFromHersteller ? normalizeCharge(source.hersteller) : undefined,
+        isTarget: false,
+      });
     }
 
-    // Bestand des Ziels je Größe und Charge: vorhandene Zahl plus Quellen.
+    const stueckPatches = new Map<string, Record<string, string>>();
+    const ausgabePatches = new Map<string, Record<string, string>>();
+    const moved: { id: string; data: BekleidungBestand; charge?: string }[] = [];
+    for (const part of participants) {
+      const [s, a, b] = await Promise.all([
+        tx.get(stueckCol(groupId).where('artikelId', '==', part.id)),
+        tx.get(ausgabeCol(groupId).where('artikelId', '==', part.id)),
+        tx.get(bestandCol(groupId).where('artikelId', '==', part.id)),
+      ]);
+      // Eine vorhandene Charge bleibt; beim Ziel ändert sich sonst nichts.
+      const patchOf = (data: { charge?: string }) => {
+        const charge = !normalizeCharge(data.charge) ? part.charge : undefined;
+        if (part.isTarget) return charge ? { charge } : undefined;
+        return { artikelId: targetId, ...(charge ? { charge } : {}) };
+      };
+      for (const d of s.docs) {
+        const patch = patchOf(d.data() as BekleidungStueck);
+        if (patch) stueckPatches.set(d.id, patch);
+      }
+      for (const d of a.docs) {
+        const patch = patchOf(d.data() as BekleidungAusgabe);
+        if (patch) ausgabePatches.set(d.id, patch);
+      }
+      for (const d of b.docs) {
+        const data = d.data() as BekleidungBestand;
+        if (part.isTarget && normalizeCharge(data.charge)) continue;
+        moved.push({ id: d.id, data, charge: normalizeCharge(data.charge) ?? part.charge });
+      }
+    }
+
+    // Bestand des Ziels je Größe und Charge: vorhandene Zahl plus Zugang. Ein
+    // Dokument, das selbst wandert, zählt hier nicht als vorhanden.
+    const movedIds = new Set(moved.map((m) => m.id));
     const targetBestand = new Map<string, { groesse: string; charge?: string; anzahl: number }>();
-    for (const { data } of sourceBestand) {
+    for (const { data, charge } of moved) {
       const groesse = normalizeGroesse(data.groesse);
-      const id = bestandDocId(targetId, groesse, data.charge);
+      const id = bestandDocId(targetId, groesse, charge);
       let entry = targetBestand.get(id);
       if (!entry) {
-        const snap = await tx.get(bestandCol(groupId).doc(id));
-        const existing = snap.exists ? (snap.data() as BekleidungBestand) : undefined;
+        const snap = movedIds.has(id) ? undefined : await tx.get(bestandCol(groupId).doc(id));
+        const existing = snap?.exists ? (snap.data() as BekleidungBestand) : undefined;
         entry = {
           groesse,
-          charge: existing?.charge ?? normalizeCharge(data.charge),
+          charge: existing?.charge ?? charge,
           anzahl: existing?.anzahl ?? 0,
         };
         targetBestand.set(id, entry);
       }
       entry.anzahl += data.anzahl ?? 0;
     }
+    const deletes = [...movedIds].filter((id) => !targetBestand.has(id));
 
     const writes =
-      stuecke.length +
-      ausgaben.length +
-      sourceBestand.length +
+      stueckPatches.size +
+      ausgabePatches.size +
+      deletes.length +
       targetBestand.size +
-      sourceIds.length;
+      sourceIds.length +
+      (targetCharge ? 1 : 0);
     if (writes > MAX_MERGE_WRITES) throw conflict('mergeTooLarge');
 
     // --- schreiben ---
-    const updated = { artikelId: targetId, updatedAt: actor.now, updatedBy: actor.uid };
-    for (const id of stuecke) tx.update(stueckCol(groupId).doc(id), updated);
-    for (const id of ausgaben) tx.update(ausgabeCol(groupId).doc(id), updated);
-    for (const { id } of sourceBestand) tx.delete(bestandCol(groupId).doc(id));
+    const stamps = { updatedAt: actor.now, updatedBy: actor.uid };
+    for (const [id, patch] of stueckPatches) {
+      tx.update(stueckCol(groupId).doc(id), { ...patch, ...stamps });
+    }
+    for (const [id, patch] of ausgabePatches) {
+      tx.update(ausgabeCol(groupId).doc(id), { ...patch, ...stamps });
+    }
+    for (const id of deletes) tx.delete(bestandCol(groupId).doc(id));
     for (const [id, entry] of targetBestand) {
       tx.set(
         bestandCol(groupId).doc(id),
@@ -514,13 +563,120 @@ async function mergeArtikelImpl(
           groesse: entry.groesse,
           charge: entry.charge,
           anzahl: entry.anzahl,
-          updatedAt: actor.now,
-          updatedBy: actor.uid,
+          ...stamps,
         }),
       );
     }
+    if (targetCharge) {
+      tx.update(artikelCol(groupId).doc(targetId), { hersteller: FieldValue.delete(), ...stamps });
+    }
     for (const id of sourceIds) tx.delete(artikelCol(groupId).doc(id));
   });
+}
+
+// --- Führung umstellen -------------------------------------------------------
+
+/** Ausgaben werden in Stapeln umgehängt, Stücke und Bestand in einer Transaktion. */
+const CONVERT_BATCH = 400;
+
+/**
+ * Stellt einen Einzelartikel auf Menge um — für Artikel, die beim Import
+ * wegen einzelner Tag-Nummern als Einzelstücke angelegt wurden. Die Rechnung
+ * macht `planConversionToMenge`: Lagerstücke der Feuerwehr werden Bestand je
+ * Größe und Charge, Ausgaben verlieren den Stückbezug und bleiben Verlauf,
+ * die Stücke werden gelöscht (mit Tag-Nummer und Waschzähler-Altbestand).
+ * Stücke mit in der App erfassten Wäschen sperren (`hasWaeschen`), weil die
+ * Wäschen sonst auf gelöschte Stücke zeigten.
+ *
+ * Zwei Schritte: zuerst die Ausgaben in Stapeln (beliebig viele, und ein
+ * erneuter Aufruf macht dort weiter), dann Stücke, Bestand und Artikel in
+ * einer Transaktion. Die Obergrenze der Transaktion prüft der Aufruf vorab
+ * (`convertTooLarge`), bevor er etwas schreibt.
+ */
+async function convertArtikelToMengeImpl(
+  groupId: string,
+  artikelId: string,
+): Promise<{ bestand: number; ausgaben: number; entfallen: number }> {
+  const session = await actionBekleidungswartRequired(groupId);
+  const actor = actorOf(session);
+  assertSafeId(artikelId, 'artikelId');
+  const artikelRef = artikelCol(groupId).doc(artikelId);
+  const updated = { updatedAt: actor.now, updatedBy: actor.uid };
+
+  // --- prüfen und Ausgaben umhängen ---
+  const artikelSnap = await artikelRef.get();
+  if (!artikelSnap.exists) throw notFound('artikel', artikelId);
+  if (asArtikel(artikelSnap.data()).fuehrung !== 'einzeln') throw conflict('artikelNotEinzeln');
+  const [stueckSnap, ausgabeSnap] = await Promise.all([
+    stueckCol(groupId).where('artikelId', '==', artikelId).get(),
+    ausgabeCol(groupId).where('artikelId', '==', artikelId).get(),
+  ]);
+  const stuecke = stueckSnap.docs.map((d) => ({ ...asStueck(d.data()), id: d.id }));
+  const ausgaben = ausgabeSnap.docs.map((d) => ({ ...asAusgabe(d.data()), id: d.id }));
+  const plan = planConversionToMenge(stuecke, ausgaben);
+  if (plan.hasWaeschen) throw conflict('hasWaeschen');
+  if (stuecke.length + plan.bestand.length + 1 > MAX_MERGE_WRITES) {
+    throw conflict('convertTooLarge');
+  }
+
+  for (let i = 0; i < plan.ausgaben.length; i += CONVERT_BATCH) {
+    const batch = firestore.batch();
+    for (const a of plan.ausgaben.slice(i, i + CONVERT_BATCH)) {
+      batch.update(ausgabeCol(groupId).doc(a.id), {
+        stueckId: FieldValue.delete(),
+        charge: orDelete(a.charge),
+        ...(a.privat ? { eigentum: 'privat' } : {}),
+        ...updated,
+      });
+    }
+    await batch.commit();
+  }
+
+  // --- Stücke zu Bestand ---
+  await firestore.runTransaction(async (tx: Transaction) => {
+    const snap = await tx.get(artikelRef);
+    if (!snap.exists) throw notFound('artikel', artikelId);
+    if (asArtikel(snap.data()).fuehrung !== 'einzeln') throw conflict('artikelNotEinzeln');
+    const current = await tx.get(stueckCol(groupId).where('artikelId', '==', artikelId));
+    const now = planConversionToMenge(
+      current.docs.map((d) => ({ ...asStueck(d.data()), id: d.id })),
+      [],
+    );
+    if (now.hasWaeschen) throw conflict('hasWaeschen');
+    const bestand: { id: string; entry: (typeof now.bestand)[number]; anzahl: number }[] = [];
+    for (const entry of now.bestand) {
+      const id = bestandDocId(artikelId, entry.groesse, entry.charge);
+      const b = await tx.get(bestandCol(groupId).doc(id));
+      bestand.push({
+        id,
+        entry,
+        anzahl: b.exists ? ((b.data() as BekleidungBestand).anzahl ?? 0) : 0,
+      });
+    }
+    if (current.size + bestand.length + 1 > MAX_MERGE_WRITES) throw conflict('convertTooLarge');
+
+    for (const d of current.docs) tx.delete(d.ref);
+    for (const { id, entry, anzahl } of bestand) {
+      tx.set(
+        bestandCol(groupId).doc(id),
+        compact({
+          artikelId,
+          groesse: entry.groesse,
+          charge: entry.charge,
+          anzahl: anzahl + entry.anzahl,
+          ...updated,
+        }),
+      );
+    }
+    // Wäschen gibt es nur für Einzelstücke.
+    tx.update(artikelRef, { fuehrung: 'menge', maxWaschgaenge: FieldValue.delete(), ...updated });
+  });
+
+  return {
+    bestand: plan.bestand.reduce((sum, b) => sum + b.anzahl, 0),
+    ausgaben: plan.ausgaben.length,
+    entfallen: plan.dropped.privat + plan.dropped.ausgeschieden + plan.dropped.ohnePerson,
+  };
 }
 
 // --- Ausgabe -----------------------------------------------------------------
@@ -1492,8 +1648,16 @@ export async function mergeArtikel(
   groupId: string,
   targetId: string,
   sourceIds: string[],
+  options: MergeOptions = {},
 ): Promise<ActionResult<{ success: true }>> {
-  return asVoidResult(() => mergeArtikelImpl(groupId, targetId, sourceIds));
+  return asVoidResult(() => mergeArtikelImpl(groupId, targetId, sourceIds, options));
+}
+
+export async function convertArtikelToMenge(
+  groupId: string,
+  artikelId: string,
+): Promise<ActionResult<{ bestand: number; ausgaben: number; entfallen: number }>> {
+  return asResult(() => convertArtikelToMengeImpl(groupId, artikelId));
 }
 
 export async function createStuecke(
