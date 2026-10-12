@@ -277,6 +277,7 @@ import {
   createStuecke,
   importBekleidung,
   issue,
+  mergeArtikel,
   previewBekleidungImport,
   recordWaesche,
   returnItems,
@@ -428,6 +429,7 @@ describe('Guard', () => {
       createPersonForBekleidung('ffnd', 'Hans Beispiel'),
       previewBekleidungImport('ffnd', ''),
       importBekleidung('ffnd', '', { fuehrung: {}, persons: {} }),
+      mergeArtikel('ffnd', 'polo', ['polo2']),
     ];
     for (const call of calls) await failsWith(call);
     expect(guard).toHaveBeenCalledTimes(calls.length);
@@ -892,6 +894,104 @@ describe('createStuecke / updateStueck', () => {
   });
 });
 
+describe('mergeArtikel', () => {
+  beforeEach(() => {
+    fake.put(`${G}/bekleidungArtikel/polo2`, {
+      kategorie: 'dienst',
+      bezeichnung: 'Polo',
+      hersteller: 'Fa X',
+      fuehrung: 'menge',
+      aktiv: true,
+      ...STAMPS,
+    });
+    fake.put(`${G}/bekleidungBestand/${bestandDocId('polo2', 'M')}`, {
+      artikelId: 'polo2',
+      groesse: 'M',
+      anzahl: 2,
+      updatedAt: STAMPS.updatedAt,
+      updatedBy: 'u0',
+    });
+    fake.put(`${G}/bekleidungBestand/${bestandDocId('polo2', 'L', 'Brand')}`, {
+      artikelId: 'polo2',
+      groesse: 'L',
+      charge: 'Brand',
+      anzahl: 4,
+      updatedAt: STAMPS.updatedAt,
+      updatedBy: 'u0',
+    });
+    fake.put(`${G}/bekleidungAusgabe/au7`, {
+      personId: 'p1',
+      artikelId: 'polo2',
+      groesse: 'M',
+      menge: 1,
+      quelle: 'import',
+      ...STAMPS,
+    });
+  });
+
+  it('hängt Ausgaben um, summiert den Bestand je Größe und Charge und löscht die Quelle', async () => {
+    ok(await mergeArtikel('ffnd', 'polo', ['polo2']));
+    expect(get('bekleidungArtikel/polo2')).toBeUndefined();
+    expect(get('bekleidungAusgabe/au7')).toMatchObject({ artikelId: 'polo', updatedBy: 'u1' });
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'M')}`)?.anzahl).toBe(7);
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'L', 'Brand')}`)).toMatchObject({
+      artikelId: 'polo',
+      groesse: 'L',
+      charge: 'Brand',
+      anzahl: 4,
+    });
+    expect(list('bekleidungBestand').some((b) => b.artikelId === 'polo2')).toBe(false);
+  });
+
+  it('hängt Stücke eines Einzelartikels um', async () => {
+    fake.put(`${G}/bekleidungArtikel/jacke2`, {
+      kategorie: 'einsatz',
+      bezeichnung: 'Jacke alt',
+      fuehrung: 'einzeln',
+      aktiv: true,
+      ...STAMPS,
+    });
+    fake.put(`${G}/bekleidungStueck/s9`, {
+      artikelId: 'jacke2',
+      groesse: 'L',
+      eigentum: 'feuerwehr',
+      status: 'lager',
+      waschgaenge: 0,
+      waschgaengeAltbestand: 0,
+      ...STAMPS,
+    });
+    ok(await mergeArtikel('ffnd', 'jacke', ['jacke2']));
+    expect(get('bekleidungStueck/s9')?.artikelId).toBe('jacke');
+    expect(get('bekleidungArtikel/jacke2')).toBeUndefined();
+  });
+
+  it('lehnt andere Kategorie oder Führung ab', async () => {
+    await failsWith(mergeArtikel('ffnd', 'jacke', ['polo2']), 'mergeMismatch');
+    expect(get('bekleidungArtikel/polo2')).toBeDefined();
+  });
+
+  it('lehnt sich selbst, leere Listen und unbekannte Artikel ab', async () => {
+    await failsWith(mergeArtikel('ffnd', 'polo', ['polo']));
+    await failsWith(mergeArtikel('ffnd', 'polo', []));
+    await failsWith(mergeArtikel('ffnd', 'polo', ['gibtsnicht']));
+  });
+
+  it('lehnt eine zu große Zusammenführung ab, ohne etwas zu schreiben', async () => {
+    for (let i = 0; i < 460; i++) {
+      fake.put(`${G}/bekleidungAusgabe/x${i}`, {
+        personId: 'p1',
+        artikelId: 'polo2',
+        groesse: 'M',
+        menge: 1,
+        quelle: 'import',
+        ...STAMPS,
+      });
+    }
+    await failsWith(mergeArtikel('ffnd', 'polo', ['polo2']), 'mergeTooLarge');
+    expect(get('bekleidungArtikel/polo2')).toBeDefined();
+  });
+});
+
 describe('saveArtikel', () => {
   it('legt einen Artikel an', async () => {
     const { id } = ok(
@@ -1328,6 +1428,25 @@ describe('importBekleidung', () => {
           ...decisions,
           rows: rows as unknown as ImportDecisions['rows'],
         }),
+      );
+    }
+    expect(list('bekleidungArtikel')).toHaveLength(0);
+  });
+
+  it('lehnt ungültige Zusammenführungen ab', async () => {
+    for (const merge of [
+      { 'einsatz|jacke|texport': 'dienst|hemd|fa. x' },
+      { 'einsatz|jacke|texport': 'einsatz|jacke|texport' },
+      { 'einsatz|jacke|texport': 42 },
+      'kaputt',
+    ]) {
+      clearBekleidung();
+      await failsWith(
+        importBekleidung('ffnd', workbook(), {
+          ...decisions,
+          merge: merge as unknown as ImportDecisions['merge'],
+        }),
+        'invalid merge',
       );
     }
     expect(list('bekleidungArtikel')).toHaveLength(0);

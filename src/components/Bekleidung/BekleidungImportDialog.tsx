@@ -48,6 +48,10 @@ type ImportTab = 'artikel' | 'personen' | 'tags' | 'status';
 
 type ImportResult = { artikel: number; stuecke: number; ausgaben: number; personsCreated: number };
 
+/** Bezeichnung mit Hersteller — Handschuhe heißen alle gleich. */
+const artikelName = (a: ImportPreview['artikel'][number]) =>
+  a.hersteller ? `${a.bezeichnung} (${a.hersteller})` : a.bezeichnung;
+
 /**
  * Einmaliger Import der Excel-Bestandslisten: Datei wählen, Vorschau,
  * Führung je Artikel und Zuordnung je Person entscheiden, importieren.
@@ -74,6 +78,7 @@ export default function BekleidungImportDialog({
   const [fuehrung, setFuehrung] = useState<Record<string, BekleidungFuehrung>>({});
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<Record<string, ImportRowDecision>>({});
+  const [merge, setMerge] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<ImportTab>('artikel');
   const [result, setResult] = useState<ImportResult>();
 
@@ -106,6 +111,7 @@ export default function BekleidungImportDialog({
       setFuehrung(Object.fromEntries(next.artikel.map((a) => [a.key, a.fuehrung])));
       setChoices(defaultPersonChoices(next));
       setRows(defaultRowDecisions(next));
+      setMerge({});
       setTab('artikel');
     } catch (err) {
       showError(String(err));
@@ -123,6 +129,7 @@ export default function BekleidungImportDialog({
         fuehrung,
         persons: personDecisions(preview, choices),
         rows,
+        ...(Object.keys(merge).length > 0 ? { merge } : {}),
       }),
     );
     setBusy(false);
@@ -250,6 +257,9 @@ export default function BekleidungImportDialog({
 
             {tab === 'artikel' && (
               <Box sx={{ overflowX: 'auto' }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  {t('import.mergeHint')}
+                </Typography>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -258,35 +268,71 @@ export default function BekleidungImportDialog({
                       <TableCell>{t('fields.kategorie')}</TableCell>
                       <TableCell align="right">#</TableCell>
                       <TableCell>{t('fields.fuehrung')}</TableCell>
+                      <TableCell>{t('import.mergeColumn')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {preview.artikel.map((a) => (
-                      <TableRow key={a.key}>
-                        <TableCell>{a.bezeichnung}</TableCell>
-                        <TableCell>{a.hersteller}</TableCell>
-                        <TableCell>{sheetLabel(a.kategorie)}</TableCell>
-                        <TableCell align="right">{a.rowCount}</TableCell>
-                        <TableCell>
-                          <TextField
-                            select
-                            size="small"
-                            label={`${t('fields.fuehrung')} ${a.bezeichnung}`}
-                            value={fuehrung[a.key] ?? a.fuehrung}
-                            onChange={(e) =>
-                              setFuehrung((prev) => ({
-                                ...prev,
-                                [a.key]: e.target.value as BekleidungFuehrung,
-                              }))
-                            }
-                            sx={{ minWidth: 150 }}
-                          >
-                            <MenuItem value="einzeln">{t('fuehrung.einzeln')}</MenuItem>
-                            <MenuItem value="menge">{t('fuehrung.menge')}</MenuItem>
-                          </TextField>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {preview.artikel.map((a) => {
+                      const mergedInto = merge[a.key];
+                      const isTarget = Object.values(merge).includes(a.key);
+                      // Ziel: jeder andere Artikel derselben Kategorie, der nicht selbst
+                      // zusammengeführt wird — sonst entstünde eine Kette.
+                      const targets = preview.artikel.filter(
+                        (b) => b.key !== a.key && b.kategorie === a.kategorie && !merge[b.key],
+                      );
+                      return (
+                        <TableRow key={a.key}>
+                          <TableCell>{a.bezeichnung}</TableCell>
+                          <TableCell>{a.hersteller}</TableCell>
+                          <TableCell>{sheetLabel(a.kategorie)}</TableCell>
+                          <TableCell align="right">{a.rowCount}</TableCell>
+                          <TableCell>
+                            <TextField
+                              select
+                              size="small"
+                              label={`${t('fields.fuehrung')} ${a.bezeichnung}`}
+                              value={fuehrung[a.key] ?? a.fuehrung}
+                              disabled={!!mergedInto}
+                              onChange={(e) =>
+                                setFuehrung((prev) => ({
+                                  ...prev,
+                                  [a.key]: e.target.value as BekleidungFuehrung,
+                                }))
+                              }
+                              sx={{ minWidth: 150 }}
+                            >
+                              <MenuItem value="einzeln">{t('fuehrung.einzeln')}</MenuItem>
+                              <MenuItem value="menge">{t('fuehrung.menge')}</MenuItem>
+                            </TextField>
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              select
+                              size="small"
+                              label={t('import.mergeLabel', { name: artikelName(a) })}
+                              value={mergedInto ?? ''}
+                              disabled={isTarget || targets.length === 0}
+                              onChange={(e) =>
+                                setMerge((prev) => {
+                                  const next = { ...prev };
+                                  if (e.target.value) next[a.key] = e.target.value;
+                                  else delete next[a.key];
+                                  return next;
+                                })
+                              }
+                              sx={{ minWidth: 200 }}
+                            >
+                              <MenuItem value="">{t('import.mergeNone')}</MenuItem>
+                              {targets.map((b) => (
+                                <MenuItem key={b.key} value={b.key}>
+                                  {artikelName(b)}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </Box>

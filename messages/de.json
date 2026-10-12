@@ -4434,7 +4434,12 @@
       "titleEdit": "Artikel bearbeiten",
       "maxWaschgaengeHelper": "Leer = keine Höchstzahl",
       "fuehrungHelper": "Einzelstücke haben eine Tag-Nummer und einen Waschzähler, Mengenartikel nur eine Anzahl je Größe.",
-      "stueckCount": "{count, plural, one {# Stück} other {# Stücke}}"
+      "stueckCount": "{count, plural, one {# Stück} other {# Stücke}}",
+      "merge": "Zusammenführen",
+      "mergeLabel": "Zusammenführen {name}",
+      "mergeTitle": "Artikel zusammenführen",
+      "mergeTarget": "Zusammenführen in",
+      "mergeHint": "{name} geht im gewählten Artikel auf: Stücke, Ausgaben und Bestand wandern mit, der Bestand wird je Größe und Charge addiert. {name} wird danach gelöscht."
     },
     "import": {
       "title": "Import aus dem Excel",
@@ -4470,7 +4475,11 @@
       "lastPerson": "zuletzt: {name}",
       "tagCollisions": "{count, plural, one {Tag-Nummer {tags} ist noch doppelt.} other {Tag-Nummern {tags} sind noch doppelt.}}",
       "tabArtikel": "Artikel ({count})",
-      "tabPersonen": "Personen ({count})"
+      "tabPersonen": "Personen ({count})",
+      "mergeColumn": "Zusammenführen mit",
+      "mergeLabel": "Zusammenführen {name}",
+      "mergeNone": "– eigener Artikel –",
+      "mergeHint": "Schreibvarianten desselben Artikels (z.B. das Handschuhmodell in der Herstellerspalte) lassen sich zu einem Artikel zusammenführen. Es gilt die Führung des Ziels."
     },
     "scanner": {
       "title": "Tag scannen",
@@ -4505,7 +4514,9 @@
       "unknownPerson": "Eine gewählte Person gibt es in dieser Gruppe nicht.",
       "unknown": "Fehler: {error}",
       "importRunning": "Ein Import läuft gerade. Bitte warten und die Seite neu laden.",
-      "notAvailable": "{stueck} kann nicht ausgegeben werden (Status: {status})."
+      "notAvailable": "{stueck} kann nicht ausgegeben werden (Status: {status}).",
+      "mergeMismatch": "Zusammenführen geht nur bei gleicher Kategorie und Führung.",
+      "mergeTooLarge": "Zu viele Einträge, um sie in einem Schritt zusammenzuführen."
     }
   },
   "geraetEinsatz": {

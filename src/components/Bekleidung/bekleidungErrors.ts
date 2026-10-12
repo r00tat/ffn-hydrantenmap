@@ -24,6 +24,8 @@ const SIMPLE_CODES = [
   'nothingToIssue',
   'nothingToReturn',
   'forbidden',
+  'mergeMismatch',
+  'mergeTooLarge',
 ] as const;
 
 type SimpleCode = (typeof SIMPLE_CODES)[number];

@@ -530,6 +530,12 @@ export interface ImportDecisions {
   /** importRowRef → Bereinigung der Zeile */
   rows?: Record<string, ImportRowDecision>;
   /**
+   * artikelKey → artikelKey: Schreibvarianten eines Artikeltyps (z.B. das
+   * Handschuhmodell in der Herstellerspalte) in einen zusammenführen. Nur
+   * innerhalb einer Kategorie, ohne Ketten (siehe `invalidMergeReason`).
+   */
+  merge?: Record<string, string>;
+  /**
    * person key → bestehende Person oder neu anzulegender Name. Ohne
    * `active` wird die neue Person aktiv angelegt.
    */
@@ -560,6 +566,29 @@ function compact<T extends object>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
+export type MergeProblem = 'unknown' | 'self' | 'kategorie' | 'chain';
+
+/**
+ * Prüft eine Zusammenführung gegen die Vorschau: Quelle und Ziel müssen
+ * Artikeltypen der Datei sein, in derselben Kategorie, und ein Ziel darf
+ * nicht selbst zusammengeführt werden — eine Kette wäre nicht eindeutig.
+ */
+export function invalidMergeReason(
+  preview: ImportPreview,
+  merge: Record<string, string>,
+): MergeProblem | undefined {
+  const byKey = new Map(preview.artikel.map((a) => [a.key, a]));
+  for (const [source, target] of Object.entries(merge)) {
+    const from = byKey.get(source);
+    const to = byKey.get(target);
+    if (!from || !to) return 'unknown';
+    if (source === target) return 'self';
+    if (from.kategorie !== to.kategorie) return 'kategorie';
+    if (target in merge) return 'chain';
+  }
+  return undefined;
+}
+
 /**
  * Aus Vorschau und Entscheidungen den Schreibplan bauen. IDs gibt es hier
  * noch nicht; Stücke tragen eine `tempId`, Artikel und Personen ihren
@@ -570,19 +599,26 @@ export function buildImportPlan(
   decisions: ImportDecisions,
   today: string,
 ): ImportPlan {
+  const merge = decisions.merge ?? {};
+  const problem = invalidMergeReason(preview, merge);
+  if (problem) throw new Error(`Bekleidungsimport: ungültige Zusammenführung (${problem})`);
+  const targetOf = (key: string) => merge[key] ?? key;
+
   const fuehrungOf = new Map<string, BekleidungFuehrung>();
-  const artikel: ImportPlan['artikel'] = preview.artikel.map((a) => {
-    const fuehrung = decisions.fuehrung[a.key] ?? a.fuehrung;
-    fuehrungOf.set(a.key, fuehrung);
-    return compact({
-      key: a.key,
-      kategorie: a.kategorie,
-      bezeichnung: a.bezeichnung,
-      hersteller: a.hersteller,
-      fuehrung,
-      aktiv: true,
+  const artikel: ImportPlan['artikel'] = preview.artikel
+    .filter((a) => !(a.key in merge))
+    .map((a) => {
+      const fuehrung = decisions.fuehrung[a.key] ?? a.fuehrung;
+      fuehrungOf.set(a.key, fuehrung);
+      return compact({
+        key: a.key,
+        kategorie: a.kategorie,
+        bezeichnung: a.bezeichnung,
+        hersteller: a.hersteller,
+        fuehrung,
+        aktiv: true,
+      });
     });
-  });
 
   // Personen: jede verwendete braucht eine Entscheidung.
   const personsToCreate: ImportPlan['personsToCreate'] = [];
@@ -609,7 +645,7 @@ export function buildImportPlan(
   const seenTags = new Set<string>();
 
   for (const excelRow of preview.rows) {
-    const key = rowArtikelKey(excelRow);
+    const key = targetOf(rowArtikelKey(excelRow));
     const fuehrung = fuehrungOf.get(key) ?? 'menge';
     const bemerkungen = [...excelRow.bemerkungen];
 

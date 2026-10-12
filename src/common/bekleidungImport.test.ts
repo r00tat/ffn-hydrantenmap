@@ -7,6 +7,7 @@ import {
   defaultRowDecisions,
   findTagCollisions,
   importRowRef,
+  invalidMergeReason,
   parseBekleidungSheet,
   type ImportDecisions,
   type ImportRow,
@@ -727,6 +728,53 @@ describe('Chargen bei Mengenartikeln', () => {
       { artikelKey: 'dienst|handschuh|fa. x', groesse: '10', anzahl: 1 },
     ]);
     expect(plan.ausgaben).toEqual([expect.objectContaining({ charge: 'Brand', menge: 1 })]);
+  });
+});
+
+describe('Artikeltypen zusammenführen', () => {
+  const einsatz = parseBekleidungSheet(einsatzGrid, 'einsatz');
+  const dienst = parseBekleidungSheet(dienstGrid, 'dienst');
+  const preview = buildImportPreview(einsatz, dienst, persons);
+  const personDecisions: ImportDecisions['persons'] = Object.fromEntries(
+    preview.persons.map((p) => [
+      p.key,
+      p.match.personId ? { personId: p.match.personId } : { create: `${p.vorname} ${p.nachname}` },
+    ]),
+  );
+  const JACKE = 'einsatz|jacke|texport';
+  const HOSE = 'einsatz|hose|texport';
+  const POLO = 'dienst|poloshirt|fa. x';
+
+  it('ordnet die Zeilen dem Ziel zu und übernimmt dessen Führung', () => {
+    const plan = buildImportPlan(
+      preview,
+      { fuehrung: { [HOSE]: 'menge' }, persons: personDecisions, merge: { [HOSE]: JACKE } },
+      '2026-10-08',
+    );
+    expect(plan.artikel.map((a) => a.key)).not.toContain(HOSE);
+    const hoseRows = preview.rows.filter((r) => r.art === 'Hose').length;
+    const jackeRows = preview.rows.filter((r) => r.art === 'Jacke').length;
+    // Jacke ist einzeln geführt: auch die Hosenzeilen werden Stücke.
+    expect(plan.stuecke.filter((s) => s.artikelKey === JACKE)).toHaveLength(hoseRows + jackeRows);
+    expect(plan.stuecke.some((s) => s.artikelKey === HOSE)).toBe(false);
+    expect(plan.ausgaben.some((a) => a.artikelKey === HOSE)).toBe(false);
+  });
+
+  it('erkennt ungültige Zusammenführungen', () => {
+    expect(invalidMergeReason(preview, { [HOSE]: JACKE })).toBeUndefined();
+    expect(invalidMergeReason(preview, { [HOSE]: HOSE })).toBe('self');
+    expect(invalidMergeReason(preview, { [HOSE]: 'einsatz|gibt|es nicht' })).toBe('unknown');
+    expect(invalidMergeReason(preview, { [HOSE]: POLO })).toBe('kategorie');
+    expect(invalidMergeReason(preview, { [JACKE]: 'x' })).toBe('unknown');
+    // Ein Ziel, das selbst zusammengeführt wird, ergäbe eine Kette.
+    const third = buildImportPreview(
+      [...einsatz, { ...einsatz[0], rowNumber: 99, art: 'Mantel', tagNummer: undefined }],
+      dienst,
+      persons,
+    );
+    expect(invalidMergeReason(third, { [HOSE]: JACKE, [JACKE]: 'einsatz|mantel|texport' })).toBe(
+      'chain',
+    );
   });
 });
 

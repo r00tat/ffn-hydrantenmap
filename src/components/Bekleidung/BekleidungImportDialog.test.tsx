@@ -22,18 +22,56 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const preview: ImportPreview = {
   rows: [],
   artikel: [
-    { key: 'einsatz|jacke|', kategorie: 'einsatz', bezeichnung: 'Einsatzjacke', fuehrung: 'einzeln', rowCount: 3 },
-    { key: 'dienst|polo|', kategorie: 'dienst', bezeichnung: 'Poloshirt', fuehrung: 'einzeln', rowCount: 2 },
+    {
+      key: 'einsatz|jacke|',
+      kategorie: 'einsatz',
+      bezeichnung: 'Einsatzjacke',
+      fuehrung: 'einzeln',
+      rowCount: 3,
+    },
+    {
+      key: 'dienst|polo|',
+      kategorie: 'dienst',
+      bezeichnung: 'Poloshirt',
+      fuehrung: 'einzeln',
+      rowCount: 2,
+    },
   ],
   persons: [
-    { key: 'max mustermann', vorname: 'Max', nachname: 'Mustermann', openCount: 2, match: { status: 'matched', personId: 'p1', candidates: ['p1'] } },
-    { key: 'erika musterfrau', vorname: 'Erika', nachname: 'Musterfrau', openCount: 1, match: { status: 'uncertain', candidates: ['p2', 'p3'] } },
-    { key: 'moritz muster', vorname: 'Moritz', nachname: 'Muster', openCount: 0, match: { status: 'new', candidates: [] } },
+    {
+      key: 'max mustermann',
+      vorname: 'Max',
+      nachname: 'Mustermann',
+      openCount: 2,
+      match: { status: 'matched', personId: 'p1', candidates: ['p1'] },
+    },
+    {
+      key: 'erika musterfrau',
+      vorname: 'Erika',
+      nachname: 'Musterfrau',
+      openCount: 1,
+      match: { status: 'uncertain', candidates: ['p2', 'p3'] },
+    },
+    {
+      key: 'moritz muster',
+      vorname: 'Moritz',
+      nachname: 'Muster',
+      openCount: 0,
+      match: { status: 'new', candidates: [] },
+    },
   ],
   duplicateTags: [
-    { tagNummer: '1001', rowNumbers: [{ sheet: 'einsatz', rowNumber: 4 }, { sheet: 'einsatz', rowNumber: 9 }] },
+    {
+      tagNummer: '1001',
+      rowNumbers: [
+        { sheet: 'einsatz', rowNumber: 4 },
+        { sheet: 'einsatz', rowNumber: 9 },
+      ],
+    },
   ],
-  statusConflicts: [{ sheet: 'dienst', rowNumber: 7, message: 'Status Lager, aber offene Ausgabe' }],
+  statusConflicts: [
+    { sheet: 'dienst', rowNumber: 7, message: 'Status Lager, aber offene Ausgabe' },
+  ],
 };
 
 const renderDialog = () =>
@@ -60,7 +98,10 @@ describe('BekleidungImportDialog', () => {
     expect(previewBekleidungImport).toHaveBeenCalledWith('ffnd', 'QkFTRTY0');
     expect(await screen.findByText('0 Zeilen · 2 Artikel · 3 Personen')).toBeInTheDocument();
     // Die Vorschau ist in Reiter geteilt, der Artikel-Reiter ist offen
-    expect(screen.getByRole('tab', { name: 'Artikel (2)' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Artikel (2)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.getByRole('tab', { name: 'Doppelte Tag-Nummern (1)' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Statuskonflikte (1)' })).toBeInTheDocument();
     // Der Hinweis auf offene Entscheidungen steht über den Reitern
@@ -79,7 +120,9 @@ describe('BekleidungImportDialog', () => {
     );
     // Unsicher: statt Erika Musterfrau (p2) neu anlegen
     await user.click(screen.getByRole('combobox', { name: 'Erika Musterfrau' }));
-    await user.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'Neu anlegen' }));
+    await user.click(
+      within(screen.getByRole('listbox')).getByRole('option', { name: 'Neu anlegen' }),
+    );
     expect(screen.queryByText(/unsichere Zuordnung/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Importieren' })).toBeEnabled();
     // Neu: der vorhandenen Person p1 zuordnen
@@ -138,7 +181,13 @@ describe('BekleidungImportDialog', () => {
       persons: [
         preview.persons[0],
         preview.persons[2],
-        { key: 'lisa muster', vorname: 'Lisa', nachname: 'Muster', openCount: 1, match: { status: 'new', candidates: [] } },
+        {
+          key: 'lisa muster',
+          vorname: 'Lisa',
+          nachname: 'Muster',
+          openCount: 1,
+          match: { status: 'new', candidates: [] },
+        },
       ],
     });
     importBekleidung.mockResolvedValue({ artikel: 2, stuecke: 5, ausgaben: 3, personsCreated: 2 });
@@ -148,7 +197,9 @@ describe('BekleidungImportDialog', () => {
     await user.click(await screen.findByRole('tab', { name: 'Personen (3)' }));
 
     await user.click(
-      await screen.findByRole('button', { name: 'Neue Personen mit offener Ausgabe aktiv anlegen (1)' }),
+      await screen.findByRole('button', {
+        name: 'Neue Personen mit offener Ausgabe aktiv anlegen (1)',
+      }),
     );
     await user.click(screen.getByRole('button', { name: 'Importieren' }));
     expect(importBekleidung).toHaveBeenCalledWith('ffnd', 'QkFTRTY0', {
@@ -190,7 +241,10 @@ describe('BekleidungImportDialog', () => {
         rowNumber: 12,
         tagNummer: '2002',
         status: 'ausgegeben',
-        ausgaben: [block('Max', 'Mustermann', '2020-01-01'), block('Moritz', 'Muster', '2022-05-01')],
+        ausgaben: [
+          block('Max', 'Mustermann', '2020-01-01'),
+          block('Moritz', 'Muster', '2022-05-01'),
+        ],
       },
     ];
     previewBekleidungImport.mockResolvedValue({
@@ -198,9 +252,21 @@ describe('BekleidungImportDialog', () => {
       rows,
       persons: [preview.persons[0], preview.persons[2]],
       duplicateTags: [
-        { tagNummer: '1001', rowNumbers: [{ sheet: 'einsatz', rowNumber: 4 }, { sheet: 'einsatz', rowNumber: 9 }] },
+        {
+          tagNummer: '1001',
+          rowNumbers: [
+            { sheet: 'einsatz', rowNumber: 4 },
+            { sheet: 'einsatz', rowNumber: 9 },
+          ],
+        },
       ],
-      statusConflicts: [{ sheet: 'einsatz', rowNumber: 12, message: '2 offene Ausgaben — nur die letzte bleibt offen' }],
+      statusConflicts: [
+        {
+          sheet: 'einsatz',
+          rowNumber: 12,
+          message: '2 offene Ausgaben — nur die letzte bleibt offen',
+        },
+      ],
     });
     importBekleidung.mockResolvedValue({ artikel: 2, stuecke: 3, ausgaben: 2, personsCreated: 1 });
     const user = userEvent.setup();
@@ -210,7 +276,9 @@ describe('BekleidungImportDialog', () => {
     // Vorbelegt: Zeile 4 behält die Nummer, Zeile 9 ohne
     await user.click(await screen.findByRole('tab', { name: 'Doppelte Tag-Nummern (1)' }));
     const tag9 = screen.getByRole('textbox', { name: 'Tag-Nummer Einsatzbekleidung Zeile 9' });
-    expect(screen.getByRole('textbox', { name: 'Tag-Nummer Einsatzbekleidung Zeile 4' })).toHaveValue('1001');
+    expect(
+      screen.getByRole('textbox', { name: 'Tag-Nummer Einsatzbekleidung Zeile 4' }),
+    ).toHaveValue('1001');
     expect(tag9).toHaveValue('');
 
     // Dieselbe Nummer sperrt den Import
@@ -223,7 +291,9 @@ describe('BekleidungImportDialog', () => {
 
     // Statuskonflikt: die frühere Ausgabe offen lassen
     await user.click(screen.getByRole('tab', { name: 'Statuskonflikte (1)' }));
-    await user.click(screen.getByRole('combobox', { name: 'Offen bei Einsatzbekleidung Zeile 12' }));
+    await user.click(
+      screen.getByRole('combobox', { name: 'Offen bei Einsatzbekleidung Zeile 12' }),
+    );
     await user.click(screen.getByRole('option', { name: 'Max Mustermann (seit 2020-01-01)' }));
 
     await user.click(screen.getByRole('button', { name: 'Importieren' }));
@@ -257,7 +327,9 @@ describe('BekleidungImportDialog', () => {
       rows: [row],
       persons: [preview.persons[0]],
       duplicateTags: [],
-      statusConflicts: [{ sheet: 'dienst', rowNumber: 7, message: 'Status ausgegeben, aber keine offene Ausgabe' }],
+      statusConflicts: [
+        { sheet: 'dienst', rowNumber: 7, message: 'Status ausgegeben, aber keine offene Ausgabe' },
+      ],
     });
     importBekleidung.mockResolvedValue({ artikel: 1, stuecke: 0, ausgaben: 0, personsCreated: 0 });
     const user = userEvent.setup();
@@ -275,6 +347,62 @@ describe('BekleidungImportDialog', () => {
       'ffnd',
       'QkFTRTY0',
       expect.objectContaining({ rows: { 'dienst:7': { status: 'lager' } } }),
+    );
+  });
+
+  it('führt Schreibvarianten eines Artikeltyps zusammen', async () => {
+    previewBekleidungImport.mockResolvedValue({
+      ...preview,
+      artikel: [
+        {
+          key: 'einsatz|handschuh|fa. x',
+          kategorie: 'einsatz',
+          bezeichnung: 'Handschuh',
+          hersteller: 'Fa. X',
+          fuehrung: 'menge',
+          rowCount: 5,
+        },
+        {
+          key: 'einsatz|handschuh|fa x',
+          kategorie: 'einsatz',
+          bezeichnung: 'Handschuh',
+          hersteller: 'Fa X',
+          fuehrung: 'menge',
+          rowCount: 1,
+        },
+        {
+          key: 'dienst|polo|',
+          kategorie: 'dienst',
+          bezeichnung: 'Poloshirt',
+          fuehrung: 'menge',
+          rowCount: 2,
+        },
+      ],
+      persons: [preview.persons[0]],
+      duplicateTags: [],
+      statusConflicts: [],
+    });
+    importBekleidung.mockResolvedValue({ artikel: 2, stuecke: 0, ausgaben: 0, personsCreated: 0 });
+    const user = userEvent.setup();
+    renderDialog();
+    await upload(user);
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Zusammenführen Handschuh (Fa X)' }),
+    );
+    // Nur Artikel derselben Kategorie stehen zur Wahl.
+    expect(screen.queryByRole('option', { name: 'Poloshirt' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'Handschuh (Fa. X)' }));
+    // Ein Ziel lässt sich nicht selbst zusammenführen.
+    expect(
+      screen.getByRole('combobox', { name: 'Zusammenführen Handschuh (Fa. X)' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Importieren' }));
+    expect(importBekleidung).toHaveBeenCalledWith(
+      'ffnd',
+      'QkFTRTY0',
+      expect.objectContaining({ merge: { 'einsatz|handschuh|fa x': 'einsatz|handschuh|fa. x' } }),
     );
   });
 

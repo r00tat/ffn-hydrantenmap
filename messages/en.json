@@ -4434,7 +4434,12 @@
       "titleEdit": "Edit article",
       "maxWaschgaengeHelper": "Empty = no limit",
       "fuehrungHelper": "Individual items have a tag number and a wash counter, quantity articles only a count per size.",
-      "stueckCount": "{count, plural, one {# item} other {# items}}"
+      "stueckCount": "{count, plural, one {# item} other {# items}}",
+      "merge": "Merge",
+      "mergeLabel": "Merge {name}",
+      "mergeTitle": "Merge items",
+      "mergeTarget": "Merge into",
+      "mergeHint": "{name} is absorbed into the chosen item: pieces, issues and stock move along, stock is added per size and batch. {name} is deleted afterwards."
     },
     "import": {
       "title": "Import from Excel",
@@ -4470,7 +4475,11 @@
       "lastPerson": "last: {name}",
       "tagCollisions": "{count, plural, one {Tag number {tags} is still duplicated.} other {Tag numbers {tags} are still duplicated.}}",
       "tabArtikel": "Items ({count})",
-      "tabPersonen": "People ({count})"
+      "tabPersonen": "People ({count})",
+      "mergeColumn": "Merge into",
+      "mergeLabel": "Merge {name}",
+      "mergeNone": "– own item –",
+      "mergeHint": "Spelling variants of the same item (e.g. the glove model in the manufacturer column) can be merged into one item. The target's tracking applies."
     },
     "scanner": {
       "title": "Scan tag",
@@ -4505,7 +4514,9 @@
       "unknownPerson": "A selected person does not exist in this group.",
       "unknown": "Error: {error}",
       "importRunning": "An import is running right now. Please wait and reload the page.",
-      "notAvailable": "{stueck} cannot be issued (status: {status})."
+      "notAvailable": "{stueck} cannot be issued (status: {status}).",
+      "mergeMismatch": "Items can only be merged with the same category and tracking.",
+      "mergeTooLarge": "Too many entries to merge in one step."
     }
   },
   "geraetEinsatz": {

@@ -232,7 +232,28 @@ Dienstbekleidung):
 - **Datum als ISO-Zeitstempel** (`2023-11-20T00:00:00.000Z`) gilt als
   Kalenderdatum; genommen werden die ersten zehn Zeichen.
 - **Artikeltyp** ist Kategorie + Art + Hersteller. Bei Handschuhen steht das
-  Modell in der Herstellerspalte, daher entstehen dort viele Artikeltypen.
+  Modell in der Herstellerspalte, daher entstehen dort viele Artikeltypen —
+  oft nur Schreibvarianten desselben Modells. Siehe „Artikeltypen
+  zusammenführen".
+
+## Artikeltypen zusammenführen
+
+Schreibvarianten („Fa. X" und „Fa X") lassen sich an zwei Stellen in einen
+Artikeltyp zusammenführen:
+
+- **In der Import-Vorschau,** Reiter „Artikel", Spalte „Zusammenführen mit".
+  Die Entscheidung geht als `merge` (Quell- → Ziel-Schlüssel) an den Server;
+  der Plan ordnet die Zeilen der Quelle dem Ziel zu und nimmt dessen Führung.
+  `invalidMergeReason` lehnt unbekannte Schlüssel, eine Zusammenführung mit
+  sich selbst, eine andere Kategorie und Ketten ab — ein Ziel, das selbst
+  zusammengeführt wird, wäre nicht eindeutig.
+- **Nach dem Import,** Reiter „Artikel", Knopf je Artikel: `mergeArtikel`
+  hängt Stücke und Ausgaben um, addiert den Mengenbestand je Größe und Charge
+  auf das Ziel und löscht die Quelle. Wäschen hängen an Stücken und bleiben
+  unberührt. Nur bei gleicher Kategorie **und** Führung (`mergeMismatch`) —
+  ein Einzelstück lässt sich nicht in eine Lagerzahl verwandeln. Alles läuft
+  in einer Transaktion, damit nichts halb umgehängt liegen bleibt; deshalb
+  gibt es eine Obergrenze von 450 Schreibvorgängen (`mergeTooLarge`).
 
 ## Bewusst nicht enthalten
 
@@ -240,4 +261,3 @@ Dienstbekleidung):
 - Etikettendruck
 - Sicht der Mitglieder auf die eigene Ausrüstung
 - Schreiben ohne Netz
-- Zusammenführen von Artikeltypen nach dem Import

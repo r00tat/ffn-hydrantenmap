@@ -31,6 +31,7 @@ import {
   buildImportPlan,
   buildImportPreview,
   findTagCollisions,
+  invalidMergeReason,
   importRowRef,
   parseBekleidungSheet,
   SHEET_DIENST,
@@ -417,6 +418,108 @@ async function updateStueckImpl(
       updatedAt: actor.now,
       updatedBy: actor.uid,
     });
+  });
+}
+
+// --- Zusammenführen ----------------------------------------------------------
+
+const MAX_MERGE_SOURCES = 20;
+/** Firestore erlaubt 500 Schreibvorgänge je Transaktion; etwas Luft bleibt. */
+const MAX_MERGE_WRITES = 450;
+
+/**
+ * Führt Artikeltypen in einen zusammen — für Schreibvarianten, die nach dem
+ * Import auffallen. Stücke und Ausgaben bekommen die neue `artikelId`, der
+ * Mengenbestand wird je Größe und Charge auf das Ziel addiert, die Quellen
+ * werden gelöscht. Wäschen hängen an Stücken, nicht am Artikel. Kategorie und
+ * Führung müssen übereinstimmen (`mergeMismatch`); alles geschieht in einer
+ * Transaktion, darum die Obergrenze (`mergeTooLarge`).
+ */
+async function mergeArtikelImpl(
+  groupId: string,
+  targetId: string,
+  sourceIdsRaw: string[],
+): Promise<void> {
+  const session = await actionBekleidungswartRequired(groupId);
+  const actor = actorOf(session);
+
+  assertSafeId(targetId, 'targetId');
+  const sourceIds = idList(sourceIdsRaw, 'sourceIds', MAX_MERGE_SOURCES);
+  if (sourceIds.length === 0) throw badRequest('sourceIds required');
+  if (sourceIds.includes(targetId)) throw badRequest('invalid sourceIds');
+
+  await firestore.runTransaction(async (tx: Transaction) => {
+    // --- lesen ---
+    const targetSnap = await tx.get(artikelCol(groupId).doc(targetId));
+    if (!targetSnap.exists) throw notFound('artikel', targetId);
+    const target = asArtikel(targetSnap.data());
+
+    const stuecke: string[] = [];
+    const ausgaben: string[] = [];
+    const sourceBestand: { id: string; data: BekleidungBestand }[] = [];
+    for (const sourceId of sourceIds) {
+      const snap = await tx.get(artikelCol(groupId).doc(sourceId));
+      if (!snap.exists) throw notFound('artikel', sourceId);
+      const source = asArtikel(snap.data());
+      if (source.kategorie !== target.kategorie || source.fuehrung !== target.fuehrung) {
+        throw conflict('mergeMismatch');
+      }
+      const [s, a, b] = await Promise.all([
+        tx.get(stueckCol(groupId).where('artikelId', '==', sourceId)),
+        tx.get(ausgabeCol(groupId).where('artikelId', '==', sourceId)),
+        tx.get(bestandCol(groupId).where('artikelId', '==', sourceId)),
+      ]);
+      stuecke.push(...s.docs.map((d) => d.id));
+      ausgaben.push(...a.docs.map((d) => d.id));
+      sourceBestand.push(...b.docs.map((d) => ({ id: d.id, data: d.data() as BekleidungBestand })));
+    }
+
+    // Bestand des Ziels je Größe und Charge: vorhandene Zahl plus Quellen.
+    const targetBestand = new Map<string, { groesse: string; charge?: string; anzahl: number }>();
+    for (const { data } of sourceBestand) {
+      const groesse = normalizeGroesse(data.groesse);
+      const id = bestandDocId(targetId, groesse, data.charge);
+      let entry = targetBestand.get(id);
+      if (!entry) {
+        const snap = await tx.get(bestandCol(groupId).doc(id));
+        const existing = snap.exists ? (snap.data() as BekleidungBestand) : undefined;
+        entry = {
+          groesse,
+          charge: existing?.charge ?? normalizeCharge(data.charge),
+          anzahl: existing?.anzahl ?? 0,
+        };
+        targetBestand.set(id, entry);
+      }
+      entry.anzahl += data.anzahl ?? 0;
+    }
+
+    const writes =
+      stuecke.length +
+      ausgaben.length +
+      sourceBestand.length +
+      targetBestand.size +
+      sourceIds.length;
+    if (writes > MAX_MERGE_WRITES) throw conflict('mergeTooLarge');
+
+    // --- schreiben ---
+    const updated = { artikelId: targetId, updatedAt: actor.now, updatedBy: actor.uid };
+    for (const id of stuecke) tx.update(stueckCol(groupId).doc(id), updated);
+    for (const id of ausgaben) tx.update(ausgabeCol(groupId).doc(id), updated);
+    for (const { id } of sourceBestand) tx.delete(bestandCol(groupId).doc(id));
+    for (const [id, entry] of targetBestand) {
+      tx.set(
+        bestandCol(groupId).doc(id),
+        compact({
+          artikelId: targetId,
+          groesse: entry.groesse,
+          charge: entry.charge,
+          anzahl: entry.anzahl,
+          updatedAt: actor.now,
+          updatedBy: actor.uid,
+        }),
+      );
+    }
+    for (const id of sourceIds) tx.delete(artikelCol(groupId).doc(id));
   });
 }
 
@@ -1129,6 +1232,19 @@ function sanitizeRowDecisions(
   return rows;
 }
 
+/** Zusammenführung aus dem Browser: nur Text, und gültig gegen die Vorschau. */
+function sanitizeMerge(raw: unknown, preview: ImportPreview): Record<string, string> | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw badRequest('invalid merge');
+  const merge: Record<string, string> = {};
+  for (const [source, target] of Object.entries(raw)) {
+    if (typeof target !== 'string') throw badRequest('invalid merge');
+    merge[source] = target;
+  }
+  if (invalidMergeReason(preview, merge)) throw badRequest('invalid merge');
+  return merge;
+}
+
 function sanitizeDecisions(
   decisions: ImportDecisions,
   groupPersons: { id: string; name: string }[],
@@ -1167,7 +1283,8 @@ function sanitizeDecisions(
   }
   const rows = sanitizeRowDecisions(decisions.rows, preview);
   if (findTagCollisions(preview, rows).length > 0) throw conflict('tagExists');
-  return { fuehrung, persons, rows };
+  const merge = sanitizeMerge(decisions.merge, preview);
+  return { fuehrung, persons, rows, ...(merge ? { merge } : {}) };
 }
 
 /**
@@ -1369,6 +1486,14 @@ export async function saveArtikel(
   input: ArtikelInput,
 ): Promise<ActionResult<{ id: string }>> {
   return asResult(() => saveArtikelImpl(groupId, artikelId, input));
+}
+
+export async function mergeArtikel(
+  groupId: string,
+  targetId: string,
+  sourceIds: string[],
+): Promise<ActionResult<{ success: true }>> {
+  return asVoidResult(() => mergeArtikelImpl(groupId, targetId, sourceIds));
 }
 
 export async function createStuecke(
