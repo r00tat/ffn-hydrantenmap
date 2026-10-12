@@ -74,32 +74,48 @@ describe('matchPersonsToUsers', () => {
     expect(matches[0].candidates.map((c) => c.uid)).toEqual(['u1', 'u2']);
   });
 
-  it('löst die Mehrdeutigkeit über die gepflegte E-Mail auf', () => {
+  it('schlägt E-Mail- und Namenstreffer gemeinsam vor, den E-Mail-Treffer zuerst', () => {
+    // An der Person steht oft die private Adresse aus BlaulichtSMS, das
+    // Feuerwehr-Konto trägt eine andere. Beide gehören womöglich derselben
+    // Person — welche, entscheidet der Verwalter, nicht die E-Mail allein.
     const matches = matchPersonsToUsers(
       [
         person({
           id: 'p1',
-          name: 'Adrian Schennet',
-          email: 'A.Schennet@ff.at',
+          name: 'Muster Max',
+          email: 'Max.Privat@example.org',
         }),
       ],
       [
         user({
           uid: 'u1',
-          displayName: 'Adrian Schennet',
-          email: 'adrian@example.at',
+          displayName: 'Max Muster',
+          email: 'max.muster@ff.example.at',
         }),
         user({
           uid: 'u2',
-          displayName: 'Adrian Schennet',
-          email: 'a.schennet@ff.at',
+          displayName: 'Max Muster',
+          email: 'max.privat@example.org',
         }),
       ],
     );
 
-    // Groß-/Kleinschreibung darf dabei keine Rolle spielen.
+    // Groß-/Kleinschreibung der E-Mail darf dabei keine Rolle spielen.
+    expect(matches[0].status).toBe('ambiguous');
+    expect(matches[0].candidates.map((c) => c.uid)).toEqual(['u2', 'u1']);
+  });
+
+  it('bleibt eindeutig, wenn E-Mail und Name dasselbe Konto treffen', () => {
+    const matches = matchPersonsToUsers(
+      [person({ id: 'p1', name: 'Muster Max', email: 'max@ff.example.at' })],
+      [
+        user({ uid: 'u1', displayName: 'Max Muster', email: 'max@ff.example.at' }),
+        user({ uid: 'u2', displayName: 'Anders Anna' }),
+      ],
+    );
+
     expect(matches[0].status).toBe('unique');
-    expect(matches[0].candidates.map((c) => c.uid)).toEqual(['u2']);
+    expect(matches[0].candidates.map((c) => c.uid)).toEqual(['u1']);
   });
 
   it('findet über die E-Mail auch ohne Namensgleichheit', () => {

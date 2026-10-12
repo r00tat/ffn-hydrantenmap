@@ -78,26 +78,26 @@ function normalizedEmail(value: string | undefined): string {
 /**
  * Die Konten, die zu einer Person passen könnten.
  *
- * Die gepflegte E-Mail wiegt mehr als der Name: Sie steht in den Stammdaten der
- * Gruppe, ist dort von Hand gepflegt und trifft auch dann, wenn im Konto ein
- * Spitzname oder ein alter Nachname steht. Ein E-Mail-Treffer beendet die Suche
- * deshalb — er löst auch die Doppelregistrierung auf, bei der zwei Konten
- * denselben Namen tragen.
+ * E-Mail- und Namenstreffer zählen gemeinsam, die E-Mail-Treffer zuerst. Die
+ * E-Mail an der Person ist oft die private Adresse aus BlaulichtSMS, das Konto
+ * der Feuerwehr trägt eine andere — ein E-Mail-Treffer darf den Namenstreffer
+ * deshalb nicht verdrängen. Treffen beide verschiedene Konten, ist die Person
+ * mehrdeutig und der Verwalter wählt, auch beide.
  */
 function candidatesFor(
   person: FahrtenbuchPerson,
   users: PersonUserCandidate[],
 ): PersonUserCandidate[] {
   const email = normalizedEmail(person.email);
-  if (email) {
-    const byEmail = users.filter((u) => normalizedEmail(u.email) === email);
-    if (byEmail.length > 0) return byEmail;
-  }
+  const byEmail = email
+    ? users.filter((u) => normalizedEmail(u.email) === email)
+    : [];
   const name = normalizePersonName(person.name ?? '');
-  if (!name) return [];
-  return users.filter(
-    (u) => normalizePersonName(u.displayName ?? '') === name,
-  );
+  const byName = name
+    ? users.filter((u) => normalizePersonName(u.displayName ?? '') === name)
+    : [];
+  const seen = new Set(byEmail.map((u) => u.uid));
+  return [...byEmail, ...byName.filter((u) => !seen.has(u.uid))];
 }
 
 /**
