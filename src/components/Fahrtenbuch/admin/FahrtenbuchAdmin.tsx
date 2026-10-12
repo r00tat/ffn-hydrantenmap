@@ -19,27 +19,25 @@ import GeraetemeisterSettings from './GeraetemeisterSettings';
 import GroupSettings from './GroupSettings';
 import MangelMigration from './MangelMigration';
 import MangelNotificationSettings from './MangelNotificationSettings';
-import PersonAdmin from './PersonAdmin';
 import ShareLinkSection from './ShareLinkSection';
 import VehicleAdmin from './VehicleAdmin';
 import WeeklyReportSendSection from './WeeklyReportSendSection';
 
 type AdminTabKey =
   | 'vehicles'
-  | 'persons'
   | 'settings'
   | 'shareLink'
   | 'pdfImport';
 
 /**
- * Admins und Gruppen-Admins sehen alle Reiter. Ein Gerätemeister pflegt
- * Fahrzeuge und Personen; Einstellungen, Share-Links und PDF-Import bleiben
- * der Gruppenadministration vorbehalten.
+ * Admins und Gruppen-Admins sehen alle Reiter. Ein Gerätemeister pflegt die
+ * Fahrzeuge; Einstellungen, Share-Links und PDF-Import bleiben der
+ * Gruppenadministration vorbehalten. Die Personen stehen auf der Seite
+ * „Personal" (/personal), weil Bekleidung und Atemschutz dieselbe Liste lesen.
  */
-const MANAGER_TABS: AdminTabKey[] = ['vehicles', 'persons'];
+const MANAGER_TABS: AdminTabKey[] = ['vehicles'];
 const ADMIN_TABS: AdminTabKey[] = [
   'vehicles',
-  'persons',
   'settings',
   'shareLink',
   'pdfImport',
@@ -47,7 +45,6 @@ const ADMIN_TABS: AdminTabKey[] = [
 
 const TAB_LABEL_KEYS = {
   vehicles: 'admin.vehicles',
-  persons: 'admin.persons',
   settings: 'admin.settings',
   shareLink: 'shareLink.heading',
   pdfImport: 'admin.pdfImport.tab',
@@ -55,7 +52,7 @@ const TAB_LABEL_KEYS = {
 
 /**
  * Klammer über die Stammdaten: Gruppenauswahl plus Tabs für Fahrzeuge und
- * Personen. Die Gruppen kommen aus `useFahrtenbuchGroup`, damit hier dieselben
+ * Einstellungen. Die Gruppen kommen aus `useFahrtenbuchGroup`, damit hier dieselben
  * Ausschlüsse gelten wie in den Regeln und den Server Actions.
  */
 export default function FahrtenbuchAdmin() {
@@ -151,13 +148,6 @@ export default function FahrtenbuchAdmin() {
                 damit keine Meldung der vorigen Gruppe stehen bleibt. */}
             {activeTab === 'vehicles' && (
               <VehicleAdmin
-                key={groupId}
-                groupId={groupId}
-                groupName={groupName}
-              />
-            )}
-            {activeTab === 'persons' && (
-              <PersonAdmin
                 key={groupId}
                 groupId={groupId}
                 groupName={groupName}

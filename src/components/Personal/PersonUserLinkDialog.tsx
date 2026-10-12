@@ -25,8 +25,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   proposePersonUserLinks,
   savePersonUserLinks,
-} from '../stammdatenActions';
-import type { PersonUserMatch } from '../personUserMatch';
+} from '../Fahrtenbuch/stammdatenActions';
+import type { PersonUserMatch } from '../Fahrtenbuch/personUserMatch';
 
 /**
  * Der Auswahlzustand: je Person die angehakten Konten.

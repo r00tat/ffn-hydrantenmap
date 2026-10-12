@@ -31,9 +31,11 @@ Actions** geschrieben.
 | `bekleidungAusgabe` | Verlauf: eine Zeile je Ausgabe, offen solange `zurueckAm` fehlt; bei Mengen die `charge`, aus der sie kam |
 | `bekleidungWaesche` | Waschgang: `datum`, `programm` (`standard`/`impraegnierung`/`sonstiges` mit `programmText`), `stueckIds` |
 
-Ausgegeben wird an die Personen der Gruppe aus dem Fahrtenbuch
-(`groups/{groupId}/person`) — dieselbe Liste, damit ein Mitglied nicht zweimal
-gepflegt wird.
+Ausgegeben wird an die Personen der Gruppe (`groups/{groupId}/person`) —
+dieselbe Liste wie im Fahrtenbuch, damit ein Mitglied nicht zweimal gepflegt
+wird. Gepflegt wird sie auf der Seite „Personal" (siehe
+[personal.md](personal.md)); „Neue Person" hier ist nur die Abkürzung während
+einer Ausgabe.
 
 ### Einzeln oder Menge — je Artikeltyp
 

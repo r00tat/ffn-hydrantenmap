@@ -1225,7 +1225,8 @@
     "connectedApps": "Verbundene Anwendungen",
     "adminMcp": "MCP-Zugänge",
     "fuellprotokoll": "Füllprotokoll",
-    "sybos": "Sybos-Übertrag"
+    "sybos": "Sybos-Übertrag",
+    "personal": "Personal"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -4668,5 +4669,28 @@
     "einsatz": "Einsatz",
     "uebung": "Übung",
     "sonstiges": "Sonstiges"
+  },
+  "personal": {
+    "title": "Personal",
+    "intro": "Der Personalstand der Gruppe – gemeinsam genutzt von Fahrtenbuch, Bekleidung und Atemschutz.",
+    "group": "Gruppe",
+    "noGroups": "Du bist in keiner Gruppe, deren Personal du verwalten darfst.",
+    "noPermission": "Du hast keine Berechtigung für diese Seite.",
+    "search": "Suchen",
+    "showInactive": "Inaktive anzeigen",
+    "summary": "{active} aktiv · {drivers} Kraftfahrer · {atemschutz} Atemschutzträger",
+    "noMatches": "Keine Person passt zur Suche.",
+    "kraftfahrer": "Kraftfahrer",
+    "kraftfahrerHint": "Steht im Fahrtenbuch als Fahrer zur Auswahl.",
+    "atemschutztraeger": "Atemschutzträger",
+    "atemschutztraegerHint": "Wird beim Atemschutz als Truppmitglied vorgeschlagen.",
+    "userAccounts": "Benutzerkonten",
+    "userAccountsHint": "Konten dieser Person – Grundlage für „Gefahren bin ich“ und das Ändern eigener Fahrten.",
+    "userAccountsUnavailable": "Benutzerkonten lassen sich nur online laden.",
+    "unknownAccount": "Konto {uid}",
+    "accountNotAuthorized": "nicht freigeschaltet",
+    "accountNotInGroup": "nicht in der Gruppe",
+    "flagSaveFailed": "Ändern fehlgeschlagen: {message}",
+    "linkSaveFailed": "Die Person ist gespeichert, die Benutzerkonten nicht: {message}"
   }
 }

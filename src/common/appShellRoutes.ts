@@ -42,6 +42,7 @@ export const APP_SHELL_PAGES: readonly string[] = [
   '/fahrzeuge',
   '/geraete',
   '/bekleidung',
+  '/personal',
   '/kennzeichen',
   '/rettungskarten',
   '/blaulicht-sms',

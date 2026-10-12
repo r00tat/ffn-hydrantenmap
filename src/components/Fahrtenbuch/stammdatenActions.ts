@@ -23,6 +23,7 @@ import {
   type KostenersatzVehicle,
 } from '../../common/kostenersatz';
 import { isTruthy } from '../../common/boolish';
+import { PERSON_FLAG_FIELDS, type PersonFlagField } from '../../common/personal';
 import { listUsers } from '../../app/api/users/listUsers';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
@@ -173,12 +174,31 @@ export async function saveFahrtenbuchPerson(
   personId: string | undefined,
   data: Pick<
     FahrtenbuchPerson,
-    'name' | 'active' | 'blaulichtSmsRecipientId' | 'phone' | 'email' | 'note'
+    | 'name'
+    | 'active'
+    | 'blaulichtSmsRecipientId'
+    | 'phone'
+    | 'email'
+    | 'note'
+    | 'kraftfahrer'
+    | 'atemschutztraeger'
   >,
 ): Promise<StammdatenResult> {
   try {
     const session = await actionFahrtenbuchManagerRequired(groupId);
     const now = new Date().toISOString();
+    // Qualifikationen nur, wenn sie als Wahrheitswert mitkommen: Ein Aufrufer,
+    // der sie nicht kennt (etwa ein älterer Client), darf die gepflegten
+    // Werte beim Bearbeiten nicht zurücksetzen.
+    const qualifications: Partial<
+      Pick<FahrtenbuchPerson, 'kraftfahrer' | 'atemschutztraeger'>
+    > = {};
+    if (typeof data.kraftfahrer === 'boolean') {
+      qualifications.kraftfahrer = data.kraftfahrer;
+    }
+    if (typeof data.atemschutztraeger === 'boolean') {
+      qualifications.atemschutztraeger = data.atemschutztraeger;
+    }
     const payload = {
       name: data.name.trim(),
       active: data.active !== false,
@@ -186,6 +206,7 @@ export async function saveFahrtenbuchPerson(
       phone: data.phone?.trim() ?? '',
       email: data.email?.trim() ?? '',
       note: data.note?.trim() ?? '',
+      ...qualifications,
       updatedAt: now,
       updatedBy: session.user.id,
     };
@@ -194,7 +215,11 @@ export async function saveFahrtenbuchPerson(
       await personsRef(groupId).doc(personId).set(payload, { merge: true });
       return { success: true, id: personId };
     }
+    // Eine neue Person bekommt die Vorgaben ausdrücklich gesetzt — dieselben,
+    // die `src/common/personal.ts` für ein fehlendes Feld annimmt.
     const ref = await personsRef(groupId).add({
+      kraftfahrer: true,
+      atemschutztraeger: false,
       ...payload,
       createdAt: now,
       createdBy: session.user.id,
@@ -202,6 +227,48 @@ export async function saveFahrtenbuchPerson(
     return { success: true, id: ref.id };
   } catch (err) {
     console.error('saveFahrtenbuchPerson failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Schaltet ein einzelnes Merkmal einer Person um — aktiv, Kraftfahrer,
+ * Atemschutzträger. Für die Schalter direkt in der Personalliste, damit
+ * niemand für einen Haken den ganzen Dialog öffnen und dabei womöglich einen
+ * gleichzeitig geänderten Namen überschreiben muss.
+ */
+export async function setPersonFlag(
+  groupId: string,
+  personId: string,
+  field: PersonFlagField,
+  value: boolean,
+): Promise<StammdatenResult> {
+  try {
+    const session = await actionFahrtenbuchManagerRequired(groupId);
+    // Server-Action-Argumente sind Client-Eingabe: Ohne diese Prüfung ließe
+    // sich über den Feldnamen jedes Feld der Person setzen, auch `userIds`.
+    if (!PERSON_FLAG_FIELDS.includes(field)) {
+      throw new Error(`field ${String(field)} is not a person flag`);
+    }
+    if (typeof value !== 'boolean') {
+      throw new Error(`value for ${field} must be a boolean`);
+    }
+    if (typeof personId !== 'string' || !personId) {
+      throw new Error('personId missing');
+    }
+    await personsRef(groupId)
+      .doc(personId)
+      .set(
+        {
+          [field]: value,
+          updatedAt: new Date().toISOString(),
+          updatedBy: session.user.id,
+        },
+        { merge: true },
+      );
+    return { success: true, id: personId };
+  } catch (err) {
+    console.error('setPersonFlag failed', err);
     return { success: false, error: (err as Error).message };
   }
 }
@@ -471,7 +538,7 @@ export interface InactivePersonsResult {
  * Namen und wäre über keine Auswertung mehr zu finden; als aktive Person
  * stünde ein Ausgetretener wieder in jeder Fahrerauswahl. Deaktiviert
  * angelegt trifft beides zu: verknüpfbar, aber nicht mehr auswählbar. Wer noch
- * fährt, wird im Personen-Tab aktiviert.
+ * fährt, wird auf der Seite „Personal" aktiviert.
  *
  * Bereits vorhandene Namen werden nicht angefasst — insbesondere wird eine
  * aktive Person nicht durch einen Import deaktiviert.
@@ -703,36 +770,70 @@ export async function proposePersonUserLinks(
   try {
     const session = await actionFahrtenbuchManagerRequired(groupId);
 
-    const [personSnapshot, allUsers] = await Promise.all([
+    const [personSnapshot, candidates] = await Promise.all([
       personsRef(groupId).get(),
-      listUsers(),
+      loadUserCandidates(groupId, session.user.isAdmin === true),
     ]);
-    const users = session.user.isAdmin
-      ? allUsers
-      : allUsers.filter((user) => inGroup(user, groupId));
     const persons = personSnapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as FahrtenbuchPerson,
     );
-    const candidates: PersonUserCandidate[] = users.map((user) => ({
-      uid: user.uid,
-      displayName: user.displayName ?? undefined,
-      email: user.email ?? undefined,
-      disabled: user.disabled === true,
-      // Am Benutzerdokument heißt das Feld `authorized`, nicht `isAuthorized` —
-      // erst `getUserSessionData` benennt es für die Sitzung um. `isTruthy`
-      // deckt zusätzlich die älteren Dokumente ab, die „true" als Text tragen;
-      // dieselbe Behandlung wie in `auth.ts`.
-      isAuthorized: isTruthy(
-        (user as { authorized?: string | boolean }).authorized,
-      ),
-      inGroup: inGroup(user, groupId),
-    }));
 
     return { success: true, matches: matchPersonsToUsers(persons, candidates) };
   } catch (err) {
     console.error('proposePersonUserLinks failed', err);
     return { success: false, error: (err as Error).message };
   }
+}
+
+/**
+ * Die Konten, die einer Person zugeordnet werden können — für die Auswahl im
+ * Personendialog der Personalverwaltung. Derselbe Zuschnitt wie im Vorschlag:
+ * der Gerätemeister sieht die Konten seiner Gruppe, der Admin alle.
+ * Gespeichert wird über `savePersonUserLinks`, das ihn noch einmal prüft.
+ */
+export async function listPersonUserCandidates(
+  groupId: string,
+): Promise<StammdatenResult & { candidates?: PersonUserCandidate[] }> {
+  try {
+    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const candidates = await loadUserCandidates(
+      groupId,
+      session.user.isAdmin === true,
+    );
+    return { success: true, candidates };
+  } catch (err) {
+    console.error('listPersonUserCandidates failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Die Benutzerkonten, die ein Verwalter dieser Gruppe zu sehen bekommt —
+ * nur Anzeigename, E-Mail und drei Merkmale (gesperrt, freigeschaltet, in der
+ * Gruppe). Kein Telefon, keine Tokens, kein Rest des Benutzerdokuments.
+ */
+async function loadUserCandidates(
+  groupId: string,
+  isAdmin: boolean,
+): Promise<PersonUserCandidate[]> {
+  const allUsers = await listUsers();
+  const users = isAdmin
+    ? allUsers
+    : allUsers.filter((user) => inGroup(user, groupId));
+  return users.map((user) => ({
+    uid: user.uid,
+    displayName: user.displayName ?? undefined,
+    email: user.email ?? undefined,
+    disabled: user.disabled === true,
+    // Am Benutzerdokument heißt das Feld `authorized`, nicht `isAuthorized` —
+    // erst `getUserSessionData` benennt es für die Sitzung um. `isTruthy`
+    // deckt zusätzlich die älteren Dokumente ab, die „true" als Text tragen;
+    // dieselbe Behandlung wie in `auth.ts`.
+    isAuthorized: isTruthy(
+      (user as { authorized?: string | boolean }).authorized,
+    ),
+    inGroup: inGroup(user, groupId),
+  }));
 }
 
 /**

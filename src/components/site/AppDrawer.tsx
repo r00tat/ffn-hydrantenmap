@@ -4,6 +4,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AirIcon from '@mui/icons-material/Air';
 import ApiIcon from '@mui/icons-material/Api';
+import BadgeIcon from '@mui/icons-material/Badge';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BiotechIcon from '@mui/icons-material/Biotech';
@@ -504,6 +505,14 @@ export default function AppDrawer({
           text: t('adminFahrtenbuch'),
           icon: <EditRoadIcon />,
           href: '/admin/fahrtenbuch',
+          fahrtenbuchAdmin: true,
+        },
+        // Dieselbe Sichtbarkeit wie die Fahrtenbuch-Verwaltung, aus der die
+        // Personenpflege kommt (siehe docs/personal.md).
+        {
+          text: t('personal'),
+          icon: <BadgeIcon />,
+          href: '/personal',
           fahrtenbuchAdmin: true,
         },
         {

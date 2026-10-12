@@ -41,7 +41,7 @@ const data: ShareLinkFormData = {
       lastCounters: { km: 1200 },
     },
   ],
-  persons: [{ id: 'p1', name: 'Max Mustermann' }],
+  persons: [{ id: 'p1', name: 'Max Mustermann', kraftfahrer: true }],
   firecalls: [
     {
       id: 'f1',

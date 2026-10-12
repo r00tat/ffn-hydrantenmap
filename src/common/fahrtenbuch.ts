@@ -118,6 +118,13 @@ export interface FahrtenbuchPerson {
    * registrieren: Dieselbe Person hat dann zwei Konten, und beide sind sie.
    */
   userIds?: string[];
+  /**
+   * Darf die Person fahren? Fehlt das Feld, ja — Auslegung in
+   * `src/common/personal.ts`.
+   */
+  kraftfahrer?: boolean;
+  /** Atemschutzträger? Fehlt das Feld, nein — siehe `src/common/personal.ts`. */
+  atemschutztraeger?: boolean;
   /** Aus dem BlaulichtSMS-CSV-Export übernommen, im Dialog korrigierbar. */
   phone?: string;
   email?: string;

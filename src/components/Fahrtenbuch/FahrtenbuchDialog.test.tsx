@@ -594,4 +594,20 @@ describe('FahrtenbuchDialog — Zusatzfahrer', () => {
       coDrivers: [{ id: 'p2', name: 'Anna Bauer' }],
     });
   });
+
+  it('bietet als Fahrer nur Kraftfahrer, als Zusatzfahrer alle an', async () => {
+    const user = userEvent.setup();
+    const kein: FahrtenbuchPerson = { ...anna, id: 'p3', name: 'Berta Beispiel', kraftfahrer: false };
+    renderWithIntl(
+      <FahrtenbuchDialog {...baseProps} vehicleId="v1" persons={[anna, kein]} />,
+    );
+
+    await user.click(screen.getByLabelText('Fahrer'));
+    expect(await screen.findByRole('option', { name: 'Anna Bauer' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Berta Beispiel' })).toBeNull();
+
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByLabelText('Zusatzfahrer'));
+    expect(await screen.findByRole('option', { name: 'Berta Beispiel' })).toBeInTheDocument();
+  });
 });

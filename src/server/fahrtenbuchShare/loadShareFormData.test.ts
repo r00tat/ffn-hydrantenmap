@@ -79,7 +79,9 @@ describe('loadShareFormData', () => {
       snapshot([{ id: 'p1', name: 'Max Mustermann', ...AUDIT }]),
     );
     const data = await loadShareFormData('ffnd');
-    expect(data.persons).toEqual([{ id: 'p1', name: 'Max Mustermann' }]);
+    expect(data.persons).toEqual([
+      { id: 'p1', name: 'Max Mustermann', kraftfahrer: true },
+    ]);
   });
 
   it('filtert deaktivierte Fahrzeuge heraus', async () => {
@@ -118,7 +120,7 @@ describe('loadShareFormData', () => {
     expect(data.persons.map((p) => p.id)).toEqual(['p1']);
   });
 
-  it('gibt von Personen nur id und name weiter', async () => {
+  it('gibt von Personen nur id, name und die Fahrerberechtigung weiter', async () => {
     personGetMock.mockResolvedValue(
       snapshot([
         {
@@ -135,8 +137,10 @@ describe('loadShareFormData', () => {
       ]),
     );
     const data = await loadShareFormData('ffnd');
-    expect(data.persons).toEqual([{ id: 'p1', name: 'Max Mustermann' }]);
-    expect(Object.keys(data.persons[0])).toEqual(['id', 'name']);
+    expect(data.persons).toEqual([
+      { id: 'p1', name: 'Max Mustermann', kraftfahrer: true },
+    ]);
+    expect(Object.keys(data.persons[0])).toEqual(['id', 'name', 'kraftfahrer']);
   });
 
   it('gibt von Fahrzeugen keine Audit- und internen Felder weiter', async () => {

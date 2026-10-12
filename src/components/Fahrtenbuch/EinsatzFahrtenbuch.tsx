@@ -31,6 +31,7 @@ import {
   estimatedDistance,
   isKmCounter,
 } from '../../common/fahrtenbuchAutoFill';
+import { driverPersons } from '../../common/personal';
 import useFahrtenbuchEntries from '../../hooks/useFahrtenbuchEntries';
 import useFahrtenbuchGroupStandort from '../../hooks/useFahrtenbuchGroupStandort';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
@@ -422,7 +423,7 @@ export function EinsatzFahrtenbuchView({
                         <Autocomplete
                           freeSolo
                           size="small"
-                          options={persons.map((p) => p.name)}
+                          options={driverPersons(persons).map((p) => p.name)}
                           value={row.driverName}
                           sx={{ flexGrow: 1, minWidth: 160 }}
                           onInputChange={(_, value) =>

@@ -125,8 +125,16 @@ describe('resolveShareLinkVehicleId', () => {
 });
 
 describe('toShareLinkPerson', () => {
-  it('gibt ausschließlich id und name weiter', () => {
-    expect(toShareLinkPerson(person)).toEqual({ id: 'p1', name: 'Max Mustermann' });
+  it('gibt ausschließlich id, name und die Fahrerberechtigung weiter', () => {
+    expect(toShareLinkPerson(person)).toEqual({
+      id: 'p1',
+      name: 'Max Mustermann',
+      kraftfahrer: true,
+    });
+  });
+
+  it('gibt weiter, ob die Person fahren darf', () => {
+    expect(toShareLinkPerson({ ...person, kraftfahrer: false }).kraftfahrer).toBe(false);
   });
 
   it('lässt Kontaktdaten und Verknüpfungen weg', () => {

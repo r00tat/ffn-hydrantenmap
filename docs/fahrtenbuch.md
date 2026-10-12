@@ -548,7 +548,7 @@ von `createdAt` abweicht.
 ## Personen den Benutzerkonten zuordnen
 
 `person.userIds` entsteht im Dialog „Bestehende Benutzer zuordnen"
-([PersonUserLinkDialog](../src/components/Fahrtenbuch/admin/PersonUserLinkDialog.tsx)),
+([PersonUserLinkDialog](../src/components/Personal/PersonUserLinkDialog.tsx)),
 die Zuordnungslogik steht rein und geprüft in
 [personUserMatch.ts](../src/components/Fahrtenbuch/personUserMatch.ts).
 

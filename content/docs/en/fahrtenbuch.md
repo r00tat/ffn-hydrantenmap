@@ -75,7 +75,7 @@ If the chosen period covers more trips than are loaded, **Load more** appears be
 
 1. Click **New entry**, or **Add trip** on the vehicle's card
 2. Pick the **vehicle** — coming from a vehicle card it is already selected. The remaining fields appear only afterwards: counters and consumables depend on the chosen vehicle
-3. Enter the **driver**: suggestions come from the group's persons, free text is allowed
+3. Enter the **driver**: suggestions come from the group's persons marked as **driver**; free text is allowed. All active persons are offered as additional drivers
 4. Choose the **purpose** (operation, drill, supply run, other)
 5. For the purpose *operation* you can additionally select the **operation** or type it in freely
 6. Enter **route / destination**, **departure** and **arrival**
@@ -215,13 +215,14 @@ How exact are the figures? Only counters with a start and an end reading are sum
 
 ### Maintain master data (admins only)
 
-The admin area under **Trip log** has five tabs:
+The admin area under **Trip log** has four tabs:
 
 - **Vehicles** Name, registration, active/decommissioned, counter preset, consumables, note. **Import vehicles** takes the vehicles over from the cost recovery inventory; the per-vehicle QR code lives here as well
-- **Persons** The group's drivers with phone, email and Alarm SMS recipient ID. **Import persons from CSV** reads the participant export from Alarm SMS; persons no longer contained can be deactivated — nothing is deleted, so past trips stay attributed
 - **Settings** The fire station location as the starting point for operation mileage, via coordinates or by picking it on the map; below it the **defect notification** with the email recipients for reported defects, and the **defect import** that creates an open defect from every existing trip that reported one (running it again creates no duplicates)
 - **Trip log link** Create, regenerate or delete the link for entry without signing in
 - **Trip log import** Take over trips from a PDF export
+
+**Persons** are no longer maintained here but under **Administration → Personnel**. That page holds phone, email, Alarm SMS recipient ID, user accounts and the qualifications **driver** and **BA wearer** — the same list is used by the trip log, clothing and breathing apparatus. **Import persons from CSV** reads the participant export from Alarm SMS; persons no longer contained can be deactivated — nothing is deleted, so past trips stay attributed. Anyone not marked as driver does not appear in the driver selection.
 
 :::info
 Decommissioned vehicles and deactivated persons disappear from the selection lists; their existing trips are kept and remain exportable.

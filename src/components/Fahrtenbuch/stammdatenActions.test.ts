@@ -51,7 +51,9 @@ vi.mock('../../server/firebase/admin', () => ({
 
 import {
   getFahrtenbuchMangelEmails,
+  listPersonUserCandidates,
   proposePersonUserLinks,
+  setPersonFlag,
   savePersonUserLinks,
   saveFahrtenbuchGroupStandort,
   saveFahrtenbuchMangelEmails,
@@ -668,5 +670,164 @@ describe('savePersonUserLinks', () => {
     ]);
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('Qualifikationen am Personalstand', () => {
+  const addMock = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    actionUserRequiredMock.mockResolvedValue(adminSession);
+    setMock.mockResolvedValue(undefined);
+    addMock.mockResolvedValue({ id: 'neu' });
+    docMock.mockReturnValue({
+      set: setMock,
+      collection: () => ({ doc: docMock, add: addMock }),
+    });
+    collectionMock.mockReturnValue({ doc: docMock });
+  });
+
+  it('legt eine neue Person als Kraftfahrer und ohne Atemschutz an', async () => {
+    const result = await saveFahrtenbuchPerson('ffnd', undefined, {
+      name: 'Muster Anna',
+      active: true,
+    });
+
+    expect(result).toEqual({ success: true, id: 'neu' });
+    expect(addMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kraftfahrer: true, atemschutztraeger: false }),
+    );
+  });
+
+  it('speichert die angegebenen Qualifikationen', async () => {
+    await saveFahrtenbuchPerson('ffnd', 'p1', {
+      name: 'Muster Anna',
+      active: true,
+      kraftfahrer: false,
+      atemschutztraeger: true,
+    });
+
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kraftfahrer: false, atemschutztraeger: true }),
+      { merge: true },
+    );
+  });
+
+  it('lässt beim Bearbeiten ohne Angabe die gespeicherten Qualifikationen stehen', async () => {
+    await saveFahrtenbuchPerson('ffnd', 'p1', { name: 'Muster Anna', active: true });
+
+    const [payload] = setMock.mock.calls[0];
+    expect(payload).not.toHaveProperty('kraftfahrer');
+    expect(payload).not.toHaveProperty('atemschutztraeger');
+  });
+
+  it('schaltet ein einzelnes Merkmal um', async () => {
+    const result = await setPersonFlag('ffnd', 'p1', 'atemschutztraeger', true);
+
+    expect(result).toEqual({ success: true, id: 'p1' });
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({ atemschutztraeger: true, updatedBy: 'admin1' }),
+      { merge: true },
+    );
+  });
+
+  it('weist ein Feld außerhalb der Merkmale ab', async () => {
+    const result = await setPersonFlag(
+      'ffnd',
+      'p1',
+      'userIds' as unknown as 'active',
+      true,
+    );
+
+    expect(result.success).toBe(false);
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it('weist einen Wert ab, der kein Wahrheitswert ist', async () => {
+    const result = await setPersonFlag(
+      'ffnd',
+      'p1',
+      'kraftfahrer',
+      'ja' as unknown as boolean,
+    );
+
+    expect(result.success).toBe(false);
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it('lässt ein einfaches Gruppenmitglied kein Merkmal umschalten', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: { id: 'u1', isAdmin: false, groups: ['ffnd'] },
+    });
+
+    const result = await setPersonFlag('ffnd', 'p1', 'kraftfahrer', false);
+
+    expect(result.success).toBe(false);
+    expect(setMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('listPersonUserCandidates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    actionUserRequiredMock.mockResolvedValue(adminSession);
+  });
+
+  it('zeigt dem Gerätemeister nur Konten seiner Gruppe', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: {
+        id: 'g1',
+        isAdmin: false,
+        groups: ['ffnd'],
+        fahrtenbuchGeraetemeister: ['ffnd'],
+      },
+    });
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', displayName: 'Muster Anna', groups: ['ffnd'] },
+      { uid: 'u2', displayName: 'Fremd Franz', groups: ['andere'] },
+    ]);
+
+    const result = await listPersonUserCandidates('ffnd');
+
+    expect(result.success).toBe(true);
+    expect(result.candidates?.map((c) => c.uid)).toEqual(['u1']);
+  });
+
+  it('gibt nur heraus, was die Auswahl braucht', async () => {
+    listUsersMock.mockResolvedValue([
+      {
+        uid: 'u1',
+        displayName: 'Muster Anna',
+        email: 'anna@example.org',
+        phoneNumber: '+43 1',
+        authorized: true,
+        groups: ['ffnd'],
+      },
+    ]);
+
+    const result = await listPersonUserCandidates('ffnd');
+
+    expect(result.candidates).toEqual([
+      {
+        uid: 'u1',
+        displayName: 'Muster Anna',
+        email: 'anna@example.org',
+        disabled: false,
+        isAuthorized: true,
+        inGroup: true,
+      },
+    ]);
+  });
+
+  it('weist ab, wer die Gruppe nicht verwalten darf', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: { id: 'u1', isAdmin: false, groups: ['ffnd'] },
+    });
+
+    const result = await listPersonUserCandidates('ffnd');
+
+    expect(result.success).toBe(false);
+    expect(listUsersMock).not.toHaveBeenCalled();
   });
 });

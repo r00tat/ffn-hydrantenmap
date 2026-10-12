@@ -5,6 +5,7 @@ import type {
   FahrtenbuchVehicleKategorie,
   FuelType,
 } from './fahrtenbuch';
+import { isKraftfahrer } from './personal';
 
 /** Top-Level-Collection; die Dokument-ID ist der Token. */
 export const FAHRTENBUCH_SHARE_LINK_COLLECTION_ID = 'fahrtenbuchShareLink';
@@ -49,10 +50,15 @@ export interface ShareLinkVehicle {
   kategorie?: FahrtenbuchVehicleKategorie;
 }
 
-/** Person auf der Gastseite: nur Anzeigename und ID, nie Kontaktdaten. */
+/**
+ * Person auf der Gastseite: Anzeigename, ID und ob sie fahren darf — nie
+ * Kontaktdaten.
+ */
 export interface ShareLinkPerson {
   id: string;
   name: string;
+  /** Steuert die Fahrerauswahl, siehe `src/common/personal.ts`. */
+  kraftfahrer: boolean;
 }
 
 /**
@@ -172,5 +178,9 @@ export function toShareLinkVehicle(vehicle: FahrtenbuchVehicle): ShareLinkVehicl
 
 /** Dieselbe Whitelist für Personen — Telefonnummern und E-Mails bleiben hier. */
 export function toShareLinkPerson(person: FahrtenbuchPerson): ShareLinkPerson {
-  return { id: person.id ?? '', name: person.name };
+  return {
+    id: person.id ?? '',
+    name: person.name,
+    kraftfahrer: isKraftfahrer(person),
+  };
 }
