@@ -3,7 +3,9 @@ import {
   atemschutzPersons,
   driverPersons,
   isAtemschutztraeger,
+  isExtern,
   isKraftfahrer,
+  memberPersons,
 } from './personal';
 
 describe('isKraftfahrer', () => {
@@ -47,5 +49,34 @@ describe('Auswahllisten', () => {
       'Beispiel Bernd',
       'Probe Clara',
     ]);
+  });
+});
+
+describe('Externe', () => {
+  it('gilt ohne Angabe als Mitglied', () => {
+    expect(isExtern({})).toBe(false);
+    expect(isExtern({ extern: true })).toBe(true);
+  });
+
+  it('ist weder Kraftfahrer noch Atemschutzträger, was auch eingetragen ist', () => {
+    const extern = { extern: true, kraftfahrer: true, atemschutztraeger: true };
+    expect(isKraftfahrer(extern)).toBe(false);
+    expect(isAtemschutztraeger(extern)).toBe(false);
+  });
+
+  it('fehlt in den Auswahllisten, inaktive Mitglieder ebenso', () => {
+    const persons = [
+      { name: 'Muster Anna', atemschutztraeger: true },
+      { name: 'Gast Gustav', extern: true, atemschutztraeger: true },
+      { name: 'Alt Otto', active: false },
+    ];
+    expect(driverPersons(persons).map((p) => p.name)).toEqual([
+      'Muster Anna',
+      'Alt Otto',
+    ]);
+    expect(atemschutzPersons(persons).map((p) => p.name)).toEqual([
+      'Muster Anna',
+    ]);
+    expect(memberPersons(persons).map((p) => p.name)).toEqual(['Muster Anna']);
   });
 });

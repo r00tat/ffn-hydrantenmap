@@ -182,6 +182,7 @@ export async function saveFahrtenbuchPerson(
     | 'note'
     | 'kraftfahrer'
     | 'atemschutztraeger'
+    | 'extern'
   >,
 ): Promise<StammdatenResult> {
   try {
@@ -191,13 +192,16 @@ export async function saveFahrtenbuchPerson(
     // der sie nicht kennt (etwa ein älterer Client), darf die gepflegten
     // Werte beim Bearbeiten nicht zurücksetzen.
     const qualifications: Partial<
-      Pick<FahrtenbuchPerson, 'kraftfahrer' | 'atemschutztraeger'>
+      Pick<FahrtenbuchPerson, 'kraftfahrer' | 'atemschutztraeger' | 'extern'>
     > = {};
     if (typeof data.kraftfahrer === 'boolean') {
       qualifications.kraftfahrer = data.kraftfahrer;
     }
     if (typeof data.atemschutztraeger === 'boolean') {
       qualifications.atemschutztraeger = data.atemschutztraeger;
+    }
+    if (typeof data.extern === 'boolean') {
+      qualifications.extern = data.extern;
     }
     const payload = {
       name: data.name.trim(),

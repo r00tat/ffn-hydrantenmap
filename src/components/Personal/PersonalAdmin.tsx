@@ -31,7 +31,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FahrtenbuchPerson } from '../../common/fahrtenbuch';
 import {
   isAtemschutztraeger,
+  isExtern,
   isKraftfahrer,
+  memberPersons,
   type PersonFlagField,
 } from '../../common/personal';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
@@ -75,6 +77,7 @@ export default function PersonalAdmin({
 
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
+  const [showExtern, setShowExtern] = useState(false);
   const [candidates, setCandidates] = useState<PersonUserCandidate[]>();
   const [candidatesError, setCandidatesError] = useState(false);
 
@@ -84,6 +87,7 @@ export default function PersonalAdmin({
   const [active, setActive] = useState(true);
   const [kraftfahrer, setKraftfahrer] = useState(true);
   const [atemschutztraeger, setAtemschutztraeger] = useState(false);
+  const [extern, setExtern] = useState(false);
   const [recipientId, setRecipientId] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -129,10 +133,12 @@ export default function PersonalAdmin({
   };
 
   const activePersons = persons.filter((p) => p.active !== false);
+  const members = memberPersons(persons);
   const summary = t('summary', {
-    active: activePersons.length,
-    drivers: activePersons.filter(isKraftfahrer).length,
-    atemschutz: activePersons.filter(isAtemschutztraeger).length,
+    active: members.length,
+    drivers: members.filter(isKraftfahrer).length,
+    atemschutz: members.filter(isAtemschutztraeger).length,
+    extern: activePersons.filter(isExtern).length,
   });
 
   const visible = useMemo(() => {
@@ -142,6 +148,7 @@ export default function PersonalAdmin({
     const words = query.toLocaleLowerCase('de').split(/\s+/).filter(Boolean);
     return persons.filter((p) => {
       if (!showInactive && p.active === false) return false;
+      if (!showExtern && isExtern(p)) return false;
       if (words.length === 0) return true;
       const personName = p.name.toLocaleLowerCase('de');
       return (
@@ -150,7 +157,7 @@ export default function PersonalAdmin({
         (p.phone ?? '').includes(query)
       );
     });
-  }, [persons, search, showInactive]);
+  }, [persons, search, showInactive, showExtern]);
 
   const openDialog = (person?: FahrtenbuchPerson) => {
     setEditing(person ?? ({} as FahrtenbuchPerson));
@@ -158,8 +165,11 @@ export default function PersonalAdmin({
     setName(person?.name ?? '');
     setNote(person?.note ?? '');
     setActive(person?.active !== false);
-    setKraftfahrer(person ? isKraftfahrer(person) : true);
-    setAtemschutztraeger(person ? isAtemschutztraeger(person) : false);
+    // Die gespeicherten Qualifikationen, nicht die ausgelegten: Wer extern
+    // abwählt, bekommt sie so unverändert zurück.
+    setKraftfahrer(person?.kraftfahrer !== false);
+    setAtemschutztraeger(person?.atemschutztraeger === true);
+    setExtern(person ? isExtern(person) : false);
     setRecipientId(person?.blaulichtSmsRecipientId ?? '');
     setPhone(person?.phone ?? '');
     setEmail(person?.email ?? '');
@@ -174,6 +184,7 @@ export default function PersonalAdmin({
         active,
         kraftfahrer,
         atemschutztraeger,
+        extern,
         blaulichtSmsRecipientId: recipientId,
         phone,
         email,
@@ -244,11 +255,13 @@ export default function PersonalAdmin({
     field: PersonFlagField,
     checked: boolean,
     label: string,
+    disabled = false,
   ) => (
     <TableCell padding="checkbox" align="center">
       <Checkbox
         size="small"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => toggle(person, field, e.target.checked)}
         slotProps={{ input: { 'aria-label': `${label}: ${person.name}` } }}
       />
@@ -298,6 +311,15 @@ export default function PersonalAdmin({
           }
           label={t('showInactive')}
         />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={showExtern}
+              onChange={(e) => setShowExtern(e.target.checked)}
+            />
+          }
+          label={t('showExtern')}
+        />
       </Stack>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -326,6 +348,7 @@ export default function PersonalAdmin({
                 <TableCell align="center">{tFb('admin.active')}</TableCell>
                 <TableCell align="center">{t('kraftfahrer')}</TableCell>
                 <TableCell align="center">{t('atemschutztraeger')}</TableCell>
+                <TableCell align="center">{t('extern')}</TableCell>
                 <TableCell />
               </TableRow>
             </TableHead>
@@ -350,13 +373,21 @@ export default function PersonalAdmin({
                     </Stack>
                   </TableCell>
                   {flagCell(person, 'active', person.active !== false, tFb('admin.active'))}
-                  {flagCell(person, 'kraftfahrer', isKraftfahrer(person), t('kraftfahrer'))}
+                  {flagCell(
+                    person,
+                    'kraftfahrer',
+                    isKraftfahrer(person),
+                    t('kraftfahrer'),
+                    isExtern(person),
+                  )}
                   {flagCell(
                     person,
                     'atemschutztraeger',
                     isAtemschutztraeger(person),
                     t('atemschutztraeger'),
+                    isExtern(person),
                   )}
+                  {flagCell(person, 'extern', isExtern(person), t('extern'))}
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                     <Tooltip title={tFb('admin.editPerson')}>
                       <span>
@@ -476,7 +507,8 @@ export default function PersonalAdmin({
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={kraftfahrer}
+                    checked={kraftfahrer && !extern}
+                    disabled={extern}
                     onChange={(e) => setKraftfahrer(e.target.checked)}
                   />
                 }
@@ -486,7 +518,8 @@ export default function PersonalAdmin({
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={atemschutztraeger}
+                    checked={atemschutztraeger && !extern}
+                    disabled={extern}
                     onChange={(e) => setAtemschutztraeger(e.target.checked)}
                   />
                 }
@@ -495,6 +528,16 @@ export default function PersonalAdmin({
               <FormHelperText sx={{ mt: -0.5, ml: 4 }}>
                 {t('atemschutztraegerHint')}
               </FormHelperText>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={extern}
+                    onChange={(e) => setExtern(e.target.checked)}
+                  />
+                }
+                label={t('extern')}
+              />
+              <FormHelperText sx={{ mt: -0.5, ml: 4 }}>{t('externHint')}</FormHelperText>
             </div>
           </Stack>
         </DialogContent>

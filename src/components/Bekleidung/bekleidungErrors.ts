@@ -17,6 +17,7 @@ const SIMPLE_CODES = [
   'fuehrungLocked',
   'personExists',
   'personInactive',
+  'personExtern',
   'programmTextRequired',
   'tagWithAnzahl',
   'artikelNotEinzeln',

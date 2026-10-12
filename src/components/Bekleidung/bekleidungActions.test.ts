@@ -555,6 +555,14 @@ describe('issue', () => {
     );
   });
 
+  it('lehnt eine externe Person ab', async () => {
+    fake.put('groups/ffnd/person/px', { name: 'Gast Gustav', active: true, extern: true });
+    await failsWith(
+      issue('ffnd', { personId: 'px', datum: '2026-10-08', stueckIds: ['s1'], mengen: [] }),
+      'personExtern',
+    );
+  });
+
   it('lehnt eine Person einer fremden Gruppe ab', async () => {
     fake.put('groups/other/person/p9', { name: 'Hans Beispiel', active: true });
     await failsWith(
@@ -813,6 +821,8 @@ describe('reassignItems', () => {
   it('lehnt eine inaktive Person, dieselbe Person und ein Stück im Lager ab', async () => {
     const input = { datum: '2026-10-08', stueckIds: ['s2'], mengen: [] };
     await failsWith(reassignItems('ffnd', { ...input, personId: 'p2' }), 'personInactive');
+    fake.put('groups/ffnd/person/px', { name: 'Gast Gustav', active: true, extern: true });
+    await failsWith(reassignItems('ffnd', { ...input, personId: 'px' }), 'personExtern');
     await failsWith(reassignItems('ffnd', { ...input, personId: 'p1' }), 'samePerson');
     await failsWith(
       reassignItems('ffnd', { ...input, personId: 'p3', stueckIds: ['s1'] }),

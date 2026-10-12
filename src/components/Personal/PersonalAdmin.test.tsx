@@ -55,10 +55,11 @@ const bernd = person({
   blaulichtSmsRecipientId: '4711',
 });
 const clara = person({ id: 'p3', name: 'Ehemalig Clara', active: false });
+const gustav = person({ id: 'p4', name: 'Gast Gustav', extern: true });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  personsMock.mockReturnValue({ persons: [anna, bernd, clara] });
+  personsMock.mockReturnValue({ persons: [anna, bernd, clara, gustav] });
 });
 
 function row(name: string) {
@@ -82,8 +83,32 @@ describe('PersonalAdmin', () => {
     renderWithIntl(<PersonalAdmin groupId="ffnd" groupName="FF Neusiedl" />);
 
     expect(
-      screen.getByText('2 aktiv · 1 Kraftfahrer · 1 Atemschutzträger'),
+      screen.getByText('2 aktiv · 1 Kraftfahrer · 1 Atemschutzträger · 1 extern'),
     ).toBeInTheDocument();
+  });
+
+  it('blendet Externe aus, bis sie eingeblendet werden', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<PersonalAdmin groupId="ffnd" groupName="FF Neusiedl" />);
+
+    expect(screen.queryByText('Gast Gustav')).toBeNull();
+
+    await user.click(screen.getByLabelText('Externe anzeigen'));
+
+    // Externe sind weder Fahrer noch Atemschutzträger, was auch eingetragen ist.
+    const gustavRow = within(row('Gast Gustav'));
+    expect(gustavRow.getByRole('checkbox', { name: /Extern/ })).toBeChecked();
+    expect(gustavRow.getByRole('checkbox', { name: /Kraftfahrer/ })).toBeDisabled();
+    expect(gustavRow.getByRole('checkbox', { name: /Atemschutzträger/ })).toBeDisabled();
+  });
+
+  it('markiert eine Person direkt in der Liste als extern', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<PersonalAdmin groupId="ffnd" groupName="FF Neusiedl" />);
+
+    await user.click(within(row('Muster Anna')).getByRole('checkbox', { name: /Extern/ }));
+
+    expect(setPersonFlag).toHaveBeenCalledWith('ffnd', 'p1', 'extern', true);
   });
 
   it('filtert über die Suche nach Name und BlaulichtSMS-ID', async () => {
@@ -157,6 +182,7 @@ describe('PersonalAdmin', () => {
         name: 'Neu Norbert',
         kraftfahrer: true,
         atemschutztraeger: true,
+        extern: false,
       }),
     ]);
     await waitFor(() =>

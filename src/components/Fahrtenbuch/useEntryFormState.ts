@@ -51,6 +51,7 @@ export interface EntryFormPerson {
   name: string;
   /** Fehlt das Feld, darf die Person fahren — siehe `src/common/personal.ts`. */
   kraftfahrer?: boolean;
+  extern?: boolean;
 }
 
 export interface EntryFormSubmitResult {

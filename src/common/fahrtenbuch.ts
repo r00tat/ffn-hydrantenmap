@@ -125,6 +125,11 @@ export interface FahrtenbuchPerson {
   kraftfahrer?: boolean;
   /** Atemschutzträger? Fehlt das Feld, nein — siehe `src/common/personal.ts`. */
   atemschutztraeger?: boolean;
+  /**
+   * Nicht Mitglied der Feuerwehr, etwa aus der BlaulichtSMS-Teilnehmerliste.
+   * Fehlt das Feld, nein — siehe `src/common/personal.ts`.
+   */
+  extern?: boolean;
   /** Aus dem BlaulichtSMS-CSV-Export übernommen, im Dialog korrigierbar. */
   phone?: string;
   email?: string;

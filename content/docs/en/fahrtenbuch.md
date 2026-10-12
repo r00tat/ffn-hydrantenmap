@@ -222,7 +222,7 @@ The admin area under **Trip log** has four tabs:
 - **Trip log link** Create, regenerate or delete the link for entry without signing in
 - **Trip log import** Take over trips from a PDF export
 
-**Persons** are no longer maintained here but under **Administration → Personnel**. That page holds phone, email, Alarm SMS recipient ID, user accounts and the qualifications **driver** and **BA wearer** — the same list is used by the trip log, clothing and breathing apparatus. **Import persons from CSV** reads the participant export from Alarm SMS; persons no longer contained can be deactivated — nothing is deleted, so past trips stay attributed. Anyone not marked as driver does not appear in the driver selection.
+**Persons** are no longer maintained here but under **Administration → Personnel**. That page holds phone, email, Alarm SMS recipient ID, user accounts and the qualifications **driver** and **BA wearer** — the same list is used by the trip log, clothing and breathing apparatus. **Import persons from CSV** reads the participant export from Alarm SMS; persons no longer contained can be deactivated — nothing is deleted, so past trips stay attributed. Anyone not marked as driver does not appear in the driver selection. External people from the participant list — members of other brigades, for example — can be marked **External**: they stay available for crew assignment but are not offered as drivers, for breathing apparatus or for clothing, and are hidden in the list until **Show external** is switched on.
 
 :::info
 Decommissioned vehicles and deactivated persons disappear from the selection lists; their existing trips are kept and remain exportable.

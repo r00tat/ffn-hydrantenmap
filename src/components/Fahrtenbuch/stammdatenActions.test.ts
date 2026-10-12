@@ -706,10 +706,15 @@ describe('Qualifikationen am Personalstand', () => {
       active: true,
       kraftfahrer: false,
       atemschutztraeger: true,
+      extern: true,
     });
 
     expect(setMock).toHaveBeenCalledWith(
-      expect.objectContaining({ kraftfahrer: false, atemschutztraeger: true }),
+      expect.objectContaining({
+        kraftfahrer: false,
+        atemschutztraeger: true,
+        extern: true,
+      }),
       { merge: true },
     );
   });
@@ -720,6 +725,17 @@ describe('Qualifikationen am Personalstand', () => {
     const [payload] = setMock.mock.calls[0];
     expect(payload).not.toHaveProperty('kraftfahrer');
     expect(payload).not.toHaveProperty('atemschutztraeger');
+    expect(payload).not.toHaveProperty('extern');
+  });
+
+  it('markiert eine Person als extern', async () => {
+    const result = await setPersonFlag('ffnd', 'p1', 'extern', true);
+
+    expect(result).toEqual({ success: true, id: 'p1' });
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({ extern: true }),
+      { merge: true },
+    );
   });
 
   it('schaltet ein einzelnes Merkmal um', async () => {

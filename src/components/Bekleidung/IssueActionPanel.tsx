@@ -10,6 +10,7 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import type { BekleidungAusgabe } from '../../common/bekleidung';
+import { memberPersons } from '../../common/personal';
 import { callAction } from '../Geraete/admin/actionResult';
 import OnlineOnly from '../site/OnlineOnly';
 import { reassignItems, returnItems } from './bekleidungActions';
@@ -46,7 +47,7 @@ export default function IssueActionPanel({
   const t = useTranslations('bekleidung');
   const errorText = useBekleidungErrorText();
   const persons = useMemo(
-    () => view.persons.filter((p) => p.active !== false && p.id !== currentPersonId),
+    () => memberPersons(view.persons).filter((p) => p.id !== currentPersonId),
     [view.persons, currentPersonId],
   );
   const [personId, setPersonId] = useState('');

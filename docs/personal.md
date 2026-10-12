@@ -30,7 +30,7 @@ gewonnen außer einem schöneren Namen.
 
 ## Qualifikationen
 
-Zwei optionale Felder, ausgelegt nur in
+Drei optionale Felder, ausgelegt nur in
 [src/common/personal.ts](../src/common/personal.ts):
 
 - **`kraftfahrer`** fehlt → **ja**. Vor dem Feld stand jede aktive Person in der
@@ -42,6 +42,20 @@ Zwei optionale Felder, ausgelegt nur in
   Nach dem Ausrollen sind deshalb zunächst keine Personen aus dem Personalstand
   in den Atemschutz-Vorschlägen — die Atemschutzträger sind einmal in der Liste
   anzuhaken.
+- **`extern`** fehlt → **nein**. Die Teilnehmerliste von BlaulichtSMS enthält
+  auch Leute, die nicht Mitglied sind (Nachbarfeuerwehren, Funktionäre); der
+  CSV-Import holt sie mit. Löschen geht nicht, weil die Besatzung eines
+  Einsatzes sie über die BlaulichtSMS-ID findet. Deshalb ein Merkmal: Ein
+  Externer ist **weder Kraftfahrer noch Atemschutzträger, gleich was in den
+  beiden Feldern steht** — `isKraftfahrer` und `isAtemschutztraeger` prüfen
+  `extern` mit, damit keine Auswahlliste es vergessen kann. Die gespeicherten
+  Qualifikationen bleiben stehen und gelten wieder, wenn das Merkmal fällt.
+  Bekleidung bekommen nur `memberPersons` (aktiv und nicht extern); `issue` und
+  `reassignItems` lehnen Externe zusätzlich mit `personExtern` ab. Rücknahme und
+  die Personenansicht der Bekleidung zeigen sie weiter — wer vor der
+  Markierung etwas bekommen hat, muss es zurückgeben können. In der
+  Personalliste sind Externe wie Inaktive ausgeblendet, bis sie eingeblendet
+  werden.
 
 Gefiltert wird nur die **Auswahl**, nicht die Eingabe: Fahrer und
 Truppmitglieder bleiben frei eintippbar (Auswärtige, Fahrer ohne

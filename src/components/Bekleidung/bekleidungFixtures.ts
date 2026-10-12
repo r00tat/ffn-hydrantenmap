@@ -65,6 +65,7 @@ export const persons: FahrtenbuchPerson[] = [
   { ...stamps, id: 'p1', name: 'Max Mustermann', active: true },
   { ...stamps, id: 'p2', name: 'Erika Musterfrau', active: true },
   { ...stamps, id: 'p3', name: 'Erika Mustermann', active: false },
+  { ...stamps, id: 'p4', name: 'Gustav Gast', active: true, extern: true },
 ];
 
 export function sampleData(over: Partial<BekleidungData> = {}): BekleidungData {
