@@ -23,6 +23,8 @@ const SIMPLE_CODES = [
   'artikelNotMenge',
   'nothingToIssue',
   'nothingToReturn',
+  'nothingToReassign',
+  'samePerson',
   'forbidden',
   'mergeMismatch',
   'mergeTooLarge',

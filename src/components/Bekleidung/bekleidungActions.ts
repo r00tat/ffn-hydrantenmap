@@ -208,6 +208,7 @@ export interface ArtikelInput {
   fuehrung: BekleidungFuehrung;
   maxWaschgaenge?: number;
   aktiv: boolean;
+  bemerkung?: string;
 }
 
 /**
@@ -241,6 +242,7 @@ async function saveArtikelImpl(
     fuehrung: input.fuehrung,
     maxWaschgaenge,
     aktiv: input.aktiv !== false,
+    bemerkung: text(input.bemerkung, 2000),
   };
 
   if (artikelId === undefined) {
@@ -280,6 +282,7 @@ async function saveArtikelImpl(
       fuehrung: fields.fuehrung,
       maxWaschgaenge: orDelete(fields.maxWaschgaenge),
       aktiv: fields.aktiv,
+      bemerkung: orDelete(fields.bemerkung),
       updatedAt: actor.now,
       updatedBy: actor.uid,
     });
@@ -847,6 +850,47 @@ async function issueImpl(groupId: string, input: IssueInput): Promise<{ ausgabeI
 
 // --- Rücknahme ---------------------------------------------------------------
 
+/**
+ * Schließt eine Mengen-Ausgabe ganz oder teilweise. Eine Teilmenge teilt sie:
+ * Das Original behält den Rest und bleibt offen, ein neuer, geschlossener
+ * Eintrag trägt die genommene Menge. Schreibt nur — gelesen hat der Aufrufer.
+ */
+function closeMengeAusgabe(
+  tx: Transaction,
+  groupId: string,
+  line: { id: string; data: BekleidungAusgabe; menge: number },
+  datum: string,
+  bemerkung: string | undefined,
+  actor: Actor,
+): void {
+  const { id, data, menge } = line;
+  const updated = { updatedAt: actor.now, updatedBy: actor.uid };
+  const closedBemerkung = joinBemerkung(data.bemerkung, bemerkung);
+  if (menge === data.menge) {
+    tx.update(ausgabeCol(groupId).doc(id), {
+      zurueckAm: datum,
+      bemerkung: orDelete(closedBemerkung),
+      ...updated,
+    });
+    return;
+  }
+  tx.update(ausgabeCol(groupId).doc(id), { menge: data.menge - menge, ...updated });
+  const rest = { ...data };
+  delete rest.id;
+  tx.set(
+    ausgabeCol(groupId).doc(),
+    compact<Omit<BekleidungAusgabe, 'id'>>({
+      ...rest,
+      menge,
+      zurueckAm: datum,
+      bemerkung: closedBemerkung,
+      createdAt: actor.now,
+      createdBy: actor.uid,
+      ...updated,
+    }),
+  );
+}
+
 export interface ReturnInput {
   datum: string;
   bemerkung?: string;
@@ -955,31 +999,8 @@ async function returnItemsImpl(groupId: string, input: ReturnInput): Promise<voi
         ...updated,
       });
     }
-    for (const { id, data, menge } of lines) {
-      const closedBemerkung = joinBemerkung(data.bemerkung, bemerkung);
-      if (menge === data.menge) {
-        tx.update(ausgabeCol(groupId).doc(id), {
-          zurueckAm: input.datum,
-          bemerkung: orDelete(closedBemerkung),
-          ...updated,
-        });
-      } else {
-        tx.update(ausgabeCol(groupId).doc(id), { menge: data.menge - menge, ...updated });
-        const rest = { ...data };
-        delete rest.id;
-        tx.set(
-          ausgabeCol(groupId).doc(),
-          compact<Omit<BekleidungAusgabe, 'id'>>({
-            ...rest,
-            menge,
-            zurueckAm: input.datum,
-            bemerkung: closedBemerkung,
-            createdAt: actor.now,
-            createdBy: actor.uid,
-            ...updated,
-          }),
-        );
-      }
+    for (const line of lines) {
+      closeMengeAusgabe(tx, groupId, line, input.datum, bemerkung, actor);
     }
     for (const [id, entry] of deltas) {
       tx.set(
@@ -993,6 +1014,185 @@ async function returnItemsImpl(groupId: string, input: ReturnInput): Promise<voi
         }),
       );
     }
+  });
+}
+
+// --- Umhängen ----------------------------------------------------------------
+
+export interface ReassignInput {
+  personId: string;
+  datum: string;
+  bemerkung?: string;
+  stueckIds: string[];
+  mengen: { ausgabeId: string; menge: number }[];
+}
+
+/**
+ * Gibt ausgegebene Stücke und Mengen direkt an eine andere Person weiter,
+ * ohne Umweg über das Lager: Die bisherige Ausgabe wird mit `datum`
+ * geschlossen (eine Teilmenge geteilt wie bei der Rücknahme), die neue Person
+ * bekommt eine offene Ausgabe ab `datum`. Der Bestand bleibt unberührt, Charge
+ * und Eigentum einer Menge wandern mit.
+ */
+async function reassignItemsImpl(groupId: string, input: ReassignInput): Promise<void> {
+  const session = await actionBekleidungswartRequired(groupId);
+  const actor = actorOf(session);
+
+  assertSafeId(input?.personId, 'personId');
+  assertDate(input.datum);
+  const bemerkung = text(input.bemerkung, 2000);
+  const stueckIds = idList(input.stueckIds, 'stueckIds', MAX_ISSUE_STUECKE);
+  if (input.mengen !== undefined && !Array.isArray(input.mengen)) {
+    throw badRequest('invalid mengen');
+  }
+  const mengen = input.mengen ?? [];
+  if (mengen.length > MAX_ISSUE_MENGEN) throw badRequest('too many mengen');
+  const seen = new Set<string>();
+  for (const line of mengen) {
+    assertSafeId(line?.ausgabeId, 'ausgabeId');
+    if (!isPositiveInt(line.menge)) throw badRequest('invalid menge');
+    if (seen.has(line.ausgabeId)) throw badRequest('duplicate ausgabeId');
+    seen.add(line.ausgabeId);
+  }
+  if (stueckIds.length === 0 && mengen.length === 0) throw badRequest('nothingToReassign');
+
+  await firestore.runTransaction(async (tx: Transaction) => {
+    // --- lesen ---
+    const personSnap = await tx.get(personCol(groupId).doc(input.personId));
+    if (!personSnap.exists) throw notFound('person', input.personId);
+    if ((personSnap.data() as { active?: boolean }).active === false) {
+      throw conflict('personInactive');
+    }
+
+    const stuecke: {
+      id: string;
+      data: BekleidungStueck;
+      ausgabe?: { id: string; data: BekleidungAusgabe };
+    }[] = [];
+    for (const id of stueckIds) {
+      const snap = await tx.get(stueckCol(groupId).doc(id));
+      if (!snap.exists) throw notFound('stueck', id);
+      const data = asStueck(snap.data());
+      if (data.status !== 'ausgegeben') throw conflict(`notIssued:${id}`);
+      if (data.personId === input.personId) throw conflict('samePerson');
+      let ausgabe: { id: string; data: BekleidungAusgabe } | undefined;
+      if (data.ausgabeId) {
+        const aSnap = await tx.get(ausgabeCol(groupId).doc(data.ausgabeId));
+        if (aSnap.exists) ausgabe = { id: data.ausgabeId, data: asAusgabe(aSnap.data()) };
+      }
+      stuecke.push({ id, data, ausgabe });
+    }
+
+    const lines: { id: string; data: BekleidungAusgabe; menge: number }[] = [];
+    for (const line of mengen) {
+      const snap = await tx.get(ausgabeCol(groupId).doc(line.ausgabeId));
+      if (!snap.exists) throw notFound('ausgabe', line.ausgabeId);
+      const data = asAusgabe(snap.data());
+      if (data.zurueckAm || data.stueckId) throw conflict(`notIssued:${line.ausgabeId}`);
+      if (data.personId === input.personId) throw conflict('samePerson');
+      if (line.menge > data.menge) throw badRequest('invalid menge');
+      lines.push({ id: line.ausgabeId, data, menge: line.menge });
+    }
+
+    // --- schreiben ---
+    const updated = { updatedAt: actor.now, updatedBy: actor.uid };
+    const stamps = { createdAt: actor.now, createdBy: actor.uid, ...updated };
+    for (const { id, data, ausgabe } of stuecke) {
+      if (ausgabe && !ausgabe.data.zurueckAm) {
+        tx.update(ausgabeCol(groupId).doc(ausgabe.id), {
+          zurueckAm: input.datum,
+          bemerkung: orDelete(joinBemerkung(ausgabe.data.bemerkung, bemerkung)),
+          ...updated,
+        });
+      }
+      const ref = ausgabeCol(groupId).doc();
+      tx.set(
+        ref,
+        compact<Omit<BekleidungAusgabe, 'id'>>({
+          personId: input.personId,
+          stueckId: id,
+          artikelId: data.artikelId,
+          groesse: data.groesse,
+          menge: 1,
+          ausgegebenAm: input.datum,
+          bemerkung,
+          quelle: 'app',
+          ...stamps,
+        }),
+      );
+      tx.update(stueckCol(groupId).doc(id), {
+        personId: input.personId,
+        ausgabeId: ref.id,
+        ausgegebenAm: input.datum,
+        ...updated,
+      });
+    }
+    for (const line of lines) {
+      closeMengeAusgabe(tx, groupId, line, input.datum, bemerkung, actor);
+      tx.set(
+        ausgabeCol(groupId).doc(),
+        compact<Omit<BekleidungAusgabe, 'id'>>({
+          personId: input.personId,
+          artikelId: line.data.artikelId,
+          groesse: line.data.groesse,
+          charge: line.data.charge,
+          menge: line.menge,
+          ausgegebenAm: input.datum,
+          bemerkung: joinBemerkung(line.data.bemerkung, bemerkung),
+          quelle: 'app',
+          eigentum: line.data.eigentum,
+          ...stamps,
+        }),
+      );
+    }
+  });
+}
+
+// --- Bemerkungen -------------------------------------------------------------
+
+/** Bemerkung eines Stücks setzen; leer löscht sie. Sonst bleibt alles, wie es ist. */
+async function setStueckBemerkungImpl(
+  groupId: string,
+  stueckId: string,
+  bemerkung: string,
+): Promise<void> {
+  const session = await actionBekleidungswartRequired(groupId);
+  const actor = actorOf(session);
+  assertSafeId(stueckId, 'stueckId');
+  await setBemerkung(stueckCol(groupId).doc(stueckId), 'stueck', stueckId, bemerkung, actor);
+}
+
+/** Bemerkung einer Ausgabe setzen, offen oder geschlossen; leer löscht sie. */
+async function setAusgabeBemerkungImpl(
+  groupId: string,
+  ausgabeId: string,
+  bemerkung: string,
+): Promise<void> {
+  const session = await actionBekleidungswartRequired(groupId);
+  const actor = actorOf(session);
+  assertSafeId(ausgabeId, 'ausgabeId');
+  await setBemerkung(ausgabeCol(groupId).doc(ausgabeId), 'ausgabe', ausgabeId, bemerkung, actor);
+}
+
+async function setBemerkung(
+  ref: DocumentReference,
+  what: string,
+  id: string,
+  bemerkung: unknown,
+  actor: Actor,
+): Promise<void> {
+  if (bemerkung !== undefined && typeof bemerkung !== 'string') {
+    throw badRequest('invalid bemerkung');
+  }
+  const value = text(bemerkung, 2000);
+  await firestore.runTransaction(async (tx: Transaction) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw notFound(what, id);
+    tx.update(ref, {
+      bemerkung: orDelete(value),
+      updatedAt: actor.now,
+      updatedBy: actor.uid,
+    });
   });
 }
 
@@ -1439,6 +1639,10 @@ function sanitizeDecisions(
         throw badRequest('invalid person active');
       }
       persons[key] = active === false ? { create: name, active: false } : { create: name };
+    } else if (value && typeof value === 'object' && 'lagerort' in value) {
+      const lagerort = text(value.lagerort, 200);
+      if (!lagerort) throw badRequest('invalid lagerort');
+      persons[key] = { lagerort };
     } else {
       throw badRequest('invalid person decision');
     }
@@ -1693,6 +1897,29 @@ export async function returnItems(
   input: ReturnInput,
 ): Promise<ActionResult<{ success: true }>> {
   return asVoidResult(() => returnItemsImpl(groupId, input));
+}
+
+export async function reassignItems(
+  groupId: string,
+  input: ReassignInput,
+): Promise<ActionResult<{ success: true }>> {
+  return asVoidResult(() => reassignItemsImpl(groupId, input));
+}
+
+export async function setStueckBemerkung(
+  groupId: string,
+  stueckId: string,
+  bemerkung: string,
+): Promise<ActionResult<{ success: true }>> {
+  return asVoidResult(() => setStueckBemerkungImpl(groupId, stueckId, bemerkung));
+}
+
+export async function setAusgabeBemerkung(
+  groupId: string,
+  ausgabeId: string,
+  bemerkung: string,
+): Promise<ActionResult<{ success: true }>> {
+  return asVoidResult(() => setAusgabeBemerkungImpl(groupId, ausgabeId, bemerkung));
 }
 
 export async function setStueckStatus(

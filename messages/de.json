@@ -4316,7 +4316,9 @@
       "waschgaenge": "Waschgänge",
       "letzteWaesche": "Letzte Wäsche",
       "ausgegebenAm": "Ausgegeben am",
-      "ziel": "Ziel"
+      "ziel": "Ziel",
+      "artikelBemerkung": "Hinweis zum Artikel",
+      "zurueckAm": "Zurück am"
     },
     "filters": {
       "all": "Alle",
@@ -4326,7 +4328,9 @@
       "empty": "Keine Stücke gefunden.",
       "noTag": "ohne Tag",
       "notFound": "Kein Stück mit der Tag-Nummer „{code}“.",
-      "groupSummary": "{count} Stück · {lager} im Lager · {ausgegeben} ausgegeben"
+      "groupSummary": "{count} Stück · {lager} im Lager · {ausgegeben} ausgegeben",
+      "chargen": "Chargen: {list}",
+      "ohneCharge": "ohne Charge"
     },
     "detail": {
       "timeline": "Verlauf",
@@ -4492,7 +4496,8 @@
       "mergeColumn": "Zusammenführen mit",
       "mergeLabel": "Zusammenführen {name}",
       "mergeNone": "– eigener Artikel –",
-      "mergeHint": "Schreibvarianten desselben Artikels (z.B. das Handschuhmodell in der Herstellerspalte) lassen sich zu einem Artikel zusammenführen. Es gilt die Führung des Ziels."
+      "mergeHint": "Schreibvarianten desselben Artikels (z.B. das Handschuhmodell in der Herstellerspalte) lassen sich zu einem Artikel zusammenführen. Es gilt die Führung des Ziels.",
+      "asLager": "Ist ein Lager: „{name}“"
     },
     "scanner": {
       "title": "Tag scannen",
@@ -4531,7 +4536,21 @@
       "mergeMismatch": "Zusammenführen geht nur bei gleicher Kategorie und Führung.",
       "mergeTooLarge": "Zu viele Einträge, um sie in einem Schritt zusammenzuführen.",
       "hasWaeschen": "Für Stücke dieses Artikels sind Wäschen erfasst — er bleibt einzeln geführt.",
-      "convertTooLarge": "Der Artikel hat zu viele Stücke, um ihn in einem Schritt umzustellen."
+      "convertTooLarge": "Der Artikel hat zu viele Stücke, um ihn in einem Schritt umzustellen.",
+      "nothingToReassign": "Bitte mindestens ein Stück oder eine Menge wählen.",
+      "samePerson": "Das ist schon bei dieser Person."
+    },
+    "issueAction": {
+      "reassign": "Weitergeben",
+      "returnTitle": "Zurücknehmen",
+      "reassignTitle": "An eine andere Person weitergeben",
+      "newPerson": "Neue Person",
+      "menge": "Anzahl (höchstens {max})",
+      "reassignSubmit": "Weitergeben"
+    },
+    "bemerkung": {
+      "empty": "keine",
+      "edit": "Bemerkung bearbeiten"
     }
   },
   "geraetEinsatz": {

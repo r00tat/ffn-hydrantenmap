@@ -216,3 +216,22 @@ export function chargenInStock(
       !x.charge ? 1 : !y.charge ? -1 : collator.compare(chargeKey(x.charge), chargeKey(y.charge)),
     );
 }
+
+/**
+ * Stücke je Charge, nach Name; Stücke ohne Charge zuletzt. Hat kein Stück
+ * eine Charge, ist die Liste leer — dann gibt es nichts zu unterscheiden.
+ */
+export function chargeCounts(stuecke: BekleidungStueck[]): { charge?: string; count: number }[] {
+  const byKey = new Map<string, { charge?: string; count: number }>();
+  for (const s of stuecke) {
+    const key = chargeKey(s.charge);
+    const entry = byKey.get(key);
+    if (entry) entry.count += 1;
+    else byKey.set(key, { charge: normalizeCharge(s.charge), count: 1 });
+  }
+  if (byKey.size === 0 || (byKey.size === 1 && byKey.has(''))) return [];
+  const collator = new Intl.Collator('de', { numeric: true });
+  return [...byKey.values()].sort((x, y) =>
+    !x.charge ? 1 : !y.charge ? -1 : collator.compare(x.charge, y.charge),
+  );
+}

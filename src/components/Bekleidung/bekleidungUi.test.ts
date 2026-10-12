@@ -7,6 +7,7 @@ import type {
 } from '../../common/bekleidung';
 import {
   buildStueckTimeline,
+  chargeCounts,
   chargenInStock,
   daysBetween,
   findStueckByCode,
@@ -148,5 +149,24 @@ describe('mengeLabel', () => {
       'Handschuh · 10 · Brand',
     );
     expect(mengeLabel({ artikelId: 'h', groesse: '10' }, byId)).toBe('Handschuh · 10');
+  });
+});
+
+describe('chargeCounts', () => {
+  const piece = (charge?: string) => ({ charge }) as BekleidungStueck;
+
+  it('zählt je Charge, gleiche Schreibweisen zusammen, ohne Charge zuletzt', () => {
+    expect(
+      chargeCounts([piece(), piece('Rosenbauer'), piece('pfeifer'), piece('Pfeifer'), piece()]),
+    ).toEqual([
+      { charge: 'pfeifer', count: 2 },
+      { charge: 'Rosenbauer', count: 1 },
+      { count: 2 },
+    ]);
+  });
+
+  it('ist leer, wenn kein Stück eine Charge hat', () => {
+    expect(chargeCounts([piece(), piece()])).toEqual([]);
+    expect(chargeCounts([])).toEqual([]);
   });
 });

@@ -228,6 +228,14 @@ Dienstbekleidung):
   gesammelt auf aktiv. Eine inaktive Person kann nichts ausgefasst bekommen
   (`personInactive`); offene Ausgaben an sie übernimmt der Import unverändert,
   zurücknehmen geht weiterhin.
+- **Lager statt Person:** In den Namensspalten steht manchmal keine Person,
+  sondern ein Platz („Achtung! kaputt"). Dafür gibt es je Person die Wahl
+  **„Ist ein Lager"** (`{ lagerort }`, der Name wird zum Lagerort). Bleibt der
+  offene Block einer Zeile bei einem Lager, liegt das Stück mit diesem
+  Lagerort im Lager — bei Mengenartikeln zählt die Zeile zum Bestand. Ein
+  geschlossener Block bei einem Lager wird keine Ausgabe, sondern eine
+  Bemerkung am Stück („Im Excel bei „…" (von – bis)"): Ein Lager hat keine
+  Ausgabehistorie, und eine Person dieses Namens soll nicht entstehen.
 - **Leere Größe** wird `–` (`GROESSE_UNBEKANNT`): Ohne Größe hätte das Stück
   kein gültiges Pflichtfeld und der Mengenbestand keine Dokument-ID.
 - **Datum als ISO-Zeitstempel** (`2023-11-20T00:00:00.000Z`) gilt als
@@ -315,6 +323,27 @@ Details erst auf Klick auf. Im Lagerstand sind das die Größen samt Chargen, in
 der Stückliste die Stücke, je Artikel seitenweise zu 100. Engen Suche,
 Artikel- oder Personenfilter die Stückliste ein, sind die Treffer gleich
 aufgeklappt, denn wer sucht, will das Stück sehen.
+
+## Weitergeben und Bemerkungen
+
+Eine Ausgabe lässt sich aus dem Stück-Detail und im Personen-Reiter direkt
+öffnen: zurücknehmen, an eine andere Person **weitergeben** oder die Bemerkung
+ergänzen. Weitergeben (`reassignItems`) geht ohne Umweg über das Lager: Die
+bisherige Ausgabe wird mit dem Datum geschlossen, die neue Person bekommt ab
+demselben Datum eine offene. Der Bestand bleibt unberührt, Charge und Eigentum
+einer Menge wandern mit. Eine Teilmenge teilt die Ausgabe wie bei der
+Rücknahme (gemeinsamer Helfer `closeMengeAusgabe`). Dieselbe oder eine inaktive
+Person lehnt der Server ab (`samePerson`, `personInactive`).
+
+Bemerkungen gibt es am Artikel (Hinweis, im Stück- und Ausgabe-Detail
+mitgezeigt), am Stück und an jeder Ausgabe, auch einer geschlossenen. Die
+eigenen Actions `setStueckBemerkung` und `setAusgabeBemerkung` ändern nur
+dieses Feld, damit ein kurzer Nachtrag nicht die übrigen Stammdaten mit
+schreibt.
+
+In der Stückliste hat die Charge eine eigene Spalte, und die Artikelzeile
+nennt die Stücke je Charge — nach dem Zusammenführen steht dort, welche
+Hersteller in einem Artikeltyp stecken.
 
 ## Bewusst nicht enthalten
 

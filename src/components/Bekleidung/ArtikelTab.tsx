@@ -130,6 +130,7 @@ export default function ArtikelTab({ view }: { view: BekleidungView }) {
                     a.maxWaschgaenge
                       ? `${t('fields.maxWaschgaenge')}: ${a.maxWaschgaenge}`
                       : undefined,
+                    a.bemerkung,
                   ]
                     .filter(Boolean)
                     .join(' · ')}

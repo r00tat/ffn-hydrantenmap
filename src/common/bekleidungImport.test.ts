@@ -884,3 +884,59 @@ describe('Bereinigung in der Vorschau', () => {
     ).toThrow(/keepOpen/);
   });
 });
+
+describe('Lager statt Person', () => {
+  const einsatz = parseBekleidungSheet(einsatzGrid, 'einsatz');
+  const dienst = parseBekleidungSheet(dienstGrid, 'dienst');
+  const preview = buildImportPreview(einsatz, dienst, persons);
+  const base: ImportDecisions['persons'] = Object.fromEntries(
+    preview.persons.map((p) => [
+      p.key,
+      p.match.personId ? { personId: p.match.personId } : { create: `${p.vorname} ${p.nachname}` },
+    ]),
+  );
+  const today = '2026-10-08';
+
+  it('ein offener Block an ein Lager legt das Stück dort ins Lager', () => {
+    const plan = buildImportPlan(
+      preview,
+      { fuehrung: {}, persons: { ...base, 'erika musterfrau': { lagerort: 'Achtung! kaputt' } } },
+      today,
+    );
+    const stueck = plan.stuecke.find((s) => s.tagNummer === '22081702')!;
+    expect(stueck).toMatchObject({ status: 'lager', lagerort: 'Achtung! kaputt' });
+    expect(stueck.personKey).toBeUndefined();
+    expect(stueck.ausgegebenAm).toBeUndefined();
+    const ausgaben = plan.ausgaben.filter((a) => a.stueckTempId === stueck.tempId);
+    expect(ausgaben.map((a) => a.personKey)).toEqual(['max mustermann']);
+    expect(plan.personsToCreate.some((p) => p.key === 'erika musterfrau')).toBe(false);
+  });
+
+  it('ein geschlossener Block an ein Lager wird keine Ausgabe, sondern eine Bemerkung', () => {
+    const plan = buildImportPlan(
+      preview,
+      { fuehrung: {}, persons: { ...base, 'anna a': { lagerort: 'Reparatur' } } },
+      today,
+    );
+    const stueck = plan.stuecke.find((s) => s.tagNummer === '30030030')!;
+    const ausgaben = plan.ausgaben.filter((a) => a.stueckTempId === stueck.tempId);
+    expect(ausgaben).toHaveLength(3);
+    expect(ausgaben.some((a) => a.personKey === 'anna a')).toBe(false);
+    expect(stueck.bemerkung).toContain('Reparatur');
+    expect(stueck.lagerort).toBeUndefined();
+  });
+
+  it('Mengenartikel: eine offene Menge an ein Lager zählt zum Bestand', () => {
+    const plan = buildImportPlan(
+      preview,
+      { fuehrung: {}, persons: { ...base, 'max mustermann': { lagerort: 'Achtung! kaputt' } } },
+      today,
+    );
+    expect(plan.bestand).toContainEqual({
+      artikelKey: 'dienst|poloshirt|fa. x',
+      groesse: 'L',
+      anzahl: 2,
+    });
+    expect(plan.ausgaben.some((a) => a.personKey === 'max mustermann')).toBe(false);
+  });
+});

@@ -280,9 +280,12 @@ import {
   issue,
   mergeArtikel,
   previewBekleidungImport,
+  reassignItems,
   recordWaesche,
   returnItems,
   saveArtikel,
+  setAusgabeBemerkung,
+  setStueckBemerkung,
   setStueckStatus,
   updateStueck,
   type BekleidungActionError,
@@ -712,6 +715,138 @@ describe('returnItems', () => {
       }),
       'notIssued:au3',
     );
+  });
+});
+
+describe('reassignItems', () => {
+  beforeEach(() => fake.put(`${G}/person/p3`, { name: 'Hans Beispiel', active: true }));
+
+  it('hängt ein Stück um: alte Ausgabe zu, neue offen, Stück bei der neuen Person', async () => {
+    ok(
+      await reassignItems('ffnd', {
+        personId: 'p3',
+        datum: '2026-10-08',
+        bemerkung: 'getauscht',
+        stueckIds: ['s2'],
+        mengen: [],
+      }),
+    );
+    expect(get('bekleidungAusgabe/au1')).toMatchObject({
+      zurueckAm: '2026-10-08',
+      bemerkung: 'getauscht',
+    });
+    const stueck = get('bekleidungStueck/s2')!;
+    expect(stueck).toMatchObject({
+      status: 'ausgegeben',
+      personId: 'p3',
+      ausgegebenAm: '2026-10-08',
+      waschgaenge: 3,
+    });
+    expect(get(`bekleidungAusgabe/${stueck.ausgabeId as string}`)).toMatchObject({
+      personId: 'p3',
+      stueckId: 's2',
+      artikelId: 'jacke',
+      groesse: 'M3',
+      menge: 1,
+      ausgegebenAm: '2026-10-08',
+      bemerkung: 'getauscht',
+      quelle: 'app',
+      createdBy: 'u1',
+    });
+  });
+
+  it('ein Stück aus dem Import ohne Person bekommt nur die neue Ausgabe', async () => {
+    ok(
+      await reassignItems('ffnd', {
+        personId: 'p3',
+        datum: '2026-10-08',
+        stueckIds: ['s3'],
+        mengen: [],
+      }),
+    );
+    const stueck = get('bekleidungStueck/s3')!;
+    expect(stueck.personId).toBe('p3');
+    expect(list('bekleidungAusgabe').filter((a) => a.stueckId === 's3')).toHaveLength(1);
+  });
+
+  it('teilt eine Menge: Rest bleibt, der Teil wechselt ohne Lagerbuchung', async () => {
+    ok(
+      await reassignItems('ffnd', {
+        personId: 'p3',
+        datum: '2026-10-08',
+        stueckIds: [],
+        mengen: [{ ausgabeId: 'au2', menge: 2 }],
+      }),
+    );
+    expect(get('bekleidungAusgabe/au2')).toMatchObject({ menge: 1, personId: 'p1' });
+    expect(get('bekleidungAusgabe/au2')!.zurueckAm).toBeUndefined();
+    const polo = list('bekleidungAusgabe').filter((a) => a.artikelId === 'polo');
+    expect(polo).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ personId: 'p1', menge: 2, zurueckAm: '2026-10-08' }),
+        expect.objectContaining({
+          personId: 'p3',
+          menge: 2,
+          groesse: 'M',
+          ausgegebenAm: '2026-10-08',
+        }),
+      ]),
+    );
+    expect(polo.find((a) => a.personId === 'p3')!.zurueckAm).toBeUndefined();
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'M')}`)?.anzahl).toBe(5);
+  });
+
+  it('eine ganze Menge wechselt und schließt die alte Ausgabe', async () => {
+    ok(
+      await reassignItems('ffnd', {
+        personId: 'p3',
+        datum: '2026-10-08',
+        stueckIds: [],
+        mengen: [{ ausgabeId: 'au2', menge: 3 }],
+      }),
+    );
+    expect(get('bekleidungAusgabe/au2')).toMatchObject({ menge: 3, zurueckAm: '2026-10-08' });
+    const neu = list('bekleidungAusgabe').find((a) => a.personId === 'p3')!;
+    expect(neu).toMatchObject({ artikelId: 'polo', menge: 3, bemerkung: 'Sommer' });
+  });
+
+  it('lehnt eine inaktive Person, dieselbe Person und ein Stück im Lager ab', async () => {
+    const input = { datum: '2026-10-08', stueckIds: ['s2'], mengen: [] };
+    await failsWith(reassignItems('ffnd', { ...input, personId: 'p2' }), 'personInactive');
+    await failsWith(reassignItems('ffnd', { ...input, personId: 'p1' }), 'samePerson');
+    await failsWith(
+      reassignItems('ffnd', { ...input, personId: 'p3', stueckIds: ['s1'] }),
+      'notIssued:s1',
+    );
+    expect(get('bekleidungStueck/s2')!.personId).toBe('p1');
+  });
+});
+
+describe('Bemerkungen ergänzen', () => {
+  it('setzt und löscht die Bemerkung eines Stücks', async () => {
+    ok(await setStueckBemerkung('ffnd', 's1', ' Naht   offen '));
+    expect(get('bekleidungStueck/s1')).toMatchObject({ bemerkung: 'Naht offen', updatedBy: 'u1' });
+    ok(await setStueckBemerkung('ffnd', 's1', ''));
+    expect(get('bekleidungStueck/s1')!.bemerkung).toBeUndefined();
+  });
+
+  it('setzt die Bemerkung einer Ausgabe', async () => {
+    ok(await setAusgabeBemerkung('ffnd', 'au2', 'Winter'));
+    expect(get('bekleidungAusgabe/au2')!.bemerkung).toBe('Winter');
+    await failsWith(setAusgabeBemerkung('ffnd', 'nope', 'x'), 'ausgabe nope not found');
+  });
+
+  it('speichert die Bemerkung eines Artikels', async () => {
+    ok(
+      await saveArtikel('ffnd', 'polo', {
+        kategorie: 'dienst',
+        bezeichnung: 'Polo',
+        fuehrung: 'menge',
+        aktiv: true,
+        bemerkung: 'nur Größen bis XL',
+      }),
+    );
+    expect(get('bekleidungArtikel/polo')!.bemerkung).toBe('nur Größen bis XL');
   });
 });
 
@@ -1507,6 +1642,36 @@ describe('importBekleidung', () => {
     );
     const erika = list('person').find((p) => p.name === 'Erika Beispiel')!;
     expect(erika).toMatchObject({ active: false, createdBy: 'u1' });
+  });
+
+  it('führt eine „Person" auf Wunsch als Lager', async () => {
+    clearBekleidung();
+    const result = ok(
+      await importBekleidung('ffnd', workbook(), {
+        ...decisions,
+        persons: { ...decisions.persons, 'max mustermann': { lagerort: 'Achtung! kaputt' } },
+      }),
+    );
+    expect(result.ausgaben).toBe(1);
+    const stueck = list('bekleidungStueck').find((s) => s.tagNummer === '22081702')!;
+    expect(stueck).toMatchObject({ status: 'lager', lagerort: 'Achtung! kaputt' });
+    expect(stueck.personId).toBeUndefined();
+    expect(stueck.ausgabeId).toBeUndefined();
+    const hemd = list('bekleidungArtikel').find((a) => a.bezeichnung === 'Hemd')!;
+    expect(get(`bekleidungBestand/${bestandDocId(hemd.id as string, 'L')}`)).toMatchObject({
+      anzahl: 1,
+    });
+    expect(list('person').some((p) => p.name === 'Achtung! kaputt')).toBe(false);
+  });
+
+  it('lehnt ein leeres Lager ab', async () => {
+    clearBekleidung();
+    await failsWith(
+      importBekleidung('ffnd', workbook(), {
+        ...decisions,
+        persons: { ...decisions.persons, 'max mustermann': { lagerort: '  ' } },
+      }),
+    );
   });
 
   it('lehnt einen ungültigen Aktiv-Wert ab', async () => {

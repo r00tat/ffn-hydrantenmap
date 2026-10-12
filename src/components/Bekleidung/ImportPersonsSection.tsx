@@ -17,6 +17,11 @@ import type { FahrtenbuchPerson } from '../../common/fahrtenbuch';
 export const CREATE_PERSON = '__new__';
 /** Auswahlwert „neu anlegen, aber inaktiv" — ehemalige Mitglieder. */
 export const CREATE_PERSON_INACTIVE = '__new_inactive__';
+/**
+ * Auswahlwert „ist ein Lager": Im Excel steht dort keine Person, sondern ein
+ * Platz wie „Achtung! kaputt". Der Name wird zum Lagerort.
+ */
+export const AS_LAGER = '__lager__';
 
 type PreviewPerson = ImportPreview['persons'][number];
 
@@ -41,10 +46,7 @@ export function defaultPersonChoices(preview: ImportPreview): Record<string, str
 }
 
 /** Anzahl der Personen ohne Entscheidung — solange > 0, ist der Import gesperrt. */
-export function openPersonChoices(
-  preview: ImportPreview,
-  choices: Record<string, string>,
-): number {
+export function openPersonChoices(preview: ImportPreview, choices: Record<string, string>): number {
   return preview.persons.filter((p) => !choices[p.key]).length;
 }
 
@@ -62,7 +64,9 @@ export function personDecisions(
         ? { create: importPersonName(p) }
         : choice === CREATE_PERSON_INACTIVE
           ? { create: importPersonName(p), active: false }
-          : { personId: choice };
+          : choice === AS_LAGER
+            ? { lagerort: importPersonName(p) }
+            : { personId: choice };
   }
   return decisions;
 }
@@ -158,6 +162,9 @@ export default function ImportPersonsSection({
                         <MenuItem value={CREATE_PERSON}>{t('import.createNew')}</MenuItem>
                         <MenuItem value={CREATE_PERSON_INACTIVE}>
                           {t('import.createNewInactive')}
+                        </MenuItem>
+                        <MenuItem value={AS_LAGER}>
+                          {t('import.asLager', { name: importPersonName(p) })}
                         </MenuItem>
                         {options.map((id) => (
                           <MenuItem key={id} value={id}>

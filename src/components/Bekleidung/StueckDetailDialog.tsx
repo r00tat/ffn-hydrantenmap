@@ -20,8 +20,10 @@ import { useMemo, useState } from 'react';
 import { totalWaschgaenge, waschLimitState } from '../../common/bekleidung';
 import { callAction } from '../Geraete/admin/actionResult';
 import OnlineOnly from '../site/OnlineOnly';
-import { setStueckStatus } from './bekleidungActions';
+import BemerkungEditor from './BemerkungEditor';
+import { setStueckBemerkung, setStueckStatus } from './bekleidungActions';
 import { useBekleidungErrorText } from './bekleidungErrors';
+import IssueActionPanel, { type IssueAction } from './IssueActionPanel';
 import {
   buildStueckTimeline,
   isoDateToDate,
@@ -32,13 +34,20 @@ import {
 
 type TargetStatus = 'ausgeschieden' | 'nicht_auffindbar' | 'lager';
 
-const STATUS_ACTIONS: { status: TargetStatus; key: 'markLager' | 'markAusgeschieden' | 'markNichtAuffindbar' }[] = [
+const STATUS_ACTIONS: {
+  status: TargetStatus;
+  key: 'markLager' | 'markAusgeschieden' | 'markNichtAuffindbar';
+}[] = [
   { status: 'lager', key: 'markLager' },
   { status: 'ausgeschieden', key: 'markAusgeschieden' },
   { status: 'nicht_auffindbar', key: 'markNichtAuffindbar' },
 ];
 
-/** Stammdaten, Waschzähler und Verlauf eines Stücks. */
+/**
+ * Stammdaten, Waschzähler und Verlauf eines Stücks. Die Bemerkung lässt sich
+ * direkt ergänzen; ein ausgegebenes Stück lässt sich hier zurücknehmen oder
+ * an eine andere Person weitergeben.
+ */
 export default function StueckDetailDialog({
   open,
   view,
@@ -57,6 +66,7 @@ export default function StueckDetailDialog({
   const errorText = useBekleidungErrorText();
   const stueck = view.stueckById.get(stueckId);
   const [target, setTarget] = useState<TargetStatus>();
+  const [issueAction, setIssueAction] = useState<IssueAction>();
   const [datum, setDatum] = useState(todayLocalDate);
   const [bemerkung, setBemerkung] = useState('');
   const [busy, setBusy] = useState(false);
@@ -91,6 +101,20 @@ export default function StueckDetailDialog({
     setBemerkung('');
   };
 
+  const saveBemerkung = async (value: string) => {
+    const outcome = await callAction(() => setStueckBemerkung(view.groupId, stueckId, value));
+    return outcome.ok ? undefined : errorText(outcome.error);
+  };
+
+  const openStatus = (status: TargetStatus) => {
+    setIssueAction(undefined);
+    setTarget(status);
+  };
+  const openIssueAction = (action: IssueAction) => {
+    setTarget(undefined);
+    setIssueAction(action);
+  };
+
   const fields: [string, string | undefined][] = [
     [t('fields.kategorie'), artikel ? t(`kategorie.${artikel.kategorie}`) : undefined],
     [t('fields.hersteller'), artikel?.hersteller],
@@ -103,7 +127,7 @@ export default function StueckDetailDialog({
     [t('fields.ausgegebenAm'), stueck.ausgegebenAm ? date(stueck.ausgegebenAm) : undefined],
     [t('fields.lagerort'), stueck.lagerort],
     [t('fields.letzteWaesche'), stueck.letzteWaescheAm ? date(stueck.letzteWaescheAm) : undefined],
-    [t('fields.bemerkung'), stueck.bemerkung],
+    [t('fields.artikelBemerkung'), artikel?.bemerkung],
   ];
 
   return (
@@ -114,7 +138,13 @@ export default function StueckDetailDialog({
           {error && <Alert severity="error">{error}</Alert>}
           <Box
             component="dl"
-            sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 2, rowGap: 0.5, m: 0 }}
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr',
+              columnGap: 2,
+              rowGap: 0.5,
+              m: 0,
+            }}
           >
             {fields
               .filter(([, value]) => value)
@@ -129,11 +159,18 @@ export default function StueckDetailDialog({
                 </Box>
               ))}
           </Box>
+          <BemerkungEditor
+            key={stueck.bemerkung ?? ''}
+            value={stueck.bemerkung}
+            onSave={saveBemerkung}
+          />
           <Typography variant="body1" component="div">
             {stueck.waschgaengeAltbestand > 0
               ? t('detail.washCounterAlt', { total, alt: stueck.waschgaengeAltbestand })
               : t('detail.washCounter', { total })}
-            {artikel?.maxWaschgaenge ? ` ${t('detail.washMax', { max: artikel.maxWaschgaenge })}` : ''}
+            {artikel?.maxWaschgaenge
+              ? ` ${t('detail.washMax', { max: artikel.maxWaschgaenge })}`
+              : ''}
             {limit !== 'ok' && (
               <Chip
                 size="small"
@@ -183,6 +220,18 @@ export default function StueckDetailDialog({
             </List>
           )}
 
+          {issueAction && (
+            <IssueActionPanel
+              view={view}
+              action={issueAction}
+              stueckId={stueckId}
+              currentPersonId={stueck.personId}
+              onCancel={() => setIssueAction(undefined)}
+              onDone={() => setIssueAction(undefined)}
+              onError={setError}
+            />
+          )}
+
           {target && (
             <Paper variant="outlined" sx={{ p: 2 }}>
               <Stack spacing={2}>
@@ -220,9 +269,18 @@ export default function StueckDetailDialog({
         </Stack>
       </DialogContent>
       <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+        {stueck.status === 'ausgegeben' &&
+          !issueAction &&
+          (['return', 'reassign'] as const).map((action) => (
+            <OnlineOnly key={action}>
+              <Button size="small" onClick={() => openIssueAction(action)}>
+                {t(action === 'return' ? 'actions.zuruecknehmen' : 'issueAction.reassign')}
+              </Button>
+            </OnlineOnly>
+          ))}
         {STATUS_ACTIONS.filter((a) => a.status !== stueck.status).map((a) => (
           <OnlineOnly key={a.status}>
-            <Button size="small" onClick={() => setTarget(a.status)}>
+            <Button size="small" onClick={() => openStatus(a.status)}>
               {t(`detail.${a.key}`)}
             </Button>
           </OnlineOnly>

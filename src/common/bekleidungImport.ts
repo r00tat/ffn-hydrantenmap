@@ -536,11 +536,17 @@ export interface ImportDecisions {
    */
   merge?: Record<string, string>;
   /**
-   * person key → bestehende Person oder neu anzulegender Name. Ohne
-   * `active` wird die neue Person aktiv angelegt.
+   * person key → bestehende Person, neu anzulegender Name oder ein Lager.
+   * Ohne `active` wird die neue Person aktiv angelegt. `lagerort`: Der
+   * „Name" im Excel ist keine Person, sondern ein Platz („Achtung! kaputt") —
+   * eine offene Ausgabe dorthin legt das Stück mit diesem Lagerort ins
+   * Lager, eine geschlossene wird nur als Bemerkung vermerkt.
    */
-  persons: Record<string, { personId: string } | { create: string; active?: boolean }>;
+  persons: Record<string, ImportPersonDecision>;
 }
+
+export type ImportPersonDecision =
+  { personId: string } | { create: string; active?: boolean } | { lagerort: string };
 
 export interface ImportPlan {
   artikel: (Omit<BekleidungArtikel, keyof Stamps | 'id'> & { key: string })[];
@@ -622,6 +628,12 @@ export function buildImportPlan(
 
   // Personen: jede verwendete braucht eine Entscheidung.
   const personsToCreate: ImportPlan['personsToCreate'] = [];
+  const lagerOf = (block: ImportAusgabeBlock) => {
+    const decision = decisions.persons[personKeyOf(block)];
+    return decision && 'lagerort' in decision
+      ? collapse(decision.lagerort) || undefined
+      : undefined;
+  };
   const usedPersons = new Set<string>();
   for (const row of preview.rows) {
     for (const block of row.ausgaben) {
@@ -651,7 +663,7 @@ export function buildImportPlan(
 
     // Bereinigung aus der Vorschau anwenden und nachvollziehbar vermerken.
     const decision = decisions.rows?.[importRowRef(excelRow)];
-    const row: ImportRow = {
+    let row: ImportRow = {
       ...excelRow,
       status: decision?.status ?? excelRow.status,
       tagNummer: effectiveTag(excelRow, decision),
@@ -665,10 +677,28 @@ export function buildImportPlan(
       bemerkungen.push(`Tag-Nummer beim Import geändert (Excel: ${excelRow.tagNummer ?? 'leer'})`);
     }
 
-    const keepOpen = keepOpenIndex(row, decision?.keepOpen);
+    let keepOpen = keepOpenIndex(row, decision?.keepOpen);
+
+    // Blöcke, deren „Person" ein Lager ist, werden keine Ausgaben. Bleibt der
+    // offene Block bei einem Lager, liegt das Stück dort.
+    const openBlock = keepOpen >= 0 ? row.ausgaben[keepOpen] : undefined;
+    const openLager = openBlock ? lagerOf(openBlock) : undefined;
+    if (openLager) {
+      row = { ...row, status: 'lager' };
+      keepOpen = -1;
+    }
+    for (const block of row.ausgaben) {
+      const lager = lagerOf(block);
+      if (!lager || (openLager && block === openBlock)) continue;
+      const range = [block.ausgegebenAm, block.zurueckAm].filter(Boolean).join(' – ');
+      bemerkungen.push(`Im Excel bei „${lager}"${range ? ` (${range})` : ''}`);
+    }
+    const personBlocks = row.ausgaben
+      .map((block, index) => ({ block, index }))
+      .filter(({ block }) => !lagerOf(block));
 
     const tempId = `${row.sheet}-${row.rowNumber}`;
-    const rowAusgaben: PlanAusgabe[] = row.ausgaben.map((block, index) => {
+    const rowAusgaben: PlanAusgabe[] = personBlocks.map(({ block, index }) => {
       let zurueckAm = block.zurueckAm;
       let bemerkung: string | undefined;
       if (zurueckAm === UNKNOWN_RETURN_DATE) {
@@ -711,6 +741,7 @@ export function buildImportPlan(
           charge: row.charge,
           eigentum: row.eigentum,
           status: row.status,
+          lagerort: openLager,
           bemerkung: bemerkungen.length > 0 ? bemerkungen.join('; ') : undefined,
           ausgegebenAm: open?.ausgegebenAm,
           waschgaenge: 0,

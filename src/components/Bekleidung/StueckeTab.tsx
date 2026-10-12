@@ -30,7 +30,7 @@ import {
 import OnlineOnly from '../site/OnlineOnly';
 import BekleidungScanDialog from './BekleidungScanDialog';
 import ExpandToggle, { toggleKey } from './ExpandToggle';
-import { findStueckByCode, type BekleidungView } from './bekleidungUi';
+import { chargeCounts, findStueckByCode, type BekleidungView } from './bekleidungUi';
 import StueckDetailDialog from './StueckDetailDialog';
 import StueckEditDialog from './StueckEditDialog';
 
@@ -231,6 +231,7 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
               <TableRow>
                 <TableCell>{t('fields.tagNummer')}</TableCell>
                 <TableCell>{t('fields.groesse')}</TableCell>
+                <TableCell>{t('fields.charge')}</TableCell>
                 <TableCell>{t('fields.status')}</TableCell>
                 <TableCell>{t('fields.person')}</TableCell>
                 <TableCell align="right">{t('fields.waschgaenge')}</TableCell>
@@ -245,6 +246,7 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
                 const limit = limits[group.artikelId] ?? PAGE_SIZE;
                 const count = (status: BekleidungStatus) =>
                   group.stuecke.filter((s) => s.status === status).length;
+                const chargen = chargeCounts(group.stuecke);
                 return (
                   <Fragment key={group.artikelId}>
                     <TableRow
@@ -258,12 +260,18 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
                         )}
                         {name}
                       </TableCell>
-                      <TableCell colSpan={4} sx={{ color: 'text.secondary' }}>
+                      <TableCell colSpan={5} sx={{ color: 'text.secondary' }}>
                         {t('stuecke.groupSummary', {
                           count: group.stuecke.length,
                           lager: count('lager'),
                           ausgegeben: count('ausgegeben'),
                         })}
+                        {chargen.length > 0 &&
+                          ` · ${t('stuecke.chargen', {
+                            list: chargen
+                              .map((c) => `${c.charge ?? t('stuecke.ohneCharge')} ${c.count}`)
+                              .join(', '),
+                          })}`}
                       </TableCell>
                     </TableRow>
                     {open &&
@@ -287,9 +295,8 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
                                 />
                               )}
                             </TableCell>
-                            <TableCell>
-                              {[s.groesse, normalizeCharge(s.charge)].filter(Boolean).join(' · ')}
-                            </TableCell>
+                            <TableCell>{s.groesse}</TableCell>
+                            <TableCell>{normalizeCharge(s.charge) ?? ''}</TableCell>
                             <TableCell>{t(`status.${s.status}`)}</TableCell>
                             <TableCell>
                               {(s.personId && view.personById.get(s.personId)?.name) ?? ''}
@@ -313,7 +320,7 @@ export default function StueckeTab({ view }: { view: BekleidungView }) {
                       })}
                     {open && group.stuecke.length > limit && (
                       <TableRow>
-                        <TableCell colSpan={5} align="center">
+                        <TableCell colSpan={6} align="center">
                           <Button
                             onClick={() =>
                               setLimits((prev) => ({

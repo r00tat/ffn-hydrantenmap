@@ -48,6 +48,7 @@ export default function ArtikelEditDialog({
     artikel?.maxWaschgaenge ? String(artikel.maxWaschgaenge) : '',
   );
   const [aktiv, setAktiv] = useState(artikel?.aktiv ?? true);
+  const [bemerkung, setBemerkung] = useState(artikel?.bemerkung ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -70,6 +71,7 @@ export default function ArtikelEditDialog({
         maxWaschgaenge:
           fuehrung === 'einzeln' && maxWaschgaenge.trim() ? maxNumber : undefined,
         aktiv,
+        bemerkung: bemerkung.trim() || undefined,
       }),
     );
     setBusy(false);
@@ -127,6 +129,12 @@ export default function ArtikelEditDialog({
               slotProps={{ htmlInput: { min: 1, step: 1 } }}
             />
           )}
+          <TextField
+            label={t('fields.bemerkung')}
+            value={bemerkung}
+            onChange={(e) => setBemerkung(e.target.value)}
+            multiline
+          />
           <FormControlLabel
             control={<Switch checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} />}
             label={t('fields.aktiv')}

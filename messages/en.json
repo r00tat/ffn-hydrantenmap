@@ -4316,7 +4316,9 @@
       "waschgaenge": "Washes",
       "letzteWaesche": "Last wash",
       "ausgegebenAm": "Issued on",
-      "ziel": "Destination"
+      "ziel": "Destination",
+      "artikelBemerkung": "Article note",
+      "zurueckAm": "Returned on"
     },
     "filters": {
       "all": "All",
@@ -4326,7 +4328,9 @@
       "empty": "No items found.",
       "noTag": "no tag",
       "notFound": "No item with tag number \"{code}\".",
-      "groupSummary": "{count, plural, one {# piece} other {# pieces}} · {lager} in stock · {ausgegeben} issued"
+      "groupSummary": "{count, plural, one {# piece} other {# pieces}} · {lager} in stock · {ausgegeben} issued",
+      "chargen": "Batches: {list}",
+      "ohneCharge": "no batch"
     },
     "detail": {
       "timeline": "History",
@@ -4492,7 +4496,8 @@
       "mergeColumn": "Merge into",
       "mergeLabel": "Merge {name}",
       "mergeNone": "– own item –",
-      "mergeHint": "Spelling variants of the same item (e.g. the glove model in the manufacturer column) can be merged into one item. The target's tracking applies."
+      "mergeHint": "Spelling variants of the same item (e.g. the glove model in the manufacturer column) can be merged into one item. The target's tracking applies.",
+      "asLager": "Is a storage place: “{name}”"
     },
     "scanner": {
       "title": "Scan tag",
@@ -4531,7 +4536,21 @@
       "mergeMismatch": "Items can only be merged with the same category and tracking.",
       "mergeTooLarge": "Too many entries to merge in one step.",
       "hasWaeschen": "Washes are recorded for pieces of this article — it stays tracked individually.",
-      "convertTooLarge": "The article has too many pieces to convert in one step."
+      "convertTooLarge": "The article has too many pieces to convert in one step.",
+      "nothingToReassign": "Please choose at least one item or quantity.",
+      "samePerson": "This person already has it."
+    },
+    "issueAction": {
+      "reassign": "Hand over",
+      "returnTitle": "Return",
+      "reassignTitle": "Hand over to another person",
+      "newPerson": "New person",
+      "menge": "Quantity (at most {max})",
+      "reassignSubmit": "Hand over"
+    },
+    "bemerkung": {
+      "empty": "none",
+      "edit": "Edit note"
     }
   },
   "geraetEinsatz": {

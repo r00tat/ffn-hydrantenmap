@@ -6,14 +6,16 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
-import type { BekleidungAusgabe } from '../../common/bekleidung';
+import type { BekleidungAusgabe, BekleidungStueck } from '../../common/bekleidung';
 import OnlineOnly from '../site/OnlineOnly';
+import AusgabeDetailDialog from './AusgabeDetailDialog';
 import {
   daysBetween,
   isoDateToDate,
@@ -23,11 +25,14 @@ import {
   type BekleidungView,
 } from './bekleidungUi';
 import PersonCreateDialog from './PersonCreateDialog';
+import StueckDetailDialog from './StueckDetailDialog';
+import StueckEditDialog from './StueckEditDialog';
 
 /**
  * Was eine Person gerade hat und früher hatte, mit Zeitraum und Dauer.
  * Private Stücke sind gekennzeichnet; eine Ausgabe ohne Datum (Import)
- * steht als „unbekannt" da.
+ * steht als „unbekannt" da. Ein Eintrag öffnet das Stück bzw. die Ausgabe —
+ * dort lässt sich eine Bemerkung ergänzen, zurücknehmen oder weitergeben.
  */
 export default function PersonenTab({
   view,
@@ -42,6 +47,14 @@ export default function PersonenTab({
   const format = useFormatter();
   const [personId, setPersonId] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [detail, setDetail] = useState<{ stueckId: string } | { ausgabeId: string }>();
+  const [editStueck, setEditStueck] = useState<BekleidungStueck>();
+
+  // Ein Stück öffnet seinen Detaildialog, solange es das Stück noch gibt.
+  const openEntry = (a: BekleidungAusgabe) => {
+    if (a.stueckId && view.stueckById.has(a.stueckId)) setDetail({ stueckId: a.stueckId });
+    else if (a.id) setDetail({ ausgabeId: a.id });
+  };
 
   const items = useMemo(
     () => (personId ? personItems(personId, view.ausgaben) : undefined),
@@ -124,16 +137,18 @@ export default function PersonenTab({
           ) : (
             <List dense disablePadding>
               {items.current.map((a) => (
-                <ListItem key={a.id} divider>
-                  <ListItemText
-                    primary={primary(a)}
-                    secondary={
-                      a.ausgegebenAm
-                        ? t('personen.seit', { date: date(a.ausgegebenAm) })
-                        : t('personen.unknown')
-                    }
-                    slotProps={{ primary: { component: 'div' } }}
-                  />
+                <ListItem key={a.id} divider disablePadding>
+                  <ListItemButton onClick={() => openEntry(a)}>
+                    <ListItemText
+                      primary={primary(a)}
+                      secondary={
+                        a.ausgegebenAm
+                          ? t('personen.seit', { date: date(a.ausgegebenAm) })
+                          : t('personen.unknown')
+                      }
+                      slotProps={{ primary: { component: 'div' } }}
+                    />
+                  </ListItemButton>
                 </ListItem>
               ))}
             </List>
@@ -145,20 +160,25 @@ export default function PersonenTab({
           ) : (
             <List dense disablePadding>
               {items.history.map((a) => (
-                <ListItem key={a.id} divider>
-                  <ListItemText
-                    primary={primary(a)}
-                    secondary={[
-                      t('personen.zeitraum', { from: date(a.ausgegebenAm), to: date(a.zurueckAm) }),
-                      a.ausgegebenAm && a.zurueckAm
-                        ? t('personen.dauer', { days: daysBetween(a.ausgegebenAm, a.zurueckAm) })
-                        : undefined,
-                      a.bemerkung,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                    slotProps={{ primary: { component: 'div' } }}
-                  />
+                <ListItem key={a.id} divider disablePadding>
+                  <ListItemButton onClick={() => openEntry(a)}>
+                    <ListItemText
+                      primary={primary(a)}
+                      secondary={[
+                        t('personen.zeitraum', {
+                          from: date(a.ausgegebenAm),
+                          to: date(a.zurueckAm),
+                        }),
+                        a.ausgegebenAm && a.zurueckAm
+                          ? t('personen.dauer', { days: daysBetween(a.ausgegebenAm, a.zurueckAm) })
+                          : undefined,
+                        a.bemerkung,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                      slotProps={{ primary: { component: 'div' } }}
+                    />
+                  </ListItemButton>
                 </ListItem>
               ))}
             </List>
@@ -166,6 +186,34 @@ export default function PersonenTab({
         </Stack>
       )}
 
+      {detail && 'stueckId' in detail && (
+        <StueckDetailDialog
+          open
+          view={view}
+          stueckId={detail.stueckId}
+          onClose={() => setDetail(undefined)}
+          onEdit={() => {
+            setEditStueck(view.stueckById.get(detail.stueckId));
+            setDetail(undefined);
+          }}
+        />
+      )}
+      {detail && 'ausgabeId' in detail && (
+        <AusgabeDetailDialog
+          open
+          view={view}
+          ausgabeId={detail.ausgabeId}
+          onClose={() => setDetail(undefined)}
+        />
+      )}
+      {editStueck && (
+        <StueckEditDialog
+          open
+          view={view}
+          stueck={editStueck}
+          onClose={() => setEditStueck(undefined)}
+        />
+      )}
       {createOpen && (
         <PersonCreateDialog
           open

@@ -42,6 +42,7 @@ export interface BekleidungArtikel extends Stamps {
   fuehrung: BekleidungFuehrung;
   maxWaschgaenge?: number;
   aktiv: boolean;
+  bemerkung?: string;
 }
 
 export interface BekleidungStueck extends Stamps {

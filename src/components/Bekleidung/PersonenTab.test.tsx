@@ -7,6 +7,9 @@ import { makeAusgabe, sampleData, sampleView } from './bekleidungFixtures';
 
 const { createPersonForBekleidung } = vi.hoisted(() => ({ createPersonForBekleidung: vi.fn() }));
 vi.mock('./bekleidungActions', () => ({ createPersonForBekleidung }));
+vi.mock('../../hooks/useBarcodeScanner', () => ({
+  default: () => ({ videoRef: { current: null }, status: 'unsupported', frames: 0 }),
+}));
 vi.mock('../../hooks/useOnline', () => ({ default: () => true }));
 
 import PersonenTab from './PersonenTab';
@@ -19,9 +22,7 @@ describe('PersonenTab', () => {
     data.ausgaben.push(makeAusgabe({ id: 'a4', stueckId: 's3', groesse: 'XL' }));
     const onReturn = vi.fn();
     const user = userEvent.setup();
-    renderWithIntl(
-      <PersonenTab view={sampleView(data)} onIssue={vi.fn()} onReturn={onReturn} />,
-    );
+    renderWithIntl(<PersonenTab view={sampleView(data)} onIssue={vi.fn()} onReturn={onReturn} />);
     await user.click(screen.getByRole('combobox', { name: 'Person wählen' }));
     expect(screen.getByRole('option', { name: 'Erika Mustermann (inaktiv)' })).toBeInTheDocument();
     await user.click(screen.getByRole('option', { name: 'Max Mustermann' }));
@@ -36,6 +37,23 @@ describe('PersonenTab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Zurücknehmen' }));
     expect(onReturn).toHaveBeenCalledWith('p1');
+  });
+
+  it('öffnet aus der Liste das Stück bzw. die Mengen-Ausgabe', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<PersonenTab view={sampleView()} onIssue={vi.fn()} onReturn={vi.fn()} />);
+    await user.click(screen.getByRole('combobox', { name: 'Person wählen' }));
+    await user.click(screen.getByRole('option', { name: 'Max Mustermann' }));
+
+    await user.click(screen.getByText('Einsatzjacke · M · #1002'));
+    let dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('Weitergeben');
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+
+    await user.click(screen.getByText('Poloshirt · M · 2 Stk.'));
+    dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('Poloshirt · M');
+    expect(dialog).toHaveTextContent('Weitergeben');
   });
 
   it('kennzeichnet private Mengen-Ausgaben aus dem Import', async () => {
