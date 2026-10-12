@@ -4452,7 +4452,7 @@
       "convertHint": "Tag numbers and wash counters of the pieces are lost. The change cannot be undone.",
       "convertWaeschen": "Washes recorded in the app belong to the pieces and would be lost. An article with recorded washes stays tracked individually.",
       "mergeAsCharge": "Use manufacturer as batch",
-      "mergeAsChargeHint": "Pieces, issues and stock without a batch get the manufacturer of their previous article as batch — including those of the target, whose manufacturer is then cleared."
+      "mergeAsChargeHint": "The manufacturer of the previous article goes into the batch of pieces, issues and stock – in front of an existing batch (“Haix Fire Flash”), otherwise on its own. This includes the target, whose manufacturer is then cleared."
     },
     "import": {
       "title": "Import from Excel",

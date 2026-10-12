@@ -124,6 +124,23 @@ export function chargeKey(charge: string | undefined): string {
 }
 
 /**
+ * Charge nach dem Zusammenführen: Hersteller vor die vorhandene Charge. Beginnt
+ * sie schon mit dem Hersteller (Excel: Hersteller „Jolly", Charge „Jolly"),
+ * bleibt sie, wie sie ist.
+ */
+export function chargeWithHersteller(
+  hersteller: string | undefined,
+  charge: string | undefined,
+): string | undefined {
+  const prefix = normalizeCharge(hersteller);
+  const existing = normalizeCharge(charge);
+  if (!prefix) return existing;
+  if (!existing) return prefix;
+  if (chargeKey(existing).startsWith(chargeKey(prefix))) return existing;
+  return `${prefix} ${existing}`;
+}
+
+/**
  * Dokument-ID des Mengenbestands je Artikel, Größe und Charge. Die Größe wird
  * kodiert, weil „52/54" sonst einen Pfadtrenner enthielte. Ohne Charge bleibt
  * die ID wie vor den Chargen; mit Charge folgt `__c_` und die kodierte Charge.

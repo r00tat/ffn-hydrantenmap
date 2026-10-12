@@ -257,16 +257,21 @@ Artikeltyp zusammenführen:
   gibt es eine Obergrenze von 450 Schreibvorgängen (`mergeTooLarge`).
 
 Der Import trennt Artikeltypen nach Kategorie, Bezeichnung **und** Hersteller
-(`artikelKey`). Steht im Excel bei derselben A-Bluse dreimal ein anderer
-Hersteller-Wert, entstehen drei Artikeltypen, oft eigentlich Chargen. Beim
-Zusammenführen nach dem Import übernimmt die Option „Hersteller als Charge
-übernehmen“ (`chargeFromHersteller`, standardmäßig an) diese Unterscheidung. Jedes
-Stück, jede Ausgabe und jeder Bestand ohne eigene Charge erhält den Hersteller
-seines bisherigen Artikels als Charge. Das gilt auch für die Daten des Ziels.
-Dessen Hersteller entfällt danach, weil der Artikel jetzt mehrere umfasst. Der
-Bestand ohne Charge zieht dabei in das Dokument seiner Charge um. Eine schon
-vorhandene Charge bleibt. Bei Einzelartikeln trägt die anschließende
-Umstellung auf Menge die Charge der Stücke in den Bestand weiter.
+(`artikelKey`). Stiefel von Haix, Jolly und Rosenbauer werden so drei
+Artikeltypen, obwohl sie für die Ausgabe ein Artikel mit Varianten sind. Damit
+die Unterscheidung beim Zusammenführen nach dem Import nicht verloren geht,
+gibt es die Option „Hersteller als Charge übernehmen“ (`chargeFromHersteller`,
+standardmäßig an). `chargeWithHersteller` stellt den Hersteller vor die
+vorhandene Charge, denn das Excel hat eine eigene Chargen-Spalte. Bei Haix
+heißt die Charge zum Beispiel „Fire Flash“, bei Fenz „2023“, und daraus werden
+„Haix Fire Flash“ und „Fenz 2023“. Fehlt die Charge, steht der Hersteller
+allein. Beginnt die Charge schon mit dem Hersteller (Jolly / „Jolly“), bleibt
+sie, wie sie ist.
+
+Das gilt für alle Stücke, Ausgaben und Bestände der Beteiligten, auch für die
+des Ziels. Dessen Hersteller entfällt danach, weil der Artikel jetzt mehrere
+umfasst. Bestand, dessen Charge sich ändert, zieht in das Dokument der neuen
+Charge um.
 
 ## Von einzeln auf Menge umstellen
 

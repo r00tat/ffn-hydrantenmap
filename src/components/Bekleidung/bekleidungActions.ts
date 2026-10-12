@@ -12,6 +12,7 @@ import {
   BEKLEIDUNG_STUECK_COLLECTION,
   BEKLEIDUNG_WAESCHE_COLLECTION,
   bestandDocId,
+  chargeWithHersteller,
   normalizeCharge,
   normalizeGroesse,
   normalizeTagNummer,
@@ -430,8 +431,9 @@ const MAX_MERGE_WRITES = 450;
 
 export interface MergeOptions {
   /**
-   * Der Hersteller jedes beteiligten Artikels wird Charge seiner Stücke,
-   * Ausgaben und Bestände, die noch keine haben — auch beim Ziel, dessen
+   * Der Hersteller jedes beteiligten Artikels geht in die Charge seiner
+   * Stücke, Ausgaben und Bestände ein — vor eine vorhandene Charge gestellt
+   * („Haix Fire Flash"), sonst allein. Das gilt auch beim Ziel, dessen
    * Hersteller danach entfällt. So bleibt sichtbar, welche Variante ein Stück
    * war, wenn der Import Varianten als eigene Artikeltypen angelegt hat.
    */
@@ -494,9 +496,13 @@ async function mergeArtikelImpl(
         tx.get(ausgabeCol(groupId).where('artikelId', '==', part.id)),
         tx.get(bestandCol(groupId).where('artikelId', '==', part.id)),
       ]);
-      // Eine vorhandene Charge bleibt; beim Ziel ändert sich sonst nichts.
+      // Neue Charge nur, wo sie sich ändert; beim Ziel ändert sich sonst nichts.
+      const newCharge = (data: { charge?: string }) => {
+        const charge = chargeWithHersteller(part.charge, data.charge);
+        return charge !== normalizeCharge(data.charge) ? charge : undefined;
+      };
       const patchOf = (data: { charge?: string }) => {
-        const charge = !normalizeCharge(data.charge) ? part.charge : undefined;
+        const charge = newCharge(data);
         if (part.isTarget) return charge ? { charge } : undefined;
         return { artikelId: targetId, ...(charge ? { charge } : {}) };
       };
@@ -510,8 +516,8 @@ async function mergeArtikelImpl(
       }
       for (const d of b.docs) {
         const data = d.data() as BekleidungBestand;
-        if (part.isTarget && normalizeCharge(data.charge)) continue;
-        moved.push({ id: d.id, data, charge: normalizeCharge(data.charge) ?? part.charge });
+        if (part.isTarget && !newCharge(data)) continue;
+        moved.push({ id: d.id, data, charge: chargeWithHersteller(part.charge, data.charge) });
       }
     }
 

@@ -967,7 +967,7 @@ describe('mergeArtikel', () => {
     expect(get('bekleidungArtikel/jacke2')).toBeUndefined();
   });
 
-  it('übernimmt auf Wunsch den Hersteller als Charge, auch beim Ziel', async () => {
+  it('übernimmt auf Wunsch den Hersteller in die Charge, auch beim Ziel', async () => {
     fake.put(`${G}/bekleidungArtikel/polo`, {
       kategorie: 'dienst',
       bezeichnung: 'Polo',
@@ -988,8 +988,12 @@ describe('mergeArtikel', () => {
       charge: 'Fa X',
       anzahl: 2,
     });
-    // Eine vorhandene Charge bleibt.
-    expect(get(`bekleidungBestand/${bestandDocId('polo', 'L', 'Brand')}`)?.anzahl).toBe(4);
+    // Eine vorhandene Charge bekommt den Hersteller vorangestellt.
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'L', 'Brand')}`)).toBeUndefined();
+    expect(get(`bekleidungBestand/${bestandDocId('polo', 'L', 'Fa X Brand')}`)).toMatchObject({
+      charge: 'Fa X Brand',
+      anzahl: 4,
+    });
     expect(get('bekleidungAusgabe/au7')).toMatchObject({ artikelId: 'polo', charge: 'Fa X' });
     expect(get('bekleidungAusgabe/au2')?.charge).toBe('Fa Y');
     // Das Ziel umfasst jetzt mehrere Hersteller.
@@ -1026,7 +1030,7 @@ describe('mergeArtikel', () => {
     });
     ok(await mergeArtikel('ffnd', 'jacke', ['jacke2'], { chargeFromHersteller: true }));
     expect(get('bekleidungStueck/s9')).toMatchObject({ artikelId: 'jacke', charge: 'Fa B' });
-    expect(get('bekleidungStueck/s10')?.charge).toBe('Alt');
+    expect(get('bekleidungStueck/s10')?.charge).toBe('Fa B Alt');
     // Das Ziel hat keinen Hersteller: seine Stücke bleiben ohne Charge.
     expect(get('bekleidungStueck/s1')?.charge).toBeUndefined();
   });

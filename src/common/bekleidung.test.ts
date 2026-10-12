@@ -6,6 +6,7 @@ import {
   normalizeTagNummer,
   totalWaschgaenge,
   waschLimitState,
+  chargeWithHersteller,
 } from './bekleidung';
 
 describe('normalizeTagNummer', () => {
@@ -90,5 +91,19 @@ describe('normalizeCharge', () => {
     expect(normalizeCharge('  Brand   - 2024 ')).toBe('Brand - 2024');
     expect(normalizeCharge('   ')).toBeUndefined();
     expect(normalizeCharge(undefined)).toBeUndefined();
+  });
+});
+
+describe('chargeWithHersteller', () => {
+  it('stellt den Hersteller vor eine vorhandene Charge', () => {
+    expect(chargeWithHersteller('Haix', 'Fire Flash')).toBe('Haix Fire Flash');
+    expect(chargeWithHersteller('Fenz', undefined)).toBe('Fenz');
+    expect(chargeWithHersteller(undefined, ' 2023 ')).toBe('2023');
+    expect(chargeWithHersteller('  ', undefined)).toBeUndefined();
+  });
+
+  it('verdoppelt den Hersteller nicht', () => {
+    expect(chargeWithHersteller('Jolly', 'jolly')).toBe('jolly');
+    expect(chargeWithHersteller('Brandbull', 'Brandbull')).toBe('Brandbull');
   });
 });

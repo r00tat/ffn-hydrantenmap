@@ -4452,7 +4452,7 @@
       "convertHint": "Tag-Nummern und Waschzähler der Stücke gehen verloren. Die Umstellung lässt sich nicht rückgängig machen.",
       "convertWaeschen": "In der App erfasste Wäschen hängen an den Stücken und gingen verloren. Ein Artikel mit erfassten Wäschen bleibt einzeln geführt.",
       "mergeAsCharge": "Hersteller als Charge übernehmen",
-      "mergeAsChargeHint": "Stücke, Ausgaben und Bestand ohne Charge bekommen den Hersteller ihres bisherigen Artikels als Charge — auch die des Ziels, dessen Hersteller danach entfällt."
+      "mergeAsChargeHint": "Der Hersteller des bisherigen Artikels kommt in die Charge von Stücken, Ausgaben und Bestand – vor eine vorhandene Charge („Haix Fire Flash“), sonst allein. Das gilt auch beim Ziel, dessen Hersteller danach entfällt."
     },
     "import": {
       "title": "Import aus dem Excel",
