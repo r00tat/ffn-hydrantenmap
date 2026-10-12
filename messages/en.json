@@ -4435,8 +4435,6 @@
       "choose": "Choose Excel file",
       "hint": "The sheets \"Bestandsliste Einsatzbekleidung\" and \"Bestandsliste Dienstbekleidung\" are read. Import only works into empty stock.",
       "counts": "{rows} rows · {artikel} articles · {persons} people",
-      "artikelSection": "Articles",
-      "personsSection": "People",
       "matched": "Matched",
       "uncertain": "Uncertain",
       "new": "New",
@@ -4464,7 +4462,9 @@
       "keepOpenOption": "{name} (since {date})",
       "issuedWithoutPerson": "issued without a person",
       "lastPerson": "last: {name}",
-      "tagCollisions": "{count, plural, one {Tag number {tags} is still duplicated.} other {Tag numbers {tags} are still duplicated.}}"
+      "tagCollisions": "{count, plural, one {Tag number {tags} is still duplicated.} other {Tag numbers {tags} are still duplicated.}}",
+      "tabArtikel": "Items ({count})",
+      "tabPersonen": "People ({count})"
     },
     "scanner": {
       "title": "Scan tag",

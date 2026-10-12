@@ -59,19 +59,24 @@ describe('BekleidungImportDialog', () => {
 
     expect(previewBekleidungImport).toHaveBeenCalledWith('ffnd', 'QkFTRTY0');
     expect(await screen.findByText('0 Zeilen · 2 Artikel · 3 Personen')).toBeInTheDocument();
-    expect(screen.getByText('Doppelte Tag-Nummern (1)')).toBeInTheDocument();
-    expect(screen.getByText('Statuskonflikte (1)')).toBeInTheDocument();
-
-    // Unsichere Zuordnung ist nicht vorbelegt: Import gesperrt, Hinweis sichtbar
-    expect(screen.getByRole('combobox', { name: 'Erika Musterfrau' })).not.toHaveTextContent(
-      'Erika Musterfrau',
-    );
+    // Die Vorschau ist in Reiter geteilt, der Artikel-Reiter ist offen
+    expect(screen.getByRole('tab', { name: 'Artikel (2)' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Doppelte Tag-Nummern (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Statuskonflikte (1)' })).toBeInTheDocument();
+    // Der Hinweis auf offene Entscheidungen steht über den Reitern
     expect(screen.getByText('Noch 1 unsichere Zuordnung offen.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Importieren' })).toBeDisabled();
+    expect(screen.queryByRole('combobox', { name: 'Erika Musterfrau' })).not.toBeInTheDocument();
 
     // Poloshirt als Menge führen
     await user.click(screen.getByRole('combobox', { name: 'Führung Poloshirt' }));
     await user.click(screen.getByRole('option', { name: 'Menge' }));
+
+    // Unsichere Zuordnung ist nicht vorbelegt
+    await user.click(screen.getByRole('tab', { name: 'Personen (3)' }));
+    expect(screen.getByRole('combobox', { name: 'Erika Musterfrau' })).not.toHaveTextContent(
+      'Erika Musterfrau',
+    );
     // Unsicher: statt Erika Musterfrau (p2) neu anlegen
     await user.click(screen.getByRole('combobox', { name: 'Erika Musterfrau' }));
     await user.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'Neu anlegen' }));
@@ -102,6 +107,7 @@ describe('BekleidungImportDialog', () => {
     const user = userEvent.setup();
     renderDialog();
     await upload(user);
+    await user.click(await screen.findByRole('tab', { name: 'Personen (3)' }));
 
     // offene Ausgaben je Person als Entscheidungshilfe
     expect(await screen.findByText('2 offen')).toBeInTheDocument();
@@ -139,6 +145,7 @@ describe('BekleidungImportDialog', () => {
     const user = userEvent.setup();
     renderDialog();
     await upload(user);
+    await user.click(await screen.findByRole('tab', { name: 'Personen (3)' }));
 
     await user.click(
       await screen.findByRole('button', { name: 'Neue Personen mit offener Ausgabe aktiv anlegen (1)' }),
@@ -201,7 +208,7 @@ describe('BekleidungImportDialog', () => {
     await upload(user);
 
     // Vorbelegt: Zeile 4 behält die Nummer, Zeile 9 ohne
-    await user.click(await screen.findByText('Doppelte Tag-Nummern (1)'));
+    await user.click(await screen.findByRole('tab', { name: 'Doppelte Tag-Nummern (1)' }));
     const tag9 = screen.getByRole('textbox', { name: 'Tag-Nummer Einsatzbekleidung Zeile 9' });
     expect(screen.getByRole('textbox', { name: 'Tag-Nummer Einsatzbekleidung Zeile 4' })).toHaveValue('1001');
     expect(tag9).toHaveValue('');
@@ -215,7 +222,7 @@ describe('BekleidungImportDialog', () => {
     expect(screen.getByRole('button', { name: 'Importieren' })).toBeEnabled();
 
     // Statuskonflikt: die frühere Ausgabe offen lassen
-    await user.click(screen.getByText('Statuskonflikte (1)'));
+    await user.click(screen.getByRole('tab', { name: 'Statuskonflikte (1)' }));
     await user.click(screen.getByRole('combobox', { name: 'Offen bei Einsatzbekleidung Zeile 12' }));
     await user.click(screen.getByRole('option', { name: 'Max Mustermann (seit 2020-01-01)' }));
 
@@ -257,7 +264,7 @@ describe('BekleidungImportDialog', () => {
     renderDialog();
     await upload(user);
 
-    await user.click(await screen.findByText('Statuskonflikte (1)'));
+    await user.click(await screen.findByRole('tab', { name: 'Statuskonflikte (1)' }));
     expect(screen.getByText('ausgegeben ohne Person')).toBeInTheDocument();
     await user.click(screen.getByRole('combobox', { name: 'Status Dienstbekleidung Zeile 7' }));
     await user.click(screen.getByRole('option', { name: 'Lager' }));
@@ -277,7 +284,8 @@ describe('BekleidungImportDialog', () => {
     const user = userEvent.setup();
     renderDialog();
     await upload(user);
-    await user.click(await screen.findByRole('combobox', { name: 'Erika Musterfrau' }));
+    await user.click(await screen.findByRole('tab', { name: 'Personen (3)' }));
+    await user.click(screen.getByRole('combobox', { name: 'Erika Musterfrau' }));
     await user.click(screen.getByRole('option', { name: 'Erika Musterfrau' }));
     await user.click(screen.getByRole('button', { name: 'Importieren' }));
     expect(

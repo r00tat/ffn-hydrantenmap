@@ -1,10 +1,7 @@
 'use client';
 
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import Accordion from '@mui/material/Accordion';
-import AccordionDetails from '@mui/material/AccordionDetails';
-import AccordionSummary from '@mui/material/AccordionSummary';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -15,11 +12,13 @@ import DialogTitle from '@mui/material/DialogTitle';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import Tab from '@mui/material/Tab';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
@@ -44,6 +43,8 @@ import ImportPersonsSection, {
   openPersonChoices,
   personDecisions,
 } from './ImportPersonsSection';
+
+type ImportTab = 'artikel' | 'personen' | 'tags' | 'status';
 
 type ImportResult = { artikel: number; stuecke: number; ausgaben: number; personsCreated: number };
 
@@ -73,6 +74,7 @@ export default function BekleidungImportDialog({
   const [fuehrung, setFuehrung] = useState<Record<string, BekleidungFuehrung>>({});
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<Record<string, ImportRowDecision>>({});
+  const [tab, setTab] = useState<ImportTab>('artikel');
   const [result, setResult] = useState<ImportResult>();
 
   const showError = (raw: string) =>
@@ -104,6 +106,7 @@ export default function BekleidungImportDialog({
       setFuehrung(Object.fromEntries(next.artikel.map((a) => [a.key, a.fuehrung])));
       setChoices(defaultPersonChoices(next));
       setRows(defaultRowDecisions(next));
+      setTab('artikel');
     } catch (err) {
       showError(String(err));
     } finally {
@@ -159,7 +162,12 @@ export default function BekleidungImportDialog({
           <Stack spacing={2}>
             <Typography variant="body2">{t('import.hint')}</Typography>
             <Box>
-              <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} disabled={busy}>
+              <Button
+                component="label"
+                variant="outlined"
+                startIcon={<UploadFileIcon />}
+                disabled={busy}
+              >
                 {t('import.choose')}
                 <input
                   hidden
@@ -187,73 +195,9 @@ export default function BekleidungImportDialog({
               })}
             </Typography>
 
-            <Typography variant="h6">{t('import.artikelSection')}</Typography>
-            <Box sx={{ overflowX: 'auto' }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>{t('fields.bezeichnung')}</TableCell>
-                    <TableCell>{t('fields.hersteller')}</TableCell>
-                    <TableCell>{t('fields.kategorie')}</TableCell>
-                    <TableCell align="right">#</TableCell>
-                    <TableCell>{t('fields.fuehrung')}</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {preview.artikel.map((a) => (
-                    <TableRow key={a.key}>
-                      <TableCell>{a.bezeichnung}</TableCell>
-                      <TableCell>{a.hersteller}</TableCell>
-                      <TableCell>{sheetLabel(a.kategorie)}</TableCell>
-                      <TableCell align="right">{a.rowCount}</TableCell>
-                      <TableCell>
-                        <TextField
-                          select
-                          size="small"
-                          label={`${t('fields.fuehrung')} ${a.bezeichnung}`}
-                          value={fuehrung[a.key] ?? a.fuehrung}
-                          onChange={(e) =>
-                            setFuehrung((prev) => ({
-                              ...prev,
-                              [a.key]: e.target.value as BekleidungFuehrung,
-                            }))
-                          }
-                          sx={{ minWidth: 150 }}
-                        >
-                          <MenuItem value="einzeln">{t('fuehrung.einzeln')}</MenuItem>
-                          <MenuItem value="menge">{t('fuehrung.menge')}</MenuItem>
-                        </TextField>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-
-            <Typography variant="h6">{t('import.personsSection')}</Typography>
-            <ImportPersonsSection
-              preview={preview}
-              persons={persons}
-              choices={choices}
-              onChange={(key, value) => setChoices((prev) => ({ ...prev, [key]: value }))}
-            />
             {openChoices > 0 && (
               <Alert severity="warning">{t('import.openChoices', { count: openChoices })}</Alert>
             )}
-
-            <ImportCleanupSection
-              preview={preview}
-              rows={rows}
-              collisions={collisions}
-              onChange={(ref, patch) =>
-                setRows((prev) => {
-                  const next = { ...prev[ref], ...patch };
-                  // Ohne „ausgegeben" bleibt ohnehin nichts offen.
-                  if (patch.status && patch.status !== 'ausgegeben') delete next.keepOpen;
-                  return { ...prev, [ref]: next };
-                })
-              }
-            />
             {collisions.length > 0 && (
               <Alert severity="warning">
                 {t('import.tagCollisions', {
@@ -262,6 +206,115 @@ export default function BekleidungImportDialog({
                 })}
               </Alert>
             )}
+
+            <Tabs
+              value={tab}
+              onChange={(_, value: ImportTab) => setTab(value)}
+              variant="scrollable"
+              allowScrollButtonsMobile
+              sx={{ borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab
+                value="artikel"
+                label={t('import.tabArtikel', { count: preview.artikel.length })}
+              />
+              <Tab
+                value="personen"
+                label={t('import.tabPersonen', { count: preview.persons.length })}
+                icon={
+                  openChoices > 0 ? (
+                    <WarningAmberIcon fontSize="small" color="warning" />
+                  ) : undefined
+                }
+                iconPosition="end"
+              />
+              {preview.duplicateTags.length > 0 && (
+                <Tab
+                  value="tags"
+                  label={t('import.duplicatesSection', { count: preview.duplicateTags.length })}
+                  icon={
+                    collisions.length > 0 ? (
+                      <WarningAmberIcon fontSize="small" color="warning" />
+                    ) : undefined
+                  }
+                  iconPosition="end"
+                />
+              )}
+              {preview.statusConflicts.length > 0 && (
+                <Tab
+                  value="status"
+                  label={t('import.conflictsSection', { count: preview.statusConflicts.length })}
+                />
+              )}
+            </Tabs>
+
+            {tab === 'artikel' && (
+              <Box sx={{ overflowX: 'auto' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t('fields.bezeichnung')}</TableCell>
+                      <TableCell>{t('fields.hersteller')}</TableCell>
+                      <TableCell>{t('fields.kategorie')}</TableCell>
+                      <TableCell align="right">#</TableCell>
+                      <TableCell>{t('fields.fuehrung')}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {preview.artikel.map((a) => (
+                      <TableRow key={a.key}>
+                        <TableCell>{a.bezeichnung}</TableCell>
+                        <TableCell>{a.hersteller}</TableCell>
+                        <TableCell>{sheetLabel(a.kategorie)}</TableCell>
+                        <TableCell align="right">{a.rowCount}</TableCell>
+                        <TableCell>
+                          <TextField
+                            select
+                            size="small"
+                            label={`${t('fields.fuehrung')} ${a.bezeichnung}`}
+                            value={fuehrung[a.key] ?? a.fuehrung}
+                            onChange={(e) =>
+                              setFuehrung((prev) => ({
+                                ...prev,
+                                [a.key]: e.target.value as BekleidungFuehrung,
+                              }))
+                            }
+                            sx={{ minWidth: 150 }}
+                          >
+                            <MenuItem value="einzeln">{t('fuehrung.einzeln')}</MenuItem>
+                            <MenuItem value="menge">{t('fuehrung.menge')}</MenuItem>
+                          </TextField>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            )}
+            {tab === 'personen' && (
+              <ImportPersonsSection
+                preview={preview}
+                persons={persons}
+                choices={choices}
+                onChange={(key, value) => setChoices((prev) => ({ ...prev, [key]: value }))}
+              />
+            )}
+            {(tab === 'tags' || tab === 'status') && (
+              <ImportCleanupSection
+                part={tab}
+                preview={preview}
+                rows={rows}
+                collisions={collisions}
+                onChange={(ref, patch) =>
+                  setRows((prev) => {
+                    const next = { ...prev[ref], ...patch };
+                    // Ohne „ausgegeben" bleibt ohnehin nichts offen.
+                    if (patch.status && patch.status !== 'ausgegeben') delete next.keepOpen;
+                    return { ...prev, [ref]: next };
+                  })
+                }
+              />
+            )}
           </Stack>
         )}
       </DialogContent>
@@ -269,7 +322,11 @@ export default function BekleidungImportDialog({
         <Button onClick={onClose}>{t('actions.close')}</Button>
         {preview && (
           <OnlineOnly>
-            <Button variant="contained" disabled={busy || openChoices > 0 || collisions.length > 0} onClick={handleImport}>
+            <Button
+              variant="contained"
+              disabled={busy || openChoices > 0 || collisions.length > 0}
+              onClick={handleImport}
+            >
               {t('import.submit')}
             </Button>
           </OnlineOnly>
