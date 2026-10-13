@@ -2990,7 +2990,7 @@
     "count": "{count} Einsatzmittel",
     "downloadCsvTooltip": "Einsatzmittel als CSV herunterladen",
     "csvFilename": "Einsatzmittel.csv",
-    "unassigned": "Nicht zugeordnet",
+    "unassigned": "Keiner Ebene zugeordnet",
     "cols": {
       "name": "Bezeichnung",
       "fw": "Feuerwehr",

@@ -120,6 +120,8 @@ describe('StrengthTable — bearbeitbar', () => {
     expect(updateLocation).toHaveBeenCalledWith('l2', {
       vehicles: { u1: '1. Zug' },
     });
+    // Nach der Auswahl schließt das Menü.
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
   it('öffnet den Bearbeiten-Dialog der Zeile', async () => {

@@ -2990,7 +2990,7 @@
     "count": "{count} resources",
     "downloadCsvTooltip": "Download resources as CSV",
     "csvFilename": "resources.csv",
-    "unassigned": "Unassigned",
+    "unassigned": "Not assigned to a layer",
     "cols": {
       "name": "Name",
       "fw": "Fire department",

@@ -72,7 +72,7 @@ Die Zuordnung ist dieselbe wie auf der Seite **Einsatzorte**.
 
 1. Fahrzeuge sind nach Ebenen gruppiert
 2. Jede Gruppe ist auf- und zuklappbar
-3. "Nicht zugeordnet" enthält Fahrzeuge ohne Ebene
+3. "Keiner Ebene zugeordnet" enthält Fahrzeuge ohne Ebene
 
 ### Fahrzeug bearbeiten
 

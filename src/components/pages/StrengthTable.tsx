@@ -57,6 +57,10 @@ function LocationSelect({
     () => new Map(locations.map((l) => [l.id, locationLabel(l)])),
     [locations],
   );
+  // Ein `multiple`-Select bleibt nach jedem Klick offen. Meist steht eine
+  // Einheit an genau einem Einsatzort — deshalb schließt das Menü nach der
+  // Auswahl; für einen weiteren Einsatzort wird es erneut geöffnet.
+  const [open, setOpen] = useState(false);
 
   return (
     <Select
@@ -64,10 +68,14 @@ function LocationSelect({
       displayEmpty
       variant="standard"
       size="small"
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
       value={selected}
       onChange={(e) => {
         const value = e.target.value;
         onAssign(row, typeof value === 'string' ? value.split(',') : value);
+        setOpen(false);
       }}
       renderValue={(ids) =>
         ids.length === 0 ? (
