@@ -16,7 +16,8 @@ import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 import { isOffline, onReconnect } from '../lib/connectivity';
 import { withTimeout } from '../lib/withTimeout';
 import { AuthState, LoginData, LoginStatus } from './auth/types';
-import { claimGroupsKey } from './auth/claimGroups';
+import { claimGroupsKey, claimsNeedRefresh } from './auth/claimGroups';
+import { hasGroupRoles } from '../common/userGroupRoles';
 import {
   refreshTokenUntilClaimsMatch,
   refreshTokenWithRetry,
@@ -757,13 +758,22 @@ async function handleSessionBasedRefresh(
   if (!auth.currentUser) return;
 
   const tokenClaims = (await auth.currentUser.getIdTokenResult()).claims;
-  const sessionGroups = claimGroupsKey(session.user.groups);
-  const tokenGroups = claimGroupsKey(tokenClaims.groups as string[] | undefined);
+  const compare = {
+    sessionAuthorized: session.user.isAuthorized,
+    tokenAuthorized: tokenClaims.authorized,
+    sessionGroups: session.user.groups as string[] | undefined,
+    tokenGroups: tokenClaims.groups as string[] | undefined,
+  };
+  // Nur wenn die Gruppen abweichen, ist der Migrationsstand überhaupt von
+  // Belang — dann eigenes Benutzerdokument lesen (s. claimsNeedRefresh).
+  const needsRefresh =
+    claimsNeedRefresh({ ...compare, rolesMigrated: undefined }) &&
+    claimsNeedRefresh({
+      ...compare,
+      rolesMigrated: await readRolesMigrated(auth.currentUser.uid),
+    });
 
-  if (
-    session.user.isAuthorized !== tokenClaims.authorized ||
-    sessionGroups !== tokenGroups
-  ) {
+  if (needsRefresh) {
     console.info(`token claims differ from session data, attempting auto-refresh`);
 
     const refreshed = await refreshTokenUntilClaimsMatch(
@@ -782,6 +792,23 @@ async function handleSessionBasedRefresh(
     }
   } else {
     setNeedsReLogin(false);
+  }
+}
+
+/**
+ * Hat das eigene Benutzerdokument schon `groupRoles`? `undefined`, wenn das
+ * Lesen scheitert (offline, Zeitüberschreitung) — dann bleibt es beim Vergleich.
+ */
+async function readRolesMigrated(uid: string): Promise<boolean | undefined> {
+  try {
+    const snap = await withTimeout(
+      getDoc(doc(firestore, USER_COLLECTION_ID, uid)),
+      5000,
+    );
+    const data = snap.data();
+    return data ? hasGroupRoles(data) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
