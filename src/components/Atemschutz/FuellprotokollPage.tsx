@@ -26,14 +26,13 @@ import {
   type FuellungZweck,
 } from '../../common/atemschutz';
 import { buildFuellprotokollCsv, fuellungCsvZeile } from '../../common/fuellprotokollCsv';
-import { isGroupAdmin } from '../../common/groupPermissions';
-import { KOSTENERSATZ_GROUP } from '../../common/kostenersatz';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
 import useFahrtenbuchFirecalls from '../../hooks/useFahrtenbuchFirecalls';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useCan } from '../../hooks/usePermissions';
 import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
 import { downloadBlob, downloadText } from '../firebase/download';
 import {
@@ -72,6 +71,7 @@ const BEKANNTE_FEHLER = [
   'fuellungVerrechnet',
   'notInGroup',
   'notGroupAdmin',
+  'notPermitted',
   'notLoggedIn',
   'saveFailed',
 ];
@@ -97,20 +97,15 @@ export default function FuellprotokollPage() {
   const t = useTranslations('atemschutz');
   const router = useRouter();
   const searchParams = useSearchParams();
-  // `groups` heißt hier bereits die Gruppenauswahl des Umschalters — die
-  // Freigaben des Benutzers brauchen deshalb einen eigenen Namen.
-  const { email, displayName, uid, isAdmin, groupAdmin, groups: freigaben } = useFirebaseLogin();
+  const { email, displayName, uid } = useFirebaseLogin();
 
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const eigeneFeuerwehr = useGroupFeuerwehrName(groupId);
   const { flaschen, fuellstationen, feuerwehren } = useAtemschutzGeraete(groupId);
   const firecalls = useFahrtenbuchFirecalls(groupId);
 
-  const istGruppenAdmin = isGroupAdmin(groupId ?? '', {
-    isAdmin,
-    groups: freigaben,
-    groupAdmin,
-  });
+  const istGruppenAdmin = useCan(groupId, 'gruppe.manage');
+  const canVerrechnen = useCan(groupId, 'kostenersatz.use');
 
   // Filter in der URL und nicht im State: Sonst landet die Zurück-Taste auf
   // der vorigen Seite statt auf dem vorigen Filter, und ein Neuladen fällt
@@ -332,9 +327,9 @@ export default function FuellprotokollPage() {
         {/* Die Verrechnung steht hier und nicht im Menü: Sie ist die
             Fortsetzung derselben Arbeit — was gefüllt wurde, wird
             abgerechnet — und unter „Fahrzeuge" war sie nicht zu finden.
-            Sichtbar nur mit der Kostenersatz-Freischaltung, derselben
-            Bedingung wie auf der Zielseite. */}
-        {freigaben?.includes(KOSTENERSATZ_GROUP) && (
+            Sichtbar nur mit `kostenersatz.use` in der gewählten Gruppe,
+            derselben Bedingung wie auf der Zielseite. */}
+        {canVerrechnen && (
           <Button component={Link} href="/atemschutz/verrechnung" startIcon={<ReceiptLongIcon />}>
             {t('rechnung.title')}
           </Button>

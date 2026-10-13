@@ -69,7 +69,9 @@ export interface BackupWarning {
   code:
     | 'attachmentDownloadFailed'
     | 'attachmentUploadFailed'
-    | 'newerBackupVersion';
+    | 'newerBackupVersion'
+    /** Kostenersatz der Datei nicht zurückgespielt — `detail` ist die Anzahl. */
+    | 'kostenersatzSkipped';
   /** Dateiname bzw. Fundstelle, soweit bekannt. */
   file?: string;
   detail?: string;
@@ -405,6 +407,19 @@ export async function exportFirecall(
       snapshot.docs.map((d) => ({ ...d.data(), id: d.id }) as T)
     );
 
+  // Den Kostenersatz liest nur, wer das Recht in der Gruppe des Einsatzes hat.
+  // Ohne lehnt die Regel ab; die Sicherung entsteht dann ohne ihn, statt ganz
+  // zu scheitern. Im Einsatz selbst bleibt er erhalten.
+  const readKostenersatz = () =>
+    readCollection<KostenersatzCalculation>(KOSTENERSATZ_SUBCOLLECTION).catch(
+      (err: unknown) => {
+        if ((err as { code?: string })?.code === 'permission-denied') {
+          return [] as KostenersatzCalculation[];
+        }
+        throw err;
+      }
+    );
+
   // Die zwölf Untersammlungen hängen nicht voneinander ab — nacheinander
   // abgefragt wären das zwölf Round-Trips hintereinander.
   const [
@@ -428,7 +443,7 @@ export async function exportFirecall(
     readCollection<FirecallMapLayer>(FIRECALL_MAP_LAYERS_COLLECTION_ID),
     readCollection<FirecallHistory>(FIRECALL_HISTORY_COLLECTION_ID),
     readCollection<FirecallLocation>(FIRECALL_LOCATIONS_COLLECTION_ID),
-    readCollection<KostenersatzCalculation>(KOSTENERSATZ_SUBCOLLECTION),
+    readKostenersatz(),
     readCollection<AuditLogEntry>(FIRECALL_AUDITLOG_COLLECTION_ID),
     readCollection<CrewAssignment>(FIRECALL_CREW_COLLECTION_ID),
     readCollection<AtemschutzTrupp>(ATEMSCHUTZ_TRUPP_COLLECTION_ID),
@@ -602,6 +617,13 @@ function itemWithoutStrokes(
 export interface ImportFirecallOptions {
   /** Zielgruppe. Ohne Angabe bleibt die Gruppe aus der Datei stehen. */
   group?: string;
+  /**
+   * Kostenersatz der Datei mit zurückspielen? Nur mit dem Recht
+   * `kostenersatz.use` in der Zielgruppe — sonst lehnte die Regel den
+   * Schreibvorgang ab und der Import bräche mittendrin ab. `false` lässt ihn
+   * weg und meldet `kostenersatzSkipped`. Standard: `true`.
+   */
+  includeKostenersatz?: boolean;
   onWarning?: BackupWarningHandler;
   onProgress?: BackupProgressHandler;
 }
@@ -622,7 +644,10 @@ function countStrokes(items: (FirecallItem | ExportDrawingItem)[]): number {
  * Weicht die Zahl von den tatsächlichen Schreibvorgängen ab, bleibt der Balken
  * stehen oder läuft über.
  */
-function countImportSteps(firecall: FirecallExport): number {
+function countImportSteps(
+  firecall: FirecallExport,
+  includeKostenersatz: boolean
+): number {
   const history = firecall.history ?? [];
 
   const documents =
@@ -640,7 +665,7 @@ function countImportSteps(firecall: FirecallExport): number {
       0
     ) +
     (firecall.locations?.length ?? 0) +
-    (firecall.kostenersatz?.length ?? 0) +
+    (includeKostenersatz ? (firecall.kostenersatz?.length ?? 0) : 0) +
     (firecall.auditlog?.length ?? 0) +
     (firecall.crew?.length ?? 0) +
     (firecall.atemschutzTrupps?.length ?? 0) +
@@ -657,9 +682,9 @@ export async function importFirecall(
   firecall: FirecallExport,
   options: ImportFirecallOptions = {}
 ) {
-  const { group, onWarning, onProgress } = options;
+  const { group, onWarning, onProgress, includeKostenersatz = true } = options;
   const progress = new ProgressReporter(onProgress);
-  progress.setTotal(countImportSteps(firecall));
+  progress.setTotal(countImportSteps(firecall, includeKostenersatz));
   progress.report('documents');
   const commitOps = commitOpsWith(progress);
 
@@ -895,7 +920,12 @@ export async function importFirecall(
   }
 
   // Import kostenersatz
-  if (kostenersatz?.length) {
+  if (kostenersatz?.length && !includeKostenersatz) {
+    onWarning?.({
+      code: 'kostenersatzSkipped',
+      detail: `${kostenersatz.length}`,
+    });
+  } else if (kostenersatz?.length) {
     await commitOps(
       kostenersatz.map((k) => ({
         ref: doc(kostenersatzCol, k.id || uuid()),

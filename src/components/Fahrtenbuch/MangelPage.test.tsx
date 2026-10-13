@@ -3,9 +3,10 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { searchParamsMock, isAdminMock } = vi.hoisted(() => ({
+const { searchParamsMock, isAdminMock, groupRolesMock } = vi.hoisted(() => ({
   searchParamsMock: { value: new URLSearchParams() },
   isAdminMock: { value: false },
+  groupRolesMock: { value: { ffnd: [] } as Record<string, string[]> },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -29,7 +30,11 @@ vi.mock('./uploadMangelImage', () => ({
 }));
 
 vi.mock('../../hooks/useFirebaseLogin', () => ({
-  default: () => ({ isAuthorized: true, isAdmin: isAdminMock.value }),
+  default: () => ({
+    isAuthorized: true,
+    isAdmin: isAdminMock.value,
+    groupRoles: groupRolesMock.value,
+  }),
 }));
 vi.mock('../../hooks/useFahrtenbuchGroup', () => ({
   default: () => ({
@@ -133,6 +138,7 @@ import MangelPage, { MANGEL_STATUS_FILTERS } from './MangelPage';
 beforeEach(() => {
   searchParamsMock.value = new URLSearchParams();
   isAdminMock.value = false;
+  groupRolesMock.value = { ffnd: [] };
 });
 
 const renderWithIntlPage = () => renderWithIntl(<MangelPage />);
@@ -205,13 +211,21 @@ describe('MangelPage', () => {
     expect(screen.queryByText('Blinker hinten links defekt')).toBeNull();
   });
 
-  it('zeigt den Löschbutton nur für Admins', () => {
+  it('zeigt den Löschbutton nur mit gruppe.manage', () => {
     const { unmount } = renderWithIntlPage();
     expect(
       screen.queryByRole('button', { name: 'Mangel löschen' }),
     ).not.toBeInTheDocument();
     unmount();
 
+    groupRolesMock.value = { ffnd: ['gruppenadmin'] };
+    const second = renderWithIntlPage();
+    expect(
+      screen.getAllByRole('button', { name: 'Mangel löschen' }).length,
+    ).toBeGreaterThan(0);
+    second.unmount();
+
+    groupRolesMock.value = { ffnd: [] };
     isAdminMock.value = true;
     renderWithIntlPage();
     expect(

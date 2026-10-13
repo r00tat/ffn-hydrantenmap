@@ -70,7 +70,7 @@ vi.mock('../../server/groups/stammdatenStore', () => ({
 
 const actionAuthMock = vi.fn();
 vi.mock('../../app/auth', () => ({
-  actionUserAuthorizedForFirecall: () => actionAuthMock(),
+  actionFirecallPermissionRequired: (...args: unknown[]) => actionAuthMock(...args),
 }));
 
 const sendMock = vi.fn().mockResolvedValue(undefined);
@@ -119,7 +119,10 @@ describe('sendKostenersatzEmailAction', () => {
     vi.clearAllMocks();
     process.env.GOOGLE_SERVICE_ACCOUNT = 'sa';
     process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT = 'me@example.com';
-    actionAuthMock.mockResolvedValue({ id: 'fc1', name: 'Einsatz 1', date: '2024-01-01' });
+    actionAuthMock.mockResolvedValue({
+      session: { user: { id: 'u1' } },
+      firecall: { id: 'fc1', name: 'Einsatz 1', date: '2024-01-01', group: 'ffnd' },
+    });
     configGet.mockResolvedValue({ exists: false });
     ratesGet.mockResolvedValue({ empty: true, docs: [] });
   });
@@ -131,6 +134,21 @@ describe('sendKostenersatzEmailAction', () => {
 
     expect(result.success).toBe(true);
     expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('verlangt das Kostenersatz-Recht in der Gruppe des Einsatzes', async () => {
+    calcGet.mockResolvedValue({ exists: true, id: 'calc1', data: () => draftCalculation() });
+
+    await sendKostenersatzEmailAction(baseRequest);
+
+    expect(actionAuthMock).toHaveBeenCalledWith('fc1', 'kostenersatz.use');
+  });
+
+  it('sendet nichts, wenn der Guard ablehnt', async () => {
+    actionAuthMock.mockRejectedValueOnce(new Error('forbidden'));
+
+    await expect(sendKostenersatzEmailAction(baseRequest)).rejects.toThrow('forbidden');
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('marks the calculation as completed (not sent) after sending', async () => {

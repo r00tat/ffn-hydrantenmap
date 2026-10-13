@@ -2,7 +2,7 @@
 import 'server-only';
 
 import { FieldValue } from 'firebase-admin/firestore';
-import { actionGroupAdminRequired } from '../../app/auth';
+import { actionPermissionRequired } from '../../app/auth';
 import {
   FAHRTENBUCH_COLLECTION_ID,
   type FahrtenbuchEntry,
@@ -301,10 +301,9 @@ export async function deleteMangel(
   mangelId: string,
 ): Promise<MangelActionResult> {
   try {
-    const session = await actionGroupMemberRequired(groupId);
-    if (!session.user.isAdmin) {
-      return { success: false, error: 'notAllowedDelete' };
-    }
+    // Löschen ist Gruppenverwaltung, nicht Mangelpflege: Erledigte Mängel
+    // bleiben als Verlauf stehen, gelöscht wird nur Irrtümliches.
+    await actionPermissionRequired(groupId, 'gruppe.manage');
     const mangel = await loadMangel(groupId, mangelId);
 
     await mangelRef(groupId).doc(mangelId).delete();
@@ -348,7 +347,7 @@ export async function migrateDefectsToMangel(
   groupId: string,
 ): Promise<MigrateDefectsResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
     const actor = actorFrom(session);
 
     const [entrySnapshot, mangelSnapshot] = await Promise.all([

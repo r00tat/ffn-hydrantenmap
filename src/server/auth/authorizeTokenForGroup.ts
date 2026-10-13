@@ -6,6 +6,7 @@ import { firestore } from '../firebase/admin';
 import { ApiException } from '../../app/api/errors';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 import { FirebaseUserInfo } from '../../common/users';
+import { memberGroupIds } from '../../common/permissions';
 
 export interface TokenGroupAuth {
   owner: string;
@@ -34,7 +35,9 @@ export async function authorizeTokenForGroup(
     .get();
   const userData = userDoc.data() as FirebaseUserInfo | undefined;
   const isAdmin = !!userData?.isAdmin;
-  const groups: string[] = userData?.groups ?? [];
+  // Mitgliedschaft aus `groupRoles` wie in der Sitzung; das alte Feld
+  // `groups` pflegt `writeUserRoles` nicht mehr.
+  const groups = memberGroupIds({ groupRoles: userData?.groupRoles });
 
   if (!isAdmin && !groups.includes(groupId)) {
     throw new ApiException(

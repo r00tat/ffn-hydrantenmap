@@ -22,11 +22,12 @@ import Link from 'next/link';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { rechnungStatusFarbe } from '../../common/atemschutzRechnung';
-import { KOSTENERSATZ_GROUP, formatCurrency } from '../../common/kostenersatz';
+import { formatCurrency } from '../../common/kostenersatz';
 import useAtemschutzEmpfaenger from '../../hooks/useAtemschutzEmpfaenger';
 import useAtemschutzRechnungen from '../../hooks/useAtemschutzRechnungen';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useCan } from '../../hooks/usePermissions';
 import { downloadBlob } from '../firebase/download';
 import { fehlerText } from './rechnungFehler';
 import RechnungEditDialog from './RechnungEditDialog';
@@ -52,8 +53,11 @@ export interface RechnungPageProps {
 export default function RechnungPage({ rechnungId }: RechnungPageProps) {
   const t = useTranslations('atemschutz');
   const format = useFormatter();
-  const { isAuthorized, groups: freigaben } = useFirebaseLogin();
-  const { groupId } = useFahrtenbuchGroup();
+  const { isAuthorized } = useFirebaseLogin();
+  // Dieselbe Gruppenwahl wie auf der Verrechnung, von der aus die Seite
+  // geöffnet wird.
+  const { groupId } = useFahrtenbuchGroup('kostenersatz.use');
+  const canVerrechnen = useCan(groupId, 'kostenersatz.use');
 
   // Kein eigener Dokument-Hook: Die Liste ist auf dieser Seite ohnehin
   // abonniert, und ein zweites Abonnement auf dasselbe Dokument brächte nur
@@ -71,7 +75,7 @@ export default function RechnungPage({ rechnungId }: RechnungPageProps) {
   const [stornoOffen, setStornoOffen] = useState(false);
   const [editOffen, setEditOffen] = useState(false);
 
-  if (!isAuthorized || !freigaben?.includes(KOSTENERSATZ_GROUP)) {
+  if (!isAuthorized || !canVerrechnen) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography>{t('rechnung.noPermission')}</Typography>

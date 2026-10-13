@@ -13,7 +13,7 @@ import {
   generateShareLinkId,
   generateShareToken,
 } from '../../server/fahrtenbuchShare/shareToken';
-import { actionGroupAdminRequired } from '../../app/auth';
+import { actionPermissionRequired } from '../../app/auth';
 
 function linksRef() {
   return firestore.collection(FAHRTENBUCH_SHARE_LINK_COLLECTION_ID);
@@ -76,7 +76,7 @@ async function revokeActiveLinks(
 export async function getFahrtenbuchShareLink(
   groupId: string,
 ): Promise<ShareLinkInfo | null> {
-  await actionGroupAdminRequired(groupId);
+  await actionPermissionRequired(groupId, 'gruppe.manage');
 
   const doc = await activeLink(groupId);
   if (!doc) return null;
@@ -95,7 +95,7 @@ export async function getFahrtenbuchShareLink(
 export async function createFahrtenbuchShareLink(
   groupId: string,
 ): Promise<ShareLinkInfo> {
-  const session = await actionGroupAdminRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'gruppe.manage');
 
   const now = new Date().toISOString();
   const batch = firestore.batch();
@@ -120,7 +120,7 @@ export async function createFahrtenbuchShareLink(
 export async function revokeFahrtenbuchShareLink(
   groupId: string,
 ): Promise<void> {
-  await actionGroupAdminRequired(groupId);
+  await actionPermissionRequired(groupId, 'gruppe.manage');
 
   const batch = firestore.batch();
   const revoked = await revokeActiveLinks(

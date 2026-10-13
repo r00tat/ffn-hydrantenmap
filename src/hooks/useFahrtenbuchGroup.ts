@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { NON_TENANT_GROUP_IDS } from '../app/groups/groupTypes';
+import { can, type Permission } from '../common/permissions';
+import { NON_TENANT_GROUP_IDS } from '../common/tenantGroups';
 import useFirebaseLogin from './useFirebaseLogin';
 
 const STORAGE_KEY = 'fahrtenbuch.group';
@@ -15,9 +16,14 @@ const STORAGE_KEY = 'fahrtenbuch.group';
  * zusätzlichen Render-Zyklus und das Lint-Problem "setState in effect"
  * (abgeleiteter Zustand sollte während des Renderns berechnet werden, siehe
  * https://react.dev/learn/you-might-not-need-an-effect).
+ *
+ * Mit `permission` stehen nur die Gruppen zur Auswahl, in denen der Benutzer
+ * das Recht hat — etwa `kostenersatz.use` auf der Verrechnung. Sonst bliebe
+ * eine Seite auf einer Gruppe stehen, deren Daten die Regeln gar nicht
+ * herausgeben, und der Umschalter böte Gruppen an, die nur abgewiesen würden.
  */
-export default function useFahrtenbuchGroup() {
-  const { myGroups } = useFirebaseLogin();
+export default function useFahrtenbuchGroup(permission?: Permission) {
+  const { myGroups, isAdmin, groupRoles } = useFirebaseLogin();
   const [manualGroupId, setManualGroupId] = useState<string | undefined>();
 
   // 'allUsers' (Pseudo-Gruppe in den Claims jedes Benutzers) und
@@ -28,9 +34,11 @@ export default function useFahrtenbuchGroup() {
     () =>
       myGroups.filter(
         (g): g is { id: string; name: string } =>
-          !!g.id && !NON_TENANT_GROUP_IDS.includes(g.id),
+          !!g.id &&
+          !NON_TENANT_GROUP_IDS.includes(g.id) &&
+          (!permission || can({ isAdmin, groupRoles }, g.id, permission)),
       ),
-    [myGroups],
+    [myGroups, permission, isAdmin, groupRoles],
   );
 
   const groupId = useMemo(() => {

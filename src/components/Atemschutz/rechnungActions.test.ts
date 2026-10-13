@@ -5,12 +5,9 @@ vi.mock('server-only', () => ({}));
 const guardMock = vi.fn();
 const sendRawMailMock = vi.fn();
 
-vi.mock('./rechnungGuards', () => ({
-  actionFuellungRechnungRequired: (groupId: string) => guardMock(groupId),
-}));
-
 vi.mock('../../app/auth', () => ({
-  actionGroupAdminRequired: vi.fn(),
+  actionPermissionRequired: (groupId: string, perm: string) =>
+    guardMock(groupId, perm),
 }));
 
 vi.mock('../firebase/firestore', () => ({
@@ -128,6 +125,7 @@ vi.mock('firebase-admin/firestore', () => ({
 import {
   buildFuellungRechnungMail,
   cancelFuellungRechnung,
+  saveAtemschutzRechnungConfig,
   sendFuellungRechnung,
   setFuellungRechnungBezahlt,
   updateFuellungRechnung,
@@ -175,6 +173,7 @@ describe('sendFuellungRechnung', () => {
   it('weist einen Aufrufer ohne Berechtigung ab, ohne zu verschicken', async () => {
     guardMock.mockRejectedValueOnce(new Error('forbidden'));
     const result = await sendFuellungRechnung(request);
+    expect(guardMock).toHaveBeenCalledWith('ffnd', 'kostenersatz.use');
     expect(result.success).toBe(false);
     expect(sendRawMailMock).not.toHaveBeenCalled();
   });
@@ -255,5 +254,36 @@ describe('updateFuellungRechnung', () => {
     const result = await updateFuellungRechnung(request);
     expect(result.success).toBe(false);
     expect(updateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('saveAtemschutzRechnungConfig', () => {
+  const request = {
+    groupId: 'ffnd',
+    config: {
+      ccEmail: '',
+      subjectTemplate: 'Rechnung',
+      bodyTemplate: 'Text',
+      leistungstext: 'Füllung',
+      zahlungszielTage: 14,
+      ustHinweis: '',
+      vorgabeTarif: '5.01',
+    },
+  } as Parameters<typeof saveAtemschutzRechnungConfig>[0];
+
+  it('verlangt gruppe.manage und kostenersatz.use in der Gruppe', async () => {
+    const result = await saveAtemschutzRechnungConfig(request);
+    expect(result.success).toBe(true);
+    expect(guardMock).toHaveBeenCalledWith('ffnd', 'gruppe.manage');
+    expect(guardMock).toHaveBeenCalledWith('ffnd', 'kostenersatz.use');
+  });
+
+  it('weist einen Gruppen-Admin ohne Kostenersatz ab', async () => {
+    guardMock.mockImplementation(async (_groupId: string, perm: string) => {
+      if (perm === 'kostenersatz.use') throw new Error('forbidden');
+      return { user: { email: 'paul@ffnd.at' } };
+    });
+    const result = await saveAtemschutzRechnungConfig(request);
+    expect(result.success).toBe(false);
   });
 });

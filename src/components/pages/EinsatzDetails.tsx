@@ -27,6 +27,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useCan } from '../../hooks/usePermissions';
 import useVehicles from '../../hooks/useVehicles';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import { useAuditLog } from '../../hooks/useAuditLog';
@@ -34,7 +35,6 @@ import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import OfflineMapPreparation from '../Map/OfflineMapPreparation';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
-import { isGroupAdmin } from '../../common/groupPermissions';
 import FirecallExport from '../firebase/FirecallExport';
 import LagekarteExport from '../firebase/LagekarteExport';
 import { firestore } from '../firebase/firebase';
@@ -76,8 +76,7 @@ export default function EinsatzDetails() {
   const tGeraete = useTranslations('geraetEinsatz');
   const firecallId = useFirecallId();
   const setFirecallId = useFirecallSelect();
-  const { isAdmin, email, myGroups, groups, groupAdmin } =
-    useFirebaseLogin();
+  const { email, myGroups } = useFirebaseLogin();
   const logChange = useAuditLog();
   const showSnackbar = useSnackbar();
   const { displayItems } = useVehicles();
@@ -87,6 +86,10 @@ export default function EinsatzDetails() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const canWrite = useFirecallWriteAccess();
+  const canDelete = useCan(firecall?.group, 'gruppe.manage');
+  // Die Berechnungen am Einsatz lesen die Regeln nur mit `kostenersatz.use`
+  // in der Gruppe des Einsatzes — ohne das Recht gäbe es nur einen Fehler.
+  const canKostenersatz = useCan(firecall?.group, 'kostenersatz.use');
   /**
    * Offene Abschnitte. Alle starten zu — die Übersicht oben reicht für den
    * ersten Blick, alles Weitere holt man sich mit einem Klick. Mehrere
@@ -293,13 +296,9 @@ export default function EinsatzDetails() {
             </IconButton>
           </Tooltip>
         )}
-        {/* Löschen darf, wer die Gruppe des Einsatzes administriert —
-            globaler Admin oder Gruppen-Admin. */}
-        {isGroupAdmin(firecall.group ?? '', {
-          isAdmin,
-          groups,
-          groupAdmin,
-        }) && (
+        {/* Löschen darf, wer in der Gruppe des Einsatzes `gruppe.manage`
+            hat — globaler Admin oder Gruppen-Admin. */}
+        {canDelete && (
           <Tooltip title={tCommon('delete')}>
             <IconButton
               size="small"
@@ -317,15 +316,17 @@ export default function EinsatzDetails() {
             </IconButton>
           </Tooltip>
         )}
-        <Tooltip title={t('jumpToKostenersatz')}>
-          <IconButton
-            size="small"
-            onClick={jumpToKostenersatz}
-            color="primary"
-          >
-            <ReceiptLongIcon />
-          </IconButton>
-        </Tooltip>
+        {canKostenersatz && (
+          <Tooltip title={t('jumpToKostenersatz')}>
+            <IconButton
+              size="small"
+              onClick={jumpToKostenersatz}
+              color="primary"
+            >
+              <ReceiptLongIcon />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       {/* Übersicht — der einzige Abschnitt, der immer offen steht. */}
@@ -554,7 +555,7 @@ export default function EinsatzDetails() {
         <EinsatzTagebuchWrapper hideTitle />
       </EinsatzDetailSection>
 
-      {firecall.id && (
+      {firecall.id && canKostenersatz && (
         <EinsatzDetailSection
           sectionId={KOSTENERSATZ_SECTION_ID}
           title={t('sections.kostenersatz')}

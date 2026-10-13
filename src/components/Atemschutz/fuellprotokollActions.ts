@@ -2,7 +2,7 @@
 import 'server-only';
 
 import { getTranslations } from 'next-intl/server';
-import { actionGroupAdminRequired } from '../../app/auth';
+import { actionPermissionRequired } from '../../app/auth';
 import type { Group } from '../../app/groups/groupTypes';
 import {
   fuellungSperre,
@@ -251,8 +251,8 @@ const ERLAUBTE_PATCH_FELDER = new Set<string>([
  * Ändert eine Füllung, die dem Benutzer nicht gehört.
  *
  * Warum überhaupt eine Server Action, wo sonst der Client schreibt: Die
- * Gruppen-Admin-Rolle steckt in keinem Custom Claim und ist für die
- * Firestore-Regeln nicht sichtbar (siehe berechtigungen.md). Die Regel lässt
+ * Rolle steckt in keinem Custom Claim, und die Regeln für das Füllprotokoll
+ * prüfen nur die Mitgliedschaft (siehe berechtigungen.md). Die Regel lässt
  * deshalb nur den Erfasser an seine eigene Zeile; alles darüber hinaus geht
  * über das Admin SDK. Der Verlust der Offline-Fähigkeit ist hier hinnehmbar —
  * eine fremde Zeile korrigiert man am Schreibtisch, nicht am Sammelplatz.
@@ -263,7 +263,7 @@ export async function updateFremdeFuellung(
   patch: FuellungAdminPatch,
 ): Promise<FuellungAdminResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
 
     const ref = fuellungRef(groupId).doc(fuellungId);
     const doc = await ref.get();
@@ -305,7 +305,7 @@ export async function deleteFremdeFuellung(
   fuellungId: string,
 ): Promise<FuellungAdminResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
 
     const ref = fuellungRef(groupId).doc(fuellungId);
     const doc = await ref.get();
@@ -379,7 +379,7 @@ export async function previewFuellungImport(
   zeilen: FuellungImportZeile[],
 ): Promise<FuellungImportPreviewResult> {
   try {
-    await actionGroupAdminRequired(groupId);
+    await actionPermissionRequired(groupId, 'gruppe.manage');
     if (!Array.isArray(zeilen) || zeilen.length === 0) {
       return { success: false, error: 'fileEmpty' };
     }
@@ -428,7 +428,7 @@ export async function importFuellungen(
   zeilen: FuellungImportZeile[],
 ): Promise<FuellungImportResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
     if (!Array.isArray(zeilen) || zeilen.length === 0) {
       return { success: false, error: 'fileEmpty' };
     }

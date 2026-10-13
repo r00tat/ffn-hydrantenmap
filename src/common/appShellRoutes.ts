@@ -138,6 +138,7 @@ export const APP_SHELL_EXCLUDED_ROUTES: Readonly<Record<string, string>> = {
   '/undefined': 'Auffangseite für fehlerhafte Links, kein Navigationsziel.',
   '/atemschutz/verrechnung/[rechnungId]': 'Dynamische ID, beim Vorwärmen unbekannt.',
   '/fahrtenbuch/[groupId]': 'Dynamische IDs, beim Vorwärmen unbekannt.',
+  '/groups/[groupId]': 'Dynamische ID; „Mitglieder und Rollen“ schreibt nur über Server Actions, also nur mit Netz.',
   '/fahrtenbuch/teilen': 'Gastseite mit Token, NetworkOnly-Regel im Worker.',
   '/wetter': 'Dynamische Station, die Messwerte kommen ohnehin nur online.',
   '/einsatz/[firecallId]/kostenersatz/[calculationId]':

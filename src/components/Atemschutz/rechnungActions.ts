@@ -3,7 +3,7 @@ import 'server-only';
 
 import { renderToBuffer } from '@react-pdf/renderer';
 import { FieldValue } from 'firebase-admin/firestore';
-import { actionGroupAdminRequired } from '../../app/auth';
+import { actionPermissionRequired } from '../../app/auth';
 import type { AtemschutzFuellung } from '../../common/atemschutz';
 import {
   DEFAULT_RECHNUNG_CONFIG,
@@ -30,7 +30,6 @@ import { buildMailMessage } from '../../server/mail/buildMailMessage';
 import { mailSender, sendRawMail } from '../../server/mail/sendRawMail';
 import { actionErrorKey } from '../Fahrtenbuch/actionErrorKey';
 import FuellungRechnungPdf from './FuellungRechnungPdf';
-import { actionFuellungRechnungRequired } from './rechnungGuards';
 import {
   empfaengerRef,
   fuellungRef,
@@ -95,7 +94,7 @@ export async function createFuellungRechnung(
 ): Promise<RechnungActionResult> {
   try {
     const { groupId, positionen, empfaengerId, datum, bemerkung } = request;
-    const session = await actionFuellungRechnungRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'kostenersatz.use');
 
     if (!Array.isArray(positionen) || positionen.length === 0) {
       return { success: false, error: 'rechnungNoPositions' };
@@ -230,7 +229,7 @@ export async function updateFuellungRechnung(
 ): Promise<RechnungActionResult> {
   try {
     const { groupId, rechnungId, empfaengerId, datum, bemerkung, tarife } = request;
-    const session = await actionFuellungRechnungRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'kostenersatz.use');
 
     const rechnung = await loadRechnung(groupId, rechnungId);
     if (rechnung.status !== 'draft') {
@@ -349,7 +348,7 @@ export async function renderFuellungRechnungPdf(request: {
 }): Promise<RechnungPdfResult> {
   try {
     const { groupId, rechnungId } = request;
-    await actionFuellungRechnungRequired(groupId);
+    await actionPermissionRequired(groupId, 'kostenersatz.use');
     const rechnung = await loadRechnung(groupId, rechnungId);
     const config = await loadRechnungConfig(groupId);
     const pdf = await baueRechnungPdf(groupId, rechnung, config);
@@ -383,7 +382,7 @@ export async function buildFuellungRechnungMail(request: {
 }): Promise<RechnungMailVorschau> {
   try {
     const { groupId, rechnungId } = request;
-    await actionFuellungRechnungRequired(groupId);
+    await actionPermissionRequired(groupId, 'kostenersatz.use');
     const rechnung = await loadRechnung(groupId, rechnungId);
     const config = await loadRechnungConfig(groupId);
     // Auch für die Mail: Der Anhang ist die Rechnung, und die entsteht nicht
@@ -420,7 +419,7 @@ export async function sendFuellungRechnung(
 ): Promise<RechnungActionResult> {
   try {
     const { groupId, rechnungId, to, cc, subject, body } = request;
-    const session = await actionFuellungRechnungRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'kostenersatz.use');
 
     if (!trimmed(to)) return { success: false, error: 'rechnungNoEmail' };
     if (!trimmed(subject) || !trimmed(body)) {
@@ -478,7 +477,7 @@ export async function setFuellungRechnungBezahlt(request: {
 }): Promise<RechnungActionResult> {
   try {
     const { groupId, rechnungId } = request;
-    const session = await actionFuellungRechnungRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'kostenersatz.use');
     const rechnung = await loadRechnung(groupId, rechnungId);
     if (!rechnungStatusErlaubt(rechnung.status, 'paid')) {
       return { success: false, error: 'rechnungStatusInvalid' };
@@ -513,7 +512,7 @@ export async function cancelFuellungRechnung(request: {
 }): Promise<RechnungActionResult> {
   try {
     const { groupId, rechnungId } = request;
-    const session = await actionFuellungRechnungRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'kostenersatz.use');
     const rechnung = await loadRechnung(groupId, rechnungId);
     if (!rechnungStatusErlaubt(rechnung.status, 'cancelled')) {
       return { success: false, error: 'rechnungStatusInvalid' };
@@ -553,8 +552,8 @@ export type EmpfaengerInput = Pick<
 /**
  * Legt einen Adressbucheintrag an oder ändert ihn.
  *
- * Absichtlich unter demselben Guard wie die Rechnung und nicht beim
- * Gruppen-Admin: Ein Empfänger entsteht, wenn zum ersten Mal an eine Wehr
+ * Absichtlich unter demselben Recht wie die Rechnung (`kostenersatz.use`)
+ * und nicht unter `gruppe.manage`: Ein Empfänger entsteht, wenn zum ersten Mal an eine Wehr
  * abgerechnet wird — bräuchte es dafür einen Admin, bliebe die Rechnung
  * liegen.
  */
@@ -565,7 +564,7 @@ export async function saveAtemschutzEmpfaenger(request: {
 }): Promise<RechnungActionResult> {
   try {
     const { groupId, empfaengerId, input } = request;
-    const session = await actionFuellungRechnungRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'kostenersatz.use');
 
     // Action-Argumente sind Client-Eingabe, der `Pick<>`-Typ ist zur Laufzeit
     // weg — deshalb bereinigen statt roh zu speichern.
@@ -615,7 +614,7 @@ export async function deleteAtemschutzEmpfaenger(request: {
 }): Promise<RechnungActionResult> {
   try {
     const { groupId, empfaengerId } = request;
-    await actionFuellungRechnungRequired(groupId);
+    await actionPermissionRequired(groupId, 'kostenersatz.use');
     await empfaengerRef(groupId).doc(empfaengerId).delete();
     return { success: true, id: empfaengerId };
   } catch (err) {
@@ -626,8 +625,8 @@ export async function deleteAtemschutzEmpfaenger(request: {
 
 /**
  * Die Konfiguration gilt für alle Rechnungen der Gruppe und ist keine
- * Tagesarbeit — deshalb `actionGroupAdminRequired` und nicht der
- * Rechnungs-Guard.
+ * Tagesarbeit — deshalb `gruppe.manage` und nicht `kostenersatz.use` wie
+ * bei den Rechnungen.
  */
 export async function saveAtemschutzRechnungConfig(request: {
   groupId: string;
@@ -635,7 +634,11 @@ export async function saveAtemschutzRechnungConfig(request: {
 }): Promise<RechnungActionResult> {
   try {
     const { groupId, config } = request;
-    const session = await actionGroupAdminRequired(groupId);
+    // Der Reiter liegt in der Atemschutz-Verwaltung (`gruppe.manage`), die
+    // Einstellungen gehören aber zur Verrechnung und sind nur mit
+    // `kostenersatz.use` lesbar — es braucht beides.
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
+    await actionPermissionRequired(groupId, 'kostenersatz.use');
     const now = new Date().toISOString();
     await rechnungConfigRef(groupId).set(
       {

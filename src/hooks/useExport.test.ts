@@ -200,6 +200,35 @@ describe('useExport', () => {
       expect(getDocsMock).toHaveBeenCalledTimes(11);
     });
 
+    it('sichert ohne Kostenersatz-Recht den Rest und lässt den Kostenersatz weg', async () => {
+      (getDocs as Mock).mockImplementation((col: { path?: string }) =>
+        col?.path?.endsWith('kostenersatz')
+          ? Promise.reject(
+              Object.assign(new Error('denied'), { code: 'permission-denied' })
+            )
+          : Promise.resolve({
+              docs: col?.path?.endsWith('chat')
+                ? [{ id: 'c1', data: () => ({ message: 'Hallo' }) }]
+                : [],
+            })
+      );
+
+      const result = await exportFirecall('test-id');
+
+      expect(result.kostenersatz).toEqual([]);
+      expect(result.chat).toHaveLength(1);
+    });
+
+    it('scheitert bei anderen Lesefehlern des Kostenersatzes weiterhin', async () => {
+      (getDocs as Mock).mockImplementation((col: { path?: string }) =>
+        col?.path?.endsWith('kostenersatz')
+          ? Promise.reject(Object.assign(new Error('offline'), { code: 'unavailable' }))
+          : Promise.resolve({ docs: [] })
+      );
+
+      await expect(exportFirecall('test-id')).rejects.toThrow('offline');
+    });
+
     it('sichert das Füllprotokoll nicht mehr mit', async () => {
       // Es liegt unter der Gruppe. Mitgesichert und zurückgespielt stünde jede
       // Füllung zweimal da — einmal je Einsatzbezug.
@@ -921,6 +950,62 @@ describe('useExport', () => {
       const last = progress[progress.length - 1];
       expect(last.total).toBe(writtenDocuments + uploads);
       expect(last.done).toBe(last.total);
+    });
+
+    it('lässt den Kostenersatz ohne Recht in der Zielgruppe weg und meldet es', async () => {
+      const warnings: BackupWarning[] = [];
+      const progress: BackupProgress[] = [];
+      await importFirecall(
+        {
+          name: 'Ohne Kostenersatz',
+          items: [],
+          chat: [{ id: 'c1', message: 'Hallo', uid: 'u1', timestamp: '2026-01-01' }],
+          layers: [],
+          history: [],
+          locations: [],
+          kostenersatz: [
+            { id: 'k1', totalSum: 10 } as unknown as FirecallExport['kostenersatz'][number],
+            { id: 'k2', totalSum: 20 } as unknown as FirecallExport['kostenersatz'][number],
+          ],
+          auditlog: [],
+        },
+        {
+          includeKostenersatz: false,
+          onWarning: (w) => warnings.push(w),
+          onProgress: (p) => progress.push(p),
+        }
+      );
+
+      // Der `doc`-Mock setzt die ID ans Ende des Pfads.
+      const writtenIds = mockCommitInBatches.mock.calls.flatMap((call) =>
+        call[1].map((op) => (op.ref as { id: string }).id)
+      );
+      expect(writtenIds).not.toContain('k1');
+      expect(writtenIds).not.toContain('k2');
+      expect(writtenIds).toContain('c1');
+      expect(warnings).toContainEqual({ code: 'kostenersatzSkipped', detail: '2' });
+      const last = progress[progress.length - 1];
+      expect(last.done).toBe(last.total);
+    });
+
+    it('spielt den Kostenersatz standardmäßig mit zurück', async () => {
+      await importFirecall({
+        name: 'Mit Kostenersatz',
+        items: [],
+        chat: [],
+        layers: [],
+        history: [],
+        locations: [],
+        kostenersatz: [
+          { id: 'k1', totalSum: 10 } as unknown as FirecallExport['kostenersatz'][number],
+        ],
+        auditlog: [],
+      });
+
+      const writtenIds = mockCommitInBatches.mock.calls.flatMap((call) =>
+        call[1].map((op) => (op.ref as { id: string }).id)
+      );
+      expect(writtenIds).toContain('k1');
     });
 
     it('should warn about a backup from a newer app version', async () => {

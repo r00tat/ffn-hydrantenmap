@@ -70,6 +70,7 @@ const SESSION = {
     name: 'Paul Wölfel',
     isAdmin: false,
     groups: ['ffnd'],
+    groupRoles: { ffnd: [] },
   },
 };
 
@@ -228,7 +229,7 @@ describe('exportFahrtenbuchPdf', () => {
 
   it('übersetzt eine fehlende Gruppenmitgliedschaft in einen Fehlerschlüssel', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: { ...SESSION.user, groups: ['andere'] },
+      user: { ...SESSION.user, groups: ['andere'], groupRoles: { andere: [] } },
     });
 
     await expect(exportFahrtenbuchPdf(request)).resolves.toEqual({

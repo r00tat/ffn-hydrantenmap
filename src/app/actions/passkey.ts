@@ -20,6 +20,10 @@ import {
   PasskeyInfo,
   toPasskeyInfo,
 } from '../../common/passkey';
+import {
+  claimGroupsForUser,
+  type UserRolesSource,
+} from '../../common/userGroupRoles';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 import { requestOrigin, rpIdFromOrigin } from '../../server/auth/baseUrl';
 import {
@@ -267,10 +271,9 @@ export async function finishPasskeyAuthentication(
   if (!userDoc.exists) {
     throw new Error(`passkey: no user document for ${passkey.uid}`);
   }
-  const userData = userDoc.data() as {
+  const userData = userDoc.data() as UserRolesSource & {
     authorized?: boolean;
     isAdmin?: boolean;
-    groups?: string[];
   };
   if (!userData.authorized) {
     throw new Error(`passkey: user ${passkey.uid} is not authorized`);
@@ -279,7 +282,10 @@ export async function finishPasskeyAuthentication(
   await updatePasskeyUsage(passkey.id, newCounter, claims.challenge);
 
   const token = await firebaseAuth.createCustomToken(passkey.uid, {
-    groups: userData.groups || ['allUsers'],
+    // Mitgliedschaft aus `groupRoles` (vor der Migration aus dem alten Feld),
+    // genau wie `writeUserRoles` den Claim setzt — sonst prägte dieser
+    // Anmeldeweg einen anderen Claim als die Rollenverwaltung.
+    groups: claimGroupsForUser(userData),
     isAdmin: !!userData.isAdmin,
     authorized: true,
   });

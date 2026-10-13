@@ -13,8 +13,7 @@ const user = {
   uid: 'uid-1',
   isAdmin: false,
   groups: ['allUsers', 'ffnd'],
-  fahrtenbuchGeraetemeister: [],
-  groupAdmin: [],
+  groupRoles: { ffnd: [] },
 };
 
 function auth(scopes: McpScope[]): McpAuthContext {

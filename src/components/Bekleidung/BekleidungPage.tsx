@@ -1,5 +1,6 @@
 'use client';
 
+import GroupIcon from '@mui/icons-material/Group';
 import LocalLaundryServiceIcon from '@mui/icons-material/LocalLaundryService';
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -14,9 +15,8 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { isBekleidungswart } from '../../common/bekleidungPermissions';
-import { isGroupAdmin } from '../../common/groupPermissions';
 import {
   useBekleidungArtikel,
   useBekleidungAusgaben,
@@ -27,11 +27,11 @@ import {
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useCan } from '../../hooks/usePermissions';
 import OfflineListHint from '../site/OfflineListHint';
 import OnlineOnly from '../site/OnlineOnly';
 import ArtikelTab from './ArtikelTab';
 import AusgabeDialog from './AusgabeDialog';
-import BekleidungswartSettings from './BekleidungswartSettings';
 import { buildBekleidungView } from './bekleidungUi';
 import LagerstandTab from './LagerstandTab';
 import PersonenTab from './PersonenTab';
@@ -48,19 +48,20 @@ type OpenDialog =
   | { kind: 'waesche' };
 
 /**
- * Seite „Bekleidung" einer Gruppe — nur für Bekleidungswart, Gruppen-Admin
- * und Admin. Die Abos starten erst mit der Berechtigung, sonst lehnen die
- * Firestore-Regeln sie ab. Die Grenze ziehen Regeln und Server Actions; die
- * Prüfung hier ist Bedienkomfort.
+ * Seite „Bekleidung" einer Gruppe — sehen mit `bekleidung.read`, Ausgabe,
+ * Rücknahme und Wäsche mit `bekleidung.manage`. Die Abos starten erst mit dem
+ * Leserecht, sonst lehnen die Firestore-Regeln sie ab. Die Grenze ziehen Regeln
+ * und Server Actions; die Prüfung hier ist Bedienkomfort.
  */
 export default function BekleidungPage() {
   const t = useTranslations('bekleidung');
-  const { isAuthorized, isAdmin, groups: userGroups, groupAdmin, bekleidungswart } =
-    useFirebaseLogin();
+  const { isAuthorized } = useFirebaseLogin();
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
-  const user = { isAdmin, groups: userGroups, groupAdmin, bekleidungswart };
-  const permitted = !!groupId && isBekleidungswart(groupId, user);
-  const canSettings = !!groupId && isGroupAdmin(groupId, user);
+  const permitted = useCan(groupId, 'bekleidung.read');
+  const canManage = useCan(groupId, 'bekleidung.manage');
+  // Der Reiter verweist nur noch auf die Rollenansicht der Gruppe — zeigen
+  // lohnt sich nur, wer dort Rollen vergeben darf.
+  const canSettings = useCan(groupId, 'rollen.assign');
   const dataGroupId = permitted ? groupId : undefined;
 
   const artikel = useBekleidungArtikel(dataGroupId);
@@ -145,35 +146,37 @@ export default function BekleidungPage() {
         <Typography>{t('noPermission')}</Typography>
       ) : (
         <>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
-            <OnlineOnly>
-              <Button
-                variant="contained"
-                startIcon={<LogoutIcon />}
-                onClick={() => setDialog({ kind: 'ausgabe' })}
-              >
-                {t('actions.ausgeben')}
-              </Button>
-            </OnlineOnly>
-            <OnlineOnly>
-              <Button
-                variant="outlined"
-                startIcon={<LoginIcon />}
-                onClick={() => setDialog({ kind: 'ruecknahme' })}
-              >
-                {t('actions.zuruecknehmen')}
-              </Button>
-            </OnlineOnly>
-            <OnlineOnly>
-              <Button
-                variant="outlined"
-                startIcon={<LocalLaundryServiceIcon />}
-                onClick={() => setDialog({ kind: 'waesche' })}
-              >
-                {t('actions.waescheErfassen')}
-              </Button>
-            </OnlineOnly>
-          </Stack>
+          {canManage && (
+            <Stack direction="row" spacing={1} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
+              <OnlineOnly>
+                <Button
+                  variant="contained"
+                  startIcon={<LogoutIcon />}
+                  onClick={() => setDialog({ kind: 'ausgabe' })}
+                >
+                  {t('actions.ausgeben')}
+                </Button>
+              </OnlineOnly>
+              <OnlineOnly>
+                <Button
+                  variant="outlined"
+                  startIcon={<LoginIcon />}
+                  onClick={() => setDialog({ kind: 'ruecknahme' })}
+                >
+                  {t('actions.zuruecknehmen')}
+                </Button>
+              </OnlineOnly>
+              <OnlineOnly>
+                <Button
+                  variant="outlined"
+                  startIcon={<LocalLaundryServiceIcon />}
+                  onClick={() => setDialog({ kind: 'waesche' })}
+                >
+                  {t('actions.waescheErfassen')}
+                </Button>
+              </OnlineOnly>
+            </Stack>
+          )}
 
           {loading && <LinearProgress sx={{ mb: 1 }} />}
           <OfflineListHint fromCache={fromCache} empty={empty} />
@@ -204,7 +207,24 @@ export default function BekleidungPage() {
           )}
           {activeTab === 'waesche' && <WaescheTab view={view} />}
           {activeTab === 'artikel' && <ArtikelTab view={view} />}
-          {activeTab === 'settings' && canSettings && <BekleidungswartSettings groupId={groupId} />}
+          {activeTab === 'settings' && canSettings && (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                {t('settings.title')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {t('settings.hint')}
+              </Typography>
+              <Button
+                component={Link}
+                href={`/groups/${encodeURIComponent(groupId)}/rollen`}
+                variant="outlined"
+                startIcon={<GroupIcon />}
+              >
+                {t('settings.link')}
+              </Button>
+            </Box>
+          )}
 
           {dialog?.kind === 'ausgabe' && (
             <AusgabeDialog

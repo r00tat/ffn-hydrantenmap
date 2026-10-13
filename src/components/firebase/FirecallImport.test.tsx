@@ -19,6 +19,9 @@ vi.mock('../../hooks/useFirebaseLogin', () => ({
       // Pseudo-Gruppe — darf nicht als Zielgruppe angeboten werden
       { id: 'allUsers', name: 'Alle Benutzer' },
     ],
+    isAdmin: false,
+    // Kostenersatz nur in Neusiedl
+    groupRoles: { ffnd: ['kostenersatz'], ffpodersdorf: [] },
   }),
 }));
 
@@ -106,6 +109,29 @@ describe('FirecallImport', () => {
 
     await waitFor(() => expect(importFirecallMock).toHaveBeenCalledTimes(1));
     expect(importFirecallMock.mock.calls[0][1].group).toBe('ffnd');
+  });
+
+  it('spielt den Kostenersatz mit zurück, wenn die Zielgruppe ihn erlaubt', async () => {
+    renderWithIntl(<FirecallImport />);
+    await chooseFile(backupFile());
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Importieren' })
+    );
+
+    await waitFor(() => expect(importFirecallMock).toHaveBeenCalledTimes(1));
+    expect(importFirecallMock.mock.calls[0][1].includeKostenersatz).toBe(true);
+  });
+
+  it('lässt den Kostenersatz ohne Recht in der Zielgruppe weg', async () => {
+    renderWithIntl(<FirecallImport />);
+    await chooseFile(backupFile());
+
+    await userEvent.click(await screen.findByRole('combobox'));
+    await userEvent.click(screen.getByRole('option', { name: 'FF Podersdorf' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Importieren' }));
+
+    await waitFor(() => expect(importFirecallMock).toHaveBeenCalledTimes(1));
+    expect(importFirecallMock.mock.calls[0][1].includeKostenersatz).toBe(false);
   });
 
   it('reports a broken file instead of opening the dialog', async () => {

@@ -119,7 +119,7 @@ describe('exchangeCustomJwtForFirebaseToken', () => {
     await exchangeCustomJwtForFirebaseToken('jwt');
 
     expect(createCustomTokenMock).toHaveBeenCalledWith('guest-uid', {
-      groups: ['ffnd'],
+      groups: ['ffnd', 'allUsers'],
       isAdmin: true,
       authorized: true,
     });
@@ -211,7 +211,7 @@ describe('exchangeNativeIdTokenForFirebaseToken', () => {
     // native Sitzung weiter in die Weboberflaeche.
     expect(verifyIdTokenMock).toHaveBeenCalledWith('id-token', true);
     expect(createCustomTokenMock).toHaveBeenCalledWith('native-uid', {
-      groups: ['ffnd'],
+      groups: ['ffnd', 'allUsers'],
       isAdmin: true,
       authorized: true,
     });
@@ -232,7 +232,7 @@ describe('exchangeNativeIdTokenForFirebaseToken', () => {
     await exchangeNativeIdTokenForFirebaseToken('id-token');
 
     expect(createCustomTokenMock).toHaveBeenCalledWith('native-uid', {
-      groups: ['ffnd'],
+      groups: ['ffnd', 'allUsers'],
       isAdmin: false,
       authorized: true,
     });

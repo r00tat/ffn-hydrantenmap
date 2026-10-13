@@ -18,6 +18,27 @@ export function isAtemschutzAdminTabKey(
  * Reiter zurück statt eine leere Seite zu zeigen — der Parameter steht in der
  * URL und damit in jedem weitergegebenen Link.
  */
-export function adminTabFromParam(value: string | null | undefined): AtemschutzAdminTabKey {
-  return isAtemschutzAdminTabKey(value) ? value : DEFAULT_ATEMSCHUTZ_ADMIN_TAB;
+export function adminTabFromParam(
+  value: string | null | undefined,
+  visible: readonly AtemschutzAdminTabKey[] = ATEMSCHUTZ_ADMIN_TABS,
+): AtemschutzAdminTabKey {
+  return isAtemschutzAdminTabKey(value) && visible.includes(value)
+    ? value
+    : DEFAULT_ATEMSCHUTZ_ADMIN_TAB;
+}
+
+/**
+ * Die Reiter, die der Benutzer in der gewählten Gruppe sieht.
+ *
+ * Die Verrechnungs-Einstellungen liegen in `atemschutzConfig`, das die
+ * Firestore-Regeln nur mit `kostenersatz.use` lesen lassen. Ein Gruppen-Admin
+ * ohne Kostenersatz sähe einen Reiter, der nicht laden kann — deshalb fehlt er
+ * dann ganz.
+ */
+export function visibleAdminTabs({
+  canBill,
+}: {
+  canBill: boolean;
+}): AtemschutzAdminTabKey[] {
+  return ATEMSCHUTZ_ADMIN_TABS.filter((key) => key !== 'rechnung' || canBill);
 }

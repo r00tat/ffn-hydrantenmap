@@ -250,10 +250,8 @@ vi.mock('../firebase/firestore', () => ({
   GROUP_COLLECTION_ID: 'groups',
   FIRECALL_COLLECTION_ID: 'call',
 }));
-vi.mock('../Fahrtenbuch/authGuards', () => ({
-  actionFahrtenbuchManagerRequired: managerGuard,
-}));
 vi.mock('../../app/auth', () => ({
+  actionPermissionRequired: managerGuard,
   actionUserAuthorizedForFirecall: firecallGuard,
   actionUserRequired: userGuard,
 }));
@@ -404,13 +402,13 @@ describe('Guards der Pflege-Actions', () => {
     ],
     ['previewGeraetImport', () => previewGeraetImport('ffnd', '')],
     ['importGeraete', () => importGeraete('ffnd', '', [])],
-  ])('%s verlangt Gruppen-Admin oder Gerätemeister', async (_name, call) => {
+  ])('%s verlangt geraete.manage', async (_name, call) => {
     putGeraet('g1');
     putBestand('b1', 'g1', srf, 1);
     const before = JSON.stringify([...fake.docs.entries()]);
     managerGuard.mockRejectedValue(new Error('forbidden'));
     await expect(call()).rejects.toThrow('forbidden');
-    expect(managerGuard).toHaveBeenCalledWith('ffnd');
+    expect(managerGuard).toHaveBeenCalledWith('ffnd', 'geraete.manage');
     expect(JSON.stringify([...fake.docs.entries()])).toBe(before);
   });
 });
@@ -1539,10 +1537,10 @@ const validSet = {
 describe('saveGeraetSet', () => {
   beforeEach(putSetArtikel);
 
-  it('verlangt Gruppen-Admin oder Gerätemeister', async () => {
+  it('verlangt geraete.manage', async () => {
     managerGuard.mockRejectedValue(new Error('forbidden'));
     await expect(saveGeraetSet('ffnd', validSet)).rejects.toThrow('forbidden');
-    expect(managerGuard).toHaveBeenCalledWith('ffnd');
+    expect(managerGuard).toHaveBeenCalledWith('ffnd', 'geraete.manage');
     expect(fake.list(`${G}/geraetSet`)).toHaveLength(0);
   });
 
@@ -1646,11 +1644,11 @@ describe('saveGeraetSet', () => {
 });
 
 describe('deleteGeraetSet', () => {
-  it('verlangt Gruppen-Admin oder Gerätemeister', async () => {
+  it('verlangt geraete.manage', async () => {
     putSet('s1');
     managerGuard.mockRejectedValue(new Error('forbidden'));
     await expect(deleteGeraetSet('ffnd', 's1')).rejects.toThrow('forbidden');
-    expect(managerGuard).toHaveBeenCalledWith('ffnd');
+    expect(managerGuard).toHaveBeenCalledWith('ffnd', 'geraete.manage');
     expect(geraetSet('s1')).toBeDefined();
   });
 

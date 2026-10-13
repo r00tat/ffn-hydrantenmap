@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 
-import { actionUserAuthorizedForFirecall } from '../../app/auth';
+import { actionFirecallPermissionRequired } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
 import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import {
@@ -18,7 +18,8 @@ export async function updateRecipientAction(
     return { success: false, error: 'Missing firecallId or calculationId' };
   }
 
-  await actionUserAuthorizedForFirecall(firecallId, { requireWrite: true });
+  // Kostenersatz gehört der Gruppe des Einsatzes; Gäste haben dort keine Rolle.
+  await actionFirecallPermissionRequired(firecallId, 'kostenersatz.use');
 
   try {
     const calculationRef = firestore

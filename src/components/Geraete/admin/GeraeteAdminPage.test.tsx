@@ -98,8 +98,7 @@ function setup({ manager, chargen = false }: { manager: boolean; chargen?: boole
     isAuthorized: true,
     isAdmin: false,
     groups: ['ffnd'],
-    groupAdmin: [],
-    fahrtenbuchGeraetemeister: manager ? ['ffnd'] : [],
+    groupRoles: { ffnd: manager ? ['geraetemeister'] : [] },
   });
   useFahrtenbuchGroup.mockReturnValue({
     groups: [{ id: 'ffnd', name: 'FF Neusiedl' }],

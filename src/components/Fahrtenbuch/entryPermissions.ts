@@ -5,7 +5,7 @@
  * braucht auch der Client — die Liste entscheidet damit, ob sie einen
  * Bearbeiten-Knopf überhaupt anbietet — und der zöge über `entryLogic` das
  * gesamte Eintrags-Validierungsmodul in sein Bundle. Dieselbe Trennung wie bei
- * `managerPermissions.ts`.
+ * `src/common/permissions.ts`.
  *
  * Server und Client müssen hier zwingend dasselbe rechnen. Ein Knopf, der
  * erscheint und beim Speichern abgewiesen wird, ist genau der Fehler, aus dem
@@ -77,7 +77,7 @@ export function isEntryDriver(
 
 /**
  * Wer einen bestehenden Eintrag ändern oder löschen darf: sein Ersteller, wer
- * die Gruppe verwalten darf (`isFahrtenbuchManager` — Admin oder
+ * in der Gruppe `fahrtenbuch.manage` hat (Admin, Gruppen-Admin oder
  * Gerätemeister), oder — nur bei Einträgen aus dem Freigabe-Link — der
  * eingetragene Fahrer.
  *

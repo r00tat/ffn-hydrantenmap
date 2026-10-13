@@ -8,6 +8,7 @@ import {
 } from 'firebase-admin/firestore';
 import { ApiException } from '../../app/api/errors';
 import {
+  actionPermissionRequired,
   actionUserAuthorizedForFirecall,
   actionUserRequired,
 } from '../../app/auth';
@@ -74,7 +75,6 @@ import {
 } from '../../common/geraetSet';
 import { readXlsxSheet } from '../../common/xlsx';
 import { firestore } from '../../server/firebase/admin';
-import { actionFahrtenbuchManagerRequired } from '../Fahrtenbuch/authGuards';
 import { FIRECALL_COLLECTION_ID, GROUP_COLLECTION_ID } from '../firebase/firestore';
 import type { NachbestellungItem } from './buildNachbestellungEmail';
 import { notifyNachbestellung } from './notifyNachbestellung';
@@ -88,8 +88,8 @@ import { notifyNachbestellung } from './notifyNachbestellung';
  *
  * Grundregeln:
  * - Jede Action ruft zuerst ihren Guard. Pflege (Stammdaten, Bestand, Import)
- *   verlangt Gruppen-Admin oder Gerätemeister
- *   (`actionFahrtenbuchManagerRequired`, schließt die Mandanten-Sperre ein),
+ *   verlangt das Recht `geraete.manage` (`actionPermissionRequired`,
+ *   schließt die Mandanten-Sperre ein),
  *   der Verbrauch im Einsatz die Einsatzberechtigung mit Schreibrecht.
  * - Jede Bestandsänderung läuft in einer Transaktion, die `geraetBestand.anzahl`
  *   und `geraet.bestandGesamt` gemeinsam ändert — so bleibt der Gesamtbestand
@@ -613,7 +613,7 @@ export async function saveGeraet(
   groupId: string,
   input: SaveGeraetInput,
 ): Promise<{ id: string }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   if (!input || typeof input !== 'object') {
     throw new ApiException('invalid geraet', { status: 400 });
@@ -715,7 +715,7 @@ export async function setGeraeteVerbrauchsmaterial(
   geraetIds: string[],
   verbrauchsmaterial: boolean,
 ): Promise<{ updated: number }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   if (!Array.isArray(geraetIds) || typeof verbrauchsmaterial !== 'boolean') {
     throw new ApiException('invalid verbrauchsmaterial selection', { status: 400 });
@@ -785,7 +785,7 @@ export async function deleteGeraet(
   groupId: string,
   geraetId: string,
 ): Promise<{ id: string; deleted: boolean }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(geraetId, 'geraetId');
 
@@ -978,7 +978,7 @@ export async function saveGeraetCharge(
   input: GeraetChargeInput,
   zugaenge?: GeraetChargeZugang[],
 ): Promise<{ id: string }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(geraetId, 'geraetId');
   const { id: chargeId, fields } = sanitizeChargeInput(input);
@@ -1135,7 +1135,7 @@ export async function archiveGeraetCharge(
   geraetId: string,
   chargeId: string,
 ): Promise<{ id: string }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(geraetId, 'geraetId');
   assertSafeId(chargeId, 'chargeId');
@@ -1190,7 +1190,7 @@ export async function ausbuchenGeraetCharge(
   chargeId: string,
   bemerkung?: string,
 ): Promise<{ id: string; bookings: number }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(geraetId, 'geraetId');
   assertSafeId(chargeId, 'chargeId');
@@ -1365,7 +1365,7 @@ export async function saveGeraetSet(
   groupId: string,
   input: GeraetSetInput,
 ): Promise<{ id: string }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   const clean = sanitizeSetInput(input);
   const id = clean.id;
@@ -1442,7 +1442,7 @@ export async function deleteGeraetSet(
   groupId: string,
   setId: string,
 ): Promise<{ id: string }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(setId, 'setId');
   const ref = setCol(groupId).doc(setId);
@@ -1487,7 +1487,7 @@ export async function createGeraetBestand(
   lagerort: GeraetLagerort,
   anzahl?: number,
 ): Promise<{ id: string }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(geraetId, 'geraetId');
   const place = sanitizeLagerort(lagerort);
@@ -1603,7 +1603,7 @@ export async function updateGeraetBestand(
   bestandId: string,
   lagerort: GeraetLagerort,
 ): Promise<{ id: string }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(bestandId, 'bestandId');
   const place = sanitizeLagerort(lagerort);
@@ -1663,7 +1663,7 @@ export async function deleteGeraetBestand(
   groupId: string,
   bestandId: string,
 ): Promise<{ id: string; deleted: boolean }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(bestandId, 'bestandId');
 
@@ -1758,7 +1758,7 @@ export async function aufteilenGeraetBestand(
   bestandId: string,
   chargen: Record<string, number>,
 ): Promise<{ id: string; buchungId?: string }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(bestandId, 'bestandId');
 
@@ -1875,7 +1875,7 @@ export async function korrigiereGeraetChargenBestand(
   rows: GeraetChargenKorrektur[],
   bemerkung?: string,
 ): Promise<{ bookings: number }> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   assertSafeId(geraetId, 'geraetId');
   const rowList = sanitizeChargenKorrektur(rows);
@@ -2079,7 +2079,7 @@ export async function bookGeraetBestand(
   groupId: string,
   input: BookGeraetBestandInput,
 ): Promise<BookGeraetBestandResult> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   if (!input || typeof input !== 'object') {
     throw new ApiException('invalid buchung', { status: 400 });
@@ -2730,7 +2730,7 @@ export async function previewGeraetImport(
   groupId: string,
   fileBase64: string,
 ): Promise<GeraetImportPreview> {
-  await actionFahrtenbuchManagerRequired(groupId);
+  await actionPermissionRequired(groupId, 'geraete.manage');
   const { plan, errors } = await prepareImport(groupId, fileBase64);
   return { ...plan, errors };
 }
@@ -2778,7 +2778,7 @@ export async function importGeraete(
   fileBase64: string,
   acceptDeviations: string[],
 ): Promise<GeraetImportSummary> {
-  const session = await actionFahrtenbuchManagerRequired(groupId);
+  const session = await actionPermissionRequired(groupId, 'geraete.manage');
   const actor = actorOf(session);
   if (
     !Array.isArray(acceptDeviations) ||

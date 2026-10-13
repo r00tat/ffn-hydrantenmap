@@ -43,9 +43,6 @@ vi.mock('../../hooks/useBekleidung', () => {
   };
 });
 vi.mock('./bekleidungActions', () => ({}));
-vi.mock('./BekleidungswartSettings', () => ({
-  default: ({ groupId }: { groupId: string }) => <div>Einstellungen für {groupId}</div>,
-}));
 vi.mock('../../hooks/useOnline', () => ({ default: () => true }));
 vi.mock('../../hooks/useConnectivity', () => ({ default: () => ({ status: 'online' }) }));
 vi.mock('../../hooks/useBarcodeScanner', () => ({
@@ -57,10 +54,14 @@ import BekleidungPage from './BekleidungPage';
 const member = {
   isAuthorized: true,
   isAdmin: false,
-  groups: ['ffnd', 'other'],
-  groupAdmin: [] as string[],
-  bekleidungswart: [] as string[],
+  groups: ['ffnd', 'other', 'allUsers'],
+  groupRoles: { ffnd: [], other: [] } as Record<string, string[]>,
 };
+
+const withRoles = (ffnd: string[]) => ({
+  ...member,
+  groupRoles: { ...member.groupRoles, ffnd },
+});
 
 describe('BekleidungPage', () => {
   beforeEach(() => {
@@ -77,7 +78,7 @@ describe('BekleidungPage', () => {
   });
 
   it('zeigt dem Bekleidungswart die Reiter ohne Einstellungen', async () => {
-    mocks.login.mockReturnValue({ ...member, bekleidungswart: ['ffnd'] });
+    mocks.login.mockReturnValue(withRoles(['bekleidungswart']));
     const user = userEvent.setup();
     renderWithIntl(<BekleidungPage />);
     expect(screen.getByRole('combobox', { name: 'Gruppe' })).toBeInTheDocument();
@@ -92,16 +93,35 @@ describe('BekleidungPage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('zeigt dem Gruppen-Admin die Einstellungen', async () => {
-    mocks.login.mockReturnValue({ ...member, groupAdmin: ['ffnd'] });
+  it('verweist den Gruppen-Admin in den Einstellungen auf die Rollenansicht', async () => {
+    mocks.login.mockReturnValue(withRoles(['gruppenadmin']));
     const user = userEvent.setup();
     renderWithIntl(<BekleidungPage />);
     await user.click(screen.getByRole('tab', { name: 'Einstellungen' }));
-    expect(screen.getByText('Einstellungen für ffnd')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mitglieder und Rollen öffnen' })).toHaveAttribute(
+      'href',
+      '/groups/ffnd/rollen',
+    );
+  });
+
+  it('liest keine alten Rollenfelder mehr', () => {
+    mocks.login.mockReturnValue({ ...member, bekleidungswart: ['ffnd'], groupAdmin: ['ffnd'] });
+    renderWithIntl(<BekleidungPage />);
+    expect(screen.getByText(/verwalten nur Bekleidungswarte/)).toBeInTheDocument();
+    expect(mocks.groupIds.every((id) => id === undefined)).toBe(true);
+  });
+
+  it('weist ab, wer Bekleidungswart nur in einer anderen Gruppe ist', () => {
+    mocks.login.mockReturnValue({
+      ...member,
+      groupRoles: { ffnd: [], other: ['bekleidungswart'] },
+    });
+    renderWithIntl(<BekleidungPage />);
+    expect(screen.getByText(/verwalten nur Bekleidungswarte/)).toBeInTheDocument();
   });
 
   it('öffnet die Rücknahme vorbelegt aus dem Personen-Reiter', async () => {
-    mocks.login.mockReturnValue({ ...member, bekleidungswart: ['ffnd'] });
+    mocks.login.mockReturnValue(withRoles(['bekleidungswart']));
     const user = userEvent.setup();
     renderWithIntl(<BekleidungPage />);
     await user.click(screen.getByRole('tab', { name: 'Personen' }));

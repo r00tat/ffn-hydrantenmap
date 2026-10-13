@@ -148,6 +148,7 @@ const SESSION = {
     email: 'max@ffn.at',
     isAdmin: false,
     groups: ['ffnd'],
+    groupRoles: { ffnd: [] },
   },
 };
 
@@ -1093,7 +1094,7 @@ describe('importFahrtenbuchEntries', () => {
 
   it('weist ein Nichtmitglied ab', async () => {
     actionUserRequiredMock.mockResolvedValueOnce({
-      user: { ...SESSION.user, groups: ['andere-feuerwehr'] },
+      user: { ...SESSION.user, groups: ['andere-feuerwehr'], groupRoles: { 'andere-feuerwehr': [] } },
     });
 
     const result = await importFahrtenbuchEntries('ffnd', [importInput()]);
@@ -1567,7 +1568,7 @@ describe('Gerätemeister korrigiert fremde Einträge', () => {
       email: 'max@ffn.at',
       isAdmin: false,
       groups: ['ffnd'],
-      fahrtenbuchGeraetemeister: ['ffnd'],
+      groupRoles: { ffnd: ['geraetemeister'] },
     },
   };
 
@@ -1674,13 +1675,14 @@ describe('Fahrer korrigiert seine über den QR-Code erfasste Fahrt', () => {
       email: 'anna@ffn.at',
       isAdmin: false,
       groups: ['ffnd'],
+      groupRoles: { ffnd: [] },
     },
   };
 
   const geraetemeisterSessionForShare = {
     user: {
       ...otherMemberSession.user,
-      fahrtenbuchGeraetemeister: ['ffnd'],
+      groupRoles: { ffnd: ['geraetemeister'] },
     },
   };
 

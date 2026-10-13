@@ -35,8 +35,28 @@ describe('mintFirebaseCustomToken', () => {
 
     expect(result).toEqual({ token: 'minted-token' });
     expect(createCustomTokenMock).toHaveBeenCalledWith('uid-1', {
-      groups: ['feuerwehr'],
+      groups: ['feuerwehr', 'allUsers'],
       isAdmin: true,
+      authorized: true,
+    });
+  });
+
+  it('nimmt die Mitgliedschaft aus groupRoles, nicht aus dem alten Feld', async () => {
+    // `writeUserRoles` pflegt `groups` nicht mehr mit; ein Claim aus dem alten
+    // Feld verlöre jede Gruppe, die nach der Migration dazukam.
+    getMock.mockResolvedValue(
+      userDoc({
+        authorized: true,
+        groups: ['alt'],
+        groupRoles: { ffnd: ['geraetemeister'], neu: [] },
+      }),
+    );
+
+    await mintFirebaseCustomToken('uid-1');
+
+    expect(createCustomTokenMock).toHaveBeenCalledWith('uid-1', {
+      groups: ['ffnd', 'neu', 'allUsers'],
+      isAdmin: false,
       authorized: true,
     });
   });

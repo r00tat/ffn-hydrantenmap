@@ -47,7 +47,7 @@ import { normalizePersonName } from '../../common/personNameMatch';
 import { readXlsxSheetByName } from '../../common/xlsx';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
-import { actionBekleidungswartRequired } from './bekleidungGuard';
+import { actionPermissionRequired } from '../../app/auth';
 
 /*
  * Server Actions der Bekleidungsverwaltung.
@@ -57,7 +57,9 @@ import { actionBekleidungswartRequired } from './bekleidungGuard';
  * alle fünf Sammlungen für Client-Schreibvorgänge.
  *
  * Grundregeln:
- * - Jede Action ruft zuerst `actionBekleidungswartRequired(groupId)`.
+ * - Jede Action ruft zuerst `requireBekleidungManage(groupId)` — das Recht
+ *   `bekleidung.manage` in der Gruppe. Reine Lese-Actions gibt es nicht; gelesen
+ *   wird im Client.
  * - Jede Zustandsänderung läuft in einer Transaktion, die den Status prüft.
  *   Firestore verlangt dort alle Lesevorgänge vor dem ersten Schreiben.
  * - Fehler werden als `ApiException` geworfen. Die Meldung ist
@@ -70,7 +72,11 @@ import { actionBekleidungswartRequired } from './bekleidungGuard';
 
 // --- Hilfen ------------------------------------------------------------------
 
-type Session = Awaited<ReturnType<typeof actionBekleidungswartRequired>>;
+/** Jede Action hier schreibt — sie verlangt das Pflegerecht der Gruppe. */
+const requireBekleidungManage = (groupId: string) =>
+  actionPermissionRequired(groupId, 'bekleidung.manage');
+
+type Session = Awaited<ReturnType<typeof requireBekleidungManage>>;
 
 interface Actor {
   uid: string;
@@ -221,7 +227,7 @@ async function saveArtikelImpl(
   artikelId: string | undefined,
   input: ArtikelInput,
 ): Promise<{ id: string }> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertOneOf(input?.kategorie, KATEGORIEN, 'kategorie');
@@ -330,7 +336,7 @@ async function createStueckeImpl(
   groupId: string,
   input: StueckInput & { artikelId: string; anzahl: number },
 ): Promise<{ ids: string[] }> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertSafeId(input?.artikelId, 'artikelId');
@@ -382,7 +388,7 @@ async function updateStueckImpl(
   stueckId: string,
   input: StueckInput,
 ): Promise<void> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertSafeId(stueckId, 'stueckId');
@@ -457,7 +463,7 @@ async function mergeArtikelImpl(
   sourceIdsRaw: string[],
   options: MergeOptions = {},
 ): Promise<void> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertSafeId(targetId, 'targetId');
@@ -606,7 +612,7 @@ async function convertArtikelToMengeImpl(
   groupId: string,
   artikelId: string,
 ): Promise<{ bestand: number; ausgaben: number; entfallen: number }> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
   assertSafeId(artikelId, 'artikelId');
   const artikelRef = artikelCol(groupId).doc(artikelId);
@@ -717,7 +723,7 @@ const MAX_ISSUE_MENGEN = 50;
  * auffindbares mit `notAvailable:<id>:<status>`.
  */
 async function issueImpl(groupId: string, input: IssueInput): Promise<{ ausgabeIds: string[] }> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertSafeId(input?.personId, 'personId');
@@ -910,7 +916,7 @@ export interface ReturnInput {
  * `lager` nicht.
  */
 async function returnItemsImpl(groupId: string, input: ReturnInput): Promise<void> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertDate(input?.datum);
@@ -1036,7 +1042,7 @@ export interface ReassignInput {
  * und Eigentum einer Menge wandern mit.
  */
 async function reassignItemsImpl(groupId: string, input: ReassignInput): Promise<void> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertSafeId(input?.personId, 'personId');
@@ -1158,7 +1164,7 @@ async function setStueckBemerkungImpl(
   stueckId: string,
   bemerkung: string,
 ): Promise<void> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
   assertSafeId(stueckId, 'stueckId');
   await setBemerkung(stueckCol(groupId).doc(stueckId), 'stueck', stueckId, bemerkung, actor);
@@ -1170,7 +1176,7 @@ async function setAusgabeBemerkungImpl(
   ausgabeId: string,
   bemerkung: string,
 ): Promise<void> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
   assertSafeId(ausgabeId, 'ausgabeId');
   await setBemerkung(ausgabeCol(groupId).doc(ausgabeId), 'ausgabe', ausgabeId, bemerkung, actor);
@@ -1214,7 +1220,7 @@ async function setStueckStatusImpl(
   datum: string,
   bemerkung?: string,
 ): Promise<void> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertSafeId(stueckId, 'stueckId');
@@ -1268,7 +1274,7 @@ async function adjustBestandImpl(
     bemerkung?: string;
   },
 ): Promise<void> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertSafeId(input?.artikelId, 'artikelId');
@@ -1322,7 +1328,7 @@ export interface WaescheInput {
 }
 
 async function recordWaescheImpl(groupId: string, input: WaescheInput): Promise<{ id: string }> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   assertDate(input?.datum);
@@ -1402,7 +1408,7 @@ async function createPersonForBekleidungImpl(
   groupId: string,
   name: string,
 ): Promise<{ id: string }> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   const clean = text(name, 200);
@@ -1466,7 +1472,7 @@ async function previewBekleidungImportImpl(
   groupId: string,
   fileBase64: string,
 ): Promise<ImportPreview> {
-  await actionBekleidungswartRequired(groupId);
+  await requireBekleidungManage(groupId);
   const { preview } = await prepareImport(groupId, fileBase64);
   return preview;
 }
@@ -1679,7 +1685,7 @@ async function importBekleidungImpl(
   fileBase64: string,
   decisions: ImportDecisions,
 ): Promise<ImportResult> {
-  const session = await actionBekleidungswartRequired(groupId);
+  const session = await requireBekleidungManage(groupId);
   const actor = actorOf(session);
 
   await precheckImport(groupId);

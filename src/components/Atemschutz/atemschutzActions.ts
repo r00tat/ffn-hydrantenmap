@@ -21,9 +21,10 @@ import {
   FAHRTENBUCH_MANGEL_COLLECTION_ID,
 } from '../../common/mangel';
 import {
-  actionGroupAdminRequired,
+  actionPermissionRequired,
   actionUserRequired,
 } from '../../app/auth';
+import { isMember } from '../../common/permissions';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import { geraeteRef, loadGeraet, loadGeraete } from './atemschutzStammdaten';
@@ -149,7 +150,7 @@ export async function saveAtemschutzGeraet(
   input: GeraetInput,
 ): Promise<AtemschutzActionResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
     const now = new Date().toISOString();
     const payload = {
       ...buildGeraetPayload(input),
@@ -178,7 +179,7 @@ export async function deleteAtemschutzGeraet(
   geraetId: string,
 ): Promise<AtemschutzActionResult> {
   try {
-    await actionGroupAdminRequired(groupId);
+    await actionPermissionRequired(groupId, 'gruppe.manage');
     await geraeteRef(groupId).doc(geraetId).delete();
     return { success: true, id: geraetId };
   } catch (err) {
@@ -201,7 +202,7 @@ export async function addAtemschutzBarcode(
   code: string,
 ): Promise<AtemschutzActionResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
     const trimmedCode = code.trim();
     if (!trimmedCode) {
       return { success: false, error: 'codeMissing' };
@@ -278,7 +279,7 @@ export async function previewAtemschutzImport(
   formData: FormData,
 ): Promise<ImportPreviewResult> {
   try {
-    await actionGroupAdminRequired(groupId);
+    await actionPermissionRequired(groupId, 'gruppe.manage');
 
     const file = formData.get('file');
     if (!(file instanceof File)) {
@@ -327,7 +328,7 @@ export async function importAtemschutzGeraete(
   plan: ImportPlanZeile[],
 ): Promise<ImportResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
     if (!Array.isArray(plan) || plan.length > IMPORT_MAX_ZEILEN) {
       return { success: false, error: 'tooManyRows' };
     }
@@ -379,7 +380,7 @@ export interface AtemschutzMangelInput {
 /**
  * Meldet einen Mangel an einem Ausrüstungsstück.
  *
- * `actionUserRequired()` und **nicht** `actionGroupAdminRequired()`: Am
+ * Nur die Mitgliedschaft und **nicht** `gruppe.manage`: Am
  * Sammelplatz fällt der Mangel auf, und wer ihn bemerkt, verwaltet die Gruppe
  * in aller Regel nicht. Die
  * Stammdaten bleiben davon unberührt — geschrieben wird nur in die
@@ -392,7 +393,7 @@ export async function createAtemschutzMangel(
 ): Promise<AtemschutzActionResult> {
   try {
     const session = await actionUserRequired();
-    if (!session.user?.groups?.includes(groupId)) {
+    if (!isMember({ groupRoles: session.user.groupRoles }, groupId)) {
       return { success: false, error: 'notInGroup' };
     }
 

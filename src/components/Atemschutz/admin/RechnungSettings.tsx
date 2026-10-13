@@ -27,7 +27,7 @@ export interface RechnungSettingsProps {
  *
  * Liegt in der Verwaltung und nicht auf der Verrechnungsseite: Die Werte
  * gelten für alle Rechnungen der Gruppe, sind keine Tagesarbeit und stehen
- * hinter `actionGroupAdminRequired`.
+ * hinter `gruppe.manage`.
  */
 export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
   const t = useTranslations('atemschutz');
