@@ -3,6 +3,7 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box';
@@ -13,6 +14,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
@@ -26,6 +28,7 @@ import {
 } from './GroupAction';
 import GroupDialog from './GroupDialog';
 import { Group, KNOWN_GROUPS } from './groupTypes';
+import { isTenantGroupId } from '../../common/tenantGroups';
 
 interface UserRowButtonParams {
   row: Group;
@@ -36,6 +39,18 @@ function GroupRowButtons({ row, editFn, deleteFn }: UserRowButtonParams) {
   const t = useTranslations('groups');
   return (
     <>
+      {/* Rollen gibt es nur in Mandanten, nicht in allUsers/kostenersatz. */}
+      {row.id && isTenantGroupId(row.id) && (
+        <Tooltip title={t('roles', { name: row.name })}>
+          <IconButton
+            component={Link}
+            href={`/groups/${encodeURIComponent(row.id)}/rollen`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ManageAccountsIcon />
+          </IconButton>
+        </Tooltip>
+      )}
       <Tooltip title={t('edit', { name: row.name })}>
         <IconButton
           onClick={(e) => {

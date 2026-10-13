@@ -51,6 +51,7 @@ import ShowChartIcon from '@mui/icons-material/ShowChart';
 import SmsIcon from '@mui/icons-material/Sms';
 import StorageIcon from '@mui/icons-material/Storage';
 import TimerIcon from '@mui/icons-material/Timer';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import WarningIcon from '@mui/icons-material/Warning';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import WavesIcon from '@mui/icons-material/Waves';
@@ -67,10 +68,9 @@ import FirecallLink from './FirecallLink';
 import { usePathname } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import { useFirecallId } from '../../hooks/useFirecall';
-import { hasAnyBekleidungRole } from '../../common/bekleidungPermissions';
-import { hasAnyGroupAdminRole } from '../../common/groupPermissions';
-import { hasAnyFahrtenbuchManagerRole } from '../Fahrtenbuch/managerPermissions';
+import { useFirecall, useFirecallId } from '../../hooks/useFirecall';
+import { can, memberGroupIds } from '../../common/permissions';
+import { useCan, useCanAny } from '../../hooks/usePermissions';
 import { useBugReport } from '../bugReport/BugReportProvider';
 
 /** Ein anklickbarer Menüpunkt — Link oder Aktion. */
@@ -80,19 +80,19 @@ interface DrawerLink {
   href: string;
   admin?: boolean;
   /**
-   * Sichtbar für Admins, Gruppen-Admins *und* Fahrtenbuch-Gerätemeister. Nicht
-   * über `admin` abbildbar, weil dieses Flag ein Dutzend anderer Einträge
-   * steuert.
+   * Sichtbar mit `fahrtenbuch.manage` in irgendeiner Gruppe. Nicht über
+   * `admin` abbildbar, weil dieses Flag ein Dutzend anderer Einträge steuert.
    */
   fahrtenbuchAdmin?: boolean;
-  /**
-   * Sichtbar für Admins und Gruppen-Admins. Wie `fahrtenbuchAdmin` ein eigenes
-   * Flag, weil `admin` ein Dutzend anderer Einträge steuert — nur ohne den
-   * Gerätemeister, der mit der Atemschutz-Ausrüstung nichts zu tun hat.
-   */
+  /** Sichtbar mit `gruppe.manage` in irgendeiner Gruppe. */
   groupAdminOnly?: boolean;
-  /** Sichtbar für Admins, Gruppen-Admins und Bekleidungswarte. */
+  /** Sichtbar mit `bekleidung.read` in irgendeiner Gruppe. */
   bekleidung?: boolean;
+  /**
+   * Sichtbar mit `kostenersatz.use` in der Gruppe des geladenen Einsatzes —
+   * die Berechnungen hängen am Einsatz, und nur dessen Gruppe zählt.
+   */
+  kostenersatz?: boolean;
   signedInOnly?: boolean;
   /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
   einsatzSection?: string;
@@ -193,14 +193,20 @@ export default function AppDrawer({
     },
     [setIsOpen],
   );
-  const {
-    isAdmin,
-    isSignedIn,
-    fahrtenbuchGeraetemeister,
-    groupAdmin,
-    bekleidungswart,
-  } = useFirebaseLogin();
+  const { isAdmin, isSignedIn, groupRoles } = useFirebaseLogin();
   const firecallId = useFirecallId();
+  // Menüpunkte öffnen nur die Oberfläche; die Entscheidung treffen Server
+  // Actions und Firestore-Regeln.
+  const canFahrtenbuchAdmin = useCanAny('fahrtenbuch.manage');
+  const canGroupAdmin = useCanAny('gruppe.manage');
+  const canBekleidung = useCanAny('bekleidung.read');
+  const canKostenersatz = useCan(useFirecall().group, 'kostenersatz.use');
+  // „Mitglieder und Rollen" liegt je Gruppe; der Eintrag führt in die erste
+  // eigene Gruppe mit `rollen.assign`, dort schaltet die Seite selbst um. Ein
+  // Admin ohne Mitgliedschaft erreicht die Ansicht über „Gruppen".
+  const rolesGroupId = memberGroupIds({ groupRoles }).find((groupId) =>
+    can({ isAdmin, groupRoles }, groupId, 'rollen.assign'),
+  );
   const pathname = usePathname();
   const t = useTranslations('drawer');
   const tGeraete = useTranslations('geraete');
@@ -313,6 +319,7 @@ export default function AppDrawer({
           icon: <ReceiptLongIcon />,
           href: '/kostenersatz',
           einsatzSection: 'kostenersatz',
+          kostenersatz: true,
         },
         {
           // Neben dem Kostenersatz: Was im Einsatz verwendet und verbraucht
@@ -471,6 +478,21 @@ export default function AppDrawer({
         },
         { text: t('users'), icon: <UserIcon />, href: '/users', admin: true },
         { text: t('groups'), icon: <GroupIcon />, href: '/groups', admin: true },
+        ...(rolesGroupId
+          ? [
+              {
+                text: t('memberRoles'),
+                icon: <ManageAccountsIcon />,
+                href: `/groups/${rolesGroupId}/rollen`,
+              },
+            ]
+          : []),
+        {
+          text: t('adminPermissions'),
+          icon: <AdminPanelSettingsIcon />,
+          href: '/admin/berechtigungen',
+          admin: true,
+        },
         {
           text: t('auditLog'),
           icon: <HistoryIcon />,
@@ -607,17 +629,19 @@ export default function AppDrawer({
   const isVisible = useCallback(
     (item: DrawerLink) =>
       (isAdmin || !item.admin) &&
-      (!item.fahrtenbuchAdmin ||
-        hasAnyFahrtenbuchManagerRole({
-          isAdmin,
-          fahrtenbuchGeraetemeister,
-          groupAdmin,
-        })) &&
-      (!item.groupAdminOnly || hasAnyGroupAdminRole({ isAdmin, groupAdmin })) &&
-      (!item.bekleidung ||
-        hasAnyBekleidungRole({ isAdmin, groupAdmin, bekleidungswart })) &&
+      (!item.fahrtenbuchAdmin || canFahrtenbuchAdmin) &&
+      (!item.groupAdminOnly || canGroupAdmin) &&
+      (!item.bekleidung || canBekleidung) &&
+      (!item.kostenersatz || canKostenersatz) &&
       (isSignedIn || !item.signedInOnly),
-    [isAdmin, isSignedIn, fahrtenbuchGeraetemeister, groupAdmin, bekleidungswart],
+    [
+      isAdmin,
+      isSignedIn,
+      canFahrtenbuchAdmin,
+      canGroupAdmin,
+      canBekleidung,
+      canKostenersatz,
+    ],
   );
 
   const renderLink = (item: DrawerLink, groupText?: string) => {

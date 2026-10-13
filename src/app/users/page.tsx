@@ -23,6 +23,7 @@ import { green, red } from '@mui/material/colors';
 import { useTranslations } from 'next-intl';
 import React, { useCallback, useMemo, useState } from 'react';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
+import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended } from '../../common/users';
 import AdminGuard from '../../components/site/AdminGuard';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
@@ -143,9 +144,9 @@ function Users() {
   }, []);
 
   const updateUser = useCallback(
-    async (user: UserRecordExtended) => {
+    async (user: UserRecordExtended, memberGroupIds?: string[]) => {
       console.info(`update user`);
-      await updateApiCall(user);
+      await updateApiCall(user, memberGroupIds);
       await fetchUsers();
     },
     [fetchUsers, updateApiCall]
@@ -326,7 +327,7 @@ function Users() {
                 {user.feuerwehr} {user.description}
               </Grid>
               <Grid size={{ xs: 6, md: 4, lg: 3 }}>
-                {(user.groups || [])
+                {userMemberGroupIds(user)
                   .map((key: string) => groups[key])
                   .filter((v: string) => v)
                   .join(', ')}
@@ -356,10 +357,10 @@ function Users() {
         <UserRecordExtendedDialog
           user={editUser}
           groups={groups}
-          onClose={(user) => {
+          onClose={(user, memberGroupIds) => {
             setShowEditUserDialog(false);
             if (user) {
-              updateUser(user);
+              updateUser(user, memberGroupIds);
             }
           }}
         />

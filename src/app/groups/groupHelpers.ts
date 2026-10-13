@@ -1,3 +1,4 @@
+import { memberGroupIds } from '../../common/permissions';
 import { UserRecordExtended } from '../../common/users';
 import {
   GROUP_COLLECTION_ID,
@@ -22,12 +23,12 @@ export async function getGroups(): Promise<Group[]> {
 
 export async function getMyGroups(userId: string): Promise<Group[]> {
   const allGropus = await getGroups();
-  const myGroupIds =
-    (
-      (
-        await firestore.collection(USER_COLLECTION_ID).doc(userId).get()
-      ).data() as UserRecordExtended
-    ).groups || [];
+  // Wie die Sitzung nur aus `groupRoles`, ohne Rückfall auf das alte Feld.
+  const myGroupIds = memberGroupIds(
+    ((
+      await firestore.collection(USER_COLLECTION_ID).doc(userId).get()
+    ).data() ?? {}) as UserRecordExtended
+  );
   const mine = allGropus.filter((g) => g.id && myGroupIds.includes(g.id));
   return sortGroupsForUser(mine);
 }

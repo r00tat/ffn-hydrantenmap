@@ -11,21 +11,22 @@ const firebaseLoginMock = vi.fn<
   () => {
     isAdmin: boolean;
     isSignedIn: boolean;
-    fahrtenbuchGeraetemeister?: string[];
-    groupAdmin?: string[];
-    bekleidungswart?: string[];
+    groupRoles?: Record<string, string[]>;
   }
 >(() => ({ isAdmin: true, isSignedIn: true }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathnameMock(),
 }));
+// `isAuthorized` fest: `useCan`/`useCanAny` prüfen es, die Tests hier nicht.
 vi.mock('../../hooks/useFirebaseLogin', () => ({
-  default: () => firebaseLoginMock(),
+  default: () => ({ isAuthorized: true, ...firebaseLoginMock() }),
 }));
 const firecallIdMock = vi.fn<() => string>(() => 'unknown');
+const firecallGroupMock = vi.fn<() => string | undefined>(() => undefined);
 vi.mock('../../hooks/useFirecall', () => ({
   useFirecallId: () => firecallIdMock(),
+  useFirecall: () => ({ id: firecallIdMock(), group: firecallGroupMock() }),
 }));
 vi.mock('../bugReport/BugReportProvider', () => ({
   useBugReport: () => ({ open: vi.fn() }),
@@ -214,7 +215,7 @@ describe('AppDrawer Berechtigungen', () => {
     firebaseLoginMock.mockReturnValue({
       isAdmin: false,
       isSignedIn: true,
-      fahrtenbuchGeraetemeister: ['ffnd'],
+      groupRoles: { ffnd: ['geraetemeister'] },
     });
     const user = userEvent.setup();
     renderDrawer();
@@ -222,6 +223,36 @@ describe('AppDrawer Berechtigungen', () => {
     await user.click(screen.getByText('Administration'));
     expect(screen.getByText('Fahrtenbuch-Verwaltung')).toBeInTheDocument();
     expect(screen.queryByText('Users')).toBeNull();
+  });
+
+  it('führt einen Gruppen-Admin zu „Mitglieder und Rollen" seiner Gruppe', async () => {
+    pathnameMock.mockReturnValue('/');
+    firebaseLoginMock.mockReturnValue({
+      isAdmin: false,
+      isSignedIn: true,
+      groupRoles: { ffxy: ['geraetemeister'], ffnd: ['gruppenadmin'] },
+    });
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(screen.getByText('Administration'));
+    expect(
+      screen.getByRole('link', { name: 'Mitglieder und Rollen' }),
+    ).toHaveAttribute('href', '/groups/ffnd/rollen');
+  });
+
+  it('verbirgt „Mitglieder und Rollen" ohne rollen.assign', async () => {
+    pathnameMock.mockReturnValue('/');
+    firebaseLoginMock.mockReturnValue({
+      isAdmin: false,
+      isSignedIn: true,
+      groupRoles: { ffnd: ['geraetemeister'] },
+    });
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(screen.getByText('Administration'));
+    expect(screen.queryByText('Mitglieder und Rollen')).toBeNull();
   });
 
   it('verbirgt die Fahrtenbuch-Verwaltung ohne jede Rolle', async () => {
@@ -239,7 +270,7 @@ describe('AppDrawer Berechtigungen', () => {
     firebaseLoginMock.mockReturnValue({
       isAdmin: false,
       isSignedIn: true,
-      fahrtenbuchGeraetemeister: ['ffnd'],
+      groupRoles: { ffnd: ['geraetemeister'] },
     });
     const user = userEvent.setup();
     renderDrawer();
@@ -254,7 +285,7 @@ describe('AppDrawer Berechtigungen', () => {
     firebaseLoginMock.mockReturnValue({
       isAdmin: false,
       isSignedIn: true,
-      bekleidungswart: ['ffnd'],
+      groupRoles: { ffnd: ['bekleidungswart'] },
     });
     const user = userEvent.setup();
     renderDrawer();
@@ -271,13 +302,46 @@ describe('AppDrawer Berechtigungen', () => {
     firebaseLoginMock.mockReturnValue({
       isAdmin: false,
       isSignedIn: true,
-      groupAdmin: ['ffnd'],
+      groupRoles: { ffnd: ['gruppenadmin'] },
     });
     const user = userEvent.setup();
     renderDrawer();
 
     await user.click(screen.getByText('Fahrzeuge'));
     expect(screen.getByText('Bekleidung')).toBeInTheDocument();
+  });
+
+  it('zeigt den Kostenersatz nur mit kostenersatz.use in der Gruppe des Einsatzes', async () => {
+    pathnameMock.mockReturnValue('/');
+    firecallIdMock.mockReturnValue('f1');
+    firecallGroupMock.mockReturnValue('ffnd');
+    firebaseLoginMock.mockReturnValue({
+      isAdmin: false,
+      isSignedIn: true,
+      groupRoles: { ffnd: ['gruppenadmin'], ffxy: ['kostenersatz'] },
+    });
+    const user = userEvent.setup();
+    const { unmount } = renderDrawer();
+
+    // Gruppen-Admin enthält den Kostenersatz bewusst nicht, und die
+    // Freischaltung in einer anderen Gruppe zählt am Einsatz nicht.
+    await user.click(screen.getByText('Einsatz-Dokumentation'));
+    expect(screen.queryByText('Kostenersatz')).toBeNull();
+    unmount();
+
+    firebaseLoginMock.mockReturnValue({
+      isAdmin: false,
+      isSignedIn: true,
+      groupRoles: { ffnd: ['kostenersatz'] },
+    });
+    renderDrawer();
+    await user.click(screen.getByText('Einsatz-Dokumentation'));
+    expect(screen.getByText('Kostenersatz').closest('a')).toHaveAttribute(
+      'href',
+      '/einsatz/f1/kostenersatz',
+    );
+    firecallIdMock.mockReturnValue('unknown');
+    firecallGroupMock.mockReturnValue(undefined);
   });
 
   it('zeigt den Profil-Eintrag nur angemeldet', async () => {

@@ -3,9 +3,16 @@ import 'server-only';
 import { uniqueArray } from '../../common/arrayUtils';
 import { guestCanWrite } from '../../common/firecallGuest';
 import { isInternalEmail } from '../../common/internalDomains';
+import {
+  memberGroupIds,
+  ROLES_CATALOG_VERSION,
+  type GroupRoles,
+} from '../../common/permissions';
+import { ALL_USERS_GROUP_ID } from '../../common/tenantGroups';
 import { FirebaseUserInfo } from '../../common/users';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 import { firebaseAuth, firestore } from '../firebase/admin';
+import { recomputeUserPermissions, writeUserRoles } from './userRoles';
 import { userSessionCache } from './userSessionCache';
 
 const DEFAULT_INTERNAL_GROUP = 'ffnd';
@@ -15,13 +22,10 @@ const DEFAULT_ABSCHNITT = 1;
 export interface AutoProvisionedUser {
   isAuthorized: boolean;
   isAdmin: boolean;
+  /** Abgeleitet: Mitgliedsgruppen aus `groupRoles` plus `allUsers`. */
   groups: string[];
-  /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
-  fahrtenbuchGeraetemeister?: string[];
-  /** Gruppen, in denen der Benutzer Bekleidungswart ist. */
-  bekleidungswart?: string[];
-  /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
-  groupAdmin?: string[];
+  /** Rollen je Gruppe, siehe `src/common/permissions.ts`. */
+  groupRoles: GroupRoles;
   firecall?: string;
   /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
   firecallWrite?: boolean;
@@ -39,7 +43,8 @@ export async function autoProvisionInternalUser(
   email: string,
   displayName?: string | null
 ): Promise<AutoProvisionedUser> {
-  const groups = uniqueArray(['allUsers', DEFAULT_INTERNAL_GROUP]);
+  const groupRoles: GroupRoles = { [DEFAULT_INTERNAL_GROUP]: [] };
+  const groups = sessionGroups(groupRoles);
 
   const userData = {
     displayName: displayName || '',
@@ -50,8 +55,13 @@ export async function autoProvisionInternalUser(
     groups,
   };
 
-  // Create user document in Firestore
+  // Create user document in Firestore. `groups` bleibt bis zum Aufräumschritt
+  // der Migration stehen, damit ein Rollback auf das vorige Release den
+  // Benutzer weiter als Mitglied sieht.
   await firestore.collection(USER_COLLECTION_ID).doc(uid).set(userData);
+  // Rollen samt der abgeleiteten Rechte für die Firestore-Regeln nur über den
+  // einzigen Schreibweg; er verlangt das bestehende Dokument.
+  await writeUserRoles(uid, { kind: 'replaceAll', groupRoles });
 
   // Set custom claims for Firestore rules to work immediately
   await firebaseAuth.setCustomUserClaims(uid, {
@@ -68,7 +78,17 @@ export async function autoProvisionInternalUser(
     isAuthorized: true,
     isAdmin: false,
     groups,
+    groupRoles,
   };
+}
+
+/**
+ * Die abgeleitete Gruppenliste der Sitzung: Mitgliedsgruppen aus
+ * `groupRoles` plus `allUsers`, damit bestehende Leser von `groups`
+ * unverändert funktionieren.
+ */
+export function sessionGroups(groupRoles: GroupRoles): string[] {
+  return uniqueArray([ALL_USERS_GROUP_ID, ...memberGroupIds({ groupRoles })]);
 }
 
 /**
@@ -127,13 +147,28 @@ export async function getUserSessionData(
 
   if (userInfo.exists) {
     const userData = userInfo.data() as FirebaseUserInfo;
+    // Bewusst keine Rückfallebene auf die alten Felder: Ohne Migration hat der
+    // Benutzer keine Gruppen (siehe Spec „Zeitfenster"). Die Regeln für
+    // Einsätze lesen den unveränderten Claim und laufen weiter.
+    const groupRoles: GroupRoles =
+      userData.groupRoles && typeof userData.groupRoles === 'object'
+        ? userData.groupRoles
+        : {};
+    if (
+      userData.groupRoles &&
+      (userData.rolesCatalogVersion ?? 0) < ROLES_CATALOG_VERSION
+    ) {
+      // Best effort und nicht abgewartet: Server und Client rechnen ohnehin
+      // aus `groupRoles` und dem Katalog, nur die Regeln hängen nach.
+      recomputeUserPermissions(uid).catch((err) =>
+        console.error(`failed to recompute permissions of ${uid}`, err),
+      );
+    }
     const result = {
       isAuthorized: !!userData.authorized,
       isAdmin: !!userData.isAdmin,
-      groups: uniqueArray(['allUsers', ...(userData.groups || [])]),
-      fahrtenbuchGeraetemeister: userData.fahrtenbuchGeraetemeister ?? [],
-      bekleidungswart: userData.bekleidungswart ?? [],
-      groupAdmin: userData.groupAdmin ?? [],
+      groups: sessionGroups(groupRoles),
+      groupRoles,
       firecall: userData.firecall,
       firecallWrite: guestCanWrite(userData),
       firecallExpiresAt: userData.firecallExpiresAt,

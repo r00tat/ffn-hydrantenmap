@@ -12,7 +12,7 @@ import {
   signStammdatenLogoUrl,
   stammdatenRef,
 } from '../../server/groups/stammdatenStore';
-import { actionGroupAdminRequired } from './groupAdminGuard';
+import { actionPermissionRequired } from './permissionGuard';
 
 export interface StammdatenActionResult {
   success: boolean;
@@ -26,7 +26,7 @@ function trimmed(wert?: string): string {
 /**
  * Absender, Bankverbindung und Logo einer Gruppe.
  *
- * `actionGroupAdminRequired` und nicht der Mitglieds-Guard: Die Werte stehen
+ * `gruppe.manage` und nicht der Mitglieds-Guard: Die Werte stehen
  * auf jedem Beleg der Gruppe und sind keine Tagesarbeit — dieselbe Schranke
  * wie bei `saveAtemschutzRechnungConfig`.
  */
@@ -36,7 +36,7 @@ export async function saveGroupStammdaten(request: {
 }): Promise<StammdatenActionResult> {
   try {
     const { groupId, stammdaten } = request;
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
 
     // Der Pfad kommt aus dem Browser: geprüft wird gegen die eigene Gruppe,
     // sonst zeigte das Dokument auf ein fremdes Storage-Objekt und die

@@ -20,9 +20,17 @@ export async function getUsers() {
   );
 }
 
-export async function updateUserAction(data: UserRecordExtended) {
+/**
+ * @param memberGroupIds Die Gruppen, in denen der Benutzer danach Mitglied
+ * ist. Ohne Angabe bleibt die Mitgliedschaft unverändert — etwa beim bloßen
+ * Freischalten aus der Liste.
+ */
+export async function updateUserAction(
+  data: UserRecordExtended,
+  memberGroupIds?: string[]
+) {
   await actionAdminRequired();
-  return updateUser(data.uid, data);
+  return updateUser(data.uid, data, memberGroupIds);
 }
 
 export async function sendPasswordResetEmailAction(email: string) {
