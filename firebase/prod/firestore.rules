@@ -16,8 +16,43 @@ service cloud.firestore {
       // get(/databases/$(database)/documents/user/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    function kostenersatzUser() {
-      return authorizedUser() && 'kostenersatz' in request.auth.token.groups;
+    // Gruppenrollen (docs/berechtigungen.md): Mitgliedschaft steht im Claim
+    // `groups`, Fachrechte am Benutzerdokument. Mitgliedschaft wird sehr oft
+    // ausgewertet (jeder Einsatz-Listener, offline) und ändert sich selten —
+    // daher der Claim. Fachrechte sind selten gefragt und sensibel; per get()
+    // wirkt ein Entzug sofort, ohne Token-Refresh.
+    //
+    // 'allUsers' ist kein Mandant, sondern ein Pseudo-Eintrag, den jeder
+    // Benutzer und jeder Einsatz-Gast im Claim trägt. 'kostenersatz' war die
+    // alte Freischaltung als Schein-Gruppe und steht bis zum Entfernen der
+    // alten Felder (Migrationsseite, Schritt 3) noch im Claim.
+    function member(g) {
+      return authorizedUser()
+        && g != 'allUsers'
+        && g != 'kostenersatz'
+        && g in request.auth.token.groups;
+    }
+
+    // `groupPerms` und `permsAny` leitet allein writeUserRoles() aus
+    // `groupRoles` ab. Fälschungssicher, weil /user/{uid} für den Benutzer nur
+    // lesbar ist. Fehlt das Dokument, schlägt der Zugriff fehl — gewollt.
+    function userDoc() {
+      return get(/databases/$(database)/documents/user/$(request.auth.uid)).data;
+    }
+
+    // Recht `p` in Gruppe `g`. Die Mitgliedschaft aus dem Claim muss
+    // zusätzlich passen: Ein Austritt wirkt so auch dann, wenn die
+    // abgeleiteten Felder hinterherhinken.
+    function hasPerm(g, p) {
+      return adminUser()
+        || (member(g) && p in userDoc().get('groupPerms', {}).get(g, []));
+    }
+
+    // Recht `p` in irgendeiner Gruppe — für die globalen Sammlungen
+    // (Tarife, Vorlagen), die keiner Gruppe gehören.
+    function hasPermAny(p) {
+      return adminUser()
+        || (authorizedUser() && p in userDoc().get('permsAny', []));
     }
 
     // Einsatz-Gäste kommen über einen Share-Link (/einsatz/<id>?token=…) und
@@ -130,9 +165,22 @@ service cloud.firestore {
           && ownLiveLocationDoc();
       }
 
+      // Kostenersatz-Berechnungen gehören der Gruppe des Einsatzes und
+      // brauchen dort `kostenersatz.use`. Gäste sind nie dabei: Sie sind
+      // Freigaben auf den Einsatz, keine Gruppenmitglieder.
+      match /kostenersatz/{calc} {
+        allow read, write: if hasPerm(
+          get(/databases/$(database)/documents/call/$(doc)).data.group,
+          'kostenersatz.use');
+      }
+
+      // Übrige Unterpfade des Einsatzes. `kostenersatz` ist ausgenommen:
+      // Passende match-Blöcke verknüpft Firestore mit ODER, ein eigener Block
+      // allein könnte den Zugriff über diesen Wildcard nicht zurücknehmen.
+      // Auch Pfade unterhalb einer Berechnung fallen so nicht hierher.
       match /{subitem=**} {
-        allow read: if callAuthorized();
-        allow write: if callWriteAuthorized();
+        allow read: if subitem[0] != 'kostenersatz' && callAuthorized();
+        allow write: if subitem[0] != 'kostenersatz' && callWriteAuthorized();
       }
       
     }
@@ -162,23 +210,24 @@ service cloud.firestore {
       allow read, write: if (request.auth != null && request.auth.uid == userId) || adminUser();
     }
 
-    // Kostenersatz rate versions - read for kostenersatz group, write for admin
+    // Tarif (Versionen und Sätze) gilt landesweit und gehört keiner Gruppe:
+    // lesen darf, wer `kostenersatz.use` in irgendeiner Gruppe hat.
     match /kostenersatzVersions/{doc=**} {
-      allow read: if kostenersatzUser();
+      allow read: if hasPermAny('kostenersatz.use');
       allow write: if adminUser();
     }
 
-    // Kostenersatz rates - read for kostenersatz group, write for admin
     match /kostenersatzRates/{doc=**} {
-      allow read: if kostenersatzUser();
+      allow read: if hasPermAny('kostenersatz.use');
       allow write: if adminUser();
     }
 
-    // Kostenersatz templates - read/create for kostenersatz group, update/delete for owner or admin
+    // Vorlagen bleiben global (`isShared` wie bisher). Ändern und Löschen nur
+    // der Ersteller oder der Admin.
     match /kostenersatzTemplates/{templateId} {
-      allow read: if kostenersatzUser();
-      allow create: if kostenersatzUser();
-      allow update, delete: if kostenersatzUser() &&
+      allow read: if hasPermAny('kostenersatz.use');
+      allow create: if hasPermAny('kostenersatz.use');
+      allow update, delete: if hasPermAny('kostenersatz.use') &&
         (resource.data.createdBy == request.auth.token.email || adminUser());
     }
 
@@ -248,20 +297,6 @@ service cloud.firestore {
     // match /{document=**} lässt Admins weiterhin direkt schreiben — Regeln
     // sind additiv, ein "allow ...: if false" kann das nicht zurücknehmen.
     match /groups/{groupId} {
-      // 'allUsers' ist keine echte Gruppe, sondern ein Pseudo-Eintrag, der
-      // jedem Benutzer in die Claims geschrieben wird (updateUser.ts) und den
-      // auch Einsatz-Gasttokens tragen (actions/auth.ts). Als Fahrtenbuch-
-      // Mandant darf er deshalb nie zählen.
-      // 'kostenersatz' ist keine Feuerwehr, sondern eine Berechtigungsgruppe
-      // ("Zugang zur Kostenersatz-Funktion") — siehe NON_TENANT_GROUP_IDS und
-      // assertFahrtenbuchGroup() in authGuards.ts, dieselbe Sperre gilt dort.
-      function fahrtenbuchMember() {
-        return authorizedUser()
-          && groupId != 'allUsers'
-          && groupId != 'kostenersatz'
-          && groupId in request.auth.token.groups;
-      }
-
       // Das Gruppen-Dokument trägt neben Name und Beschreibung den Standort
       // des Feuerwehrhauses. Den braucht der Client, um im Fahrtenbuch die
       // Einsatzkilometer abzuschätzen. Jedes Feld dieses Dokuments ist damit
@@ -271,28 +306,27 @@ service cloud.firestore {
       // Schreiben nur über Server Actions; diese Regel gibt keinem Client
       // Schreibrechte — Admins schreiben weiterhin über den Catch-all am
       // Dateiende (siehe Kommentar oben).
-      allow read: if fahrtenbuchMember();
+      allow read: if member(groupId);
       allow write: if false;
 
       match /person/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow write: if adminUser();
       }
 
       match /vehicle/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow write: if adminUser();
       }
 
       // Atemschutz-Ausrüstung der Gruppe — Flaschen, Masken, Pressluftatmer.
       // Wörtlich wie `vehicle`: Jedes Gruppenmitglied liest sie (der
       // Sammelplatz braucht sie zum Nachschlagen und Scannen), geschrieben
-      // wird ausschließlich über Server Actions. Dass hier `adminUser()` steht
-      // und nicht der Gruppen-Admin, ist deshalb ohne Wirkung: Die Rolle steckt
-      // in keinem Custom Claim und ist für Regeln nicht sichtbar; wer schreiben
-      // darf, entscheidet `actionGroupAdminRequired(groupId)`.
+      // wird ausschließlich über Server Actions. Dass hier `adminUser()` steht,
+      // ist deshalb ohne Wirkung; wer schreiben darf, entscheidet
+      // `actionPermissionRequired(groupId, 'gruppe.manage')`.
       match /atemschutzGeraet/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow write: if adminUser();
       }
 
@@ -310,48 +344,44 @@ service cloud.firestore {
       // ist ein Nachweis — vorher durfte jedes Mitglied jede fremde Zeile
       // ändern und löschen.
       //
-      // Der Gruppen-Admin darf mehr, sieht diese Regel aber nicht: Seine
-      // Rolle steckt in keinem Custom Claim (siehe berechtigungen.md). Er
-      // korrigiert deshalb über `updateFremdeFuellung` /
-      // `deleteFremdeFuellung` mit dem Admin SDK; dieselbe Prüfung steht dort
-      // als `fuellungSperre`.
+      // Der Gruppen-Admin darf mehr, korrigiert aber über
+      // `updateFremdeFuellung` / `deleteFremdeFuellung` mit dem Admin SDK;
+      // dieselbe Prüfung steht dort als `fuellungSperre`. Offline-Schreiben
+      // braucht nur das Mitglied, deshalb bleibt diese Regel claim-basiert.
       //
       // `createdBy` beim Anlegen an den Aufrufer gebunden: Ohne diese
       // Bedingung schriebe ein manipulierter Client eine fremde uid hinein und
       // sperrte die Zeile für den, der sie zu sehen bekommt.
       match /atemschutzFuellung/{doc} {
-        allow read: if fahrtenbuchMember();
-        allow create: if fahrtenbuchMember()
+        allow read: if member(groupId);
+        allow create: if member(groupId)
           && request.resource.data.createdBy == request.auth.uid;
-        allow update: if fahrtenbuchMember()
+        allow update: if member(groupId)
           && resource.data.createdBy == request.auth.uid
           && !('rechnungId' in resource.data)
           // Die Zeile darf nicht die Seite wechseln: weder den Erfasser
           // verlieren noch sich selbst eine Rechnung anhängen.
           && request.resource.data.createdBy == resource.data.createdBy
           && !('rechnungId' in request.resource.data);
-        allow delete: if fahrtenbuchMember()
+        allow delete: if member(groupId)
           && resource.data.createdBy == request.auth.uid
           && !('rechnungId' in resource.data);
       }
 
-      // Verrechnung der Füllungen. Lesen setzt beides voraus: Mitgliedschaft
-      // in dieser Feuerwehr *und* die Kostenersatz-Freischaltung — wörtlich
-      // derselbe Satz wie `actionFuellungRechnungRequired(groupId)` in den
-      // Server Actions. Dass hier zwei Bedingungen stehen, ist der Grund für
-      // diesen Zuschnitt: Regel und Action können nicht auseinanderlaufen.
+      // Verrechnung der Füllungen: `kostenersatz.use` in *dieser* Gruppe —
+      // wörtlich derselbe Satz wie `actionPermissionRequired(groupId,
+      // 'kostenersatz.use')` in den Server Actions. Vorher galt die
+      // Freischaltung in jeder Gruppe, in der man Mitglied war.
       //
-      // Geschrieben wird ausschließlich serverseitig. `adminUser()` steht hier
-      // wie bei `atemschutzGeraet` nur der Form halber — die Rolle des
-      // Gruppen-Admins steckt in keinem Custom Claim und ist für Regeln nicht
-      // sichtbar.
+      // Geschrieben wird ausschließlich serverseitig; `adminUser()` steht nur
+      // der Form halber.
       match /atemschutzRechnung/{doc} {
-        allow read: if fahrtenbuchMember() && kostenersatzUser();
+        allow read: if hasPerm(groupId, 'kostenersatz.use');
         allow write: if adminUser();
       }
 
       match /atemschutzEmpfaenger/{doc} {
-        allow read: if fahrtenbuchMember() && kostenersatzUser();
+        allow read: if hasPerm(groupId, 'kostenersatz.use');
         allow write: if adminUser();
       }
 
@@ -359,7 +389,7 @@ service cloud.firestore {
       // der Nummernkreis. Ein eigenes Dokument und nicht das Gruppen-Dokument:
       // Dessen Felder liest jedes Gruppenmitglied.
       match /atemschutzConfig/{doc} {
-        allow read: if fahrtenbuchMember() && kostenersatzUser();
+        allow read: if hasPerm(groupId, 'kostenersatz.use');
         allow write: if adminUser();
       }
 
@@ -367,24 +397,24 @@ service cloud.firestore {
       // und nicht das Gruppen-Dokument: Dessen Felder liest jedes
       // Gruppenmitglied.
       //
-      // Lesen ohne `kostenersatzUser()` — anders als bei `atemschutzConfig`:
+      // Lesen ohne `kostenersatz.use` — anders als bei `atemschutzConfig`:
       // Die Kostenersatz-Oberfläche zeigt die Stammdaten-Lücken auch dem, der
       // nur rechnet. Geschrieben wird über `saveGroupStammdaten`; die echte
-      // Grenze ist `actionGroupAdminRequired`.
+      // Grenze ist `actionPermissionRequired(groupId, 'gruppe.manage')`.
       match /groupConfig/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow write: if adminUser();
       }
 
       // Mailvorlagen des Kostenersatzes, je Gruppe. Vorher ein einzelnes
       // Dokument auf Wurzelebene.
       match /kostenersatzConfig/{doc} {
-        allow read: if fahrtenbuchMember() && kostenersatzUser();
+        allow read: if hasPerm(groupId, 'kostenersatz.use');
         allow write: if adminUser();
       }
 
       match /fahrtenbuch/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow create, update, delete: if false;
       }
 
@@ -394,7 +424,7 @@ service cloud.firestore {
       // serverseitig, damit Statuswechsel und Verlaufseinträge ihre Spur
       // (Autor, Zeitpunkt) nicht verlieren können.
       match /mangel/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow create, update, delete: if false;
       }
 
@@ -410,17 +440,17 @@ service cloud.firestore {
       // `call/{id}/geraetEinsatz` und fallen unter die generische Regel
       // `call/{doc}/{subitem=**}` — dort schreibt der Client offline.
       match /geraet/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow create, update, delete: if false;
       }
 
       match /geraetBestand/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow create, update, delete: if false;
       }
 
       match /geraetBuchung/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow create, update, delete: if false;
       }
 
@@ -429,25 +459,17 @@ service cloud.firestore {
       // Actions `saveGeraetSet`/`deleteGeraetSet` — dort laufen die Prüfungen
       // der Codes und Inhalte. Einsatz-Gäste lesen keine Sets.
       match /geraetSet/{doc} {
-        allow read: if fahrtenbuchMember();
+        allow read: if member(groupId);
         allow create, update, delete: if false;
       }
 
-      // Bekleidung: nur Bekleidungswart, Gruppen-Admin oder Admin. Die Rollen
-      // stehen nicht im Token, darum liest die Regel das Benutzerdokument.
-      // Geschrieben wird ausschließlich über Server Actions (docs/bekleidung.md).
-      // Anders als bei den Geräten liest ein einfaches Mitglied hier nichts:
-      // Größen und Ausgaben je Person sind keine Gruppenöffentlichkeit.
+      // Bekleidung: nur mit `bekleidung.read` (Bekleidungswart, Gruppen-Admin)
+      // oder als Admin. Geschrieben wird ausschließlich über Server Actions
+      // (docs/bekleidung.md). Anders als bei den Geräten liest ein einfaches
+      // Mitglied hier nichts: Größen und Ausgaben je Person sind keine
+      // Gruppenöffentlichkeit.
       function bekleidungReader() {
-        // fahrtenbuchMember() prüft authorizedUser() und damit
-        // request.auth != null, bevor bekleidungRole() die uid braucht.
-        return adminUser() || (fahrtenbuchMember() && bekleidungRole());
-      }
-
-      function bekleidungRole() {
-        let user = get(/databases/$(database)/documents/user/$(request.auth.uid)).data;
-        return groupId in user.get('bekleidungswart', [])
-          || groupId in user.get('groupAdmin', []);
+        return hasPerm(groupId, 'bekleidung.read');
       }
 
       match /bekleidungArtikel/{doc} {
