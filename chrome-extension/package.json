@@ -34,6 +34,7 @@
     "wxt": "^0.21.3"
   },
   "overrides": {
-    "typescript-eslint": "8.59.0"
+    "typescript-eslint": "8.59.0",
+    "@grpc/grpc-js": "^1.14.6"
   }
 }
