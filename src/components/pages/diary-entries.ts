@@ -66,6 +66,11 @@ export function buildDiaries(
     return ats > 0 ? 'ATS ' + ats : '';
   };
 
+  // Beschriftet, damit im Tagebuch nicht nur eine nackte Zahl steht:
+  // „Stärke 14, ATS 3" bzw. „Besatzung 1:8, ATS 2".
+  const fmtBeschreibung = (item: Fzg | TacticalUnit) =>
+    [fmtBesatzung(item), fmtAts(item)].filter(Boolean).join(', ');
+
   const firecallEntries: Diary[] = [
     cars
       .filter((item) => item.alarmierung)
@@ -79,7 +84,7 @@ export function buildDiaries(
               name: item.name,
               fw: item.fw || '',
             }),
-            beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
+            beschreibung: fmtBeschreibung(item),
             editable: false,
             original: item,
             textRepresenation: t('vehicleTextAlerted', {
@@ -113,7 +118,7 @@ export function buildDiaries(
               name: item.name,
               fw: item.fw || '',
             }),
-            beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
+            beschreibung: fmtBeschreibung(item),
             editable: false,
             original: item,
             textRepresenation: t('vehicleTextArrived', {
@@ -141,7 +146,7 @@ export function buildDiaries(
               name: item.name,
               fw: item.fw || '',
             }),
-            beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
+            beschreibung: fmtBeschreibung(item),
             editable: false,
             original: item,
             textRepresenation: t('vehicleTextDeparted', {

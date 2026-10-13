@@ -26,7 +26,39 @@ describe('buildDiaries', () => {
       '1. Zug Weiden am See alarmiert',
       '1. Zug Weiden am See eingetroffen',
     ]);
-    expect(diaries[0].beschreibung).toContain('9');
+    expect(diaries[0].beschreibung).toBe('Stärke 9');
+  });
+
+  it('beschriftet Stärke, Besatzung und ATS in der Beschreibung', () => {
+    const items = [
+      {
+        id: 'u1',
+        type: 'tacticalUnit',
+        name: '1. Zug',
+        mann: 14,
+        ats: 3,
+        alarmierung: '2026-10-13T09:00:00.000Z',
+      },
+      {
+        id: 'v1',
+        type: 'vehicle',
+        name: 'TLF',
+        besatzung: '8',
+        ats: 2,
+        alarmierung: '2026-10-13T09:01:00.000Z',
+      },
+      {
+        id: 'v2',
+        type: 'vehicle',
+        name: 'KDO',
+        alarmierung: '2026-10-13T09:02:00.000Z',
+      },
+    ] as unknown as FirecallItem[];
+    expect(buildDiaries(items, [], t, true).map((d) => d.beschreibung)).toEqual([
+      'Stärke 14, ATS 3',
+      'Besatzung 1:8, ATS 2',
+      '',
+    ]);
   });
 
   it('ordnet Einträge aus derselben Sekunde nach der Millisekunde', () => {
