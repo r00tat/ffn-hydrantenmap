@@ -3007,6 +3007,7 @@
     },
     "editItem": "Edit {name}",
     "locationFor": "Location of {name}",
+    "noLocation": "no location",
     "total": "Total",
     "totalFw": "{count} FDs",
     "ownForces": "Own forces",

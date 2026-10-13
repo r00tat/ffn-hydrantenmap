@@ -23,6 +23,8 @@ Einsatzorte dienen zur Verwaltung einzelner Einsatzstellen innerhalb eines Einsa
 3. Status setzen
 4. Speichern
 
+Jeder neue Einsatzort — ob auf dieser Seite oder auf der Karte angelegt — erscheint im Einsatztagebuch.
+
 ### Status ändern
 
 1. Dropdown in der Status-Spalte klicken

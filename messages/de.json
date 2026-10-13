@@ -3007,6 +3007,7 @@
     },
     "editItem": "{name} bearbeiten",
     "locationFor": "Einsatzort von {name}",
+    "noLocation": "kein Einsatzort",
     "total": "Gesamt",
     "totalFw": "{count} FW",
     "ownForces": "Eigene Kräfte",

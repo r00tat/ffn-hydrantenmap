@@ -64,9 +64,9 @@ praktisch für Fahrzeuge anderer Feuerwehren ohne Besatzungszuordnung.
 
 1. Am Ende jeder Zeile öffnet der Stift den Bearbeiten-Dialog des Fahrzeugs bzw. der Einheit
 2. Gibt es im Einsatz Einsatzorte, zeigt die Spalte **Einsatzort**, wo das Fahrzeug oder die Einheit eingesetzt ist
-3. Einsatzort in der Auswahl an- oder abhaken — mehrere Einsatzorte sind möglich
+3. Einsatzort in der Auswahl wählen — mit **kein Einsatzort** wird die Zuordnung aufgehoben
 
-Die Zuordnung ist dieselbe wie auf der Seite **Einsatzorte**.
+Ein Fahrzeug oder eine Einheit steht immer nur an **einem** Einsatzort: Wer einen anderen wählt, zieht es vom bisherigen ab. Jede Zuordnung und jedes Abziehen steht wie auf der Seite **Einsatzorte** im Einsatztagebuch.
 
 ### Fahrzeuge nach Ebenen ansehen
 

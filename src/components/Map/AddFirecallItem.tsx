@@ -17,6 +17,8 @@ import {
   merkeFrischAngelegt,
   wasserstandBasis,
 } from './Wasserstand/wasserstandAnlegen';
+import { locationCreatedEntry } from '../Einsatzorte/locationDiary';
+import useLocationDiary from '../Einsatzorte/useLocationDiary';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -28,6 +30,7 @@ export default function AddFirecallItem() {
   const leitungen = useLeitungen();
   const drawingCtx = useDrawing();
   const addFirecallItem = useFirecallItemAdd();
+  const addLocationDiary = useLocationDiary();
   const [fzgDrawing, setFzgDrawing] = useState<FirecallItem>();
   const {
     setEditFirecallItemIsOpen,
@@ -72,8 +75,15 @@ export default function AddFirecallItem() {
       }
 
       await addFirecallItem(angelegt);
+
+      // Wie auf der Seite „Einsatzorte": ein neuer Einsatzort steht auch im
+      // Einsatztagebuch, egal wo er angelegt wurde.
+      if (angelegt.type === 'location') {
+        const { name, beschreibung } = locationCreatedEntry(angelegt);
+        void addLocationDiary(name, beschreibung);
+      }
     },
-    [addFirecallItem, getDefaultPosition]
+    [addFirecallItem, addLocationDiary, getDefaultPosition]
   );
 
   useMapEvent('mousemove', (e) => {

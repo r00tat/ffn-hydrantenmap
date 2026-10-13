@@ -23,6 +23,8 @@ Operation sites are used to manage individual locations within an operation. Eac
 3. Set the status
 4. Save
 
+Every new operation site — whether created on this page or on the map — appears in the operational diary.
+
 ### Change the status
 
 1. Click the dropdown in the status column

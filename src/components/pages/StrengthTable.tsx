@@ -22,10 +22,17 @@ import useFirecallLocations from '../../hooks/useFirecallLocations';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { StrengthGroup, StrengthRow, calculateStrength } from './fahrzeuge-utils';
 import {
-  isAssignedToLocation,
+  currentLocationId,
   locationLabel,
-  locationUpdatesForItem,
+  moveItemToLocation,
 } from './location-assignment';
+import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
+import {
+  getLocationDisplayName,
+  vehicleAssignedEntry,
+  vehicleRemovedEntry,
+} from '../Einsatzorte/locationDiary';
+import useLocationDiary from '../Einsatzorte/useLocationDiary';
 
 const BASE_COLUMNS = 8;
 
@@ -33,7 +40,8 @@ const BASE_COLUMNS = 8;
 interface Editing {
   locations: FirecallLocation[];
   onEdit: (row: StrengthRow) => void;
-  onAssign: (row: StrengthRow, locationIds: string[]) => void;
+  /** `locationId` leer heißt: von jedem Einsatzort abziehen. */
+  onAssign: (row: StrengthRow, locationId: string) => void;
 }
 
 function LocationSelect({
@@ -46,49 +54,28 @@ function LocationSelect({
   onAssign: Editing['onAssign'];
 }) {
   const t = useTranslations('einsatzmittel');
+  // Eine Einheit steht immer nur an einem Einsatzort — deshalb eine
+  // Einfachauswahl; ein neuer Ort zieht sie vom bisherigen ab.
   const selected = useMemo(
-    () =>
-      locations
-        .filter((l) => l.id && isAssignedToLocation(l, row))
-        .map((l) => l.id as string),
+    () => currentLocationId(locations, row),
     [locations, row],
   );
-  const labels = useMemo(
-    () => new Map(locations.map((l) => [l.id, locationLabel(l)])),
-    [locations],
-  );
-  // Ein `multiple`-Select bleibt nach jedem Klick offen. Meist steht eine
-  // Einheit an genau einem Einsatzort — deshalb schließt das Menü nach der
-  // Auswahl; für einen weiteren Einsatzort wird es erneut geöffnet.
-  const [open, setOpen] = useState(false);
 
   return (
     <Select
-      multiple
       displayEmpty
       variant="standard"
       size="small"
-      open={open}
-      onOpen={() => setOpen(true)}
-      onClose={() => setOpen(false)}
       value={selected}
-      onChange={(e) => {
-        const value = e.target.value;
-        onAssign(row, typeof value === 'string' ? value.split(',') : value);
-        setOpen(false);
-      }}
-      renderValue={(ids) =>
-        ids.length === 0 ? (
-          <Typography variant="body2" color="text.disabled" component="span">
-            –
-          </Typography>
-        ) : (
-          ids.map((id) => labels.get(id) || id).join(', ')
-        )
-      }
+      onChange={(e) => onAssign(row, e.target.value)}
       inputProps={{ 'aria-label': t('locationFor', { name: row.name }) }}
       sx={{ minWidth: 120, maxWidth: 240, fontSize: 'body2.fontSize' }}
     >
+      <MenuItem value="">
+        <Typography variant="body2" color="text.secondary" component="span">
+          {t('noLocation')}
+        </Typography>
+      </MenuItem>
       {locations.map((l) => (
         <MenuItem key={l.id} value={l.id}>
           {locationLabel(l)}
@@ -272,13 +259,32 @@ function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
     (row: StrengthRow) => setEditItem(items.find((i) => i.id === row.id)),
     [items],
   );
+  const addDiaryEntry = useLocationDiary();
+  const { saveHistory } = useSaveHistory();
+
+  // Wie auf der Seite „Einsatzorte": erst den Verlaufsstand sichern, dann
+  // zuordnen und jeden Wechsel ins Einsatztagebuch schreiben.
   const onAssign = useCallback(
-    (row: StrengthRow, locationIds: string[]) => {
-      for (const update of locationUpdatesForItem(locations, row, locationIds)) {
+    async (row: StrengthRow, locationId: string) => {
+      const move = moveItemToLocation(locations, row, locationId);
+      if (move.updates.length === 0) return;
+
+      const anlass = move.assignedTo
+        ? `Status vor ${row.name} zu Einsatzort ${getLocationDisplayName(move.assignedTo)} zugeordnet`
+        : `Status vor ${row.name} von Einsatzort abgezogen`;
+      await saveHistory(anlass);
+
+      for (const update of move.updates) {
         void updateLocation(update.id, { vehicles: update.vehicles });
       }
+      for (const location of move.removedFrom) {
+        void addDiaryEntry(vehicleRemovedEntry(row.name, location));
+      }
+      if (move.assignedTo) {
+        void addDiaryEntry(vehicleAssignedEntry(row.name, move.assignedTo));
+      }
     },
-    [locations, updateLocation],
+    [addDiaryEntry, locations, saveHistory, updateLocation],
   );
   const editing = useMemo(
     () => ({ locations, onEdit, onAssign }),

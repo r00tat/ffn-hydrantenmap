@@ -1,17 +1,14 @@
 import { FirecallLocation } from '../firebase/firestore';
+import { getLocationDisplayName } from '../Einsatzorte/locationDiary';
 
 interface AssignableItem {
   id?: string;
   name: string;
 }
 
-/** Anzeigename eines Einsatzorts: Name, sonst Adresse. */
+/** Anzeigename eines Einsatzorts — derselbe wie im Einsatztagebuch. */
 export function locationLabel(location: FirecallLocation): string {
-  return (
-    location.name ||
-    `${location.street || ''} ${location.number || ''}`.trim() ||
-    'Einsatzort'
-  );
+  return getLocationDisplayName(location);
 }
 
 /**
@@ -23,8 +20,8 @@ export function isAssignedToLocation(
   location: FirecallLocation,
   item: AssignableItem,
 ): boolean {
-  return Object.entries(location.vehicles || {}).some(
-    ([key, name]) => matches(key, name, item),
+  return Object.entries(location.vehicles || {}).some(([key, name]) =>
+    matches(key, name, item),
   );
 }
 
@@ -32,32 +29,65 @@ function matches(key: string, name: string, item: AssignableItem): boolean {
   return (!!item.id && key === item.id) || (key === name && name === item.name);
 }
 
-/**
- * Die Änderungen an den Einsatzorten, damit das Element genau an den
- * gewählten steht. Ein Element darf an mehreren Einsatzorten stehen — wie im
- * Dialog des Einsatzorts. Zurückgegeben werden nur Einsatzorte, an denen sich
- * etwas ändert, jeweils mit dem vollständigen neuen `vehicles`.
- */
-export function locationUpdatesForItem(
+/** Der Einsatzort, an dem das Element steht — leer, wenn keiner. */
+export function currentLocationId(
   locations: FirecallLocation[],
   item: AssignableItem,
-  selectedIds: string[],
-): { id: string; vehicles: Record<string, string> }[] {
-  if (!item.id) return [];
-  const selected = new Set(selectedIds);
-  const updates: { id: string; vehicles: Record<string, string> }[] = [];
+): string {
+  return locations.find((l) => isAssignedToLocation(l, item))?.id ?? '';
+}
+
+export interface LocationMove {
+  /** Je betroffenem Einsatzort das vollständige neue `vehicles`. */
+  updates: { id: string; vehicles: Record<string, string> }[];
+  /** Einsatzorte, von denen das Element abgezogen wird. */
+  removedFrom: FirecallLocation[];
+  /** Der Einsatzort, dem es neu zugeordnet wird. */
+  assignedTo?: FirecallLocation;
+}
+
+/**
+ * Setzt das Element an genau einen Einsatzort — oder an keinen, wenn
+ * `targetId` leer ist. Eine Einheit steht immer nur an einem Einsatzort: Wer
+ * sie einem anderen zuordnet, zieht sie vom bisherigen ab. Steht sie aus
+ * älteren Zuordnungen an mehreren, wird sie von allen anderen abgezogen.
+ */
+export function moveItemToLocation(
+  locations: FirecallLocation[],
+  item: AssignableItem,
+  targetId: string,
+): LocationMove {
+  const move: LocationMove = { updates: [], removedFrom: [] };
+  if (!item.id) return move;
+
   for (const location of locations) {
-    if (!location.id) continue;
-    const assigned = isAssignedToLocation(location, item);
-    const wanted = selected.has(location.id);
-    if (assigned === wanted) continue;
-    const vehicles = Object.fromEntries(
-      Object.entries(location.vehicles || {}).filter(
-        ([key, name]) => !matches(key, name, item),
-      ),
-    );
-    if (wanted) vehicles[item.id] = item.name;
-    updates.push({ id: location.id, vehicles });
+    if (!location.id || location.id === targetId) continue;
+    if (!isAssignedToLocation(location, item)) continue;
+    move.updates.push({
+      id: location.id,
+      vehicles: withoutItem(location.vehicles, item),
+    });
+    move.removedFrom.push(location);
   }
-  return updates;
+
+  const target = locations.find((l) => l.id === targetId);
+  if (target?.id && !isAssignedToLocation(target, item)) {
+    move.updates.push({
+      id: target.id,
+      vehicles: { ...withoutItem(target.vehicles, item), [item.id]: item.name },
+    });
+    move.assignedTo = target;
+  }
+  return move;
+}
+
+function withoutItem(
+  vehicles: Record<string, string> | undefined,
+  item: AssignableItem,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(vehicles || {}).filter(
+      ([key, name]) => !matches(key, name, item),
+    ),
+  );
 }

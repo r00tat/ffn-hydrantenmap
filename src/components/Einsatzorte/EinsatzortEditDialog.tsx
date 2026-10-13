@@ -18,18 +18,14 @@ import useFirecallLocations from '../../hooks/useFirecallLocations';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import { useVehicleSuggestions } from '../../hooks/useVehicleSuggestions';
 import useVehicles from '../../hooks/useVehicles';
-import { Diary, FirecallLocation, Fzg } from '../firebase/firestore';
+import { FirecallLocation, Fzg } from '../firebase/firestore';
 import EinsatzorteCard from './EinsatzorteCard';
-
-function getLocationDisplayName(location: Partial<FirecallLocation>): string {
-  return (
-    location.name ||
-    [location.street, location.number, location.city]
-      .filter(Boolean)
-      .join(' ') ||
-    'Unbekannt'
-  );
-}
+import {
+  getLocationDisplayName,
+  vehicleAssignedEntry,
+  vehicleRemovedEntry,
+} from './locationDiary';
+import useLocationDiary from './useLocationDiary';
 
 type EditableKey = keyof FirecallLocation;
 
@@ -99,16 +95,9 @@ export default function EinsatzortEditDialog({
     return Object.keys(computeDiff(location, working)).length > 0;
   }, [location, working]);
 
-  const addDiaryEntry = useCallback(
-    (name: string, beschreibung?: string) =>
-      addFirecallItem({
-        type: 'diary',
-        art: 'M',
-        name,
-        beschreibung: beschreibung || '',
-      } as Diary).catch(() => {}),
-    [addFirecallItem],
-  );
+  // Nummeriert wie auf der Seite „Einsatzorte" — vorher liefen die Einträge
+  // aus dem Dialog ohne Nummer ins Tagebuch.
+  const addDiaryEntry = useLocationDiary();
 
   const handleLocalChange = useCallback(
     (updates: Partial<FirecallLocation>) => {
@@ -267,12 +256,12 @@ export default function EinsatzortEditDialog({
         const newVehicles = diff.vehicles as Record<string, string>;
         for (const [vId, vName] of Object.entries(oldVehicles)) {
           if (!(vId in newVehicles)) {
-            addDiaryEntry(`${vName} von Einsatzort ${displayName} abgezogen`);
+            addDiaryEntry(vehicleRemovedEntry(vName, working));
           }
         }
         for (const [vId, vName] of Object.entries(newVehicles)) {
           if (!(vId in (oldVehicles as Record<string, string>))) {
-            addDiaryEntry(`${vName} zu Einsatzort ${displayName} zugeordnet`);
+            addDiaryEntry(vehicleAssignedEntry(vName, working));
           }
         }
       }

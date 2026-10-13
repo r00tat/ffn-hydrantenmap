@@ -26,6 +26,14 @@ const locations = [
 vi.mock('../../hooks/useFirecallLocations', () => ({
   default: () => ({ locations, updateLocation }),
 }));
+const addDiaryEntry = vi.fn();
+vi.mock('../Einsatzorte/useLocationDiary', () => ({
+  default: () => addDiaryEntry,
+}));
+const saveHistory = vi.fn();
+vi.mock('../../hooks/firecallHistory/useSaveHistory', () => ({
+  useSaveHistory: () => ({ saveHistory, saveInProgress: false }),
+}));
 vi.mock('../FirecallItems/FirecallItemUpdateDialog', () => ({
   default: ({ item }: { item: FirecallItem }) => (
     <div role="dialog">Dialog {item.name}</div>
@@ -98,7 +106,11 @@ describe('StrengthTable — bearbeitbar', () => {
     mann: 9,
   } as unknown as FirecallItem;
 
-  beforeEach(() => updateLocation.mockReset());
+  beforeEach(() => {
+    updateLocation.mockReset();
+    addDiaryEntry.mockReset();
+    saveHistory.mockReset();
+  });
 
   it('zeigt ohne editable weder Einsatzort noch Bearbeiten', () => {
     renderWithIntl(<StrengthTable items={[TLF_WITH_ID]} />);
@@ -117,11 +129,45 @@ describe('StrengthTable — bearbeitbar', () => {
     await user.click(screen.getByRole('combobox', { name: 'Einsatzort von 1. Zug' }));
     await user.click(screen.getByRole('option', { name: 'Seestraße 5' }));
 
+    expect(saveHistory).toHaveBeenCalledWith(
+      'Status vor 1. Zug zu Einsatzort Seestraße 5 zugeordnet',
+    );
     expect(updateLocation).toHaveBeenCalledWith('l2', {
       vehicles: { u1: '1. Zug' },
     });
+    expect(addDiaryEntry).toHaveBeenCalledWith(
+      '1. Zug zu Einsatzort Seestraße 5 zugeordnet',
+    );
     // Nach der Auswahl schließt das Menü.
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('wechselt den Einsatzort: abziehen vom alten, zuordnen zum neuen', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StrengthTable items={[TLF_WITH_ID]} editable />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Einsatzort von TLF' }));
+    await user.click(screen.getByRole('option', { name: 'Seestraße 5' }));
+
+    expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
+    expect(updateLocation).toHaveBeenCalledWith('l2', { vehicles: { v1: 'TLF' } });
+    expect(addDiaryEntry.mock.calls.map((c) => c[0])).toEqual([
+      'TLF von Einsatzort Keller Hauptplatz abgezogen',
+      'TLF zu Einsatzort Seestraße 5 zugeordnet',
+    ]);
+  });
+
+  it('zieht mit „kein Einsatzort" ab', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StrengthTable items={[TLF_WITH_ID]} editable />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Einsatzort von TLF' }));
+    await user.click(screen.getByRole('option', { name: 'kein Einsatzort' }));
+
+    expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
+    expect(addDiaryEntry).toHaveBeenCalledWith(
+      'TLF von Einsatzort Keller Hauptplatz abgezogen',
+    );
   });
 
   it('öffnet den Bearbeiten-Dialog der Zeile', async () => {
