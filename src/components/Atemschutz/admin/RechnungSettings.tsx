@@ -26,8 +26,9 @@ export interface RechnungSettingsProps {
  * an zwei Orten liefe auseinander.
  *
  * Liegt in der Verwaltung und nicht auf der Verrechnungsseite: Die Werte
- * gelten für alle Rechnungen der Gruppe, sind keine Tagesarbeit und stehen
- * hinter `gruppe.manage`.
+ * gelten für alle Rechnungen der Gruppe und sind keine Tagesarbeit. Pflegen
+ * darf sie, wer verrechnet (`kostenersatz.use`) — `gruppe.manage` braucht es
+ * dafür nicht.
  */
 export default function RechnungSettings({ groupId }: RechnungSettingsProps) {
   const t = useTranslations('atemschutz');

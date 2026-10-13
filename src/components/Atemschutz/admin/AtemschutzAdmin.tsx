@@ -74,16 +74,24 @@ export default function AtemschutzAdmin() {
     },
     [router, searchParams],
   );
-  // Zur Auswahl stehen nur die Gruppen mit `gruppe.manage`. Keine
-  // Sicherheitsgrenze — die ist `actionPermissionRequired` in den Actions;
-  // hier stehen bloß keine Gruppen zur Auswahl, die ohnehin abgewiesen würden.
+  // Zur Auswahl stehen die Gruppen mit `gruppe.manage` oder
+  // `kostenersatz.use` (nur Reiter „Verrechnung"). Keine Sicherheitsgrenze —
+  // die ist `actionPermissionRequired` in den Actions; hier stehen bloß keine
+  // Gruppen zur Auswahl, die ohnehin abgewiesen würden.
   const groups = useMemo(
     () =>
-      allGroups.filter((g) => can({ isAdmin, groupRoles }, g.id, 'gruppe.manage')),
+      allGroups.filter(
+        (g) =>
+          can({ isAdmin, groupRoles }, g.id, 'gruppe.manage') ||
+          can({ isAdmin, groupRoles }, g.id, 'kostenersatz.use'),
+      ),
     [allGroups, isAdmin, groupRoles],
   );
-  const { geraete, feuerwehren } = useAtemschutzGeraete(groupId);
+  const canManage = !!groupId && can({ isAdmin, groupRoles }, groupId, 'gruppe.manage');
+  // Die Geräteliste liest nur, wer sie auch sieht.
+  const { geraete, feuerwehren } = useAtemschutzGeraete(canManage ? groupId : undefined);
   const visibleTabs = visibleAdminTabs({
+    canManage,
     canBill: !!groupId && can({ isAdmin, groupRoles }, groupId, 'kostenersatz.use'),
   });
   // Der aktive Reiter steht in der URL, nicht im State — dasselbe Muster wie

@@ -271,11 +271,11 @@ describe('saveAtemschutzRechnungConfig', () => {
     },
   } as Parameters<typeof saveAtemschutzRechnungConfig>[0];
 
-  it('verlangt gruppe.manage und kostenersatz.use in der Gruppe', async () => {
+  it('verlangt nur kostenersatz.use in der Gruppe', async () => {
     const result = await saveAtemschutzRechnungConfig(request);
     expect(result.success).toBe(true);
-    expect(guardMock).toHaveBeenCalledWith('ffnd', 'gruppe.manage');
     expect(guardMock).toHaveBeenCalledWith('ffnd', 'kostenersatz.use');
+    expect(guardMock).not.toHaveBeenCalledWith('ffnd', 'gruppe.manage');
   });
 
   it('weist einen Gruppen-Admin ohne Kostenersatz ab', async () => {

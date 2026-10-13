@@ -86,8 +86,11 @@ interface DrawerLink {
   fahrtenbuchAdmin?: boolean;
   /** Sichtbar mit `personal.manage` in irgendeiner Gruppe. */
   personalAdmin?: boolean;
-  /** Sichtbar mit `gruppe.manage` in irgendeiner Gruppe. */
-  groupAdminOnly?: boolean;
+  /**
+   * Sichtbar mit `gruppe.manage` oder `kostenersatz.use` in irgendeiner
+   * Gruppe — Letzteres für den Reiter „Verrechnung" der Atemschutz-Verwaltung.
+   */
+  atemschutzAdmin?: boolean;
   /** Sichtbar mit `bekleidung.read` in irgendeiner Gruppe. */
   bekleidung?: boolean;
   /**
@@ -202,6 +205,7 @@ export default function AppDrawer({
   const canFahrtenbuchAdmin = useCanAny('fahrtenbuch.manage');
   const canPersonalAdmin = useCanAny('personal.manage');
   const canGroupAdmin = useCanAny('gruppe.manage');
+  const canBillAnyGroup = useCanAny('kostenersatz.use');
   const canBekleidung = useCanAny('bekleidung.read');
   const canKostenersatz = useCan(useFirecall().group, 'kostenersatz.use');
   // „Mitglieder und Rollen" liegt je Gruppe; der Eintrag führt in die erste
@@ -544,7 +548,7 @@ export default function AppDrawer({
           text: t('adminAtemschutz'),
           icon: <AirIcon />,
           href: '/admin/atemschutz',
-          groupAdminOnly: true,
+          atemschutzAdmin: true,
         },
         {
           text: t('adminDrive'),
@@ -634,7 +638,7 @@ export default function AppDrawer({
       (isAdmin || !item.admin) &&
       (!item.fahrtenbuchAdmin || canFahrtenbuchAdmin) &&
       (!item.personalAdmin || canPersonalAdmin) &&
-      (!item.groupAdminOnly || canGroupAdmin) &&
+      (!item.atemschutzAdmin || canGroupAdmin || canBillAnyGroup) &&
       (!item.bekleidung || canBekleidung) &&
       (!item.kostenersatz || canKostenersatz) &&
       (isSignedIn || !item.signedInOnly),
@@ -644,6 +648,7 @@ export default function AppDrawer({
       canFahrtenbuchAdmin,
       canPersonalAdmin,
       canGroupAdmin,
+      canBillAnyGroup,
       canBekleidung,
       canKostenersatz,
     ],

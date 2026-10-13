@@ -22,23 +22,26 @@ export function adminTabFromParam(
   value: string | null | undefined,
   visible: readonly AtemschutzAdminTabKey[] = ATEMSCHUTZ_ADMIN_TABS,
 ): AtemschutzAdminTabKey {
-  return isAtemschutzAdminTabKey(value) && visible.includes(value)
-    ? value
-    : DEFAULT_ATEMSCHUTZ_ADMIN_TAB;
+  if (isAtemschutzAdminTabKey(value) && visible.includes(value)) return value;
+  return visible[0] ?? DEFAULT_ATEMSCHUTZ_ADMIN_TAB;
 }
 
 /**
  * Die Reiter, die der Benutzer in der gewählten Gruppe sieht.
  *
- * Die Verrechnungs-Einstellungen liegen in `atemschutzConfig`, das die
- * Firestore-Regeln nur mit `kostenersatz.use` lesen lassen. Ein Gruppen-Admin
- * ohne Kostenersatz sähe einen Reiter, der nicht laden kann — deshalb fehlt er
- * dann ganz.
+ * Geräte und Stammdaten brauchen `gruppe.manage`. Die Verrechnungs-
+ * Einstellungen liegen in `atemschutzConfig`, das die Firestore-Regeln nur mit
+ * `kostenersatz.use` lesen lassen, und brauchen nur dieses Recht: Wer die
+ * Füllungen verrechnet, pflegt auch Betreff, Text und Zahlungsziel. Ein
+ * Gruppen-Admin ohne Kostenersatz sähe einen Reiter, der nicht laden kann —
+ * deshalb fehlt er dann ganz.
  */
 export function visibleAdminTabs({
+  canManage,
   canBill,
 }: {
+  canManage: boolean;
   canBill: boolean;
 }): AtemschutzAdminTabKey[] {
-  return ATEMSCHUTZ_ADMIN_TABS.filter((key) => key !== 'rechnung' || canBill);
+  return ATEMSCHUTZ_ADMIN_TABS.filter((key) => (key === 'rechnung' ? canBill : canManage));
 }

@@ -525,19 +525,21 @@ Rechnungen beider. Seit dem Recht je Gruppe ist das geschlossen (siehe
 [berechtigungen.md](berechtigungen.md#kostenersatz-je-gruppe)).
 
 Die Konfiguration (Betreff, Text, CC, Zahlungsziel, Vorgabetarif) verlangt
-**beides**, `gruppe.manage` und `kostenersatz.use`: Sie gilt für alle
-Rechnungen der Gruppe und ist keine Tagesarbeit, deshalb liegt sie in der
-Atemschutz-Verwaltung (`gruppe.manage`). Gelesen wird sie aber im Browser aus
-`atemschutzConfig`, und das lassen die Regeln nur mit `kostenersatz.use` zu.
-Ein Gruppen-Admin ohne Kostenersatz sähe einen Reiter, der nicht laden kann —
-der Reiter „Verrechnung" fehlt ihm deshalb (`visibleAdminTabs`), und die
-Action prüft dasselbe.
+nur `kostenersatz.use`, **nicht** `gruppe.manage`: Wer die Füllungen
+verrechnet, pflegt auch die Vorlagen dazu. Sie gilt für alle Rechnungen der
+Gruppe und ist keine Tagesarbeit, deshalb liegt sie trotzdem in der
+Atemschutz-Verwaltung `/admin/atemschutz`. Die Seite öffnet sich deshalb auch
+mit `kostenersatz.use` allein; dann ist „Verrechnung" der einzige Reiter,
+„Geräte" und „Stammdaten" bleiben bei `gruppe.manage` (`visibleAdminTabs`).
+Gelesen wird die Konfiguration im Browser aus `atemschutzConfig`, und das
+lassen die Regeln nur mit `kostenersatz.use` zu — ein Gruppen-Admin ohne
+Kostenersatz sähe einen Reiter, der nicht laden kann, und bekommt ihn nicht.
 
 ### Wo die Rechnungsstammdaten stehen
 
 Zahlungsziel, Umsatzsteuerhinweis und der Leistungstext liegen in
 `atemschutzConfig/rechnung` und werden unter `/admin/atemschutz` gepflegt
-(Gruppen-Admin mit `kostenersatz.use`, siehe oben).
+(mit `kostenersatz.use`, siehe oben).
 
 **Absender, Anschrift, Kontakt, Kontoinhaber, IBAN, BIC und das Logo stehen
 nicht mehr hier**, sondern in den Gruppen-Stammdaten

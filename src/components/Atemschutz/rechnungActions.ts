@@ -624,10 +624,8 @@ export async function deleteAtemschutzEmpfaenger(request: {
 }
 
 /**
- * Die Konfiguration gilt für alle Rechnungen der Gruppe und ist keine
- * Tagesarbeit — deshalb zusätzlich `gruppe.manage`; `kostenersatz.use` wie
- * bei den Rechnungen braucht es trotzdem (s. unten). Gespeichert wird nur
- * mit beiden Rechten.
+ * Die Konfiguration gilt für alle Rechnungen der Gruppe. Pflegen darf sie, wer
+ * verrechnet — dasselbe Recht wie bei den Rechnungen, kein `gruppe.manage`.
  */
 export async function saveAtemschutzRechnungConfig(request: {
   groupId: string;
@@ -635,11 +633,7 @@ export async function saveAtemschutzRechnungConfig(request: {
 }): Promise<RechnungActionResult> {
   try {
     const { groupId, config } = request;
-    // Der Reiter liegt in der Atemschutz-Verwaltung (`gruppe.manage`), die
-    // Einstellungen gehören aber zur Verrechnung und sind nur mit
-    // `kostenersatz.use` lesbar — es braucht beides.
-    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
-    await actionPermissionRequired(groupId, 'kostenersatz.use');
+    const session = await actionPermissionRequired(groupId, 'kostenersatz.use');
     const now = new Date().toISOString();
     await rechnungConfigRef(groupId).set(
       {
