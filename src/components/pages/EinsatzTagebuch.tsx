@@ -3,8 +3,6 @@
 import AddIcon from '@mui/icons-material/Add';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -38,9 +36,7 @@ import PendingSyncIcon from '../site/PendingSyncIcon';
 import OfflineListHint from '../site/OfflineListHint';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import AiAssistantButton from '../Map/AiAssistantButton';
-import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
-import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { downloadRowsAsCsv } from '../firebase/download';
 import {
   Diary,
@@ -51,6 +47,7 @@ import {
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
 import { buildDiaries } from './diary-entries';
+import DiaryButtons from './DiaryButtons';
 import McpOriginChip from '../mcp/McpOriginChip';
 import {
   useHistoryPathSegments,
@@ -120,60 +117,6 @@ function downloadDiaries(
     ]),
   ];
   downloadRowsAsCsv(rows, t('csvFilename'));
-}
-
-export function DiaryButtons({ diary }: { diary: Diary }) {
-  const t = useTranslations('tagebuch');
-  const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
-  const [deleteDialog, setDeleteDialog] = useState(false);
-
-  return (
-    <>
-      {diary.editable && (
-        <>
-          <Tooltip title={t('editEntry', { name: diary.name })}>
-            <IconButton
-              onClick={(e) => {
-                e.stopPropagation();
-                setDisplayUpdateDialog(true);
-              }}
-            >
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={t('deleteEntry', { name: diary.name })}>
-            <IconButton
-              color="warning"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeleteDialog(true);
-              }}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-          {displayUpdateDialog && (
-            <FirecallItemUpdateDialog
-              allowTypeChange={false}
-              item={diary}
-              callback={() => {
-                setDisplayUpdateDialog(false);
-              }}
-            />
-          )}
-
-          {deleteDialog && (
-            <DeleteFirecallItemDialog
-              item={diary.original || diary}
-              callback={() => {
-                setDeleteDialog(false);
-              }}
-            />
-          )}
-        </>
-      )}
-    </>
-  );
 }
 
 export interface EinsatzTagebuchOptions {

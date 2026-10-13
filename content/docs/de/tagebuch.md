@@ -11,7 +11,7 @@ Das Einsatztagebuch dokumentiert alle wichtigen Ereignisse während eines Einsat
 - **Von/An Felder für Absender und Empfänger** Dokumentiert die Kommunikationswege im Einsatz
 - Automatische Nummerierung der Einträge
 - **Chronologische Timeline mit Sortierung** Sortierbar nach Nummer, Datum, Art, Name und Beschreibung
-- **Automatische Fahrzeug-Einträge** Alarmierung, Eintreffen und Abrücken werden automatisch aus Fahrzeugdaten generiert
+- **Automatische Einträge für Fahrzeuge und Einheiten** Alarmierung, Eintreffen und Abrücken werden automatisch aus den Daten der Fahrzeuge und taktischen Einheiten generiert, samt Stärke bzw. Besatzung und ATS
 - **KI-gestützte Zusammenfassung** Automatische Zusammenfassung des gesamten Einsatzes basierend auf allen Tagebucheinträgen
 - CSV-Export des Tagebuchs
 - Einträge bearbeiten und löschen
@@ -57,3 +57,5 @@ Tipp: Die Eintragsarten folgen dem Stabsarbeits-Schema: M = Meldung (Information
 :::info
 Tipp: Fahrzeug-Zeitstempel (Alarmierung, Eintreffen, Abrücken) werden automatisch als Tagebucheinträge generiert. Du musst diese nicht manuell anlegen.
 :::
+
+Diese automatischen Einträge sind kein eigenes Dokument, sondern werden aus den Zeiten des Fahrzeugs bzw. der Einheit abgeleitet. Ihr Bearbeiten-Symbol öffnet deshalb den Dialog des Fahrzeugs bzw. der Einheit: Dort änderst du Alarmierung, Eintreffen, Abrücken oder die Stärke, und der Eintrag passt sich an. Wird die Zeit gelöscht, verschwindet der Eintrag. Ein Löschen-Symbol gibt es hier nicht – es würde das ganze Fahrzeug löschen.

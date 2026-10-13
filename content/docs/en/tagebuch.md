@@ -11,7 +11,7 @@ The operation log documents all important events during an operation in chronolo
 - **From/To fields for sender and recipient** Documents the communication paths in the operation
 - Automatic numbering of entries
 - **Chronological timeline with sorting** Sortable by number, date, type, name and description
-- **Automatic vehicle entries** Alert, arrival and departure are generated automatically from vehicle data
+- **Automatic entries for vehicles and units** Alert, arrival and departure are generated automatically from the data of vehicles and tactical units, including strength or crew and breathing apparatus wearers
 - **AI-assisted summary** Automatic summary of the whole operation based on all log entries
 - CSV export of the log
 - Edit and delete entries
@@ -57,3 +57,5 @@ Tip: The entry types follow the command staff scheme: M = message (information),
 :::info
 Tip: Vehicle timestamps (alert, arrival, departure) are generated automatically as log entries. You do not need to create them manually.
 :::
+
+These automatic entries are not stored on their own but derived from the times of the vehicle or unit. Their edit icon therefore opens the vehicle's or unit's dialog: change alert, arrival, departure or strength there and the entry follows. Clearing the time removes the entry. There is no delete icon here – it would delete the whole vehicle.
