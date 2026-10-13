@@ -9,6 +9,8 @@
  */
 
 import { uniqueArray } from './arrayUtils';
+import { isTruthy } from './boolish';
+import { guestCanWrite, type FirecallGuestInfo } from './firecallGuest';
 import {
   legacyToGroupRoles,
   memberGroupIds,
@@ -68,4 +70,41 @@ export function claimGroupsForUser(
       ? [LEGACY_KOSTENERSATZ_GROUP]
       : []),
   ]);
+}
+
+/** Was `claimsForStoredUser` vom Benutzerdokument liest. */
+export interface StoredClaimsSource extends UserRolesSource, FirecallGuestInfo {
+  isAdmin?: boolean;
+  /** Ältere Dokumente tragen „true" als Text. */
+  authorized?: boolean | string;
+  firecallExpiresAt?: number;
+}
+
+/**
+ * Die Custom Claims, wie sie aus dem gespeicherten Benutzerdokument folgen —
+ * für jede Stelle, die Claims ohne frische Eingabe neu setzt
+ * (`writeUserRoles()`, „Claims für alle setzen"). Gruppen wie
+ * `claimGroupsForUser`, dazu die Gast-Claims samt Ablauf: Ein Neusetzen ohne
+ * sie machte einen Gastzugang aus Sicht der Regeln unbegrenzt.
+ *
+ * @param groupRoles soeben geschriebene Rollen, die das Dokument noch nicht trägt.
+ */
+export function claimsForStoredUser(
+  user: StoredClaimsSource,
+  groupRoles?: GroupRoles,
+) {
+  return {
+    groups: claimGroupsForUser(user, groupRoles),
+    isAdmin: !!user.isAdmin,
+    authorized: isTruthy(user.authorized),
+    ...(user.firecall
+      ? {
+          firecall: user.firecall,
+          firecallWrite: guestCanWrite(user),
+          ...(user.firecallExpiresAt
+            ? { firecallExpires: user.firecallExpiresAt }
+            : {}),
+        }
+      : {}),
+  };
 }

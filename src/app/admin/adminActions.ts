@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 
-import { UserRecordExtended } from '../../common/users';
+import { FirebaseUserInfo, UserRecordExtended } from '../../common/users';
 import {
   CLUSTER_COLLECTION_ID,
   Firecall,
@@ -17,6 +17,7 @@ import {
   getDevFirestore,
   getProdFirestore,
 } from '../../server/firebase/admin';
+import { claimsForStoredUser } from '../../common/userGroupRoles';
 import { setCustomClaimsForUser } from '../api/users/[uid]/updateUser';
 import { actionAdminRequired } from '../auth';
 
@@ -74,13 +75,15 @@ export async function setCustomClaimsForAllUsers() {
     .where('authorized', '==', true)
     .get();
   await Promise.all(
-    authorizedUsers.docs.map(async (user) => {
-      return setCustomClaimsForUser(user.id, {
-        authorized: true,
-        isAdmin: user.data().isAdmin,
-        groups: user.data().groups || [],
-      });
-    })
+    // Dieselbe Ableitung wie `writeUserRoles()`: Gruppen aus `groupRoles`,
+    // Gast-Claims samt Ablauf. Das alte Feld `groups` pflegt niemand mehr —
+    // aus ihm kämen ausgetretene Gruppen zurück und neue fehlten.
+    authorizedUsers.docs.map(async (user) =>
+      setCustomClaimsForUser(
+        user.id,
+        claimsForStoredUser(user.data() as FirebaseUserInfo)
+      )
+    )
   );
   console.info(`BULK ACTION COMPLETE: setCustomClaimsForAllUsers`);
   return authorizedUsers.docs.map(

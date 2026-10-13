@@ -9,10 +9,11 @@ import {
   type GroupRoles,
   type RoleId,
 } from '../../common/permissions';
-import { ALL_USERS_GROUP_ID, isTenantGroupId } from '../../common/tenantGroups';
+import { isTenantGroupId } from '../../common/tenantGroups';
 import type { FirebaseUserInfo } from '../../common/users';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 import { setCustomClaimsForUser } from '../../app/api/users/[uid]/updateUser';
+import { claimsForStoredUser } from '../../common/userGroupRoles';
 import { firestore } from '../firebase/admin';
 import { userSessionCache } from './userSessionCache';
 
@@ -34,8 +35,6 @@ export type UserRolesChange =
   | { kind: 'removeMember'; groupId: string }
   /** Alles ersetzen — Migration und Benutzerverwaltung. */
   | { kind: 'replaceAll'; groupRoles: GroupRoles };
-
-const LEGACY_KOSTENERSATZ_GROUP = 'kostenersatz';
 
 function normalizeRoles(roles: readonly unknown[] | undefined): RoleId[] {
   return [...new Set((roles ?? []).filter(isRoleId))].sort();
@@ -159,24 +158,7 @@ export async function writeUserRoles(
     // Der Claim trägt die Mitgliedschaft, die Regeln für `call/**` lesen ihn.
     // `'kostenersatz'` bleibt drin, solange es in `groups` steht — es fällt
     // erst mit dem Schritt „Alte Felder entfernen" der Migration weg.
-    await setCustomClaimsForUser(uid, {
-      groups: [
-        ...memberGroupIds({ groupRoles: after }),
-        ALL_USERS_GROUP_ID,
-        ...((data.groups ?? []).includes(LEGACY_KOSTENERSATZ_GROUP)
-          ? [LEGACY_KOSTENERSATZ_GROUP]
-          : []),
-      ],
-      isAdmin: !!data.isAdmin,
-      authorized: !!data.authorized,
-      ...(data.firecall
-        ? {
-            firecall: data.firecall,
-            firecallWrite: data.firecallWrite !== false,
-            firecallExpires: data.firecallExpiresAt,
-          }
-        : {}),
-    });
+    await setCustomClaimsForUser(uid, claimsForStoredUser(data, after));
   }
 
   userSessionCache.invalidate(uid);

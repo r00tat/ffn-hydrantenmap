@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   claimGroupsForUser,
+  claimsForStoredUser,
   effectiveGroupRoles,
   hasGroupRoles,
   userMemberGroupIds,
@@ -89,5 +90,47 @@ describe('claimGroupsForUser', () => {
     expect(
       claimGroupsForUser({ groups: ['ffnd'] }, { other: [] }),
     ).toEqual(['other', 'allUsers']);
+  });
+});
+
+describe('claimsForStoredUser', () => {
+  const EXPIRES_AT = 1_800_000_000_000;
+
+  it('bildet die Gruppen aus groupRoles, nicht aus dem alten Feld', () => {
+    expect(
+      claimsForStoredUser({
+        authorized: true,
+        groupRoles: { ffnd: ['gruppenadmin'] },
+        groups: ['allUsers', 'ffnd', 'ausgetreten'],
+      }),
+    ).toEqual({ groups: ['ffnd', 'allUsers'], isAdmin: false, authorized: true });
+  });
+
+  it('übernimmt die Gast-Claims samt Ablauf', () => {
+    expect(
+      claimsForStoredUser({
+        authorized: true,
+        groups: ['allUsers'],
+        firecall: 'fc1',
+        firecallWrite: false,
+        firecallExpiresAt: EXPIRES_AT,
+      }),
+    ).toEqual({
+      groups: ['allUsers'],
+      isAdmin: false,
+      authorized: true,
+      firecall: 'fc1',
+      firecallWrite: false,
+      firecallExpires: EXPIRES_AT,
+    });
+  });
+
+  it('nimmt soeben geschriebene groupRoles vor dem gespeicherten Stand', () => {
+    expect(
+      claimsForStoredUser(
+        { authorized: true, isAdmin: true, groupRoles: { ffnd: [] } },
+        { ffwien: [] },
+      ),
+    ).toEqual({ groups: ['ffwien', 'allUsers'], isAdmin: true, authorized: true });
   });
 });
