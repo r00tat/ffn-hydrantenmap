@@ -785,7 +785,7 @@ describe('Qualifikationen am Personalstand', () => {
 
   it('lässt ein einfaches Gruppenmitglied kein Merkmal umschalten', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: { id: 'u1', isAdmin: false, groups: ['ffnd'] },
+      user: { id: 'u1', isAdmin: false, groups: ['ffnd'], groupRoles: { ffnd: [] } },
     });
 
     const result = await setPersonFlag('ffnd', 'p1', 'kraftfahrer', false);
@@ -806,13 +806,12 @@ describe('listPersonUserCandidates', () => {
       user: {
         id: 'g1',
         isAdmin: false,
-        groups: ['ffnd'],
-        fahrtenbuchGeraetemeister: ['ffnd'],
+        groupRoles: { ffnd: ['geraetemeister'] },
       },
     });
     listUsersMock.mockResolvedValue([
-      { uid: 'u1', displayName: 'Muster Anna', groups: ['ffnd'] },
-      { uid: 'u2', displayName: 'Fremd Franz', groups: ['andere'] },
+      { uid: 'u1', displayName: 'Muster Anna', groupRoles: { ffnd: [] } },
+      { uid: 'u2', displayName: 'Fremd Franz', groupRoles: { andere: [] } },
     ]);
 
     const result = await listPersonUserCandidates('ffnd');
@@ -829,7 +828,7 @@ describe('listPersonUserCandidates', () => {
         email: 'anna@example.org',
         phoneNumber: '+43 1',
         authorized: true,
-        groups: ['ffnd'],
+        groupRoles: { ffnd: [] },
       },
     ]);
 
@@ -849,7 +848,7 @@ describe('listPersonUserCandidates', () => {
 
   it('weist ab, wer die Gruppe nicht verwalten darf', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: { id: 'u1', isAdmin: false, groups: ['ffnd'] },
+      user: { id: 'u1', isAdmin: false, groups: ['ffnd'], groupRoles: { ffnd: [] } },
     });
 
     const result = await listPersonUserCandidates('ffnd');

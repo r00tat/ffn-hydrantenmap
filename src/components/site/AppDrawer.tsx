@@ -84,6 +84,8 @@ interface DrawerLink {
    * `admin` abbildbar, weil dieses Flag ein Dutzend anderer Einträge steuert.
    */
   fahrtenbuchAdmin?: boolean;
+  /** Sichtbar mit `personal.manage` in irgendeiner Gruppe. */
+  personalAdmin?: boolean;
   /** Sichtbar mit `gruppe.manage` in irgendeiner Gruppe. */
   groupAdminOnly?: boolean;
   /** Sichtbar mit `bekleidung.read` in irgendeiner Gruppe. */
@@ -198,6 +200,7 @@ export default function AppDrawer({
   // Menüpunkte öffnen nur die Oberfläche; die Entscheidung treffen Server
   // Actions und Firestore-Regeln.
   const canFahrtenbuchAdmin = useCanAny('fahrtenbuch.manage');
+  const canPersonalAdmin = useCanAny('personal.manage');
   const canGroupAdmin = useCanAny('gruppe.manage');
   const canBekleidung = useCanAny('bekleidung.read');
   const canKostenersatz = useCan(useFirecall().group, 'kostenersatz.use');
@@ -529,13 +532,13 @@ export default function AppDrawer({
           href: '/admin/fahrtenbuch',
           fahrtenbuchAdmin: true,
         },
-        // Dieselbe Sichtbarkeit wie die Fahrtenbuch-Verwaltung, aus der die
-        // Personenpflege kommt (siehe docs/personal.md).
+        // Eigenes Recht statt der Fahrtenbuch-Verwaltung: Die Seite prüft
+        // `personal.manage` (siehe docs/personal.md).
         {
           text: t('personal'),
           icon: <BadgeIcon />,
           href: '/personal',
-          fahrtenbuchAdmin: true,
+          personalAdmin: true,
         },
         {
           text: t('adminAtemschutz'),
@@ -630,6 +633,7 @@ export default function AppDrawer({
     (item: DrawerLink) =>
       (isAdmin || !item.admin) &&
       (!item.fahrtenbuchAdmin || canFahrtenbuchAdmin) &&
+      (!item.personalAdmin || canPersonalAdmin) &&
       (!item.groupAdminOnly || canGroupAdmin) &&
       (!item.bekleidung || canBekleidung) &&
       (!item.kostenersatz || canKostenersatz) &&
@@ -638,6 +642,7 @@ export default function AppDrawer({
       isAdmin,
       isSignedIn,
       canFahrtenbuchAdmin,
+      canPersonalAdmin,
       canGroupAdmin,
       canBekleidung,
       canKostenersatz,

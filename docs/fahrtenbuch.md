@@ -532,9 +532,10 @@ Drei Dinge, die daran hängen:
   stehen am Eintrag, damit die Liste einen Namen zeigen kann, ohne eine
   Benutzerabfrage zu stellen. Keiner der beiden darf je eine Berechtigung
   begründen.
-- **`entryPermissions.ts` liegt nicht in `entryLogic.ts`**, aus demselben Grund
-  wie `managerPermissions.ts`: Die Liste braucht die Prädikate im Client und
-  zöge sonst das Eintrags-Validierungsmodul in ihr Bundle.
+- **`entryPermissions.ts` liegt nicht in `entryLogic.ts`**: Die Liste braucht
+  die Prädikate im Client und zöge sonst das Eintrags-Validierungsmodul in ihr
+  Bundle. Das Verwalterrecht selbst kommt aus `src/common/permissions.ts`
+  (`can(user, groupId, 'fahrtenbuch.manage')`).
 
 **Die Änderung ist am Eintrag ausgewiesen.** `updatedByName` steht neben
 `updatedBy` (der UID), damit die Liste den Änderer nennen kann, ohne eine
