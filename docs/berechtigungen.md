@@ -225,9 +225,18 @@ Anlage interner Benutzer (`autoProvisionUser.ts`) und die Migration.
 | Änderung | Wirkung |
 | --- | --- |
 | `setGroupRoles` | Rollen einer Gruppe ersetzen; die Mitgliedschaft muss bestehen |
+| `toggleRole` | eine einzelne Rolle einer Gruppe setzen oder entfernen; die Mitgliedschaft muss bestehen |
 | `addMember` | in eine Gruppe aufnehmen, optional mit Rollen |
 | `removeMember` | Austritt: löscht den Schlüssel und damit alle Rollen der Gruppe |
 | `replaceAll` | alles ersetzen — Benutzerverwaltung und Migration |
+
+**Ein Schalter ist `toggleRole`, nicht `setGroupRoles`.** Der Schalter einer
+Rolle in „Mitglieder und Rollen" und der Gruppen-Admin-Schalter der
+Gruppenverwaltung ändern genau eine Rolle. Rechneten sie die neue Rollenliste
+im Browser aus und schickten sie als `setGroupRoles`, verwürfe der zweite von
+zwei gleichzeitigen Klicks (zwei Admins, oder zwei Schalter kurz
+hintereinander) die Rolle des ersten. `toggleRole` wendet die Änderung auf den
+Stand an, den die Transaktion liest.
 
 Was die Funktion tut, und warum:
 
@@ -362,9 +371,14 @@ entfernen" der Migration im Claim stehen und steht deshalb noch in
 `NON_TENANT_GROUP_IDS`; mit dem Aufräum-PR nach dem Release fällt sie weg.
 
 Folge für Einsätze mit `group == 'allUsers'`: Für sie gibt es kein
-Gruppenrecht, also lehnt `actionFirecallPermissionRequired` sie ab — an ihnen
-ist kein Kostenersatz möglich. Ob solche Einsätze überhaupt existieren, ist vor
-dem Aufräum-PR zu klären (siehe [Nach dem Release](#nach-dem-release)).
+Gruppenrecht, also lehnt `actionFirecallPermissionRequired` sie für jeden
+außer dem globalen Admin ab. Der Admin darf, weil die Regeln es ihm ebenfalls
+erlauben (`hasPerm()` beginnt mit `adminUser()`); `assertTenantGroup` greift
+dort deshalb nur für Nicht-Admins, ebenso in der PDF-Route
+(`kostenersatzPdfAccess.ts`). Sonst sähe der Admin die Berechnungen am Einsatz,
+könnte aber weder PDF noch Mail erzeugen. Ob solche Einsätze überhaupt
+existieren, ist vor dem Aufräum-PR zu klären (siehe
+[Nach dem Release](#nach-dem-release)).
 
 ## Kostenersatz je Gruppe
 
@@ -395,11 +409,21 @@ Regeltests sichern das ab.
 | Was | Regel bzw. Guard |
 | --- | --- |
 | Berechnungen `call/{id}/kostenersatz` | `hasPerm(Gruppe des Einsatzes, 'kostenersatz.use')` |
-| Server Actions und PDF-Route am Einsatz (Empfänger, Mail, SumUp, Zahlungsprüfung, `/api/kostenersatz/pdf`) | `actionFirecallPermissionRequired(firecallId, 'kostenersatz.use')` |
+| Server Actions und PDF-Route am Einsatz (Empfänger, Mail, SumUp, Zahlungsstatus, `/api/kostenersatz/pdf`) | `actionFirecallPermissionRequired(firecallId, 'kostenersatz.use')` |
+| Zahlungsbestätigung nach SumUp (`verifyPaymentAndComplete`) | **bewusst ohne Guard** — s. unten |
 | Verrechnung der Füllungen, Mailvorlagen (`groups/{g}/…`) | `hasPerm(g, 'kostenersatz.use')` bzw. `actionPermissionRequired` |
 | Tarif `kostenersatzVersions`, `kostenersatzRates` (global) | `hasPermAny('kostenersatz.use')` |
 | Vorlagen `kostenersatzTemplates` (global, `isShared` wie bisher) | `hasPermAny('kostenersatz.use')`; ändern und löschen nur Ersteller oder Admin |
 | Seiten `/einsatz/[id]/kostenersatz`, `/kostenersatz`, Drawer | `useCan(firecall.group, 'kostenersatz.use')` |
+
+**Die Zahlungsbestätigung bleibt ohne Sitzung.** `verifyPaymentAndComplete`
+([verifyPaymentAction.ts](../src/components/Kostenersatz/verifyPaymentAction.ts))
+ruft die Seite auf, auf die SumUp den Zahlungspflichtigen zurückleitet. Der hat
+kein Konto und keine Sitzung; ein Rollen-Guard sperrte genau ihn aus. Geschützt
+ist sie über das `sumupRedirectToken` je Checkout (zufällig, zeitkonstant
+verglichen), und sie tut nur eines: eine Zahlung, die SumUp als bezahlt meldet,
+an der Berechnung als bezahlt vermerken. Das ist keine Lücke der Rollen,
+sondern ein eigener Zugang mit eigenem Nachweis.
 
 Tarif und Vorlagen bleiben global: Das Landesgesetzblatt gilt landesweit
 gleich, und eine Vorlage für „Fahrzeugbergung mit KRF" ist nicht an eine
@@ -477,8 +501,10 @@ Umstellung vermeiden soll. In diesem Fenster gilt:
   Einsatzliste die Mitgliedschaft aus der Session; die fehlt.
 - Gruppenfunktionen — Fahrtenbuch, Geräte, Bekleidung, Kostenersatz,
   Verrechnung — sind gesperrt.
-- Der Vergleich von Claim und Session kann einen erneuten Login anstoßen, weil
-  die Session nur `allUsers` kennt. Die Schein-Gruppe `kostenersatz` ist dabei
+- Der Vergleich von Claim und Session stößt deshalb **keinen** erneuten Login
+  an: Ohne `groupRoles` am Benutzerdokument vergleicht der Client nur die
+  Freischaltung (s. unten). Die Schein-Gruppe `kostenersatz` ist beim
+  Gruppenvergleich
   ausgenommen (`claimGroupsKey`), sonst hielte der Client das Token jedes
   Kostenersatz-Benutzers auch nach der Migration für veraltet.
 - Der globale Admin ist nicht betroffen (`isAdmin`), die Migrationsseite ist
@@ -503,10 +529,28 @@ neue Oberfläche gemacht wurden, gehen dabei verloren.
   Benutzer ohne `groupRoles` einmal `legacyToGroupRoles(alte Felder)` samt der
   Änderung als `replaceAll` (`changeUserRoles`) — per Feldpfad allein verlöre
   er alle übrigen Mitgliedschaften. Er gilt danach als migriert und wird von
-  Schritt 2 übersprungen; die Häkchen der Vorschau gelten für ihn nicht mehr,
-  er behält Kostenersatz in allen Mitgliedsgruppen, wenn er `'kostenersatz'`
-  hatte. Nicht migrierte Benutzer zeigt die Rollenverwaltung mit dem Hinweis
-  „alte Felder".
+  Schritt 2 übersprungen. Nicht migrierte Benutzer zeigt die Rollenverwaltung
+  mit dem Hinweis „alte Felder".
+- **Ausnahme: Benutzer mit `'kostenersatz'` bleiben bis Schritt 2 gesperrt.**
+  Für sie entscheiden die Häkchen der Vorschau, in welchen Gruppen sie
+  Kostenersatz bekommen. Eine nebenbei geschriebene Migration nähme die
+  Vorbelegung (alle Mitgliedsgruppen) und überginge diese Entscheidung still.
+  Deshalb lehnen `changeUserRoles` (`UserNotMigratedError`), die Aktionen von
+  „Mitglieder und Rollen" (Fehler `notMigrated`) und die Benutzerverwaltung
+  eine Rollen- oder Mitgliedschaftsänderung an ihnen ab und sagen es; die
+  Gruppenverwaltung speichert die übrigen Mitglieder und nennt die
+  übersprungenen (`awaitsKostenersatzChoice`).
+- **„Claims für alle setzen" und das Neusetzen nach einer Rollenänderung**
+  bilden den Claim mit `claimsForStoredUser` — `groups` aus `groupRoles`
+  (bzw. vor der Migration aus dem alten Feld), dazu `isAdmin`, `authorized`
+  und die Einsatz-Claims eines Gasts. Ein Claim nur aus dem alten Feld
+  `groups` verlöre jede Mitgliedschaft, die nach der Migration vergeben wurde.
+- **Der Client erneuert das Token vor der Migration nicht wegen der Gruppen.**
+  Die Session kennt dann nur `allUsers`, der Claim die alten Gruppen; das löst
+  erst Schritt 2. Der Login-Beobachter liest bei abweichenden Gruppen das
+  eigene Benutzerdokument und vergleicht ohne `groupRoles` nur die
+  Freischaltung (`claimsNeedRefresh`) — sonst endete jeder Seitenaufruf
+  nach fünf vergeblichen Token-Erneuerungen im Hinweis „erneut anmelden".
 - **Schritt 3 kann Claims ändern.** Er setzt die Claims aus `groupRoles`. Wich
   das alte Feld `groups` von der migrierten Mitgliedschaft ab, ändert sich der
   Claim, und der Client stößt einen erneuten Login an.

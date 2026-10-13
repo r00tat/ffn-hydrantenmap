@@ -625,8 +625,9 @@ export async function deleteAtemschutzEmpfaenger(request: {
 
 /**
  * Die Konfiguration gilt für alle Rechnungen der Gruppe und ist keine
- * Tagesarbeit — deshalb `gruppe.manage` und nicht `kostenersatz.use` wie
- * bei den Rechnungen.
+ * Tagesarbeit — deshalb zusätzlich `gruppe.manage`; `kostenersatz.use` wie
+ * bei den Rechnungen braucht es trotzdem (s. unten). Gespeichert wird nur
+ * mit beiden Rechten.
  */
 export async function saveAtemschutzRechnungConfig(request: {
   groupId: string;
