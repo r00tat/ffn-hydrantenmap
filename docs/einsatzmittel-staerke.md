@@ -192,5 +192,13 @@ Fremd und „Eingetroffen" bleiben nach dem Anlegen stehen — nachrückende Kr�
 mehrere Fahrzeuge derselben Organisation. Die Chips der eigenen Fahrzeuge legen dagegen
 immer eigene Kräfte ohne Stärkeangabe an, auch wenn im Feld gerade eine Nachbarwehr steht.
 
+Ohne „Eingetroffen" setzt die Schnelleingabe die **Alarmierung** auf jetzt. Das
+Einsatztagebuch speichert für Einsatzmittel keine eigenen Einträge, es leitet
+„alarmiert", „eingetroffen" und „abgerückt" aus diesen Zeitfeldern ab
+(`buildDiaries()` in `diary-entries.ts`) — ohne eine der beiden Zeiten stünde das
+neue Einsatzmittel nicht im Tagebuch. Das gilt für taktische Einheiten genauso wie
+für Fahrzeuge; sie tragen dieselben drei Zeitfelder, die Stärke steht als
+„Stärke 9" (Gesamtstärke aus `mann`) statt als „Besatzung 1:8".
+
 Position ist die Einsatzadresse wie beim Personal-Board; wer das Element auf der Karte
 genauer haben will, verschiebt es dort.

@@ -90,6 +90,7 @@ describe('buildQuickAddItem', () => {
       besatzung: '8',
       ats: 4,
       fremd: 'true',
+      alarmierung: NOW.toISOString(),
       datum: NOW.toISOString(),
       lat: 47.9,
       lng: 16.8,
@@ -110,6 +111,13 @@ describe('buildQuickAddItem', () => {
   it('setzt das Eintreffen auf jetzt, wenn die Kräfte da sind', () => {
     const item = buildQuickAddItem(input({ arrived: true }), CTX) as Fzg;
     expect(item.eintreffen).toBe(NOW.toISOString());
+    expect(item.alarmierung).toBeUndefined();
+  });
+
+  it('setzt sonst die Alarmierung auf jetzt — damit steht es im Tagebuch', () => {
+    const item = buildQuickAddItem(input({ arrived: false }), CTX) as Fzg;
+    expect(item.alarmierung).toBe(NOW.toISOString());
+    expect(item.eintreffen).toBeUndefined();
   });
 
   it('legt eine taktische Einheit mit Gesamtstärke an', () => {
@@ -131,6 +139,7 @@ describe('buildQuickAddItem', () => {
       fw: 'Weiden am See',
       mann: 9,
       ats: 3,
+      alarmierung: NOW.toISOString(),
       datum: NOW.toISOString(),
       lat: 47.9,
       lng: 16.8,

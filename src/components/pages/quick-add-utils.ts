@@ -92,7 +92,10 @@ export function buildQuickAddItem(
   const fw = input.fw.trim() || undefined;
   const ats = parsePositiveInt(input.ats);
   const datum = now.toISOString();
+  // Eine der beiden Zeiten ist immer gesetzt: Aus ihr entsteht der Eintrag
+  // „… alarmiert" bzw. „… eingetroffen" im Einsatztagebuch.
   const eintreffen = input.arrived ? datum : undefined;
+  const alarmierung = input.arrived ? undefined : datum;
 
   if (input.kind === 'tacticalUnit') {
     return stripUndefined({
@@ -102,6 +105,7 @@ export function buildQuickAddItem(
       fw,
       mann: parseTotalStrength(input.strength),
       ats,
+      alarmierung,
       eintreffen,
       datum,
       lat,
@@ -119,6 +123,7 @@ export function buildQuickAddItem(
     besatzung: besatzung ? String(besatzung) : undefined,
     ats,
     fremd: input.fremd ? 'true' : undefined,
+    alarmierung,
     eintreffen,
     datum,
     lat,

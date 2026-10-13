@@ -34,7 +34,7 @@ The cursor then returns to the name; fire brigade, **External** and **Arrived** 
 - **Crew 1:?** on a vehicle is the crew without the commander — `8` or `1:8` means nine people
 - **Strength** on a tactical unit is the total strength — `9`, `1:8` or `1/8/9` mean nine people
 - **External** switches on as soon as another brigade than your own is entered, and can be toggled
-- **Arrived** sets the arrival time to now
+- **Arrived** sets the arrival time to now, otherwise the alert time is set to now — so every new vehicle and unit appears as "alerted" or "arrived" in the operational diary
 - Your own vehicles can also be added with one click on their chip
 
 The new item is placed at the incident address. Alarm time, description or position can be added afterwards via **Edit**.
