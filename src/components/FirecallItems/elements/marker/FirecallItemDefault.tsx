@@ -33,6 +33,12 @@ export interface MarkerRenderOptions {
   pane?: string;
   /* callback for right-click context menu */
   onContextMenu?: (item: FirecallItem, event: L.LeafletMouseEvent) => void;
+  /**
+   * Speichert die neue Position nach dem Ziehen selbst. Ohne Angabe landet sie
+   * im Element unter `call/{id}/item` — für alles, was dort nicht liegt (etwa
+   * die Einsatzorte), muss der Aufrufer schreiben.
+   */
+  onDragEnd?: (item: FirecallItem, position: L.LatLng) => void;
 }
 
 export interface FirecallItemMarkerProps {
@@ -120,7 +126,13 @@ async function updateFirecallItemRotation(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup, disableClick, heatmapColor, onContextMenu } = {},
+  options: {
+    hidePopup,
+    disableClick,
+    heatmapColor,
+    onContextMenu,
+    onDragEnd,
+  } = {},
   children,
 }: FirecallItemMarkerProps) {
   /**
@@ -216,8 +228,13 @@ export function FirecallItemMarkerDefault({
         eventHandlers={{
           ...record.eventHandlers,
           dragend: (event) => {
-            setStartPos((event.target as L.Marker)?.getLatLng());
-            updateFircallItemPos(firecallId, event, record, email);
+            const position = (event.target as L.Marker)?.getLatLng();
+            setStartPos(position);
+            if (onDragEnd) {
+              if (position) onDragEnd(record.data(), position);
+            } else {
+              updateFircallItemPos(firecallId, event, record, email);
+            }
           },
           ...(disableClick
             ? {}

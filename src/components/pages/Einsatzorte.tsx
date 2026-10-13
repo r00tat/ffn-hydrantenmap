@@ -32,16 +32,13 @@ import EinsatzorteTable, {
   type EinsatzorteSortField,
 } from '../Einsatzorte/EinsatzorteTable';
 import EinsatzorteCard from '../Einsatzorte/EinsatzorteCard';
-
-function getLocationDisplayName(location: Partial<FirecallLocation>): string {
-  return (
-    location.name ||
-    [location.street, location.number, location.city]
-      .filter(Boolean)
-      .join(' ') ||
-    'Unbekannt'
-  );
-}
+import {
+  getLocationDisplayName,
+  locationCreatedEntry,
+  vehicleAssignedEntry,
+  vehicleRemovedEntry,
+} from '../Einsatzorte/locationDiary';
+import useLocationDiary from '../Einsatzorte/useLocationDiary';
 
 export interface EinsatzorteProps {
   /** Überschrift weglassen, wenn der Aufrufer schon eine hat. */
@@ -73,31 +70,7 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
   const updateFirecallItem = useFirecallItemUpdate();
   const { saveHistory } = useSaveHistory();
 
-  // Next diary entry number (count of numbered diary entries + 1)
-  const diaryCounter = useMemo(
-    () =>
-      firecallItems.filter((f) => f.type === 'diary' && (f as Diary).nummer)
-        .length + 1,
-    [firecallItems],
-  );
-  const diaryCounterRef = useRef(diaryCounter);
-  useEffect(() => {
-    diaryCounterRef.current = diaryCounter;
-  }, [diaryCounter]);
-
-  const addDiaryEntry = useCallback(
-    (name: string, beschreibung?: string) => {
-      const nummer = diaryCounterRef.current++;
-      return addFirecallItem({
-        type: 'diary',
-        art: 'M',
-        nummer,
-        name,
-        beschreibung: beschreibung || '',
-      } as Diary).catch(() => {});
-    },
-    [addFirecallItem],
-  );
+  const addDiaryEntry = useLocationDiary();
 
   // Sorting state
   const [sortField, setSortField] = useState<EinsatzorteSortField>('created');
@@ -201,11 +174,8 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
     async (location: Partial<FirecallLocation>) => {
       try {
         await addLocation(location);
-        const displayName = getLocationDisplayName(location);
-        addDiaryEntry(
-          `Einsatzort ${displayName} angelegt`,
-          location.status ? `Status: ${location.status}` : '',
-        );
+        const entry = locationCreatedEntry(location);
+        addDiaryEntry(entry.name, entry.beschreibung);
       } catch (error) {
         setSnackbar('Fehler beim Hinzufügen');
         console.error('Add failed:', error);
@@ -236,9 +206,7 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
               oldVehicles,
             )) {
               if (!(vehicleId in updates.vehicles)) {
-                addDiaryEntry(
-                  `${vehicleName} von Einsatzort ${displayName} abgezogen`,
-                );
+                addDiaryEntry(vehicleRemovedEntry(vehicleName, location));
               }
             }
           }
@@ -346,9 +314,7 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
         }
 
         // Diary entry for vehicle assignment
-        addDiaryEntry(
-          `${vehicleDisplayName} zu Einsatzort ${locationDisplayName} zugeordnet`,
-        );
+        addDiaryEntry(vehicleAssignedEntry(vehicleDisplayName, location));
       } catch (error) {
         console.error(`Failed to add/update vehicle "${vehicleName}":`, error);
         setSnackbar(`Fehler beim Aktualisieren von ${vehicleName}`);
@@ -386,9 +352,7 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
         }
 
         // Diary entry for vehicle assignment
-        addDiaryEntry(
-          `${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`,
-        );
+        addDiaryEntry(vehicleAssignedEntry(vehicleName, location));
       } catch (error) {
         console.error(`Failed to assign vehicle "${vehicleName}":`, error);
         setSnackbar(`Fehler beim Zuordnen von ${vehicleName}`);
@@ -438,9 +402,7 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
           });
         }
 
-        addDiaryEntry(
-          `${vehicleDisplayName} zu Einsatzort ${locationDisplayName} zugeordnet`,
-        );
+        addDiaryEntry(vehicleAssignedEntry(vehicleDisplayName, location));
       } catch (error) {
         console.error(`Failed to create vehicle "${name}":`, error);
         setSnackbar(`Fehler beim Erstellen von ${name}`);

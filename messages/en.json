@@ -2990,7 +2990,7 @@
     "count": "{count} resources",
     "downloadCsvTooltip": "Download resources as CSV",
     "csvFilename": "resources.csv",
-    "unassigned": "Unassigned",
+    "unassigned": "Not assigned to a layer",
     "cols": {
       "name": "Name",
       "fw": "Fire department",
@@ -3002,8 +3002,12 @@
       "alarmierung": "Alerted at",
       "eintreffen": "Arrived at",
       "abruecken": "Departed at",
-      "force": "Forces"
+      "force": "Forces",
+      "location": "Location"
     },
+    "editItem": "Edit {name}",
+    "locationFor": "Location of {name}",
+    "noLocation": "no location",
     "total": "Total",
     "totalFw": "{count} FDs",
     "ownForces": "Own forces",
@@ -3011,7 +3015,22 @@
     "ownForcesTotal": "Own forces total",
     "foreignForcesTotal": "Other organisations total",
     "forceOwn": "own",
-    "forceForeign": "other"
+    "forceForeign": "other",
+    "quickAdd": {
+      "title": "Add resources",
+      "vehicle": "Vehicle",
+      "tacticalUnit": "Tactical unit",
+      "name": "Name",
+      "unitType": "Type",
+      "fw": "Fire brigade / organisation",
+      "crew": "Crew 1:?",
+      "strength": "Strength",
+      "ats": "SCBA",
+      "fremd": "External",
+      "arrived": "Arrived",
+      "add": "Add",
+      "added": "{name} added"
+    }
   },
   "einsaetze": {
     "title": "Operations",
@@ -3144,6 +3163,7 @@
       "F": "Question"
     },
     "editEntry": "Edit {name}",
+    "editSource": "Edit {name} (alert, arrival, departure, strength)",
     "deleteEntry": "Delete {name}"
   },
   "history": {

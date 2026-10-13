@@ -3,8 +3,6 @@
 import AddIcon from '@mui/icons-material/Add';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -17,7 +15,6 @@ import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import moment from 'moment';
 import { useTranslations } from 'next-intl';
 import React, {
   useCallback,
@@ -27,18 +24,7 @@ import React, {
   useState,
 } from 'react';
 import { useFirecallAIQueryStream } from '../../app/ai/aiQuery';
-import {
-  dateTimeFormat,
-  formatTimestamp,
-  parseTimestamp,
-} from '../../common/time-format';
-import {
-  countCrewByVehicle,
-  einsatzmittelKategorie,
-  formatBesatzung,
-  getEffectiveAts,
-  getEffectiveBesatzung,
-} from '../../common/vehicle-utils';
+import { formatTimestamp } from '../../common/time-format';
 import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
 import useFirecall, {
   FirecallContext,
@@ -50,19 +36,18 @@ import PendingSyncIcon from '../site/PendingSyncIcon';
 import OfflineListHint from '../site/OfflineListHint';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import AiAssistantButton from '../Map/AiAssistantButton';
-import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
-import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { downloadRowsAsCsv } from '../firebase/download';
 import {
   Diary,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
-  Fzg,
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
+import { buildDiaries } from './diary-entries';
+import DiaryButtons from './DiaryButtons';
 import McpOriginChip from '../mcp/McpOriginChip';
 import {
   useHistoryPathSegments,
@@ -96,194 +81,7 @@ export function useDiaries(
     });
 
   useEffect(() => {
-    const cars: Fzg[] = firecallItems.filter(
-      (item: FirecallItem) => item.type === 'vehicle'
-    ) as Fzg[];
-
-    const { crewCount: crewCountMap, atsCount: atsCountMap } =
-      countCrewByVehicle(crewAssignments);
-
-    const getBesatzungText = (item: Fzg) => {
-      const kategorie = einsatzmittelKategorie(item);
-      const bes = getEffectiveBesatzung(
-        item.besatzung,
-        crewCountMap.get(item.id || '') ?? 0,
-        kategorie
-      );
-      return bes > 0 ? formatBesatzung(bes, kategorie) : '';
-    };
-
-    const fmtBesatzung = (item: Fzg) => {
-      const bt = getBesatzungText(item);
-      return bt ? 'Besatzung ' + bt : '';
-    };
-    const fmtAts = (item: Fzg) => {
-      const ats = getEffectiveAts(
-        item.ats,
-        atsCountMap.get(item.id || '') ?? 0
-      );
-      return ats > 0 ? 'ATS ' + ats : '';
-    };
-
-    const firecallEntries: Diary[] = [
-      cars
-        .filter((item) => item.alarmierung)
-        .map(
-          (item) =>
-            ({
-              id: 'alarmierung' + item.id,
-              datum: item.alarmierung,
-              type: 'diary',
-              name: t('vehicleAlerted', {
-                name: item.name,
-                fw: item.fw || '',
-              }),
-              beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
-              editable: false,
-              original: item,
-              textRepresenation: t('vehicleTextAlerted', {
-                name: item.name,
-                fw: item.fw || '',
-                besatzung: fmtBesatzung(item),
-                ats: fmtAts(item),
-                alarmiert: item.alarmierung
-                  ? formatTimestamp(item.alarmierung)
-                  : '',
-                eintreffen: item.eintreffen
-                  ? formatTimestamp(item.eintreffen)
-                  : '',
-                abruecken: item.abruecken
-                  ? formatTimestamp(item.abruecken)
-                  : '',
-                lat: item.lat ?? '',
-                lng: item.lng ?? '',
-              }),
-            } as Diary)
-        ),
-      cars
-        .filter((item) => item.eintreffen)
-        .map(
-          (item) =>
-            ({
-              id: 'eintreffen' + item.id,
-              datum: item.eintreffen,
-              type: 'diary',
-              name: t('vehicleArrived', {
-                name: item.name,
-                fw: item.fw || '',
-              }),
-              beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
-              editable: false,
-              original: item,
-              textRepresenation: t('vehicleTextArrived', {
-                name: item.name,
-                fw: item.fw || '',
-                besatzung: fmtBesatzung(item),
-                ats: fmtAts(item),
-                eintreffen: item.eintreffen
-                  ? formatTimestamp(item.eintreffen)
-                  : '',
-                lat: item.lat ?? '',
-                lng: item.lng ?? '',
-              }),
-            } as Diary)
-        ),
-      cars
-        .filter((item) => item.abruecken)
-        .map(
-          (item) =>
-            ({
-              id: 'abruecken' + item.id,
-              datum: item.abruecken,
-              type: 'diary',
-              name: t('vehicleDeparted', {
-                name: item.name,
-                fw: item.fw || '',
-              }),
-              beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
-              editable: false,
-              original: item,
-              textRepresenation: t('vehicleTextDeparted', {
-                name: item.name,
-                fw: item.fw || '',
-                besatzung: fmtBesatzung(item),
-                ats: fmtAts(item),
-                abruecken: item.abruecken
-                  ? formatTimestamp(item.abruecken)
-                  : '',
-                lat: item.lat ?? '',
-                lng: item.lng ?? '',
-              }),
-            } as Diary)
-        ),
-      // firecallItems
-      //   .filter(
-      //     (item: FirecallItem) =>
-      //       ['vehicle', 'diary'].indexOf(item.type) < 0 && item.datum
-      //   )
-      //   .map(
-      //     (item: FirecallItem) =>
-      //       ({
-      //         ...item,
-      //         type: 'diary',
-      //         editable: true,
-      //         original: item,
-      //       } as Diary)
-      //   ),
-      firecallItems
-        .filter((item: FirecallItem) => item.type === 'diary')
-        .map((item: FirecallItem) => item as Diary)
-        .map(
-          (item: Diary) =>
-            ({
-              ...item,
-              original: item,
-              editable: true,
-              textRepresenation: `${formatTimestamp(item.datum)} ${
-                item.art === 'B'
-                  ? t('type.B')
-                  : item.art === 'F'
-                    ? t('type.F')
-                    : t('type.M')
-              } ${item.von ? 'von ' + item.von : ''} ${
-                item.an ? 'an ' + item.an : ''
-              }: ${item.name} ${item.beschreibung} ${
-                item.erledigt
-                  ? 'erledigt ' + formatTimestamp(item.erledigt)
-                  : ''
-              }`,
-            } as Diary)
-        ),
-    ].flat();
-    const diaries = firecallEntries
-      .map((a) => {
-        const m = parseTimestamp(a.datum);
-        if (m) {
-          a.datum = m.format();
-        } else {
-          a.datum = new Date().toISOString();
-        }
-        return a;
-      })
-      // sort ascending by timestamp to assign sequential numbers
-      .sort((a, b) => a.datum.localeCompare(b.datum))
-      .map((a, index) => ({
-        ...a,
-        nummer: index + 1,
-      }))
-      // apply requested display sort order
-      .sort((a, b) =>
-        sortAscending
-          ? a.datum.localeCompare(b.datum)
-          : b.datum.localeCompare(a.datum)
-      )
-      .map((a) => ({
-        ...a,
-        datum: moment(a.datum).format(dateTimeFormat),
-        erledigt: a.erledigt
-          ? moment(a.erledigt).format(dateTimeFormat)
-          : undefined,
-      }));
+    const diaries = buildDiaries(firecallItems, crewAssignments, t, sortAscending);
     (async () => {
       setDiaries(diaries);
       setDiaryCounter(diaries.length + 1);
@@ -319,60 +117,6 @@ function downloadDiaries(
     ]),
   ];
   downloadRowsAsCsv(rows, t('csvFilename'));
-}
-
-export function DiaryButtons({ diary }: { diary: Diary }) {
-  const t = useTranslations('tagebuch');
-  const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
-  const [deleteDialog, setDeleteDialog] = useState(false);
-
-  return (
-    <>
-      {diary.editable && (
-        <>
-          <Tooltip title={t('editEntry', { name: diary.name })}>
-            <IconButton
-              onClick={(e) => {
-                e.stopPropagation();
-                setDisplayUpdateDialog(true);
-              }}
-            >
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={t('deleteEntry', { name: diary.name })}>
-            <IconButton
-              color="warning"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeleteDialog(true);
-              }}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-          {displayUpdateDialog && (
-            <FirecallItemUpdateDialog
-              allowTypeChange={false}
-              item={diary}
-              callback={() => {
-                setDisplayUpdateDialog(false);
-              }}
-            />
-          )}
-
-          {deleteDialog && (
-            <DeleteFirecallItemDialog
-              item={diary.original || diary}
-              callback={() => {
-                setDeleteDialog(false);
-              }}
-            />
-          )}
-        </>
-      )}
-    </>
-  );
 }
 
 export interface EinsatzTagebuchOptions {
@@ -432,7 +176,9 @@ function compareDiaryField(
       result = (a.nummer ?? 0) - (b.nummer ?? 0);
       break;
     case 'datum':
-      result = (a.datum || '').localeCompare(b.datum || '');
+      // `datum` ist hier schon als „DD.MM.YYYY HH:mm:ss" formatiert und taugt
+      // nicht zum Vergleich; die Nummer ist die chronologische Reihenfolge.
+      result = (a.nummer ?? 0) - (b.nummer ?? 0);
       break;
     case 'art':
       result = (a.art || '').localeCompare(b.art || '');

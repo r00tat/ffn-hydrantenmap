@@ -2990,7 +2990,7 @@
     "count": "{count} Einsatzmittel",
     "downloadCsvTooltip": "Einsatzmittel als CSV herunterladen",
     "csvFilename": "Einsatzmittel.csv",
-    "unassigned": "Nicht zugeordnet",
+    "unassigned": "Keiner Ebene zugeordnet",
     "cols": {
       "name": "Bezeichnung",
       "fw": "Feuerwehr",
@@ -3002,8 +3002,12 @@
       "alarmierung": "Alarmierung",
       "eintreffen": "Eintreffen",
       "abruecken": "Abrücken",
-      "force": "Kräfte"
+      "force": "Kräfte",
+      "location": "Einsatzort"
     },
+    "editItem": "{name} bearbeiten",
+    "locationFor": "Einsatzort von {name}",
+    "noLocation": "kein Einsatzort",
     "total": "Gesamt",
     "totalFw": "{count} FW",
     "ownForces": "Eigene Kräfte",
@@ -3011,7 +3015,22 @@
     "ownForcesTotal": "Summe eigene Kräfte",
     "foreignForcesTotal": "Summe Fremdkräfte",
     "forceOwn": "eigen",
-    "forceForeign": "fremd"
+    "forceForeign": "fremd",
+    "quickAdd": {
+      "title": "Kräfte hinzufügen",
+      "vehicle": "Fahrzeug",
+      "tacticalUnit": "Taktische Einheit",
+      "name": "Bezeichnung",
+      "unitType": "Art",
+      "fw": "Feuerwehr / Organisation",
+      "crew": "Besatzung 1:?",
+      "strength": "Stärke",
+      "ats": "ATS",
+      "fremd": "Fremd",
+      "arrived": "Eingetroffen",
+      "add": "Hinzufügen",
+      "added": "{name} hinzugefügt"
+    }
   },
   "einsaetze": {
     "title": "Einsätze",
@@ -3144,6 +3163,7 @@
       "F": "Frage"
     },
     "editEntry": "{name} bearbeiten",
+    "editSource": "{name} bearbeiten (Alarmierung, Eintreffen, Abrücken, Stärke)",
     "deleteEntry": "{name} löschen"
   },
   "history": {

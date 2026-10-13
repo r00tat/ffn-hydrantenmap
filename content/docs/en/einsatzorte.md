@@ -23,6 +23,8 @@ Operation sites are used to manage individual locations within an operation. Eac
 3. Set the status
 4. Save
 
+Every new operation site — whether created on this page or on the map — appears in the operational diary.
+
 ### Change the status
 
 1. Click the dropdown in the status column
@@ -36,6 +38,13 @@ Tip: The status colours help with a quick overview: red = urgent, orange = in pr
 
 1. Open the vehicle dropdown on the operation site
 2. Pick a vehicle from the list or create a new one
+
+Vehicles and tactical units can also be assigned on the **Operational resources** page in the **Location** column of the strength table.
+
+### Move an operation site on the map
+
+1. Switch the map to edit mode
+2. Drag the marker of the operation site to the right spot — the new position is saved immediately
 
 ### Use email import
 
