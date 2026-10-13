@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OFFLINE_AUTH_STORAGE_KEY,
+  OfflineAuthData,
   loadOfflineAuth,
   saveOfflineAuth,
 } from './auth/offlineAuthCache';
@@ -66,13 +67,13 @@ import useFirebaseLoginObserver, {
   OFFLINE_LOGIN_TIMEOUT_MS,
 } from './useFirebaseLoginObserver';
 
-const cachedLogin = {
+const cachedLogin: OfflineAuthData = {
   uid: 'uid-1',
   email: 'muster@example.com',
   isAuthorized: true,
   isAdmin: false,
   groups: ['ffnd', 'allUsers'],
-  groupAdmin: ['ffnd'],
+  groupRoles: { ffnd: ['gruppenadmin'] },
   myGroups: [{ id: 'ffnd', name: 'FF Neusiedl' }],
 };
 
@@ -135,7 +136,7 @@ describe('useFirebaseLoginObserver: Kaltstart ohne Netz', () => {
 
     expect(result.current.isAuthorized).toBe(true);
     expect(result.current.groups).toEqual(['ffnd', 'allUsers']);
-    expect(result.current.groupAdmin).toEqual(['ffnd']);
+    expect(result.current.groupRoles).toEqual({ ffnd: ['gruppenadmin'] });
     expect(result.current.myGroups).toEqual([{ id: 'ffnd', name: 'FF Neusiedl' }]);
     expect(result.current.hasFirebaseUser).toBe(true);
     expect(result.current.isAuthLoading).toBe(false);
@@ -184,7 +185,7 @@ describe('useFirebaseLoginObserver: Kaltstart ohne Netz', () => {
           isAuthorized: true,
           isAdmin: false,
           groups: ['ffnd', 'allUsers'],
-          groupAdmin: ['ffnd'],
+          groupRoles: { ffnd: ['gruppenadmin'] },
         },
       },
     };
@@ -197,7 +198,7 @@ describe('useFirebaseLoginObserver: Kaltstart ohne Netz', () => {
 
     const stored = loadOfflineAuth('uid-1');
     expect(stored?.isAuthorized).toBe(true);
-    expect(stored?.groupAdmin).toEqual(['ffnd']);
+    expect(stored?.groupRoles).toEqual({ ffnd: ['gruppenadmin'] });
     expect(stored?.myGroups).toEqual([{ id: 'ffnd', name: 'FF Neusiedl' }]);
   });
 
@@ -277,7 +278,7 @@ describe('useFirebaseLoginObserver: Kaltstart ohne Netz', () => {
 
       expect(result.current.isAuthorized).toBe(false);
       expect(result.current.groups).toEqual([]);
-      expect(result.current.groupAdmin).toBeUndefined();
+      expect(result.current.groupRoles).toBeUndefined();
       expect(result.current.myGroups).toEqual([]);
       expect(result.current.offlineAuth).toBe(false);
     } finally {

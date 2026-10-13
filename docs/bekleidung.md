@@ -10,12 +10,12 @@ Bestandslisten einmalig.
 | --- | --- |
 | Typen, Sammlungsnamen, Größen- und Tag-Normalisierung, Waschzähler | [`src/common/bekleidung.ts`](../src/common/bekleidung.ts) |
 | Lagerstand (rein) | [`src/common/bekleidungLagerstand.ts`](../src/common/bekleidungLagerstand.ts) |
-| Rolle (rein, auch im Client) | [`src/common/bekleidungPermissions.ts`](../src/common/bekleidungPermissions.ts) |
+| Rechte `bekleidung.read`/`bekleidung.manage` (rein, auch im Client) | [`src/common/permissions.ts`](../src/common/permissions.ts) |
 | Namensabgleich beim Import | [`src/common/personNameMatch.ts`](../src/common/personNameMatch.ts) |
 | Excel-Import: Parser, Vorschau, Plan | [`src/common/bekleidungImport.ts`](../src/common/bekleidungImport.ts) |
-| Guard | [`src/components/Bekleidung/bekleidungGuard.ts`](../src/components/Bekleidung/bekleidungGuard.ts) |
+| Guard | `actionPermissionRequired` aus [`src/app/auth.ts`](../src/app/auth.ts) |
 | Server Actions | [`src/components/Bekleidung/bekleidungActions.ts`](../src/components/Bekleidung/bekleidungActions.ts) |
-| Rolle vergeben | [`src/components/Bekleidung/bekleidungswartActions.ts`](../src/components/Bekleidung/bekleidungswartActions.ts) |
+| Rolle vergeben | Ansicht „Mitglieder und Rollen" der Gruppe, siehe [berechtigungen.md](berechtigungen.md#wer-vergibt-was) |
 | Seite | `/bekleidung` |
 
 ## Datenmodell
@@ -108,19 +108,28 @@ des Herstellers ist eine Prüfempfehlung, kein Ablaufdatum.
 
 ## Rolle und warum per Regel gelesen wird
 
-Die Rolle heißt **Bekleidungswart** (`user/{uid}.bekleidungswart: string[]`),
-gebaut wie der Gerätemeister: Admin oder Gruppen-Admin vergeben sie im Reiter
-„Einstellungen", der Gruppen-Admin schließt sie ein, Mitgliedschaft ist
-Voraussetzung (siehe [berechtigungen.md](berechtigungen.md)).
+Die Rolle heißt **Bekleidungswart** (`bekleidungswart` in
+`user/{uid}.groupRoles`) und bringt die Rechte `bekleidung.read` und
+`bekleidung.manage`. Der Gruppen-Admin hat beide ebenfalls. Vergeben wird sie
+wie jede Gruppenrolle in der Ansicht „Mitglieder und Rollen" — vom globalen
+Admin oder vom Gruppen-Admin der Gruppe; der frühere Reiter „Einstellungen" auf
+`/bekleidung` verlinkt dorthin. Mitgliedschaft ist Voraussetzung (siehe
+[berechtigungen.md](berechtigungen.md)).
 
 Anders als bei Geräten & Material sieht ein einfaches Mitglied **nichts**:
-Größen und wer was hat sind keine Gruppenöffentlichkeit. Die Gruppenrollen
-stehen nicht im Token, darum liest die Firestore-Regel das Benutzerdokument
-(`get()` in `bekleidungRole()`), aber nur nachdem `fahrtenbuchMember()` die
-Anmeldung und Mitgliedschaft geprüft hat. Das kostet je Regelprüfung einen
-Dokument-Read; bei einer Handvoll Bekleidungswarte ist das vernachlässigbar und
-erspart, alle Lesevorgänge über Server Actions zu führen — die Listen
-aktualisieren sich live und sind offline aus dem Cache lesbar.
+Größen und wer was hat sind keine Gruppenöffentlichkeit. Fachrechte stehen
+nicht im Token, darum liest die Firestore-Regel das Benutzerdokument
+(`hasPerm(groupId, 'bekleidung.read')`, ein `get()` auf `groupPerms`), aber
+nur nachdem `member()` Anmeldung und Mitgliedschaft aus dem Claim geprüft hat.
+Das kostet je Regelprüfung einen Dokument-Read; bei einer Handvoll
+Bekleidungswarte ist das vernachlässigbar und erspart, alle Lesevorgänge über
+Server Actions zu führen — die Listen aktualisieren sich live und sind offline
+aus dem Cache lesbar. Ein entzogenes Recht wirkt dafür sofort, ohne
+Token-Refresh (Hintergrund:
+[berechtigungen.md](berechtigungen.md#claim-gegen-get)).
+
+Die Server Actions verlangen zum Pflegen `bekleidung.manage`, reine
+Lese-Actions `bekleidung.read` (`actionPermissionRequired`).
 
 Geschrieben wird nur über Server Actions, weil Ausgabe, Rücknahme und Wäsche
 Stück, Verlauf und Zähler in **einer Transaktion** fortschreiben: Geben zwei

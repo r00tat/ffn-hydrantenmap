@@ -14,6 +14,7 @@ import {
   type FirecallShareLink,
 } from '../../common/firecallShareLink';
 import { FirebaseUserInfo } from '../../common/users';
+import { claimGroupsForUser } from '../../common/userGroupRoles';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 import { getBaseUrl } from '../../server/auth/baseUrl';
 import { userSessionCache } from '../../server/auth/userSessionCache';
@@ -239,7 +240,10 @@ export async function updateFirecallShareLink(
   }
 
   await setCustomClaimsForUser(uid, {
-    groups: data.groups || ['allUsers'],
+    // Mitgliedschaft aus `groupRoles` (vor der Migration aus dem alten Feld),
+    // genau wie `writeUserRoles` den Claim setzt — sonst prägte dieser
+    // Anmeldeweg einen anderen Claim als die Rollenverwaltung.
+    groups: claimGroupsForUser(data),
     isAdmin: false,
     authorized,
     firecall: firecallId,

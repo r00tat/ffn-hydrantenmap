@@ -252,7 +252,7 @@ const { guard } = vi.hoisted(() => ({ guard: vi.fn() }));
 vi.mock('../../server/firebase/admin', () => ({ firestore: fake.firestore }));
 vi.mock('firebase-admin/firestore', () => ({ FieldValue: fake.FieldValue }));
 vi.mock('../firebase/firestore', () => ({ GROUP_COLLECTION_ID: 'groups' }));
-vi.mock('./bekleidungGuard', () => ({ actionBekleidungswartRequired: guard }));
+vi.mock('../../app/auth', () => ({ actionPermissionRequired: guard }));
 // Die Tests schicken je Blatt ein Raster als JSON statt einer echten XLSX-Datei.
 vi.mock('../../common/xlsx', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../common/xlsx')>()),
@@ -403,7 +403,7 @@ describe('Guard', () => {
     await failsWith(
       issue('ffnd', { personId: 'p1', datum: '2026-10-08', stueckIds: ['s1'], mengen: [] }),
     );
-    expect(guard).toHaveBeenCalledWith('ffnd');
+    expect(guard).toHaveBeenCalledWith('ffnd', 'bekleidung.manage');
     expect(fake.docs.size).toBe(before);
     expect(get('bekleidungStueck/s1')?.status).toBe('lager');
   });
@@ -438,7 +438,9 @@ describe('Guard', () => {
     ];
     for (const call of calls) await failsWith(call);
     expect(guard).toHaveBeenCalledTimes(calls.length);
-    expect(guard.mock.calls.every(([g]) => g === 'ffnd')).toBe(true);
+    expect(
+      guard.mock.calls.every(([g, perm]) => g === 'ffnd' && perm === 'bekleidung.manage'),
+    ).toBe(true);
   });
 });
 

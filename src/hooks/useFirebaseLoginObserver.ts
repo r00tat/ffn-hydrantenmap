@@ -9,12 +9,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { getMyGroupsFromServer } from '../app/groups/GroupAction';
 import { Group } from '../app/groups/groupTypes';
-import { uniqueArray } from '../common/arrayUtils';
+import { memberGroupIds, type GroupRoles } from '../common/permissions';
+import { ALL_USERS_GROUP_ID } from '../common/tenantGroups';
 import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 import { isOffline, onReconnect } from '../lib/connectivity';
 import { withTimeout } from '../lib/withTimeout';
 import { AuthState, LoginData, LoginStatus } from './auth/types';
+import { claimGroupsKey, claimsNeedRefresh } from './auth/claimGroups';
+import { hasGroupRoles } from '../common/userGroupRoles';
 import {
   refreshTokenUntilClaimsMatch,
   refreshTokenWithRetry,
@@ -67,9 +70,7 @@ function offlineAuthState(cached: OfflineAuthSnapshot): Partial<LoginData> {
     isAuthorized: cached.isAuthorized,
     isAdmin: cached.isAdmin,
     groups: cached.groups,
-    groupAdmin: cached.groupAdmin,
-    fahrtenbuchGeraetemeister: cached.fahrtenbuchGeraetemeister,
-    bekleidungswart: cached.bekleidungswart,
+    groupRoles: cached.groupRoles,
     firecall: cached.firecall,
     firecallWrite: cached.firecallWrite,
     email: cached.email,
@@ -166,18 +167,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   const derivedFirecallWrite = hasSessionAuth
     ? (session.user.firecallWrite ?? loginStatus.firecallWrite)
     : loginStatus.firecallWrite;
-  const derivedGeraetemeister = hasSessionAuth
-    ? (session.user.fahrtenbuchGeraetemeister ??
-      loginStatus.fahrtenbuchGeraetemeister)
-    : loginStatus.fahrtenbuchGeraetemeister;
-  const derivedBekleidungswart = hasSessionAuth
-    ? (session.user.bekleidungswart ?? loginStatus.bekleidungswart)
-    : loginStatus.bekleidungswart;
-  // Wie der Gerätemeister: Die Rolle steht nur in der Session, nicht in den
-  // Token-Claims — der Firestore-Fallback unten kennt sie deshalb nicht.
-  const derivedGroupAdmin = hasSessionAuth
-    ? (session.user.groupAdmin ?? loginStatus.groupAdmin)
-    : loginStatus.groupAdmin;
+  // Die Rollen stehen nur in der Session, nicht in den Token-Claims.
+  const derivedGroupRoles = hasSessionAuth
+    ? (session.user.groupRoles ?? loginStatus.groupRoles)
+    : loginStatus.groupRoles;
 
   const serverLogin = useCallback(async () => {
     const token = await auth.currentUser?.getIdToken();
@@ -227,9 +220,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           firecallWrite: session.user.firecallWrite,
           // Auch die Rollen, die nur in der Sitzung stehen: Antwortet die
           // Sitzung später nicht mehr (offline), bleiben sie so erhalten.
-          groupAdmin: session.user.groupAdmin,
-          fahrtenbuchGeraetemeister: session.user.fahrtenbuchGeraetemeister,
-          bekleidungswart: session.user.bekleidungswart,
+          groupRoles: session.user.groupRoles,
           isRefreshing: false,
         }));
       } else {
@@ -373,9 +364,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
                   isAuthorized: false,
                   isAdmin: false,
                   groups: [],
-                  groupAdmin: undefined,
-                  fahrtenbuchGeraetemeister: undefined,
-                  bekleidungswart: undefined,
+                  groupRoles: undefined,
                   firecall: undefined,
                   firecallWrite: undefined,
                   myGroups: [],
@@ -431,9 +420,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
                   isAuthorized: false,
                   isAdmin: false,
                   groups: [],
-                  groupAdmin: undefined,
-                  fahrtenbuchGeraetemeister: undefined,
-                  bekleidungswart: undefined,
+                  groupRoles: undefined,
                   offlineAuth: false,
                 }
               : {}),
@@ -485,9 +472,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       isAuthorized: !!derivedIsAuthorized,
       isAdmin: !!derivedIsAdmin,
       groups: derivedGroups ?? [],
-      groupAdmin: derivedGroupAdmin,
-      fahrtenbuchGeraetemeister: derivedGeraetemeister,
-      bekleidungswart: derivedBekleidungswart,
+      groupRoles: derivedGroupRoles ?? {},
       firecall: derivedFirecall,
       firecallWrite: derivedFirecallWrite,
       expiresAt: sessionUser.firecallExpiresAt,
@@ -505,9 +490,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     derivedIsAuthorized,
     derivedIsAdmin,
     derivedGroups,
-    derivedGroupAdmin,
-    derivedGeraetemeister,
-    derivedBekleidungswart,
+    derivedGroupRoles,
     derivedFirecall,
     derivedFirecallWrite,
     myGroups,
@@ -635,9 +618,11 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         const userData = snapshot.data();
         if (!userData) return;
 
+        const groupRoles = rolesOf(userData);
         const currentAuth: AuthState = {
           authorized: !!userData.authorized,
-          groups: [...(userData.groups || [])].sort(),
+          groups: claimGroupsFor(userData),
+          roles: rolesKey(groupRoles),
         };
 
         // On first snapshot, just store the initial state
@@ -650,7 +635,8 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         const prevAuth = lastKnownAuthRef.current;
         const authChanged =
           currentAuth.authorized !== prevAuth.authorized ||
-          JSON.stringify(currentAuth.groups) !== JSON.stringify(prevAuth.groups?.sort());
+          claimGroupsKey(currentAuth.groups) !== claimGroupsKey(prevAuth.groups) ||
+          currentAuth.roles !== prevAuth.roles;
 
         if (authChanged && auth.currentUser) {
           console.info(`credentials changed by admin, refreshing token and session`);
@@ -661,6 +647,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
             ...prev,
             isAuthorized: currentAuth.authorized ?? prev.isAuthorized,
             groups: currentAuth.groups ?? prev.groups,
+            groupRoles,
           }));
           setCredentialsRefreshed(true);
           setNeedsReLogin(false);
@@ -701,9 +688,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     groups: derivedGroups,
     firecall: derivedFirecall,
     firecallWrite: derivedFirecallWrite,
-    fahrtenbuchGeraetemeister: derivedGeraetemeister,
-    bekleidungswart: derivedBekleidungswart,
-    groupAdmin: derivedGroupAdmin,
+    groupRoles: derivedGroupRoles,
     myGroups,
     refresh,
     signOut: fbSignOut,
@@ -773,13 +758,22 @@ async function handleSessionBasedRefresh(
   if (!auth.currentUser) return;
 
   const tokenClaims = (await auth.currentUser.getIdTokenResult()).claims;
-  const sessionGroups = uniqueArray(session.user.groups || [])?.sort().join(',');
-  const tokenGroups = uniqueArray((tokenClaims.groups as string[]) || [])?.sort().join(',');
+  const compare = {
+    sessionAuthorized: session.user.isAuthorized,
+    tokenAuthorized: tokenClaims.authorized,
+    sessionGroups: session.user.groups as string[] | undefined,
+    tokenGroups: tokenClaims.groups as string[] | undefined,
+  };
+  // Nur wenn die Gruppen abweichen, ist der Migrationsstand überhaupt von
+  // Belang — dann eigenes Benutzerdokument lesen (s. claimsNeedRefresh).
+  const needsRefresh =
+    claimsNeedRefresh({ ...compare, rolesMigrated: undefined }) &&
+    claimsNeedRefresh({
+      ...compare,
+      rolesMigrated: await readRolesMigrated(auth.currentUser.uid),
+    });
 
-  if (
-    session.user.isAuthorized !== tokenClaims.authorized ||
-    sessionGroups !== tokenGroups
-  ) {
+  if (needsRefresh) {
     console.info(`token claims differ from session data, attempting auto-refresh`);
 
     const refreshed = await refreshTokenUntilClaimsMatch(
@@ -801,6 +795,23 @@ async function handleSessionBasedRefresh(
   }
 }
 
+/**
+ * Hat das eigene Benutzerdokument schon `groupRoles`? `undefined`, wenn das
+ * Lesen scheitert (offline, Zeitüberschreitung) — dann bleibt es beim Vergleich.
+ */
+async function readRolesMigrated(uid: string): Promise<boolean | undefined> {
+  try {
+    const snap = await withTimeout(
+      getDoc(doc(firestore, USER_COLLECTION_ID, uid)),
+      5000,
+    );
+    const data = snap.data();
+    return data ? hasGroupRoles(data) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function handleFirestoreBasedRefresh(
   uid: string,
   setNeedsReLogin: (value: boolean) => void,
@@ -811,8 +822,8 @@ async function handleFirestoreBasedRefresh(
 
   if (auth.currentUser && userData) {
     const tokenClaims = (await auth.currentUser.getIdTokenResult()).claims;
-    const userDataGroups = uniqueArray(userData.groups || [])?.sort().join(',');
-    const tokenGroups = uniqueArray((tokenClaims.groups as string[]) || [])?.sort().join(',');
+    const userDataGroups = claimGroupsKey(claimGroupsFor(userData));
+    const tokenGroups = claimGroupsKey(tokenClaims.groups as string[] | undefined);
 
     if (userData.authorized !== tokenClaims.authorized || userDataGroups !== tokenGroups) {
       console.warn(`token claims differ from firebase data, relogin required.`);
@@ -827,11 +838,45 @@ async function handleFirestoreBasedRefresh(
       ...prev,
       isAuthorized: true,
       messagingTokens: userData.messaging,
-      groups: [...(userData.groups || []), 'allUsers'],
+      groups: [ALL_USERS_GROUP_ID, ...memberGroupIds({ groupRoles: rolesOf(userData) })],
+      groupRoles: rolesOf(userData),
       isRefreshing: false,
       isAdmin: prev.isAdmin || userData?.isAdmin === true,
     }));
   } else {
     setLoginStatus((prev) => ({ ...prev, isRefreshing: false }));
   }
+}
+
+function rolesOf(userData: { groupRoles?: unknown }): GroupRoles {
+  const roles = userData.groupRoles;
+  return roles && typeof roles === 'object' && !Array.isArray(roles)
+    ? (roles as GroupRoles)
+    : {};
+}
+
+function rolesKey(groupRoles: GroupRoles): string {
+  return JSON.stringify(
+    Object.keys(groupRoles)
+      .sort()
+      .map((groupId) => [groupId, [...(groupRoles[groupId] ?? [])].sort()])
+  );
+}
+
+/**
+ * Die Gruppen, die der Claim nach dem Benutzerdokument tragen sollte — nur um
+ * ein veraltetes Token zu erkennen, keine Berechtigung. Ohne `groupRoles`
+ * (vor der Migration) stehen die Claims noch auf dem alten Feld `groups`.
+ */
+function claimGroupsFor(userData: {
+  groupRoles?: unknown;
+  groups?: string[];
+}): string[] {
+  if (userData.groupRoles) {
+    return [
+      ALL_USERS_GROUP_ID,
+      ...memberGroupIds({ groupRoles: rolesOf(userData) }),
+    ];
+  }
+  return [ALL_USERS_GROUP_ID, ...(userData.groups ?? [])];
 }

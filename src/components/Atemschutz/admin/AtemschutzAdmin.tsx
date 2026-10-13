@@ -39,6 +39,7 @@ import ConfirmDialog from '../../dialogs/ConfirmDialog';
 import AtemschutzAdminGuard from './AtemschutzAdminGuard';
 import useAtemschutzGeraete from '../../../hooks/useAtemschutzGeraete';
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
+import { can } from '../../../common/permissions';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import {
   deleteAtemschutzGeraet,
@@ -51,8 +52,8 @@ import GeraetQrDialog from './GeraetQrDialog';
 import StammdatenSettings from '../../groups/StammdatenSettings';
 import RechnungSettings from './RechnungSettings';
 import {
-  ATEMSCHUTZ_ADMIN_TABS,
   adminTabFromParam,
+  visibleAdminTabs,
   type AtemschutzAdminTabKey,
 } from './atemschutzAdminTabs';
 
@@ -62,14 +63,9 @@ export default function AtemschutzAdmin() {
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
   const { groups: allGroups, groupId, setGroupId } = useFahrtenbuchGroup();
-  const { isAdmin, groupAdmin } = useFirebaseLogin();
+  const { isAdmin, groupRoles } = useFirebaseLogin();
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Der aktive Reiter steht in der URL, nicht im State — dasselbe Muster wie
-  // am Sammelplatz: Sonst landet die Zurück-Taste auf der vorigen Seite statt
-  // auf dem vorigen Reiter, und ein Neuladen fällt auf den ersten zurück.
-  const tab = adminTabFromParam(searchParams.get('tab'));
-
   const setTab = useCallback(
     (next: AtemschutzAdminTabKey) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -78,16 +74,30 @@ export default function AtemschutzAdmin() {
     },
     [router, searchParams],
   );
-  // Ein Gruppen-Admin verwaltet nur die Gruppen, in denen er eingetragen ist.
-  // Keine Sicherheitsgrenze — die ist `actionGroupAdminRequired` in den
-  // Actions; hier stehen bloß keine Gruppen zur Auswahl, die ohnehin abgewiesen
-  // würden.
+  // Zur Auswahl stehen die Gruppen mit `gruppe.manage` oder
+  // `kostenersatz.use` (nur Reiter „Verrechnung"). Keine Sicherheitsgrenze —
+  // die ist `actionPermissionRequired` in den Actions; hier stehen bloß keine
+  // Gruppen zur Auswahl, die ohnehin abgewiesen würden.
   const groups = useMemo(
     () =>
-      isAdmin ? allGroups : allGroups.filter((g) => groupAdmin?.includes(g.id)),
-    [allGroups, isAdmin, groupAdmin],
+      allGroups.filter(
+        (g) =>
+          can({ isAdmin, groupRoles }, g.id, 'gruppe.manage') ||
+          can({ isAdmin, groupRoles }, g.id, 'kostenersatz.use'),
+      ),
+    [allGroups, isAdmin, groupRoles],
   );
-  const { geraete, feuerwehren } = useAtemschutzGeraete(groupId);
+  const canManage = !!groupId && can({ isAdmin, groupRoles }, groupId, 'gruppe.manage');
+  // Die Geräteliste liest nur, wer sie auch sieht.
+  const { geraete, feuerwehren } = useAtemschutzGeraete(canManage ? groupId : undefined);
+  const visibleTabs = visibleAdminTabs({
+    canManage,
+    canBill: !!groupId && can({ isAdmin, groupRoles }, groupId, 'kostenersatz.use'),
+  });
+  // Der aktive Reiter steht in der URL, nicht im State — dasselbe Muster wie
+  // am Sammelplatz: Sonst landet die Zurück-Taste auf der vorigen Seite statt
+  // auf dem vorigen Reiter, und ein Neuladen fällt auf den ersten zurück.
+  const tab = adminTabFromParam(searchParams.get('tab'), visibleTabs);
 
   const [typFilter, setTypFilter] = useState<TypFilter>('alle');
   const [suche, setSuche] = useState('');
@@ -159,7 +169,7 @@ export default function AtemschutzAdmin() {
               onChange={(_, next: AtemschutzAdminTabKey) => setTab(next)}
               sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
             >
-              {ATEMSCHUTZ_ADMIN_TABS.map((key) => (
+              {visibleTabs.map((key) => (
                 <Tab
                   key={key}
                   value={key}

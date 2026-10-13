@@ -114,7 +114,7 @@ Clicking **Edit** opens the defect:
 - **Add note** appends an entry to the history. Notes cannot be changed afterwards, which keeps the path from report to repair traceable (“garage appointment on 12 Aug”, “spare part ordered”).
 - The **defect description** can be corrected without it showing up in the history — a typo is not an event.
 
-Every member of the group may edit: whoever works off a defect is rarely the person who reported it. Traceability comes from the history. **Deleting** is restricted to administrators and is meant for defects created by mistake — a repaired defect belongs on *Resolved*, not deleted.
+Every member of the group may edit: whoever works off a defect is rarely the person who reported it. Traceability comes from the history. **Deleting** is restricted to group admins (and administrators) and is meant for defects created by mistake — a repaired defect belongs on *Resolved*, not deleted.
 
 **Report defect** also records a defect without a trip, for instance during the monthly vehicle check.
 
@@ -245,16 +245,18 @@ Unknown drivers are created as deactivated persons so the trip has a driver with
 - **Bulk entry for an operation** Members of the group the operation belongs to
 - **Change or delete a trip** Only the creator of the trip, an equipment officer of the group or an administrator
 - **Entry via the QR code** Anyone holding the link — recording only, no insight into existing trips
-- **Maintain vehicles and people** Administrators and equipment officers of the group
-- **Trip log link, import and group settings** Administrators only
+- **Maintain vehicles and people** Administrators, group admins and equipment officers of the group
+- **Trip log link, import and group settings** Administrators and group admins only
 
 ## Equipment officers
 
 Normally only the person who recorded a trip may correct it. In addition, an
-administrator can appoint **equipment officers** per fire brigade: they may
-change any trip of their brigade after the fact — a mistyped odometer reading,
-for example — and maintain its vehicles and people.
+administrator or group admin can give the **equipment officer** role per fire
+brigade: equipment officers may change any trip of their brigade after the
+fact — a mistyped odometer reading, for example —, maintain its vehicles and
+people, and manage equipment & material.
 
-Equipment officers are appointed in the trip log administration under
-"Settings". Only members of the respective brigade can be selected.
+The role is assigned in the **"Members and roles"** view of the brigade; the
+trip log administration links there under "Settings". Only members of the
+respective brigade can be selected.
 

@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AtemschutzFuellung } from '../../common/atemschutz';
+import type { GroupRoles } from '../../common/permissions';
 
 // Die Seite hängt an einem Dutzend Firestore-Hooks. Gemockt wird alles, was
 // eine Subscription aufmachen würde — geprüft wird hier nur die Filterlogik
@@ -24,9 +25,10 @@ const {
       email: 'a@b.c',
       displayName: 'Paul',
       uid: 'u1',
+      isAuthorized: true,
       isAdmin: false,
       groups: ['ffnd'],
-      groupAdmin: [] as string[],
+      groupRoles: { ffnd: [] } as GroupRoles,
     },
   },
 }));
@@ -133,9 +135,10 @@ describe('FuellprotokollPage', () => {
       email: 'a@b.c',
       displayName: 'Paul',
       uid: 'u1',
+      isAuthorized: true,
       isAdmin: false,
       groups: ['ffnd'],
-      groupAdmin: [],
+      groupRoles: { ffnd: [] },
     };
     fuellungenMock.mockReturnValue({
       fuellungen: [
@@ -240,7 +243,7 @@ describe('FuellprotokollPage', () => {
   });
 
   it('gibt dem Gruppen-Admin die fremde Zeile frei und löscht über die Action', async () => {
-    loginStub.value = { ...loginStub.value, groupAdmin: ['ffnd'] };
+    loginStub.value = { ...loginStub.value, groupRoles: { ffnd: ['gruppenadmin'] } };
     fuellungenMock.mockReturnValue({
       fuellungen: [fuellung({ id: 'a', createdBy: 'jemand-anderes' })],
       flaschenGesamt: 1,
@@ -266,10 +269,26 @@ describe('FuellprotokollPage', () => {
     ).not.toBeInTheDocument();
 
     cleanup();
-    loginStub.value = { ...loginStub.value, groupAdmin: ['ffnd'] };
+    loginStub.value = { ...loginStub.value, groupRoles: { ffnd: ['gruppenadmin'] } };
     renderWithIntl(<FuellprotokollPage />);
     expect(
       screen.getByRole('button', { name: 'Importieren' }),
     ).toBeInTheDocument();
+  });
+
+  it('zeigt die Verrechnung nur mit kostenersatz.use in der gewählten Gruppe', () => {
+    renderWithIntl(<FuellprotokollPage />);
+    expect(screen.queryByRole('link', { name: 'Verrechnung' })).not.toBeInTheDocument();
+
+    cleanup();
+    // Gruppen-Admin allein reicht nicht — die Rolle enthält kein kostenersatz.use.
+    loginStub.value = { ...loginStub.value, groupRoles: { ffnd: ['gruppenadmin'] } };
+    renderWithIntl(<FuellprotokollPage />);
+    expect(screen.queryByRole('link', { name: 'Verrechnung' })).not.toBeInTheDocument();
+
+    cleanup();
+    loginStub.value = { ...loginStub.value, groupRoles: { ffnd: ['kostenersatz'] } };
+    renderWithIntl(<FuellprotokollPage />);
+    expect(screen.getByRole('link', { name: 'Verrechnung' })).toBeInTheDocument();
   });
 });

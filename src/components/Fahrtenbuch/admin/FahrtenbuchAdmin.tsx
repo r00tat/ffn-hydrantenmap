@@ -12,36 +12,20 @@ import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
-import { isGroupAdmin } from '../../../common/groupPermissions';
+import MemberRolesLink from '../../groups/MemberRolesLink';
+import {
+  canAdministerFahrtenbuch,
+  fahrtenbuchAdminTabs,
+  type AdminTabKey,
+} from './adminTabs';
 import FahrtenbuchAdminGuard from './FahrtenbuchAdminGuard';
 import FahrtenbuchImport from './FahrtenbuchImport';
-import GeraetemeisterSettings from './GeraetemeisterSettings';
 import GroupSettings from './GroupSettings';
 import MangelMigration from './MangelMigration';
 import MangelNotificationSettings from './MangelNotificationSettings';
 import ShareLinkSection from './ShareLinkSection';
 import VehicleAdmin from './VehicleAdmin';
 import WeeklyReportSendSection from './WeeklyReportSendSection';
-
-type AdminTabKey =
-  | 'vehicles'
-  | 'settings'
-  | 'shareLink'
-  | 'pdfImport';
-
-/**
- * Admins und Gruppen-Admins sehen alle Reiter. Ein Gerätemeister pflegt die
- * Fahrzeuge; Einstellungen, Share-Links und PDF-Import bleiben der
- * Gruppenadministration vorbehalten. Die Personen stehen auf der Seite
- * „Personal" (/personal), weil Bekleidung und Atemschutz dieselbe Liste lesen.
- */
-const MANAGER_TABS: AdminTabKey[] = ['vehicles'];
-const ADMIN_TABS: AdminTabKey[] = [
-  'vehicles',
-  'settings',
-  'shareLink',
-  'pdfImport',
-];
 
 const TAB_LABEL_KEYS = {
   vehicles: 'admin.vehicles',
@@ -58,37 +42,21 @@ const TAB_LABEL_KEYS = {
 export default function FahrtenbuchAdmin() {
   const t = useTranslations('fahrtenbuch');
   const { groups: allGroups, groupId, setGroupId } = useFahrtenbuchGroup();
-  const {
-    isAdmin,
-    fahrtenbuchGeraetemeister,
-    groupAdmin,
-    groups: userGroups,
-  } = useFirebaseLogin();
-  // Ein Gerätemeister oder Gruppen-Admin verwaltet nur die Gruppen, in denen
-  // er eingetragen ist. Das ist keine Sicherheitsgrenze — die ist
-  // `actionFahrtenbuchManagerRequired` bzw. `actionGroupAdminRequired` in den
-  // Server Actions.
+  const { isAdmin, groupRoles } = useFirebaseLogin();
+  // Zur Auswahl stehen nur Gruppen, in denen der Benutzer mindestens einen
+  // Reiter hat. Das ist keine Sicherheitsgrenze — die ist
+  // `actionPermissionRequired` in den Server Actions.
   const groups = useMemo(
     () =>
-      isAdmin
-        ? allGroups
-        : allGroups.filter(
-            (g) =>
-              fahrtenbuchGeraetemeister?.includes(g.id) ||
-              groupAdmin?.includes(g.id),
-          ),
-    [allGroups, isAdmin, fahrtenbuchGeraetemeister, groupAdmin],
+      allGroups.filter((g) =>
+        canAdministerFahrtenbuch({ isAdmin, groupRoles }, g.id),
+      ),
+    [allGroups, isAdmin, groupRoles],
   );
   // Die Reiter hängen an der *gewählten* Gruppe: Wer in einer Gruppe
   // Gruppen-Admin und in einer anderen nur Gerätemeister ist, sieht beim
   // Umschalten unterschiedliche Reiter.
-  const tabs = isGroupAdmin(groupId ?? '', {
-    isAdmin,
-    groups: userGroups,
-    groupAdmin,
-  })
-    ? ADMIN_TABS
-    : MANAGER_TABS;
+  const tabs = fahrtenbuchAdminTabs({ isAdmin, groupRoles }, groupId);
   const [tab, setTab] = useState<AdminTabKey>('vehicles');
   // Beim Wechsel auf eine Gruppe mit weniger Reitern zeigte `tab` sonst auf
   // einen, den es dort nicht gibt — die Seite bliebe leer.
@@ -188,7 +156,9 @@ export default function FahrtenbuchAdmin() {
               >
                 <GroupSettings groupId={groupId} />
                 <MangelNotificationSettings groupId={groupId} />
-                <GeraetemeisterSettings groupId={groupId} />
+                {/* Gerätemeister vergibt die Rollen-Ansicht der Gruppe, nicht
+                    mehr eine eigene Auswahl hier. */}
+                <MemberRolesLink groupId={groupId} />
                 {/* Folgt den Empfängern, weil der Versand sie vorbelegt: Die
                     Nachbarschaft macht den Unterschied zwischen einmaliger
                     Überschreibung und dauerhafter Pflege sichtbar. */}

@@ -31,6 +31,8 @@ import {
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { feuerwehren } from '../../common/feuerwehren';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
+import { isTenantGroupId } from '../../common/tenantGroups';
+import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended, userTextFields } from '../../common/users';
 
 const ITEM_HEIGHT = 48;
@@ -47,7 +49,11 @@ const MenuProps = {
 };
 
 export interface UserRecordExtendedDialogOptions {
-  onClose: (item?: UserRecordExtended) => void;
+  /**
+   * `memberGroupIds` sind die gewählten Gruppen. Sie stehen getrennt vom
+   * Benutzer, weil das alte Feld `groups` nicht mehr die Mitgliedschaft trägt.
+   */
+  onClose: (item?: UserRecordExtended, memberGroupIds?: string[]) => void;
   user: UserRecordExtended;
   groups: { [key: string]: string };
 }
@@ -213,6 +219,14 @@ export default function UserRecordExtendedDialog({
   const [open, setOpen] = useState(true);
   const [user, setUserRecordExtended] =
     useState<UserRecordExtended>(userDefault);
+  const [memberGroups, setMemberGroups] = useState<string[]>(() =>
+    userMemberGroupIds(userDefault)
+  );
+  // Nur Mandanten: `allUsers` bekommt jeder, und Kostenersatz ist keine
+  // Gruppe mehr, sondern eine Rolle je Gruppe.
+  const tenantGroups = Object.entries(groups).filter(([key]) =>
+    isTenantGroupId(key)
+  );
 
   const onChange =
     (field: string) =>
@@ -244,13 +258,7 @@ export default function UserRecordExtendedDialog({
     const {
       target: { value },
     } = event;
-    setUserRecordExtended(
-      (prev) =>
-        ({
-          ...prev,
-          groups: typeof value === 'string' ? value.split(',') : value,
-        } as unknown as UserRecordExtended)
-    );
+    setMemberGroups(typeof value === 'string' ? value.split(',') : value);
   };
 
   return (
@@ -304,7 +312,7 @@ export default function UserRecordExtendedDialog({
             labelId="user-group-checkbox-label"
             id="user-group-checkbox"
             multiple
-            value={user.groups || []}
+            value={memberGroups}
             onChange={handleGroupChange}
             input={<OutlinedInput label={t('groupLabel')} />}
             renderValue={(selected) =>
@@ -315,13 +323,16 @@ export default function UserRecordExtendedDialog({
             }
             MenuProps={MenuProps}
           >
-            {Object.entries(groups).map(([key, name]) => (
+            {tenantGroups.map(([key, name]) => (
               <MenuItem key={key} value={key}>
-                <Checkbox checked={(user.groups || []).indexOf(key) > -1} />
+                <Checkbox checked={memberGroups.includes(key)} />
                 <ListItemText primary={name} />
               </MenuItem>
             ))}
           </Select>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            {t('rolesHint')}
+          </Typography>
         </FormControl>
         <FormGroup>
           <FormControlLabel
@@ -387,7 +398,7 @@ export default function UserRecordExtendedDialog({
         <Button
           onClick={() => {
             setOpen(false);
-            onClose(user);
+            onClose(user, memberGroups);
           }}
         >
           Aktualisieren

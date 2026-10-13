@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 import userRequired from '../../../../server/auth/userRequired';
-import { verifyUserAuthorizedForFirecall } from '../../../../server/auth/verifyUserAuthorizedForFirecall';
 import { firestore } from '../../../../server/firebase/admin';
 import KostenersatzPdf from '../../../../components/Kostenersatz/KostenersatzPdf';
 import {
@@ -18,6 +17,7 @@ import {
   StammdatenUnvollstaendigError,
 } from '../../../../server/groups/requireStammdaten';
 import { loadStammdatenLogo } from '../../../../server/groups/stammdatenStore';
+import { requireKostenersatzForFirecall } from './kostenersatzPdfAccess';
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Verify the caller is authorized for this specific firecall (prevents
-    // IDOR: the calculation contains the recipient's name, address and contact
-    // details, which must not be readable across firecalls/groups).
-    const firecall = await verifyUserAuthorizedForFirecall(
-      authData,
+    // Nur mit Kostenersatz-Recht in der Gruppe des Einsatzes: Die Berechnung
+    // enthält Name, Anschrift und Kontaktdaten des Zahlungspflichtigen, die
+    // weder über Einsätze/Gruppen hinweg noch für Gäste lesbar sein dürfen.
+    const firecall = await requireKostenersatzForFirecall(
+      authData.uid,
       firecallId
     );
 

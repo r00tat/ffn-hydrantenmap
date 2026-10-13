@@ -79,7 +79,7 @@ If supplies were consumed or stock was booked by hand since the last import, the
 ## Permissions
 
 - **View, assign, consume:** all members of the fire brigade, or everyone with access to the operation
-- **Maintain items, stock and sets, import:** fire brigade administrators and equipment managers
+- **Maintain items, stock and sets, import:** administrators, group admins and equipment officers of the fire brigade
 - **Choose sets in an operation:** members of the fire brigade; guests of an operation record single items
 
 ## Notes

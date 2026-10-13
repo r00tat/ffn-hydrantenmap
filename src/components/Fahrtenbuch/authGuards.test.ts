@@ -13,7 +13,7 @@ vi.mock('../../app/auth', () => ({
 import { ApiException } from '../../app/api/errors';
 import { NON_TENANT_GROUP_IDS } from '../../app/groups/groupTypes';
 import {
-  actionFahrtenbuchManagerRequired,
+  actionGroupMemberRequired,
   assertFahrtenbuchGroup,
 } from './authGuards';
 
@@ -56,43 +56,39 @@ describe('assertFahrtenbuchGroup', () => {
   });
 });
 
-describe('actionFahrtenbuchManagerRequired', () => {
-  it('lässt einen Admin durch', async () => {
+describe('actionGroupMemberRequired', () => {
+  it('lässt ein Mitglied laut groupRoles durch, auch ohne Zusatzrolle', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: { id: 'a1', isAdmin: true, groups: ['allUsers'] },
+      user: { id: 'u1', isAdmin: false, groupRoles: { ffnd: [] } },
     });
-    await expect(
-      actionFahrtenbuchManagerRequired('ffnd'),
-    ).resolves.toBeDefined();
+    await expect(actionGroupMemberRequired('ffnd')).resolves.toBeDefined();
   });
 
-  it('lässt einen Gerätemeister der Gruppe durch', async () => {
+  it('weist ab, wer nur im alten Feld groups steht', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: {
-        id: 'g1',
-        isAdmin: false,
-        groups: ['ffnd'],
-        fahrtenbuchGeraetemeister: ['ffnd'],
-      },
+      user: { id: 'u1', isAdmin: false, groups: ['ffnd'], groupRoles: {} },
     });
-    await expect(
-      actionFahrtenbuchManagerRequired('ffnd'),
-    ).resolves.toBeDefined();
+    await expect(actionGroupMemberRequired('ffnd')).rejects.toMatchObject({
+      status: 403,
+    });
   });
 
-  it('weist ein einfaches Gruppenmitglied ab', async () => {
+  it('macht den globalen Admin nicht zum Mitglied', async () => {
+    // Einträge erfasst nur, wer der Gruppe angehört — auch der Admin.
     actionUserRequiredMock.mockResolvedValue({
-      user: { id: 'u1', isAdmin: false, groups: ['ffnd'] },
+      user: { id: 'a1', isAdmin: true, groupRoles: {} },
     });
-    await expect(actionFahrtenbuchManagerRequired('ffnd')).rejects.toThrow();
+    await expect(actionGroupMemberRequired('ffnd')).rejects.toMatchObject({
+      status: 403,
+    });
   });
 
-  it('weist eine Nicht-Mandanten-Gruppe ab, auch beim Admin', async () => {
+  it('weist eine Nicht-Mandanten-Gruppe mit 400 ab', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: { id: 'a1', isAdmin: true, groups: ['allUsers'] },
+      user: { id: 'u1', groupRoles: { allUsers: [] } },
     });
-    await expect(
-      actionFahrtenbuchManagerRequired('kostenersatz'),
-    ).rejects.toThrow();
+    await expect(actionGroupMemberRequired('allUsers')).rejects.toMatchObject({
+      status: 400,
+    });
   });
 });

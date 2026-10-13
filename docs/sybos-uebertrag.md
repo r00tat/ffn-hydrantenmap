@@ -29,7 +29,9 @@ folgt die Reihenfolge der Erfassung in Sybos:
 5. **Messungen** — Gammaspektren und je Ebene mit Datenfeldern (Strahlenmessung,
    Radiacode, eigene Messreihen) eine Tabelle der Messpunkte, als CSV herunterladbar.
 6. **Sonstige Notizen** — Einsatzorte mit ihren Notizen, Geschäftsbuch,
-   Kostenersatz-Berechnungen.
+   Kostenersatz-Berechnungen (nur mit `kostenersatz.use` in der Gruppe des
+   Einsatzes, sonst ohne sie — siehe
+   [berechtigungen.md](berechtigungen.md#kostenersatz-je-gruppe)).
 7. **Anhänge und Fotos** — Anhänge aus dem Storage (am Einsatz und an Elementen) und
    die Dateien im Drive-Ordner, je Datei und gesammelt herunterladbar.
 8. **Einsatztagebuch** — vollständig. Angezeigt als dieselbe Tabelle wie auf der

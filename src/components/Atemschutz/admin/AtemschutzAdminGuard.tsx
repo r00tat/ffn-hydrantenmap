@@ -5,18 +5,20 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { ReactNode } from 'react';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
-import { hasAnyGroupAdminRole } from '../../../common/groupPermissions';
+import { useCanAny } from '../../../hooks/usePermissions';
 
 /**
- * Wie `AdminGuard`, lässt aber auch Gruppen-Admins durch.
+ * Wie `AdminGuard`, lässt aber jeden durch, der in einer Gruppe
+ * `gruppe.manage` oder `kostenersatz.use` hat — Letzterer sieht nur den
+ * Reiter „Verrechnung".
  *
- * Kein `hasAnyFahrtenbuchManagerRole`: Der Gerätemeister pflegt Fahrzeuge und
- * Personen des Fahrtenbuchs, die Atemschutz-Ausrüstung gehört nicht dazu.
- * Wer sie pflegen soll, bekommt die Gruppen-Admin-Rolle.
+ * Nicht `geraete.manage`: Der Gerätemeister pflegt Fahrzeuge, Personen und
+ * Geräte, die Atemschutz-Ausrüstung gehört nicht dazu. Wer sie pflegen soll,
+ * bekommt die Rolle Gruppen-Admin.
  *
  * Das ist keine Sicherheitsgrenze — die steht in
- * `actionGroupAdminRequired(groupId)` in den Server Actions. Hier wird nur
- * eine Seite ausgeblendet, die dem Benutzer nichts nützt.
+ * `actionPermissionRequired` in den Server Actions.
+ * Hier wird nur eine Seite ausgeblendet, die dem Benutzer nichts nützt.
  */
 export default function AtemschutzAdminGuard({
   children,
@@ -24,9 +26,11 @@ export default function AtemschutzAdminGuard({
   children: ReactNode;
 }) {
   const t = useTranslations('atemschutz');
-  const { isAuthorized, isAdmin, groupAdmin } = useFirebaseLogin();
+  const { isAuthorized } = useFirebaseLogin();
+  const canManageAnyGroup = useCanAny('gruppe.manage');
+  const canBillAnyGroup = useCanAny('kostenersatz.use');
 
-  if (!isAuthorized || !hasAnyGroupAdminRole({ isAdmin, groupAdmin })) {
+  if (!isAuthorized || !(canManageAnyGroup || canBillAnyGroup)) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography>{t('admin.noPermission')}</Typography>

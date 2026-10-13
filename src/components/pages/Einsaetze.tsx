@@ -41,11 +41,11 @@ import { formatTimestamp } from '../../common/time-format';
 import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
 import OfflineListHint from '../site/OfflineListHint';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useCan } from '../../hooks/usePermissions';
 import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
-import { isGroupAdmin } from '../../common/groupPermissions';
 import FirecallExport from '../firebase/FirecallExport';
 import LagekarteExport from '../firebase/LagekarteExport';
 import FirecallImport from '../firebase/FirecallImport';
@@ -100,7 +100,10 @@ function EinsatzCard({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [kostenersatzOpen, setKostenersatzOpen] = useState(false);
   const updateFirecall = useFirecallUpdate();
-  const { isAdmin, groups, groupAdmin } = useFirebaseLogin();
+  const canDelete = useCan(einsatz.group, 'gruppe.manage');
+  // Kostenersatz am Einsatz nur mit dem Recht in dessen Gruppe — die Regeln
+  // lassen die Berechnungen sonst nicht lesen.
+  const canKostenersatz = useCan(einsatz.group, 'kostenersatz.use');
   const setFirecallId = useFirecallSelect();
   const navigate = useFirecallNavigate();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -203,13 +206,9 @@ function EinsatzCard({
               <EditIcon />
             </IconButton>
           </Tooltip>
-          {/* Löschen darf, wer die Gruppe des Einsatzes administriert —
-              globaler Admin oder Gruppen-Admin. */}
-          {isGroupAdmin(einsatz.group ?? '', {
-            isAdmin,
-            groups,
-            groupAdmin,
-          }) && (
+          {/* Löschen darf, wer in der Gruppe des Einsatzes `gruppe.manage`
+              hat — globaler Admin oder Gruppen-Admin. */}
+          {canDelete && (
             <Tooltip title={t('common.delete')}>
               <IconButton
                 size="small"
@@ -228,15 +227,17 @@ function EinsatzCard({
               <ShareIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title={t('einsaetze.kostenersatzTooltip')}>
-            <IconButton
-              size="small"
-              onClick={() => setKostenersatzOpen(true)}
-              color="primary"
-            >
-              <ReceiptLongIcon />
-            </IconButton>
-          </Tooltip>
+          {canKostenersatz && (
+            <Tooltip title={t('einsaetze.kostenersatzTooltip')}>
+              <IconButton
+                size="small"
+                onClick={() => setKostenersatzOpen(true)}
+                color="primary"
+              >
+                <ReceiptLongIcon />
+              </IconButton>
+            </Tooltip>
+          )}
         </CardActions>
       </Card>
       {displayUpdateDialog && (
@@ -273,7 +274,7 @@ function EinsatzCard({
             {t('common.close')}
           </Button>
         </Box>
-        {einsatz.id && (
+        {einsatz.id && canKostenersatz && (
           <KostenersatzList firecallId={einsatz.id} />
         )}
       </Drawer>

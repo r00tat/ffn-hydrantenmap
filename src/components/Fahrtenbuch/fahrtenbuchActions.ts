@@ -43,7 +43,7 @@ import {
   type EntryModifyActor,
 } from './entryPermissions';
 import { cachedRouteLegs, routeCacheEntry } from './firecallRoute';
-import { isFahrtenbuchManager } from './managerPermissions';
+import { can, type GroupRoles } from '../../common/permissions';
 import { createMangelForEntry, refreshVehicleCache } from './mangelStore';
 import { notifyMangel } from './notifyMangel';
 
@@ -90,8 +90,7 @@ type ModifySession = {
     name?: string | null;
     email?: string | null;
     isAdmin?: boolean;
-    groups?: string[];
-    fahrtenbuchGeraetemeister?: string[];
+    groupRoles?: GroupRoles;
   };
 };
 
@@ -135,7 +134,7 @@ async function mayModifyEntry(
   session: ModifySession,
   entry: FahrtenbuchEntry,
 ): Promise<boolean> {
-  const canManage = isFahrtenbuchManager(groupId, session.user);
+  const canManage = can(session.user, groupId, 'fahrtenbuch.manage');
   const actor: EntryModifyActor = { userId: session.user.id };
   if (canModifyEntry(entry, actor, canManage)) return true;
   if (!isShareLinkEntry(entry) || !entry.driverId) return false;

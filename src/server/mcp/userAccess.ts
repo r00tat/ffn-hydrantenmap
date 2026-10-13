@@ -1,7 +1,8 @@
 import 'server-only';
 
-import { uniqueArray } from '../../common/arrayUtils';
 import { isFirecallGuest } from '../../common/firecallGuest';
+import { memberGroupIds, type GroupRoles } from '../../common/permissions';
+import { ALL_USERS_GROUP_ID } from '../../common/tenantGroups';
 import { FirebaseUserInfo } from '../../common/users';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 import { firestore } from '../firebase/admin';
@@ -20,9 +21,9 @@ import { firestore } from '../firebase/admin';
 export interface McpUser {
   uid: string;
   isAdmin: boolean;
+  /** Mitgliedsgruppen plus `allUsers` — dieselbe Ableitung wie in der Sitzung. */
   groups: string[];
-  fahrtenbuchGeraetemeister: string[];
-  groupAdmin: string[];
+  groupRoles: GroupRoles;
 }
 
 export class McpUserAccessError extends Error {
@@ -50,11 +51,13 @@ export async function loadMcpUser(uid: string): Promise<McpUser> {
     );
   }
 
+  // Die Mitgliedschaft kommt aus `groupRoles`: Das alte Feld `groups` pflegt
+  // `writeUserRoles()` nicht mehr, ein Austritt stünde dort noch drin.
+  const groupRoles = data.groupRoles ?? {};
   return {
     uid,
     isAdmin: !!data.isAdmin,
-    groups: uniqueArray(['allUsers', ...(data.groups || [])]),
-    fahrtenbuchGeraetemeister: data.fahrtenbuchGeraetemeister ?? [],
-    groupAdmin: data.groupAdmin ?? [],
+    groups: [ALL_USERS_GROUP_ID, ...memberGroupIds({ groupRoles })],
+    groupRoles,
   };
 }

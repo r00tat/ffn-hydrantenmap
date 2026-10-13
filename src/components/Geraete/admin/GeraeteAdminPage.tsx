@@ -31,10 +31,10 @@ import {
 } from '../../../common/geraet';
 import { expiringChargen } from '../../../common/geraetCharge';
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
-import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useGeraete from '../../../hooks/useGeraete';
+import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useGeraetSets from '../../../hooks/useGeraetSets';
-import { isFahrtenbuchManager } from '../../Fahrtenbuch/managerPermissions';
+import { useCan } from '../../../hooks/usePermissions';
 import OfflineListHint from '../../site/OfflineListHint';
 import OnlineOnly from '../../site/OnlineOnly';
 import { setGeraeteVerbrauchsmaterial } from '../geraeteActions';
@@ -71,28 +71,20 @@ function lagerortSummary(bestaende: GeraetBestand[] | undefined): string {
  * Lagerseite „Geräte & Material" einer Gruppe.
  *
  * Lesen dürfen alle Gruppenmitglieder (wo liegt was, was ist nachzubestellen);
- * Pflege, Buchungen und Import nur Gruppen-Admin und Gerätemeister — dieselbe
- * Rolle wie im Fahrtenbuch. Die Knöpfe sind Bedienkomfort, die Grenze ziehen
- * die Server Actions mit `actionFahrtenbuchManagerRequired`.
+ * Pflege, Buchungen und Import nur mit dem Recht `geraete.manage`
+ * (Gruppen-Admin, Gerätemeister). Die Knöpfe sind Bedienkomfort, die Grenze
+ * ziehen die Server Actions mit `actionPermissionRequired`.
  */
 export default function GeraeteAdminPage() {
   const t = useTranslations('geraete');
   const format = useFormatter();
-  const { isAuthorized, isAdmin, groups: userGroups, groupAdmin, fahrtenbuchGeraetemeister } =
-    useFirebaseLogin();
+  const { isAuthorized } = useFirebaseLogin();
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { geraete, bestaende, bestaendeByGeraet, loading, fromCache } = useGeraete(groupId);
   const { sets } = useGeraetSets(groupId);
   const containers = useMemo(() => geraete.filter(isContainer), [geraete]);
 
-  const canManage =
-    !!groupId &&
-    isFahrtenbuchManager(groupId, {
-      isAdmin,
-      groups: userGroups,
-      groupAdmin,
-      fahrtenbuchGeraetemeister,
-    });
+  const canManage = useCan(groupId, 'geraete.manage');
 
   const [view, setView] = useState<View>('list');
   const [filter, setFilter] = useState<GeraeteFilter>(DEFAULT_GERAETE_FILTER);

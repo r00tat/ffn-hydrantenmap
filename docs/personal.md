@@ -68,10 +68,12 @@ Der Fahrtenbuch-Link für Gäste bekommt `kraftfahrer` mit
 
 ## Wer pflegt
 
-Gruppen-Admin, Gerätemeister der Gruppe und Admin — dieselben wie zuvor im
-Personen-Reiter des Fahrtenbuchs, geprüft von
-`actionFahrtenbuchManagerRequired`. Die Rechte wurden mit dem Umzug nicht
-ausgeweitet; insbesondere ordnet ein Bekleidungswart keine Benutzerkonten zu,
+Wer in der Gruppe das Recht `personal.manage` hat — Gruppen-Admin,
+Gerätemeister, dazu der globale Admin; geprüft mit
+`actionPermissionRequired(groupId, 'personal.manage')`, in der Oberfläche
+mit `useCanAny`/`can` (siehe [berechtigungen.md](berechtigungen.md)). Das
+sind dieselben wie zuvor im Personen-Reiter des Fahrtenbuchs; die Rechte
+wurden mit dem Umzug nicht ausgeweitet; insbesondere ordnet ein Bekleidungswart keine Benutzerkonten zu,
 denn an `userIds` hängt das Änderungsrecht an Fahrten
 (`entryPermissions.ts`).
 

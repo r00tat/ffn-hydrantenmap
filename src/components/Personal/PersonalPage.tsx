@@ -8,42 +8,33 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
+import { can } from '../../common/permissions';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import {
-  hasAnyFahrtenbuchManagerRole,
-  isFahrtenbuchManager,
-} from '../Fahrtenbuch/managerPermissions';
+import { useCanAny } from '../../hooks/usePermissions';
 import PersonalAdmin from './PersonalAdmin';
 
 /**
  * Seite „Personal" einer Gruppe — der eine Ort, an dem der Personalstand
  * gepflegt wird, den Fahrtenbuch, Bekleidung und Atemschutz lesen.
  *
- * Zugang wie bisher beim Personen-Reiter des Fahrtenbuchs: Gruppen-Admin,
- * Gerätemeister und Admin. Die Grenze ziehen die Server Actions
- * (`actionFahrtenbuchManagerRequired`); die Prüfung hier ist Bedienkomfort.
- * Siehe docs/personal.md.
+ * Zugang mit `personal.manage` (Gruppen-Admin, Gerätemeister, Admin). Die
+ * Grenze ziehen die Server Actions (`actionPermissionRequired`); die Prüfung
+ * hier ist Bedienkomfort. Siehe docs/personal.md.
  */
 export default function PersonalPage() {
   const t = useTranslations('personal');
   const { groups: allGroups, groupId, setGroupId } = useFahrtenbuchGroup();
-  const {
-    isAuthorized,
-    isAdmin,
-    fahrtenbuchGeraetemeister,
-    groupAdmin,
-    groups: userGroups,
-  } = useFirebaseLogin();
-  const user = useMemo(
-    () => ({ isAdmin, fahrtenbuchGeraetemeister, groupAdmin, groups: userGroups }),
-    [isAdmin, fahrtenbuchGeraetemeister, groupAdmin, userGroups],
-  );
+  const { isAdmin, groupRoles } = useFirebaseLogin();
+  const canManageAny = useCanAny('personal.manage');
   const groups = useMemo(
-    () => allGroups.filter((g) => isFahrtenbuchManager(g.id, user)),
-    [allGroups, user],
+    () =>
+      allGroups.filter((g) =>
+        can({ isAdmin, groupRoles }, g.id, 'personal.manage'),
+      ),
+    [allGroups, isAdmin, groupRoles],
   );
 
-  if (!isAuthorized || !hasAnyFahrtenbuchManagerRole(user)) {
+  if (!canManageAny) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography>{t('noPermission')}</Typography>

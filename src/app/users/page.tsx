@@ -23,7 +23,9 @@ import { green, red } from '@mui/material/colors';
 import { useTranslations } from 'next-intl';
 import React, { useCallback, useMemo, useState } from 'react';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
+import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended } from '../../common/users';
+import { useSnackbar } from '../../components/providers/SnackbarProvider';
 import AdminGuard from '../../components/site/AdminGuard';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
@@ -89,6 +91,7 @@ function Users() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const updateApiCall = useUpdateUser();
+  const showSnackbar = useSnackbar();
 
   const groupsArray = useFirebaseCollection<Group>({
     collectionName: 'groups',
@@ -143,12 +146,18 @@ function Users() {
   }, []);
 
   const updateUser = useCallback(
-    async (user: UserRecordExtended) => {
+    async (user: UserRecordExtended, memberGroupIds?: string[]) => {
       console.info(`update user`);
-      await updateApiCall(user);
+      const result = await updateApiCall(user, memberGroupIds);
+      if (result && 'error' in result && result.error === 'notMigrated') {
+        showSnackbar(
+          t('notMigrated', { name: user.displayName || user.email || user.uid }),
+          'warning'
+        );
+      }
       await fetchUsers();
     },
-    [fetchUsers, updateApiCall]
+    [fetchUsers, updateApiCall, showSnackbar, t]
   );
 
   const authorizeAction = useCallback(
@@ -326,7 +335,7 @@ function Users() {
                 {user.feuerwehr} {user.description}
               </Grid>
               <Grid size={{ xs: 6, md: 4, lg: 3 }}>
-                {(user.groups || [])
+                {userMemberGroupIds(user)
                   .map((key: string) => groups[key])
                   .filter((v: string) => v)
                   .join(', ')}
@@ -356,10 +365,10 @@ function Users() {
         <UserRecordExtendedDialog
           user={editUser}
           groups={groups}
-          onClose={(user) => {
+          onClose={(user, memberGroupIds) => {
             setShowEditUserDialog(false);
             if (user) {
-              updateUser(user);
+              updateUser(user, memberGroupIds);
             }
           }}
         />

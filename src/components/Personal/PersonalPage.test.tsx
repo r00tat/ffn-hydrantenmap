@@ -34,8 +34,7 @@ describe('PersonalPage', () => {
     firebaseLoginMock.mockReturnValue({
       isAuthorized: true,
       isAdmin: false,
-      groups: ['ffnd'],
-      groupAdmin: ['ffnd'],
+      groupRoles: { ffnd: ['gruppenadmin'] },
     });
 
     renderWithIntl(<PersonalPage />);
@@ -49,8 +48,7 @@ describe('PersonalPage', () => {
     firebaseLoginMock.mockReturnValue({
       isAuthorized: true,
       isAdmin: false,
-      groups: ['ffnd'],
-      fahrtenbuchGeraetemeister: ['ffnd'],
+      groupRoles: { ffnd: ['geraetemeister'] },
     });
 
     renderWithIntl(<PersonalPage />);
@@ -62,7 +60,7 @@ describe('PersonalPage', () => {
     firebaseLoginMock.mockReturnValue({
       isAuthorized: true,
       isAdmin: false,
-      groups: ['ffnd'],
+      groupRoles: { ffnd: [] },
     });
 
     renderWithIntl(<PersonalPage />);

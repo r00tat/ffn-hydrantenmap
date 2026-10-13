@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 
-import { actionGroupAdminRequired } from '../../app/auth';
+import { actionPermissionRequired } from '../../app/auth';
 import {
   FAHRTENBUCH_CONFIG_COLLECTION_ID,
   FAHRTENBUCH_PERSON_COLLECTION_ID,
@@ -24,12 +24,10 @@ import {
 } from '../../common/kostenersatz';
 import { isTruthy } from '../../common/boolish';
 import { PERSON_FLAG_FIELDS, type PersonFlagField } from '../../common/personal';
+import { isMember, type GroupRoles } from '../../common/permissions';
 import { listUsers } from '../../app/api/users/listUsers';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
-import {
-  actionFahrtenbuchManagerRequired,
-} from './authGuards';
 import { planInactivePersons } from './fahrtenbuchImportPlan';
 import {
   matchPersonsToUsers,
@@ -112,7 +110,7 @@ export async function saveFahrtenbuchVehicle(
   >,
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'fahrtenbuch.manage');
     const now = new Date().toISOString();
     const payload = {
       name: data.name.trim(),
@@ -160,7 +158,7 @@ export async function deleteFahrtenbuchVehicle(
   vehicleId: string,
 ): Promise<StammdatenResult> {
   try {
-    await actionFahrtenbuchManagerRequired(groupId);
+    await actionPermissionRequired(groupId, 'fahrtenbuch.manage');
     await vehiclesRef(groupId).doc(vehicleId).delete();
     return { success: true, id: vehicleId };
   } catch (err) {
@@ -186,7 +184,7 @@ export async function saveFahrtenbuchPerson(
   >,
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'personal.manage');
     const now = new Date().toISOString();
     // Qualifikationen nur, wenn sie als Wahrheitswert mitkommen: Ein Aufrufer,
     // der sie nicht kennt (etwa ein älterer Client), darf die gepflegten
@@ -248,7 +246,7 @@ export async function setPersonFlag(
   value: boolean,
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'personal.manage');
     // Server-Action-Argumente sind Client-Eingabe: Ohne diese Prüfung ließe
     // sich über den Feldnamen jedes Feld der Person setzen, auch `userIds`.
     if (!PERSON_FLAG_FIELDS.includes(field)) {
@@ -282,7 +280,7 @@ export async function deleteFahrtenbuchPerson(
   personId: string,
 ): Promise<StammdatenResult> {
   try {
-    await actionFahrtenbuchManagerRequired(groupId);
+    await actionPermissionRequired(groupId, 'personal.manage');
     await personsRef(groupId).doc(personId).delete();
     return { success: true, id: personId };
   } catch (err) {
@@ -307,7 +305,7 @@ export async function previewVehicleImport(
   groupId: string,
 ): Promise<{ success: boolean; rows: VehicleImportPlanRow[]; error?: string }> {
   try {
-    await actionFahrtenbuchManagerRequired(groupId);
+    await actionPermissionRequired(groupId, 'fahrtenbuch.manage');
     const [source, existing] = await Promise.all([
       loadKostenersatzVehicles(),
       loadVehicles(groupId),
@@ -330,7 +328,7 @@ export async function importVehiclesFromKostenersatz(
   error?: string;
 }> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'fahrtenbuch.manage');
     const [source, existing] = await Promise.all([
       loadKostenersatzVehicles(),
       loadVehicles(groupId),
@@ -389,7 +387,7 @@ export async function previewPersonCsvImport(
   csvText: string,
 ): Promise<PersonImportPreview> {
   try {
-    await actionFahrtenbuchManagerRequired(groupId);
+    await actionPermissionRequired(groupId, 'personal.manage');
     const { records, errors } = parseRecipientCsv(csvText);
     const plan = planPersonCsvImport(records, await loadPersons(groupId));
     return {
@@ -432,7 +430,7 @@ export async function importPersonsFromCsv(
   selection: PersonImportSelection,
 ): Promise<PersonImportResult> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'personal.manage');
     const { records } = parseRecipientCsv(csvText);
     const plan = planPersonCsvImport(records, await loadPersons(groupId));
     // Server-Action-Argumente sind Client-Eingabe — der Typ ist zur Laufzeit
@@ -552,7 +550,7 @@ export async function createInactivePersons(
   names: string[],
 ): Promise<InactivePersonsResult> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'personal.manage');
     // Server-Action-Argumente sind Client-Eingabe — der Typ ist zur Laufzeit
     // weg, also darf hier nichts als Array vorausgesetzt werden.
     const list = (Array.isArray(names) ? names : []).filter(
@@ -605,7 +603,7 @@ export async function saveFahrtenbuchGroupStandort(
   standort: GeoPositionObject | undefined,
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
 
     const sanitized = sanitizeStandort(standort);
     // Kein Standort ist erlaubt (Zurücksetzen); ein übergebener, aber
@@ -645,7 +643,7 @@ export async function saveFahrtenbuchGroupFeuerwehrName(
   feuerwehrName: string,
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
 
     const now = new Date().toISOString();
     await firestore
@@ -692,7 +690,7 @@ export async function getFahrtenbuchMangelEmails(
   groupId: string,
 ): Promise<MangelEmailsQueryResult> {
   try {
-    await actionGroupAdminRequired(groupId);
+    await actionPermissionRequired(groupId, 'gruppe.manage');
 
     const doc = await configRef(groupId).get();
     if (!doc.exists) return { success: true, emails: [] };
@@ -721,7 +719,7 @@ export async function saveFahrtenbuchMangelEmails(
   emails: string[],
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
 
     const { emails: sanitized, error } = sanitizeMangelEmails(emails);
     if (error) return { success: false, error };
@@ -745,17 +743,24 @@ export async function saveFahrtenbuchMangelEmails(
   }
 }
 
-/** Ist dieses Benutzerkonto Mitglied der Gruppe? */
+/**
+ * Ist dieses Benutzerkonto Mitglied der Gruppe? Liest `groupRoles` und nicht
+ * `groups`: Das alte Feld pflegt `writeUserRoles()` nicht mehr. Ohne `isAdmin`,
+ * denn gefragt ist die Mitgliedschaft des Kontos, nicht sein Zugriff.
+ */
 function inGroup(user: unknown, groupId: string): boolean {
-  return (user as { groups?: string[] }).groups?.includes(groupId) === true;
+  return isMember(
+    { groupRoles: (user as { groupRoles?: GroupRoles }).groupRoles },
+    groupId,
+  );
 }
 
 /**
  * Vorschlag, welche Benutzerkonten zu welcher Person gehören — für den Dialog
  * „Bestehende Benutzer zuordnen".
  *
- * **Gerätemeister und Admin**, aber mit verschiedenem Blickfeld: Der
- * Gerätemeister sieht nur Konten, die **Mitglied seiner Gruppe** sind. Die
+ * **Wer `personal.manage` hat, und der Admin**, aber mit verschiedenem
+ * Blickfeld: Der Gerätemeister sieht nur Konten, die **Mitglied seiner Gruppe** sind. Die
  * Personen seiner Feuerwehr kennt er ohnehin namentlich; die Konten anderer
  * Feuerwehren sind nicht seine Sache, und ein Verteiler über alle Konten der App
  * wäre etwas anderes als die Aufgabe, die er hier erledigt.
@@ -772,7 +777,7 @@ export async function proposePersonUserLinks(
   groupId: string,
 ): Promise<StammdatenResult & { matches?: PersonUserMatch[] }> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'personal.manage');
 
     const [personSnapshot, candidates] = await Promise.all([
       personsRef(groupId).get(),
@@ -799,7 +804,7 @@ export async function listPersonUserCandidates(
   groupId: string,
 ): Promise<StammdatenResult & { candidates?: PersonUserCandidate[] }> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'personal.manage');
     const candidates = await loadUserCandidates(
       groupId,
       session.user.isAdmin === true,
@@ -860,7 +865,7 @@ export async function savePersonUserLinks(
   links: PersonUserLink[],
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionFahrtenbuchManagerRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'personal.manage');
 
     const [users, personSnapshot] = await Promise.all([
       listUsers(),

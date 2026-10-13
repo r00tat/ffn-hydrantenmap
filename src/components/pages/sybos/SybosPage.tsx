@@ -26,6 +26,7 @@ import { useFirecallLayersSorted } from '../../../hooks/useFirecallLayers';
 import useFirecallLocations from '../../../hooks/useFirecallLocations';
 import useFirecallWriteAccess from '../../../hooks/useFirecallWriteAccess';
 import { useFirecallKostenersatz } from '../../../hooks/useKostenersatz';
+import { useCan } from '../../../hooks/usePermissions';
 import useVehicles from '../../../hooks/useVehicles';
 import { setDocLocal } from '../../../lib/firestoreClient';
 import OnlineOnly from '../../site/OnlineOnly';
@@ -299,7 +300,12 @@ export default function SybosPage() {
   const fahrtenbuch = useFahrtenbuchEntries(firecall.group, {
     firecallId: firecall.id,
   });
-  const { calculations } = useFirecallKostenersatz(firecall.id);
+  // Kostenersatz nur mit Recht in der Gruppe des Einsatzes. Ohne bleibt die
+  // Tabelle leer statt das Abo an den Regeln scheitern zu lassen.
+  const canKostenersatz = useCan(firecall.group, 'kostenersatz.use');
+  const { calculations } = useFirecallKostenersatz(
+    canKostenersatz ? firecall.id : undefined,
+  );
   const alarmText = useFirecallAlarmText(firecall);
   const computed = useComputedFields(firecallItems, layers);
   const einsatzGeraetRows = useEinsatzGeraetRows(firecall);

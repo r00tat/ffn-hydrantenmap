@@ -21,10 +21,10 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/service-worker-pwa.md](docs/service-worker-pwa.md) | Änderungen unter `src/worker/`, Push, Precaching, App-Shell für den Kaltstart ohne Netz (Cache je Build, Vorwärmen, Vorlage für Einsatzseiten, Rückfallseite `/offline`) |
 | [docs/auth-und-origins.md](docs/auth-und-origins.md) | Basis-URL, WebAuthn-Origins, Cron-Aufrufer |
 | [docs/api-keys.md](docs/api-keys.md) | API-Keys des Firebase-Projekts: warum der Browser-Key öffentlich ist und Referrer nicht schützen, die begründete Freigabeliste je Key, die drei Android-SHA-1 und ihre Verteilwege, App-Check-Erzwingung für Gemini unter `firebaseml` statt `firebasevertexai`, Debug-Token lokal, Drift-Prüfung |
-| [docs/berechtigungen.md](docs/berechtigungen.md) | Rollen: globaler Admin, Gruppen-Admin, Gerätemeister, Bekleidungswart, Gruppenmitglied, Einsatz-Gast; wer was vergibt, warum kein Custom Claim, die Guards |
+| [docs/berechtigungen.md](docs/berechtigungen.md) | Gruppenrollen und Rechte: Rechte-Katalog und Rollen (`gruppenadmin`, `geraetemeister`, `bekleidungswart`, `kostenersatz`) in `src/common/permissions.ts`, warum Rechte und nicht Rollen geprüft werden, was jedes Mitglied ohne Recht darf, globaler Admin und Einsatz-Gast außerhalb der Gruppenrollen, wer was vergibt (Teilmengenregel), Ablage `groupRoles`/`groupPerms`/`permsAny` am Benutzerdokument, Mitgliedschaft im Claim gegen Fachrechte per `get()`, `writeUserRoles` als einziger Schreibweg, Katalogänderung und Neuableitung, Guards (`actionPermissionRequired`, `actionFirecallPermissionRequired`) und Hooks (`useCan`), Kostenersatz je Gruppe samt Berechnungen am Einsatz, Migrationsseite `/admin/berechtigungen` und Zeitfenster nach dem Deploy, Offline-Zwischenspeicher der Anmeldung |
 | [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Screenshot-Aufnahme |
 | [docs/ai-sprachassistent.md](docs/ai-sprachassistent.md) | Sprach-Assistent auf der Karte: Live-Gespräch gegen Einzelaufruf, warum der Kartenkontext zu Beginn hinausgeht und nicht am Ende, warum die Sitzung ein ganzes Gespräch lang lebt, warum die Mikrofonblöcke gesammelt werden, warum nicht `startAudioConversation`, warum die Verbindung ohne Firebase-SDK gebaut ist, kurzlebige Tokens und was darin festgenagelt ist, Tageskontingent, Rückfall, Abschrift, Werkzeuge außerhalb der Karte (Fahrtenbuch per Server Action, Atemschutztrupps im Browser), wann Werkzeuge zusammengelegt werden (`createMarker` mit `kind`, `calculateStrahlenschutz` mit `formel`), was das Modell von einem Element sieht und ändern kann (Richtung bei `nearItem`, Drehung, Felder je Typ), Ebenen und Messwerte per Sprache (aktive Ebene, Einheitenumrechnung, Himmelsrichtung vom letzten Messpunkt), Ebenen anlegen und ändern samt Datenfeldern (`editLayer`: Schlüssel, Einheit bei vorhandenen Werten, Formelprüfung), warum der Kontext nur ein Überblick ist und Details über `findItems` kommen, Gedächtnis über das Gespräch hinaus (Notizen per `remember`, Protokoll des vorigen Gesprächs, warum localStorage je Gerät und warum erst am Ende gespeichert) |
-| [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, eine Fahrt diktieren (Sprach-Assistent), Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle (Rollen allgemein: docs/berechtigungen.md), Fahrzeugkategorie und Anzeigereihenfolge |
+| [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, eine Fahrt diktieren (Sprach-Assistent), Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle und welches Recht welche Aufgabe verlangt (Rollen allgemein: docs/berechtigungen.md), Fahrzeugkategorie und Anzeigereihenfolge |
 | [docs/einsatz-drive-fotos.md](docs/einsatz-drive-fotos.md) | Einsatz-Fotos im Google Shared Drive |
 | [docs/einsatz-backup.md](docs/einsatz-backup.md) | Einsatz sichern und zurückspielen: Umfang, was bewusst fehlt, Gruppenwahl beim Import, Dateinamen von Anhängen |
 | [docs/sybos-uebertrag.md](docs/sybos-uebertrag.md) | Seite „Sybos-Übertrag“: Aufbau in Sybos-Reihenfolge, wann Kopierfeld und wann alphabetische Tabelle, warum deutsch, Download von Anhängen und Drive-Fotos über den Server, CSV der Messreihen, Ableitung der Zeiten, Kräfte und Material, Gemini-Zusammenfassung als JSON-Schema mit zwei Feldern, Speichern am Einsatz |
@@ -294,9 +294,13 @@ Prefer Next.js Server Actions (`'use server'`) over API route handlers (`src/app
 **All server actions must be protected** with the appropriate auth guard from `src/app/auth.ts`:
 
 - `actionAdminRequired()` — admin-only operations (user management, system config)
-- `actionGroupAdminRequired(groupId)` — administrative operations within *one* group (Fahrtenbuch administration, group settings); see [docs/berechtigungen.md](docs/berechtigungen.md)
+- `actionPermissionRequired(groupId, perm)` — a permission within *one* group, e.g. `'gruppe.manage'` (group settings), `'fahrtenbuch.manage'`, `'geraete.manage'`, `'personal.manage'`, `'bekleidung.read'`/`'bekleidung.manage'`, `'kostenersatz.use'`. Always check the permission of the task, never a role. Catalog in `src/common/permissions.ts`; see [docs/berechtigungen.md](docs/berechtigungen.md)
+- `actionGroupMemberRequired(groupId)` — any member of the group (or global admin)
 - `actionUserRequired()` — any authorized/logged-in user
-- `actionUserAuthorizedForFirecall(firecallId)` — user authorized for a specific firecall
+- `actionUserAuthorizedForFirecall(firecallId)` — user authorized for a specific firecall (member or guest)
+- `actionFirecallPermissionRequired(firecallId, perm)` — a permission in the *firecall's* group (e.g. Kostenersatz at an operation); guests never pass
+
+In client components use `useCan(groupId, perm)` / `useCanAny(perm)` from `src/hooks/usePermissions.ts`. Roles and their derived fields on the user document are written **only** through `writeUserRoles()` (`src/server/auth/userRoles.ts`).
 
 Call the guard at the top of every server action before any logic. For API routes (legacy), use `adminRequired(req)` from `src/server/auth/adminRequired.ts` instead.
 
@@ -310,7 +314,7 @@ Call the guard at the top of every server action before any logic. For API route
 - Server-side Admin SDK in `src/server/firebase/admin.ts`
 - Separate dev (`ffndev`) and prod Firebase projects configured via `NEXT_PUBLIC_FIRESTORE_DB`
 
-**Authentication Flow**: Firebase Auth (client) → Firebase ID token → NextAuth Credentials provider (server verification) → Session with authorization flags (`isAuthorized`, `isAdmin`, `groups`).
+**Authentication Flow**: Firebase Auth (client) → Firebase ID token → NextAuth Credentials provider (server verification) → Session with authorization flags (`isAuthorized`, `isAdmin`, `groupRoles`, and `groups` derived from it).
 
 **Map Architecture**: `PositionedMap` → `Map` (Leaflet config) → `Clusters` (marker clustering) + layer components in `components/Map/layers/`.
 
@@ -328,16 +332,16 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 - `history` - Event history entries
 - `layer` - Element-Gruppierung je Einsatz (**nicht** Kartenebenen)
 - `mapLayer` - Eigene WMS-/WMTS-Kartenebenen je Einsatz (siehe [docs/eigene-kartenebenen.md](docs/eigene-kartenebenen.md))
-- `user` - User profiles with authorization
+- `user` - User profiles with authorization; Gruppenrollen in `groupRoles` (Quelle) plus abgeleitet `groupPerms`/`permsAny` für die Firestore-Regeln, geschrieben nur über `writeUserRoles()` (siehe [docs/berechtigungen.md](docs/berechtigungen.md))
 - `person` - Personalstand je Gruppe (`groups/{groupId}/person`): Name, Kontakt, BlaulichtSMS-ID, Benutzerkonten (`userIds`), Qualifikationen `kraftfahrer`/`atemschutztraeger`. Eine Liste für Fahrtenbuch, Bekleidung und Atemschutz, gepflegt auf `/personal` (siehe [docs/personal.md](docs/personal.md))
 - `clusters6` - Geohashed hydrant clusters
 - `bugReport` - In-App Bug-Reports & Feature-Requests (siehe unten)
-- `appConfig` - App-weite Konfiguration (u.a. Dokument `bugReport` mit Empfänger-E-Mails)
+- `appConfig` - App-weite Konfiguration (u.a. Dokument `bugReport` mit Empfänger-E-Mails, `permissionsMigration` mit dem Stand der Rollen-Migration)
 - `atemschutzGeraet` - Atemschutz-Ausrüstung je Gruppe (`groups/{groupId}/atemschutzGeraet`, siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
 - `atemschutzFuellung` - Füllprotokoll je Gruppe (`groups/{groupId}/atemschutzFuellung`), mit `firecallId` als Einsatzbezug und `zweck` als Anlass. Ändern/Löschen nur durch den Erfasser (Firestore-Regel) bzw. den Gruppen-Admin (Server Action), nie nach der Verrechnung
-- `atemschutzRechnung`, `atemschutzEmpfaenger`, `atemschutzConfig` - Verrechnung der Flaschenfüllungen je Gruppe; **ohne** Absender und Bankverbindung, die liegen in `groupConfig` (siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
+- `atemschutzRechnung`, `atemschutzEmpfaenger`, `atemschutzConfig` - Verrechnung der Flaschenfüllungen je Gruppe, lesen nur mit `kostenersatz.use` in der Gruppe; **ohne** Absender und Bankverbindung, die liegen in `groupConfig` (siehe [docs/atemschutzsammelplatz.md](docs/atemschutzsammelplatz.md))
 - `groupConfig` - Stammdaten einer Gruppe: Absender, Bankverbindung und Logo (`groups/{groupId}/groupConfig/stammdaten`). Von Kostenersatz **und** Atemschutz-Verrechnung gelesen (siehe [docs/gruppen-stammdaten.md](docs/gruppen-stammdaten.md))
-- `kostenersatzConfig` - Mailvorlagen des Kostenersatzes je Gruppe (`groups/{groupId}/kostenersatzConfig/email`)
+- `kostenersatzConfig` - Mailvorlagen des Kostenersatzes je Gruppe (`groups/{groupId}/kostenersatzConfig/email`), lesen nur mit `kostenersatz.use` in der Gruppe. Die Berechnungen am Einsatz (`call/{id}/kostenersatz`) verlangen `kostenersatz.use` in der Gruppe des Einsatzes, Gäste nie (siehe [docs/berechtigungen.md](docs/berechtigungen.md))
 - `atemschutzTrupp` - Bereitstellungen der Atemschutztrupps je Einsatz (`call/{firecallId}/atemschutzTrupp`). Trägt **beides**: die Logistik des Sammelplatzes und die Felder der Atemschutzüberwachung (`abfragen`, `ueberwachungUids`, `ueberwachungSeit`/`ueberwachungBis` als Zeitraum der Zeitkontrolle, `warnungen`, Gerätesatz) — ein Trupp ist ein Trupp (siehe [docs/atemschutzueberwachung.md](docs/atemschutzueberwachung.md))
 - `atemschutzAusgabe` - Ausgabe der Ausrüstung am Sammelplatz je Einsatz
 - `geraet` - Geräte und Lagerartikel je Gruppe (`groups/{groupId}/geraet`, ID = Sybos-`ID`), mit Flag `verbrauchsmaterial`, `mindestbestand` und mitgeführtem `bestandGesamt`. Atemschutz liegt **nicht** hier (siehe [docs/geraete-lager.md](docs/geraete-lager.md))
@@ -345,7 +349,7 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 - `geraetBuchung` - Protokoll jeder Mengenänderung **und** jeder Änderung an Stammdaten, Chargen, Lagerorten, Sets und Geräte-Zuordnungen je Gruppe (`groups/{groupId}/geraetBuchung`, Historie, siehe [docs/geraete-lager.md](docs/geraete-lager.md)). `geraet`, `geraetBestand` und `geraetBuchung` schreiben nur Server Actions
 - `geraetSet` - Sets für Geräte und Material je Gruppe (`groups/{groupId}/geraetSet`): Name, Codes, Inhalte, optional an einen Sybos-Set-Artikel gebunden. Schreiben nur Server Actions; im Einsatz entstehen daraus Einzeleinträge in `geraetEinsatz` mit `setZuordnungId` (siehe [docs/geraete-lager.md](docs/geraete-lager.md), Abschnitt „Sets")
 - `geraetEinsatz` - Zuordnung und Verbrauch von Geräten/Material im Einsatz (`call/{firecallId}/geraetEinsatz`), lokal geschrieben; das Abbuchen gleicht `syncGeraetVerbrauch` nach
-- `bekleidungArtikel`, `bekleidungStueck`, `bekleidungBestand`, `bekleidungAusgabe`, `bekleidungWaesche` - Bekleidungsverwaltung je Gruppe (`groups/{groupId}/…`): Artikeltypen, Einzelstücke, Mengenbestand je Größe und Charge, Ausgabe-Verlauf, Waschgänge. Lesen nur Bekleidungswart, Gruppen-Admin, Admin; schreiben nur Server Actions (siehe [docs/bekleidung.md](docs/bekleidung.md))
+- `bekleidungArtikel`, `bekleidungStueck`, `bekleidungBestand`, `bekleidungAusgabe`, `bekleidungWaesche` - Bekleidungsverwaltung je Gruppe (`groups/{groupId}/…`): Artikeltypen, Einzelstücke, Mengenbestand je Größe und Charge, Ausgabe-Verlauf, Waschgänge. Lesen nur mit dem Recht `bekleidung.read` in der Gruppe (Bekleidungswart, Gruppen-Admin) oder als Admin; schreiben nur Server Actions (siehe [docs/bekleidung.md](docs/bekleidung.md))
 - `oauthClients`, `oauthAuthCodes`, `oauthRefreshTokens`, `oauthConsents` - OAuth-Authorization-Server des MCP-Zugangs, rein serverseitig (siehe [docs/mcp-server.md](docs/mcp-server.md))
 
 ## Bug Reports / Feedback

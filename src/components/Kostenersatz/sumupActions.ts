@@ -1,13 +1,12 @@
 'use server';
 import 'server-only';
 
-import { actionUserAuthorizedForFirecall, auth } from '../../app/auth';
+import { actionFirecallPermissionRequired } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
-import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
+import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import {
   KostenersatzCalculation,
   KOSTENERSATZ_SUBCOLLECTION,
-  KOSTENERSATZ_GROUP,
 } from '../../common/kostenersatz';
 import { completePaymentAndNotify } from './completePaymentAndNotify';
 import { getBaseUrl } from '../../server/auth/baseUrl';
@@ -40,23 +39,11 @@ interface SumupPaymentStatusResponse {
 // ============================================================================
 
 /**
- * Check authentication, kostenersatz group membership, and firecall authorization.
- * Throws on failure; returns the session on success.
+ * Kostenersatz-Recht in der Gruppe des Einsatzes. Wirft sonst; liefert Sitzung
+ * und Einsatz.
  */
 async function requireKostenersatzUser(firecallId: string) {
-  const session = await auth();
-  if (!session?.user) {
-    throw new Error('Not authenticated');
-  }
-
-  if (!session.user.groups?.includes(KOSTENERSATZ_GROUP)) {
-    throw new Error('User is not in the kostenersatz group');
-  }
-
-  // Use existing pattern instead of reimplementing
-  await actionUserAuthorizedForFirecall(firecallId);
-
-  return session;
+  return actionFirecallPermissionRequired(firecallId, 'kostenersatz.use');
 }
 
 /**
@@ -226,11 +213,7 @@ export async function getSumupDeepLink(
   calculationId: string,
 ): Promise<SumupDeepLinkResponse> {
   try {
-    await requireKostenersatzUser(firecallId);
-
-    const firecall = (
-      await firestore.collection(FIRECALL_COLLECTION_ID).doc(firecallId).get()
-    ).data() as Firecall;
+    const { firecall } = await requireKostenersatzUser(firecallId);
 
     const calculation = await getCalculation(firecallId, calculationId);
 

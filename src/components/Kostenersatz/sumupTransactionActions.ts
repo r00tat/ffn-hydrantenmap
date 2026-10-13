@@ -1,13 +1,14 @@
 'use server';
 import 'server-only';
 
-import { auth } from '../../app/auth';
+import { ApiException } from '../../app/api/errors';
+import { actionUserRequired } from '../../app/auth';
+import { can, canAny } from '../../common/permissions';
 import { firestore } from '../../server/firebase/admin';
-import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
+import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import {
   KostenersatzCalculation,
   KOSTENERSATZ_SUBCOLLECTION,
-  KOSTENERSATZ_GROUP,
 } from '../../common/kostenersatz';
 
 export interface SumUpTransactionRow {
@@ -23,13 +24,16 @@ export interface SumUpTransactionRow {
   sumupCheckoutRef?: string;
 }
 
+/**
+ * SumUp-Zahlungen aller Einsätze, deren Gruppe dem Benutzer Kostenersatz
+ * erlaubt. Die Abfrage läuft über alle Einsätze (Collection Group); gefiltert
+ * wird je Einsatz nach dessen Gruppe — wer Kostenersatz nur in einer Gruppe
+ * macht, sieht die Zahlungen der anderen nicht.
+ */
 export async function fetchSumupTransactions(): Promise<SumUpTransactionRow[]> {
-  const session = await auth();
-  if (!session?.user) {
-    throw new Error('Not authenticated');
-  }
-  if (!session.user.groups?.includes(KOSTENERSATZ_GROUP)) {
-    throw new Error('User is not in the kostenersatz group');
+  const session = await actionUserRequired();
+  if (!canAny(session.user, 'kostenersatz.use')) {
+    throw new ApiException('user lacks kostenersatz.use', { status: 403 });
   }
 
   const snapshot = await firestore
@@ -38,21 +42,28 @@ export async function fetchSumupTransactions(): Promise<SumUpTransactionRow[]> {
     .get();
 
   const rows: SumUpTransactionRow[] = [];
-  const firecallCache = new Map<string, string>();
+  const firecallCache = new Map<string, { name: string; permitted: boolean }>();
 
   for (const doc of snapshot.docs) {
     const data = doc.data() as KostenersatzCalculation;
     const firecallId = doc.ref.parent.parent?.id || '';
+    if (!firecallId) continue;
 
-    let firecallName = firecallCache.get(firecallId) || '';
-    if (!firecallName && firecallId) {
-      const firecallDoc = await firestore
-        .collection(FIRECALL_COLLECTION_ID)
-        .doc(firecallId)
-        .get();
-      firecallName = firecallDoc.data()?.name || firecallId;
-      firecallCache.set(firecallId, firecallName);
+    let firecallInfo = firecallCache.get(firecallId);
+    if (!firecallInfo) {
+      const firecall = (
+        await firestore.collection(FIRECALL_COLLECTION_ID).doc(firecallId).get()
+      ).data() as Firecall | undefined;
+      firecallInfo = {
+        name: firecall?.name || firecallId,
+        permitted:
+          !!firecall?.group &&
+          can(session.user, firecall.group, 'kostenersatz.use'),
+      };
+      firecallCache.set(firecallId, firecallInfo);
     }
+    if (!firecallInfo.permitted) continue;
+    const firecallName = firecallInfo.name;
 
     rows.push({
       firecallId,

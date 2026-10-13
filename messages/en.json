@@ -45,6 +45,7 @@
       "fuellungVerrechnet": "This filling is on an invoice and can no longer be changed.",
       "notInGroup": "No access to this fire brigade.",
       "notGroupAdmin": "This requires group admin rights.",
+      "notPermitted": "You lack the permission for this in this group.",
       "notLoggedIn": "Not signed in or not authorized."
     },
     "admin": {
@@ -1155,7 +1156,8 @@
     "firecallGuestSection": "Operation guest",
     "firecallGuestFor": "Access limited to operation {firecall}",
     "firecallWrite": "Write access to the operation",
-    "firecallWriteHint": "Takes effect the next time the access is refreshed (within 45 minutes)."
+    "firecallWriteHint": "Takes effect the next time the access is refreshed (within 45 minutes).",
+    "rolesHint": "This only sets the membership. Roles per group are assigned under Groups → Members and roles."
   },
   "header": {
     "appTitle": "Operations Map",
@@ -1224,6 +1226,8 @@
     "users": "Users",
     "connectedApps": "Connected applications",
     "adminMcp": "MCP access",
+    "adminPermissions": "Permissions (migration)",
+    "memberRoles": "Members and roles",
     "fuellprotokoll": "Filling log",
     "sybos": "Sybos transfer",
     "personal": "Personnel"
@@ -1339,6 +1343,7 @@
       "notAllowed": "Only the author, an equipment officer or an admin may change this entry.",
       "notInGroup": "You are not a member of this group.",
       "notGroupAdmin": "You are not allowed to administer this group.",
+      "notPermitted": "You lack the permission for this in this group.",
       "notLoggedIn": "Not signed in, or your authorisation was revoked. Please sign in again.",
       "entryDeleted": "This entry was deleted and cannot be edited.",
       "tooManyEntries": "Too many trips at once. Please save in smaller batches.",
@@ -1647,16 +1652,6 @@
       "mangelEmailsSaveFailed": "Recipients could not be saved: {message}",
       "mangelEmailInvalid": "Please enter valid email addresses.",
       "mangelEmailsTooMany": "At most {max} recipients are possible.",
-      "geraetemeister": "Equipment officers",
-      "geraetemeisterHint": "Equipment officers may correct any trip of this group after the fact — a mistyped odometer reading, for example — and maintain its vehicles and people. Otherwise only the author of a trip or an admin may do so.",
-      "geraetemeisterLabel": "Users",
-      "geraetemeisterPlaceholder": "Search by name",
-      "geraetemeisterHelper": "Only members of this group can be selected.",
-      "geraetemeisterSaved": "Equipment officers saved.",
-      "geraetemeisterLoadFailed": "Could not load equipment officers: {message}",
-      "geraetemeisterSaveFailed": "Could not save equipment officers: {message}",
-      "geraetemeisterNotAMember": "At least one selected user does not belong to this group.",
-      "geraetemeisterNoMembers": "This group has no members that could be assigned.",
       "noPermission": "You do not have permission to view this page.",
       "weeklyReport": {
         "title": "Send weekly report",
@@ -1773,7 +1768,6 @@
         "statusInvalid": "Invalid status.",
         "resolvedAtInvalid": "The resolution date is invalid.",
         "mangelNotFound": "This defect no longer exists.",
-        "notAllowedDelete": "Only an admin may delete a defect.",
         "saveFailed": "Saving failed: {message}",
         "deleteFailed": "Deleting failed: {message}",
         "imageUploadFailed": "An image could not be uploaded. Please try again.",
@@ -2262,7 +2256,7 @@
     "title": "Cost recovery",
     "titleForCall": "Cost recovery - {name}",
     "loginRequired": "Please sign in.",
-    "noPermission": "You do not have permission for this feature. Please contact an administrator to obtain access to the \"Cost recovery\" group.",
+    "noPermission": "You do not have cost recovery permission in this operation's group. A group admin assigns the \"Cost recovery\" role.",
     "noFirecall": "No operation selected.",
     "calculations": "Cost-recovery calculations",
     "newCalculation": "New calculation",
@@ -2898,6 +2892,7 @@
     "geraete": "Equipment & supplies"
   },
   "users": {
+    "notMigrated": "{name} has not been migrated yet (old cost recovery flag); the groups were not changed. Run step 2 under “Permissions (migration)” first.",
     "title": "Users",
     "filter": "Filter...",
     "filterByGroups": "Filter by groups",
@@ -2920,6 +2915,7 @@
     "guestReadOnly": "Read only"
   },
   "groups": {
+    "notMigrated": "Not changed because not migrated yet (old cost recovery flag): {names}. Run step 2 under “Permissions (migration)” first.",
     "title": "Groups",
     "createKnown": "Create standard groups",
     "createKnownTooltip": "Create missing groups: {names}",
@@ -2935,7 +2931,8 @@
     "fahrtenbuchLinkHint": "The logbook link and its QR codes are managed in the logbook administration.",
     "fahrtenbuchLinkAction": "Go to logbook administration",
     "groupAdmins": "Group admins",
-    "groupAdminsHint": "Group admins handle all administrative tasks within this group — logbook administration including equipment managers, group settings and deleting the group's operations. Only group members can be selected."
+    "groupAdminsHint": "Group admins handle all administrative tasks within this group — logbook, equipment, personnel, clothing, group settings and assigning the other roles. Only group members can be selected; assign the other roles under “Members and roles”.",
+    "roles": "Members and roles of {name}"
   },
   "tokens": {
     "title": "API tokens",
@@ -3075,7 +3072,8 @@
     "warningsTitle": "{count, plural, one {# warning} other {# warnings}}",
     "warningAttachmentDownloadFailed": "Attachment “{file}” could not be backed up.",
     "warningAttachmentUploadFailed": "Attachment “{file}” could not be uploaded.",
-    "warningNewerBackupVersion": "The file comes from a newer version of the app — data may be missing."
+    "warningNewerBackupVersion": "The file comes from a newer version of the app — data may be missing.",
+    "warningKostenersatzSkipped": "{count, plural, one {# cost recovery calculation was} other {# cost recovery calculations were}} not imported — this requires the \"Cost recovery\" role in the target group."
   },
   "geschaeftsbuch": {
     "title": "Business log",
@@ -3673,6 +3671,72 @@
     "mcpOrigin": "AI",
     "mcpOriginTooltip": "This entry was written by the connected application “{client}” through the MCP interface, not by hand."
   },
+  "adminPermissions": {
+    "pageTitle": "Permissions",
+    "intro": "Moves the old role fields (group admin, equipment officer, clothing officer, cost recovery) to roles per group. Each step can be run on its own and repeated.",
+    "loadError": "The users could not be loaded: {message}",
+    "actionError": "The step failed: {message}",
+    "reload": "Reload",
+    "summary": "{total} users: {migrated} migrated, {pending} pending, {legacy} with old fields",
+    "step1Title": "1. Preview",
+    "step1Text": "The old fields of each user and the roles computed from them. A user gets cost recovery only in the ticked groups; all groups they belong to are ticked by default.",
+    "onlyPending": "Pending users only",
+    "columnUser": "User",
+    "columnStatus": "Status",
+    "columnLegacy": "Old fields",
+    "columnRoles": "New roles",
+    "columnKostenersatz": "Cost recovery in",
+    "columnHints": "Notes",
+    "statusMigrated": "migrated",
+    "statusPending": "pending",
+    "legacyGroups": "Groups",
+    "legacyGroupAdmin": "Group admin",
+    "legacyGeraetemeister": "Equipment officer",
+    "legacyBekleidungswart": "Clothing officer",
+    "noRoles": "Member without role",
+    "noMembership": "no membership",
+    "hintDroppedRole": "Role {role} in {group} is dropped (not a member)",
+    "hintWithoutTenantGroup": "No real group, only allUsers/kostenersatz",
+    "hintSkipped": "Already migrated, will be skipped",
+    "noUsers": "No users found.",
+    "step2Title": "2. Migrate",
+    "step2Text": "Writes the roles and the derived permissions for every pending user. Old fields and claims stay unchanged, so a rollback to the previous release remains possible.",
+    "migrateButton": "{count, plural, one {Migrate # user} other {Migrate # users}}",
+    "migrateConfirmTitle": "Migrate users?",
+    "migrateConfirmText": "{count, plural, one {# user gets} other {# users get}} roles per group. Old fields and claims stay in place.",
+    "step3Title": "3. Remove old fields",
+    "step3Text": "Deletes group admin, equipment officer, clothing officer and “kostenersatz” from the groups and resets the claims. A rollback is no longer straightforward afterwards — run it only once the release has proven itself.",
+    "cleanupButton": "Remove old fields",
+    "cleanupBlocked": "Only possible once all users are migrated ({pending} pending).",
+    "cleanupConfirmTitle": "Remove old fields for good?",
+    "cleanupConfirmText": "The old role fields are deleted and the claims of all users are reset. A rollback to the previous release is then no longer possible without repairing data.",
+    "cleanupNotAllowed": "Old fields can only be removed once all users are migrated.",
+    "recomputeTitle": "Recompute permissions",
+    "recomputeText": "Recomputes the permissions read by the Firestore rules for all users from their roles and the current catalog, and reports deviations. Run it after every catalog change.",
+    "recomputeButton": "Recompute permissions",
+    "lastRun": "Last run: {at} by {by}",
+    "resultCounts": "{processed} written, {skipped} unchanged, {errors} errors",
+    "resultNotMigrated": "{count, plural, one {# user} other {# users}} not migrated",
+    "noDeviations": "No deviations.",
+    "deviationsTitle": "Deviations before recomputing",
+    "errorsTitle": "Errors",
+    "confirm": "Run",
+    "cancel": "Cancel",
+    "deviation": {
+      "notMigrated": "not migrated",
+      "catalogVersion": "catalog version outdated",
+      "groupPerms": "permissions per group differ",
+      "permsAny": "overall permissions differ",
+      "unknownRole": "unknown role (left in place)",
+      "nonTenantGroup": "no real group in the roles"
+    },
+    "role": {
+      "gruppenadmin": "Group admin",
+      "geraetemeister": "Equipment officer",
+      "bekleidungswart": "Clothing officer",
+      "kostenersatz": "Cost recovery"
+    }
+  },
   "adminMcp": {
     "pageTitle": "MCP access",
     "description": "Registered applications and active grants of the MCP server.",
@@ -4248,16 +4312,8 @@
     "title": "Clothing",
     "settings": {
       "title": "Clothing officers",
-      "hint": "Clothing officers manage this group's turnout gear and uniforms: stock, issue, return and laundry. Group admins and admins may always do so.",
-      "label": "Users",
-      "placeholder": "Search by name",
-      "helper": "Only members of this group can be selected.",
-      "save": "Save",
-      "saved": "Clothing officers saved.",
-      "loadFailed": "Could not load clothing officers: {message}",
-      "saveFailed": "Could not save clothing officers: {message}",
-      "notAMember": "At least one selected user does not belong to this group.",
-      "noMembers": "This group has no members that could be assigned."
+      "hint": "The \"Clothing officer\" role controls who may view and manage this group's clothing. You assign roles in the group's roles view.",
+      "link": "Open members and roles"
     },
     "subtitle": "Turnout gear and uniforms: items, stock, issue, return and laundry.",
     "group": "Group",
@@ -4716,5 +4772,81 @@
     "accountNotInGroup": "not in group",
     "flagSaveFailed": "Change failed: {message}",
     "linkSaveFailed": "The person was saved, the user accounts were not: {message}"
+  },
+  "groupRoles": {
+    "title": "Members and roles",
+    "group": "Group",
+    "intro": "Roles of the members of {group}. Without a role every member sees the group's operations, map and logbook; a role unlocks additional tasks.",
+    "noAccess": "You may not assign roles in this group.",
+    "member": "Member",
+    "noMembers": "The group has no members yet.",
+    "notMigrated": "old fields",
+    "notMigratedHint": "These roles still come from the old fields. The first change rewrites them as roles per group.",
+    "toggleRole": "{role} for {name}",
+    "notAssignable": "You may not assign this role: only the admin assigns group admins, other roles only someone who holds their permissions.",
+    "addMemberLabel": "Add user",
+    "addMember": "Add",
+    "memberAdded": "{name} is now a member.",
+    "removeMember": "Remove {name} from the group",
+    "removeConfirmTitle": "Remove {name}?",
+    "removeConfirmText": "{name} loses the membership in {group} together with all roles there.",
+    "memberRemoved": "{name} is no longer a member.",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "explanationTitle": "What the roles allow",
+    "explanationIntro": "Roles apply to this group only. A member can hold several roles and gets the permissions of all of them.",
+    "linkHint": "Equipment officers, clothing officers and cost recovery are assigned per group under “Members and roles”.",
+    "linkAction": "Assign roles",
+    "roles": {
+      "gruppenadmin": {
+        "name": "Group admin",
+        "description": "Manages the group: settings, logbook, equipment, personnel and clothing, and assigns the other roles. Cost recovery is not included. Only the admin assigns it."
+      },
+      "geraetemeister": {
+        "name": "Equipment officer",
+        "description": "Maintains the logbook (vehicles, people, corrections to trips), equipment & material and the group's personnel."
+      },
+      "bekleidungswart": {
+        "name": "Clothing officer",
+        "description": "Sees and manages the group's clothing: stock, issues, washes."
+      },
+      "kostenersatz": {
+        "name": "Cost recovery",
+        "description": "Creates cost recovery calculations for the group's operations and the billing of cylinder fillings."
+      }
+    },
+    "permissions": {
+      "fahrtenbuch": {
+        "manage": "Manage logbook"
+      },
+      "geraete": {
+        "manage": "Manage equipment & material"
+      },
+      "personal": {
+        "manage": "Manage personnel"
+      },
+      "bekleidung": {
+        "read": "View clothing",
+        "manage": "Manage clothing"
+      },
+      "kostenersatz": {
+        "use": "Cost recovery"
+      },
+      "gruppe": {
+        "manage": "Manage group"
+      },
+      "rollen": {
+        "assign": "Assign roles"
+      }
+    },
+    "errors": {
+      "forbidden": "You may not assign or revoke this role.",
+      "invalidRole": "Unknown role.",
+      "notAMember": "The user is not a member of this group.",
+      "unknownUser": "The user does not exist.",
+      "firecallGuest": "Operation guests cannot become members.",
+      "notMigrated": "This user has not been migrated yet and still has the old cost recovery flag. Run step 2 under “Permissions (migration)” first — that is where you choose the groups in which they keep cost recovery.",
+      "unknown": "That did not work: {message}"
+    }
   }
 }

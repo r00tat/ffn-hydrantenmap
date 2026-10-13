@@ -34,7 +34,7 @@ import {
   type FeuerwehrBuendel,
 } from '../../common/atemschutzRechnung';
 import { stammdatenLuecken } from '../../common/groupStammdaten';
-import { KOSTENERSATZ_GROUP, formatCurrency } from '../../common/kostenersatz';
+import { formatCurrency } from '../../common/kostenersatz';
 import useAtemschutzEmpfaenger from '../../hooks/useAtemschutzEmpfaenger';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
 import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
@@ -44,6 +44,7 @@ import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
 import useGroupStammdaten from '../../hooks/useGroupStammdaten';
+import { useCan } from '../../hooks/usePermissions';
 import { useKostenersatzRates } from '../../hooks/useKostenersatz';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import EmpfaengerDialog from './EmpfaengerDialog';
@@ -77,8 +78,11 @@ export default function VerrechnungPage() {
   const tCommon = useTranslations('common');
   const format = useFormatter();
   const router = useRouter();
-  const { isAuthorized, groups: freigaben } = useFirebaseLogin();
-  const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
+  const { isAuthorized } = useFirebaseLogin();
+  // Nur Gruppen mit `kostenersatz.use` stehen zur Auswahl: Die Rechnungen,
+  // Empfänger und Einstellungen anderer Gruppen geben die Regeln nicht heraus.
+  const { groups, groupId, setGroupId } = useFahrtenbuchGroup('kostenersatz.use');
+  const canVerrechnen = useCan(groupId, 'kostenersatz.use');
 
   const { fuellungen } = useAtemschutzFuellungen(groupId, {
     nurVerrechnen: true,
@@ -139,9 +143,9 @@ export default function VerrechnungPage() {
     );
   }
 
-  // Wer abrechnet, braucht die Kostenersatz-Freigabe — dieselbe Bedingung wie
-  // in `actionFuellungRechnungRequired` und in den Firestore-Regeln.
-  if (!freigaben?.includes(KOSTENERSATZ_GROUP)) {
+  // Wer abrechnet, braucht `kostenersatz.use` in der Gruppe — dieselbe
+  // Bedingung wie in den Rechnungs-Actions und in den Firestore-Regeln.
+  if (!canVerrechnen) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography variant="h5" gutterBottom>

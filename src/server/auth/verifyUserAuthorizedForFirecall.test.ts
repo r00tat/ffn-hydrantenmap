@@ -43,7 +43,12 @@ const { collectionMock, setFirecall, setFirecallMissing, setUser } = vi.hoisted(
       firecallWrite?: boolean,
       // Gäste brauchen seit der Link-Verwaltung ein Ablaufdatum; ohne eines
       // gelten sie als abgelaufen. `null` erzwingt genau diesen Altbestand.
-      options: { authorized?: boolean; firecallExpiresAt?: number | null } = {},
+      options: {
+        authorized?: boolean;
+        firecallExpiresAt?: number | null;
+        /** Nur das alte Feld `groups`, ohne `groupRoles` (nicht migriert). */
+        legacyOnly?: boolean;
+      } = {},
     ) => {
       const expiresAt =
         options.firecallExpiresAt === undefined
@@ -53,6 +58,13 @@ const { collectionMock, setFirecall, setFirecallMissing, setUser } = vi.hoisted(
         exists: true,
         data: () => ({
           groups,
+          ...(options.legacyOnly
+            ? {}
+            : {
+                groupRoles: Object.fromEntries(
+                  groups.filter((g) => g !== 'allUsers').map((g) => [g, []]),
+                ),
+              }),
           authorized: options.authorized ?? true,
           firecall: firecallClaim,
           ...(firecallWrite === undefined ? {} : { firecallWrite }),
@@ -82,6 +94,24 @@ describe('verifyUserAuthorizedForFirecall', () => {
     const result = await verifyUserAuthorizedForFirecall(user, 'fc1');
     expect(result.group).toBe('einsatz');
     expect(result.id).toBe('fc1');
+  });
+
+  it('counts membership from groupRoles, not from the legacy groups field', async () => {
+    // `writeUserRoles` pflegt `groups` nicht mehr — wer dort noch steht, aber
+    // nicht in `groupRoles`, ist kein Mitglied (wie in der Sitzung).
+    setFirecall('einsatz');
+    setUser(['einsatz', 'allUsers'], undefined, undefined, { legacyOnly: true });
+    await expect(
+      verifyUserAuthorizedForFirecall(user, 'fc1'),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('lets every user see a firecall of the allUsers pseudo-group', async () => {
+    setFirecall('allUsers');
+    setUser(['einsatz', 'allUsers']);
+    await expect(
+      verifyUserAuthorizedForFirecall(user, 'fc1'),
+    ).resolves.toMatchObject({ group: 'allUsers' });
   });
 
   it('returns the firecall for a single-firecall guest claim', async () => {

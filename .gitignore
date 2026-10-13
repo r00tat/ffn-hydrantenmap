@@ -23,6 +23,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# Firestore-Emulator (npm run test:rules)
+firestore-debug.log
 
 # local env files
 .env.local

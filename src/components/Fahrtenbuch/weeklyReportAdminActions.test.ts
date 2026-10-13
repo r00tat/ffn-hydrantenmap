@@ -16,9 +16,9 @@ vi.mock('../../app/auth', async () => {
     typeof import('../../app/groups/groupTypes')
   >('../../app/groups/groupTypes');
   return {
-    actionGroupAdminRequired: (groupId: string) => {
+    actionPermissionRequired: (groupId: string, perm: string) => {
       assertTenantGroup(groupId);
-      return actionGroupAdminRequiredMock(groupId);
+      return actionGroupAdminRequiredMock(groupId, perm);
     },
     // `authGuards` importiert diese Funktion; sie wird hier nicht aufgerufen,
     // muss aber vorhanden sein, damit der Named Import nicht scheitert.
@@ -57,7 +57,7 @@ describe('sendWeeklyReportNow', () => {
       recipients: ['kommandant@example.at'],
     });
 
-    expect(actionGroupAdminRequiredMock).toHaveBeenCalled();
+    expect(actionGroupAdminRequiredMock).toHaveBeenCalledWith('ffnd', 'gruppe.manage');
     expect(result).toEqual({ success: true, result: sentResult });
     expect(sendMock).toHaveBeenCalledWith({
       groupId: 'ffnd',

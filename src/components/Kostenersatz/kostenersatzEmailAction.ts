@@ -3,7 +3,7 @@ import 'server-only';
 
 import { renderToBuffer } from '@react-pdf/renderer';
 import { gmail } from '@googleapis/gmail';
-import { actionUserAuthorizedForFirecall } from '../../app/auth';
+import { actionFirecallPermissionRequired } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
 import {
   requireStammdatenForFirecall,
@@ -57,10 +57,11 @@ export async function sendKostenersatzEmailAction(
     return { success: false, error: 'Missing subject or body' };
   }
 
-  // Check authentication and authorization for this firecall
-  const firecall = await actionUserAuthorizedForFirecall(firecallId, {
-    requireWrite: true,
-  });
+  // Kostenersatz-Recht in der Gruppe des Einsatzes — Gäste kommen nie durch.
+  const { firecall } = await actionFirecallPermissionRequired(
+    firecallId,
+    'kostenersatz.use',
+  );
 
   // Validate Gmail API is configured
   if (!process.env.GOOGLE_SERVICE_ACCOUNT || !process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT) {

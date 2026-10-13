@@ -39,7 +39,9 @@ describe('authorizeTokenForGroup', () => {
 
   it('throws 403 when the owner is not a member of the group', async () => {
     tokenRequiredMock.mockResolvedValue({ owner: 'u1' });
-    userGetMock.mockResolvedValue(userDoc({ groups: ['other'], isAdmin: false }));
+    userGetMock.mockResolvedValue(
+      userDoc({ groupRoles: { other: [] }, isAdmin: false }),
+    );
     await expect(authorizeTokenForGroup(req, 'ffnd')).rejects.toMatchObject({
       status: 403,
     });
@@ -47,9 +49,20 @@ describe('authorizeTokenForGroup', () => {
 
   it('resolves for a group member', async () => {
     tokenRequiredMock.mockResolvedValue({ owner: 'u1' });
-    userGetMock.mockResolvedValue(userDoc({ groups: ['ffnd'], isAdmin: false }));
+    userGetMock.mockResolvedValue(
+      userDoc({ groupRoles: { ffnd: [] }, isAdmin: false }),
+    );
     const result = await authorizeTokenForGroup(req, 'ffnd');
     expect(result).toEqual({ owner: 'u1', isAdmin: false, groups: ['ffnd'] });
+  });
+
+  it('ignores the legacy groups field without groupRoles', async () => {
+    // Wie in der Sitzung: Mitglied ist, wer in `groupRoles` steht.
+    tokenRequiredMock.mockResolvedValue({ owner: 'u1' });
+    userGetMock.mockResolvedValue(userDoc({ groups: ['ffnd'], isAdmin: false }));
+    await expect(authorizeTokenForGroup(req, 'ffnd')).rejects.toMatchObject({
+      status: 403,
+    });
   });
 
   it('resolves for an admin regardless of membership', async () => {

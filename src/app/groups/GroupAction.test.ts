@@ -4,66 +4,36 @@ vi.mock('server-only', () => ({}));
 
 const {
   actionAdminRequiredMock,
-  memberBatchUpdateMock,
-  memberBatchCommitMock,
-  roleBatchSetMock,
-  roleBatchCommitMock,
-  invalidateMock,
-  setClaimsMock,
+  changeUserRolesMock,
   usersGetMock,
   groupSetMock,
+  groupAddMock,
 } = vi.hoisted(() => ({
   actionAdminRequiredMock: vi.fn(),
-  memberBatchUpdateMock: vi.fn(),
-  memberBatchCommitMock: vi.fn(),
-  roleBatchSetMock: vi.fn(),
-  roleBatchCommitMock: vi.fn(),
-  invalidateMock: vi.fn(),
-  setClaimsMock: vi.fn(),
+  changeUserRolesMock: vi.fn(),
   usersGetMock: vi.fn(),
   groupSetMock: vi.fn(),
+  groupAddMock: vi.fn(),
 }));
 
 vi.mock('../auth', () => ({
   actionAdminRequired: () => actionAdminRequiredMock(),
   actionUserRequired: () => actionAdminRequiredMock(),
 }));
-vi.mock('../api/users/[uid]/updateUser', () => ({
-  setCustomClaimsForUser: (uid: string, data: unknown) =>
-    setClaimsMock(uid, data),
+vi.mock('../../server/auth/changeUserRoles', () => ({
+  changeUserRoles: (uid: string, change: unknown, user: unknown) =>
+    changeUserRolesMock(uid, change, user),
 }));
-vi.mock('../../server/auth/userSessionCache', () => ({
-  userSessionCache: { invalidate: (uid: string) => invalidateMock(uid) },
-}));
-vi.mock('firebase-admin/firestore', () => ({
-  FieldValue: {
-    arrayUnion: (value: string) => ({ union: value }),
-    arrayRemove: (value: string) => ({ remove: value }),
-  },
-}));
-
-// Zwei aufeinanderfolgende `batch()`-Aufrufe: erst die Mitgliedschaft, dann
-// die Rollen. Der Mock hält sie auseinander, damit die Erwartungen unten
-// benennen können, was in welchem Durchgang geschrieben wurde.
-let batchCall = 0;
 vi.mock('../../server/firebase/admin', () => ({
   firestore: {
     collection: (name: string) => {
       if (name === 'user') {
-        return {
-          get: () => usersGetMock(),
-          doc: (uid: string) => ({ id: uid, path: `user/${uid}` }),
-        };
+        return { get: () => usersGetMock() };
       }
       return {
         doc: (id: string) => ({ id, set: groupSetMock }),
+        add: groupAddMock,
       };
-    },
-    batch: () => {
-      batchCall += 1;
-      return batchCall === 1
-        ? { update: memberBatchUpdateMock, commit: memberBatchCommitMock }
-        : { set: roleBatchSetMock, commit: roleBatchCommitMock };
     },
   },
 }));
@@ -78,160 +48,106 @@ const GROUP = { id: 'ffnd', name: 'FF Neusiedl am See' };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  batchCall = 0;
   actionAdminRequiredMock.mockResolvedValue({ user: { id: 'a1' } });
   groupSetMock.mockResolvedValue(undefined);
-  memberBatchCommitMock.mockResolvedValue(undefined);
-  roleBatchCommitMock.mockResolvedValue(undefined);
-  setClaimsMock.mockResolvedValue(undefined);
+  changeUserRolesMock.mockResolvedValue({});
 });
 
-describe('updateGroupAction — Gruppen-Admins', () => {
-  it('trägt einen neuen Gruppen-Admin mit arrayUnion ein', async () => {
+describe('updateGroupAction', () => {
+  it('verlangt den globalen Admin', async () => {
+    actionAdminRequiredMock.mockRejectedValue(new Error('admin required'));
+
+    await expect(updateGroupAction(GROUP, [], [])).rejects.toThrow(
+      'admin required',
+    );
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
+  });
+
+  it('schreibt Mitgliedschaft und Gruppen-Admin über den Rollen-Schreibweg', async () => {
+    const u1 = { groupRoles: {} };
+    const u2 = { groupRoles: { ffnd: ['gruppenadmin', 'kostenersatz'] } };
+    const u3 = { groupRoles: { ffnd: [] } };
     usersGetMock.mockResolvedValue({
-      docs: [userDoc('u1', { groups: ['ffnd'] })],
+      docs: [userDoc('u1', u1), userDoc('u2', u2), userDoc('u3', u3)],
+    });
+
+    // u1 kommt als Admin dazu, u2 verliert die Admin-Rolle, u3 scheidet aus.
+    await updateGroupAction(GROUP, ['u1', 'u2'], ['u1']);
+
+    expect(changeUserRolesMock).toHaveBeenCalledTimes(3);
+    expect(changeUserRolesMock).toHaveBeenCalledWith(
+      'u1',
+      { kind: 'addMember', groupId: 'ffnd', roles: ['gruppenadmin'] },
+      u1,
+    );
+    expect(changeUserRolesMock).toHaveBeenCalledWith(
+      'u2',
+      { kind: 'toggleRole', groupId: 'ffnd', role: 'gruppenadmin', enabled: false },
+      u2,
+    );
+    expect(changeUserRolesMock).toHaveBeenCalledWith(
+      'u3',
+      { kind: 'removeMember', groupId: 'ffnd' },
+      u3,
+    );
+  });
+
+  it('schreibt nichts an Benutzern, wenn sich nichts ändert', async () => {
+    usersGetMock.mockResolvedValue({
+      docs: [userDoc('u1', { groupRoles: { ffnd: ['gruppenadmin'] } })],
     });
 
     await updateGroupAction(GROUP, ['u1'], ['u1']);
 
-    expect(roleBatchSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'u1' }),
-      { groupAdmin: { union: 'ffnd' } },
-      { merge: true },
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
+  });
+
+  it('nimmt Mitglieder einer neu angelegten Gruppe unter deren neuer ID auf', async () => {
+    groupAddMock.mockResolvedValue({ id: 'neu' });
+    usersGetMock.mockResolvedValue({
+      docs: [userDoc('u1', { groupRoles: {} })],
+    });
+
+    const result = await updateGroupAction({ name: 'Neu' }, ['u1'], []);
+
+    expect(result).toEqual({ groupId: 'neu', notMigrated: [] });
+    expect(changeUserRolesMock).toHaveBeenCalledWith(
+      'u1',
+      { kind: 'addMember', groupId: 'neu', roles: [] },
+      expect.anything(),
     );
   });
 
-  it('entfernt einen abgewählten Gruppen-Admin mit arrayRemove', async () => {
+  it('übergeht nicht migrierte Benutzer mit altem Kostenersatz und meldet sie', async () => {
+    // Die Umrechnung gäbe ihm Kostenersatz in jeder Gruppe, und Schritt 2
+    // überspränge ihn danach samt der Auswahl je Gruppe.
+    const legacy = { groups: ['allUsers', 'other', 'kostenersatz'] };
+    const u2 = { groupRoles: {} };
     usersGetMock.mockResolvedValue({
-      docs: [userDoc('u1', { groups: ['ffnd'], groupAdmin: ['ffnd'] })],
+      docs: [userDoc('u1', legacy), userDoc('u2', u2)],
     });
 
-    await updateGroupAction(GROUP, ['u1'], []);
+    const result = await updateGroupAction(GROUP, ['u1', 'u2'], []);
 
-    expect(roleBatchSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'u1' }),
-      { groupAdmin: { remove: 'ffnd' } },
-      { merge: true },
+    expect(result).toEqual({ groupId: 'ffnd', notMigrated: ['u1'] });
+    expect(changeUserRolesMock).toHaveBeenCalledTimes(1);
+    expect(changeUserRolesMock).toHaveBeenCalledWith(
+      'u2',
+      { kind: 'addMember', groupId: 'ffnd', roles: [] },
+      u2,
     );
   });
 
-  it('schreibt nichts, wenn sich an den Rollen nichts ändert', async () => {
+  it('speichert Pseudo-Gruppen, ändert dort aber keine Mitgliedschaft', async () => {
+    // `allUsers` hat jeder, `kostenersatz` ist eine Rolle je Gruppe — eine
+    // Mitgliedschaft darin gibt es nicht mehr.
     usersGetMock.mockResolvedValue({
-      docs: [userDoc('u1', { groups: ['ffnd'], groupAdmin: ['ffnd'] })],
+      docs: [userDoc('u1', { groupRoles: {} })],
     });
 
-    await updateGroupAction(GROUP, ['u1'], ['u1']);
+    await updateGroupAction({ id: 'kostenersatz', name: 'K' }, ['u1'], ['u1']);
 
-    expect(roleBatchSetMock).not.toHaveBeenCalled();
-    expect(roleBatchCommitMock).not.toHaveBeenCalled();
-  });
-
-  it('macht einen Nicht-Mitglied nicht zum Gruppen-Admin', async () => {
-    usersGetMock.mockResolvedValue({
-      docs: [userDoc('u1', { groups: [] })],
-    });
-
-    await updateGroupAction(GROUP, [], ['u1']);
-
-    expect(roleBatchSetMock).not.toHaveBeenCalled();
-  });
-
-  it('nimmt einem ausscheidenden Mitglied beide Gruppenrollen', async () => {
-    usersGetMock.mockResolvedValue({
-      docs: [
-        userDoc('u1', {
-          groups: ['ffnd'],
-          groupAdmin: ['ffnd'],
-          fahrtenbuchGeraetemeister: ['ffnd'],
-        }),
-      ],
-    });
-
-    await updateGroupAction(GROUP, [], []);
-
-    expect(roleBatchSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'u1' }),
-      { groupAdmin: { remove: 'ffnd' } },
-      { merge: true },
-    );
-    expect(roleBatchSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'u1' }),
-      { fahrtenbuchGeraetemeister: { remove: 'ffnd' } },
-      { merge: true },
-    );
-  });
-
-  it('lässt die Gerätemeister-Rolle eines bleibenden Mitglieds unangetastet', async () => {
-    usersGetMock.mockResolvedValue({
-      docs: [
-        userDoc('u1', {
-          groups: ['ffnd'],
-          fahrtenbuchGeraetemeister: ['ffnd'],
-        }),
-      ],
-    });
-
-    await updateGroupAction(GROUP, ['u1'], []);
-
-    expect(roleBatchSetMock).not.toHaveBeenCalled();
-  });
-
-  it('nimmt einem ausscheidenden Mitglied die Bekleidungswart-Rolle', async () => {
-    usersGetMock.mockResolvedValue({
-      docs: [
-        userDoc('u1', { groups: ['ffnd'], bekleidungswart: ['ffnd', 'other'] }),
-      ],
-    });
-
-    await updateGroupAction(GROUP, [], []);
-
-    expect(roleBatchSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'u1' }),
-      { bekleidungswart: { remove: 'ffnd' } },
-      { merge: true },
-    );
-    expect(roleBatchCommitMock).toHaveBeenCalled();
-  });
-
-  it('räumt eine schlafende Bekleidungswart-Rolle eines Nicht-Mitglieds ab und invalidiert die Session', async () => {
-    usersGetMock.mockResolvedValue({
-      docs: [userDoc('u1', { groups: [], bekleidungswart: ['ffnd'] })],
-    });
-
-    await updateGroupAction(GROUP, [], []);
-
-    expect(roleBatchSetMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'u1' }),
-      { bekleidungswart: { remove: 'ffnd' } },
-      { merge: true },
-    );
-    expect(invalidateMock).toHaveBeenCalledWith('u1');
-  });
-
-  it('lässt die Bekleidungswart-Rolle eines bleibenden Mitglieds unangetastet', async () => {
-    usersGetMock.mockResolvedValue({
-      docs: [userDoc('u1', { groups: ['ffnd'], bekleidungswart: ['ffnd'] })],
-    });
-
-    await updateGroupAction(GROUP, ['u1'], []);
-
-    expect(roleBatchSetMock).not.toHaveBeenCalled();
-  });
-
-  it('invalidiert den Session-Cache jedes berührten Benutzers', async () => {
-    usersGetMock.mockResolvedValue({
-      docs: [
-        userDoc('u1', { groups: ['ffnd'] }),
-        userDoc('u2', { groups: ['ffnd'], groupAdmin: ['ffnd'] }),
-        userDoc('u3', { groups: [] }),
-      ],
-    });
-
-    await updateGroupAction(GROUP, ['u1', 'u2', 'u3'], ['u1']);
-
-    // u1 wird Admin, u2 verliert die Rolle, u3 kommt neu in die Gruppe.
-    expect(invalidateMock).toHaveBeenCalledWith('u1');
-    expect(invalidateMock).toHaveBeenCalledWith('u2');
-    expect(invalidateMock).toHaveBeenCalledWith('u3');
+    expect(groupSetMock).toHaveBeenCalled();
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 
-import { actionGroupAdminRequired } from '../../app/auth';
+import { actionPermissionRequired } from '../../app/auth';
 import {
   sendWeeklyReportForGroup,
   type WeeklyReportResult,
@@ -49,7 +49,7 @@ export async function sendWeeklyReportNow({
   dryRun = false,
 }: SendWeeklyReportNowInput): Promise<SendWeeklyReportNowResult> {
   try {
-    const session = await actionGroupAdminRequired(groupId);
+    const session = await actionPermissionRequired(groupId, 'gruppe.manage');
 
     // Dieselbe Prüfung wie beim Pflegen der Empfänger: gleiche Höchstzahl,
     // gleiche Fehlerschlüssel, gleiches Entdoppeln.

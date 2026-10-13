@@ -4,8 +4,8 @@ import { useCallback, useMemo } from 'react';
 import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useCan } from '../../hooks/usePermissions';
 import { canModifyEntry, type EntryModifyActor } from './entryPermissions';
-import { isFahrtenbuchManager } from './managerPermissions';
 
 /**
  * Die Frage „darf ich diesen Eintrag ändern?" für die Liste — damit ein
@@ -23,20 +23,10 @@ import { isFahrtenbuchManager } from './managerPermissions';
  * Behauptung, die der Server gleich widerlegt.
  */
 export default function useEntryPermissions(groupId?: string) {
-  const { uid, isAdmin, groups, fahrtenbuchGeraetemeister } =
-    useFirebaseLogin();
+  const { uid } = useFirebaseLogin();
   const { persons } = useFahrtenbuchPersons(groupId);
 
-  const canManage = useMemo(
-    () =>
-      !!groupId &&
-      isFahrtenbuchManager(groupId, {
-        isAdmin,
-        groups,
-        fahrtenbuchGeraetemeister,
-      }),
-    [groupId, isAdmin, groups, fahrtenbuchGeraetemeister],
-  );
+  const canManage = useCan(groupId, 'fahrtenbuch.manage');
 
   const actor = useMemo<EntryModifyActor>(
     () => ({

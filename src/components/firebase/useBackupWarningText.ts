@@ -27,6 +27,10 @@ export default function useBackupWarningText() {
           });
         case 'newerBackupVersion':
           return t('warningNewerBackupVersion');
+        case 'kostenersatzSkipped':
+          return t('warningKostenersatzSkipped', {
+            count: Number(warning.detail ?? 0),
+          });
       }
     },
     [t]

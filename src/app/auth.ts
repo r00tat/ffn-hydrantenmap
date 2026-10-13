@@ -5,6 +5,7 @@ import { isTruthy } from '../common/boolish';
 import { guestCanWrite } from '../common/firecallGuest';
 import { shareLinkStatus } from '../common/firecallShareLink';
 import { isInternalEmail } from '../common/internalDomains';
+import type { GroupRoles } from '../common/permissions';
 import {
   Firecall,
   FIRECALL_COLLECTION_ID,
@@ -61,13 +62,13 @@ declare module 'next-auth' {
       id: string;
       isAuthorized: boolean;
       isAdmin: boolean;
+      /**
+       * Abgeleitet: Mitgliedsgruppen aus `groupRoles` plus `allUsers`. Bleibt,
+       * solange Aufrufer es lesen; Entscheidungen laufen über `can()`.
+       */
       groups: string[];
-      /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
-      fahrtenbuchGeraetemeister?: string[];
-      /** Gruppen, in denen der Benutzer Bekleidungswart ist. */
-      bekleidungswart?: string[];
-      /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
-      groupAdmin?: string[];
+      /** Rollen je Gruppe, siehe `src/common/permissions.ts`. */
+      groupRoles: GroupRoles;
       /** Einsatz-Gast: der einzige Einsatz, auf den dieser Benutzer Zugriff hat. */
       firecall?: string;
       /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
@@ -164,10 +165,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.isAuthorized = userData.isAuthorized;
           session.user.isAdmin = userData.isAdmin;
           session.user.groups = userData.groups;
-          session.user.fahrtenbuchGeraetemeister =
-            userData.fahrtenbuchGeraetemeister;
-          session.user.bekleidungswart = userData.bekleidungswart;
-          session.user.groupAdmin = userData.groupAdmin;
+          session.user.groupRoles = userData.groupRoles;
           session.user.firecall = userData.firecall;
           session.user.firecallWrite = userData.firecallWrite;
           session.user.firecallExpiresAt = userData.firecallExpiresAt;
@@ -238,11 +236,14 @@ export async function actionAdminRequired() {
 }
 
 /**
- * Der Guard für gruppenbezogene Administration. Er steht in einem eigenen
- * Modul, damit er sich ohne NextAuth und Firebase Admin testen lässt, und wird
+ * Rechte-Guards je Gruppe und je Einsatz. Sie stehen in einem eigenen Modul,
+ * damit sie sich ohne NextAuth und Firebase Admin testen lassen, und werden
  * hier nur weitergereicht — Aufrufer holen alle Guards aus `app/auth`.
  */
-export { actionGroupAdminRequired } from './groups/groupAdminGuard';
+export {
+  actionFirecallPermissionRequired,
+  actionPermissionRequired,
+} from './groups/permissionGuard';
 
 export interface FirecallAuthorizationOptions {
   /**

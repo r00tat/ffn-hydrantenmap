@@ -36,7 +36,7 @@ const {
 
 vi.mock('../../app/auth', () => ({
   actionUserRequired: actionUserRequiredMock,
-  actionGroupAdminRequired: actionGroupAdminRequiredMock,
+  actionPermissionRequired: actionGroupAdminRequiredMock,
 }));
 
 vi.mock('./mangelImageStore', () => ({
@@ -103,6 +103,7 @@ const SESSION = {
     email: 'max@ffn.at',
     isAdmin: false,
     groups: ['ffnd'],
+    groupRoles: { ffnd: [] },
   },
 };
 
@@ -212,7 +213,7 @@ describe('createMangel', () => {
 
   it('lehnt ein Nicht-Mitglied ab', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: { ...SESSION.user, groups: ['andere'] },
+      user: { ...SESSION.user, groups: ['andere'], groupRoles: { andere: [] } },
     });
     const result = await createMangel('ffnd', {
       vehicleId: 'v1',
@@ -224,7 +225,7 @@ describe('createMangel', () => {
 
   it('lehnt eine Pseudo-Gruppe ab', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: { ...SESSION.user, groups: ['allUsers'] },
+      user: { ...SESSION.user, groups: ['allUsers'], groupRoles: {} },
     });
     const result = await createMangel('allUsers', {
       vehicleId: 'v1',
@@ -495,7 +496,7 @@ describe('mangelImageUrls', () => {
 
   it('signiert nichts für ein Nicht-Mitglied', async () => {
     actionUserRequiredMock.mockResolvedValue({
-      user: { ...SESSION.user, groups: ['andere'] },
+      user: { ...SESSION.user, groups: ['andere'], groupRoles: { andere: [] } },
     });
     const result = await mangelImageUrls('ffnd', 'm1');
     expect(result).toEqual({ success: false, error: 'notInGroup' });
@@ -515,16 +516,25 @@ describe('mangelImageUrls', () => {
 });
 
 describe('deleteMangel', () => {
-  it('löscht nur für Admins', async () => {
+  it('verlangt gruppe.manage in der Gruppe', async () => {
+    actionGroupAdminRequiredMock.mockRejectedValue(new Error('forbidden'));
     const result = await deleteMangel('ffnd', 'm1');
     expect(result.success).toBe(false);
+    expect(actionGroupAdminRequiredMock).toHaveBeenCalledWith('ffnd', 'gruppe.manage');
     expect(mangelDocDeleteMock).not.toHaveBeenCalled();
   });
 
-  it('löscht für einen Admin und frischt den Cache auf', async () => {
-    actionUserRequiredMock.mockResolvedValue({
-      user: { ...SESSION.user, isAdmin: true },
+  it('löscht für einen Gruppen-Admin ohne globales Admin-Recht', async () => {
+    actionGroupAdminRequiredMock.mockResolvedValue({
+      user: { ...SESSION.user, groupRoles: { ffnd: ['gruppenadmin'] } },
     });
+    mangelQueryGetMock.mockResolvedValue(openMangel([]));
+    const result = await deleteMangel('ffnd', 'm1');
+    expect(result.success).toBe(true);
+    expect(mangelDocDeleteMock).toHaveBeenCalled();
+  });
+
+  it('löscht für einen Admin und frischt den Cache auf', async () => {
     mangelQueryGetMock.mockResolvedValue(openMangel([]));
     const result = await deleteMangel('ffnd', 'm1');
     expect(result.success).toBe(true);
@@ -536,9 +546,6 @@ describe('deleteMangel', () => {
   });
 
   it('räumt die Bilder aus dem Storage mit weg', async () => {
-    actionUserRequiredMock.mockResolvedValue({
-      user: { ...SESSION.user, isAdmin: true },
-    });
     mangelDocGetMock.mockResolvedValue(
       mangelSnapshot({ images: ['groups/ffnd/mangel/m1/a.jpg'] }),
     );
@@ -629,6 +636,7 @@ describe('migrateDefectsToMangel', () => {
   it('verlangt Admin-Rechte', async () => {
     actionGroupAdminRequiredMock.mockRejectedValue(new Error('group admin required'));
     const result = await migrateDefectsToMangel('ffnd');
+    expect(actionGroupAdminRequiredMock).toHaveBeenCalledWith('ffnd', 'gruppe.manage');
     expect(result.success).toBe(false);
     expect(batchCommitMock).not.toHaveBeenCalled();
   });

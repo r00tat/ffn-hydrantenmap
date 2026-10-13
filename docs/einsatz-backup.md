@@ -18,7 +18,7 @@ Das Einsatz-Dokument selbst plus alle Untersammlungen unter `call/{id}`:
 | `mapLayer` | `mapLayers` | eigene WMS-/WMTS-Kartenebenen, s. [eigene-kartenebenen.md](eigene-kartenebenen.md) |
 | `history` | `history` | je Eintrag `snapshotItems` (mit den Strichen der Zeichnungen) und `snapshotLayers` |
 | `location` | `locations` | Einsatzorte |
-| `kostenersatz` | `kostenersatz` | |
+| `kostenersatz` | `kostenersatz` | nur mit `kostenersatz.use` in der Gruppe des Einsatzes, sonst weggelassen (siehe [berechtigungen.md](berechtigungen.md#kostenersatz-je-gruppe)) |
 | `auditlog` | `auditlog` | |
 | `chat` | `chat` | |
 | `crew` | `crew` | Besatzung je Fahrzeug |

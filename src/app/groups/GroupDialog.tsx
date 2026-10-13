@@ -24,6 +24,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import React, { useEffect, useMemo, useState } from 'react';
+import { effectiveGroupRoles } from '../../common/userGroupRoles';
 import { UserRecordExtended } from '../../common/users';
 import {
   BlaulichtsmsConfigPublic,
@@ -113,11 +114,18 @@ export default function GroupDialogg({
 
   const userMap = Object.fromEntries(users.map((user) => [user.uid, user]));
 
+  // Aus `groupRoles` (für nicht migrierte Benutzer aus den alten Feldern) —
+  // das alte Feld `groups` pflegt niemand mehr.
   const initialUsers = useMemo(
     () =>
       users
         .filter(
-          (user) => group.id && user.groups && user.groups.includes(group.id)
+          (user) =>
+            group.id &&
+            Object.prototype.hasOwnProperty.call(
+              effectiveGroupRoles(user),
+              group.id
+            )
         )
         .map((user) => user.uid),
     [group.id, users]
@@ -127,7 +135,11 @@ export default function GroupDialogg({
   const initialAdmins = useMemo(
     () =>
       users
-        .filter((user) => group.id && user.groupAdmin?.includes(group.id))
+        .filter(
+          (user) =>
+            group.id &&
+            effectiveGroupRoles(user)[group.id]?.includes('gruppenadmin')
+        )
         .map((user) => user.uid),
     [group.id, users]
   );

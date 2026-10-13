@@ -146,7 +146,8 @@ describe('VerrechnungPage', () => {
   beforeEach(() => {
     loginMock.mockReturnValue({
       isAuthorized: true,
-      groups: ['ffnd', 'kostenersatz'],
+      groups: ['ffnd'],
+      groupRoles: { ffnd: ['kostenersatz'] },
     });
     fuellungenMock.mockReturnValue({
       fuellungen: [
@@ -161,7 +162,11 @@ describe('VerrechnungPage', () => {
   });
 
   it('weist einen Benutzer ohne Kostenersatz-Freigabe ab', () => {
-    loginMock.mockReturnValue({ isAuthorized: true, groups: ['ffnd'] });
+    loginMock.mockReturnValue({
+      isAuthorized: true,
+      groups: ['ffnd'],
+      groupRoles: { ffnd: ['gruppenadmin'] },
+    });
 
     renderWithIntl(<VerrechnungPage />);
 
@@ -203,7 +208,8 @@ describe('VerrechnungPage — Navigation', () => {
   beforeEach(() => {
     loginMock.mockReturnValue({
       isAuthorized: true,
-      groups: ['ffnd', 'kostenersatz'],
+      groups: ['ffnd'],
+      groupRoles: { ffnd: ['kostenersatz'] },
     });
     fuellungenMock.mockReturnValue({ fuellungen: [], flaschenGesamt: 0 });
     rechnungenMock.mockReturnValue([rechnung()]);

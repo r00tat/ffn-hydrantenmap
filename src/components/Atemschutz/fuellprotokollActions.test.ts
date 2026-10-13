@@ -7,7 +7,8 @@ const groupAdminMock = vi.fn();
 const memberMock = vi.fn();
 
 vi.mock('../../app/auth', () => ({
-  actionGroupAdminRequired: (groupId: string) => groupAdminMock(groupId),
+  actionPermissionRequired: (groupId: string, perm: string) =>
+    groupAdminMock(groupId, perm),
 }));
 
 vi.mock('../Fahrtenbuch/authGuards', () => ({
@@ -128,6 +129,7 @@ describe('previewFuellungImport', () => {
   it('verlangt die Gruppen-Admin-Rolle', async () => {
     groupAdminMock.mockRejectedValue(new Error('user may not administer group'));
     const result = await previewFuellungImport('ffnd', [zeile(csv())]);
+    expect(groupAdminMock).toHaveBeenCalledWith('ffnd', 'gruppe.manage');
     expect(result).toEqual({ success: false, error: 'notGroupAdmin' });
   });
 

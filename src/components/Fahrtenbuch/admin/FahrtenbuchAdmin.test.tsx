@@ -26,7 +26,7 @@ vi.mock('./GroupSettings', () => ({ default: () => <div>GroupSettings</div> }));
 vi.mock('./MangelNotificationSettings', () => ({ default: () => <div /> }));
 vi.mock('./WeeklyReportSendSection', () => ({ default: () => <div /> }));
 vi.mock('./MangelMigration', () => ({ default: () => <div /> }));
-vi.mock('./GeraetemeisterSettings', () => ({ default: () => <div /> }));
+vi.mock('../../groups/MemberRolesLink', () => ({ default: () => <div /> }));
 vi.mock('./ShareLinkSection', () => ({ default: () => <div /> }));
 vi.mock('./FahrtenbuchImport', () => ({ default: () => <div /> }));
 
@@ -51,7 +51,7 @@ describe('FahrtenbuchAdmin Zugang', () => {
     firebaseLoginMock.mockReturnValue({
       isAuthorized: true,
       isAdmin: false,
-      fahrtenbuchGeraetemeister: ['ffnd'],
+      groupRoles: { ffnd: ['geraetemeister'], ffxy: [] },
       myGroups: [],
     });
 
@@ -64,7 +64,7 @@ describe('FahrtenbuchAdmin Zugang', () => {
     firebaseLoginMock.mockReturnValue({
       isAuthorized: true,
       isAdmin: false,
-      fahrtenbuchGeraetemeister: ['ffnd'],
+      groupRoles: { ffnd: ['geraetemeister'], ffxy: [] },
       myGroups: [],
     });
 

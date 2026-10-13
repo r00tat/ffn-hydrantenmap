@@ -24,6 +24,7 @@ import {
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
 import useFahrtenbuchVehicles from '../../hooks/useFahrtenbuchVehicles';
+import { useCan } from '../../hooks/usePermissions';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import MangelDialog from './MangelDialog';
 import MangelList from './MangelList';
@@ -74,8 +75,9 @@ function statusFilterLabelKey(filter: StatusFilter) {
 export default function MangelPage() {
   const t = useTranslations('fahrtenbuch.maengel');
   const tFahrtenbuch = useTranslations('fahrtenbuch');
-  const { isAuthorized, isAdmin } = useFirebaseLogin();
+  const { isAuthorized } = useFirebaseLogin();
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
+  const canDelete = useCan(groupId, 'gruppe.manage');
   const { vehicles, activeVehicles } = useFahrtenbuchVehicles(groupId);
   const [itemTypeFilter, setItemTypeFilter] = useState<MangelItemType | 'alle'>(
     'alle',
@@ -243,7 +245,7 @@ export default function MangelPage() {
           setEditMangel(item);
           setDialogOpen(true);
         }}
-        onDelete={isAdmin ? requestDelete : undefined}
+        onDelete={canDelete ? requestDelete : undefined}
       />
 
       {/* Bedingtes Mounten (plus key): der Dialog liest seinen Anfangszustand

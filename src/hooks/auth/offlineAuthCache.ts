@@ -1,10 +1,15 @@
 import type { Group } from '../../app/groups/groupTypes';
+import {
+  legacyToGroupRoles,
+  type GroupRoles,
+  type LegacyRoleFields,
+} from '../../common/permissions';
 
 /**
  * Zwischenspeicher der zuletzt am Server bestätigten Anmeldung für den
  * Kaltstart ohne Netz (Issue #839, Phase 5).
  *
- * Die Rechte der Oberfläche (`isAuthorized`, `groups`, `groupAdmin`, …) stehen
+ * Die Rechte der Oberfläche (`isAuthorized`, `groups`, `groupRoles`, …) stehen
  * in der NextAuth-Sitzung und kommen aus `getMyGroupsFromServer` — beides
  * braucht den Server. Ohne Netz zeigte die App deshalb nach einem Neustart den
  * Login-Bildschirm, obwohl Firebase Auth den Benutzer aus IndexedDB kennt und
@@ -41,9 +46,8 @@ export interface OfflineAuthData {
   isAuthorized: boolean;
   isAdmin: boolean;
   groups: string[];
-  groupAdmin?: string[];
-  fahrtenbuchGeraetemeister?: string[];
-  bekleidungswart?: string[];
+  /** Rollen je Gruppe, siehe `src/common/permissions.ts`. */
+  groupRoles: GroupRoles;
   firecall?: string;
   firecallWrite?: boolean;
   /**
@@ -72,9 +76,22 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
-function isSnapshot(value: unknown): value is OfflineAuthSnapshot {
+function isGroupRoles(value: unknown): value is GroupRoles {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.values(value).every(isStringArray)
+  );
+}
+
+/** Ein gespeicherter Eintrag, gegebenenfalls noch im Format vor `groupRoles`. */
+type StoredSnapshot = Omit<OfflineAuthSnapshot, 'groupRoles'> &
+  LegacyRoleFields & { groupRoles?: unknown };
+
+function isSnapshot(value: unknown): value is StoredSnapshot {
   if (!value || typeof value !== 'object') return false;
-  const v = value as Partial<OfflineAuthSnapshot>;
+  const v = value as Partial<StoredSnapshot>;
   return (
     typeof v.uid === 'string' &&
     v.uid.length > 0 &&
@@ -145,17 +162,44 @@ export function loadOfflineAuth(
     clearOfflineAuth();
     return null;
   }
+  const snapshot = upgradeSnapshot(parsed);
 
-  const age = now - parsed.savedAt;
+  const age = now - snapshot.savedAt;
   const expired =
     age > OFFLINE_AUTH_MAX_AGE_MS ||
     age < -CLOCK_SKEW_MS ||
-    (typeof parsed.expiresAt === 'number' && now > parsed.expiresAt);
+    (typeof snapshot.expiresAt === 'number' && now > snapshot.expiresAt);
   if (expired) {
     clearOfflineAuth();
     return null;
   }
-  if (!parsed.isAuthorized) return null;
-  if (uid !== undefined && parsed.uid !== uid) return null;
-  return parsed;
+  if (!snapshot.isAuthorized) return null;
+  if (uid !== undefined && snapshot.uid !== uid) return null;
+  return snapshot;
+}
+
+/**
+ * Einträge aus der Zeit vor `groupRoles` rechnet der Leser einmalig um — rein
+ * lokal, kein paralleles Schreiben. Sonst stünden Geräte, die seit dem Release
+ * nicht online waren, beim Kaltstart ohne Netz ohne Gruppen da.
+ */
+function upgradeSnapshot(stored: StoredSnapshot): OfflineAuthSnapshot {
+  const {
+    groupAdmin,
+    fahrtenbuchGeraetemeister,
+    bekleidungswart,
+    groupRoles,
+    ...rest
+  } = stored;
+  return {
+    ...rest,
+    groupRoles: isGroupRoles(groupRoles)
+      ? groupRoles
+      : legacyToGroupRoles({
+          groups: stored.groups,
+          groupAdmin,
+          fahrtenbuchGeraetemeister,
+          bekleidungswart,
+        }),
+  };
 }

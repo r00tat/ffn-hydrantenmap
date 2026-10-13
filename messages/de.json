@@ -45,6 +45,7 @@
       "fuellungVerrechnet": "Diese Füllung steht auf einer Rechnung und lässt sich nicht mehr ändern.",
       "notInGroup": "Kein Zugriff auf diese Feuerwehr.",
       "notGroupAdmin": "Dafür braucht es die Rechte eines Gruppen-Admins.",
+      "notPermitted": "Dafür fehlt dir das Recht in dieser Gruppe.",
       "notLoggedIn": "Nicht angemeldet oder nicht freigeschaltet."
     },
     "admin": {
@@ -1155,7 +1156,8 @@
     "firecallGuestSection": "Einsatz-Gast",
     "firecallGuestFor": "Zugang beschränkt auf Einsatz {firecall}",
     "firecallWrite": "Schreibzugriff auf den Einsatz",
-    "firecallWriteHint": "Wirkt beim nächsten Aktualisieren des Zugangs (spätestens nach 45 Minuten)."
+    "firecallWriteHint": "Wirkt beim nächsten Aktualisieren des Zugangs (spätestens nach 45 Minuten).",
+    "rolesHint": "Hier legst du nur die Mitgliedschaft fest. Rollen je Gruppe vergibst du unter Gruppen → Mitglieder und Rollen."
   },
   "header": {
     "appTitle": "Einsatzkarte",
@@ -1224,6 +1226,8 @@
     "users": "Users",
     "connectedApps": "Verbundene Anwendungen",
     "adminMcp": "MCP-Zugänge",
+    "adminPermissions": "Berechtigungen (Migration)",
+    "memberRoles": "Mitglieder und Rollen",
     "fuellprotokoll": "Füllprotokoll",
     "sybos": "Sybos-Übertrag",
     "personal": "Personal"
@@ -1339,6 +1343,7 @@
       "notAllowed": "Nur der Ersteller, ein Gerätemeister oder ein Admin darf diesen Eintrag ändern.",
       "notInGroup": "Du bist kein Mitglied dieser Gruppe.",
       "notGroupAdmin": "Du darfst diese Gruppe nicht verwalten.",
+      "notPermitted": "Dafür fehlt dir das Recht in dieser Gruppe.",
       "notLoggedIn": "Nicht angemeldet oder Freigabe entzogen. Bitte neu anmelden.",
       "entryDeleted": "Dieser Eintrag wurde gelöscht und kann nicht bearbeitet werden.",
       "tooManyEntries": "Zu viele Fahrten auf einmal. Bitte in kleineren Schritten speichern.",
@@ -1647,16 +1652,6 @@
       "mangelEmailsSaveFailed": "Empfänger konnten nicht gespeichert werden: {message}",
       "mangelEmailInvalid": "Bitte gültige E-Mail-Adressen eintragen.",
       "mangelEmailsTooMany": "Es sind höchstens {max} Empfänger möglich.",
-      "geraetemeister": "Gerätemeister",
-      "geraetemeisterHint": "Gerätemeister dürfen jede Fahrt dieser Gruppe nachträglich korrigieren — etwa einen falsch erfassten Kilometerstand — und die Fahrzeuge und Personen pflegen. Sonst darf das nur der Ersteller einer Fahrt oder ein Admin.",
-      "geraetemeisterLabel": "Benutzer",
-      "geraetemeisterPlaceholder": "Name suchen",
-      "geraetemeisterHelper": "Wählbar sind nur Mitglieder dieser Gruppe.",
-      "geraetemeisterSaved": "Gerätemeister gespeichert.",
-      "geraetemeisterLoadFailed": "Gerätemeister konnten nicht geladen werden: {message}",
-      "geraetemeisterSaveFailed": "Gerätemeister konnten nicht gespeichert werden: {message}",
-      "geraetemeisterNotAMember": "Mindestens ein gewählter Benutzer gehört nicht zu dieser Gruppe.",
-      "geraetemeisterNoMembers": "Diese Gruppe hat keine Mitglieder, die eingetragen werden könnten.",
       "noPermission": "Sie haben keine Berechtigung für diese Seite.",
       "weeklyReport": {
         "title": "Wochenbericht versenden",
@@ -1773,7 +1768,6 @@
         "statusInvalid": "Ungültiger Status.",
         "resolvedAtInvalid": "Das Behebungsdatum ist ungültig.",
         "mangelNotFound": "Dieser Mangel existiert nicht mehr.",
-        "notAllowedDelete": "Nur ein Admin darf einen Mangel löschen.",
         "saveFailed": "Speichern fehlgeschlagen: {message}",
         "deleteFailed": "Löschen fehlgeschlagen: {message}",
         "imageUploadFailed": "Ein Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.",
@@ -2262,7 +2256,7 @@
     "title": "Kostenersatz",
     "titleForCall": "Kostenersatz - {name}",
     "loginRequired": "Bitte melden Sie sich an.",
-    "noPermission": "Sie haben keine Berechtigung für diese Funktion. Bitte kontaktieren Sie einen Administrator, um Zugang zur Gruppe \"Kostenersatz\" zu erhalten.",
+    "noPermission": "Sie haben in der Gruppe dieses Einsatzes keine Berechtigung für den Kostenersatz. Die Rolle „Kostenersatz“ vergibt ein Gruppen-Admin.",
     "noFirecall": "Kein Einsatz ausgewählt.",
     "calculations": "Kostenersatz-Berechnungen",
     "newCalculation": "Neue Berechnung",
@@ -2898,6 +2892,7 @@
     "geraete": "Geräte & Material"
   },
   "users": {
+    "notMigrated": "{name} ist noch nicht migriert (alte Kostenersatz-Freischaltung); die Gruppen wurden nicht geändert. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus.",
     "title": "Benutzer",
     "filter": "Filter...",
     "filterByGroups": "Nach Gruppen filtern",
@@ -2920,6 +2915,7 @@
     "guestReadOnly": "Nur Lesezugriff"
   },
   "groups": {
+    "notMigrated": "Nicht geändert, weil noch nicht migriert (alte Kostenersatz-Freischaltung): {names}. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus.",
     "title": "Gruppen",
     "createKnown": "Standardgruppen anlegen",
     "createKnownTooltip": "Fehlende Gruppen anlegen: {names}",
@@ -2935,7 +2931,8 @@
     "fahrtenbuchLinkHint": "Der Fahrtenbuch-Link samt QR-Codes wird in der Fahrtenbuch-Verwaltung gepflegt.",
     "fahrtenbuchLinkAction": "Zur Fahrtenbuch-Verwaltung",
     "groupAdmins": "Gruppen-Admins",
-    "groupAdminsHint": "Gruppen-Admins übernehmen alle administrativen Aufgaben innerhalb dieser Gruppe — Fahrtenbuch-Verwaltung samt Gerätemeistern, Gruppeneinstellungen und das Löschen von Einsätzen der Gruppe. Wählbar sind nur Mitglieder der Gruppe."
+    "groupAdminsHint": "Gruppen-Admins übernehmen alle administrativen Aufgaben innerhalb dieser Gruppe — Fahrtenbuch, Geräte, Personal, Bekleidung, Gruppeneinstellungen und das Vergeben der übrigen Rollen. Wählbar sind nur Mitglieder der Gruppe; die weiteren Rollen vergibst du unter „Mitglieder und Rollen“.",
+    "roles": "Mitglieder und Rollen von {name}"
   },
   "tokens": {
     "title": "API Token",
@@ -3075,7 +3072,8 @@
     "warningsTitle": "{count, plural, one {# Warnung} other {# Warnungen}}",
     "warningAttachmentDownloadFailed": "Anhang „{file}“ konnte nicht gesichert werden.",
     "warningAttachmentUploadFailed": "Anhang „{file}“ konnte nicht hochgeladen werden.",
-    "warningNewerBackupVersion": "Die Datei stammt aus einer neueren Version der App — möglicherweise fehlen Daten."
+    "warningNewerBackupVersion": "Die Datei stammt aus einer neueren Version der App — möglicherweise fehlen Daten.",
+    "warningKostenersatzSkipped": "{count, plural, one {# Kostenersatz-Berechnung wurde} other {# Kostenersatz-Berechnungen wurden}} nicht übernommen — dafür fehlt die Rolle „Kostenersatz“ in der Zielgruppe."
   },
   "geschaeftsbuch": {
     "title": "Geschäftsbuch",
@@ -3673,6 +3671,72 @@
     "mcpOrigin": "KI",
     "mcpOriginTooltip": "Dieser Eintrag wurde von der verbundenen Anwendung „{client}\" über die MCP-Schnittstelle geschrieben, nicht von Hand."
   },
+  "adminPermissions": {
+    "pageTitle": "Berechtigungen",
+    "intro": "Umstellung der alten Rollenfelder (Gruppen-Admin, Gerätemeister, Bekleidungswart, Kostenersatz) auf Rollen je Gruppe. Jeder Schritt lässt sich einzeln und wiederholt auslösen.",
+    "loadError": "Die Benutzer konnten nicht geladen werden: {message}",
+    "actionError": "Der Schritt ist fehlgeschlagen: {message}",
+    "reload": "Neu laden",
+    "summary": "{total} Benutzer: {migrated} migriert, {pending} offen, {legacy} mit alten Feldern",
+    "step1Title": "1. Vorschau",
+    "step1Text": "Je Benutzer die alten Felder und die daraus berechneten Rollen. Kostenersatz bekommt ein Benutzer nur in den angehakten Gruppen; vorbelegt sind alle Gruppen, in denen er Mitglied ist.",
+    "onlyPending": "Nur offene Benutzer",
+    "columnUser": "Benutzer",
+    "columnStatus": "Status",
+    "columnLegacy": "Alte Felder",
+    "columnRoles": "Neue Rollen",
+    "columnKostenersatz": "Kostenersatz in",
+    "columnHints": "Hinweise",
+    "statusMigrated": "migriert",
+    "statusPending": "offen",
+    "legacyGroups": "Gruppen",
+    "legacyGroupAdmin": "Gruppen-Admin",
+    "legacyGeraetemeister": "Gerätemeister",
+    "legacyBekleidungswart": "Bekleidungswart",
+    "noRoles": "Mitglied ohne Rolle",
+    "noMembership": "keine Mitgliedschaft",
+    "hintDroppedRole": "Rolle {role} in {group} entfällt (kein Mitglied)",
+    "hintWithoutTenantGroup": "Keine echte Gruppe, nur allUsers/kostenersatz",
+    "hintSkipped": "Bereits migriert, wird übersprungen",
+    "noUsers": "Keine Benutzer gefunden.",
+    "step2Title": "2. Migrieren",
+    "step2Text": "Schreibt für jeden offenen Benutzer die Rollen und die abgeleiteten Rechte. Alte Felder und Claims bleiben unverändert; ein Rollback auf das vorige Release bleibt möglich.",
+    "migrateButton": "{count, plural, one {# Benutzer migrieren} other {# Benutzer migrieren}}",
+    "migrateConfirmTitle": "Benutzer migrieren?",
+    "migrateConfirmText": "{count, plural, one {# Benutzer erhält} other {# Benutzer erhalten}} Rollen je Gruppe. Alte Felder und Claims bleiben stehen.",
+    "step3Title": "3. Alte Felder entfernen",
+    "step3Text": "Löscht Gruppen-Admin, Gerätemeister, Bekleidungswart und „kostenersatz“ aus den Gruppen und setzt die Claims neu. Danach ist ein Rollback nicht mehr ohne Weiteres möglich — erst ausführen, wenn sich das Release bewährt hat.",
+    "cleanupButton": "Alte Felder entfernen",
+    "cleanupBlocked": "Erst möglich, wenn alle Benutzer migriert sind ({pending} offen).",
+    "cleanupConfirmTitle": "Alte Felder endgültig entfernen?",
+    "cleanupConfirmText": "Die alten Rollenfelder werden gelöscht und die Claims aller Benutzer neu gesetzt. Ein Rollback auf das vorige Release ist danach nicht mehr ohne Datenreparatur möglich.",
+    "cleanupNotAllowed": "Alte Felder können erst entfernt werden, wenn alle Benutzer migriert sind.",
+    "recomputeTitle": "Rechte neu ableiten",
+    "recomputeText": "Berechnet die Rechte, die die Firestore-Regeln lesen, für alle Benutzer aus ihren Rollen und dem aktuellen Katalog neu und meldet Abweichungen. Nach jeder Katalogänderung ausführen.",
+    "recomputeButton": "Rechte neu ableiten",
+    "lastRun": "Letzter Lauf: {at} durch {by}",
+    "resultCounts": "{processed} geschrieben, {skipped} unverändert, {errors} Fehler",
+    "resultNotMigrated": "{count, plural, one {# Benutzer} other {# Benutzer}} nicht migriert",
+    "noDeviations": "Keine Abweichungen.",
+    "deviationsTitle": "Abweichungen vor dem Neuableiten",
+    "errorsTitle": "Fehler",
+    "confirm": "Ausführen",
+    "cancel": "Abbrechen",
+    "deviation": {
+      "notMigrated": "nicht migriert",
+      "catalogVersion": "Katalogstand veraltet",
+      "groupPerms": "Rechte je Gruppe abweichend",
+      "permsAny": "Rechte gesamt abweichend",
+      "unknownRole": "unbekannte Rolle (bleibt stehen)",
+      "nonTenantGroup": "keine echte Gruppe in den Rollen"
+    },
+    "role": {
+      "gruppenadmin": "Gruppen-Admin",
+      "geraetemeister": "Gerätemeister",
+      "bekleidungswart": "Bekleidungswart",
+      "kostenersatz": "Kostenersatz"
+    }
+  },
   "adminMcp": {
     "pageTitle": "MCP-Zugänge",
     "description": "Registrierte Anwendungen und aktive Zugänge des MCP-Servers.",
@@ -4248,16 +4312,8 @@
     "title": "Bekleidung",
     "settings": {
       "title": "Bekleidungswarte",
-      "hint": "Bekleidungswarte verwalten die Einsatz- und Dienstbekleidung dieser Gruppe: Lagerstand, Ausgabe, Rücknahme und Wäsche. Gruppen-Admins und Admins dürfen das immer.",
-      "label": "Benutzer",
-      "placeholder": "Name suchen",
-      "helper": "Wählbar sind nur Mitglieder dieser Gruppe.",
-      "save": "Speichern",
-      "saved": "Bekleidungswarte gespeichert.",
-      "loadFailed": "Bekleidungswarte konnten nicht geladen werden: {message}",
-      "saveFailed": "Bekleidungswarte konnten nicht gespeichert werden: {message}",
-      "notAMember": "Mindestens ein gewählter Benutzer gehört nicht zu dieser Gruppe.",
-      "noMembers": "Diese Gruppe hat keine Mitglieder, die eingetragen werden könnten."
+      "hint": "Wer die Bekleidung dieser Gruppe sehen und pflegen darf, regelt die Rolle „Bekleidungswart“. Rollen vergibst du gesammelt in der Rollenansicht der Gruppe.",
+      "link": "Mitglieder und Rollen öffnen"
     },
     "subtitle": "Einsatz- und Dienstbekleidung: Stücke, Lagerstand, Ausgabe, Rücknahme und Wäsche.",
     "group": "Gruppe",
@@ -4716,5 +4772,81 @@
     "accountNotInGroup": "nicht in der Gruppe",
     "flagSaveFailed": "Ändern fehlgeschlagen: {message}",
     "linkSaveFailed": "Die Person ist gespeichert, die Benutzerkonten nicht: {message}"
+  },
+  "groupRoles": {
+    "title": "Mitglieder und Rollen",
+    "group": "Gruppe",
+    "intro": "Rollen der Mitglieder in {group}. Jedes Mitglied sieht ohne Rolle Einsätze, Karte und Fahrtenbuch der Gruppe; eine Rolle schaltet zusätzliche Aufgaben frei.",
+    "noAccess": "Du darfst in dieser Gruppe keine Rollen vergeben.",
+    "member": "Mitglied",
+    "noMembers": "Die Gruppe hat noch keine Mitglieder.",
+    "notMigrated": "alte Felder",
+    "notMigratedHint": "Die Rollen stammen noch aus den alten Feldern. Die erste Änderung schreibt sie als Rollen je Gruppe neu.",
+    "toggleRole": "{role} für {name}",
+    "notAssignable": "Diese Rolle darfst du nicht vergeben: Gruppen-Admin vergibt nur der Admin, andere Rollen nur, wer ihre Rechte selbst hat.",
+    "addMemberLabel": "Benutzer aufnehmen",
+    "addMember": "Aufnehmen",
+    "memberAdded": "{name} ist jetzt Mitglied.",
+    "removeMember": "{name} aus der Gruppe entfernen",
+    "removeConfirmTitle": "{name} entfernen?",
+    "removeConfirmText": "{name} verliert die Mitgliedschaft in {group} samt aller Rollen dort.",
+    "memberRemoved": "{name} ist kein Mitglied mehr.",
+    "remove": "Entfernen",
+    "cancel": "Abbrechen",
+    "explanationTitle": "Was die Rollen dürfen",
+    "explanationIntro": "Rollen gelten nur in dieser Gruppe. Ein Mitglied kann mehrere Rollen haben; es erhält die Rechte aller zusammen.",
+    "linkHint": "Gerätemeister, Bekleidungswarte und Kostenersatz vergibst du je Gruppe unter „Mitglieder und Rollen“.",
+    "linkAction": "Rollen vergeben",
+    "roles": {
+      "gruppenadmin": {
+        "name": "Gruppen-Admin",
+        "description": "Verwaltet die Gruppe: Einstellungen, Fahrtenbuch, Geräte, Personal und Bekleidung, und vergibt die übrigen Rollen. Kostenersatz gehört nicht dazu. Vergibt nur der Admin."
+      },
+      "geraetemeister": {
+        "name": "Gerätemeister",
+        "description": "Pflegt Fahrtenbuch (Fahrzeuge, Personen, Korrekturen an Fahrten), Geräte & Material und das Personal der Gruppe."
+      },
+      "bekleidungswart": {
+        "name": "Bekleidungswart",
+        "description": "Sieht und verwaltet die Bekleidung der Gruppe: Lagerstand, Ausgabe, Wäschen."
+      },
+      "kostenersatz": {
+        "name": "Kostenersatz",
+        "description": "Erstellt Kostenersatz-Berechnungen an Einsätzen der Gruppe und die Verrechnung der Flaschenfüllungen."
+      }
+    },
+    "permissions": {
+      "fahrtenbuch": {
+        "manage": "Fahrtenbuch verwalten"
+      },
+      "geraete": {
+        "manage": "Geräte & Material verwalten"
+      },
+      "personal": {
+        "manage": "Personal verwalten"
+      },
+      "bekleidung": {
+        "read": "Bekleidung einsehen",
+        "manage": "Bekleidung verwalten"
+      },
+      "kostenersatz": {
+        "use": "Kostenersatz"
+      },
+      "gruppe": {
+        "manage": "Gruppe verwalten"
+      },
+      "rollen": {
+        "assign": "Rollen vergeben"
+      }
+    },
+    "errors": {
+      "forbidden": "Diese Rolle darfst du nicht vergeben oder entziehen.",
+      "invalidRole": "Unbekannte Rolle.",
+      "notAMember": "Der Benutzer ist kein Mitglied dieser Gruppe.",
+      "unknownUser": "Den Benutzer gibt es nicht.",
+      "firecallGuest": "Einsatz-Gäste können keine Mitglieder werden.",
+      "notMigrated": "Der Benutzer ist noch nicht migriert und hat die alte Kostenersatz-Freischaltung. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus — dort legst du fest, in welchen Gruppen er Kostenersatz behält.",
+      "unknown": "Das hat nicht geklappt: {message}"
+    }
   }
 }

@@ -82,6 +82,21 @@ describe('filterUsers', () => {
     ).toEqual([]);
   });
 
+  it('filters by the membership in groupRoles, not the stale groups field', () => {
+    const migrated = user({
+      uid: 'u5',
+      email: 'm@example.org',
+      groups: ['allUsers', 'alt'],
+      groupRoles: { neu: [] },
+    });
+    expect(
+      filterUsers([migrated], { ...defaultUserFilters, groups: ['neu'] }),
+    ).toEqual([migrated]);
+    expect(
+      filterUsers([migrated], { ...defaultUserFilters, groups: ['alt'] }),
+    ).toEqual([]);
+  });
+
   it('treats a user without a firecall as a regular user', () => {
     const withoutName = user({ uid: 'u4', email: 'x@example.org' });
     expect(filterUsers([withoutName], defaultUserFilters)).toEqual([

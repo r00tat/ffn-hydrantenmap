@@ -4,7 +4,9 @@ The admin area offers advanced management features for administrators. Here you 
 
 ## Features
 
-- User management: view users, set permissions, assign custom claims
+- User management: view users, authorize them, assign them to fire brigades
+- Members and roles: assign roles per fire brigade (group admin, equipment officer, clothing officer, cost recovery)
+- Permissions: migration of the roles and "Recompute permissions"
 - Group management: create and manage groups
 - Admin actions: database maintenance, user repair, copy data between environments
 - GIS data pipeline: import HAR files and process geo data
@@ -31,6 +33,38 @@ The admin area offers advanced management features for administrators. Here you 
 1. Click "Groups" in the menu
 2. Create/edit/delete groups
 3. Store Alarm SMS credentials per group
+
+### Assign roles
+
+Roles always apply **within one fire brigade**. They are assigned in the
+"Members and roles" view of the brigade:
+
+- **Group admin** Administration of the brigade: settings, share links,
+  breathing apparatus administration; includes equipment officer and clothing
+  officer, but not cost recovery
+- **Equipment officer** Correct the trip log, vehicles, people, equipment &
+  material
+- **Clothing officer** View and maintain clothing
+- **Cost recovery** Cost recovery for the brigade's operations, billing of
+  cylinder fillings
+
+Administrators assign every role and add users to brigades. Group admins
+assign the other roles within their brigade — but only roles whose
+permissions they hold themselves, and never the group admin role.
+
+### Migrate permissions
+
+The **Permissions** page (`/admin/berechtigungen`) converts the former role
+fields into roles per fire brigade. Run it right after the change has been
+rolled out — until then the brigade features are locked.
+
+1. Check the **preview**; for cost recovery, decide per brigade where the role
+   applies
+2. **Migrate** — the old fields stay unchanged
+3. **Remove old fields** only once the release has proven itself
+
+**Recompute permissions** reconciles the stored permissions of all users with
+the current role catalog.
 
 ### Admin dashboard
 

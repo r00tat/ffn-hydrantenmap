@@ -8,6 +8,8 @@ import {
 import { FirebaseUserInfo } from '../../common/users';
 import { guestCanWrite } from '../../common/firecallGuest';
 import { shareLinkStatus } from '../../common/firecallShareLink';
+import { memberGroupIds } from '../../common/permissions';
+import { ALL_USERS_GROUP_ID } from '../../common/tenantGroups';
 import { firestore } from '../firebase/admin';
 
 /**
@@ -61,7 +63,12 @@ export async function verifyUserAuthorizedForFirecall(
     .doc(user.uid)
     .get();
   const userData = userDoc.data() as FirebaseUserInfo | undefined;
-  const userGroups: string[] = userData?.groups || [];
+  // Mitgliedschaft wie in der Sitzung: aus `groupRoles` plus `allUsers`.
+  // Das alte Feld `groups` pflegt `writeUserRoles` nicht mehr.
+  const userGroups = [
+    ALL_USERS_GROUP_ID,
+    ...memberGroupIds({ groupRoles: userData?.groupRoles }),
+  ];
   const userFirecall: string | undefined = userData?.firecall;
   const isGroupMember = userGroups.includes(firecallData.group);
 

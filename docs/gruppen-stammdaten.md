@@ -18,11 +18,11 @@ auseinanderläuft, sobald sich das Konto ändert.
 Ein eigenes Dokument und **nicht** das Gruppen-Dokument selbst: Dessen Felder
 liest jedes Gruppenmitglied auf jedem Einsatz-Screen mit, und die
 Bankverbindung gehört dort nicht hin. Die Leseregel ist deshalb
-`fahrtenbuchMember()` — ohne `kostenersatzUser()`, anders als bei
+`member(groupId)` — ohne `hasPerm(groupId, 'kostenersatz.use')`, anders als bei
 `atemschutzConfig`, weil die Kostenersatz-Oberfläche die Lücken auch dem
 zeigen muss, der nur rechnet. Geschrieben wird ausschließlich über
 `saveGroupStammdaten`; die eigentliche Grenze ist dort
-`actionGroupAdminRequired`.
+`actionPermissionRequired(groupId, 'gruppe.manage')`.
 
 ## Ohne Stammdaten entsteht kein Beleg
 
@@ -73,10 +73,11 @@ Die Storage-Regel erlaubt nur `create`, bindet den Upload an
 Die Gruppenbindung ist nötig, weil `authorizedUser()` allein jeden
 Angemeldeten Dateien in den Ordner **jeder** Gruppe legen ließe. Die
 Mitgliedschaft steht als Claim im Token (`groups`, gesetzt in
-`updateUser.ts`) und ist damit ohne Firestore-Zugriff prüfbar — die
-Gruppen-Admin-Rolle dagegen gibt es bewusst nicht als Claim
-([berechtigungen.md](berechtigungen.md)). Die Regel prüft also die
-Mitgliedschaft, die eigentliche Schranke bleibt `actionGroupAdminRequired` in
+`writeUserRoles`) und ist damit ohne Firestore-Zugriff prüfbar — Fachrechte
+wie `gruppe.manage` dagegen gibt es bewusst nicht als Claim, und Storage-Regeln
+lesen kein Benutzerdokument
+([berechtigungen.md](berechtigungen.md#claim-gegen-get)). Die Regel prüft also
+die Mitgliedschaft, die eigentliche Schranke bleibt `gruppe.manage` in
 `saveGroupStammdaten`: Eine hochgeladene Datei ist wirkungslos, solange kein
 Gruppen-Admin das Dokument der Gruppe darauf zeigen lässt.
 

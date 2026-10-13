@@ -187,7 +187,7 @@ Jede Server Action im Client-Pfad gehört deshalb in eine von drei Gruppen:
 Der Gerätebestand wurde schon vorher clientseitig gelesen; `atemschutzStammdaten.ts`
 ist `server-only` und dient nur Server Actions (Import, Mangel, Verrechnung), die
 ohnehin nur online laufen. Die Firestore-Regeln erlauben Gruppenmitgliedern das
-Lesen von `atemschutzGeraet` (`fahrtenbuchMember()`).
+Lesen von `atemschutzGeraet` (`member(groupId)`).
 
 `syncGeraetVerbrauch` ist bewusst ein **Abgleich**, keine einmalige Buchung: Die
 Action liest den `geraetEinsatz`-Eintrag beim Abarbeiten neu und bucht nur die

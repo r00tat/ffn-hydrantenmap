@@ -23,14 +23,17 @@ beforeEach(() => {
 });
 
 describe('loadMcpUser', () => {
-  it('liefert Gruppen und Adminflag eines berechtigten Benutzers', async () => {
-    userDoc({ authorized: true, isAdmin: true, groups: ['ffnd'] });
+  it('liefert Gruppen, Rollen und Adminflag eines berechtigten Benutzers', async () => {
+    userDoc({
+      authorized: true,
+      isAdmin: true,
+      groupRoles: { ffnd: ['geraetemeister'] },
+    });
     await expect(loadMcpUser('uid-1')).resolves.toEqual({
       uid: 'uid-1',
       isAdmin: true,
       groups: ['allUsers', 'ffnd'],
-      fahrtenbuchGeraetemeister: [],
-      groupAdmin: [],
+      groupRoles: { ffnd: ['geraetemeister'] },
     });
   });
 
@@ -38,6 +41,16 @@ describe('loadMcpUser', () => {
     userDoc({ authorized: true });
     await expect(loadMcpUser('uid-1')).resolves.toMatchObject({
       groups: ['allUsers'],
+      groupRoles: {},
+    });
+  });
+
+  it('liest die Mitgliedschaft aus groupRoles, nicht aus dem alten Feld groups', async () => {
+    // `groups` pflegt `writeUserRoles()` nicht mehr mit — ein Austritt stünde
+    // dort noch drin.
+    userDoc({ authorized: true, groups: ['ffnd', 'ffxy'], groupRoles: { ffnd: [] } });
+    await expect(loadMcpUser('uid-1')).resolves.toMatchObject({
+      groups: ['allUsers', 'ffnd'],
     });
   });
 

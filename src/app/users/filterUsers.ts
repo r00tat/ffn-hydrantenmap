@@ -1,4 +1,5 @@
 import { isFirecallGuest } from '../../common/firecallGuest';
+import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended } from '../../common/users';
 
 export interface UserFilters {
@@ -44,7 +45,9 @@ export function filterUsers(
       return false;
     }
     if (filters.groups.length > 0) {
-      const userGroups = user.groups || [];
+      // Mitgliedschaft aus `groupRoles`; das alte Feld `groups` pflegt
+      // niemand mehr.
+      const userGroups = userMemberGroupIds(user);
       if (!filters.groups.some((g) => userGroups.includes(g))) {
         return false;
       }

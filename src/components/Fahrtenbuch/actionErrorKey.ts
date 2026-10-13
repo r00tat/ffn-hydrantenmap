@@ -20,8 +20,16 @@ export function actionErrorKey(err: unknown): string {
   }
   // Mitglied ja, Gruppen-Admin nein — das ist etwas anderes als "nicht in der
   // Gruppe" und darf nicht als "nicht angemeldet" beim Benutzer ankommen.
-  if (/may not administer group/.test(message)) {
+  if (
+    /may not administer group/.test(message) ||
+    /lacks gruppe\.manage /.test(message)
+  ) {
     return 'notGroupAdmin';
+  }
+  // Ein anderes fehlendes Recht (`actionPermissionRequired`) — ebenfalls
+  // eine 403, aber kein Anmeldeproblem.
+  if (/lacks [a-z]+\.[a-z]+ (in group|for firecall)/.test(message)) {
+    return 'notPermitted';
   }
   // `actionUserRequired` wirft bei fehlender Anmeldung oder entzogener
   // Freigabe eine übersetzte Meldung — der Status ist das verlässliche Signal.

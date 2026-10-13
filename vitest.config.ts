@@ -52,6 +52,9 @@ export default defineConfig({
       '**/chrome-extension/**',
       // worktrees are separate checkouts — their tests run from their own tree.
       '**/.worktrees/**',
+      // Regeltests brauchen den Firestore-Emulator: `npm run test:rules`
+      // (vitest.rules.config.ts). Der Vergleich dev/prod läuft hier mit.
+      'firebase/**/*.rules.test.ts',
     ],
     coverage: {
       provider: 'v8',

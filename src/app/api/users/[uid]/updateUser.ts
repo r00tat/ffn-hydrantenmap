@@ -4,16 +4,51 @@ import { uniqueArray } from '../../../../common/arrayUtils';
 import { isTruthy } from '../../../../common/boolish';
 import { feuerwehren } from '../../../../common/feuerwehren';
 import { isFirecallGuest } from '../../../../common/firecallGuest';
-import { UserRecordExtended } from '../../../../common/users';
+import { isTenantGroupId } from '../../../../common/tenantGroups';
+import {
+  awaitsKostenersatzChoice,
+  claimGroupsForUser,
+  userMemberGroupIds,
+} from '../../../../common/userGroupRoles';
+import { FirebaseUserInfo, UserRecordExtended } from '../../../../common/users';
 import { USER_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { firebaseAuth, firestore } from '../../../../server/firebase/admin';
+import { setUserMemberships } from '../../../../server/auth/changeUserRoles';
 import { userSessionCache } from '../../../../server/auth/userSessionCache';
 
 export interface UsersResponse {
   user: UserRecordExtended;
 }
 
-export async function updateUser(uid: string, user: UserRecordExtended) {
+/**
+ * Stammdaten, Freischaltung und Admin-Flag eines Benutzers.
+ *
+ * Die Gruppen kommen **nicht** aus `user.groups`: Das alte Feld pflegt niemand
+ * mehr, und wer nur die Freischaltung umschaltet, schickt es veraltet mit.
+ * Die Mitgliedschaft ändert sich nur, wenn `memberGroupIds` übergeben wird,
+ * und dann über `writeUserRoles()` (siehe `setUserMemberships`).
+ */
+export async function updateUser(
+  uid: string,
+  user: UserRecordExtended,
+  memberGroupIds?: string[]
+) {
+  const userRef = firestore.collection(USER_COLLECTION_ID).doc(`${uid}`);
+  const stored = await userRef.get();
+  const storedData = ((stored.exists ? stored.data() : undefined) ??
+    {}) as FirebaseUserInfo;
+
+  // Vor jedem Schreibvorgang, damit nichts halb gespeichert bleibt: Die
+  // Umrechnung gäbe ihm Kostenersatz in jeder Gruppe, und Schritt 2 der
+  // Migration überspränge ihn danach samt der Auswahl je Gruppe.
+  if (
+    memberGroupIds &&
+    awaitsKostenersatzChoice(storedData) &&
+    !sameGroups(userMemberGroupIds(storedData), memberGroupIds)
+  ) {
+    return { error: 'notMigrated' as const };
+  }
+
   const newData = {
     displayName: user.displayName,
     email: user.email,
@@ -21,7 +56,6 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     isAdmin: !!user.isAdmin,
     feuerwehr: user.feuerwehr || 'neusiedl',
     abschnitt: feuerwehren[user.feuerwehr || 'neusiedl'].abschnitt || 0,
-    groups: uniqueArray([...(user.groups || []), 'allUsers']),
     // Nur für Einsatz-Gäste relevant. Bei allen anderen Benutzern bleibt das
     // Feld undefined und wird von `filteredData` unten herausgefiltert, damit
     // ein merge-Write kein bestehendes Feld überschreibt.
@@ -43,15 +77,17 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     }): ${JSON.stringify(filteredData)}`
   );
 
-  await firestore
-    .collection(USER_COLLECTION_ID)
-    .doc(`${uid}`)
-    .set(filteredData, {
-      merge: true,
-    });
+  await userRef.set(filteredData, {
+    merge: true,
+  });
+
+  const groupRoles = memberGroupIds
+    ? await setUserMemberships(uid, memberGroupIds, storedData)
+    : undefined;
 
   setCustomClaimsForUser(uid, {
-    groups: newData.groups,
+    // Aus dem gespeicherten Dokument, nicht aus dem Client: siehe oben.
+    groups: claimGroupsForUser(storedData, groupRoles),
     isAdmin: newData.isAdmin,
     authorized: newData.authorized,
     ...(isFirecallGuest(user)
@@ -70,7 +106,13 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
   // Invalidierung bliebe eine Admin-Änderung bis zum Cache-Ablauf wirkungslos.
   userSessionCache.invalidate(uid);
 
-  return newData;
+  return { ...newData, ...(groupRoles ? { groupRoles } : {}) };
+}
+
+function sameGroups(current: string[], desired: string[]) {
+  const a = new Set(current);
+  const b = new Set(desired.filter(isTenantGroupId));
+  return a.size === b.size && [...a].every((groupId) => b.has(groupId));
 }
 
 export interface CustomClaims {

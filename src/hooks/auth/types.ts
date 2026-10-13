@@ -1,5 +1,6 @@
 import { User } from 'firebase/auth';
 import { Group } from '../../app/groups/groupTypes';
+import type { GroupRoles } from '../../common/permissions';
 
 export type LoginStep =
   | 'idle'
@@ -32,13 +33,13 @@ export interface LoginData {
   messagingTokens?: string[];
   expiration?: string;
   idToken?: string;
+  /** Abgeleitet: Mitgliedsgruppen plus `allUsers`. Entscheidungen über `can()`. */
   groups?: string[];
-  /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
-  fahrtenbuchGeraetemeister?: string[];
-  /** Gruppen, in denen der Benutzer Bekleidungswart ist. */
-  bekleidungswart?: string[];
-  /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
-  groupAdmin?: string[];
+  /**
+   * Rollen je Gruppe, siehe `src/common/permissions.ts`. Steht nur in der
+   * Sitzung bzw. im Zwischenspeicher, nicht in den Token-Claims.
+   */
+  groupRoles?: GroupRoles;
   isRefreshing?: boolean;
   myGroups: Group[];
   needsReLogin?: boolean;
@@ -72,4 +73,6 @@ export interface LoginStatus extends LoginData {
 export interface AuthState {
   authorized?: boolean;
   groups?: string[];
+  /** `groupRoles` als stabiler Text, damit auch reine Rollenänderungen auffallen. */
+  roles?: string;
 }

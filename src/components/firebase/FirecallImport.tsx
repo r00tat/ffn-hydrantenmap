@@ -16,6 +16,7 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useState } from 'react';
 import { NON_TENANT_GROUP_IDS } from '../../app/groups/groupTypes';
+import { can } from '../../common/permissions';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import {
@@ -44,7 +45,7 @@ export default function FirecallImport() {
   const showSnackbar = useSnackbar();
   const warningText = useBackupWarningText();
   const progressText = useBackupProgressText();
-  const { myGroups } = useFirebaseLogin();
+  const { myGroups, isAdmin, groupRoles } = useFirebaseLogin();
 
   const [pending, setPending] = useState<FirecallExport>();
   const [targetGroup, setTargetGroup] = useState('');
@@ -91,6 +92,13 @@ export default function FirecallImport() {
         { ...pending, name },
         {
           group: targetGroup || undefined,
+          // Den Kostenersatz schreibt nur, wer ihn in der Zielgruppe machen
+          // darf — sonst lehnte die Regel ab und der Import bräche mittendrin ab.
+          includeKostenersatz: can(
+            { isAdmin, groupRoles },
+            targetGroup || pending.group || '',
+            'kostenersatz.use'
+          ),
           onWarning: (warning) => warnings.push(warning),
           onProgress: setProgress,
         }
@@ -112,7 +120,7 @@ export default function FirecallImport() {
     } finally {
       setProgress(undefined);
     }
-  }, [pending, targetGroup, showSnackbar, t, warningText]);
+  }, [pending, targetGroup, isAdmin, groupRoles, showSnackbar, t, warningText]);
 
   return (
     <>

@@ -406,10 +406,12 @@ Zeilen ohne `createdBy` bleiben dem Gruppen-Admin vorbehalten. Das ist die
 sichere Richtung — `createdBy: ''` gegen ein leeres `uid` zu vergleichen gäbe
 sonst jedem abgemeldeten Zustand das Recht.
 
-**Zwei Schreibwege, und warum.** Die Firestore-Regel kann nur die eigene Zeile
-freigeben: Die Gruppen-Admin-Rolle steckt in keinem Custom Claim und ist für
-Regeln nicht sichtbar (siehe [berechtigungen.md](berechtigungen.md)). Der
-Gruppen-Admin korrigiert deshalb über `updateFremdeFuellung` /
+**Zwei Schreibwege, und warum.** Die Firestore-Regel gibt nur die eigene Zeile
+frei. Das Recht `gruppe.manage` steht in keinem Custom Claim; die Regel könnte
+es per `get()` vom Benutzerdokument lesen (siehe
+[berechtigungen.md](berechtigungen.md#claim-gegen-get)), müsste dann aber die
+Felder des Dialogs und die Sperre nach der Verrechnung noch einmal selbst
+nachbauen. Der Gruppen-Admin korrigiert deshalb über `updateFremdeFuellung` /
 `deleteFremdeFuellung` mit dem Admin SDK, das die Prüfung noch einmal selbst
 macht. Die Action akzeptiert nur die Felder des Dialogs — `createdBy`,
 `rechnungId` und die Zeitstempel stehen nicht darin: Wer eine fremde Zeile
@@ -502,27 +504,42 @@ Position ein. Ein vom Client geschickter Betrag wird nie geglaubt, und eine
 gestellte Rechnung ändert sich nicht mehr, wenn der Katalog später gepflegt
 wird.
 
-### Warum Kostenersatz-Freigabe und nicht Gerätemeister
+### Warum Kostenersatz und nicht Gerätemeister
 
-`actionFuellungRechnungRequired(groupId)` verlangt **Gruppenmitglied und
-Kostenersatz-Freischaltung**. Wer den Kostenersatz der Feuerwehr macht, macht
-auch diese Rechnungen, und das ist nicht zwangsläufig der Gerätemeister — die
-Rolle wäre hier die falsche Grenze.
+Die Verrechnung verlangt das Recht **`kostenersatz.use` in dieser Gruppe**
+(`actionPermissionRequired(groupId, 'kostenersatz.use')`). Wer den
+Kostenersatz der Feuerwehr macht, macht auch diese Rechnungen, und das ist
+nicht zwangsläufig der Gerätemeister — dessen Rechte wären hier die falsche
+Grenze.
 
-Der Zuschnitt hat einen zweiten Grund: Die Firestore-Regel trägt wörtlich
-denselben Satz (`fahrtenbuchMember() && kostenersatzUser()`). Regel und Action
-können damit nicht auseinanderlaufen, und der Client darf den Tarifkatalog
-selbst lesen — sonst bräuchte die Vorschau eine eigene Server Action.
+Der Zuschnitt hat einen zweiten Grund: Die Firestore-Regel prüft wörtlich
+dasselbe Recht (`hasPerm(groupId, 'kostenersatz.use')`). Regel und Action
+können damit nicht auseinanderlaufen, und der Client darf Rechnungen und
+Adressbuch selbst lesen; den Tarifkatalog liest er über
+`hasPermAny('kostenersatz.use')` — sonst bräuchte die Vorschau eine eigene
+Server Action.
 
-Die Konfiguration (Betreff, Text, CC, Zahlungsziel, Vorgabetarif) hängt
-dagegen an `actionGroupAdminRequired`: Sie gilt für alle Rechnungen der Gruppe
-und ist keine Tagesarbeit.
+Bis zur Umstellung auf Gruppenrollen galt die Kostenersatz-Freischaltung
+gruppenübergreifend: Wer sie hatte und in zwei Gruppen Mitglied war, las die
+Rechnungen beider. Seit dem Recht je Gruppe ist das geschlossen (siehe
+[berechtigungen.md](berechtigungen.md#kostenersatz-je-gruppe)).
+
+Die Konfiguration (Betreff, Text, CC, Zahlungsziel, Vorgabetarif) verlangt
+nur `kostenersatz.use`, **nicht** `gruppe.manage`: Wer die Füllungen
+verrechnet, pflegt auch die Vorlagen dazu. Sie gilt für alle Rechnungen der
+Gruppe und ist keine Tagesarbeit, deshalb liegt sie trotzdem in der
+Atemschutz-Verwaltung `/admin/atemschutz`. Die Seite öffnet sich deshalb auch
+mit `kostenersatz.use` allein; dann ist „Verrechnung" der einzige Reiter,
+„Geräte" und „Stammdaten" bleiben bei `gruppe.manage` (`visibleAdminTabs`).
+Gelesen wird die Konfiguration im Browser aus `atemschutzConfig`, und das
+lassen die Regeln nur mit `kostenersatz.use` zu — ein Gruppen-Admin ohne
+Kostenersatz sähe einen Reiter, der nicht laden kann, und bekommt ihn nicht.
 
 ### Wo die Rechnungsstammdaten stehen
 
 Zahlungsziel, Umsatzsteuerhinweis und der Leistungstext liegen in
 `atemschutzConfig/rechnung` und werden unter `/admin/atemschutz` gepflegt
-(Gruppen-Admin).
+(mit `kostenersatz.use`, siehe oben).
 
 **Absender, Anschrift, Kontakt, Kontoinhaber, IBAN, BIC und das Logo stehen
 nicht mehr hier**, sondern in den Gruppen-Stammdaten
@@ -623,8 +640,8 @@ schlechter Verbindung.
   Protokoll. Dafür ist **keine eigene Firestore-Regel nötig** — die bestehende
   `match /{subitem=**}` unter `call/{doc}` deckt jede neue Untersammlung ab.
 - **Füllprotokoll** (`groups/{groupId}/atemschutzFuellung`): lesen und
-  *anlegen* jedes Gruppenmitglied (`fahrtenbuchMember()`); ändern und löschen
-  nur der Erfasser, der Gruppen-Admin über eine Server Action, und beide nicht
+  *anlegen* jedes Gruppenmitglied (`member(groupId)`); ändern und löschen
+  nur der Erfasser, der Gruppen-Admin (`gruppe.manage`) über eine Server Action, und beide nicht
   mehr nach der Verrechnung — siehe „Wer eine Füllung nachträglich ändern
   darf". Anders als bei den
   Stammdaten schreibt hier der **Client** und nicht eine Server Action: Am
@@ -637,14 +654,14 @@ schlechter Verbindung.
   Hinweis — ein verschwundener Reiter würde als Fehler gelesen. Sie könnten die
   Geräte-Stammdaten ohnehin nicht lesen.
 - **Stammdaten** (`groups/{groupId}/atemschutzGeraet`): lesen jedes
-  Gruppenmitglied, schreiben `actionGroupAdminRequired(groupId)` — also der
-  globale Admin *oder* der Gruppen-Admin dieser Feuerwehr (Rolle aus PR #752,
-  siehe [berechtigungen.md](berechtigungen.md)). Die Firestore-Regel
+  Gruppenmitglied, schreiben `actionPermissionRequired(groupId, 'gruppe.manage')`
+  — also der globale Admin *oder* der Gruppen-Admin dieser Feuerwehr (siehe
+  [berechtigungen.md](berechtigungen.md)). Die Firestore-Regel
   steht wörtlich wie bei `vehicle` auf `adminUser()`; geschrieben wird ohnehin
   ausschließlich serverseitig, kein Client hat hier Schreibrechte.
 - **Ausrüstungsmängel**: gemeldet über `createAtemschutzMangel`, geschützt mit
   `actionUserRequired()` plus Gruppenprüfung. Bewusst **nicht**
-  `actionGroupAdminRequired()`: Am Sammelplatz fällt der Mangel auf, und wer
+  `gruppe.manage`: Am Sammelplatz fällt der Mangel auf, und wer
   ihn bemerkt, verwaltet die Gruppe in aller Regel nicht.
 
 ## Bedienung am Sammelplatz

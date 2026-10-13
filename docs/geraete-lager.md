@@ -340,7 +340,7 @@ ebenso gelöschte (`missing`) und inaktive (`inactive`) Artikel. Die Vorschau im
 Dialog zeigt sie ausgegraut mit Grund; Menge, Stunden und Lagerort sind dort je
 Zeile änderbar.
 
-**Gäste** lesen keine Sets (`fahrtenbuchMember()`), `useGeraetSets` abonniert ohne
+**Gäste** lesen keine Sets (`member(groupId)` verlangt die Mitgliedschaft), `useGeraetSets` abonniert ohne
 Gruppenmitgliedschaft nichts. Sie erfassen einzelne Artikel und sehen bestehende
 Set-Einträge unter dem kopierten Namen.
 
@@ -675,14 +675,16 @@ Verbrauch, Storno und Zuordnung übernehmen sie als `firecallArt` in den Eintrag
 
 Pflege — Artikel anlegen und ändern, Zugang, Umbuchung, Inventur, Import, Sets,
 Chargen — dürfen
-**Gruppen-Admin und Gerätemeister** der Gruppe
-(`actionFahrtenbuchManagerRequired(groupId)`, plus `assertTenantGroup`). Der
-Gerätemeister pflegt schon Fahrzeuge und Personen im Fahrtenbuch; die Beladung
-dieser Fahrzeuge gehört zur selben Aufgabe. Eine eigene Rolle „Lagerverwalter" wäre
-eine weitere Liste am Benutzerdokument, die in der Praxis dieselben Personen trüge.
+alle mit dem Recht **`geraete.manage`** in der Gruppe — Gruppen-Admin und
+Gerätemeister (`actionPermissionRequired(groupId, 'geraete.manage')`, der auch
+`assertTenantGroup` prüft). Der Gerätemeister pflegt schon Fahrzeuge und Personen
+im Fahrtenbuch; die Beladung dieser Fahrzeuge gehört zur selben Aufgabe. Eine
+eigene Rolle „Lagerverwalter" trüge in der Praxis dieselben Personen. Weil die
+Pflege ein eigenes Recht prüft und nicht die Rolle, wäre sie trotzdem nur ein
+Katalogeintrag, falls sich das ändert.
 
-Lesen dürfen alle Mitglieder der Gruppe (`fahrtenbuchMember()` in den
-Firestore-Regeln), denn der Einsatz-Dialog braucht Artikel und Lagerorte — auch
+Lesen dürfen alle Mitglieder der Gruppe (`member(groupId)` in den
+Firestore-Regeln, aus dem Claim `groups`), denn der Einsatz-Dialog braucht Artikel und Lagerorte — auch
 offline aus dem Cache. Schreiben aus dem Client ist für `geraet`, `geraetBestand` und
 `geraetBuchung` gesperrt, damit `bestandGesamt` und Protokoll nicht auseinanderlaufen;
 für `geraetSet`, damit die Code-Eindeutigkeit nur an einer Stelle geprüft wird.

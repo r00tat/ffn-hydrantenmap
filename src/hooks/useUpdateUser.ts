@@ -8,7 +8,8 @@ export default function useUpdateUser() {
 
   return useCallback(
     async (
-      userData: UserRecordExtended
+      userData: UserRecordExtended,
+      memberGroupIds?: string[]
     ): Promise<UserRecordExtended | undefined> => {
       if (!isSignedIn || !user) {
         return undefined;
@@ -26,7 +27,7 @@ export default function useUpdateUser() {
       // const usersResponse = await response.json();
       // console.info(`users: ${JSON.stringify(usersResponse.users)}`);
       console.info(`before user action`);
-      const updateResult = await updateUserAction(userData);
+      const updateResult = await updateUserAction(userData, memberGroupIds);
       return updateResult as unknown as any;
     },
     [isSignedIn, user]

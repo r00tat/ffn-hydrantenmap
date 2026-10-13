@@ -2,6 +2,7 @@ import 'server-only';
 
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 import { FirebaseUserInfo } from '../../common/users';
+import { claimGroupsForUser } from '../../common/userGroupRoles';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
 import { shareLinkStatus } from '../../common/firecallShareLink';
 import { firebaseAuth, firestore } from '../firebase/admin';
@@ -59,7 +60,10 @@ export async function mintFirebaseCustomToken(
 
   const firecall = userData.firecall;
   const token = await firebaseAuth.createCustomToken(uid, {
-    groups: userData.groups || ['allUsers'],
+    // Mitgliedschaft aus `groupRoles` (vor der Migration aus dem alten Feld),
+    // genau wie `writeUserRoles` den Claim setzt — sonst prägte dieser
+    // Anmeldeweg einen anderen Claim als die Rollenverwaltung.
+    groups: claimGroupsForUser(userData),
     isAdmin: !!userData.isAdmin,
     authorized: true,
     // `undefined` ist als Developer Claim nicht erlaubt — die Einsatz-Claims

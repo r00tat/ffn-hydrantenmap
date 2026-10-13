@@ -332,7 +332,7 @@ describe('finishPasskeyAuthentication', () => {
       authResponse() as never,
     );
     expect(createCustomTokenMock).toHaveBeenCalledWith('user-1', {
-      groups: ['ffnd', 'admin'],
+      groups: ['ffnd', 'admin', 'allUsers'],
       isAdmin: true,
       authorized: true,
     });
