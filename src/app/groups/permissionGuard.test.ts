@@ -151,4 +151,14 @@ describe('actionFirecallPermissionRequired', () => {
       actionFirecallPermissionRequired('fc1', 'kostenersatz.use'),
     ).rejects.toThrow();
   });
+
+  it('lässt den globalen Admin an einen Einsatz der Pseudo-Gruppe allUsers', async () => {
+    // Wie die Regel `hasPerm()`: Der Admin sieht die Berechnungen dort, also
+    // muss er sie auch speichern, drucken und versenden können.
+    signedInAs({ id: 'a', isAdmin: true, groupRoles: {} });
+    firecall({ group: 'allUsers' });
+    await expect(
+      actionFirecallPermissionRequired('fc1', 'kostenersatz.use'),
+    ).resolves.toMatchObject({ firecall: { id: 'fc1', group: 'allUsers' } });
+  });
 });

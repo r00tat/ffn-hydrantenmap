@@ -44,10 +44,11 @@ export async function requireKostenersatzForFirecall(
       status: 403,
     });
   }
-  // Wie im Guard: Ein Recht „in allUsers" gälte für jeden Benutzer.
-  assertTenantGroup(groupId);
-
   const user = userDoc.data() as FirebaseUserInfo | undefined;
+  // Wie im Guard: Ein Recht „in allUsers" gälte für jeden Benutzer. Der
+  // globale Admin kommt trotzdem durch, wie in der Regel `hasPerm()`.
+  if (!user?.isAdmin) assertTenantGroup(groupId);
+
   if (
     !can(
       { isAdmin: user?.isAdmin, groupRoles: user?.groupRoles },

@@ -91,12 +91,23 @@ describe('requireKostenersatzForFirecall', () => {
   });
 
   it.each(NON_TENANT_GROUP_IDS)(
-    'weist einen Einsatz der Pseudo-Gruppe %s auch beim Admin ab',
+    'weist einen Einsatz der Pseudo-Gruppe %s bei Nicht-Admins ab',
+    async (groupId) => {
+      docs.set('call/fc2', { name: 'X', group: groupId });
+      user('u1', { groupRoles: { ffnd: ['kostenersatz'] } });
+      await expect(requireKostenersatzForFirecall('u1', 'fc2')).rejects.toMatchObject({
+        status: 400,
+      });
+    },
+  );
+
+  it.each(NON_TENANT_GROUP_IDS)(
+    'lässt den Admin an einen Einsatz der Pseudo-Gruppe %s, wie die Regeln',
     async (groupId) => {
       docs.set('call/fc2', { name: 'X', group: groupId });
       user('a1', { isAdmin: true });
-      await expect(requireKostenersatzForFirecall('a1', 'fc2')).rejects.toMatchObject({
-        status: 400,
+      await expect(requireKostenersatzForFirecall('a1', 'fc2')).resolves.toMatchObject({
+        id: 'fc2',
       });
     },
   );

@@ -44,6 +44,12 @@ export async function actionPermissionRequired(
  * Den Einsatz selbst sieht, wer Mitglied ist oder globaler Admin; das deckt
  * `can()` mit ab.
  *
+ * Anders als bei `actionPermissionRequired` kommt der globale Admin auch an
+ * einen Einsatz einer Pseudo-Gruppe (Altbestand mit `group: 'allUsers'`): Die
+ * Regel `hasPerm()` lässt ihn die Berechnungen dort lesen und schreiben, also
+ * soll er sie auch speichern, drucken und versenden können. Für alle anderen
+ * bleibt die Sperre — ein Recht „in allUsers" gälte für jeden.
+ *
  * @returns die Sitzung und den Einsatz, damit der Aufrufer ihn nicht ein
  * zweites Mal liest.
  */
@@ -68,7 +74,7 @@ export async function actionFirecallPermissionRequired(
       status: 400,
     });
   }
-  assertTenantGroup(groupId);
+  if (!session.user.isAdmin) assertTenantGroup(groupId);
   if (!can(session.user, groupId, perm)) {
     throw new ApiException(
       `user lacks ${perm} for firecall ${firecallId}`,
