@@ -173,6 +173,7 @@
       "@mui/material": "$@mui/material"
     },
     "@simplewebauthn/browser": "$@simplewebauthn/browser",
-    "@simplewebauthn/server": "$@simplewebauthn/server"
+    "@simplewebauthn/server": "$@simplewebauthn/server",
+    "@grpc/grpc-js": "^1.14.6"
   }
 }
