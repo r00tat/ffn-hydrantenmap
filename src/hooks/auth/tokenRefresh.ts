@@ -1,5 +1,6 @@
 import { isInternalEmail } from '../../common/internalDomains';
 import { auth } from '../../components/firebase/firebase';
+import { claimGroupsKey } from './claimGroups';
 
 export { isInternalEmail };
 
@@ -13,7 +14,7 @@ export async function refreshTokenUntilClaimsMatch(
   maxRetries = 5,
   retryDelayMs = 1000
 ): Promise<boolean> {
-  const sortedExpectedGroups = [...expectedGroups].sort().join(',');
+  const expectedGroupsKey = claimGroupsKey(expectedGroups);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) {
@@ -28,13 +29,13 @@ export async function refreshTokenUntilClaimsMatch(
     }
 
     const tokenAuthorized = !!tokenResult.claims.authorized;
-    const tokenGroups = [...((tokenResult.claims.groups as string[]) || [])]
-      .sort()
-      .join(',');
+    const tokenGroups = claimGroupsKey(
+      tokenResult.claims.groups as string[] | undefined
+    );
 
     if (
       tokenAuthorized === expectedAuthorized &&
-      tokenGroups === sortedExpectedGroups
+      tokenGroups === expectedGroupsKey
     ) {
       return true;
     }
@@ -69,11 +70,13 @@ export async function refreshTokenWithRetry(
 
     const tokenResult = await auth.currentUser!.getIdTokenResult();
     const tokenAuthorized = !!tokenResult.claims.authorized;
-    const tokenGroups = [...((tokenResult.claims.groups as string[]) || [])].sort();
+    const tokenGroups = claimGroupsKey(
+      tokenResult.claims.groups as string[] | undefined
+    );
 
     claimsMatch =
       tokenAuthorized === expectedAuthorized &&
-      JSON.stringify(tokenGroups) === JSON.stringify(expectedGroups);
+      tokenGroups === claimGroupsKey(expectedGroups);
 
     if (claimsMatch) {
       console.info(`token claims now match Firestore data`);

@@ -1,4 +1,5 @@
 import type { GeoPositionObject } from '../../common/geo';
+import { NON_TENANT_GROUP_IDS } from '../../common/tenantGroups';
 import { ApiException } from '../api/errors';
 
 export interface Group {
@@ -25,21 +26,12 @@ export interface Group {
   feuerwehrName?: string;
 }
 
-/**
- * Pseudo-Gruppe, die jedem Benutzer in die Claims geschrieben wird
- * (`updateUser.ts`) und die auch Einsatz-Gasttokens tragen. Sie ist kein
- * Mandant und darf nie als Fahrtenbuch-Gruppe gelten.
- */
-export const ALL_USERS_GROUP_ID = 'allUsers';
-
-/**
- * Group IDs that are capabilities or pseudo-groups rather than brigades
- * ("Mandanten"). Features that let a user pick "their" group — such as the
- * Fahrtenbuch group selector — must filter these out, the same way
- * `ALL_USERS_GROUP_ID` alone used to be filtered before `kostenersatz` was
- * recognised as belonging to the same category.
- */
-export const NON_TENANT_GROUP_IDS: string[] = [ALL_USERS_GROUP_ID, 'kostenersatz'];
+// Die Sperrliste steht in `common/`, damit die reine Berechtigungslogik sie
+// ohne Import aus `app/` nutzen kann; hier nur weitergereicht.
+export {
+  ALL_USERS_GROUP_ID,
+  NON_TENANT_GROUP_IDS,
+} from '../../common/tenantGroups';
 
 /**
  * Prüft, ob die Gruppen-ID ein echter Mandant ist — die Sperre für jeden
@@ -50,14 +42,16 @@ export const NON_TENANT_GROUP_IDS: string[] = [ALL_USERS_GROUP_ID, 'kostenersatz
  *   Einsatz-Gasttokens (die nur für einen einzigen Einsatz gelten). Ein
  *   „Admin von allUsers" wäre Admin für jeden, ein Fahrtenbuch darunter für
  *   jeden Empfänger eines Gastlinks lesbar.
- * - `kostenersatz` ist eine Berechtigungsgruppe („Zugang zur
- *   Kostenersatz-Funktion") und keine Feuerwehr.
+ * - `kostenersatz` war die frühere Berechtigungsgruppe („Zugang zur
+ *   Kostenersatz-Funktion") und ist keine Feuerwehr. Seit den Gruppenrollen
+ *   ist Kostenersatz eine Rolle je Gruppe; die ID bleibt gesperrt, solange sie
+ *   in Altbeständen von `user.groups` und in Claims stehen kann.
  *
  * Steht in diesem reinen Datenmodul und nicht bei den Guards, damit sowohl
- * `actionGroupAdminRequired` (src/app/auth.ts) als auch
+ * `actionPermissionRequired` (src/app/groups/permissionGuard.ts) als auch
  * `assertFahrtenbuchGroup` (Fahrtenbuch) dieselbe Regel benutzen, ohne dass
  * eines der beiden das andere importieren muss. Dieselbe Sperre steht in
- * `fahrtenbuchMember()` in den Firestore-Regeln.
+ * `member()` in den Firestore-Regeln.
  */
 export function assertTenantGroup(groupId: string) {
   if (!groupId) {
@@ -81,10 +75,5 @@ export const KNOWN_GROUPS: Group[] = [
     id: 'allUsers',
     name: 'Alle Benutzer',
     description: 'Alle registrierten Benutzer',
-  },
-  {
-    id: 'kostenersatz',
-    name: 'Kostenersatz',
-    description: 'Zugang zur Kostenersatz-Funktion',
   },
 ];

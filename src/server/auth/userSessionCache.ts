@@ -1,13 +1,12 @@
+import type { GroupRoles } from '../../common/permissions';
+
 export interface CacheableUserData {
   isAuthorized: boolean;
   isAdmin: boolean;
+  /** Abgeleitet: Mitgliedsgruppen aus `groupRoles` plus `allUsers`. */
   groups: string[];
-  /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
-  fahrtenbuchGeraetemeister?: string[];
-  /** Gruppen, in denen der Benutzer Bekleidungswart ist. */
-  bekleidungswart?: string[];
-  /** Gruppen, in denen der Benutzer Gruppen-Admin ist. */
-  groupAdmin?: string[];
+  /** Rollen je Gruppe, siehe `src/common/permissions.ts`. */
+  groupRoles: GroupRoles;
   firecall?: string;
   /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
   firecallWrite?: boolean;

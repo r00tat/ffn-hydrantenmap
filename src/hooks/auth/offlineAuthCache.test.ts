@@ -19,9 +19,7 @@ function data(overrides: Partial<OfflineAuthData> = {}): OfflineAuthData {
     isAuthorized: true,
     isAdmin: false,
     groups: ['ffnd', 'allUsers'],
-    groupAdmin: ['ffnd'],
-    fahrtenbuchGeraetemeister: [],
-    bekleidungswart: ['ffnd'],
+    groupRoles: { ffnd: ['bekleidungswart', 'gruppenadmin'] },
     myGroups: [{ id: 'ffnd', name: 'FF Neusiedl' }],
     ...overrides,
   };
@@ -37,8 +35,10 @@ describe('offlineAuthCache', () => {
     const loaded = loadOfflineAuth('uid-1', NOW + 1000);
     expect(loaded?.isAuthorized).toBe(true);
     expect(loaded?.groups).toEqual(['ffnd', 'allUsers']);
-    expect(loaded?.groupAdmin).toEqual(['ffnd']);
-    expect(loaded?.bekleidungswart).toEqual(['ffnd']);
+    expect(loaded?.groupRoles).toEqual({
+      ffnd: ['bekleidungswart', 'gruppenadmin'],
+    });
+    expect(loaded).not.toHaveProperty('groupAdmin');
     expect(loaded?.myGroups).toEqual([{ id: 'ffnd', name: 'FF Neusiedl' }]);
     expect(loaded?.savedAt).toBe(NOW);
   });
@@ -95,6 +95,52 @@ describe('offlineAuthCache', () => {
       JSON.stringify({ uid: 'uid-1', isAuthorized: true }),
     );
     expect(loadOfflineAuth('uid-1', NOW)).toBeNull();
+  });
+
+  it('rechnet einen Eintrag im alten Format in groupRoles um', () => {
+    // Geräte, die seit dem Release nicht online waren, stünden beim Kaltstart
+    // ohne Netz sonst ohne Gruppen da.
+    window.localStorage.setItem(
+      OFFLINE_AUTH_STORAGE_KEY,
+      JSON.stringify({
+        uid: 'uid-1',
+        savedAt: NOW,
+        isAuthorized: true,
+        isAdmin: false,
+        groups: ['allUsers', 'ffnd', 'ffxy', 'kostenersatz'],
+        groupAdmin: ['ffnd'],
+        fahrtenbuchGeraetemeister: ['ffxy'],
+        bekleidungswart: ['ffzz'],
+        myGroups: [],
+      }),
+    );
+
+    const loaded = loadOfflineAuth('uid-1', NOW);
+
+    expect(loaded?.groupRoles).toEqual({
+      ffnd: ['gruppenadmin', 'kostenersatz'],
+      ffxy: ['geraetemeister', 'kostenersatz'],
+    });
+    expect(loaded?.groups).toEqual(['allUsers', 'ffnd', 'ffxy', 'kostenersatz']);
+    expect(loaded).not.toHaveProperty('groupAdmin');
+    expect(loaded).not.toHaveProperty('fahrtenbuchGeraetemeister');
+    expect(loaded).not.toHaveProperty('bekleidungswart');
+  });
+
+  it('verwirft kaputte groupRoles und rechnet aus den alten Feldern', () => {
+    window.localStorage.setItem(
+      OFFLINE_AUTH_STORAGE_KEY,
+      JSON.stringify({
+        uid: 'uid-1',
+        savedAt: NOW,
+        isAuthorized: true,
+        isAdmin: false,
+        groups: ['allUsers', 'ffnd'],
+        groupRoles: 'kaputt',
+        myGroups: [],
+      }),
+    );
+    expect(loadOfflineAuth('uid-1', NOW)?.groupRoles).toEqual({ ffnd: [] });
   });
 
   it('löscht beim Abmelden', () => {
