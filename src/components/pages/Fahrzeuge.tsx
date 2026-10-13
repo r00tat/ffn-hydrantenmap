@@ -19,8 +19,10 @@ import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 import {
   FirecallContext,
   useAtsCountForVehicle,
+  useFirecallId,
   useCrewCountForVehicle,
 } from '../../hooks/useFirecall';
+import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useVehicles from '../../hooks/useVehicles';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { CrewAssignment, FirecallItem } from '../firebase/firestore';
@@ -29,6 +31,7 @@ import { DownloadButton } from '../inputs/DownloadButton';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { getItemInstance } from '../FirecallItems/elements';
 import { FirecallVehicle } from '../FirecallItems/elements/FirecallVehicle';
+import EinsatzmittelQuickAdd from './EinsatzmittelQuickAdd';
 import StrengthTable from './StrengthTable';
 import { calculateStrength } from './fahrzeuge-utils';
 
@@ -245,6 +248,10 @@ export default function Fahrzeuge() {
   const { crewAssignments } = useContext(FirecallContext);
   const { displayItems } = useVehicles();
   const layers = useFirecallLayers();
+  const canWrite = useFirecallWriteAccess();
+  // Ohne gewählten Einsatz landete ein neues Element unter `call/unknown`.
+  const firecallId = useFirecallId();
+  const canAdd = canWrite && firecallId !== 'unknown';
 
   const groupedByLayer = useMemo(() => {
     const groups: SimpleMap<FirecallItem[]> = {};
@@ -292,6 +299,8 @@ export default function Fahrzeuge() {
           }
         />
       </Typography>
+
+      {canAdd && <EinsatzmittelQuickAdd items={displayItems} />}
 
       <StrengthTable items={displayItems} />
 

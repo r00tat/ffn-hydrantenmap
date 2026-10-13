@@ -169,3 +169,28 @@ Einsatztagebuch, Fahrzeugdruck, Stärketabelle und die Zusammenfassung für den
 Sprachassistenten gehen darüber. Der Export nach lagekarte.info trägt die Stärke als
 Text (`infoData.mannschaftAnz`) und bekommt deshalb ebenfalls die angeschriebene Form
 `1:8`, nicht die gespeicherte Zahl (siehe [lagekarte-austausch.md](lagekarte-austausch.md)).
+
+## Schnelleingabe auf der Seite „Einsatzmittel"
+
+Die Eingabezeile oberhalb der Stärketabelle
+([EinsatzmittelQuickAdd.tsx](../src/components/pages/EinsatzmittelQuickAdd.tsx), Logik in
+[quick-add-utils.ts](../src/components/pages/quick-add-utils.ts)) legt Fahrzeuge und
+taktische Einheiten ohne Dialog an. Sie hält sich an die beiden Konventionen oben:
+
+- Am **Fahrzeug** geht das Stärkefeld durch `parseBesatzung()` und landet kanonisch als
+  Zahl hinter dem Doppelpunkt — wie bei jedem anderen schreibenden Weg.
+- An der **Einheit** speichert `mann` die Gesamtstärke. Gemeldet wird eine Einheit aber
+  als „1:8"; `parseTotalStrength()` addiert deshalb die Teile bzw. nimmt bei „1/8/9" die
+  angeschriebene Summe. Ein `parseInt` ergäbe aus „1:8" eine `1`.
+- Leere Felder bleiben weg statt als `0` gespeichert zu werden — eine `0` am Fahrzeug
+  überschriebe den Rückfall auf die Besatzungszuordnung.
+
+Der Schalter **Fremd** folgt der Feuerwehr (`defaultFremd()`): an, sobald eine andere als
+die Feuerwehr des Einsatzes eingetragen ist, weil eine Nachbarwehr nicht die eigene
+Mannschaft ist. Ein Klick legt ihn fest, bis die Feuerwehr wieder geändert wird. Feuerwehr,
+Fremd und „Eingetroffen" bleiben nach dem Anlegen stehen — nachrückende Kräfte sind meist
+mehrere Fahrzeuge derselben Organisation. Die Chips der eigenen Fahrzeuge legen dagegen
+immer eigene Kräfte ohne Stärkeangabe an, auch wenn im Feld gerade eine Nachbarwehr steht.
+
+Position ist die Einsatzadresse wie beim Personal-Board; wer das Element auf der Karte
+genauer haben will, verschiebt es dort.

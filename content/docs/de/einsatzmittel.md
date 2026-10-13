@@ -5,6 +5,7 @@ Die Einsatzmittel-Seite bietet eine Übersicht aller im Einsatz eingesetzten Fah
 ## Funktionen
 
 - Übersicht aller eingesetzten Fahrzeuge und Ressourcen
+- **Schnelleingabe** für weitere Fahrzeuge und taktische Einheiten direkt auf der Seite
 - **Stärketabelle** Mit Gesamtbesatzung und Atemschutzträger (ATS)
 - Gruppierung nach Ebenen
 - Kompakte Kartenansicht pro Fahrzeug
@@ -18,6 +19,25 @@ Die Einsatzmittel-Seite bietet eine Übersicht aller im Einsatz eingesetzten Fah
 
 1. Im Menü auf "Einsatzmittel" klicken
 2. Die Seite zeigt alle Fahrzeuge des aktiven Einsatzes
+
+### Weitere Kräfte schnell hinzufügen
+
+Oberhalb der Stärketabelle steht eine Eingabezeile, mit der nachrückende Kräfte ohne Dialog erfasst werden.
+
+1. Oben **Fahrzeug** oder **Taktische Einheit** wählen
+2. **Bezeichnung** eingeben — bei Fahrzeugen werden die eigenen Fahrzeuge vorgeschlagen, jede andere Bezeichnung geht ebenso
+3. Optional **Feuerwehr / Organisation**, Stärke und **ATS** ausfüllen
+4. **Enter** drücken oder **Hinzufügen** klicken
+
+Danach steht der Cursor wieder in der Bezeichnung; Feuerwehr, **Fremd** und **Eingetroffen** bleiben stehen. So lassen sich mehrere Fahrzeuge einer Nachbarwehr hintereinander eintippen.
+
+- **Besatzung 1:?** am Fahrzeug ist die Mannschaft ohne Kommandant — `8` oder `1:8` ergibt neun Personen
+- **Stärke** an der taktischen Einheit ist die Gesamtstärke — `9`, `1:8` oder `1/8/9` ergeben neun Personen
+- **Fremd** schaltet sich ein, sobald eine andere als die eigene Feuerwehr eingetragen ist, und lässt sich umschalten
+- **Eingetroffen** setzt die Eintreffzeit auf jetzt
+- Die eigenen Fahrzeuge lassen sich zusätzlich mit einem Klick auf ihren Chip anlegen
+
+Das neue Element liegt an der Einsatzadresse. Alarmierungszeit, Beschreibung oder Position lassen sich danach wie gewohnt über **Bearbeiten** ergänzen.
 
 ### Stärketabelle lesen
 

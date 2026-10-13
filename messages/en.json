@@ -3011,7 +3011,22 @@
     "ownForcesTotal": "Own forces total",
     "foreignForcesTotal": "Other organisations total",
     "forceOwn": "own",
-    "forceForeign": "other"
+    "forceForeign": "other",
+    "quickAdd": {
+      "title": "Add resources",
+      "vehicle": "Vehicle",
+      "tacticalUnit": "Tactical unit",
+      "name": "Name",
+      "unitType": "Type",
+      "fw": "Fire brigade / organisation",
+      "crew": "Crew 1:?",
+      "strength": "Strength",
+      "ats": "SCBA",
+      "fremd": "External",
+      "arrived": "Arrived",
+      "add": "Add",
+      "added": "{name} added"
+    }
   },
   "einsaetze": {
     "title": "Operations",

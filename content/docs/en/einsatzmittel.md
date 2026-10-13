@@ -5,6 +5,7 @@ The operational resources page gives an overview of all vehicles and resources d
 ## Features
 
 - Overview of all deployed vehicles and resources
+- **Quick entry** for further vehicles and tactical units right on the page
 - **Strength table** With total crew size and breathing apparatus wearers (ATS)
 - Grouping by layers
 - Compact card view for each vehicle
@@ -18,6 +19,25 @@ The operational resources page gives an overview of all vehicles and resources d
 
 1. Click "Operational resources" in the menu
 2. The page shows all vehicles of the active operation
+
+### Quickly add further resources
+
+Above the strength table there is an input row to record arriving resources without opening a dialog.
+
+1. Choose **Vehicle** or **Tactical unit**
+2. Enter the **Name** — for vehicles your own fleet is suggested, any other name works too
+3. Optionally fill in **Fire brigade / organisation**, strength and **SCBA**
+4. Press **Enter** or click **Add**
+
+The cursor then returns to the name; fire brigade, **External** and **Arrived** are kept, so several vehicles of a neighbouring brigade can be typed one after another.
+
+- **Crew 1:?** on a vehicle is the crew without the commander — `8` or `1:8` means nine people
+- **Strength** on a tactical unit is the total strength — `9`, `1:8` or `1/8/9` mean nine people
+- **External** switches on as soon as another brigade than your own is entered, and can be toggled
+- **Arrived** sets the arrival time to now
+- Your own vehicles can also be added with one click on their chip
+
+The new item is placed at the incident address. Alarm time, description or position can be added afterwards via **Edit**.
 
 ### Read the strength table
 

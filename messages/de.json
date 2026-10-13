@@ -3011,7 +3011,22 @@
     "ownForcesTotal": "Summe eigene Kräfte",
     "foreignForcesTotal": "Summe Fremdkräfte",
     "forceOwn": "eigen",
-    "forceForeign": "fremd"
+    "forceForeign": "fremd",
+    "quickAdd": {
+      "title": "Kräfte hinzufügen",
+      "vehicle": "Fahrzeug",
+      "tacticalUnit": "Taktische Einheit",
+      "name": "Bezeichnung",
+      "unitType": "Art",
+      "fw": "Feuerwehr / Organisation",
+      "crew": "Besatzung 1:?",
+      "strength": "Stärke",
+      "ats": "ATS",
+      "fremd": "Fremd",
+      "arrived": "Eingetroffen",
+      "add": "Hinzufügen",
+      "added": "{name} hinzugefügt"
+    }
   },
   "einsaetze": {
     "title": "Einsätze",
