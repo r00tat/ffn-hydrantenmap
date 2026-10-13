@@ -79,7 +79,7 @@ Wurde seit dem letzten Import im Einsatz verbraucht oder von Hand gebucht, über
 ## Berechtigungen
 
 - **Ansehen, zuordnen, verbrauchen:** alle Mitglieder der Feuerwehr bzw. alle mit Zugriff auf den Einsatz
-- **Artikel, Bestand und Sets pflegen, Import:** Administratoren der Feuerwehr und Gerätemeister
+- **Artikel, Bestand und Sets pflegen, Import:** Administratoren, Gruppen-Admins und Gerätemeister der Feuerwehr
 - **Sets im Einsatz wählen:** Mitglieder der Feuerwehr; Gäste eines Einsatzes erfassen einzelne Artikel
 
 ## Hinweise

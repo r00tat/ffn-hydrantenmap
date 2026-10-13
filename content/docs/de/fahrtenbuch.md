@@ -114,7 +114,7 @@ Ein Klick auf **Bearbeiten** öffnet den Mangel:
 - **Notiz hinzufügen** hängt einen Eintrag an den Verlauf. Notizen sind nachträglich unveränderlich; so bleibt der Weg von der Meldung bis zur Reparatur nachvollziehbar („Werkstatttermin am 12.8.", „Ersatzteil bestellt").
 - Die **Mangelbeschreibung** lässt sich korrigieren, ohne dass das im Verlauf landet — ein Tippfehler ist kein Vorgang.
 
-Bearbeiten darf jedes Mitglied der Gruppe: Wer einen Mangel abarbeitet, ist selten der, der ihn gemeldet hat. Nachvollziehbar bleibt es über den Verlauf. **Löschen** dürfen nur Administratoren und ist für versehentlich angelegte Mängel gedacht — ein reparierter Mangel gehört auf *Behoben* gesetzt, nicht gelöscht.
+Bearbeiten darf jedes Mitglied der Gruppe: Wer einen Mangel abarbeitet, ist selten der, der ihn gemeldet hat. Nachvollziehbar bleibt es über den Verlauf. **Löschen** dürfen nur Gruppen-Admins (und Administratoren) und ist für versehentlich angelegte Mängel gedacht — ein reparierter Mangel gehört auf *Behoben* gesetzt, nicht gelöscht.
 
 Über **Mangel melden** lässt sich ein Mangel auch ohne Fahrt erfassen, etwa bei der monatlichen Fahrzeugüberprüfung.
 
@@ -245,16 +245,18 @@ Unbekannte Fahrer werden als deaktivierte Personen angelegt, damit die Fahrt ein
 - **Sammelerfassung zum Einsatz** Mitglieder der Gruppe, zu der der Einsatz gehört
 - **Fahrt ändern oder löschen** Nur der Ersteller der Fahrt, ein Gerätemeister der Gruppe oder ein Administrator
 - **Erfassung über den QR-Code** Jeder mit dem Link — ausschließlich erfassen, kein Einblick in bestehende Fahrten
-- **Fahrzeuge und Personen pflegen** Administratoren und Gerätemeister der Gruppe
-- **Fahrtenbuch-Link, Import und Gruppeneinstellungen** Nur Administratoren
+- **Fahrzeuge und Personen pflegen** Administratoren, Gruppen-Admins und Gerätemeister der Gruppe
+- **Fahrtenbuch-Link, Import und Gruppeneinstellungen** Nur Administratoren und Gruppen-Admins
 
 ## Gerätemeister
 
 Fahrten korrigieren darf normalerweise nur, wer sie erfasst hat. Zusätzlich
-kann ein Administrator je Feuerwehr **Gerätemeister** eintragen: Sie dürfen
-jede Fahrt ihrer Feuerwehr nachträglich ändern — etwa einen falsch erfassten
-Kilometerstand — und die Fahrzeuge und Personen pflegen.
+kann ein Administrator oder Gruppen-Admin je Feuerwehr die Rolle
+**Gerätemeister** vergeben: Gerätemeister dürfen jede Fahrt ihrer Feuerwehr
+nachträglich ändern — etwa einen falsch erfassten Kilometerstand —, die
+Fahrzeuge und Personen pflegen und Geräte & Material verwalten.
 
-Eingetragen werden Gerätemeister in der Fahrtenbuch-Verwaltung unter
-„Einstellungen". Wählbar sind nur Mitglieder der jeweiligen Feuerwehr.
+Vergeben wird die Rolle in der Ansicht **„Mitglieder und Rollen"** der
+Feuerwehr; die Fahrtenbuch-Verwaltung verlinkt unter „Einstellungen" dorthin.
+Wählbar sind nur Mitglieder der jeweiligen Feuerwehr.
 

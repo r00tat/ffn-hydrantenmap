@@ -4,7 +4,9 @@ Der Admin-Bereich bietet erweiterte Verwaltungsfunktionen für Administratoren. 
 
 ## Funktionen
 
-- Benutzerverwaltung: Benutzer anzeigen, Berechtigungen setzen, Custom Claims vergeben
+- Benutzerverwaltung: Benutzer anzeigen, freischalten, Feuerwehren zuordnen
+- Mitglieder und Rollen: Rollen je Feuerwehr vergeben (Gruppen-Admin, Gerätemeister, Bekleidungswart, Kostenersatz)
+- Berechtigungen: Migration der Rollen und „Rechte neu ableiten"
 - Gruppenverwaltung: Gruppen erstellen und verwalten
 - Admin-Aktionen: Datenbank-Wartung, Benutzer-Reparatur, Daten zwischen Umgebungen kopieren
 - GIS-Daten-Pipeline: HAR-Dateien importieren und Geodaten verarbeiten
@@ -31,6 +33,39 @@ Der Admin-Bereich bietet erweiterte Verwaltungsfunktionen für Administratoren. 
 1. Im Menü auf "Groups" klicken
 2. Gruppen erstellen/bearbeiten/löschen
 3. Alarm-SMS-Zugangsdaten pro Gruppe hinterlegen
+
+### Rollen vergeben
+
+Rollen gelten immer **in einer Feuerwehr**. Vergeben werden sie in der Ansicht
+„Mitglieder und Rollen" der Feuerwehr:
+
+- **Gruppen-Admin** Verwaltung der Feuerwehr: Einstellungen, Freigabe-Links,
+  Atemschutz-Verwaltung; schließt Gerätemeister und Bekleidungswart ein, nicht
+  aber den Kostenersatz
+- **Gerätemeister** Fahrtenbuch korrigieren, Fahrzeuge, Personen, Geräte &
+  Material
+- **Bekleidungswart** Bekleidung sehen und pflegen
+- **Kostenersatz** Kostenersatz an Einsätzen der Feuerwehr, Verrechnung der
+  Füllungen
+
+Administratoren vergeben alle Rollen und nehmen Benutzer in Feuerwehren auf.
+Gruppen-Admins vergeben in ihrer Feuerwehr die übrigen Rollen — aber nur
+solche, deren Rechte sie selbst haben, und nie die Rolle Gruppen-Admin.
+
+### Berechtigungen migrieren
+
+Die Seite **Berechtigungen** (`/admin/berechtigungen`) überführt die
+früheren Rollenfelder in die Rollen je Feuerwehr. Sie ist nach dem Ausrollen
+der Umstellung sofort auszuführen — bis dahin sind die Funktionen der
+Feuerwehren gesperrt.
+
+1. **Vorschau** prüfen; bei Kostenersatz je Feuerwehr festlegen, wo die Rolle
+   gelten soll
+2. **Migrieren** — die alten Felder bleiben dabei unverändert stehen
+3. **Alte Felder entfernen** erst, wenn sich das Release bewährt hat
+
+**Rechte neu ableiten** gleicht die gespeicherten Rechte aller Benutzer mit
+dem aktuellen Rollenkatalog ab.
 
 ### Admin-Dashboard
 

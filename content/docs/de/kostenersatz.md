@@ -91,3 +91,19 @@ Abrechnungen können direkt per Kartenzahlung über SumUp beglichen werden:
 - **Speichern** Speichert die Berechnung als Entwurf - du kannst sie später weiter bearbeiten
 - **Abschließen** Schließt die Berechnung ab - danach sind keine Änderungen mehr möglich
 - **Kopieren** Bei abgeschlossenen Berechnungen kannst du eine Kopie erstellen, um Änderungen vorzunehmen
+
+## Berechtigungen
+
+Kostenersatz gilt **je Feuerwehr**: Du siehst und bearbeitest den Kostenersatz
+eines Einsatzes nur, wenn du in der Feuerwehr des Einsatzes die Rolle
+**Kostenersatz** hast. Dasselbe gilt für die Verrechnung der
+Flaschenfüllungen und die Mailvorlagen.
+
+- **Rolle vergeben** Administratoren; Gruppen-Admins, die selbst die Rolle
+  Kostenersatz haben — in der Ansicht „Mitglieder und Rollen" der Feuerwehr
+- **Gruppen-Admin allein reicht nicht** Wer Rechnungen stellt, bekommt das
+  ausdrücklich zugeteilt
+- **Einsatz-Gäste** sehen keinen Kostenersatz, auch wenn sie den Einsatz
+  bearbeiten dürfen
+- **Ohne die Rolle** fehlen die Berechnungen auch im Einsatz-Export, im Backup
+  und im Sybos-Übertrag

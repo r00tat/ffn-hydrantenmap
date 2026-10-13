@@ -471,7 +471,8 @@ niemand zurückholt. Den Mangel trägt man im Dialog ein.
 
 Entscheidend ist `canModifyEntry` in
 [entryPermissions.ts](../src/components/Fahrtenbuch/entryPermissions.ts): der
-Ersteller, ein Verwalter (`isFahrtenbuchManager` — Admin oder Gerätemeister)
+Ersteller, ein Verwalter (`can(user, groupId, 'fahrtenbuch.manage')` — Admin,
+Gruppen-Admin oder Gerätemeister)
 oder — nur bei Fahrten aus dem Freigabe-Link — der eingetragene Fahrer.
 
 **Der Fahrer als dritter Fall ist die Auflösung eines Widerspruchs.** Wer über
@@ -600,8 +601,9 @@ braucht, steht oben.
 Drei Dinge, die daran hängen:
 
 - **Gerätemeister und Admin, mit verschiedenem Blickfeld.** Zuordnen darf beide
-  (`actionFahrtenbuchManagerRequired`), aber der Gerätemeister sieht nur Konten,
-  die **Mitglied seiner Gruppe** sind. Die Personen seiner Feuerwehr kennt er
+  (`actionPermissionRequired(groupId, 'personal.manage')`), aber der
+  Gerätemeister sieht nur Konten, die **Mitglied seiner Gruppe** sind (Schlüssel
+  in `groupRoles`). Die Personen seiner Feuerwehr kennt er
   ohnehin namentlich; die Konten anderer Feuerwehren sind nicht seine Sache, und
   ein Verteiler über alle Konten der App wäre etwas anderes als die Aufgabe, die
   er hier erledigt. Der Admin sieht alle — nur er kann eine fehlende
@@ -735,48 +737,31 @@ Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{nam
 
 ## Gerätemeister
 
-Ein Admin oder Gruppen-Admin trägt je Gruppe Gerätemeister ein
-(Einstellungen-Tab der Fahrtenbuch-Verwaltung). Sie dürfen zusätzlich jeden
-Eintrag ihrer Gruppe korrigieren und die Fahrzeuge und Personen pflegen — nicht
-aber die Gruppeneinstellungen, die Share-Links, den PDF-Import oder das Löschen
-von Mängeln. Für die bleibt es beim Admin oder Gruppen-Admin, der die
-Gerätemeister-Rechte ohnehin einschließt; die Rollen im Überblick stehen in
-[berechtigungen.md](berechtigungen.md).
+Der Gerätemeister ist eine Gruppenrolle (`geraetemeister` in
+`user/{uid}.groupRoles`) mit den Rechten `fahrtenbuch.manage`,
+`geraete.manage` und `personal.manage`. Fürs Fahrtenbuch heißt das: Er darf
+zusätzlich jeden Eintrag seiner Gruppe korrigieren und die Fahrzeuge und
+Personen pflegen — nicht aber die Gruppeneinstellungen, die Share-Links, den
+PDF-Import oder das Löschen von Mängeln. Die verlangen `gruppe.manage`, also
+den Admin oder Gruppen-Admin, der die Rechte des Gerätemeisters ohnehin
+einschließt.
 
-Die Rolle steht als Liste von Gruppen-IDs **am Benutzerdokument**
-(`user/{uid}.fahrtenbuchGeraetemeister`) und nicht an `fahrtenbuchConfig`, wo
-die Mangel-Empfänger liegen. Grund ist der Leseweg: `fahrtenbuchConfig` ist für
-Clients gesperrt, also bräuchte jeder Guard einen zusätzlichen Firestore-Read
-und jede Seite, die die Rolle kennen muss — Drawer, Seitenschutz,
-Bearbeiten-Knöpfe — einen Server-Action-Roundtrip. Am Benutzerdokument nimmt
-die Rolle denselben Weg wie `isAdmin` und `groups`: über `getUserSessionData`
-in die Session und von dort in den Client.
+Vergeben wird die Rolle wie jede Gruppenrolle in der Ansicht „Mitglieder und
+Rollen" der Gruppe, vom globalen Admin oder vom Gruppen-Admin. Der frühere
+Abschnitt im Einstellungen-Tab der Fahrtenbuch-Verwaltung verlinkt dorthin.
+Ablage, Schreibweg und warum die Rolle am Benutzerdokument steht und nicht an
+`fahrtenbuchConfig` (wo die Mangel-Empfänger liegen): [berechtigungen.md](berechtigungen.md).
 
-Manipulationssicher ist das, weil `/user/{uid}` in den Regeln nur `read`
-erlaubt und der Catch-all am Dateiende Schreibrechte an `adminUser()` bindet —
-dasselbe Dokument trägt schon heute `isAdmin`.
+Geprüft wird immer das Recht der Aufgabe, nicht die Rolle: Eintrag
+korrigieren und Fahrzeuge `fahrtenbuch.manage`, Personen `personal.manage`.
+Die Aufteilung kostet heute nichts, weil der Gerätemeister alle drei Rechte
+hat, und macht ein späteres Trennen der Rolle zu einer Katalogänderung.
 
-Drei Dinge, die daran hängen:
-
-- **Kein Custom Claim.** Die Firestore-Regeln brauchen die Rolle nicht:
-  Fahrzeuge, Personen und Einträge werden ausschließlich über Server Actions
-  mit dem Admin SDK geschrieben. Ein Claim erzwänge dagegen einen
-  Token-Refresh bei jeder Rollenänderung.
-- **`arrayUnion`/`arrayRemove` statt Liste neu schreiben.** Zwei Admins, die
-  gleichzeitig zwei *verschiedene* Gruppen pflegen, fassen dasselbe
-  Benutzerdokument an und überschrieben sich sonst gegenseitig.
-- **`userSessionCache.invalidate()` nicht vergessen.** Ohne die Invalidierung
-  in `saveFahrtenbuchGeraetemeister` bliebe eine Rollenänderung bis zum
-  Cache-Ablauf wirkungslos — dieselbe Falle wie in `updateUser.ts`.
-
-Die Entscheidung fällt an genau einer Stelle:
-`isFahrtenbuchManager(groupId, user)` in
-[managerPermissions.ts](../src/components/Fahrtenbuch/managerPermissions.ts).
-Sie gibt auch für den Gruppen-Admin `true` zurück und holt sich diesen Teil aus
-`isGroupAdmin` in [groupPermissions.ts](../src/common/groupPermissions.ts).
-Sie liegt bewusst nicht in `entryLogic.ts` — auch der Drawer braucht sie, und
-der zöge sonst das Eintrags-Validierungsmodul in sein Bundle. Die Asymmetrie
-darin ist Absicht: Der Gerätemeister braucht die Mitgliedschaft in der Gruppe,
-der Admin nicht (sonst nähme man ihm ein Recht, das er unter
-`actionAdminRequired()` in den Stammdaten-Actions immer hatte).
+Die Entscheidung fällt in `can()` aus
+[permissions.ts](../src/common/permissions.ts), auf dem Server über
+`actionPermissionRequired`, in der Oberfläche über `useCan`;
+`canModifyEntry` fragt dasselbe Recht. Die Asymmetrie darin ist Absicht:
+Der Gerätemeister braucht die Mitgliedschaft in der Gruppe, der Admin nicht
+(sonst nähme man ihm ein Recht, das er unter `actionAdminRequired()` in den
+Stammdaten-Actions immer hatte).
 

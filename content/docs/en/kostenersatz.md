@@ -91,3 +91,19 @@ Invoices can be paid directly by card via SumUp:
 - **Save** Stores the calculation as a draft – you can keep editing it later
 - **Close** Finalises the calculation – no further changes are possible afterwards
 - **Copy** For finalised calculations you can create a copy to make changes
+
+## Permissions
+
+Cost recovery applies **per fire brigade**: you only see and edit the cost
+recovery of an operation if you hold the **cost recovery** role in the
+operation's brigade. The same applies to billing cylinder fillings and to the
+email templates.
+
+- **Assigning the role** Administrators; group admins who hold the cost
+  recovery role themselves — in the "Members and roles" view of the brigade
+- **Being group admin is not enough** Whoever issues invoices gets that
+  assigned explicitly
+- **Operation guests** see no cost recovery, even if they may edit the
+  operation
+- **Without the role** the calculations are also left out of the operation
+  export, the backup and the Sybos transfer
