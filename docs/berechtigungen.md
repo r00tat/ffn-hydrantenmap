@@ -247,8 +247,15 @@ Was die Funktion tut, und warum:
   fassen dasselbe Benutzerdokument an und überschrieben sich sonst
   gegenseitig. `FieldPath` statt Punktnotation, weil eine Gruppen-ID einen
   Punkt enthalten darf.
-- **Claims nur, wenn sich die Mitgliedschaft ändert.** Rollen stehen nicht im
-  Claim, ein Neusetzen wäre umsonst.
+- **Claims nur bei Aufnahme, Austritt oder geänderter Mitgliedschaft.** Rollen
+  stehen nicht im Claim, ein Neusetzen wäre umsonst. Aufnahme und Austritt
+  setzen die Claims aber **immer**, auch wenn das Dokument schon stimmt: Der
+  Aufruf liegt nach dem Commit und kann scheitern. Dann meldet die Server Action
+  den Fehler, und ein erneuter Versuch bringt den Claim nach. Ein bereits
+  ausgestelltes ID-Token trägt die alte Mitgliedschaft bis zu seinem Ablauf
+  (höchstens 1 h). Gleichzeitige Änderungen desselben Benutzers durch zwei
+  Admins sind kein realistischer Fall und werden für die Claims nicht
+  abgefangen.
 - **`userSessionCache.invalidate(uid)` danach.** Die Session liest über einen
   Cache mit 60 s Lebensdauer; ohne Invalidierung bliebe eine Rollenänderung
   bis zum Ablauf wirkungslos.

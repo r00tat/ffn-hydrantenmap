@@ -185,7 +185,25 @@ describe('writeUserRoles', () => {
     store.u1 = member({ ffnd: ['kostenersatz'] });
     await writeUserRoles('u1', { kind: 'addMember', groupId: 'ffnd' });
     expect(store.u1?.groupRoles).toEqual({ ffnd: ['kostenersatz'] });
-    expect(setClaimsMock).not.toHaveBeenCalled();
+  });
+
+  it('meldet einen Fehler beim Setzen der Claims an den Aufrufer', async () => {
+    store.u1 = member({ ffnd: [], ffxy: [] });
+    setClaimsMock.mockRejectedValueOnce(new Error('auth down'));
+
+    await expect(
+      writeUserRoles('u1', { kind: 'removeMember', groupId: 'ffxy' }),
+    ).rejects.toThrow('auth down');
+  });
+
+  it('setzt die Claims beim erneuten Entfernen, auch wenn das Dokument schon stimmt', async () => {
+    // Ein gescheiterter Claim-Aufruf lässt sich so durch Wiederholen reparieren.
+    store.u1 = member({ ffnd: [] });
+
+    await writeUserRoles('u1', { kind: 'removeMember', groupId: 'ffxy' });
+
+    expect(setClaimsMock).toHaveBeenCalledTimes(1);
+    expect([...setClaimsMock.mock.calls[0][1].groups].sort()).toEqual(['allUsers', 'ffnd']);
   });
 
   it('entfernt mit der Mitgliedschaft alle Rollen der Gruppe', async () => {

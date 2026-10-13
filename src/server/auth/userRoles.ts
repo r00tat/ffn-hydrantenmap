@@ -175,7 +175,12 @@ export async function writeUserRoles(
     },
   );
 
-  if (membershipChanged) {
+  // Aufnahme und Austritt setzen die Claims immer, auch ohne Änderung am
+  // Dokument: Scheitert der Aufruf nach dem Commit, wirft die Server Action, und
+  // ein erneuter Versuch bringt den Claim nach. `replaceAll` setzt sie nur bei
+  // geänderter Mitgliedschaft, damit die Migration die Claims nicht anfasst.
+  const membershipKind = change.kind === 'addMember' || change.kind === 'removeMember';
+  if (membershipKind || membershipChanged) {
     // Der Claim trägt die Mitgliedschaft, die Regeln für `call/**` lesen ihn.
     // `'kostenersatz'` bleibt drin, solange es in `groups` steht — es fällt
     // erst mit dem Schritt „Alte Felder entfernen" der Migration weg.
