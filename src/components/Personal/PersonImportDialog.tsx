@@ -21,11 +21,11 @@ import { useCallback, useState } from 'react';
 import type {
   PersonImportPlanRow,
   RecipientCsvError,
-} from '../personCsvImport';
+} from '../Fahrtenbuch/personCsvImport';
 import {
   importPersonsFromCsv,
   previewPersonCsvImport,
-} from '../stammdatenActions';
+} from '../Fahrtenbuch/stammdatenActions';
 
 /** Zeilen, die der Import anfassen kann — alles andere ist nur Information. */
 const IMPORTABLE = ['create', 'link', 'update'];

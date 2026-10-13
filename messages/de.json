@@ -1225,7 +1225,8 @@
     "connectedApps": "Verbundene Anwendungen",
     "adminMcp": "MCP-Zugänge",
     "fuellprotokoll": "Füllprotokoll",
-    "sybos": "Sybos-Übertrag"
+    "sybos": "Sybos-Übertrag",
+    "personal": "Personal"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -4520,6 +4521,7 @@
       "fuehrungLocked": "Die Führung lässt sich nicht mehr ändern, weil es schon Stücke oder Bestand gibt.",
       "personExists": "Eine Person mit diesem Namen gibt es schon.",
       "personInactive": "Die Person ist inaktiv.",
+      "personExtern": "Die Person ist extern und bekommt keine Bekleidung.",
       "programmTextRequired": "Bitte das Programm beschreiben.",
       "fileTooLarge": "Die Datei ist zu groß (höchstens {maxKb} kB).",
       "tagWithAnzahl": "Eine Tag-Nummer geht nur bei Anzahl 1.",
@@ -4668,5 +4670,31 @@
     "einsatz": "Einsatz",
     "uebung": "Übung",
     "sonstiges": "Sonstiges"
+  },
+  "personal": {
+    "title": "Personal",
+    "intro": "Der Personalstand der Gruppe – gemeinsam genutzt von Fahrtenbuch, Bekleidung und Atemschutz.",
+    "group": "Gruppe",
+    "noGroups": "Du bist in keiner Gruppe, deren Personal du verwalten darfst.",
+    "noPermission": "Du hast keine Berechtigung für diese Seite.",
+    "search": "Suchen",
+    "showInactive": "Inaktive anzeigen",
+    "showExtern": "Externe anzeigen",
+    "summary": "{active} aktiv · {drivers} Kraftfahrer · {atemschutz} Atemschutzträger · {extern} extern",
+    "noMatches": "Keine Person passt zur Suche.",
+    "kraftfahrer": "Kraftfahrer",
+    "kraftfahrerHint": "Steht im Fahrtenbuch als Fahrer zur Auswahl.",
+    "atemschutztraeger": "Atemschutzträger",
+    "atemschutztraegerHint": "Wird beim Atemschutz als Truppmitglied vorgeschlagen.",
+    "extern": "Extern",
+    "externHint": "Nicht Mitglied der Feuerwehr, etwa aus der BlaulichtSMS-Teilnehmerliste. Bleibt für die Besatzung erhalten, steht aber weder im Fahrtenbuch noch bei Atemschutz oder Bekleidung zur Auswahl.",
+    "userAccounts": "Benutzerkonten",
+    "userAccountsHint": "Konten dieser Person – Grundlage für „Gefahren bin ich“ und das Ändern eigener Fahrten.",
+    "userAccountsUnavailable": "Benutzerkonten lassen sich nur online laden.",
+    "unknownAccount": "Konto {uid}",
+    "accountNotAuthorized": "nicht freigeschaltet",
+    "accountNotInGroup": "nicht in der Gruppe",
+    "flagSaveFailed": "Ändern fehlgeschlagen: {message}",
+    "linkSaveFailed": "Die Person ist gespeichert, die Benutzerkonten nicht: {message}"
   }
 }

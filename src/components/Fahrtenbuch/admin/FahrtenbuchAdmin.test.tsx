@@ -22,7 +22,6 @@ vi.mock('../../../hooks/useFahrtenbuchGroup', () => ({
 // Die Reiterinhalte sind hier nicht Gegenstand des Tests und ziehen sonst
 // Firestore-Listener nach sich.
 vi.mock('./VehicleAdmin', () => ({ default: () => <div>VehicleAdmin</div> }));
-vi.mock('./PersonAdmin', () => ({ default: () => <div>PersonAdmin</div> }));
 vi.mock('./GroupSettings', () => ({ default: () => <div>GroupSettings</div> }));
 vi.mock('./MangelNotificationSettings', () => ({ default: () => <div /> }));
 vi.mock('./WeeklyReportSendSection', () => ({ default: () => <div /> }));
@@ -36,7 +35,7 @@ import FahrtenbuchAdmin from './FahrtenbuchAdmin';
 beforeEach(() => vi.clearAllMocks());
 
 describe('FahrtenbuchAdmin Zugang', () => {
-  it('zeigt dem Admin alle fünf Reiter', () => {
+  it('zeigt dem Admin alle vier Reiter', () => {
     firebaseLoginMock.mockReturnValue({
       isAuthorized: true,
       isAdmin: true,
@@ -45,10 +44,10 @@ describe('FahrtenbuchAdmin Zugang', () => {
 
     renderWithIntl(<FahrtenbuchAdmin />);
 
-    expect(screen.getAllByRole('tab')).toHaveLength(5);
+    expect(screen.getAllByRole('tab')).toHaveLength(4);
   });
 
-  it('zeigt dem Gerätemeister nur Fahrzeuge und Personen', () => {
+  it('zeigt dem Gerätemeister nur die Fahrzeuge', () => {
     firebaseLoginMock.mockReturnValue({
       isAuthorized: true,
       isAdmin: false,
@@ -58,7 +57,7 @@ describe('FahrtenbuchAdmin Zugang', () => {
 
     renderWithIntl(<FahrtenbuchAdmin />);
 
-    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
   });
 
   it('zeigt dem Gerätemeister nur seine Gruppen im Umschalter', () => {

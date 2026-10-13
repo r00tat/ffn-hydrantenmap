@@ -8,13 +8,13 @@ const { proposeMock, saveMock } = vi.hoisted(() => ({
   saveMock: vi.fn(),
 }));
 
-vi.mock('../stammdatenActions', () => ({
+vi.mock('../Fahrtenbuch/stammdatenActions', () => ({
   proposePersonUserLinks: (...args: unknown[]) => proposeMock(...args),
   savePersonUserLinks: (...args: unknown[]) => saveMock(...args),
 }));
 
-import { renderWithIntl } from '../../../test-utils/intlRender';
-import type { PersonUserMatch } from '../personUserMatch';
+import { renderWithIntl } from '../../test-utils/intlRender';
+import type { PersonUserMatch } from '../Fahrtenbuch/personUserMatch';
 import PersonUserLinkDialog from './PersonUserLinkDialog';
 
 const unique: PersonUserMatch = {

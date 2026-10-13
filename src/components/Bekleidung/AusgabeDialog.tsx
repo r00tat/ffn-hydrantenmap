@@ -14,6 +14,7 @@ import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useState } from 'react';
 import type { BekleidungStueck } from '../../common/bekleidung';
+import { memberPersons } from '../../common/personal';
 import { callAction } from '../Geraete/admin/actionResult';
 import OnlineOnly from '../site/OnlineOnly';
 import { issue, returnItems } from './bekleidungActions';
@@ -51,7 +52,7 @@ export default function AusgabeDialog({
   const t = useTranslations('bekleidung');
   const errorText = useBekleidungErrorText();
   const activePersons = useMemo(
-    () => view.persons.filter((p) => p.active !== false),
+    () => memberPersons(view.persons),
     [view.persons],
   );
   const [personId, setPersonId] = useState(initialPersonId ?? '');

@@ -757,9 +757,10 @@ async function issueImpl(groupId: string, input: IssueInput): Promise<{ ausgabeI
     // --- lesen ---
     const personSnap = await tx.get(personCol(groupId).doc(input.personId));
     if (!personSnap.exists) throw notFound('person', input.personId);
-    if ((personSnap.data() as { active?: boolean }).active === false) {
-      throw conflict('personInactive');
-    }
+    const personData = personSnap.data() as { active?: boolean; extern?: boolean };
+    if (personData.active === false) throw conflict('personInactive');
+    // Externe gehören nicht der Feuerwehr an und bekommen keine Bekleidung.
+    if (personData.extern === true) throw conflict('personExtern');
 
     const stuecke: { id: string; data: BekleidungStueck }[] = [];
     for (const id of stueckIds) {
@@ -1060,9 +1061,10 @@ async function reassignItemsImpl(groupId: string, input: ReassignInput): Promise
     // --- lesen ---
     const personSnap = await tx.get(personCol(groupId).doc(input.personId));
     if (!personSnap.exists) throw notFound('person', input.personId);
-    if ((personSnap.data() as { active?: boolean }).active === false) {
-      throw conflict('personInactive');
-    }
+    const personData = personSnap.data() as { active?: boolean; extern?: boolean };
+    if (personData.active === false) throw conflict('personInactive');
+    // Externe gehören nicht der Feuerwehr an und bekommen keine Bekleidung.
+    if (personData.extern === true) throw conflict('personExtern');
 
     const stuecke: {
       id: string;

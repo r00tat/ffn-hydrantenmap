@@ -1225,7 +1225,8 @@
     "connectedApps": "Connected applications",
     "adminMcp": "MCP access",
     "fuellprotokoll": "Filling log",
-    "sybos": "Sybos transfer"
+    "sybos": "Sybos transfer",
+    "personal": "Personnel"
   },
   "fahrtenbuch": {
     "title": "Trip log",
@@ -4520,6 +4521,7 @@
       "fuehrungLocked": "Tracking can no longer be changed because items or stock exist.",
       "personExists": "A person with this name already exists.",
       "personInactive": "The person is inactive.",
+      "personExtern": "The person is external and cannot be issued clothing.",
       "programmTextRequired": "Please describe the programme.",
       "fileTooLarge": "The file is too large (at most {maxKb} kB).",
       "tagWithAnzahl": "A tag number only works with count 1.",
@@ -4668,5 +4670,31 @@
     "einsatz": "Operation",
     "uebung": "Exercise",
     "sonstiges": "Other"
+  },
+  "personal": {
+    "title": "Personnel",
+    "intro": "The group's personnel roster – shared by vehicle log, clothing and breathing apparatus.",
+    "group": "Group",
+    "noGroups": "You are not in any group whose personnel you may manage.",
+    "noPermission": "You do not have permission to view this page.",
+    "search": "Search",
+    "showInactive": "Show inactive",
+    "showExtern": "Show external",
+    "summary": "{active} active · {drivers} drivers · {atemschutz} SCBA wearers · {extern} external",
+    "noMatches": "No person matches the search.",
+    "kraftfahrer": "Driver",
+    "kraftfahrerHint": "Available as driver in the vehicle log.",
+    "atemschutztraeger": "BA wearer",
+    "atemschutztraegerHint": "Suggested as team member for breathing apparatus.",
+    "extern": "External",
+    "externHint": "Not a member of the fire brigade, e.g. from the BlaulichtSMS participant list. Kept for crew assignment, but not selectable in the logbook, breathing apparatus or clothing.",
+    "userAccounts": "User accounts",
+    "userAccountsHint": "Accounts of this person – basis for “I drove” and editing one's own trips.",
+    "userAccountsUnavailable": "User accounts can only be loaded online.",
+    "unknownAccount": "Account {uid}",
+    "accountNotAuthorized": "not authorized",
+    "accountNotInGroup": "not in group",
+    "flagSaveFailed": "Change failed: {message}",
+    "linkSaveFailed": "The person was saved, the user accounts were not: {message}"
   }
 }

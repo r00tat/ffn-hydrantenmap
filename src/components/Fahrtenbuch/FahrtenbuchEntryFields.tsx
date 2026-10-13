@@ -11,11 +11,13 @@ import Grid from '@mui/material/Grid';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import { useFormatter, useTranslations } from 'next-intl';
+import { useMemo } from 'react';
 import {
   FAHRT_ZWECKE,
   requiresDriver,
   type FahrtZweck,
 } from '../../common/fahrtenbuch';
+import { driverPersons } from '../../common/personal';
 import CounterFields from './CounterFields';
 import { vehicleSelectItems } from './vehicleSelectItems';
 import {
@@ -40,6 +42,12 @@ export default function FahrtenbuchEntryFields({
 }: FahrtenbuchEntryFieldsProps) {
   const t = useTranslations('fahrtenbuch');
   const format = useFormatter();
+  // Als Fahrer stehen nur Kraftfahrer zur Wahl; Zusatzfahrer und die
+  // Zuordnung einer frei getippten Person bleiben bei allen Personen.
+  const driverOptions = useMemo(
+    () => driverPersons(persons).map((p) => p.name),
+    [persons],
+  );
 
   // Genau eines von beiden: das Einsatzfeld oder die Fahrtstrecke.
   const showFirecallField =
@@ -96,7 +104,7 @@ export default function FahrtenbuchEntryFields({
             <Grid size={{ xs: 12 }}>
               <Autocomplete
                 freeSolo
-                options={persons.map((p) => p.name)}
+                options={driverOptions}
                 value={form.driverName}
                 onInputChange={(_, value) =>
                   form.changeDriver(

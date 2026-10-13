@@ -9,7 +9,7 @@ Stellen; dieses Dokument nennt sie und begründet die Bauform.
 | --- | --- | --- | --- |
 | **Globaler Admin** | `user/{uid}.isAdmin` | alles, in jeder Gruppe, plus `/admin/*` und die Benutzerverwaltung | ein globaler Admin in `/users` |
 | **Gruppen-Admin** | `user/{uid}.groupAdmin: string[]` | alle administrativen Aufgaben *einer* Gruppe | ein globaler Admin in `/groups` |
-| **Gerätemeister** | `user/{uid}.fahrtenbuchGeraetemeister: string[]` | Fahrtenbuch einer Gruppe: jeden Eintrag korrigieren, Fahrzeuge und Personen pflegen; Geräte & Material der Gruppe pflegen (Artikel, Bestand, Import) | ein Admin **oder Gruppen-Admin** der Gruppe, im Einstellungen-Tab der Fahrtenbuch-Verwaltung |
+| **Gerätemeister** | `user/{uid}.fahrtenbuchGeraetemeister: string[]` | Fahrtenbuch einer Gruppe: jeden Eintrag korrigieren, Fahrzeuge pflegen; den Personalstand pflegen (`/personal`, siehe [personal.md](personal.md)); Geräte & Material der Gruppe pflegen (Artikel, Bestand, Import) | ein Admin **oder Gruppen-Admin** der Gruppe, im Einstellungen-Tab der Fahrtenbuch-Verwaltung |
 | **Bekleidungswart** | `user/{uid}.bekleidungswart: string[]` | Bekleidung einer Gruppe sehen und pflegen: Stücke, Lagerstand, Ausgabe, Wäsche, Import | ein Admin **oder Gruppen-Admin** der Gruppe, im Reiter „Einstellungen" auf `/bekleidung` |
 | **Gruppenmitglied** | `user/{uid}.groups: string[]` | Einsätze, Fahrtenbucheinträge und Mängel der Gruppe; Geräte & Material lesen, im Einsatz zuordnen und verbrauchen | ein globaler Admin in `/groups` oder `/users` |
 | **Einsatz-Gast** | `user/{uid}.firecall` | genau ein Einsatz, lesend oder schreibend, mit Ablauf | jedes Gruppenmitglied über den Share-Link |

@@ -548,7 +548,7 @@ von `createdAt` abweicht.
 ## Personen den Benutzerkonten zuordnen
 
 `person.userIds` entsteht im Dialog „Bestehende Benutzer zuordnen"
-([PersonUserLinkDialog](../src/components/Fahrtenbuch/admin/PersonUserLinkDialog.tsx)),
+([PersonUserLinkDialog](../src/components/Personal/PersonUserLinkDialog.tsx)),
 die Zuordnungslogik steht rein und geprüft in
 [personUserMatch.ts](../src/components/Fahrtenbuch/personUserMatch.ts).
 
@@ -558,21 +558,29 @@ Benutzer selbst, mit einem Namen, den er sich gegeben hat. Hier ist es ein
 Vorschlag, den ein Admin sieht und bestätigt. Und ohne ihn ginge es nicht — nur
 5 von rund 110 Personendatensätzen tragen überhaupt eine E-Mail.
 
-Die Reihenfolge der Signale:
+Zwei Signale, **gemeinsam ausgewertet**:
 
-- **Die gepflegte E-Mail zuerst.** Sie steht in den Stammdaten der Gruppe, ist
-  dort von Hand gepflegt und trifft auch, wenn im Konto ein Spitzname oder ein
-  alter Nachname steht. Ein E-Mail-Treffer beendet die Suche und löst damit auch
-  die Doppelregistrierung auf, bei der zwei Konten denselben Namen tragen.
-- **Sonst der Name**, normalisiert mit `normalizePersonName` (wortweise
-  sortiert, damit „Schennet Adrian" und „Adrian Schennet" dieselbe Person sind).
+- **Die gepflegte E-Mail.** Sie steht in den Stammdaten der Gruppe und trifft
+  auch, wenn im Konto ein Spitzname oder ein alter Nachname steht. Ihre Treffer
+  stehen im Dialog oben.
+- **Der Name**, normalisiert mit `normalizePersonName` (wortweise sortiert,
+  damit „Muster Max" und „Max Muster" dieselbe Person sind).
+
+Die Kandidaten sind die Vereinigung beider Treffer. Früher beendete ein
+E-Mail-Treffer die Suche — das ging schief, weil die E-Mail an der Person oft
+die private Adresse aus BlaulichtSMS ist, das Feuerwehr-Konto aber eine andere
+trägt: Vorgeschlagen wurde das private Konto, das Feuerwehr-Konto fehlte. Treffen
+E-Mail und Name verschiedene Konten, ist die Person deshalb `ambiguous`, und der
+Verwalter hakt das richtige an — oder beide, wenn beide demselben Menschen
+gehören.
 
 Vier Zustände, und der Umgang mit ihnen ist der Kern:
 
 - `unique` — genau ein offenes Konto. **Vorgehakt, aber bestätigungspflichtig.**
 - `ambiguous` — **nicht vorgehakt.** Ein vorgehakter mehrdeutiger Vorschlag
   überspränge genau die Prüfung, für die der Dialog da ist. Zwei Anlässe führen
-  hierher: mehrere gleichnamige Konten (die Doppelregistrierung) und ein Konto,
+  hierher: mehrere passende Konten (die Doppelregistrierung, auch privat per
+  E-Mail und dienstlich per Name) und ein Konto,
   das auch zu einer anderen, noch unverknüpften Person passt (`contestedBy` —
   zwei echte Menschen können denselben Namen tragen, das Konto gehört aber nur
   einem).

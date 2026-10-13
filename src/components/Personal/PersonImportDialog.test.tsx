@@ -2,9 +2,9 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FahrtenbuchPerson } from '../../../common/fahrtenbuch';
-import { renderWithIntl } from '../../../test-utils/intlRender';
-import { planPersonCsvImport } from '../personCsvImport';
+import type { FahrtenbuchPerson } from '../../common/fahrtenbuch';
+import { renderWithIntl } from '../../test-utils/intlRender';
+import { planPersonCsvImport } from '../Fahrtenbuch/personCsvImport';
 
 // `stammdatenActions` ist eine 'use server'/'server-only'-Datei und lässt sich
 // im Test nicht laden — die beiden Actions werden ersetzt.
@@ -13,7 +13,7 @@ const { previewPersonCsvImport, importPersonsFromCsv } = vi.hoisted(() => ({
   importPersonsFromCsv: vi.fn(),
 }));
 
-vi.mock('../stammdatenActions', () => ({
+vi.mock('../Fahrtenbuch/stammdatenActions', () => ({
   previewPersonCsvImport,
   importPersonsFromCsv,
 }));

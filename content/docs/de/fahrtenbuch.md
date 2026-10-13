@@ -75,7 +75,7 @@ Reicht der gewählte Zeitraum über mehr Fahrten, als geladen sind, steht unter 
 
 1. Klicke auf **Neuer Eintrag** oder auf **Fahrt eintragen** auf der Karte des Fahrzeugs
 2. Wähle das **Fahrzeug** — bei der Fahrzeugkarte ist es bereits vorbelegt. Die übrigen Felder erscheinen erst danach: Zähler und Betriebsmittel hängen am gewählten Fahrzeug
-3. Trage den **Fahrer** ein: Vorschläge kommen aus den Personen der Gruppe, freie Namen sind erlaubt
+3. Trage den **Fahrer** ein: Vorschläge kommen aus den Personen der Gruppe, die als **Kraftfahrer** eingetragen sind; freie Namen sind erlaubt. Als Zusatzfahrer stehen alle aktiven Personen zur Wahl
 4. Wähle den **Fahrtzweck** (Einsatz, Übung, Versorgungsfahrt, Sonstiges)
 5. Beim Zweck *Einsatz* kann zusätzlich der **Einsatz** ausgewählt oder frei eingegeben werden
 6. Trage **Fahrstrecke / Ziel**, **Abfahrt** und **Ankunft** ein
@@ -215,13 +215,14 @@ Wie genau sind die Zahlen? Summiert werden nur Zähler mit Start- und Endstand; 
 
 ### Stammdaten pflegen (nur Admins)
 
-Der Admin-Bereich unter **Fahrtenbuch** hat fünf Reiter:
+Der Admin-Bereich unter **Fahrtenbuch** hat vier Reiter:
 
 - **Fahrzeuge** Name, Kennzeichen, aktiv/stillgelegt, Zähler-Vorlage, Betriebsmittel, Notiz. Über **Fahrzeuge importieren** lassen sich die Fahrzeuge aus dem Kostenersatz-Bestand übernehmen; je Fahrzeug gibt es hier auch den QR-Code
-- **Personen** Fahrer der Gruppe mit Telefon, E-Mail und Alarm-SMS-Empfänger-ID. Über **Personen aus CSV importieren** wird der Teilnehmer-Export aus Alarm SMS eingelesen; Personen, die nicht mehr enthalten sind, können deaktiviert werden — gelöscht wird nichts, damit vergangene Fahrten zugeordnet bleiben
 - **Einstellungen** Standort des Feuerwehrhauses als Startpunkt der Einsatzkilometer, per Koordinaten oder Auswahl auf der Karte; darunter die **Mangel-Benachrichtigung** mit den E-Mail-Empfängern für gemeldete Defekte und die **Mängel-Übernahme**, die aus jeder bestehenden Fahrt mit gemeldetem Defekt einen offenen Mangel anlegt (mehrfaches Ausführen erzeugt keine Duplikate)
 - **Fahrtenbuch-Link** Link für die Erfassung ohne Anmeldung erzeugen, neu erzeugen oder löschen
 - **Fahrtenbuch-Import** Fahrten aus einem PDF-Export übernehmen
+
+Die **Personen** werden nicht mehr hier gepflegt, sondern unter **Administration → Personal**. Dort stehen Telefon, E-Mail, Alarm-SMS-Empfänger-ID, Benutzerkonten und die Qualifikationen **Kraftfahrer** und **Atemschutzträger** — dieselbe Liste nutzen Fahrtenbuch, Bekleidung und Atemschutz. Über **Personen aus CSV importieren** wird der Teilnehmer-Export aus Alarm SMS eingelesen; Personen, die nicht mehr enthalten sind, können deaktiviert werden — gelöscht wird nichts, damit vergangene Fahrten zugeordnet bleiben. Wer nicht als Kraftfahrer eingetragen ist, erscheint nicht in der Fahrerauswahl. Externe aus der Teilnehmerliste — etwa Mitglieder anderer Feuerwehren — lassen sich als **Extern** markieren: Sie bleiben für die Besatzung erhalten, stehen aber weder als Fahrer noch bei Atemschutz oder Bekleidung zur Auswahl und sind in der Liste ausgeblendet, bis **Externe anzeigen** eingeschaltet ist.
 
 :::info
 Stillgelegte Fahrzeuge und deaktivierte Personen verschwinden aus den Auswahllisten, ihre bisherigen Fahrten bleiben erhalten und sind weiterhin exportierbar.

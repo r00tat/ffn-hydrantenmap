@@ -35,9 +35,10 @@ describe('AusgabeDialog', () => {
 
     await user.click(screen.getByRole('combobox', { name: 'Person' }));
     await user.click(screen.getByRole('option', { name: 'Max Mustermann' }));
-    // Inaktive Personen stehen nicht zur Wahl.
+    // Inaktive und externe Personen stehen nicht zur Wahl.
     await user.click(screen.getByRole('combobox', { name: 'Person' }));
     expect(screen.queryByRole('option', { name: 'Erika Mustermann' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Gustav Gast' })).not.toBeInTheDocument();
     await user.keyboard('{Escape}');
 
     await user.clear(screen.getByLabelText('Datum'));
