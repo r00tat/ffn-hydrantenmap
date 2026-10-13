@@ -25,6 +25,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
 import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended } from '../../common/users';
+import { useSnackbar } from '../../components/providers/SnackbarProvider';
 import AdminGuard from '../../components/site/AdminGuard';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
@@ -90,6 +91,7 @@ function Users() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const updateApiCall = useUpdateUser();
+  const showSnackbar = useSnackbar();
 
   const groupsArray = useFirebaseCollection<Group>({
     collectionName: 'groups',
@@ -146,10 +148,16 @@ function Users() {
   const updateUser = useCallback(
     async (user: UserRecordExtended, memberGroupIds?: string[]) => {
       console.info(`update user`);
-      await updateApiCall(user, memberGroupIds);
+      const result = await updateApiCall(user, memberGroupIds);
+      if (result && 'error' in result && result.error === 'notMigrated') {
+        showSnackbar(
+          t('notMigrated', { name: user.displayName || user.email || user.uid }),
+          'warning'
+        );
+      }
       await fetchUsers();
     },
-    [fetchUsers, updateApiCall]
+    [fetchUsers, updateApiCall, showSnackbar, t]
   );
 
   const authorizeAction = useCallback(

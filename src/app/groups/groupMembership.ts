@@ -60,14 +60,16 @@ export function planGroupRoleChanges(
         },
       });
     } else if (isMember && wantAdmin !== roles.includes('gruppenadmin')) {
-      const others = roles.filter((role) => role !== 'gruppenadmin');
+      // Nur gruppenadmin umschalten: Die übrigen Rollen liest die Transaktion
+      // frisch, statt sie aus dem Stand vom Anfang zurückzuschreiben.
       result.push({
         uid,
         user,
         change: {
-          kind: 'setGroupRoles',
+          kind: 'toggleRole',
           groupId,
-          roles: (wantAdmin ? [...others, 'gruppenadmin'] : others).sort() as RoleId[],
+          role: 'gruppenadmin',
+          enabled: wantAdmin,
         },
       });
     }

@@ -2,6 +2,7 @@
 import 'server-only';
 
 import { isTenantGroupId } from '../../common/tenantGroups';
+import { awaitsKostenersatzChoice } from '../../common/userGroupRoles';
 import { changeUserRoles } from '../../server/auth/changeUserRoles';
 import {
   GROUP_COLLECTION_ID,
@@ -18,11 +19,21 @@ export async function getGroupsAction(): Promise<Group[]> {
   return await getGroups();
 }
 
+export interface GroupUpdateResult {
+  groupId: string;
+  /**
+   * Benutzer, deren Mitgliedschaft oder Gruppen-Admin-Rolle nicht geändert
+   * wurde, weil für sie die Kostenersatz-Auswahl der Migration noch aussteht
+   * (siehe `awaitsKostenersatzChoice`).
+   */
+  notMigrated: string[];
+}
+
 export async function updateGroupAction(
   group: Group,
   assigendUsers: string[],
   groupAdmins: string[] = []
-) {
+): Promise<GroupUpdateResult> {
   await actionAdminRequired();
 
   console.info(
@@ -53,7 +64,7 @@ export async function updateGroupAction(
   // Mitgliedschaft gibt es nur in Mandanten. `allUsers` hat jeder, und
   // `kostenersatz` ist eine Rolle je Gruppe; Name und Beschreibung dieser
   // Gruppen bleiben trotzdem pflegbar.
-  if (!isTenantGroupId(groupId)) return groupId;
+  if (!isTenantGroupId(groupId)) return { groupId, notMigrated: [] };
 
   const users = (await firestore.collection(USER_COLLECTION_ID).get()).docs;
   const changes = planGroupRoleChanges(
@@ -72,11 +83,18 @@ export async function updateGroupAction(
   // setzt bei Ein- und Austritt die Claims und invalidiert den Session-Cache.
   // Ein Austritt löscht alle Rollen der Gruppe, schlafende Rollen gibt es
   // nicht mehr.
+  // Wer noch auf die Kostenersatz-Auswahl der Migration wartet, bleibt
+  // unverändert und wird gemeldet; die übrigen Änderungen gelten trotzdem.
+  const notMigrated: string[] = [];
   for (const { uid, change, user } of changes) {
+    if (awaitsKostenersatzChoice(user)) {
+      notMigrated.push(uid);
+      continue;
+    }
     await changeUserRoles(uid, change, user);
   }
 
-  return groupId;
+  return { groupId, notMigrated };
 }
 
 export async function getMyGroupsFromServer(): Promise<Group[]> {

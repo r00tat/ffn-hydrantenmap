@@ -65,9 +65,22 @@ beforeEach(() => {
   permissionRequiredMock.mockResolvedValue(GROUP_ADMIN);
   adminRequiredMock.mockResolvedValue(ADMIN);
   changeUserRolesMock.mockImplementation(
-    async (_uid: string, change: { groupId: string; roles?: string[] }) => ({
-      [change.groupId]: change.roles ?? [],
-    }),
+    async (
+      uid: string,
+      change: { kind: string; groupId: string; roles?: string[]; role?: string; enabled?: boolean },
+    ) => {
+      if (change.kind !== 'toggleRole') {
+        return { [change.groupId]: change.roles ?? [] };
+      }
+      const current =
+        (userDocs[uid]?.groupRoles as Record<string, string[]> | undefined)?.[
+          change.groupId
+        ] ?? [];
+      const others = current.filter((r) => r !== change.role);
+      return {
+        [change.groupId]: (change.enabled ? [...others, change.role!] : others).sort(),
+      };
+    },
   );
   listUsersMock.mockResolvedValue([
     { uid: 'u1', displayName: 'Anna', groupRoles: { ffnd: ['geraetemeister'] } },
@@ -126,12 +139,15 @@ describe('setMemberRoleAction', () => {
     const result = await setMemberRoleAction('ffnd', 'u1', 'geraetemeister', true);
 
     expect(permissionRequiredMock).toHaveBeenCalledWith('ffnd', 'rollen.assign');
+    // Nur die eine Rolle, umgeschaltet in der Transaktion: Eine fertige Liste
+    // gäbe bei gleichzeitigem Entzug die entzogene Rolle zurück.
     expect(changeUserRolesMock).toHaveBeenCalledWith(
       'u1',
       {
-        kind: 'setGroupRoles',
+        kind: 'toggleRole',
         groupId: 'ffnd',
-        roles: ['geraetemeister', 'kostenersatz'],
+        role: 'geraetemeister',
+        enabled: true,
       },
       userDocs.u1,
     );
@@ -178,6 +194,15 @@ describe('setMemberRoleAction', () => {
     expect(changeUserRolesMock).not.toHaveBeenCalled();
   });
 
+  it('bearbeitet keinen nicht migrierten Benutzer mit altem Kostenersatz', async () => {
+    userDocs.u4 = { groups: ['allUsers', 'ffnd', 'kostenersatz'] };
+
+    expect(
+      await setMemberRoleAction('ffnd', 'u4', 'geraetemeister', true),
+    ).toEqual({ success: false, error: 'notMigrated' });
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
+  });
+
   it('schreibt nichts, wenn die Rolle schon so steht', async () => {
     const result = await setMemberRoleAction('ffnd', 'u1', 'geraetemeister', false);
 
@@ -203,6 +228,16 @@ describe('addMemberAction', () => {
       { kind: 'addMember', groupId: 'ffnd' },
       userDocs.u2,
     );
+  });
+
+  it('nimmt keinen nicht migrierten Benutzer mit altem Kostenersatz auf', async () => {
+    userDocs.u4 = { groups: ['allUsers', 'other', 'kostenersatz'] };
+
+    expect(await addMemberAction('ffnd', 'u4')).toEqual({
+      success: false,
+      error: 'notMigrated',
+    });
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
   });
 
   it('nimmt keinen Einsatz-Gast auf', async () => {
@@ -244,6 +279,16 @@ describe('removeMemberAction', () => {
       { kind: 'removeMember', groupId: 'ffnd' },
       userDocs.u1,
     );
+  });
+
+  it('entfernt keinen nicht migrierten Benutzer mit altem Kostenersatz', async () => {
+    userDocs.u4 = { groups: ['allUsers', 'ffnd', 'kostenersatz'] };
+
+    expect(await removeMemberAction('ffnd', 'u4')).toEqual({
+      success: false,
+      error: 'notMigrated',
+    });
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
   });
 
   it('meldet unbekannte Benutzer', async () => {

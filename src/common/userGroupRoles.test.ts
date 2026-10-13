@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  awaitsKostenersatzChoice,
   claimGroupsForUser,
   claimsForStoredUser,
   effectiveGroupRoles,
@@ -132,5 +133,22 @@ describe('claimsForStoredUser', () => {
         { ffwien: [] },
       ),
     ).toEqual({ groups: ['ffwien', 'allUsers'], isAdmin: true, authorized: true });
+  });
+});
+
+describe('awaitsKostenersatzChoice', () => {
+  it('trifft nicht migrierte Benutzer mit alter Kostenersatz-Freischaltung', () => {
+    expect(awaitsKostenersatzChoice({ groups: ['ffnd', 'kostenersatz'] })).toBe(true);
+  });
+
+  it('trifft weder migrierte noch Benutzer ohne Kostenersatz', () => {
+    expect(
+      awaitsKostenersatzChoice({
+        groups: ['ffnd', 'kostenersatz'],
+        groupRoles: { ffnd: ['kostenersatz'] },
+      }),
+    ).toBe(false);
+    expect(awaitsKostenersatzChoice({ groups: ['ffnd'] })).toBe(false);
+    expect(awaitsKostenersatzChoice({})).toBe(false);
   });
 });

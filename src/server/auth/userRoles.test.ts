@@ -296,3 +296,69 @@ describe('recomputeUserPermissions', () => {
     await expect(recomputeUserPermissions('nope')).resolves.toBe(false);
   });
 });
+
+describe('writeUserRoles mit toggleRole', () => {
+  it('schaltet die Rolle auf dem in der Transaktion gelesenen Stand um', async () => {
+    // Der Aufrufer hat noch ['bekleidungswart', 'kostenersatz'] gesehen;
+    // kostenersatz ist inzwischen entzogen und darf nicht zurückkommen.
+    store.u1 = member({ ffnd: ['bekleidungswart'] });
+
+    const result = await writeUserRoles('u1', {
+      kind: 'toggleRole',
+      groupId: 'ffnd',
+      role: 'geraetemeister',
+      enabled: true,
+    });
+
+    expect(result).toEqual({ ffnd: ['bekleidungswart', 'geraetemeister'] });
+    expect(store.u1?.groupPerms).toEqual({
+      ffnd: [
+        'bekleidung.manage',
+        'bekleidung.read',
+        'fahrtenbuch.manage',
+        'geraete.manage',
+        'personal.manage',
+      ],
+    });
+  });
+
+  it('entzieht nur die eine Rolle', async () => {
+    store.u1 = member({ ffnd: ['geraetemeister', 'kostenersatz'] });
+
+    const result = await writeUserRoles('u1', {
+      kind: 'toggleRole',
+      groupId: 'ffnd',
+      role: 'kostenersatz',
+      enabled: false,
+    });
+
+    expect(result).toEqual({ ffnd: ['geraetemeister'] });
+  });
+
+  it('nimmt niemanden über eine Rolle in die Gruppe auf', async () => {
+    store.u1 = member({ ffxy: [] });
+
+    await expect(
+      writeUserRoles('u1', {
+        kind: 'toggleRole',
+        groupId: 'ffnd',
+        role: 'kostenersatz',
+        enabled: true,
+      }),
+    ).rejects.toThrow(/not a member/);
+    expect(store.u1?.groupRoles).toEqual({ ffxy: [] });
+  });
+
+  it('lehnt eine unbekannte Rolle ab', async () => {
+    store.u1 = member({ ffnd: [] });
+
+    await expect(
+      writeUserRoles('u1', {
+        kind: 'toggleRole',
+        groupId: 'ffnd',
+        role: 'superuser' as never,
+        enabled: true,
+      }),
+    ).rejects.toThrow(/role/);
+  });
+});

@@ -171,3 +171,36 @@ describe('updateUser — Mitgliedschaft', () => {
   });
 });
 
+
+describe('updateUser vor der Migration', () => {
+  it('ändert die Gruppen eines Benutzers mit altem Kostenersatz nicht', async () => {
+    // Die Umrechnung gäbe ihm Kostenersatz in jeder Gruppe, und Schritt 2
+    // überspränge ihn danach samt der Auswahl je Gruppe.
+    storedUser({ groups: ['allUsers', 'ffnd', 'kostenersatz'] });
+
+    const result = await updateUser(
+      'member-uid',
+      { authorized: true } as UserRecordExtended,
+      ['ffnd', 'ffwien'],
+    );
+
+    expect(result).toEqual({ error: 'notMigrated' });
+    expect(userDocSetMock).not.toHaveBeenCalled();
+    expect(setUserMembershipsMock).not.toHaveBeenCalled();
+    expect(setCustomUserClaimsMock).not.toHaveBeenCalled();
+  });
+
+  it('speichert ihn, solange die Gruppen gleich bleiben', async () => {
+    storedUser({ groups: ['allUsers', 'ffnd', 'kostenersatz'] });
+    setUserMembershipsMock.mockResolvedValue({ ffnd: ['kostenersatz'] });
+
+    const result = await updateUser(
+      'member-uid',
+      { authorized: true } as UserRecordExtended,
+      ['ffnd'],
+    );
+
+    expect(result).not.toHaveProperty('error');
+    expect(userDocSetMock).toHaveBeenCalled();
+  });
+});

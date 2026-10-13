@@ -2892,6 +2892,7 @@
     "geraete": "Geräte & Material"
   },
   "users": {
+    "notMigrated": "{name} ist noch nicht migriert (alte Kostenersatz-Freischaltung); die Gruppen wurden nicht geändert. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus.",
     "title": "Benutzer",
     "filter": "Filter...",
     "filterByGroups": "Nach Gruppen filtern",
@@ -2914,6 +2915,7 @@
     "guestReadOnly": "Nur Lesezugriff"
   },
   "groups": {
+    "notMigrated": "Nicht geändert, weil noch nicht migriert (alte Kostenersatz-Freischaltung): {names}. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus.",
     "title": "Gruppen",
     "createKnown": "Standardgruppen anlegen",
     "createKnownTooltip": "Fehlende Gruppen anlegen: {names}",
@@ -4843,6 +4845,7 @@
       "notAMember": "Der Benutzer ist kein Mitglied dieser Gruppe.",
       "unknownUser": "Den Benutzer gibt es nicht.",
       "firecallGuest": "Einsatz-Gäste können keine Mitglieder werden.",
+      "notMigrated": "Der Benutzer ist noch nicht migriert und hat die alte Kostenersatz-Freischaltung. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus — dort legst du fest, in welchen Gruppen er Kostenersatz behält.",
       "unknown": "Das hat nicht geklappt: {message}"
     }
   }

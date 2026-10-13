@@ -45,11 +45,9 @@ describe('planGroupRoleChanges', () => {
         ['u1'],
       ).map((c) => c.change),
     ).toEqual([
-      {
-        kind: 'setGroupRoles',
-        groupId: 'ffnd',
-        roles: ['gruppenadmin', 'kostenersatz'],
-      },
+      // Nur gruppenadmin umschalten: Die übrigen Rollen liest die Transaktion
+      // frisch, eine gleichzeitige Änderung daran geht nicht verloren.
+      { kind: 'toggleRole', groupId: 'ffnd', role: 'gruppenadmin', enabled: true },
     ]);
   });
 
@@ -62,7 +60,7 @@ describe('planGroupRoleChanges', () => {
         [],
       ).map((c) => c.change),
     ).toEqual([
-      { kind: 'setGroupRoles', groupId: 'ffnd', roles: ['bekleidungswart'] },
+      { kind: 'toggleRole', groupId: 'ffnd', role: 'gruppenadmin', enabled: false },
     ]);
   });
 

@@ -2892,6 +2892,7 @@
     "geraete": "Equipment & supplies"
   },
   "users": {
+    "notMigrated": "{name} has not been migrated yet (old cost recovery flag); the groups were not changed. Run step 2 under “Permissions (migration)” first.",
     "title": "Users",
     "filter": "Filter...",
     "filterByGroups": "Filter by groups",
@@ -2914,6 +2915,7 @@
     "guestReadOnly": "Read only"
   },
   "groups": {
+    "notMigrated": "Not changed because not migrated yet (old cost recovery flag): {names}. Run step 2 under “Permissions (migration)” first.",
     "title": "Groups",
     "createKnown": "Create standard groups",
     "createKnownTooltip": "Create missing groups: {names}",
@@ -4843,6 +4845,7 @@
       "notAMember": "The user is not a member of this group.",
       "unknownUser": "The user does not exist.",
       "firecallGuest": "Operation guests cannot become members.",
+      "notMigrated": "This user has not been migrated yet and still has the old cost recovery flag. Run step 2 under “Permissions (migration)” first — that is where you choose the groups in which they keep cost recovery.",
       "unknown": "That did not work: {message}"
     }
   }

@@ -3,6 +3,7 @@ import 'server-only';
 import { memberGroupIds, type GroupRoles } from '../../common/permissions';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import {
+  awaitsKostenersatzChoice,
   effectiveGroupRoles,
   hasGroupRoles,
   type UserRolesSource,
@@ -23,8 +24,23 @@ import { writeUserRoles, type UserRolesChange } from './userRoles';
  * solche Benutzer wird die Änderung deshalb auf die umgerechneten alten Felder
  * angewandt und als Ganzes geschrieben.
  *
+ * Ausnahme: Hat der Benutzer noch die alte Freischaltung `'kostenersatz'` in
+ * `groups`, lehnt der Vorbau ab (`UserNotMigratedError`). Die Umrechnung gäbe
+ * ihm Kostenersatz in **jeder** Mitgliedsgruppe, und weil er danach als
+ * migriert gilt, überspränge Schritt 2 ihn samt der Kostenersatz-Auswahl je
+ * Gruppe. Erst migrieren, dann bearbeiten.
+ *
  * Prüft wie `writeUserRoles()` **nicht**, ob der Aufrufer das darf.
  */
+
+export class UserNotMigratedError extends Error {
+  constructor() {
+    super(
+      'user still carries the legacy kostenersatz flag; run the permissions migration (step 2) first',
+    );
+    this.name = 'UserNotMigratedError';
+  }
+}
 
 function hasKey(groupRoles: GroupRoles, groupId: string) {
   return Object.prototype.hasOwnProperty.call(groupRoles, groupId);
@@ -35,6 +51,7 @@ export function planUserRolesChange(
   change: UserRolesChange,
 ): UserRolesChange {
   if (hasGroupRoles(user) || change.kind === 'replaceAll') return change;
+  if (awaitsKostenersatzChoice(user)) throw new UserNotMigratedError();
 
   const groupRoles = { ...effectiveGroupRoles(user) };
   switch (change.kind) {
@@ -44,6 +61,16 @@ export function planUserRolesChange(
       }
       groupRoles[change.groupId] = change.roles;
       break;
+    case 'toggleRole': {
+      if (!hasKey(groupRoles, change.groupId)) {
+        throw new Error(`user is not a member of group ${change.groupId}`);
+      }
+      const others = groupRoles[change.groupId].filter((r) => r !== change.role);
+      groupRoles[change.groupId] = change.enabled
+        ? [...others, change.role]
+        : others;
+      break;
+    }
     case 'addMember':
       groupRoles[change.groupId] =
         change.roles ?? groupRoles[change.groupId] ?? [];
@@ -73,6 +100,7 @@ export function planMembershipChanges(
   if (!removed.length && !added.length) return [];
 
   if (!hasGroupRoles(user)) {
+    if (awaitsKostenersatzChoice(user)) throw new UserNotMigratedError();
     const groupRoles: GroupRoles = {};
     for (const groupId of desired) groupRoles[groupId] = current[groupId] ?? [];
     return [{ kind: 'replaceAll', groupRoles }];

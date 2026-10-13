@@ -18,6 +18,7 @@ import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
+import { useSnackbar } from '../../components/providers/SnackbarProvider';
 import AdminGuard from '../../components/site/AdminGuard';
 import { getUsers } from '../users/action';
 import {
@@ -114,6 +115,7 @@ function Groups() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [editGroup, setEditGroup] = useState<Group>();
   const [groups, getGroups, users] = useGroupList();
+  const showSnackbar = useSnackbar();
 
   const missingKnownGroups = useMemo(() => {
     const existingIds = new Set(groups.map((g) => g.id));
@@ -226,11 +228,21 @@ function Groups() {
               // edit mode so the integration sections (Alarm-SMS / ÖBFV-Token),
               // which require an existing group id, become available.
               const wasNew = !group.id;
-              const savedId = await updateGroupAction(
-                group,
-                assigendUsers,
-                groupAdmins || []
-              );
+              const { groupId: savedId, notMigrated } =
+                await updateGroupAction(group, assigendUsers, groupAdmins || []);
+              if (notMigrated.length > 0) {
+                showSnackbar(
+                  t('notMigrated', {
+                    names: notMigrated
+                      .map((uid) => {
+                        const u = users.find((user) => user.uid === uid);
+                        return u?.displayName || u?.email || uid;
+                      })
+                      .join(', '),
+                  }),
+                  'warning'
+                );
+              }
               await getGroups();
               if (wasNew && savedId) {
                 setEditGroup({ ...group, id: savedId });

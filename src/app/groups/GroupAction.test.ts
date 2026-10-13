@@ -82,7 +82,7 @@ describe('updateGroupAction', () => {
     );
     expect(changeUserRolesMock).toHaveBeenCalledWith(
       'u2',
-      { kind: 'setGroupRoles', groupId: 'ffnd', roles: ['kostenersatz'] },
+      { kind: 'toggleRole', groupId: 'ffnd', role: 'gruppenadmin', enabled: false },
       u2,
     );
     expect(changeUserRolesMock).toHaveBeenCalledWith(
@@ -108,13 +108,33 @@ describe('updateGroupAction', () => {
       docs: [userDoc('u1', { groupRoles: {} })],
     });
 
-    const id = await updateGroupAction({ name: 'Neu' }, ['u1'], []);
+    const result = await updateGroupAction({ name: 'Neu' }, ['u1'], []);
 
-    expect(id).toBe('neu');
+    expect(result).toEqual({ groupId: 'neu', notMigrated: [] });
     expect(changeUserRolesMock).toHaveBeenCalledWith(
       'u1',
       { kind: 'addMember', groupId: 'neu', roles: [] },
       expect.anything(),
+    );
+  });
+
+  it('übergeht nicht migrierte Benutzer mit altem Kostenersatz und meldet sie', async () => {
+    // Die Umrechnung gäbe ihm Kostenersatz in jeder Gruppe, und Schritt 2
+    // überspränge ihn danach samt der Auswahl je Gruppe.
+    const legacy = { groups: ['allUsers', 'other', 'kostenersatz'] };
+    const u2 = { groupRoles: {} };
+    usersGetMock.mockResolvedValue({
+      docs: [userDoc('u1', legacy), userDoc('u2', u2)],
+    });
+
+    const result = await updateGroupAction(GROUP, ['u1', 'u2'], []);
+
+    expect(result).toEqual({ groupId: 'ffnd', notMigrated: ['u1'] });
+    expect(changeUserRolesMock).toHaveBeenCalledTimes(1);
+    expect(changeUserRolesMock).toHaveBeenCalledWith(
+      'u2',
+      { kind: 'addMember', groupId: 'ffnd', roles: [] },
+      u2,
     );
   });
 

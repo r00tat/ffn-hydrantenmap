@@ -8,6 +8,7 @@ import {
   type RoleId,
 } from '../../common/permissions';
 import {
+  awaitsKostenersatzChoice,
   effectiveGroupRoles,
   type UserRolesSource,
 } from '../../common/userGroupRoles';
@@ -45,7 +46,9 @@ export type MemberRolesError =
   | 'invalidRole'
   | 'notAMember'
   | 'unknownUser'
-  | 'firecallGuest';
+  | 'firecallGuest'
+  /** Wartet noch auf die Kostenersatz-Auswahl der Migration (Schritt 2). */
+  | 'notMigrated';
 
 export type MemberRolesResult<T = object> =
   | ({ success: true } & T)
@@ -117,15 +120,21 @@ export async function setMemberRoleAction(
   // Rollenvergabe Benutzer in die Gruppe auf, was dem Admin vorbehalten ist.
   const current = user && !isFirecallGuest(user) ? rolesInGroup(user, groupId) : undefined;
   if (!user || !current) return { success: false, error: 'notAMember' };
+  if (awaitsKostenersatzChoice(user)) {
+    return { success: false, error: 'notMigrated' };
+  }
 
   const roles = withRole(current, role, enabled);
   const unchanged =
     roles.length === current.length && roles.every((r) => current.includes(r));
   if (unchanged) return { success: true, roles };
 
+  // Nur die eine Rolle umschalten, nicht die hier gelesene Liste schreiben:
+  // Ändert gleichzeitig jemand anderes die Rollen, gälte sonst die veraltete
+  // Liste — ein soeben entzogenes Recht käme zurück.
   const groupRoles = await changeUserRoles(
     uid,
-    { kind: 'setGroupRoles', groupId, roles },
+    { kind: 'toggleRole', groupId, role, enabled },
     user,
   );
   return { success: true, roles: groupRoles[groupId] ?? roles };
@@ -145,6 +154,9 @@ export async function addMemberAction(
   // Ein Gast-Zugang ist eine Freigabe auf einen Einsatz; ihn zum Mitglied zu
   // machen, gäbe einem Gastlink-Empfänger die ganze Gruppe.
   if (isFirecallGuest(user)) return { success: false, error: 'firecallGuest' };
+  if (awaitsKostenersatzChoice(user)) {
+    return { success: false, error: 'notMigrated' };
+  }
 
   await changeUserRoles(uid, { kind: 'addMember', groupId }, user);
   return { success: true };
@@ -160,6 +172,9 @@ export async function removeMemberAction(
 
   const user = await readUser(uid);
   if (!user) return { success: false, error: 'unknownUser' };
+  if (awaitsKostenersatzChoice(user)) {
+    return { success: false, error: 'notMigrated' };
+  }
 
   await changeUserRoles(uid, { kind: 'removeMember', groupId }, user);
   return { success: true };

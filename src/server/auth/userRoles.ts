@@ -29,6 +29,13 @@ import { userSessionCache } from './userSessionCache';
 export type UserRolesChange =
   /** Rollen einer Gruppe ersetzen; die Mitgliedschaft muss bestehen. */
   | { kind: 'setGroupRoles'; groupId: string; roles: RoleId[] }
+  /**
+   * Eine Rolle vergeben oder entziehen; die Mitgliedschaft muss bestehen.
+   * Angewandt auf den Stand, den die Transaktion liest — anders als
+   * `setGroupRoles` setzt sich so keine veraltete Liste eines gleichzeitigen
+   * Aufrufers durch und gibt ein soeben entzogenes Recht zurück.
+   */
+  | { kind: 'toggleRole'; groupId: string; role: RoleId; enabled: boolean }
   /** In eine Gruppe aufnehmen; ohne `roles` bleiben vorhandene Rollen. */
   | { kind: 'addMember'; groupId: string; roles?: RoleId[] }
   /** Austritt: löscht den Schlüssel und damit alle Rollen der Gruppe. */
@@ -69,6 +76,20 @@ function applyChange(before: GroupRoles, change: UserRolesChange): GroupRoles {
       }
       after[change.groupId] = normalizeRoles(change.roles);
       break;
+    case 'toggleRole': {
+      assertTenant(change.groupId);
+      if (!isRoleId(change.role)) {
+        throw new Error(`unknown role ${String(change.role)}`);
+      }
+      if (!Object.prototype.hasOwnProperty.call(before, change.groupId)) {
+        throw new Error(`user is not a member of group ${change.groupId}`);
+      }
+      const others = before[change.groupId].filter((r) => r !== change.role);
+      after[change.groupId] = normalizeRoles(
+        change.enabled ? [...others, change.role] : others,
+      );
+      break;
+    }
     case 'addMember':
       assertTenant(change.groupId);
       after[change.groupId] = normalizeRoles(

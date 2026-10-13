@@ -22,7 +22,9 @@ import {
   planMembershipChanges,
   planUserRolesChange,
   setUserMemberships,
+  UserNotMigratedError,
 } from './changeUserRoles';
+import type { UserRolesChange } from './userRoles';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -72,6 +74,44 @@ describe('planUserRolesChange', () => {
     ).toEqual({ kind: 'replaceAll', groupRoles: { ffnd: [] } });
   });
 
+  it('rechnet toggleRole eines nicht migrierten Benutzers um', () => {
+    expect(
+      planUserRolesChange(
+        { groups: ['ffnd', 'b'], groupAdmin: ['b'] },
+        { kind: 'toggleRole', groupId: 'ffnd', role: 'bekleidungswart', enabled: true },
+      ),
+    ).toEqual({
+      kind: 'replaceAll',
+      groupRoles: { ffnd: ['bekleidungswart'], b: ['gruppenadmin'] },
+    });
+  });
+
+  it.each<UserRolesChange>([
+    { kind: 'addMember', groupId: 'c' },
+    { kind: 'removeMember', groupId: 'b' },
+    { kind: 'setGroupRoles', groupId: 'ffnd', roles: [] },
+    { kind: 'toggleRole', groupId: 'ffnd', role: 'kostenersatz', enabled: false },
+  ])(
+    'lehnt $kind an einem nicht migrierten Benutzer mit altem Kostenersatz ab',
+    (change) => {
+      expect(() =>
+        planUserRolesChange({ groups: ['ffnd', 'b', 'kostenersatz'] }, change),
+      ).toThrow(UserNotMigratedError);
+    },
+  );
+
+  it('lässt einen migrierten Benutzer trotz altem Kostenersatz in groups durch', () => {
+    // Zwischen Schritt 2 und 3 steht 'kostenersatz' noch in groups; die
+    // Auswahl ist da schon in groupRoles angekommen.
+    const change = { kind: 'removeMember', groupId: 'b' } as const;
+    expect(
+      planUserRolesChange(
+        { groups: ['ffnd', 'b', 'kostenersatz'], groupRoles: { ffnd: [], b: [] } },
+        change,
+      ),
+    ).toBe(change);
+  });
+
   it('lehnt Rollen in einer Gruppe ohne Mitgliedschaft ab', () => {
     expect(() =>
       planUserRolesChange(
@@ -118,15 +158,30 @@ describe('planMembershipChanges', () => {
   it('schreibt einen nicht migrierten Benutzer in einem Zug neu', () => {
     expect(
       planMembershipChanges(
-        { groups: ['ffnd', 'kostenersatz'], groupAdmin: ['ffnd'] },
+        { groups: ['ffnd', 'allUsers'], groupAdmin: ['ffnd'] },
         ['ffnd', 'c'],
       ),
     ).toEqual([
       {
         kind: 'replaceAll',
-        groupRoles: { ffnd: ['gruppenadmin', 'kostenersatz'], c: [] },
+        groupRoles: { ffnd: ['gruppenadmin'], c: [] },
       },
     ]);
+  });
+
+  it('lehnt einen nicht migrierten Benutzer mit altem Kostenersatz ab', () => {
+    // Die Umrechnung gäbe ihm Kostenersatz in jeder Gruppe und machte ihn zu
+    // „migriert" — die Auswahl je Gruppe in Schritt 2 griffe nicht mehr.
+    expect(() =>
+      planMembershipChanges(
+        { groups: ['ffnd', 'kostenersatz'], groupAdmin: ['ffnd'] },
+        ['ffnd', 'c'],
+      ),
+    ).toThrow(UserNotMigratedError);
+    // Ohne Änderung gibt es nichts abzulehnen.
+    expect(
+      planMembershipChanges({ groups: ['ffnd', 'kostenersatz'] }, ['ffnd']),
+    ).toEqual([]);
   });
 });
 

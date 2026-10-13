@@ -4,7 +4,12 @@ import { uniqueArray } from '../../../../common/arrayUtils';
 import { isTruthy } from '../../../../common/boolish';
 import { feuerwehren } from '../../../../common/feuerwehren';
 import { isFirecallGuest } from '../../../../common/firecallGuest';
-import { claimGroupsForUser } from '../../../../common/userGroupRoles';
+import { isTenantGroupId } from '../../../../common/tenantGroups';
+import {
+  awaitsKostenersatzChoice,
+  claimGroupsForUser,
+  userMemberGroupIds,
+} from '../../../../common/userGroupRoles';
 import { FirebaseUserInfo, UserRecordExtended } from '../../../../common/users';
 import { USER_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { firebaseAuth, firestore } from '../../../../server/firebase/admin';
@@ -32,6 +37,17 @@ export async function updateUser(
   const stored = await userRef.get();
   const storedData = ((stored.exists ? stored.data() : undefined) ??
     {}) as FirebaseUserInfo;
+
+  // Vor jedem Schreibvorgang, damit nichts halb gespeichert bleibt: Die
+  // Umrechnung gäbe ihm Kostenersatz in jeder Gruppe, und Schritt 2 der
+  // Migration überspränge ihn danach samt der Auswahl je Gruppe.
+  if (
+    memberGroupIds &&
+    awaitsKostenersatzChoice(storedData) &&
+    !sameGroups(userMemberGroupIds(storedData), memberGroupIds)
+  ) {
+    return { error: 'notMigrated' as const };
+  }
 
   const newData = {
     displayName: user.displayName,
@@ -91,6 +107,12 @@ export async function updateUser(
   userSessionCache.invalidate(uid);
 
   return { ...newData, ...(groupRoles ? { groupRoles } : {}) };
+}
+
+function sameGroups(current: string[], desired: string[]) {
+  const a = new Set(current);
+  const b = new Set(desired.filter(isTenantGroupId));
+  return a.size === b.size && [...a].every((groupId) => b.has(groupId));
 }
 
 export interface CustomClaims {

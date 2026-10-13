@@ -34,6 +34,18 @@ export function hasGroupRoles(user: UserRolesSource): boolean {
   );
 }
 
+/**
+ * Nicht migriert und mit der alten Freischaltung `'kostenersatz'`: Für ihn
+ * steht die Kostenersatz-Auswahl je Gruppe der Migration (Schritt 2) noch aus.
+ * Die Verwaltung bearbeitet ihn bis dahin nicht (siehe `changeUserRoles`).
+ */
+export function awaitsKostenersatzChoice(user: UserRolesSource): boolean {
+  return (
+    !hasGroupRoles(user) &&
+    (user.groups ?? []).includes(LEGACY_KOSTENERSATZ_GROUP)
+  );
+}
+
 /** `groupRoles`, für nicht migrierte Benutzer aus den alten Feldern. */
 export function effectiveGroupRoles(user: UserRolesSource): GroupRoles {
   if (!hasGroupRoles(user)) return legacyToGroupRoles(user);
