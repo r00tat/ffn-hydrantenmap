@@ -3002,8 +3002,11 @@
       "alarmierung": "Alarmierung",
       "eintreffen": "Eintreffen",
       "abruecken": "Abrücken",
-      "force": "Kräfte"
+      "force": "Kräfte",
+      "location": "Einsatzort"
     },
+    "editItem": "{name} bearbeiten",
+    "locationFor": "Einsatzort von {name}",
     "total": "Gesamt",
     "totalFw": "{count} FW",
     "ownForces": "Eigene Kräfte",

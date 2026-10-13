@@ -302,7 +302,7 @@ export default function Fahrzeuge() {
 
       {canAdd && <EinsatzmittelQuickAdd items={displayItems} />}
 
-      <StrengthTable items={displayItems} />
+      <StrengthTable items={displayItems} editable={canAdd} />
 
       {Object.entries(layers).map(([layerId, layer]) => {
         const items = groupedByLayer[layerId] || [];

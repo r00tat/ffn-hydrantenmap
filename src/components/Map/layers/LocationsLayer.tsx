@@ -17,7 +17,7 @@ import FirecallElement from '../../FirecallItems/elements/FirecallElement';
 import { FirecallItem, FirecallLocation } from '../../firebase/firestore';
 
 export default function LocationsLayer() {
-  const { locations } = useFirecallLocations();
+  const { locations, updateLocation } = useFirecallLocations();
   const router = useRouter();
   const map = useMap();
 
@@ -52,6 +52,16 @@ export default function LocationsLayer() {
     [locations]
   );
 
+  // Einsatzorte liegen nicht unter `item`, sondern in einer eigenen Sammlung —
+  // die neue Position schreibt deshalb `updateLocation`, nicht der Marker.
+  const handleDragEnd = useCallback(
+    (item: FirecallItem, position: L.LatLng) => {
+      if (!item.id) return;
+      void updateLocation(item.id, { lat: position.lat, lng: position.lng });
+    },
+    [updateLocation]
+  );
+
   const openEditFromMenu = useCallback(() => {
     if (contextItem) openLocationEditor(contextItem);
     closeContextMenu();
@@ -67,12 +77,15 @@ export default function LocationsLayer() {
               {
                 ...location,
                 type: 'location',
-                draggable: false,
+                draggable: true,
               } as FirecallItem
             }
             selectItem={openLocationEditor}
             key={location.id}
-            options={{ onContextMenu: handleContextMenu }}
+            options={{
+              onContextMenu: handleContextMenu,
+              onDragEnd: handleDragEnd,
+            }}
           />
         ))}
       <Menu

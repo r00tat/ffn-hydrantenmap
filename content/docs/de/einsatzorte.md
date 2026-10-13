@@ -37,6 +37,13 @@ Tipp: Die Statusfarben helfen bei der schnellen Übersicht: Rot = dringend, Oran
 1. Fahrzeug-Dropdown am Einsatzort öffnen
 2. Fahrzeug aus Liste wählen oder neues erstellen
 
+Fahrzeuge und taktische Einheiten lassen sich auch auf der Seite **Einsatzmittel** in der Spalte **Einsatzort** der Stärketabelle zuordnen.
+
+### Einsatzort auf der Karte verschieben
+
+1. Auf der Karte den Bearbeitungsmodus einschalten
+2. Den Marker des Einsatzorts an die richtige Stelle ziehen — die neue Position wird sofort gespeichert
+
 ### E-Mail-Import nutzen
 
 1. E-Mail-Check Button klicken oder automatisch alle 60 Sekunden warten

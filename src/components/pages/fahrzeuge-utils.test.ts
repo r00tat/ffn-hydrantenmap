@@ -325,3 +325,13 @@ describe('calculateStrength: eigene Kräfte und Fremdkräfte', () => {
     expect(result.fremde.rows).toHaveLength(0);
   });
 });
+
+describe('calculateStrength — Element-ID', () => {
+  it('führt die ID des Elements an der Zeile', () => {
+    const items = [
+      { id: 'v1', name: 'TLF', type: 'vehicle' },
+      { id: 'u1', name: '1. Zug', type: 'tacticalUnit' },
+    ] as FirecallItem[];
+    expect(calculateStrength(items).rows.map((r) => r.id)).toEqual(['v1', 'u1']);
+  });
+});

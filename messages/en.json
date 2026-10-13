@@ -3002,8 +3002,11 @@
       "alarmierung": "Alerted at",
       "eintreffen": "Arrived at",
       "abruecken": "Departed at",
-      "force": "Forces"
+      "force": "Forces",
+      "location": "Location"
     },
+    "editItem": "Edit {name}",
+    "locationFor": "Location of {name}",
     "total": "Total",
     "totalFw": "{count} FDs",
     "ownForces": "Own forces",

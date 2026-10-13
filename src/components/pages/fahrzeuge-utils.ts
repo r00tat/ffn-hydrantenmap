@@ -16,6 +16,8 @@ import {
 } from '../../common/vehicle-utils';
 
 export interface StrengthRow {
+  /** ID des Elements — zum Bearbeiten aus der Tabelle heraus. */
+  id?: string;
   name: string;
   fw?: string;
   typ: string;
@@ -84,6 +86,7 @@ export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAs
       const kategorie = einsatzmittelKategorie(v);
       const besatzung = getEffectiveBesatzung(v.besatzung, crewCount, kategorie);
       rows.push({
+        id: v.id,
         name: v.name,
         fw: v.fw,
         typ: EINSATZMITTEL_KATEGORIE_LABELS[kategorie],
@@ -97,6 +100,7 @@ export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAs
     } else if (item.type === 'tacticalUnit') {
       const u = item as TacticalUnit;
       rows.push({
+        id: u.id,
         name: u.name,
         fw: u.fw,
         typ: u.unitType ? TACTICAL_UNIT_LABELS[u.unitType] : 'Einheit',

@@ -60,6 +60,14 @@ Only when no value is set are they counted automatically from the crew assignmen
 vehicles of other fire brigades without a crew assignment.
 :::
 
+### Edit in the strength table and assign to locations
+
+1. The pencil at the end of each row opens the edit dialog of the vehicle or unit
+2. If the operation has locations, the **Location** column shows where the vehicle or unit is deployed
+3. Tick or untick a location in the selection — several locations are possible
+
+The assignment is the same as on the **Locations** page.
+
 ### View vehicles by layer
 
 1. Vehicles are grouped by layer

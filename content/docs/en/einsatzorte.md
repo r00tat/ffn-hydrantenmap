@@ -37,6 +37,13 @@ Tip: The status colours help with a quick overview: red = urgent, orange = in pr
 1. Open the vehicle dropdown on the operation site
 2. Pick a vehicle from the list or create a new one
 
+Vehicles and tactical units can also be assigned on the **Operational resources** page in the **Location** column of the strength table.
+
+### Move an operation site on the map
+
+1. Switch the map to edit mode
+2. Drag the marker of the operation site to the right spot — the new position is saved immediately
+
 ### Use email import
 
 1. Click the email check button or wait for the automatic poll every 60 seconds
