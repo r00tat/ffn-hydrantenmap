@@ -82,7 +82,7 @@ export default function SnackbarProvider({
   );
 
   const handleClose = useCallback(
-    (_event?: React.SyntheticEvent | Event, reason?: string) => {
+    (_event?: React.SyntheticEvent | Event | null, reason?: string) => {
       if (reason === 'clickaway') return;
       setState((prev) => ({ ...prev, open: false }));
     },
