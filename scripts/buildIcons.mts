@@ -9,7 +9,8 @@
  * so the icons keep the anti-aliasing of the 2048 px originals instead of a
  * hard threshold. Web/PWA gets white background and coloured artwork, Android
  * blue background and white artwork — so both installs are told apart on one
- * home screen. The dev environment gets its own web set with a "DEV" band
+ * home screen. The Chrome extension uses the Android look, a white
+ * tile would be lost in the light Chrome toolbar. The dev environment gets its own web set with a "DEV" band
  * (see appIconPath() in src/common/appEnvironment.ts).
  *
  * It also writes docs/design/vorschau-icons.png, a contact sheet of the
@@ -27,6 +28,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DESIGN_DIR = join(ROOT, 'docs/design');
 const BRAND_DIR = join(ROOT, 'public/brand');
 const ANDROID_RES = join(ROOT, 'capacitor/android/app/src/main/res');
+const EXTENSION_ICONS = join(ROOT, 'chrome-extension/public/icons');
 
 type Rgb = [number, number, number];
 
@@ -284,6 +286,23 @@ async function webSet(art: Cutout, dir: string, dev: boolean): Promise<void> {
   await write(join(dir, 'favicon.ico'), await favicon(art, dev));
 }
 
+/**
+ * Chrome extension (toolbar, extensions page, Web Store): the white artwork
+ * on a blue tile like the Android launcher. A white tile is lost in the light
+ * Chrome toolbar.
+ */
+async function extensionSet(white: Cutout): Promise<void> {
+  for (const size of [16, 48, 128]) {
+    await write(
+      join(EXTENSION_ICONS, `icon${size}.png`),
+      await compose(white, size, size, size <= 16 ? 0.86 : 0.74, {
+        kind: 'rounded',
+        color: PRIMARY_HEX,
+      }),
+    );
+  }
+}
+
 /** Android launcher, adaptive foreground and splash: blue with white artwork. */
 async function androidSet(white: Cutout): Promise<void> {
   for (const [bucket, factor] of Object.entries(DENSITIES)) {
@@ -386,6 +405,7 @@ async function main(): Promise<void> {
   await webSet(colour, join(BRAND_DIR, 'dev'), true);
   // Browsers and crawlers ask for /favicon.ico without reading any <link>.
   await write(join(ROOT, 'public/favicon.ico'), await favicon(colour));
+  await extensionSet(white);
   await androidSet(white);
   await previewSheet();
 }
