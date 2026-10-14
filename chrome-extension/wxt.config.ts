@@ -88,15 +88,18 @@ function envOverlayPlugin(): Plugin {
   };
 }
 
-// Nur `wxt build` nutzt `dist/` (wird von CI, scripts/package.mjs und
-// scripts/publish-cws.mjs erwartet). `wxt` (dev) schreibt in `.output/`, damit
-// stale Build-Artefakte aus dist/ nicht vom Vite-Entry-Scanner als Entrypoints
-// aufgegriffen werden.
-const isBuildCommand = process.argv[2] === 'build';
-
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
-  outDir: isBuildCommand ? 'dist' : '.output',
+  // Dev und Build schreiben beide nach `dist/`: CI, scripts/package.mjs und
+  // scripts/publish-cws.mjs erwarten den Build dort, und im Browser bleibt
+  // derselbe entpackte Ordner geladen. WXT leert `dist/` beim Start.
+  //
+  // Vites Abhängigkeits-Scan sucht sonst alle `**/*.html` unter dem Projekt und
+  // nimmt nur `build.outDir` aus — im Dev-Server ist das nicht `dist/`. Er griffe
+  // dann ein altes `dist/popup.html` auf, das WXT gerade löscht, und bräche mit
+  // UNRESOLVED_ENTRY ab. Deshalb nennt `optimizeDeps.entries` unten die echten
+  // Entrypoints ausdrücklich.
+  outDir: 'dist',
   outDirTemplate: '',
   srcDir: '.',
   entrypointsDir: 'entrypoints',
@@ -166,5 +169,7 @@ export default defineConfig({
       },
     },
     plugins: process.env.EXT_ENV_LOCAL ? [envOverlayPlugin()] : [],
+    // Siehe Kommentar an `outDir`: nur die echten Entrypoints scannen.
+    optimizeDeps: { entries: ['entrypoints/**/*.html'] },
   }),
 });

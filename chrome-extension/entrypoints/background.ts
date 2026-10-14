@@ -20,6 +20,8 @@ import {
 } from 'firebase/firestore';
 import { FIREBASE_CONFIG, FIRESTORE_DB } from '@shared/config';
 import { initExtensionAppCheck } from '@shared/appCheck';
+import { createMessageListener } from '@shared/messaging';
+import { loadSelectedFirecall } from '@shared/selectedFirecall';
 import {
   FAHRTENBUCH_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
@@ -344,7 +346,10 @@ export default defineBackground({
             'selectedFirecallId',
           );
           if (!selectedFirecallId) return { firecall: null };
-          return getFirecallData(selectedFirecallId);
+          return loadSelectedFirecall(
+            () => getFirecallData(selectedFirecallId),
+            () => chrome.storage.local.remove('selectedFirecallId'),
+          );
         }
 
         case 'GET_FIRECALL': {
@@ -394,12 +399,7 @@ export default defineBackground({
       }
     }
 
-    chrome.runtime.onMessage.addListener(
-      (message: MessageRequest, _sender, sendResponse) => {
-        handleMessage(message).then(sendResponse);
-        return true;
-      },
-    );
+    chrome.runtime.onMessage.addListener(createMessageListener(handleMessage));
 
     chrome.runtime.onInstalled.addListener(() => {
       console.log('Einsatzkarte Extension installed');

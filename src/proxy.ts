@@ -7,10 +7,12 @@ import { NextFetchEvent, NextRequest, NextResponse } from 'next/server';
 // a new permission prompt, which would disable the extension for existing users
 // until they re-approve it.
 //
-// The id is pinned by the manifest's `key` field, so unpacked dev builds and the
-// Chrome Web Store release share it. CHROME_EXTENSION_IDS (comma separated) can
-// add further ids without a code change.
-const DEFAULT_EXTENSION_IDS = 'pmbpeglmifalphllnijipcolfgjhmlbn';
+// Two ids: the Chrome Web Store assigns its own key to the published extension
+// (pmbpeglm…), while local builds take the manifest `key` derived from
+// chrome-extension/dist.pem (lnmnbapp…). Both talk to this server.
+// CHROME_EXTENSION_IDS (comma separated) replaces the list without a code change.
+const DEFAULT_EXTENSION_IDS =
+  'pmbpeglmifalphllnijipcolfgjhmlbn,lnmnbappdmeibaabgehimahhdajmihdf';
 
 function allowedExtensionOrigins(): string[] {
   return (process.env.CHROME_EXTENSION_IDS || DEFAULT_EXTENSION_IDS)
