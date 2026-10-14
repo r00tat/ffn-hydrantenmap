@@ -4,9 +4,11 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   updateDoc,
   type Firestore,
@@ -153,6 +155,14 @@ describe('Einsatz (claim-basiert, unverändert)', () => {
     await assertSucceeds(read(db(USERS.mitglied), 'call/callA'));
     await assertSucceeds(read(db(USERS.mitglied), 'call/callA/item/i1'));
     await assertSucceeds(write(db(USERS.mitglied), 'call/callA/item/i2'));
+  });
+
+  // Eine Abfrage prüft Firestore gegen die Regel, ohne die Dokumente zu
+  // kennen — anders als das Lesen eines einzelnen Dokuments. So fragen
+  // Web-App und Chrome-Extension die Elemente eines Einsatzes ab.
+  it('Mitglied und Gast fragen die Elemente eines Einsatzes ab', async () => {
+    await assertSucceeds(getDocs(collection(db(USERS.mitglied), 'call/callA/item')));
+    await assertSucceeds(getDocs(collection(guest(false), 'call/callA/item')));
   });
 
   it('Fremder liest nicht', async () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { proxy } from './proxy';
 
 const EXTENSION_ID = 'pmbpeglmifalphllnijipcolfgjhmlbn';
+const DEV_EXTENSION_ID = 'lnmnbappdmeibaabgehimahhdajmihdf';
 
 function makeReq(
   pathname: string,
@@ -41,6 +42,20 @@ describe('proxy CORS handling', () => {
 
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
       `chrome-extension://${EXTENSION_ID}`
+    );
+  });
+
+  it('allows the locally built dev extension origin on api requests', () => {
+    const res = proxy(
+      makeReq('/api/appcheck', {
+        method: 'OPTIONS',
+        origin: `chrome-extension://${DEV_EXTENSION_ID}`,
+      }),
+      ev
+    );
+
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
+      `chrome-extension://${DEV_EXTENSION_ID}`
     );
   });
 

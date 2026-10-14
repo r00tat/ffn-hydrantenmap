@@ -53,6 +53,17 @@ npm run dev
 ```
 
 Startet Vite im Watch-Modus mit HMR. Die Extension wird in `dist/` gebaut.
+Die Env kommt aus der Root-`.env.local`, also typischerweise gegen die
+Dev-Datenbank `ffndev`.
+
+```bash
+npm run dev:prod
+```
+
+Wie `npm run dev`, aber mit derselben Env wie `npm run build:prod`: Die Werte
+aus `chrome-extension/.env.production.local` liegen über der Root-`.env.local`,
+damit läuft die Extension gegen die Prod-Datenbank. Den App-Check-Token holt sie
+in beiden Fällen von `https://einsatz.ffnd.at`.
 
 ### Production Build
 

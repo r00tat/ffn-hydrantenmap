@@ -178,9 +178,15 @@ service cloud.firestore {
       // Passende match-Blöcke verknüpft Firestore mit ODER, ein eigener Block
       // allein könnte den Zugriff über diesen Wildcard nicht zurücknehmen.
       // Auch Pfade unterhalb einer Berechnung fallen so nicht hierher.
-      match /{subitem=**} {
-        allow read: if subitem[0] != 'kostenersatz' && callAuthorized();
-        allow write: if subitem[0] != 'kostenersatz' && callWriteAuthorized();
+      //
+      // Die Collection steht als eigenes Segment `{coll}` und nicht als
+      // `subitem[0]` eines `{subitem=**}`: Bei einer Abfrage (getDocs auf
+      // `call/{id}/item`) war `subitem[0]` nicht auswertbar, die Regel lehnte
+      // jede Abfrage ab. Nur Admins kamen über den Catch-all am Dateiende
+      // noch durch — so blieb es unbemerkt.
+      match /{coll}/{rest=**} {
+        allow read: if coll != 'kostenersatz' && callAuthorized();
+        allow write: if coll != 'kostenersatz' && callWriteAuthorized();
       }
       
     }

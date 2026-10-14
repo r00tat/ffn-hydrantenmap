@@ -39,6 +39,10 @@ Erzeugt werden:
   sind im Entwurf weiß und würden freigestellt in einer dunklen Tableiste
   verschwinden.
 - Android: Launcher-, Round- und Adaptive-Vordergrund sowie alle Splash-Größen.
+- `chrome-extension/public/icons/icon16/48/128.png`: die Icons der Chrome-Extension
+  (Toolbar, Erweiterungsseite, Web Store), weißes Motiv auf blauer, abgerundeter
+  Kachel wie der Android-Launcher. Eine weiße Kachel geht in der hellen
+  Chrome-Toolbar unter.
 - `drawable-*/ic_stat_einsatzkarte.png`: das Benachrichtigungs-Icon (24 dp),
   weißes Motiv auf transparent. Android wertet bei einem Small Icon nur den
   Alphakanal aus. Ein eigenes Icon ist nötig, denn der Adaptive-Vordergrund
