@@ -114,7 +114,16 @@ const updateConnectionInFirestore = async (
         elementType: fcItem.type || 'connection',
         elementId: fcItem.id,
         elementName: fcItem.name || '',
-        newValue: { distance: newValue.distance },
+        // Die Punkte selbst gehören ins Protokoll — nur die Länge sagt
+        // nicht, was sich geändert hat, und lässt sich nicht zurückholen.
+        previousValue: {
+          positions: fcItem.positions,
+          distance: fcItem.distance,
+          ...(fcItem.type === 'area'
+            ? { area: (fcItem as { area?: number }).area }
+            : {}),
+        },
+        newValue,
       });
     }
 

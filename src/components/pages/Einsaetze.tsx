@@ -52,6 +52,8 @@ import FirecallImport from '../firebase/FirecallImport';
 import { firestore } from '../firebase/firebase';
 import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
 import { KostenersatzList } from '../Kostenersatz';
+import { auditActionForUpdate } from '../../common/auditAction';
+import { cachedDocData } from '../../hooks/cachedDocData';
 import { useAuditLog } from '../../hooks/useAuditLog';
 import {
   filterFirecalls,
@@ -69,19 +71,23 @@ function useFirecallUpdate() {
       console.info(
         `update of einsatz ${einsatz.id}: ${JSON.stringify(einsatz)}`
       );
-      setDocLocal(
-        doc(firestore, FIRECALL_COLLECTION_ID, '' + einsatz.id),
-        { ...einsatz, updatedAt: new Date().toISOString(), updatedBy: email },
-        { merge: true }
-      );
+      const ref = doc(firestore, FIRECALL_COLLECTION_ID, '' + einsatz.id);
+      const previous = await cachedDocData(ref);
+      const newValue = {
+        ...einsatz,
+        updatedAt: new Date().toISOString(),
+        updatedBy: email,
+      };
+      setDocLocal(ref, newValue, { merge: true });
 
       logChange({
-        action: 'update',
+        action: auditActionForUpdate(previous, einsatz),
         elementType: 'firecall',
         elementId: einsatz.id || '',
         elementName: einsatz.name || '',
         firecallId: einsatz.id,
-        newValue: { name: einsatz.name, description: einsatz.description, date: einsatz.date, eintreffen: einsatz.eintreffen, abruecken: einsatz.abruecken },
+        ...(previous ? { previousValue: previous } : {}),
+        newValue,
       });
     },
     [email, logChange]

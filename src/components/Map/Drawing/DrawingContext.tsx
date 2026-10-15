@@ -20,6 +20,7 @@ import {
   FIRECALL_ITEMS_COLLECTION_ID,
 } from '../../firebase/firestore';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
+import { logAuditChange } from '../../../hooks/useAuditLog';
 import { useFirecallId } from '../../../hooks/useFirecall';
 
 interface DrawingSessionItem {
@@ -121,7 +122,7 @@ export const useDrawingProvider = (): DrawingContextValue => {
       );
       const batch = writeBatch(firestore);
 
-      batch.set(itemRef, {
+      const drawingData = {
         type: 'drawing',
         name: sessionItem.name,
         lat,
@@ -130,7 +131,8 @@ export const useDrawingProvider = (): DrawingContextValue => {
         created: new Date().toISOString(),
         creator: email,
         deleted: false,
-      });
+      };
+      batch.set(itemRef, drawingData);
 
       // Firestore does not support nested arrays, so flatten points to [lat, lng, lat, lng, ...]
       for (const stroke of strokes) {
@@ -140,6 +142,16 @@ export const useDrawingProvider = (): DrawingContextValue => {
         batch.set(strokeRef, { ...stroke, points: stroke.points.flat() });
       }
       await batch.commit();
+
+      if (email) {
+        logAuditChange(firecallId, email, {
+          action: 'create',
+          elementType: 'drawing',
+          elementId: itemRef.id,
+          elementName: sessionItem.name || '',
+          newValue: { ...drawingData, strokes: strokes.length },
+        });
+      }
 
       setIsDrawing(false);
       setStrokes([]);

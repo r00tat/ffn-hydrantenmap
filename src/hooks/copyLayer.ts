@@ -8,7 +8,8 @@ import {
 } from 'firebase/firestore';
 import { v4 as uuid } from 'uuid';
 import { allSettled } from '../common/promise';
-import { firestore } from '../components/firebase/firebase';
+import { auth, firestore } from '../components/firebase/firebase';
+import { logAuditChange } from './useAuditLog';
 import {
   FcMarker,
   FIRECALL_COLLECTION_ID,
@@ -123,4 +124,17 @@ export default async function copyAndSaveFirecallItems(
   });
 
   await batch.commit();
+
+  const user = auth.currentUser?.email;
+  if (user) {
+    newItems.forEach((copy) =>
+      logAuditChange(firecallId, user, {
+        action: 'create',
+        elementType: copy.type,
+        elementId: '' + copy.id,
+        elementName: copy.name || '',
+        newValue: copy as unknown as Record<string, unknown>,
+      })
+    );
+  }
 }

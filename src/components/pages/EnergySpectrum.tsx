@@ -41,7 +41,9 @@ import {
   useRef,
   useState,
 } from 'react';
-import { where } from 'firebase/firestore';
+import { doc, where } from 'firebase/firestore';
+import { firestore } from '../firebase/firebase';
+import { cachedDocData } from '../../hooks/cachedDocData';
 import { NUCLIDES } from '../../common/strahlenschutz';
 import {
   parseSpectrumFile,
@@ -56,6 +58,8 @@ import { exportSpectrumXml } from '../../common/spectrumExporter';
 import { resolveSpectrumIdentification } from '../../common/spectrumIdentification';
 import {
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
+  FirecallItem,
   Spectrum,
 } from '../../components/firebase/firestore';
 import { downloadText } from '../firebase/download';
@@ -323,12 +327,27 @@ export default function EnergySpectrum() {
     (id: string) => {
       const spectrum = allSpectra.find((s) => s.id === id);
       if (spectrum?.firestoreId) {
-        updateItem({
-          id: spectrum.firestoreId,
-          type: 'spectrum',
-          name: spectrum.data.sampleName || '',
-          deleted: true,
-        });
+        const firestoreId = spectrum.firestoreId;
+        // `updateItem` ersetzt das ganze Dokument. Mit nur diesen Feldern
+        // wären die Messdaten weg und das Spektrum nicht wiederherstellbar —
+        // deshalb vom gespeicherten Stand ausgehen.
+        void cachedDocData(
+          doc(
+            firestore,
+            FIRECALL_COLLECTION_ID,
+            firecallId,
+            FIRECALL_ITEMS_COLLECTION_ID,
+            firestoreId
+          )
+        ).then((stored) =>
+          updateItem({
+            ...(stored as Partial<FirecallItem>),
+            id: firestoreId,
+            type: 'spectrum',
+            name: (stored?.name as string) || spectrum.data.sampleName || '',
+            deleted: true,
+          })
+        );
       }
       setHiddenIds((prev) => {
         const next = new Set(prev);
@@ -336,7 +355,7 @@ export default function EnergySpectrum() {
         return next;
       });
     },
-    [updateItem, allSpectra],
+    [updateItem, allSpectra, firecallId],
   );
 
   const handleDownload = useCallback((spectrum: LoadedSpectrum) => {

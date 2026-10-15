@@ -71,7 +71,12 @@ export interface BackupWarning {
     | 'attachmentUploadFailed'
     | 'newerBackupVersion'
     /** Kostenersatz der Datei nicht zurückgespielt — `detail` ist die Anzahl. */
-    | 'kostenersatzSkipped';
+    | 'kostenersatzSkipped'
+    /**
+     * Audit-Log-Einträge anderer Benutzer nicht zurückgespielt — `detail` ist
+     * die Anzahl.
+     */
+    | 'auditlogSkipped';
   /** Dateiname bzw. Fundstelle, soweit bekannt. */
   file?: string;
   detail?: string;
@@ -624,6 +629,13 @@ export interface ImportFirecallOptions {
    * weg und meldet `kostenersatzSkipped`. Standard: `true`.
    */
   includeKostenersatz?: boolean;
+  /**
+   * Nur die Audit-Log-Einträge dieses Benutzers zurückspielen. Die Regel lässt
+   * einen Eintrag nur unter der eigenen E-Mail zu (Admins ausgenommen) — ein
+   * fremder Eintrag bräche den Import mittendrin ab. Die übrigen fallen weg
+   * und werden als `auditlogSkipped` gemeldet. Ohne Angabe: alle Einträge.
+   */
+  auditlogUser?: string;
   onWarning?: BackupWarningHandler;
   onProgress?: BackupProgressHandler;
 }
@@ -646,7 +658,8 @@ function countStrokes(items: (FirecallItem | ExportDrawingItem)[]): number {
  */
 function countImportSteps(
   firecall: FirecallExport,
-  includeKostenersatz: boolean
+  includeKostenersatz: boolean,
+  auditlogCount: number
 ): number {
   const history = firecall.history ?? [];
 
@@ -666,7 +679,7 @@ function countImportSteps(
     ) +
     (firecall.locations?.length ?? 0) +
     (includeKostenersatz ? (firecall.kostenersatz?.length ?? 0) : 0) +
-    (firecall.auditlog?.length ?? 0) +
+    auditlogCount +
     (firecall.crew?.length ?? 0) +
     (firecall.atemschutzTrupps?.length ?? 0) +
     (firecall.atemschutzAusgaben?.length ?? 0);
@@ -682,9 +695,22 @@ export async function importFirecall(
   firecall: FirecallExport,
   options: ImportFirecallOptions = {}
 ) {
-  const { group, onWarning, onProgress, includeKostenersatz = true } = options;
+  const {
+    group,
+    onWarning,
+    onProgress,
+    includeKostenersatz = true,
+    auditlogUser,
+  } = options;
+  const allAuditlog = firecall.auditlog ?? [];
+  const importedAuditlog =
+    auditlogUser === undefined
+      ? allAuditlog
+      : allAuditlog.filter((a) => a.user === auditlogUser);
   const progress = new ProgressReporter(onProgress);
-  progress.setTotal(countImportSteps(firecall, includeKostenersatz));
+  progress.setTotal(
+    countImportSteps(firecall, includeKostenersatz, importedAuditlog.length)
+  );
   progress.report('documents');
   const commitOps = commitOpsWith(progress);
 
@@ -935,9 +961,15 @@ export async function importFirecall(
   }
 
   // Import auditlog
-  if (auditlog?.length) {
+  if (importedAuditlog.length < (auditlog?.length ?? 0)) {
+    onWarning?.({
+      code: 'auditlogSkipped',
+      detail: `${(auditlog?.length ?? 0) - importedAuditlog.length}`,
+    });
+  }
+  if (importedAuditlog.length) {
     await commitOps(
-      auditlog.map((a) => ({
+      importedAuditlog.map((a) => ({
         ref: doc(auditlogCol, a.id || uuid()),
         data: a as unknown as Record<string, unknown>,
       }))

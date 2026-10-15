@@ -30,6 +30,8 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useCan } from '../../hooks/usePermissions';
 import useVehicles from '../../hooks/useVehicles';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
+import { auditActionForUpdate } from '../../common/auditAction';
+import { cachedDocData } from '../../hooks/cachedDocData';
 import { useAuditLog } from '../../hooks/useAuditLog';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import OfflineMapPreparation from '../Map/OfflineMapPreparation';
@@ -148,18 +150,22 @@ export default function EinsatzDetails() {
 
   const updateFirecall = useCallback(
     async (fc: Firecall) => {
-      setDocLocal(
-        doc(firestore, FIRECALL_COLLECTION_ID, '' + fc.id),
-        { ...fc, updatedAt: new Date().toISOString(), updatedBy: email },
-        { merge: true }
-      );
+      const ref = doc(firestore, FIRECALL_COLLECTION_ID, '' + fc.id);
+      const previous = await cachedDocData(ref);
+      const newValue = {
+        ...fc,
+        updatedAt: new Date().toISOString(),
+        updatedBy: email,
+      };
+      setDocLocal(ref, newValue, { merge: true });
       logChange({
-        action: 'update',
+        action: auditActionForUpdate(previous, fc),
         elementType: 'firecall',
         elementId: fc.id || '',
         elementName: fc.name || '',
         firecallId: fc.id,
-        newValue: { name: fc.name, description: fc.description, date: fc.date },
+        ...(previous ? { previousValue: previous } : {}),
+        newValue,
       });
       setFirecall(fc);
     },

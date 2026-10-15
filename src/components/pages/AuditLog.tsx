@@ -3,10 +3,12 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RestoreIcon from '@mui/icons-material/Restore';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import FormControl from '@mui/material/FormControl';
 import Grid from '@mui/material/Grid';
@@ -18,9 +20,17 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import React, { useCallback, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
+import {
+  changedFields,
+  isRestorableAuditEntry,
+} from '../../common/auditAction';
+import useFirecallItemRestore from '../../hooks/useFirecallItemRestore';
+import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
+import { useSnackbar } from '../providers/SnackbarProvider';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { useAuditLogEntries } from '../../hooks/useAuditLog';
-import { AuditLogEntry } from '../firebase/firestore';
+import { AuditLogEntry, FirecallItem } from '../firebase/firestore';
 import { downloadRowsAsCsv } from '../firebase/download';
 import { DownloadButton } from '../inputs/DownloadButton';
 
@@ -31,12 +41,13 @@ type AuditSortField =
   | 'elementType'
   | 'elementName';
 
-const ACTION_KEYS = ['create', 'update', 'delete'] as const;
+const ACTION_KEYS = ['create', 'update', 'delete', 'restore'] as const;
 
-const ACTION_COLORS: Record<string, 'success' | 'warning' | 'error'> = {
+const ACTION_COLORS: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
   create: 'success',
   update: 'warning',
   delete: 'error',
+  restore: 'info',
 };
 
 function SortableHeader({
@@ -109,13 +120,19 @@ function actionLabel(
   action: string,
   t: ReturnType<typeof useTranslations<'auditlog'>>,
 ): string {
-  if (action === 'create' || action === 'update' || action === 'delete') {
-    return t(`action.${action}`);
+  if ((ACTION_KEYS as readonly string[]).includes(action)) {
+    return t(`action.${action as (typeof ACTION_KEYS)[number]}`);
   }
   return action;
 }
 
-function ValueDisplay({ data }: { data?: Record<string, any> }) {
+function ValueDisplay({
+  data,
+  highlight,
+}: {
+  data?: Record<string, any>;
+  highlight?: string[];
+}) {
   if (!data) return <Typography variant="body2" color="text.secondary">-</Typography>;
 
   return (
@@ -123,11 +140,91 @@ function ValueDisplay({ data }: { data?: Record<string, any> }) {
       {Object.entries(data)
         .filter(([, v]) => v !== undefined && v !== null)
         .map(([k, v]) => (
-          <div key={k}>
+          <Box
+            key={k}
+            sx={
+              highlight?.includes(k)
+                ? { backgroundColor: 'action.selected' }
+                : undefined
+            }
+          >
             <b>{k}:</b> {typeof v === 'object' ? JSON.stringify(v) : String(v)}
-          </div>
+          </Box>
         ))}
     </Box>
+  );
+}
+
+function AuditEntryDetails({
+  entry,
+  canRestore,
+  onRestore,
+}: {
+  entry: AuditLogEntry;
+  canRestore: boolean;
+  onRestore: () => void;
+}) {
+  const t = useTranslations('auditlog');
+  const changed = changedFields(entry.previousValue, entry.newValue);
+
+  return (
+    <Grid container spacing={2}>
+      {changed.length > 0 && (
+        <Grid size={{ xs: 12 }}>
+          <Typography variant="subtitle2" color="text.secondary">
+            {t('changedFields')}
+          </Typography>
+          <Typography variant="body2" component="div">
+            {changed.map((field) => (
+              <Chip
+                key={field}
+                label={field}
+                size="small"
+                variant="outlined"
+                sx={{ mr: 0.5, mb: 0.5 }}
+              />
+            ))}
+          </Typography>
+        </Grid>
+      )}
+      <Grid size={{ xs: 12, md: 6 }}>
+        <Typography variant="subtitle2" color="text.secondary">
+          {t('elementId')}
+        </Typography>
+        <Typography variant="body2" sx={{ fontFamily: 'monospace', mb: 1 }}>
+          {entry.elementId}
+        </Typography>
+        <Typography variant="subtitle2" color="text.secondary">
+          {t('user')}
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          {entry.user}
+        </Typography>
+      </Grid>
+      {entry.previousValue && (
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Typography variant="subtitle2" color="text.secondary">
+            {t('previousValue')}
+          </Typography>
+          <ValueDisplay data={entry.previousValue} highlight={changed} />
+        </Grid>
+      )}
+      {entry.newValue && (
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Typography variant="subtitle2" color="text.secondary">
+            {t('newValue')}
+          </Typography>
+          <ValueDisplay data={entry.newValue} highlight={changed} />
+        </Grid>
+      )}
+      {canRestore && (
+        <Grid size={{ xs: 12 }}>
+          <Button size="small" startIcon={<RestoreIcon />} onClick={onRestore}>
+            {t('restorePrevious')}
+          </Button>
+        </Grid>
+      )}
+    </Grid>
   );
 }
 
@@ -160,6 +257,36 @@ export default function AuditLog() {
   const t = useTranslations('auditlog');
   const firecallId = useFirecallId();
   const entries = useAuditLogEntries();
+  const canWrite = useFirecallWriteAccess();
+  const restoreItem = useFirecallItemRestore();
+  const showSnackbar = useSnackbar();
+  const [restoreEntry, setRestoreEntry] = useState<AuditLogEntry>();
+
+  const restoreConfirmed = useCallback(
+    async (confirmed: boolean) => {
+      const entry = restoreEntry;
+      setRestoreEntry(undefined);
+      if (!confirmed || !entry?.previousValue) return;
+      try {
+        // Zusammenführen: Der Vorzustand enthält oft nur die geänderten
+        // Felder (etwa `lat`/`lng` nach dem Verschieben).
+        await restoreItem(
+          {
+            ...entry.previousValue,
+            id: entry.elementId,
+            type: entry.elementType,
+            name: entry.previousValue.name ?? entry.elementName,
+          } as FirecallItem,
+          { merge: true }
+        );
+        showSnackbar(t('restoreDone', { name: entry.elementName }), 'success');
+      } catch (err) {
+        console.error('Failed to restore from audit log:', err);
+        showSnackbar(t('restoreFailed'), 'error');
+      }
+    },
+    [restoreEntry, restoreItem, showSnackbar, t]
+  );
 
   const [searchText, setSearchText] = useState('');
   const [filterAction, setFilterAction] = useState<string>('');
@@ -363,41 +490,25 @@ export default function AuditLog() {
             </Grid>
           </AccordionSummary>
           <AccordionDetails>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  {t('elementId')}
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', mb: 1 }}>
-                  {entry.elementId}
-                </Typography>
-                <Typography variant="subtitle2" color="text.secondary">
-                  {t('user')}
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  {entry.user}
-                </Typography>
-              </Grid>
-              {entry.previousValue && (
-                <Grid size={{ xs: 12, md: 6 }}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    {t('previousValue')}
-                  </Typography>
-                  <ValueDisplay data={entry.previousValue} />
-                </Grid>
-              )}
-              {entry.newValue && (
-                <Grid size={{ xs: 12, md: 6 }}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    {t('newValue')}
-                  </Typography>
-                  <ValueDisplay data={entry.newValue} />
-                </Grid>
-              )}
-            </Grid>
+            <AuditEntryDetails
+              entry={entry}
+              canRestore={canWrite && isRestorableAuditEntry(entry)}
+              onRestore={() => setRestoreEntry(entry)}
+            />
           </AccordionDetails>
         </Accordion>
       ))}
+
+      {restoreEntry && (
+        <ConfirmDialog
+          title={t('restoreTitle', { name: restoreEntry.elementName })}
+          text={t('restoreText', {
+            name: restoreEntry.elementName,
+            timestamp: formatTimestamp(restoreEntry.timestamp),
+          })}
+          onConfirm={restoreConfirmed}
+        />
+      )}
 
       {filteredAndSorted.length === 0 && (
         <Typography sx={{ py: 4, textAlign: 'center' }} color="text.secondary">
