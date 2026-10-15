@@ -59,6 +59,7 @@ export async function generateSybosSummary(context: string): Promise<SybosSummar
         // entschärft, sonst könnte er den Block vorzeitig beenden.
         parts: [
           {
+            type: 'text',
             text: `<einsatzdaten>\n${context.replace(/<\/?einsatzdaten>/gi, '')}\n</einsatzdaten>`,
           },
         ],

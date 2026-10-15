@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GenerateContentRequest, Content, GenerationConfig, ThinkingLevel } from 'firebase/ai';
+import { GenerateContentRequest, Content, GenerationConfig, Part, ThinkingLevel } from 'firebase/ai';
 import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
 import { FirecallItem } from '../../components/firebase/firestore';
@@ -119,7 +119,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         ...chatHistoryRef.current,
         {
           role: 'user',
-          parts: [...userParts, { text: contextText }],
+          parts: [...userParts, { type: 'text', text: contextText }],
         },
       ];
 
@@ -214,7 +214,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           }
 
           setProcessingStatus('executing');
-          const functionResponseParts = [];
+          const functionResponseParts: Part[] = [];
 
           for (const fc of functionCalls) {
             console.info(`[AI] Executing tool: ${fc.name}`, fc.args);
@@ -225,6 +225,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             console.info(`[AI] Tool result (${fc.name}):`, { success: execResult.success, message: execResult.message });
 
             functionResponseParts.push({
+              type: 'functionResponse',
               functionResponse: {
                 name: fc.name,
                 response: { result: execResult }
@@ -288,8 +289,8 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         // und wird dort protokolliert.
         return await sendToGemini(
           [
-            { inlineData: { mimeType: AUDIO_MIME_TYPE, data: audioBase64 } },
-            { text: VOICE_TURN_PROMPT },
+            { type: 'inlineData', inlineData: { mimeType: AUDIO_MIME_TYPE, data: audioBase64 } },
+            { type: 'text', text: VOICE_TURN_PROMPT },
           ],
           run
         );
@@ -308,7 +309,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     async (text: string, parentRun?: LatencyRun): Promise<AiAssistantResult> => {
       const run = parentRun ?? startLatencyRun('textbefehl');
       try {
-        return await sendToGemini([{ text }], run);
+        return await sendToGemini([{ type: 'text', text }], run);
       } finally {
         if (!parentRun) run.finish();
       }

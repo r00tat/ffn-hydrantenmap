@@ -285,6 +285,7 @@ describe('useAiAssistant Sprachbefehl', () => {
     // Benutzerbeitrag steht am Anfang.
     const parts = (geminiModel.generateContent as any).mock.calls[0][0].contents[0].parts;
     expect(parts[0]).toEqual({
+      type: 'inlineData',
       inlineData: { mimeType: 'audio/webm', data: AUDIO_BASE64 },
     });
   });
