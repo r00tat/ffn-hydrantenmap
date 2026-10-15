@@ -32,10 +32,10 @@ const SECTIONS: FirecallSectionRegistry = {
 };
 
 /**
- * Karte oder Abschnitt eines Einsatzes, gewählt nach der Adresse. Beide Routen
- * unter `/einsatz/<id>` rendern diese Komponente; ein Wechsel per
- * `FirecallLink` ändert nur die Adresse — auch zu einem anderen Einsatz —,
- * und diese Komponente rendert neu
+ * Karte oder Abschnitt eines Einsatzes, gewählt nach der Adresse. Gerendert
+ * wird sie vom Layout `app/einsatz/layout.tsx`, nicht von den Seiten — warum,
+ * steht dort. Ein Wechsel per `FirecallLink` ändert nur die Adresse — auch zu
+ * einem anderen Einsatz —, und diese Komponente rendert neu
  * ohne Serverabruf (siehe `common/firecallNavigation.ts`).
  */
 export default function FirecallView({

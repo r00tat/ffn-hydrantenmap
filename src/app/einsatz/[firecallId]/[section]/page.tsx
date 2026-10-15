@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation';
 import { isFirecallSectionName } from '../../../../common/firecallNavigation';
-import FirecallView from '../../../../components/pages/FirecallView';
 
 /**
  * Abschnitt eines Einsatzes. Gerendert wird er wie die Karte von
- * `FirecallView` nach der Adresse; ein Wechsel per `FirecallLink` lädt die
- * Seite deshalb nicht neu (siehe `common/firecallNavigation.ts`).
+ * `FirecallView` im Layout `einsatz/layout.tsx` nach der Adresse; ein Wechsel
+ * per `FirecallLink` lädt die Seite deshalb nicht neu (siehe
+ * `common/firecallNavigation.ts`). Die Seite prüft nur noch den Abschnitt.
  */
 export default async function EinsatzSectionPage({
   params,
@@ -16,5 +16,5 @@ export default async function EinsatzSectionPage({
   if (!isFirecallSectionName(section)) {
     notFound();
   }
-  return <FirecallView />;
+  return null;
 }
