@@ -36,6 +36,10 @@ vi.mock('../../hooks/useMapEditor', () => ({
   }),
 }));
 
+vi.mock('../../lib/syncRetry', () => ({
+  retrySyncNow: vi.fn(async () => 'retried'),
+}));
+
 let connectivityStatus: 'online' | 'offline' | 'syncing' = 'online';
 vi.mock('../../hooks/useConnectivity', () => ({
   default: () => ({

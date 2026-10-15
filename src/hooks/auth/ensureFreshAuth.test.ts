@@ -20,7 +20,11 @@ vi.mock('../../app/firebaseAuth', () => ({
 
 const { mockAuth, firebaseTokenLoginMock } = hoisted;
 
-import { ensureFreshAuth, isAuthError } from './ensureFreshAuth';
+import {
+  ensureFreshAuth,
+  isAuthError,
+  SERVER_LOGIN_TIMEOUT_MS,
+} from './ensureFreshAuth';
 
 function makeUser(expirationOffsetMs: number): MockUser {
   const expirationTime = new Date(Date.now() + expirationOffsetMs).toISOString();
@@ -126,6 +130,30 @@ describe('ensureFreshAuth', () => {
 
     await Promise.all([p1, p2]);
     expect(firebaseTokenLoginMock).toHaveBeenCalled();
+  });
+});
+
+describe('ensureFreshAuth with a hanging server login', () => {
+  beforeEach(() => {
+    firebaseTokenLoginMock.mockReset();
+  });
+
+  it('gives up after the timeout instead of blocking every later caller', async () => {
+    vi.useFakeTimers();
+    try {
+      mockAuth.currentUser = makeUser(30 * 60 * 1000);
+      firebaseTokenLoginMock.mockReturnValue(new Promise(() => {}));
+
+      const first = ensureFreshAuth(true);
+      await vi.advanceTimersByTimeAsync(SERVER_LOGIN_TIMEOUT_MS);
+      await expect(first).resolves.toBe(false);
+
+      // Der nächste Aufruf hängt sich nicht an das alte Versprechen.
+      firebaseTokenLoginMock.mockResolvedValue({ ok: true });
+      await expect(ensureFreshAuth(true)).resolves.toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -1,7 +1,6 @@
-import {
-  initializeAppCheck,
-  ReCaptchaEnterpriseProvider,
-} from 'firebase/app-check';
+import { initializeAppCheck } from 'firebase/app-check';
+import { BoundedReCaptchaEnterpriseProvider } from '../components/firebase/boundedAppCheckProvider';
+import { recordError } from '../components/firebase/crashlytics';
 import { firebaseApp } from '../components/firebase/firebase';
 import { useEffect } from 'react';
 
@@ -75,8 +74,15 @@ export default function useFirebaseAppCheck() {
     // enforcement is on, while Firestore rules and the server-side auth guards
     // keep gating everything else.
     try {
+      // Mit Zeitgrenze: Ein hängender reCAPTCHA-Abruf hielt sonst Firestores
+      // Schreib-Stream bis zum Neustart an (boundedAppCheckProvider.ts).
       initializeAppCheck(firebaseApp, {
-        provider: new ReCaptchaEnterpriseProvider(siteKey || ''),
+        provider: new BoundedReCaptchaEnterpriseProvider(siteKey || '', {
+          onTimeout: (err) => {
+            console.warn('app check token request hung', err);
+            void recordError(err, { area: 'appCheck' });
+          },
+        }),
         isTokenAutoRefreshEnabled: true,
       });
       appCheckInitialized = true;

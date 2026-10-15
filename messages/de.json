@@ -952,9 +952,9 @@
   "networkStatus": {
     "offlineMode": "Offline-Modus",
     "offlinePending": "Offline-Modus · {count, plural, one {# Änderung} other {# Änderungen}} ausstehend",
-    "offlineHint": "Keine Verbindung zum Server. Änderungen werden auf dem Gerät gespeichert und übertragen, sobald die Verbindung wieder steht. Antippen, um die Verbindung erneut zu prüfen.",
+    "offlineHint": "Keine Verbindung zum Server. Änderungen werden auf dem Gerät gespeichert und übertragen, sobald die Verbindung wieder steht. Antippen, um sofort einen neuen Verbindungsversuch zu starten.",
     "syncing": "{count, plural, one {# Änderung wird} other {# Änderungen werden}} übertragen…",
-    "syncingHint": "Die Verbindung steht wieder. Offline erfasste Änderungen werden gerade an den Server übertragen.",
+    "syncingHint": "Diese Änderungen liegen auf dem Gerät und warten auf die Bestätigung des Servers. Antippen, um die Übertragung erneut anzustoßen.",
     "synced": "Änderungen wurden synchronisiert",
     "syncErrors": "{count, plural, one {# Änderung} other {# Änderungen}} nicht übertragen",
     "syncErrorsHint": "Der Server hat Änderungen abgelehnt. Antippen für Einzelheiten.",
