@@ -73,10 +73,39 @@ fälschlich „online" — genau die Lagen, in denen es im Einsatz darauf ankomm
 Angezeigt wird der Status als Chip in der Kopfzeile (`NetworkStatusChip`)
 statt der früheren Snackbar, die Inhalte verdeckte: „Offline-Modus" (mit Zahl
 der ausstehenden Änderungen), „N Änderungen werden übertragen…", online
-nichts. Antippen prüft sofort. `syncing` zeigt der Chip erst, wenn es 1,5 s
+nichts. Antippen startet in beiden Zuständen einen Synchronisationsversuch
+(`retrySyncNow` in `src/lib/syncRetry.ts`): Ping, Anmeldung erneuern
+(`ensureFreshAuth(true)`), Firestore per `disableNetwork`/`enableNetwork` neu
+verbinden — die Streams holen dabei frische Tokens und überspringen den
+Backoff des SDK —, dann die Warteschlange der Server Actions und Uploads.
+Solange er läuft, dreht sich das Symbol; ein Doppeltippen startet keinen
+zweiten Durchlauf. `syncing` zeigt der Chip erst, wenn es 1,5 s
 anhält (`SYNCING_DISPLAY_DELAY_MS`): Online ist jeder Schreibvorgang einen
 Moment unbestätigt, der Chip würde sonst bei jedem Speichern aufblitzen. Der
 Store selbst meldet `syncing` sofort.
+
+### Hängende Tokens und dauerhaft „ausstehend"
+
+Firestore öffnet einen Stream erst, wenn **beide** Tokens da sind, Auth und
+App Check — ohne Zeitgrenze. Der Lese-Stream bleibt offen und liefert weiter,
+der Schreib-Stream schließt nach einer Minute Leerlauf. Hing beim Neuaufbau
+der App-Check-Abruf (reCAPTCHA-Skript beim Start nicht geladen, `execute()`
+nach dem Standby stecken geblieben), blieben alle Änderungen bis zum Neustart
+der App „ausstehend", während die Oberfläche normal weiterlief. App Check hält
+einen solchen Abruf fest und hängt jeden weiteren daran an; sichtbar wurde das,
+sobald das App-Check-Token nach rund einer Stunde erneuert werden musste.
+
+Deshalb begrenzt `BoundedReCaptchaEnterpriseProvider`
+(`src/components/firebase/boundedAppCheckProvider.ts`) jeden Abruf auf 15 s.
+Danach gibt App Check Firestore ein Platzhalter-Token, und Firestore verbindet
+sich trotzdem — für Firestore ist App Check nicht erzwungen
+([api-keys.md](api-keys.md)). Fehlt reCAPTCHA im Fenster, lädt der nächste
+Abruf das Skript nach. Jede Zeitüberschreitung geht als Non-Fatal (`area:
+appCheck`) an Crashlytics, damit sich zählen lässt, wie oft das vorkommt.
+
+Aus demselben Grund hat die Anmeldung am Server in `ensureFreshAuth` eine
+Zeitgrenze (15 s): Alle wartenden Schreibvorgänge über `withFreshAuth` hängen
+sich an denselben laufenden Abruf.
 
 Firestore erkennt seine Verbindung unabhängig vom Ping. Der Chip kann deshalb
 einen Moment früher auf online springen, als das SDK überträgt; die Meldung

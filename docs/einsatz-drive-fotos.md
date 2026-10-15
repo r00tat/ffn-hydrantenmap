@@ -11,6 +11,21 @@ Feuerwehr, Struktur `<Basisordner>/YYYY/YYYY-MM-DD_Einsatzname`.
   Session ihre CORS-Erlaubnis knüpft — ohne ihn scheitert jeder Upload im
   Browser. Der Dienst hat 1 GiB und hat sich beim Fahrtenbuch-Export schon
   einmal daran verschluckt; genau das soll hier nicht wieder passieren.
+- **Viele Fotos auf einmal: Pakete, begrenzte Parallelität, Wiederholung.**
+  Drive drosselt Schreibzugriffe je Konto (grob ab drei je Sekunde) mit 403
+  `userRateLimitExceeded` oder 429, und jede Upload-Session legt eine Datei an.
+  Früher gingen alle Sessions per `Promise.all` auf einmal hinaus, und ein
+  einziger gedrosselter Aufruf ließ den ganzen Stapel scheitern — ab etwa zehn
+  Fotos, je nach Lage. Jetzt fragt der Browser die Sessions in Paketen zu zehn
+  an (`uploadFilesToDrive.ts`, die Grenze des Servers von 25 gilt je Aufruf),
+  der Server eröffnet höchstens zwei gleichzeitig und wiederholt gedrosselte
+  Antworten mit Backoff
+  ([uploadSession.ts](../src/server/drive/uploadSession.ts)). Hochgeladen
+  wird mit höchstens drei Dateien gleichzeitig. Bricht ein Upload ab oder wird
+  gedrosselt, fragt der Browser den Stand der Session ab und schickt nur den
+  Rest ([uploadToDriveSession.ts](../src/components/drive/uploadToDriveSession.ts)).
+  Scheitert ein Paket, laufen die übrigen weiter; gemeldet wird die Zahl der
+  nicht hochgeladenen Dateien.
 - **Der Basisordner steht je Gruppe in `driveConfig`**, für Clients gesperrt,
   gepflegt unter `/admin/drive`. Keine Konfiguration heißt: die Funktion ist für
   die Gruppe aus. Es gibt bewusst kein zusätzliches `enabled`-Flag.

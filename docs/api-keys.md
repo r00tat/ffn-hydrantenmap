@@ -179,7 +179,10 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $PROJECT" \
 Der Web-Client initialisiert App Check in
 [../src/hooks/useFirebaseAppCheck.ts](../src/hooks/useFirebaseAppCheck.ts) über
 den reCAPTCHA-Enterprise-Provider mit dem Site-Key aus
-`NEXT_PUBLIC_RECAPTCHA_KEY`. Der Site-Key ist nur für die deployten Domains
+`NEXT_PUBLIC_RECAPTCHA_KEY` — genauer über die Unterklasse
+`BoundedReCaptchaEnterpriseProvider`, die jeden Tokenabruf zeitlich begrenzt.
+Ohne die Grenze hielt ein hängender reCAPTCHA-Abruf Firestores Schreib-Stream
+bis zum Neustart an (siehe [offline-modus.md](offline-modus.md)). Der Site-Key ist nur für die deployten Domains
 freigegeben, `localhost` ist **nicht** darunter.
 
 ### Lokal entwickeln

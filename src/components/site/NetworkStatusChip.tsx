@@ -3,12 +3,13 @@
 import CloudSyncIcon from '@mui/icons-material/CloudSync';
 import WifiOffIcon from '@mui/icons-material/WifiOff';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import useConnectivity from '../../hooks/useConnectivity';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import { checkConnectivityNow } from '../../lib/connectivity';
+import { retrySyncNow } from '../../lib/syncRetry';
 import SyncErrorsChip from './SyncErrorsChip';
 
 /**
@@ -35,9 +36,13 @@ function useDelayedFlag(flag: boolean, delayMs: number): boolean {
  * Dauerhafte Anzeige des Verbindungsstatus in der HeaderBar.
  *
  * - offline: „Offline-Modus", solange der Server nicht erreichbar ist (Ping
- *   gegen `/api/ping`, nicht nur `navigator.onLine`). Antippen prüft sofort.
+ *   gegen `/api/ping`, nicht nur `navigator.onLine`).
  * - syncing: „N Änderungen werden übertragen…", solange nach dem Reconnect
  *   noch Schreibvorgänge offen sind.
+ *
+ * Antippen startet in beiden Fällen einen Synchronisationsversuch
+ * (`retrySyncNow`): Ping, Anmeldung erneuern, Firestore neu verbinden,
+ * Warteschlange abarbeiten. Solange er läuft, dreht sich das Symbol.
  * - online: nichts.
  *
  * Daneben, unabhängig vom Zustand: `SyncErrorsChip`, sobald der Server
@@ -64,6 +69,16 @@ function ConnectivityChip() {
     status === 'syncing',
     SYNCING_DISPLAY_DELAY_MS,
   );
+  const [retrying, setRetrying] = useState(false);
+  const retry = useCallback(async () => {
+    setRetrying(true);
+    try {
+      await retrySyncNow();
+    } finally {
+      setRetrying(false);
+    }
+  }, []);
+  const spinner = <CircularProgress size={14} color="inherit" />;
 
   if (status === 'offline') {
     const label =
@@ -79,12 +94,12 @@ function ConnectivityChip() {
         }
       >
         <Chip
-          icon={<WifiOffIcon />}
+          icon={retrying ? spinner : <WifiOffIcon />}
           label={label}
           color="warning"
           size="small"
           onClick={() => {
-            void checkConnectivityNow();
+            void retry();
           }}
           sx={{ ml: 1, mr: 1, flexShrink: 0, maxWidth: { xs: 160, sm: 'none' } }}
         />
@@ -96,16 +111,20 @@ function ConnectivityChip() {
     return (
       <Tooltip title={t('syncingHint')}>
         <Chip
-          icon={<CloudSyncIcon />}
+          icon={retrying ? spinner : <CloudSyncIcon />}
           label={t('syncing', { count: pendingWrites })}
           color="info"
           size="small"
+          onClick={() => {
+            void retry();
+          }}
           sx={{
             ml: 1,
             mr: 1,
             flexShrink: 0,
             maxWidth: { xs: 160, sm: 'none' },
             backgroundColor: '#fff',
+            '&:hover, &.Mui-focusVisible': { backgroundColor: 'grey.100' },
             color: 'info.main',
             '& .MuiChip-icon': { color: 'info.main' },
           }}

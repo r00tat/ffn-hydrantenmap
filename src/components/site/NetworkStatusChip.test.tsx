@@ -6,7 +6,7 @@ import { clearSyncErrors, recordSyncError } from '../../lib/syncErrors';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import NetworkStatusChip, { SYNCING_DISPLAY_DELAY_MS } from './NetworkStatusChip';
 
-const { state, checkMock, login } = vi.hoisted(() => ({
+const { state, retryMock, login } = vi.hoisted(() => ({
   login: { offlineAuth: false },
   state: {
     current: {
@@ -16,7 +16,7 @@ const { state, checkMock, login } = vi.hoisted(() => ({
       pendingWrites: 0,
     } as ConnectivityState,
   },
-  checkMock: vi.fn(() => Promise.resolve(true)),
+  retryMock: vi.fn(() => Promise.resolve('retried' as 'retried' | 'offline')),
 }));
 
 vi.mock('../../hooks/useConnectivity', () => ({
@@ -27,8 +27,8 @@ vi.mock('../../hooks/useFirebaseLogin', () => ({
   default: () => login,
 }));
 
-vi.mock('../../lib/connectivity', () => ({
-  checkConnectivityNow: checkMock,
+vi.mock('../../lib/syncRetry', () => ({
+  retrySyncNow: retryMock,
 }));
 
 function setState(next: Partial<ConnectivityState>) {
@@ -38,7 +38,7 @@ function setState(next: Partial<ConnectivityState>) {
 describe('NetworkStatusChip', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    checkMock.mockClear();
+    retryMock.mockClear();
     state.current = {
       reachable: true,
       status: 'online',
@@ -84,11 +84,45 @@ describe('NetworkStatusChip', () => {
     ).toBeInTheDocument();
   });
 
-  it('prüft beim Antippen die Verbindung erneut', () => {
+  it('startet offline beim Antippen einen Verbindungsversuch', async () => {
     setState({ reachable: false, status: 'offline' });
     renderWithIntl(<NetworkStatusChip />);
-    fireEvent.click(screen.getByRole('button'));
-    expect(checkMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button'));
+    });
+    expect(retryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('stößt beim Antippen der ausstehenden Änderungen die Übertragung erneut an', async () => {
+    setState({ status: 'syncing', pendingWrites: 2 });
+    renderWithIntl(<NetworkStatusChip />);
+    act(() => {
+      vi.advanceTimersByTime(SYNCING_DISPLAY_DELAY_MS);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button'));
+    });
+    expect(retryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('zeigt während des Versuchs einen Fortschritt', async () => {
+    let finish!: (v: 'retried') => void;
+    retryMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    setState({ reachable: false, status: 'offline' });
+    renderWithIntl(<NetworkStatusChip />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button'));
+    });
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+
+    await act(async () => {
+      finish('retried');
+    });
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('zeigt die Übertragung erst, wenn sie länger dauert', () => {

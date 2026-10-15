@@ -75,6 +75,10 @@ describe('useFirebaseAppCheck', () => {
     expect(initializeAppCheckMock.mock.calls[0][1]).toMatchObject({
       isTokenAutoRefreshEnabled: true,
     });
+    // Mit Zeitgrenze, sonst blockiert ein hängender reCAPTCHA-Abruf Firestore.
+    expect(
+      initializeAppCheckMock.mock.calls[0][1].provider.constructor.name,
+    ).toBe('BoundedReCaptchaEnterpriseProvider');
   });
 
   it('does not enable the debug provider when no debug token is configured', () => {

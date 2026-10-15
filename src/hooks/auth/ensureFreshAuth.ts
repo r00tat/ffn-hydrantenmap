@@ -2,8 +2,17 @@
 
 import { auth } from '../../components/firebase/firebase';
 import { firebaseTokenLogin } from '../../app/firebaseAuth';
+import { withTimeout } from '../../lib/withTimeout';
 
 const TOKEN_MIN_LIFETIME_MS = 5 * 60 * 1000;
+
+/**
+ * Höchstdauer der Anmeldung am Server. Ohne Grenze hing eine Server Action auf
+ * einer toten Verbindung beliebig lange — und mit ihr jeder Aufrufer, der
+ * sich an das laufende Versprechen hängt, also jeder wartende Schreibvorgang
+ * über `withFreshAuth`, bis die App neu startete.
+ */
+export const SERVER_LOGIN_TIMEOUT_MS = 15_000;
 
 let inflightAny: Promise<boolean> | null = null;
 let inflightForce: Promise<boolean> | null = null;
@@ -44,7 +53,11 @@ async function doEnsure(forceServerLogin: boolean): Promise<boolean> {
   if (needsTokenRefresh || forceServerLogin) {
     const token = await user.getIdToken();
     if (!token) return false;
-    const result = await firebaseTokenLogin(token);
+    const result = await withTimeout(
+      firebaseTokenLogin(token),
+      SERVER_LOGIN_TIMEOUT_MS,
+      'firebaseTokenLogin',
+    );
     if (result && typeof result === 'object' && 'error' in result && result.error) {
       console.warn('ensureFreshAuth: firebaseTokenLogin failed', result.error);
       return false;
