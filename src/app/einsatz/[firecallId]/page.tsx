@@ -1,5 +1,4 @@
-import FirecallView from '../../../components/pages/FirecallView';
-
+/** Die Karte rendert das Layout `einsatz/layout.tsx` (siehe dort). */
 export default function EinsatzPage() {
-  return <FirecallView />;
+  return null;
 }

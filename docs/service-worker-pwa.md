@@ -184,10 +184,11 @@ nach einem Tag ohne Besuch war die Seite weg.
 
 ## Wechsel zwischen Einsatzseiten ohne Neuladen
 
-Karte und Abschnitte eines Einsatzes unterscheiden sich im Code nicht: Beide
-Routen (`/einsatz/[firecallId]` und `/einsatz/[firecallId]/[section]`)
-rendern [FirecallView](../src/components/pages/FirecallView.tsx), die den
-Abschnitt aus `usePathname()` liest. Die Links in Menü, Kopfzeile und
+Karte und Abschnitte eines Einsatzes unterscheiden sich im Code nicht: Für
+beide Routen (`/einsatz/[firecallId]` und `/einsatz/[firecallId]/[section]`)
+rendert das Layout [einsatz/layout.tsx](../src/app/einsatz/layout.tsx)
+[FirecallView](../src/components/pages/FirecallView.tsx), die den Abschnitt
+aus `usePathname()` liest; die Seiten selbst geben `null` zurück. Die Links in Menü, Kopfzeile und
 Einsatzliste sind [FirecallLink](../src/components/site/FirecallLink.tsx),
 Knöpfe nehmen [useFirecallNavigate](../src/hooks/useFirecallNavigate.ts):
 Sind Ausgangs- und Zielseite Einsatzseiten
@@ -204,6 +205,15 @@ Zurück-Button stellt ihn ohne Neuladen wieder her.
   Wartezeit und Verlust des Seitenzustands. So bleibt online wie offline
   alles im Browser; nur ein noch nie geladener Abschnitt holt seinen Chunk,
   und der liegt im Precache.
+- **Die Ansicht hängt im Layout, nicht in der Seite.** Der Router behält
+  nach einem Wechsel den Baum der Seite, mit der geladen wurde. Setzt danach
+  eine Server Action Cookies — `firebaseTokenLogin` beim Zurückkehren in die
+  App und alle 30 Minuten —, gilt der Pfad als revalidiert, und Next.js
+  übernimmt den Baum, den der Server für die *aktuelle* Adresse rendert. Das
+  ist ein anderes Seitensegment (`[section]` statt der Karte, ein anderer
+  Abschnitt oder Einsatz); hinge `FirecallView` in der Seite, würde sie neu
+  gemountet, und offene Dialoge samt Eingaben wären weg (#868). Das Layout
+  `app/einsatz/layout.tsx` hat keinen Parameter und bleibt stehen.
 - **`useParams` bleibt beim alten Wert**, er kommt aus dem Router-Baum, und
   der zeigt nach einem Wechsel weiter den Einsatz, mit dem die Seite geladen
   wurde. `EinsatzClient` liest die Einsatz-ID deshalb aus der Adresse und
