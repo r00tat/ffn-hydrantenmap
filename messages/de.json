@@ -2977,10 +2977,17 @@
     "action": {
       "create": "Erstellt",
       "update": "Geändert",
-      "delete": "Gelöscht"
+      "delete": "Gelöscht",
+      "restore": "Wiederhergestellt"
     },
     "previousValue": "Vorheriger Wert",
-    "newValue": "Neuer Wert"
+    "newValue": "Neuer Wert",
+    "changedFields": "Geänderte Felder",
+    "restorePrevious": "Vorherigen Stand wiederherstellen",
+    "restoreTitle": "{name} wiederherstellen",
+    "restoreText": "Den Stand von {name} vor der Änderung vom {timestamp} wiederherstellen? Die Felder werden auf den vorherigen Wert gesetzt, ein gelöschtes Element wird wiederhergestellt.",
+    "restoreDone": "{name} wiederhergestellt",
+    "restoreFailed": "Element konnte nicht wiederhergestellt werden."
   },
   "einsatzmittel": {
     "count": "{count} Einsatzmittel",

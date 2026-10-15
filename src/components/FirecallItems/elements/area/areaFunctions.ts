@@ -14,6 +14,7 @@ import {
   calculateDistance,
   getConnectionPositions,
 } from '../connection/distance';
+import { calculateArea } from './area';
 
 export async function updateFirecallPositions(
   firecallId: string,
@@ -52,6 +53,9 @@ const updateConnectionInFirestore = async (
     const newValue = {
       positions: JSON.stringify(positions),
       distance: Math.round(calculateDistance(positions)),
+      // Wie in `updateConnectionInFirestore`: Mit den Punkten ändert sich
+      // auch die Fläche.
+      area: Math.round(calculateArea(positions)),
     };
     setDocLocal(
       doc(
@@ -73,7 +77,14 @@ const updateConnectionInFirestore = async (
         elementType: fcItem.type || 'area',
         elementId: fcItem.id,
         elementName: fcItem.name || '',
-        newValue: { distance: newValue.distance },
+        // Die Punkte selbst gehören ins Protokoll — nur die Länge sagt
+        // nicht, was sich geändert hat, und lässt sich nicht zurückholen.
+        previousValue: {
+          positions: fcItem.positions,
+          distance: fcItem.distance,
+          area: fcItem.area,
+        },
+        newValue,
       });
     }
   }

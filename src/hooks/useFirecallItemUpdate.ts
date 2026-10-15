@@ -24,6 +24,8 @@ import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
 import { isAuthError } from './auth/ensureFreshAuth';
+import { auditActionForUpdate } from '../common/auditAction';
+import { cachedDocData } from './cachedDocData';
 
 // Die Item-Klassen-Registry (`../components/FirecallItems/elements`) lädt alle
 // Elementklassen auf Modulebene, und mehrere davon hängen an `leaflet`. Ein
@@ -63,18 +65,19 @@ export default function useFirecallItemUpdate() {
       );
 
       try {
-        // Lokal: wartet nicht auf den Server, siehe `setDocLocal`.
-        setDocLocal(
-          doc(
-            firestore,
-            FIRECALL_COLLECTION_ID,
-            firecallId,
-            itemClass.firebaseCollectionName(),
-            '' + item.id
-          ),
-          newData,
-          { merge: false }
+        const itemRef = doc(
+          firestore,
+          FIRECALL_COLLECTION_ID,
+          firecallId,
+          itemClass.firebaseCollectionName(),
+          '' + item.id
         );
+        // Viele Aufrufer übergeben keinen Vorzustand; ohne ihn fehlt im
+        // Audit-Log, was vor der Änderung im Feld stand.
+        const cachedPrevious = await cachedDocData(itemRef);
+
+        // Lokal: wartet nicht auf den Server, siehe `setDocLocal`.
+        setDocLocal(itemRef, newData, { merge: false });
 
         // Straßen-Routing und Höhenprofil hängen an Feldern, die hier
         // gespeichert werden: an den Optionen selbst, am Routing-Profil, an den
@@ -98,13 +101,34 @@ export default function useFirecallItemUpdate() {
           const snapshot = await getDocs(
             query(itemsCol, where('layer', '==', item.id))
           );
-          if (!snapshot.empty) {
+          // Nur die noch sichtbaren Elemente: Was schon vorher gelöscht war,
+          // soll beim Wiederherstellen der Ebene gelöscht bleiben. Daran
+          // erkennt `useFirecallItemRestore` die Elemente über
+          // `deletedWithLayer`.
+          const active = snapshot.docs.filter((d) => d.data().deleted !== true);
+          if (active.length > 0) {
             const batch = writeBatch(firestore);
             const now = new Date().toISOString();
-            snapshot.docs.forEach((d) => {
-              batch.update(d.ref, { deleted: true, updatedAt: now, updatedBy: email });
+            active.forEach((d) => {
+              batch.update(d.ref, {
+                deleted: true,
+                deletedWithLayer: item.id,
+                updatedAt: now,
+                updatedBy: email,
+              });
             });
             commitBatchLocal(batch, `Ebene ${item.id} löschen`);
+            active.forEach((d) => {
+              const data = d.data();
+              logChange({
+                action: 'delete',
+                elementType: data.type,
+                elementId: d.id,
+                elementName: data.name || '',
+                previousValue: data,
+                newValue: { deleted: true, deletedWithLayer: item.id },
+              });
+            });
           }
         }
 
@@ -147,9 +171,9 @@ export default function useFirecallItemUpdate() {
           }
         }
 
-        const prev = previousItem || item.original;
+        const prev = cachedPrevious || previousItem || item.original;
         logChange({
-          action: 'update',
+          action: auditActionForUpdate(prev, newData),
           elementType: item.type,
           elementId: item.id || '',
           elementName: item.name || '',

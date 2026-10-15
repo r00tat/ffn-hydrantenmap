@@ -5,6 +5,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RestoreIcon from '@mui/icons-material/Restore';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -17,7 +18,6 @@ import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { SxProps, Theme, styled } from '@mui/material/styles';
-import { collection, getDocs, query, where } from 'firebase/firestore';
 import { ReactNode, Ref, useCallback, useMemo, useState } from 'react';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import {
@@ -26,18 +26,15 @@ import {
   useFirecallId,
 } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import useFirecallItemRestore from '../../hooks/useFirecallItemRestore';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
-import { firestore } from '../firebase/firebase';
-import {
-  FIRECALL_COLLECTION_ID,
-  FIRECALL_ITEMS_COLLECTION_ID,
-  FirecallItem,
-} from '../firebase/firestore';
+import { useSnackbar } from '../providers/SnackbarProvider';
+import { FirecallItem } from '../firebase/firestore';
 import LayerExportMenu from '../firebase/LayerExportMenu';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
 import { FirecallVehicle } from './elements/FirecallVehicle';
-import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
+import useMapEditor, { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 
 interface ExpandMoreProps extends IconButtonProps {
   expand: boolean;
@@ -88,6 +85,14 @@ export default function FirecallItemCard({
   const firecallId = useFirecallId();
   const [expanded, setExpanded] = useState(false);
   const canEdit = useMapEditorCanEdit();
+  const { canWrite, historyModeActive, historyId } = useMapEditor();
+  const restoreItem = useFirecallItemRestore();
+  const showSnackbar = useSnackbar();
+  const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
+  // Zurückholen geht aus einem Verlauf-Snapshot oder bei einem gelöschten
+  // Element (Ansicht „Gelöschte Elemente" für Admins).
+  const canRestore =
+    canWrite && !!itemData.id && (historyModeActive || itemData.deleted === true);
   const vehicleId = itemData.type === 'vehicle' ? itemData.id : undefined;
   const crewCount = useCrewCountForVehicle(vehicleId);
   const atsCount = useAtsCountForVehicle(vehicleId);
@@ -112,34 +117,28 @@ export default function FirecallItemCard({
     async (result: boolean) => {
       setIsConfirmOpen(false);
       if (result) {
+        // Die Elemente einer Ebene löscht `useFirecallItemUpdate` mit.
         updateItem({ ...item.filteredData(), deleted: true });
-        if (item.type === 'layer') {
-          // delete all elements in this layer
-          const docs = await getDocs(
-            query(
-              collection(
-                firestore,
-                FIRECALL_COLLECTION_ID,
-                firecallId,
-                FIRECALL_ITEMS_COLLECTION_ID
-              ),
-              where('layer', '==', item.id)
-            )
-          );
-
-          await Promise.allSettled(
-            docs.docs.map((doc) =>
-              updateItem({
-                ...doc.data(),
-                id: doc.id,
-                deleted: true,
-              } as FirecallItem)
-            )
-          );
-        }
       }
     },
-    [updateItem, item, firecallId]
+    [updateItem, item]
+  );
+
+  const restoreFn = useCallback(
+    async (result: boolean) => {
+      setIsRestoreConfirmOpen(false);
+      if (!result) return;
+      try {
+        await restoreItem(itemData, {
+          historyId: historyModeActive ? historyId : undefined,
+        });
+        showSnackbar(`${item.name || item.markerName()} wiederhergestellt`, 'success');
+      } catch (err) {
+        console.error('Failed to restore firecall item:', err);
+        showSnackbar('Element konnte nicht wiederhergestellt werden.', 'error');
+      }
+    },
+    [restoreItem, itemData, historyModeActive, historyId, showSnackbar, item]
   );
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
@@ -226,6 +225,20 @@ export default function FirecallItemCard({
                 <EditIcon fontSize="small" />
               </IconButton>
             )}
+            {compact && canRestore && (
+              <Tooltip title="Wiederherstellen">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsRestoreConfirmOpen(true);
+                  }}
+                  aria-label="wiederherstellen"
+                >
+                  <RestoreIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             {close && (
               <IconButton
                 onClick={close}
@@ -284,6 +297,17 @@ export default function FirecallItemCard({
             )}
           </CardActions>
         )}
+        {canRestore && !compact && (
+          <CardActions>
+            <Button
+              size="small"
+              startIcon={<RestoreIcon />}
+              onClick={() => setIsRestoreConfirmOpen(true)}
+            >
+              Wiederherstellen
+            </Button>
+          </CardActions>
+        )}
         <Collapse in={expanded} timeout={1000} unmountOnExit>
           <CardContent>
             <Grid container spacing={2}>
@@ -316,6 +340,17 @@ export default function FirecallItemCard({
             title={`${item.title()} löschen`}
             text={`${item.markerName()} ${item.name} wirklich löschen?`}
             onConfirm={deleteFn}
+          />
+        )}
+        {isRestoreConfirmOpen && (
+          <ConfirmDialog
+            title={`${item.title()} wiederherstellen`}
+            text={
+              historyModeActive
+                ? `${item.markerName()} ${item.name} auf den Stand aus dem Verlauf zurücksetzen? Der aktuelle Stand des Elements wird überschrieben.`
+                : `${item.markerName()} ${item.name} wiederherstellen?`
+            }
+            onConfirm={restoreFn}
           />
         )}
       </div>
