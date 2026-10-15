@@ -125,7 +125,7 @@
     "simplify-js": "^1.2.4",
     "three": "^0.186.1",
     "unist-util-visit": "^5.1.0",
-    "zod": "^4.6.2"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.1",
