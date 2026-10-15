@@ -3079,6 +3079,7 @@
     "warningAttachmentDownloadFailed": "Anhang „{file}“ konnte nicht gesichert werden.",
     "warningAttachmentUploadFailed": "Anhang „{file}“ konnte nicht hochgeladen werden.",
     "warningNewerBackupVersion": "Die Datei stammt aus einer neueren Version der App — möglicherweise fehlen Daten.",
+    "warningAuditlogSkipped": "{count, plural, one {# Audit-Log-Eintrag eines anderen Benutzers wurde} other {# Audit-Log-Einträge anderer Benutzer wurden}} nicht übernommen — das darf nur ein Admin.",
     "warningKostenersatzSkipped": "{count, plural, one {# Kostenersatz-Berechnung wurde} other {# Kostenersatz-Berechnungen wurden}} nicht übernommen — dafür fehlt die Rolle „Kostenersatz“ in der Zielgruppe."
   },
   "geschaeftsbuch": {

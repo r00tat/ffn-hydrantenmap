@@ -45,7 +45,7 @@ export default function FirecallImport() {
   const showSnackbar = useSnackbar();
   const warningText = useBackupWarningText();
   const progressText = useBackupProgressText();
-  const { myGroups, isAdmin, groupRoles } = useFirebaseLogin();
+  const { myGroups, isAdmin, groupRoles, email } = useFirebaseLogin();
 
   const [pending, setPending] = useState<FirecallExport>();
   const [targetGroup, setTargetGroup] = useState('');
@@ -99,6 +99,9 @@ export default function FirecallImport() {
             targetGroup || pending.group || '',
             'kostenersatz.use'
           ),
+          // Fremde Audit-Log-Einträge darf nur ein Admin anlegen; die
+          // eigenen kommen immer mit.
+          auditlogUser: isAdmin ? undefined : (email ?? ''),
           onWarning: (warning) => warnings.push(warning),
           onProgress: setProgress,
         }
@@ -120,7 +123,16 @@ export default function FirecallImport() {
     } finally {
       setProgress(undefined);
     }
-  }, [pending, targetGroup, isAdmin, groupRoles, showSnackbar, t, warningText]);
+  }, [
+    pending,
+    targetGroup,
+    isAdmin,
+    groupRoles,
+    email,
+    showSnackbar,
+    t,
+    warningText,
+  ]);
 
   return (
     <>

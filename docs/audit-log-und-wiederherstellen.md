@@ -74,6 +74,29 @@ und `restore` protokolliert.
 Verlauf und Audit-Log verlangen Schreibrecht am Einsatz, Nur-Lese-Gäste sehen
 die Knöpfe nicht.
 
+## Wer Einträge anlegen darf
+
+Die Firestore-Regel für `call/{id}/auditlog` lässt das Anlegen nur mit
+Schreibrecht am Einsatz (`callWriteAuthorized()`) und nur unter der eigenen
+E-Mail (`user`) zu; Ändern und Löschen gar nicht. Ein schreibender Gast
+protokolliert seine Änderungen also wie ein Mitglied.
+
+Der Grund ist das Wiederherstellen: „Vorherigen Stand wiederherstellen" schreibt
+den Vorzustand eines Eintrags mit den Rechten dessen, der den Knopf drückt.
+Dürfte ein Nur-Lese-Gast Einträge anlegen, könnte er einen Vorzustand
+erfinden, den ein Bearbeiter dann ahnungslos ins Element übernimmt.
+
+Die allgemeine Regel `match /{coll}/{rest=**}` unter `call/{doc}` nimmt
+`auditlog` deshalb vom Schreiben aus. Firestore verknüpft Regeln mit ODER —
+ohne den Ausschluss hätte sie Ändern, Löschen und fremde E-Mails trotz der
+eigenen Regel erlaubt.
+
+Ausnahme ist der globale Admin: Er darf Einträge unter fremdem Namen anlegen,
+damit eine Einsatz-Sicherung ihr Audit-Log vollständig zurückbringt. Alle
+anderen spielen beim Import nur die eigenen Einträge zurück, die übrigen
+fallen weg und werden als `auditlogSkipped` gemeldet (siehe
+[einsatz-backup.md](einsatz-backup.md)).
+
 ## Bekannte Lücken
 
 Nicht protokolliert sind abgeleitete Daten (Straßen-Routing, Höhenprofil,
