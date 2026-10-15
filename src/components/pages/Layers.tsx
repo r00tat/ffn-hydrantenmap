@@ -25,6 +25,8 @@ import Divider from '@mui/material/Divider';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Fab from '@mui/material/Fab';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
 import Grid, { GridBaseProps } from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import {
@@ -35,7 +37,8 @@ import {
 import { SimpleMap } from '../../common/types';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import { useFirecallId } from '../../hooks/useFirecall';
+import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
+import { useCan } from '../../hooks/usePermissions';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import {
@@ -49,6 +52,7 @@ import FirecallItemCard, {
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { getItemInstance } from '../FirecallItems/elements';
 import MapLayersSection from '../Map/MapLayers/MapLayersSection';
+import DeletedItemsSection from './DeletedItemsSection';
 import LayerImport from '../firebase/LayerImport';
 import {
   FIRECALL_COLLECTION_ID,
@@ -189,6 +193,11 @@ export default function LayersPage() {
   const sortedLayers = useFirecallLayersSorted();
   const { historyPathSegments, historyModeActive } = useMapEditor();
   const canEdit = useMapEditorCanEdit();
+  const firecall = useFirecall();
+  // Gelöschte Elemente sieht der Admin: global oder in der Gruppe des
+  // Einsatzes (`useCan` lässt den globalen Admin immer durch).
+  const canSeeDeleted = useCan(firecall.group, 'gruppe.manage');
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const items = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
@@ -350,6 +359,17 @@ export default function LayersPage() {
           <Typography variant="h4" gutterBottom>
             Ebenen {canEdit && <LayerImport />}
           </Typography>
+          {canSeeDeleted && !historyModeActive && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showDeleted}
+                  onChange={(e) => setShowDeleted(e.target.checked)}
+                />
+              }
+              label="Gelöschte Elemente anzeigen"
+            />
+          )}
           <Grid container spacing={2}>
             <Grid
               size={hasUnassignedItems ? { xs: 12, md: 7, xl: 8 } : { xs: 12, xl: 10 }}
@@ -377,6 +397,9 @@ export default function LayersPage() {
               items={layerItems['default']}
             />
           </Grid>
+          {canSeeDeleted && showDeleted && !historyModeActive && (
+            <DeletedItemsSection />
+          )}
           <Divider sx={{ my: 3 }} />
           <MapLayersSection canEdit={canEdit} />
         </Box>

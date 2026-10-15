@@ -8,6 +8,7 @@ const hoisted = vi.hoisted(() => ({
   ensureFreshAuth: vi.fn(),
   ensureConnectionDerived: vi.fn(),
   logChange: vi.fn(),
+  getDocFromCache: vi.fn(),
 }));
 
 vi.mock('firebase/firestore', () => ({
@@ -21,6 +22,7 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(),
   where: vi.fn(),
   writeBatch: vi.fn(),
+  getDocFromCache: hoisted.getDocFromCache,
 }));
 
 vi.mock('../components/firebase/firebase', () => ({ firestore: {}, auth: {} }));
@@ -59,6 +61,7 @@ describe('useFirecallItemUpdate', () => {
     hoisted.ensureFreshAuth.mockImplementation(never);
     hoisted.ensureConnectionDerived.mockImplementation(never);
     hoisted.doc.mockReturnValue({ id: 'x', path: 'call/fc-1/item/x' });
+    hoisted.getDocFromCache.mockRejectedValue(new Error('not cached'));
   });
 
   it('returns although the server never confirms the write', async () => {
@@ -78,5 +81,57 @@ describe('useFirecallItemUpdate', () => {
     await result.current({ id: 'x', type: 'connection', name: 'B-Leitung' } as never);
 
     expect(hoisted.ensureConnectionDerived).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs a soft delete as delete, not as update', async () => {
+    const { result } = renderHook(() => useFirecallItemUpdate());
+
+    await result.current({
+      id: 'x',
+      type: 'marker',
+      name: 'Marker',
+      deleted: true,
+    } as never);
+
+    expect(hoisted.logChange).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'delete', elementId: 'x' }),
+    );
+  });
+
+  it('logs undeleting an item as restore', async () => {
+    hoisted.getDocFromCache.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ type: 'marker', name: 'Marker', deleted: true }),
+    });
+    const { result } = renderHook(() => useFirecallItemUpdate());
+
+    await result.current({ id: 'x', type: 'marker', name: 'Marker' } as never);
+
+    expect(hoisted.logChange).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'restore' }),
+    );
+  });
+
+  it('takes the previous value from the local cache when the caller passes none', async () => {
+    // Viele Aufrufer übergeben keinen Vorzustand — ohne ihn fehlt im
+    // Audit-Log, was vor der Änderung im Feld stand.
+    hoisted.getDocFromCache.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ type: 'marker', name: 'Alt', beschreibung: 'vorher' }),
+    });
+    const { result } = renderHook(() => useFirecallItemUpdate());
+
+    await result.current({ id: 'x', type: 'marker', name: 'Neu' } as never);
+
+    expect(hoisted.logChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'update',
+        previousValue: expect.objectContaining({
+          name: 'Alt',
+          beschreibung: 'vorher',
+        }),
+        newValue: expect.objectContaining({ name: 'Neu' }),
+      }),
+    );
   });
 });

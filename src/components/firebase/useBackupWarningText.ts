@@ -31,6 +31,10 @@ export default function useBackupWarningText() {
           return t('warningKostenersatzSkipped', {
             count: Number(warning.detail ?? 0),
           });
+        case 'auditlogSkipped':
+          return t('warningAuditlogSkipped', {
+            count: Number(warning.detail ?? 0),
+          });
       }
     },
     [t]

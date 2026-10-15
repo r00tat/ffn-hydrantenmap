@@ -184,6 +184,59 @@ describe('Einsatz (claim-basiert, unverändert)', () => {
   });
 });
 
+describe('Audit-Log (call/{id}/auditlog)', () => {
+  const entry = (email: string) => ({
+    user: email,
+    action: 'update',
+    elementType: 'marker',
+    elementId: 'i1',
+    elementName: 'Marker',
+    timestamp: '2026-10-15T10:00:00.000Z',
+    previousValue: { name: 'Alt' },
+  });
+  const addEntry = (fs: Firestore, email: string) =>
+    setDoc(doc(collection(fs, 'call/callA/auditlog')), entry(email));
+
+  it('Mitglied und schreibender Gast protokollieren ihre Änderungen', async () => {
+    await assertSucceeds(addEntry(db(USERS.mitglied), 'mitglied@example.com'));
+    await assertSucceeds(addEntry(guest(true), 'gast@example.com'));
+  });
+
+  // Ein Nur-Lese-Gast ändert keine Elemente, hat also nichts zu
+  // protokollieren. Dürfte er Einträge anlegen, könnte er einen Vorzustand
+  // erfinden, den ein Bearbeiter über „Vorherigen Stand wiederherstellen"
+  // mit seinen eigenen Rechten ins Element schreibt.
+  it('Nur-Lese-Gast legt keine Einträge an, liest sie aber', async () => {
+    await assertFails(addEntry(guest(false), 'gast@example.com'));
+    await assertSucceeds(getDocs(collection(guest(false), 'call/callA/auditlog')));
+  });
+
+  it('niemand trägt eine fremde E-Mail ein', async () => {
+    await assertFails(addEntry(db(USERS.mitglied), 'jemand@example.com'));
+    await assertFails(addEntry(guest(true), 'jemand@example.com'));
+  });
+
+  // Das Zurückspielen einer Einsatz-Sicherung bringt die Einträge aller
+  // Bearbeiter mit.
+  it('ein Admin legt Einträge unter fremdem Namen an', async () => {
+    await assertSucceeds(addEntry(admin(), 'jemand@example.com'));
+  });
+
+  it('Einträge lassen sich nicht ändern oder löschen', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'call/callA/auditlog/e1'),
+        entry('mitglied@example.com')
+      );
+    });
+    const fs = db(USERS.mitglied);
+    await assertFails(
+      updateDoc(doc(fs, 'call/callA/auditlog/e1'), { elementName: 'x' })
+    );
+    await assertFails(deleteDoc(doc(fs, 'call/callA/auditlog/e1')));
+  });
+});
+
 describe('Gruppendaten (Mitgliedschaft aus dem Claim)', () => {
   it('Mitglied liest die eigene Gruppe, Fremder nicht', async () => {
     await assertSucceeds(read(db(USERS.mitglied), 'groups/ffnd'));

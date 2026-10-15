@@ -789,7 +789,7 @@ export interface AuditLogEntry {
   id?: string;
   timestamp: string;
   user: string;
-  action: 'create' | 'update' | 'delete';
+  action: 'create' | 'update' | 'delete' | 'restore';
   elementType: string;
   elementId: string;
   elementName: string;

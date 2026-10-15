@@ -19,7 +19,7 @@ Das Einsatz-Dokument selbst plus alle Untersammlungen unter `call/{id}`:
 | `history` | `history` | je Eintrag `snapshotItems` (mit den Strichen der Zeichnungen) und `snapshotLayers` |
 | `location` | `locations` | Einsatzorte |
 | `kostenersatz` | `kostenersatz` | nur mit `kostenersatz.use` in der Gruppe des Einsatzes, sonst weggelassen (siehe [berechtigungen.md](berechtigungen.md#kostenersatz-je-gruppe)) |
-| `auditlog` | `auditlog` | |
+| `auditlog` | `auditlog` | Import vollständig nur als Admin; sonst nur die eigenen Einträge, die übrigen werden gemeldet (siehe [audit-log-und-wiederherstellen.md](audit-log-und-wiederherstellen.md#wer-einträge-anlegen-darf)) |
 | `chat` | `chat` | |
 | `crew` | `crew` | Besatzung je Fahrzeug |
 | `atemschutzTrupp` | `atemschutzTrupps` | je Zeile eine Bereitstellung; `truppKey` bindet sie zusammen und bleibt erhalten |

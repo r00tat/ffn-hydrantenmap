@@ -13,6 +13,7 @@ import {
   type FirecallItem,
 } from '../../components/firebase/firestore';
 import { firestore } from '../firebase/admin';
+import { auditActionForUpdate } from '../../common/auditAction';
 
 /**
  * Der Schreibpfad des MCP-Servers.
@@ -142,7 +143,11 @@ export async function updateMcpFirecallItem(
     .set(data, { merge: true });
 
   await writeAuditLog(context, {
-    action: item.deleted ? 'delete' : 'update',
+    // Ein Tool-Call liefert nur die geänderten Felder: fehlt `deleted`, bleibt
+    // es beim bisherigen Wert.
+    action: auditActionForUpdate(previous, {
+      deleted: item.deleted ?? previous?.deleted,
+    }),
     elementType: item.type,
     elementId: id,
     elementName: item.name,

@@ -3,6 +3,7 @@ import React, { FC, ReactNode, useCallback, useContext, useState } from 'react';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import { addDocLocal } from '../../../lib/firestoreClient';
+import { logAuditChange } from '../../../hooks/useAuditLog';
 import { firestore } from '../../firebase/firebase';
 import {
   FIRECALL_COLLECTION_ID,
@@ -76,6 +77,16 @@ export const useLeitungsProvider = (): Leitungen => {
           ),
           newItem
         );
+
+        if (email) {
+          logAuditChange(firecallId, email, {
+            action: 'create',
+            elementType: newItem.type,
+            elementId: docRef.id,
+            elementName: newItem.name || '',
+            newValue: newItem,
+          });
+        }
 
         // Gesetzt, bevor das Abgeleitete nachgezogen wird: Die Auswahl auf der
         // Seite soll nicht auf Routing und Höhenprofil warten — der Rechner

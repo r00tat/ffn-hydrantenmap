@@ -988,6 +988,52 @@ describe('useExport', () => {
       expect(last.done).toBe(last.total);
     });
 
+    it('spielt nur die eigenen Audit-Log-Einträge zurück und meldet die übrigen', async () => {
+      const warnings: BackupWarning[] = [];
+      const progress: BackupProgress[] = [];
+      const auditEntry = (id: string, user: string) =>
+        ({
+          id,
+          user,
+          action: 'update',
+          elementType: 'marker',
+          elementId: 'm1',
+          elementName: 'Marker',
+          timestamp: '2026-10-15T10:00:00.000Z',
+        }) as FirecallExport['auditlog'][number];
+      await importFirecall(
+        {
+          name: 'Fremdes Audit-Log',
+          items: [],
+          chat: [],
+          layers: [],
+          history: [],
+          locations: [],
+          kostenersatz: [],
+          auditlog: [
+            auditEntry('a1', 'muster@example.com'),
+            auditEntry('a2', 'jemand@example.com'),
+            auditEntry('a3', 'andere@example.com'),
+          ],
+        },
+        {
+          auditlogUser: 'muster@example.com',
+          onWarning: (w) => warnings.push(w),
+          onProgress: (p) => progress.push(p),
+        }
+      );
+
+      const writtenIds = mockCommitInBatches.mock.calls.flatMap((call) =>
+        call[1].map((op) => (op.ref as { id: string }).id)
+      );
+      expect(writtenIds).toContain('a1');
+      expect(writtenIds).not.toContain('a2');
+      expect(writtenIds).not.toContain('a3');
+      expect(warnings).toContainEqual({ code: 'auditlogSkipped', detail: '2' });
+      const last = progress[progress.length - 1];
+      expect(last.done).toBe(last.total);
+    });
+
     it('spielt den Kostenersatz standardmäßig mit zurück', async () => {
       await importFirecall({
         name: 'Mit Kostenersatz',

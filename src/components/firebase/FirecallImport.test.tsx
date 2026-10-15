@@ -20,6 +20,7 @@ vi.mock('../../hooks/useFirebaseLogin', () => ({
       { id: 'allUsers', name: 'Alle Benutzer' },
     ],
     isAdmin: false,
+    email: 'muster@example.com',
     // Kostenersatz nur in Neusiedl
     groupRoles: { ffnd: ['kostenersatz'], ffpodersdorf: [] },
   }),
@@ -132,6 +133,19 @@ describe('FirecallImport', () => {
 
     await waitFor(() => expect(importFirecallMock).toHaveBeenCalledTimes(1));
     expect(importFirecallMock.mock.calls[0][1].includeKostenersatz).toBe(false);
+  });
+
+  it('spielt ohne Admin-Recht nur die eigenen Audit-Log-Einträge zurück', async () => {
+    renderWithIntl(<FirecallImport />);
+    await chooseFile(backupFile());
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Importieren' })
+    );
+
+    await waitFor(() => expect(importFirecallMock).toHaveBeenCalledTimes(1));
+    expect(importFirecallMock.mock.calls[0][1].auditlogUser).toBe(
+      'muster@example.com'
+    );
   });
 
   it('reports a broken file instead of opening the dialog', async () => {

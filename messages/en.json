@@ -2977,10 +2977,17 @@
     "action": {
       "create": "Created",
       "update": "Updated",
-      "delete": "Deleted"
+      "delete": "Deleted",
+      "restore": "Restored"
     },
     "previousValue": "Previous value",
-    "newValue": "New value"
+    "newValue": "New value",
+    "changedFields": "Changed fields",
+    "restorePrevious": "Restore previous state",
+    "restoreTitle": "Restore {name}",
+    "restoreText": "Restore {name} to its state before the change at {timestamp}? The fields are set to their previous values, a deleted element is restored.",
+    "restoreDone": "{name} restored",
+    "restoreFailed": "Element could not be restored."
   },
   "einsatzmittel": {
     "count": "{count} resources",
@@ -3072,6 +3079,7 @@
     "warningAttachmentDownloadFailed": "Attachment “{file}” could not be backed up.",
     "warningAttachmentUploadFailed": "Attachment “{file}” could not be uploaded.",
     "warningNewerBackupVersion": "The file comes from a newer version of the app — data may be missing.",
+    "warningAuditlogSkipped": "{count, plural, one {# audit log entry by another user was} other {# audit log entries by other users were}} not imported — only an admin may do that.",
     "warningKostenersatzSkipped": "{count, plural, one {# cost recovery calculation was} other {# cost recovery calculations were}} not imported — this requires the \"Cost recovery\" role in the target group."
   },
   "geschaeftsbuch": {

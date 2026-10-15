@@ -12,6 +12,7 @@ import {
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import useFirebaseCollection from './useFirebaseCollection';
+import { sanitizeAuditValue } from '../common/auditAction';
 
 type AuditLogInput = Omit<AuditLogEntry, 'id' | 'timestamp' | 'user'> & {
   firecallId?: string;
@@ -27,11 +28,13 @@ export function useAuditLog() {
       if (!targetFirecallId || targetFirecallId === 'unknown' || !email) return;
 
       const { firecallId: _, ...rest } = entry;
-      const logEntry: Omit<AuditLogEntry, 'id'> = {
+      // Bereinigt: Ein einziges `undefined`-Feld im Vor- oder Nachher-Stand
+      // ließe Firestore den ganzen Eintrag ablehnen.
+      const logEntry = sanitizeAuditValue({
         ...rest,
         timestamp: new Date().toISOString(),
         user: email,
-      };
+      }) as Omit<AuditLogEntry, 'id'>;
 
       try {
         addDocLocal(
@@ -72,11 +75,11 @@ export function logAuditChange(
         firecallId,
         FIRECALL_AUDITLOG_COLLECTION_ID
       ),
-      {
+      sanitizeAuditValue({
         ...entry,
         timestamp: new Date().toISOString(),
         user,
-      }
+      }) as Omit<AuditLogEntry, 'id'>
     );
   } catch (err) {
     console.error('Failed to write audit log:', err);

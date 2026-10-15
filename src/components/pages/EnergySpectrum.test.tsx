@@ -13,6 +13,10 @@ vi.mock('../../hooks/useFirecallItemUpdate', () => ({
   default: () => vi.fn(async () => {}),
 }));
 
+vi.mock('../firebase/firebase', () => ({ default: {}, firestore: {} }));
+vi.mock('../../hooks/cachedDocData', () => ({
+  cachedDocData: vi.fn(() => Promise.resolve(undefined)),
+}));
 vi.mock('../../hooks/useFirebaseCollection', () => ({
   default: vi.fn(() => []),
 }));

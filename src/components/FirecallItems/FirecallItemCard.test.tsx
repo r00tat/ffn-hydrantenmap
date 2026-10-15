@@ -35,7 +35,12 @@ vi.mock('../../hooks/useFirecall', () => ({
   useAtsCountForVehicle: () => 0,
 }));
 vi.mock('../../hooks/useFirecallItemUpdate', () => ({ default: () => vi.fn() }));
-vi.mock('../../hooks/useMapEditor', () => ({ useMapEditorCanEdit: () => false }));
+vi.mock('../../hooks/useMapEditor', () => ({
+  default: () => ({ canWrite: false, historyModeActive: false }),
+  useMapEditorCanEdit: () => false,
+}));
+vi.mock('../../hooks/useFirecallItemRestore', () => ({ default: () => vi.fn() }));
+vi.mock('../providers/SnackbarProvider', () => ({ useSnackbar: () => vi.fn() }));
 vi.mock('../../hooks/copyLayer', () => ({ default: vi.fn() }));
 vi.mock('../firebase/LayerExportMenu', () => ({ default: () => null }));
 vi.mock('./FirecallItemUpdateDialog', () => ({ default: () => null }));

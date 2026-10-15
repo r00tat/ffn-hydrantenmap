@@ -127,11 +127,20 @@ service cloud.firestore {
         )
       }
 
-      // Audit log: append-only, user field must match authenticated email
+      // Audit log: append-only, user field must match authenticated email.
+      // Anlegen nur mit Schreibrecht am Einsatz: Ein Eintrag gehört zu einer
+      // Änderung an einem Element, und die darf ein Nur-Lese-Gast nicht
+      // machen. Dürfte er Einträge anlegen, könnte er einen Vorzustand
+      // erfinden, den ein Bearbeiter über „Vorherigen Stand wiederherstellen"
+      // mit seinen eigenen Rechten ins Element schreibt
+      // (docs/audit-log-und-wiederherstellen.md).
+      // Ein Admin darf Einträge unter fremdem Namen anlegen — für das
+      // Zurückspielen einer Einsatz-Sicherung samt Audit-Log.
       match /auditlog/{entryId} {
         allow read: if callAuthorized();
-        allow create: if callAuthorized()
-          && request.resource.data.user == request.auth.token.email;
+        allow create: if (callWriteAuthorized()
+            && request.resource.data.user == request.auth.token.email)
+          || adminUser();
         // No update or delete allowed for audit log entries
       }
 
@@ -140,8 +149,7 @@ service cloud.firestore {
       // Bewusst callAuthorized() statt callWriteAuthorized(): Die eigene
       // Standortfreigabe ist keine Bearbeitung des Einsatzes, sondern eine
       // Information an die Einsatzleitung — genau dafür sind Nur-Lese-Gäste
-      // (externe Kräfte, Nachbarwehr) da. Dasselbe gilt für das Audit-Log
-      // oben: append-only und nur zur Nachvollziehbarkeit.
+      // (externe Kräfte, Nachbarwehr) da.
       // Ein Dokument je **Gerät**, nicht je Benutzer: `<uid>_<deviceId>`.
       // Vorher war die Dokument-ID die bloße uid, und dasselbe Konto auf
       // Tablet und Desktop überschrieb sich gegenseitig. Die bloße uid bleibt
@@ -184,9 +192,13 @@ service cloud.firestore {
       // `call/{id}/item`) war `subitem[0]` nicht auswertbar, die Regel lehnte
       // jede Abfrage ab. Nur Admins kamen über den Catch-all am Dateiende
       // noch durch — so blieb es unbemerkt.
+      // Auch das Audit-Log ist ausgenommen: Firestore verknüpft Regeln mit
+      // ODER, und dieses Schreibrecht hätte die Prüfung der E-Mail und das
+      // „nur anhängen" oben für jeden Bearbeiter ausgehebelt.
       match /{coll}/{rest=**} {
         allow read: if coll != 'kostenersatz' && callAuthorized();
-        allow write: if coll != 'kostenersatz' && callWriteAuthorized();
+        allow write: if coll != 'kostenersatz' && coll != 'auditlog'
+          && callWriteAuthorized();
       }
       
     }
