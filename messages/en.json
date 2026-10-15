@@ -1098,7 +1098,6 @@
     "uploadButton": "Upload to Drive",
     "uploading": "Uploading …",
     "uploadFailed": "{count, plural, one {One file could not be uploaded to Drive.} other {# files could not be uploaded to Drive.}}",
-    "uploadStartFailed": "The upload to Drive could not be started.",
     "openFolder": "{count, plural, =0 {Open folder in Drive} one {Open folder in Drive (1 file)} other {Open folder in Drive (# files)}}",
     "noFiles": "No files in Drive yet.",
     "loadFailed": "Could not load the Drive folder: {message}",

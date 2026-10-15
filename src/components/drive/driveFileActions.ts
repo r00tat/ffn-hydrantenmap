@@ -11,15 +11,17 @@ import {
   FirecallDriveState,
 } from '../../common/drive';
 import { firecallFolderNaming } from '../../common/driveFolderName';
+import { mapWithConcurrency } from '../../common/mapWithConcurrency';
 import { requestOrigin } from '../../server/auth/baseUrl';
 import { driveAccessToken } from '../../server/auth/driveAuth';
 import { driveClient } from '../../server/drive/driveClient';
 import { resolveFirecallFolder } from '../../server/drive/firecallFolder';
+import {
+  openResumableSession,
+  SESSION_CONCURRENCY,
+} from '../../server/drive/uploadSession';
 import { firestore } from '../../server/firebase/admin';
 import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
-
-const RESUMABLE_URL =
-  'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true';
 
 async function baseFolderIdForGroup(group: string): Promise<string | undefined> {
   const doc = await firestore
@@ -44,6 +46,11 @@ export interface DriveUploadSession {
  * Legt den Einsatz-Ordner an (falls nötig) und eröffnet je Datei eine resumable
  * Upload-Session. Die Bytes lädt der Browser danach direkt zu Google — über
  * Cloud Run läuft nur diese Handvoll JSON.
+ *
+ * Die Sessions gehen nicht alle auf einmal hinaus, und gedrosselte Antworten
+ * werden wiederholt (`openResumableSession`): Drive begrenzt die
+ * Schreibzugriffe je Konto, und ein einziger Fehlschlag ließ sonst den ganzen
+ * Stapel scheitern.
  */
 export async function createDriveUploadSessions(
   firecallId: string,
@@ -88,35 +95,17 @@ export async function createDriveUploadSessions(
   }
 
   const token = await driveAccessToken();
-  // Der Origin-Header beim Eröffnen ist das, woran die Session ihre
-  // CORS-Erlaubnis knüpft — ohne ihn kann der Browser die Bytes nicht liefern.
   const origin = await requestOrigin();
 
-  return Promise.all(
-    files.map(async (file) => {
-      const res = await fetch(RESUMABLE_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json; charset=UTF-8',
-          'X-Upload-Content-Type': file.mimeType || 'application/octet-stream',
-          'X-Upload-Content-Length': String(file.size),
-          ...(origin ? { Origin: origin } : {}),
-        },
-        body: JSON.stringify({
-          name: file.name,
-          parents: [folder.folderId],
-        }),
-      });
-      const uploadUrl = res.headers.get('location');
-      if (!res.ok || !uploadUrl) {
-        throw new Error(
-          `could not start upload for ${file.name}: ${res.status}`,
-        );
-      }
-      return { name: file.name, uploadUrl };
+  return mapWithConcurrency(files, SESSION_CONCURRENCY, async (file) => ({
+    name: file.name,
+    uploadUrl: await openResumableSession({
+      token,
+      origin,
+      folderId: folder.folderId,
+      file,
     }),
-  );
+  }));
 }
 
 /**

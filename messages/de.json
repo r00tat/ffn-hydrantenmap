@@ -1098,7 +1098,6 @@
     "uploadButton": "Ins Drive hochladen",
     "uploading": "Wird hochgeladen …",
     "uploadFailed": "{count, plural, one {Eine Datei konnte nicht ins Drive geladen werden.} other {# Dateien konnten nicht ins Drive geladen werden.}}",
-    "uploadStartFailed": "Der Upload ins Drive konnte nicht gestartet werden.",
     "openFolder": "{count, plural, =0 {Ordner in Drive öffnen} one {Ordner in Drive öffnen (1 Datei)} other {Ordner in Drive öffnen (# Dateien)}}",
     "noFiles": "Noch keine Dateien im Drive.",
     "loadFailed": "Drive-Ordner konnte nicht geladen werden: {message}",

@@ -102,6 +102,31 @@ describe('createDriveUploadSessions', () => {
     expect(firecallSet).not.toHaveBeenCalled();
   });
 
+  it('opens the sessions with limited concurrency', async () => {
+    let running = 0;
+    let peak = 0;
+    global.fetch = vi.fn(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 1));
+      running -= 1;
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ location: 'https://upload.example/session' }),
+      };
+    }) as unknown as typeof fetch;
+    const files = Array.from({ length: 12 }, (_, i) => ({
+      name: `${i}.jpg`,
+      mimeType: 'image/jpeg',
+      size: 1,
+    }));
+    const sessions = await createDriveUploadSessions('fc1', files);
+    expect(sessions).toHaveLength(12);
+    expect(sessions[11].name).toBe('11.jpg');
+    expect(peak).toBeLessThanOrEqual(2);
+  });
+
   it('rejects more than 25 files', async () => {
     const files = Array.from({ length: 26 }, (_, i) => ({
       name: `${i}.jpg`,

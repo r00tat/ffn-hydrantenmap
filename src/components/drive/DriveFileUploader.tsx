@@ -9,7 +9,7 @@ import { useCallback, useState } from 'react';
 import LinearProgressWithLabel from '../inputs/LinearProgressWithLabel';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import { createDriveUploadSessions } from './driveFileActions';
-import { uploadToDriveSession } from './uploadToDriveSession';
+import { uploadFilesToDrive } from './uploadFilesToDrive';
 import OnlineOnly from '../site/OnlineOnly';
 
 const VisuallyHiddenInput = styled('input')({
@@ -36,52 +36,28 @@ export default function DriveFileUploader({
   const t = useTranslations('einsatzDrive');
   const showSnackbar = useSnackbar();
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState<Record<string, number>>({});
+  const [names, setNames] = useState<string[]>([]);
+  const [progress, setProgress] = useState<Record<number, number>>({});
 
   const handleUpload = useCallback(
     async (fileList: FileList) => {
       const files = Array.from(fileList);
       if (files.length === 0) return;
       setUploading(true);
+      setNames(files.map((f) => f.name));
       setProgress({});
       try {
-        const sessions = await createDriveUploadSessions(
-          firecallId,
-          files.map((f) => ({
-            name: f.name,
-            mimeType: f.type || 'application/octet-stream',
-            size: f.size,
-          })),
-        );
-        const settled = await Promise.allSettled(
-          sessions.map((session, index) =>
-            uploadToDriveSession(
-              session.uploadUrl,
-              files[index],
-              (loaded, total) =>
-                setProgress((prev) => ({
-                  ...prev,
-                  [session.name]: total > 0 ? (loaded / total) * 100 : 0,
-                })),
-            ),
-          ),
-        );
-        const failed = settled.filter((s) => s.status === 'rejected');
-        if (failed.length > 0) {
-          failed.forEach((f) =>
-            console.error(
-              'drive upload failed',
-              (f as PromiseRejectedResult).reason,
-            ),
-          );
-          showSnackbar(t('uploadFailed', { count: failed.length }), 'error');
+        const { uploaded, failed } = await uploadFilesToDrive(firecallId, files, {
+          createSessions: createDriveUploadSessions,
+          onProgress: (index, percent) =>
+            setProgress((prev) => ({ ...prev, [index]: percent })),
+        });
+        if (failed > 0) {
+          showSnackbar(t('uploadFailed', { count: failed }), 'error');
         }
-        if (failed.length < settled.length) {
+        if (uploaded > 0) {
           onUploadComplete();
         }
-      } catch (err) {
-        console.error('could not start drive upload', err);
-        showSnackbar(t('uploadStartFailed'), 'error');
       } finally {
         setUploading(false);
       }
@@ -118,8 +94,12 @@ export default function DriveFileUploader({
       {uploading && (
         <>
           <Typography>{t('uploading')}</Typography>
-          {Object.entries(progress).map(([name, value]) => (
-            <LinearProgressWithLabel key={name} value={value} label={name} />
+          {names.map((name, index) => (
+            <LinearProgressWithLabel
+              key={index}
+              value={progress[index] ?? 0}
+              label={name}
+            />
           ))}
         </>
       )}
