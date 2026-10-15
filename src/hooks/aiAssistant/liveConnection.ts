@@ -1,4 +1,4 @@
-import { FunctionResponse, Part } from 'firebase/ai';
+import { FunctionResponse } from 'firebase/ai';
 import { liveModelPath } from '../../common/aiLiveToken';
 import { LiveMessage } from './liveConversation';
 
@@ -32,10 +32,20 @@ export function liveWebSocketUrl(token: string): string {
   return url.toString();
 }
 
+/**
+ * Teil eines Beitrags, wie er über die Leitung geht. Das `type` der
+ * SDK-Parts (`Part` ab firebase 13) ist rein clientseitig und wird vom SDK vor
+ * dem Senden entfernt — diese Verbindung läuft ohne SDK, also gar nicht erst
+ * setzen.
+ */
+export interface LiveTextPart {
+  text: string;
+}
+
 export interface LiveConnection {
   readonly isClosed: boolean;
   /** Schließt den Sprecherwechsel ab und schickt den Text mit. */
-  send(parts: Part[], turnComplete: boolean): Promise<void>;
+  send(parts: LiveTextPart[], turnComplete: boolean): Promise<void>;
   /** 16-bit-PCM, 16 kHz, base64 — laufend während der Aufnahme. */
   sendAudioRealtime(blob: { mimeType: string; data: string }): Promise<void>;
   /**

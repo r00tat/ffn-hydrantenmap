@@ -161,7 +161,7 @@ laufende Pflege.
 ## App Check: die Erzwingung hängt an `firebaseml`, nicht an `firebasevertexai`
 
 Das ist die Stolperstelle. Das SDK ruft `firebasevertexai.googleapis.com` auf
-(`VertexAIBackend` in [../src/components/firebase/vertexai.ts](../src/components/firebase/vertexai.ts)),
+(`AgentPlatformBackend` in [../src/components/firebase/vertexai.ts](../src/components/firebase/vertexai.ts)),
 und genau dieser Dienst muss im API-Key freigegeben sein. **App Check zählt und
 erzwingt dieselben Anfragen aber unter dem Namen `firebaseml.googleapis.com`** —
 der Altbezeichnung von Firebase AI Logic. Wer die Erzwingung auf
