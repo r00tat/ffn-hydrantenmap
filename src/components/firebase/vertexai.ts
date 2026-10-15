@@ -7,7 +7,7 @@ import {
   getGenerativeModel,
   HarmBlockThreshold,
   HarmCategory,
-  VertexAIBackend,
+  AgentPlatformBackend,
 } from 'firebase/ai';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -15,7 +15,7 @@ import { GEMINI_MODEL } from '../../common/ai';
 
 // Initialize the Vertex AI service
 export const vertexAI = getAI(firebaseApp, {
-  backend: new VertexAIBackend('global'),
+  backend: new AgentPlatformBackend('global'),
 });
 
 // Initialize the generative model with a model that supports your use case
@@ -51,6 +51,7 @@ export async function askGemini(prompt: string, systemInstruction?: string) {
         role: 'user',
         parts: [
           {
+            type: 'text',
             text: prompt,
           },
         ],
@@ -87,6 +88,7 @@ export function useAiQueryHook() {
             role: 'user',
             parts: [
               {
+                type: 'text',
                 text: prompt,
               },
             ],

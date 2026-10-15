@@ -29,7 +29,7 @@ export function stripInlineDataParts(contents: Content[]): Content[] {
     return {
       ...content,
       parts: content.parts.map((part): Part =>
-        'inlineData' in part && part.inlineData ? { text: AUDIO_PLACEHOLDER } : part
+        'inlineData' in part && part.inlineData ? { type: 'text', text: AUDIO_PLACEHOLDER } : part
       ),
     };
   });
@@ -54,7 +54,7 @@ export function stripMapContextParts(contents: Content[]): Content[] {
     const parts = content.parts.filter((part) => !isContext(part));
     return {
       ...content,
-      parts: parts.length > 0 ? parts : [{ text: CONTEXT_PLACEHOLDER }],
+      parts: parts.length > 0 ? parts : [{ type: 'text', text: CONTEXT_PLACEHOLDER }],
     };
   });
 }
