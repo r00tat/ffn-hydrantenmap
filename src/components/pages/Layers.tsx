@@ -189,7 +189,7 @@ export default function LayersPage() {
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
   const sortedLayers = useFirecallLayersSorted();
-  const { historyPathSegments, historyModeActive } = useMapEditor();
+  const { historyPathSegments } = useMapEditor();
   const canEdit = useMapEditorCanEdit();
   const firecall = useFirecall();
   // Gelöschte Elemente sieht der Admin: global oder in der Gruppe des
@@ -383,7 +383,7 @@ export default function LayersPage() {
               items={layerItems['default']}
             />
           </Grid>
-          {canSeeDeleted && !historyModeActive && (
+          {canSeeDeleted && (
             <DeletedItemsSection />
           )}
           <Divider sx={{ my: 3 }} />

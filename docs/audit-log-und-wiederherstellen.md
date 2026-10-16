@@ -62,16 +62,19 @@ und `restore` protokolliert.
   `gruppe.manage` in der Gruppe des Einsatzes. Kein Schalter mehr: hinter dem
   Schalter war der Abschnitt nicht zu finden. Die Zahl im Kopf zeigt, ob es
   etwas zurückzuholen gibt; dafür läuft die Abfrage auf `deleted == true`,
-  solange die Ansicht offen ist. Im Verlaufsmodus ausgeblendet, sonst stünde
-  der aktuelle Stand neben dem Snapshot.
+  solange die Ansicht offen ist. Im Verlaufsmodus zeigt der Abschnitt die
+  gelöschten Elemente **des Snapshots** — `useSaveHistory` sichert gelöschte
+  Dokumente mit.
 - **Verlauf-Snapshot:** Im Verlaufsmodus hat jede Element-Karte
   „Wiederherstellen", ebenso das Popup des Elements auf der Karte
   (`RestoreItemButton` in `FirecallItemPopup` sowie in den Popups von Fläche
   und Leitung). Der Stand aus dem Snapshot ersetzt den aktuellen
   vollständig (`merge: false`); bei einer Zeichnung ersetzen die gesicherten
-  Striche die aktuellen, sonst bliebe ein Mischbild. Ein gelöschtes Element
-  kommt nie mit der `historyId` zurück — sein Stand ist der aktuelle, die
-  Striche des Snapshots gehörten nicht dazu.
+  Striche die aktuellen, sonst bliebe ein Mischbild.
+
+Zurück kommt immer der **gewählte Stand**: im Verlaufsmodus der des Snapshots
+(mit `historyId`), auch bei einem Element, das im Snapshot oder seither
+gelöscht ist; im aktuellen Stand der aktuelle.
 - **Audit-Log:** „Vorherigen Stand wiederherstellen" an `update`- und
   `delete`-Einträgen mit Vorzustand. Hier wird **zusammengeführt**
   (`merge: true`), weil der Vorzustand oft nur die geänderten Felder enthält

@@ -130,12 +130,8 @@ export default function FirecallItemCard({
       if (!result) return;
       try {
         await restoreItem(itemData, {
-          // Ein gelöschtes Element kommt aus dem aktuellen Stand, nie aus
-          // einem Snapshot.
-          historyId:
-            historyModeActive && itemData.deleted !== true
-              ? historyId
-              : undefined,
+          // Zurück kommt immer der gewählte Stand: Snapshot oder aktuell.
+          historyId: historyModeActive ? historyId : undefined,
         });
         showSnackbar(`${item.name || item.markerName()} wiederhergestellt`, 'success');
       } catch (err) {

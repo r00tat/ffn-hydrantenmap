@@ -10,6 +10,7 @@ import { where } from 'firebase/firestore';
 import { useMemo } from 'react';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
+import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 import FirecallItemCard from '../FirecallItems/FirecallItemCard';
 import {
   FIRECALL_COLLECTION_ID,
@@ -30,16 +31,19 @@ const byDeletionDesc = (a: FirecallItem, b: FirecallItem) =>
  */
 export default function DeletedItemsSection() {
   const firecallId = useFirecallId();
+  // Im Verlauf die gelöschten Elemente des gewählten Snapshots — der Snapshot
+  // sichert auch gelöschte Dokumente mit.
+  const historyPathSegments = useHistoryPathSegments();
   const queryConstraints = useMemo(() => [where('deleted', '==', true)], []);
 
   const deletedLayers = useFirebaseCollection<FirecallLayer>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_LAYERS_COLLECTION_ID],
+    pathSegments: [firecallId, ...historyPathSegments, FIRECALL_LAYERS_COLLECTION_ID],
     queryConstraints,
   });
   const deletedItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
+    pathSegments: [firecallId, ...historyPathSegments, FIRECALL_ITEMS_COLLECTION_ID],
     queryConstraints,
   });
 

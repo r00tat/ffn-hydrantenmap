@@ -21,7 +21,9 @@ export default function RestoreItemButton({ item }: { item: FirecallItem }) {
   const showSnackbar = useSnackbar();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const fromHistory = historyModeActive && item.deleted !== true;
+  // Zurück kommt immer der gewählte Stand: im Verlauf der des Snapshots —
+  // auch bei einem Element, das im Snapshot gelöscht ist —, sonst der aktuelle.
+  const fromHistory = historyModeActive;
   const name = item.name || 'Element';
 
   const restoreFn = useCallback(

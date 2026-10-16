@@ -63,4 +63,15 @@ describe('RestoreItemButton', () => {
       }),
     );
   });
+
+  it('holt im Verlauf auch ein gelöschtes Element aus dem Snapshot zurück', async () => {
+    Object.assign(editor, { historyModeActive: true, historyId: 'h1' });
+    const deleted = { ...marker, deleted: true };
+    render(<RestoreItemButton item={deleted} />);
+
+    await userEvent.click(screen.getByLabelText('Wiederherstellen'));
+    await userEvent.click(screen.getByRole('button', { name: 'ja' }));
+
+    await waitFor(() => expect(restoreMock).toHaveBeenCalledWith(deleted, { historyId: 'h1' }));
+  });
 });
