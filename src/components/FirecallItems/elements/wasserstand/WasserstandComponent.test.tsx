@@ -48,6 +48,7 @@ vi.mock('../../../../hooks/useFirecallItemUpdate', () => ({
 vi.mock('../../../../hooks/useMapEditor', () => ({
   useMapEditable: () => false,
 }));
+vi.mock('../../RestoreItemButton', () => ({ default: () => null }));
 vi.mock('../../../../common/terrain/terrainClient', () => ({
   terrainClient: () => ({ sample: async () => [null] }),
 }));

@@ -130,6 +130,7 @@ export default function FirecallItemCard({
       if (!result) return;
       try {
         await restoreItem(itemData, {
+          // Zurück kommt immer der gewählte Stand: Snapshot oder aktuell.
           historyId: historyModeActive ? historyId : undefined,
         });
         showSnackbar(`${item.name || item.markerName()} wiederhergestellt`, 'success');

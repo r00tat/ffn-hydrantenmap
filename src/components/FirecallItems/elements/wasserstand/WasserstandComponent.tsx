@@ -209,6 +209,7 @@ export default function WasserstandComponent({
             war das Element weder zu bearbeiten noch zu löschen. */}
         <FirecallItemPopup
           onClick={() => selectItem(item)}
+          item={item}
           lat={position[0]}
           lng={position[1]}
         >

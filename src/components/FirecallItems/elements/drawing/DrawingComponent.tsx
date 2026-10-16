@@ -46,6 +46,7 @@ export default function DrawingComponent({
         >
           <FirecallItemPopup
             onClick={() => selectItem(item)}
+            item={item}
             lat={item.lat}
             lng={item.lng}
           >

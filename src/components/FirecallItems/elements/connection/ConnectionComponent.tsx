@@ -25,6 +25,7 @@ import {
 } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
+import RestoreItemButton from '../../RestoreItemButton';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import PointContextMenu from '../PointContextMenu';
@@ -351,6 +352,7 @@ export default function ConnectionMarker({
       >
         <Popup>
           <PopupNavigateButton lat={record.lat} lng={record.lng} />
+          <RestoreItemButton item={record.data()} />
           {editable && pointIndex >= 0 && (
             <Tooltip title={t('addPointHere')}>
               <IconButton
