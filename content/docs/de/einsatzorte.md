@@ -6,7 +6,7 @@ Einsatzorte dienen zur Verwaltung einzelner Einsatzstellen innerhalb eines Einsa
 
 - Einsatzorte erstellen mit Adresse und Beschreibung
 - **Status-Verwaltung mit Farbcodierung** Offen (gelb), Einsatz notwendig (rot), In Arbeit (orange), Erledigt (grün), Kein Einsatz (grün)
-- **Fahrzeuge pro Einsatzort zuweisen** Aus Karten-Fahrzeugen oder Kostenersatz-Vorschlägen
+- **Fahrzeuge und taktische Einheiten pro Einsatzort zuweisen** Aus Karten-Fahrzeugen, taktischen Einheiten oder Kostenersatz-Vorschlägen
 - **Zeitstempel** Alarmzeit, Startzeit, Zeitpunkt abgearbeitet
 - **Automatischer E-Mail-Import von Einsatzorten** Für FFN-Gruppe, alle 60 Sekunden
 - Deduplizierung über Auftragsnummer
@@ -34,10 +34,12 @@ Jeder neue Einsatzort — ob auf dieser Seite oder auf der Karte angelegt — er
 Tipp: Die Statusfarben helfen bei der schnellen Übersicht: Rot = dringend, Orange = in Bearbeitung, Grün = erledigt.
 :::
 
-### Fahrzeuge zuweisen
+### Fahrzeuge und Einheiten zuweisen
 
 1. Fahrzeug-Dropdown am Einsatzort öffnen
-2. Fahrzeug aus Liste wählen oder neues erstellen
+2. Fahrzeug oder taktische Einheit aus der Liste wählen oder ein neues Fahrzeug erstellen — Einheiten sind mit ihrer Art (Zug, Gruppe, …) gekennzeichnet
+
+Hat der Einsatzort Koordinaten, wird das Fahrzeug bzw. die Einheit beim Zuordnen auf der Karte dorthin versetzt.
 
 Fahrzeuge und taktische Einheiten lassen sich auch auf der Seite **Einsatzmittel** in der Spalte **Einsatzort** der Stärketabelle zuordnen.
 

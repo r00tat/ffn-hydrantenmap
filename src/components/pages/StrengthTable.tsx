@@ -18,6 +18,7 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { FirecallItem, FirecallLocation } from '../firebase/firestore';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallContext } from '../../hooks/useFirecall';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { StrengthGroup, StrengthRow, calculateStrength } from './fahrzeuge-utils';
@@ -25,6 +26,7 @@ import {
   currentLocationId,
   locationLabel,
   moveItemToLocation,
+  positionAtLocation,
 } from './location-assignment';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import {
@@ -261,6 +263,7 @@ function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
   );
   const addDiaryEntry = useLocationDiary();
   const { saveHistory } = useSaveHistory();
+  const updateFirecallItem = useFirecallItemUpdate();
 
   // Wie auf der Seite „Einsatzorte": erst den Verlaufsstand sichern, dann
   // zuordnen und jeden Wechsel ins Einsatztagebuch schreiben.
@@ -282,9 +285,22 @@ function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
       }
       if (move.assignedTo) {
         void addDiaryEntry(vehicleAssignedEntry(row.name, move.assignedTo));
+        // Auf der Karte zum Einsatzort versetzen
+        const item = items.find((i) => i.id === row.id);
+        const moved = item && positionAtLocation(item, move.assignedTo);
+        if (moved) {
+          void updateFirecallItem(moved);
+        }
       }
     },
-    [addDiaryEntry, locations, saveHistory, updateLocation],
+    [
+      addDiaryEntry,
+      items,
+      locations,
+      saveHistory,
+      updateFirecallItem,
+      updateLocation,
+    ],
   );
   const editing = useMemo(
     () => ({ locations, onEdit, onAssign }),

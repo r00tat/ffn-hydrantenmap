@@ -234,6 +234,9 @@ export interface TacticalUnit extends FirecallItem {
   abruecken?: string;
 }
 
+/** Was einem Einsatzort zugeordnet werden kann: Fahrzeuge und taktische Einheiten. */
+export type AssignableUnit = Fzg | TacticalUnit;
+
 export interface Rohr extends FirecallItem {
   art: 'C' | 'B' | 'Wasserwerfer' | string;
   durchfluss?: number;

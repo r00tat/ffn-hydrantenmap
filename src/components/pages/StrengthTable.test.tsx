@@ -21,7 +21,15 @@ const locations = [
     number: '1',
     vehicles: { v1: 'TLF' },
   },
-  { id: 'l2', name: '', street: 'Seestraße', number: '5', vehicles: {} },
+  {
+    id: 'l2',
+    name: '',
+    street: 'Seestraße',
+    number: '5',
+    vehicles: {},
+    lat: 47.95,
+    lng: 16.85,
+  },
 ];
 vi.mock('../../hooks/useFirecallLocations', () => ({
   default: () => ({ locations, updateLocation }),
@@ -29,6 +37,10 @@ vi.mock('../../hooks/useFirecallLocations', () => ({
 const addDiaryEntry = vi.fn();
 vi.mock('../Einsatzorte/useLocationDiary', () => ({
   default: () => addDiaryEntry,
+}));
+const updateFirecallItem = vi.fn();
+vi.mock('../../hooks/useFirecallItemUpdate', () => ({
+  default: () => updateFirecallItem,
 }));
 const saveHistory = vi.fn();
 vi.mock('../../hooks/firecallHistory/useSaveHistory', () => ({
@@ -110,6 +122,7 @@ describe('StrengthTable — bearbeitbar', () => {
     updateLocation.mockReset();
     addDiaryEntry.mockReset();
     saveHistory.mockReset();
+    updateFirecallItem.mockReset();
   });
 
   it('zeigt ohne editable weder Einsatzort noch Bearbeiten', () => {
@@ -155,6 +168,31 @@ describe('StrengthTable — bearbeitbar', () => {
       'TLF von Einsatzort Keller Hauptplatz abgezogen',
       'TLF zu Einsatzort Seestraße 5 zugeordnet',
     ]);
+  });
+
+  it('versetzt die Einheit auf die Koordinaten des neuen Einsatzorts', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StrengthTable items={[TLF_WITH_ID, ZUG]} editable />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Einsatzort von 1. Zug' }));
+    await user.click(screen.getByRole('option', { name: 'Seestraße 5' }));
+
+    expect(updateFirecallItem).toHaveBeenCalledWith({
+      ...ZUG,
+      lat: 47.95,
+      lng: 16.85,
+    });
+  });
+
+  it('lässt die Position stehen, wenn der Einsatzort keine Koordinaten hat', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StrengthTable items={[TLF_WITH_ID, ZUG]} editable />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Einsatzort von 1. Zug' }));
+    await user.click(screen.getByRole('option', { name: 'Keller Hauptplatz' }));
+
+    expect(updateLocation).toHaveBeenCalled();
+    expect(updateFirecallItem).not.toHaveBeenCalled();
   });
 
   it('zieht mit „kein Einsatzort" ab', async () => {

@@ -23,7 +23,7 @@ import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import { useVehicleSuggestions } from '../../hooks/useVehicleSuggestions';
 import {
-  Diary,
+  AssignableUnit,
   FirecallLocation,
   defaultFirecallLocation,
   Fzg,
@@ -39,6 +39,7 @@ import {
   vehicleRemovedEntry,
 } from '../Einsatzorte/locationDiary';
 import useLocationDiary from '../Einsatzorte/useLocationDiary';
+import { positionAtLocation } from './location-assignment';
 
 export interface EinsatzorteProps {
   /** Überschrift weglassen, wenn der Aufrufer schon eine hat. */
@@ -58,12 +59,16 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const hasAutoImported = useRef(false);
 
-  // Access existing vehicle items in this firecall
-  const { vehicles: firecallVehicles, firecallItems } = useVehicles();
+  // Access existing vehicle items and tactical units in this firecall
+  const { vehicles: firecallVehicles, tacticalUnits } = useVehicles();
+  const assignableUnits = useMemo<AssignableUnit[]>(
+    () => [...firecallVehicles, ...tacticalUnits],
+    [firecallVehicles, tacticalUnits],
+  );
 
-  // Vehicle suggestions from Kostenersatz and map vehicles
+  // Suggestions from Kostenersatz, map vehicles and tactical units
   const { mapVehicles, kostenersatzVehicleNames } =
-    useVehicleSuggestions(firecallVehicles);
+    useVehicleSuggestions(assignableUnits);
 
   // Hooks for creating/updating vehicle items
   const addFirecallItem = useFirecallItemAdd();
@@ -351,6 +356,13 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
           });
         }
 
+        // Fahrzeug bzw. Einheit auf der Karte zum Einsatzort versetzen
+        const unit = assignableUnits.find((u) => u.id === vehicleId);
+        const moved = unit && positionAtLocation(unit, location);
+        if (moved) {
+          await updateFirecallItem(moved);
+        }
+
         // Diary entry for vehicle assignment
         addDiaryEntry(vehicleAssignedEntry(vehicleName, location));
       } catch (error) {
@@ -358,7 +370,13 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
         setSnackbar(`Fehler beim Zuordnen von ${vehicleName}`);
       }
     },
-    [saveHistory, updateLocation, addDiaryEntry],
+    [
+      saveHistory,
+      updateLocation,
+      assignableUnits,
+      updateFirecallItem,
+      addDiaryEntry,
+    ],
   );
 
   const handleCreateVehicle = useCallback(

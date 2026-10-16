@@ -5,6 +5,7 @@ import {
   isAssignedToLocation,
   locationLabel,
   moveItemToLocation,
+  positionAtLocation,
 } from './location-assignment';
 
 function loc(
@@ -92,5 +93,25 @@ describe('moveItemToLocation', () => {
       removedFrom: [],
       assignedTo: undefined,
     });
+  });
+});
+
+describe('positionAtLocation', () => {
+  const vehicle = { id: 'v1', name: 'TLFA 4000', type: 'vehicle', lat: 47.9, lng: 16.8 };
+
+  it('setzt das Element auf die Koordinaten des Einsatzorts', () => {
+    expect(
+      positionAtLocation(vehicle, loc('a', {}, { lat: 47.95, lng: 16.85 })),
+    ).toEqual({ ...vehicle, lat: 47.95, lng: 16.85 });
+  });
+
+  it('lässt das Element stehen, wenn der Einsatzort keine Koordinaten hat', () => {
+    expect(positionAtLocation(vehicle, loc('a', {}))).toBeUndefined();
+  });
+
+  it('meldet nichts, wenn das Element schon dort steht', () => {
+    expect(
+      positionAtLocation(vehicle, loc('a', {}, { lat: 47.9, lng: 16.8 })),
+    ).toBeUndefined();
   });
 });

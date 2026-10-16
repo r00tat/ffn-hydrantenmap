@@ -66,7 +66,7 @@ vehicles of other fire brigades without a crew assignment.
 2. If the operation has locations, the **Location** column shows where the vehicle or unit is deployed
 3. Pick a location in the selection — **no location** removes the assignment
 
-A vehicle or unit is always at **one** location only: picking another one withdraws it from the previous one. Every assignment and withdrawal is written to the operational diary, as on the **Locations** page.
+A vehicle or unit is always at **one** location only: picking another one withdraws it from the previous one. If the location has coordinates, it is moved there on the map. Every assignment and withdrawal is written to the operational diary, as on the **Locations** page.
 
 ### View vehicles by layer
 

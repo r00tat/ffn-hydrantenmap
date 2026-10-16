@@ -9,7 +9,11 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import { useCallback } from 'react';
-import { FirecallLocation, defaultFirecallLocation, Fzg } from '../firebase/firestore';
+import {
+  AssignableUnit,
+  FirecallLocation,
+  defaultFirecallLocation,
+} from '../firebase/firestore';
 import EinsatzorteRow from './EinsatzorteRow';
 
 export type EinsatzorteSortField =
@@ -27,7 +31,7 @@ interface EinsatzorteTableProps {
   onUpdate: (id: string, updates: Partial<FirecallLocation>) => void;
   onDelete: (id: string) => void;
   onAdd: (location: Partial<FirecallLocation>) => void;
-  mapVehicles: Fzg[];
+  mapVehicles: AssignableUnit[];
   kostenersatzVehicleNames: Set<string>;
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
   onMapVehicleSelected?: (vehicleId: string, vehicleName: string, location: FirecallLocation) => void;

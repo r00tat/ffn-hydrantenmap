@@ -18,7 +18,8 @@ import useFirecallLocations from '../../hooks/useFirecallLocations';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import { useVehicleSuggestions } from '../../hooks/useVehicleSuggestions';
 import useVehicles from '../../hooks/useVehicles';
-import { FirecallLocation, Fzg } from '../firebase/firestore';
+import { AssignableUnit, FirecallLocation, Fzg } from '../firebase/firestore';
+import { positionAtLocation } from '../pages/location-assignment';
 import EinsatzorteCard from './EinsatzorteCard';
 import {
   getLocationDisplayName,
@@ -72,9 +73,13 @@ export default function EinsatzortEditDialog({
   const tCommon = useTranslations('common');
   const firecall = useFirecall();
   const { updateLocation, deleteLocation } = useFirecallLocations();
-  const { vehicles: firecallVehicles } = useVehicles();
+  const { vehicles: firecallVehicles, tacticalUnits } = useVehicles();
+  const assignableUnits = useMemo<AssignableUnit[]>(
+    () => [...firecallVehicles, ...tacticalUnits],
+    [firecallVehicles, tacticalUnits],
+  );
   const { mapVehicles, kostenersatzVehicleNames } =
-    useVehicleSuggestions(firecallVehicles);
+    useVehicleSuggestions(assignableUnits);
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
   const { saveHistory } = useSaveHistory();
@@ -192,12 +197,19 @@ export default function EinsatzortEditDialog({
             vehicles: { ...currentVehicles, [vehicleId]: vehicleName },
           });
         }
+
+        // Fahrzeug bzw. Einheit auf der Karte zum Einsatzort versetzen
+        const unit = assignableUnits.find((u) => u.id === vehicleId);
+        const moved = unit && positionAtLocation(unit, loc);
+        if (moved) {
+          await updateFirecallItem(moved);
+        }
       } catch (err) {
         console.error(`Failed to assign vehicle "${vehicleName}":`, err);
         setError(`Fehler beim Zuordnen von ${vehicleName}`);
       }
     },
-    [saveHistory, handleLocalChange],
+    [saveHistory, handleLocalChange, assignableUnits, updateFirecallItem],
   );
 
   const handleCreateVehicle = useCallback(

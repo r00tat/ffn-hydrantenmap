@@ -1,4 +1,4 @@
-import { FirecallLocation } from '../firebase/firestore';
+import { FirecallItem, FirecallLocation } from '../firebase/firestore';
 import { getLocationDisplayName } from '../Einsatzorte/locationDiary';
 
 interface AssignableItem {
@@ -90,4 +90,19 @@ function withoutItem(
       ([key, name]) => !matches(key, name, item),
     ),
   );
+}
+
+/**
+ * Das Element auf die Koordinaten des Einsatzorts versetzt — so steht es auf
+ * der Karte dort, wo es eingesetzt ist. Leer, wenn der Einsatzort keine
+ * Koordinaten hat oder das Element schon dort steht.
+ */
+export function positionAtLocation<T extends FirecallItem>(
+  item: T,
+  location: FirecallLocation,
+): T | undefined {
+  const { lat, lng } = location;
+  if (lat === undefined || lng === undefined) return undefined;
+  if (item.lat === lat && item.lng === lng) return undefined;
+  return { ...item, lat, lng };
 }

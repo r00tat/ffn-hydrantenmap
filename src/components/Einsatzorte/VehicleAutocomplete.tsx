@@ -7,15 +7,20 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useState } from 'react';
-import { Fzg } from '../firebase/firestore';
+import { AssignableUnit, TACTICAL_UNIT_LABELS } from '../firebase/firestore';
+
+function unitCaption(unit: AssignableUnit): string | undefined {
+  if (unit.type !== 'tacticalUnit') return undefined;
+  return unit.unitType ? TACTICAL_UNIT_LABELS[unit.unitType] : 'Einheit';
+}
 
 interface VehicleAutocompleteProps {
   /** Current vehicles as Record<id, name> */
   value: Record<string, string>;
   /** Called when vehicles change */
   onChange: (vehicles: Record<string, string>) => void;
-  /** Map vehicles (Fzg items with IDs) */
-  mapVehicles: Fzg[];
+  /** Map vehicles and tactical units (items with IDs) */
+  mapVehicles: AssignableUnit[];
   /** Kostenersatz vehicle names (not yet on map) */
   kostenersatzVehicleNames: Set<string>;
   disabled?: boolean;
@@ -29,7 +34,7 @@ interface VehicleAutocompleteProps {
 
 type SuggestionOption = {
   type: 'map';
-  vehicle: Fzg;
+  vehicle: AssignableUnit;
 } | {
   type: 'kostenersatz';
   name: string;
@@ -223,6 +228,8 @@ export default function VehicleAutocomplete({
           const name = option.type === 'map' ? option.vehicle.name : option.name;
           const fw = option.type === 'map' ? option.vehicle.fw : undefined;
           const isKostenersatz = option.type === 'kostenersatz';
+          const caption =
+            option.type === 'map' ? unitCaption(option.vehicle) : undefined;
 
           return (
             <Box component="li" {...props} key={option.type === 'map' ? option.vehicle.id : option.name}>
@@ -232,6 +239,11 @@ export default function VehicleAutocomplete({
                   {fw && (
                     <Typography variant="caption" color="text.secondary">
                       {fw}
+                    </Typography>
+                  )}
+                  {caption && (
+                    <Typography variant="caption" color="text.secondary">
+                      {caption}
                     </Typography>
                   )}
                   {isKostenersatz && (
