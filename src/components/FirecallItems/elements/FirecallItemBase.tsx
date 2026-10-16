@@ -15,6 +15,7 @@ import {
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
 } from '../../firebase/firestore';
+import RestoreItemButton from '../RestoreItemButton';
 import { leafletIcons } from '../icons';
 import {
   FirecallItemMarkerDefault,
@@ -62,6 +63,8 @@ export interface FirecallItemPopupProps {
   onClick: () => void;
   lat?: number;
   lng?: number;
+  /** Das Element des Popups — für „Wiederherstellen" im Verlauf. */
+  item?: FirecallItem;
 }
 
 export function FirecallItemPopup({
@@ -69,11 +72,13 @@ export function FirecallItemPopup({
   onClick,
   lat,
   lng,
+  item,
 }: FirecallItemPopupProps) {
   const editable = useMapEditable();
   return (
     <Popup>
       <PopupNavigateButton lat={lat} lng={lng} />
+      {item && <RestoreItemButton item={item} />}
       {editable && (
         <IconButton
           sx={{ marginLeft: 'auto', float: 'right' }}
@@ -304,6 +309,7 @@ export class FirecallItemBase {
     return (
       <FirecallItemPopup
         onClick={() => selectItem(this.data())}
+        item={this.data()}
         lat={this.lat}
         lng={this.lng}
       >
