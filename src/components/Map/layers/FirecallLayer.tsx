@@ -6,6 +6,8 @@ import { useFirecallId } from '../../../hooks/useFirecall';
 import FirecallItemsLayer from './FirecallItemsLayer';
 import FirecallMarker from '../markers/FirecallMarker';
 import { useFirecallLayersSorted } from '../../../hooks/useFirecallLayers';
+import useFirecallLocations from '../../../hooks/useFirecallLocations';
+import LocationsLayer from './LocationsLayer';
 import MarkerClusterLayer from './MarkerClusterLayer';
 import HeatmapOverlayLayer from './HeatmapOverlayLayer';
 import HeatmapLegendEntry from '../HeatmapLegendEntry';
@@ -57,6 +59,17 @@ function FirecallLayerInner({
   const firecallId = useFirecallId();
   const map = useMap();
   const sortedLayers = useFirecallLayersSorted();
+  // Ebenen mit eigenem Einsatzort (Ebene je Einsatzort) zeigen dessen Marker mit.
+  const { locations } = useFirecallLocations();
+  const layersWithLocations = useMemo(
+    () =>
+      new Set(
+        locations
+          .filter((loc) => loc.lat && loc.lng && loc.layer)
+          .map((loc) => loc.layer as string),
+      ),
+    [locations],
+  );
   const [visibleOverlays, setVisibleOverlays] = useState<Set<string>>(new Set());
 
   const onOverlayAdd = useCallback((e: L.LayersControlEvent) => {
@@ -116,6 +129,7 @@ function FirecallLayerInner({
               layer={layer}
               rank={rank}
               defaultChecked={defaultChecked && layer.defaultVisible !== 'false'}
+              withLocations={!!layer.id && layersWithLocations.has(layer.id)}
             />
             {layer.heatmapConfig?.enabled && (
               <LayersControl.Overlay
@@ -161,10 +175,12 @@ function LayerPaneEntry({
   layer,
   rank,
   defaultChecked,
+  withLocations,
 }: {
   layer: FirecallLayerType;
   rank: number;
   defaultChecked: boolean;
+  withLocations: boolean;
 }) {
   const paneName = `firecall-layer-${layer.id}`;
   // Use rank (0-based sort position) instead of raw zIndex so the pane
@@ -174,26 +190,36 @@ function LayerPaneEntry({
 
   useCreatePane(paneName, paneZIndex);
 
+  const cluster = (
+    <MarkerClusterLayer
+      summaryPosition={
+        (layer.summaryPosition ||
+          (layer.showSummary !== 'false'
+            ? 'right'
+            : 'off')) as any
+      }
+      clusterMode={(layer.clusterMode || 'normal') as any}
+    >
+      <FirecallItemsLayer layer={layer} pane={paneName} />
+    </MarkerClusterLayer>
+  );
+
   return (
     <LayersControl.Overlay
       name={`Einsatz ${layer.name}`}
       checked={defaultChecked}
     >
-      {layer.grouped === 'true' ? (
-        <MarkerClusterLayer
-          summaryPosition={
-            (layer.summaryPosition ||
-              (layer.showSummary !== 'false'
-                ? 'right'
-                : 'off')) as any
-          }
-          clusterMode={(layer.clusterMode || 'normal') as any}
-        >
-          <FirecallItemsLayer layer={layer} pane={paneName} />
-        </MarkerClusterLayer>
+      {layer.grouped === 'true' && withLocations ? (
+        <LayerGroup>
+          {cluster}
+          <LocationsLayer layerId={layer.id} />
+        </LayerGroup>
+      ) : layer.grouped === 'true' ? (
+        cluster
       ) : (
         <LayerGroup>
           <FirecallItemsLayer layer={layer} pane={paneName} />
+          {withLocations && <LocationsLayer layerId={layer.id} />}
         </LayerGroup>
       )}
     </LayersControl.Overlay>

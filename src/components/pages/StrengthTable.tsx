@@ -18,7 +18,7 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { FirecallItem, FirecallLocation } from '../firebase/firestore';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallContext } from '../../hooks/useFirecall';
-import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import useLocationLayers from '../../hooks/useLocationLayers';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { StrengthGroup, StrengthRow, calculateStrength } from './fahrzeuge-utils';
@@ -26,7 +26,6 @@ import {
   currentLocationId,
   locationLabel,
   moveItemToLocation,
-  positionAtLocation,
 } from './location-assignment';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import {
@@ -263,7 +262,7 @@ function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
   );
   const addDiaryEntry = useLocationDiary();
   const { saveHistory } = useSaveHistory();
-  const updateFirecallItem = useFirecallItemUpdate();
+  const locationLayers = useLocationLayers();
 
   // Wie auf der Seite „Einsatzorte": erst den Verlaufsstand sichern, dann
   // zuordnen und jeden Wechsel ins Einsatztagebuch schreiben.
@@ -283,22 +282,23 @@ function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
       for (const location of move.removedFrom) {
         void addDiaryEntry(vehicleRemovedEntry(row.name, location));
       }
+      const item = items.find((i) => i.id === row.id);
       if (move.assignedTo) {
         void addDiaryEntry(vehicleAssignedEntry(row.name, move.assignedTo));
-        // Auf der Karte zum Einsatzort versetzen
-        const item = items.find((i) => i.id === row.id);
-        const moved = item && positionAtLocation(item, move.assignedTo);
-        if (moved) {
-          void updateFirecallItem(moved);
+        // Auf der Karte zum Einsatzort versetzen und in seine Ebene legen
+        if (item) void locationLayers.placeItem(item, move.assignedTo);
+      } else if (item) {
+        for (const location of move.removedFrom) {
+          void locationLayers.releaseItem(item, location);
         }
       }
     },
     [
       addDiaryEntry,
       items,
+      locationLayers,
       locations,
       saveHistory,
-      updateFirecallItem,
       updateLocation,
     ],
   );

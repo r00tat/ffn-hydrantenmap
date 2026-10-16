@@ -41,6 +41,12 @@ Tip: The status colours help with a quick overview: red = urgent, orange = in pr
 
 If the operation site has coordinates, the vehicle or unit is moved there on the map when it is assigned.
 
+### Layer per site
+
+With the **Layer per site** switch at the top of the page, each operation site gets a layer of its own as soon as the first vehicle or unit is assigned to it. Assigned resources and the site's marker sit in that layer and can be shown and hidden together on the map. Anything withdrawn falls back to the **Einsatz** layer.
+
+The switch applies to the whole operation and starts off, which keeps the layer list manageable for large operations with many sites. Switching it on applies existing assignments; switching it off keeps the layers.
+
 Vehicles and tactical units can also be assigned on the **Operational resources** page in the **Location** column of the strength table.
 
 ### Move an operation site on the map

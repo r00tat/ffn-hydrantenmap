@@ -1048,6 +1048,8 @@
     "title": "Operation sites - {name}",
     "noFirecall": "No operation selected",
     "checkEmails": "Check emails",
+    "locationLayers": "Layer per site",
+    "locationLayersHint": "Vehicles and units assigned to an operation site go into a layer of their own for that site, so they can be shown and hidden together on the map. Switching on applies existing assignments; switching off keeps the layers.",
     "status": {
       "offen": "open",
       "einsatz notwendig": "operation needed",

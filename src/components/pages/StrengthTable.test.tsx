@@ -38,9 +38,10 @@ const addDiaryEntry = vi.fn();
 vi.mock('../Einsatzorte/useLocationDiary', () => ({
   default: () => addDiaryEntry,
 }));
-const updateFirecallItem = vi.fn();
-vi.mock('../../hooks/useFirecallItemUpdate', () => ({
-  default: () => updateFirecallItem,
+const placeItem = vi.fn();
+const releaseItem = vi.fn();
+vi.mock('../../hooks/useLocationLayers', () => ({
+  default: () => ({ placeItem, releaseItem }),
 }));
 const saveHistory = vi.fn();
 vi.mock('../../hooks/firecallHistory/useSaveHistory', () => ({
@@ -122,7 +123,8 @@ describe('StrengthTable — bearbeitbar', () => {
     updateLocation.mockReset();
     addDiaryEntry.mockReset();
     saveHistory.mockReset();
-    updateFirecallItem.mockReset();
+    placeItem.mockReset();
+    releaseItem.mockReset();
   });
 
   it('zeigt ohne editable weder Einsatzort noch Bearbeiten', () => {
@@ -170,29 +172,18 @@ describe('StrengthTable — bearbeitbar', () => {
     ]);
   });
 
-  it('versetzt die Einheit auf die Koordinaten des neuen Einsatzorts', async () => {
+  it('setzt die Einheit auf der Karte an den neuen Einsatzort', async () => {
     const user = userEvent.setup();
     renderWithIntl(<StrengthTable items={[TLF_WITH_ID, ZUG]} editable />);
 
     await user.click(screen.getByRole('combobox', { name: 'Einsatzort von 1. Zug' }));
     await user.click(screen.getByRole('option', { name: 'Seestraße 5' }));
 
-    expect(updateFirecallItem).toHaveBeenCalledWith({
-      ...ZUG,
-      lat: 47.95,
-      lng: 16.85,
-    });
-  });
-
-  it('lässt die Position stehen, wenn der Einsatzort keine Koordinaten hat', async () => {
-    const user = userEvent.setup();
-    renderWithIntl(<StrengthTable items={[TLF_WITH_ID, ZUG]} editable />);
-
-    await user.click(screen.getByRole('combobox', { name: 'Einsatzort von 1. Zug' }));
-    await user.click(screen.getByRole('option', { name: 'Keller Hauptplatz' }));
-
-    expect(updateLocation).toHaveBeenCalled();
-    expect(updateFirecallItem).not.toHaveBeenCalled();
+    expect(placeItem).toHaveBeenCalledWith(
+      ZUG,
+      expect.objectContaining({ id: 'l2' }),
+    );
+    expect(releaseItem).not.toHaveBeenCalled();
   });
 
   it('zieht mit „kein Einsatzort" ab', async () => {
@@ -205,6 +196,10 @@ describe('StrengthTable — bearbeitbar', () => {
     expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
     expect(addDiaryEntry).toHaveBeenCalledWith(
       'TLF von Einsatzort Keller Hauptplatz abgezogen',
+    );
+    expect(releaseItem).toHaveBeenCalledWith(
+      TLF_WITH_ID,
+      expect.objectContaining({ id: 'l1' }),
     );
   });
 

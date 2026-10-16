@@ -1048,6 +1048,8 @@
     "title": "Einsatzorte - {name}",
     "noFirecall": "Kein Einsatz ausgewählt",
     "checkEmails": "E-Mails prüfen",
+    "locationLayers": "Ebene je Einsatzort",
+    "locationLayersHint": "Fahrzeuge und Einheiten, die einem Einsatzort zugeordnet werden, landen in einer eigenen Ebene des Einsatzorts – damit lassen sie sich auf der Karte gemeinsam ein- und ausblenden. Beim Einschalten werden die bestehenden Zuordnungen nachgezogen; beim Ausschalten bleiben die Ebenen erhalten.",
     "status": {
       "offen": "offen",
       "einsatz notwendig": "einsatz notwendig",
