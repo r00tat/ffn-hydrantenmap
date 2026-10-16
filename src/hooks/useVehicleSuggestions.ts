@@ -1,12 +1,12 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Fzg } from '../components/firebase/firestore';
+import { AssignableUnit } from '../components/firebase/firestore';
 import { useKostenersatzVehicles } from './useKostenersatzVehicles';
 
 export interface UseVehicleSuggestionsResult {
-  /** Map vehicles (Fzg items) for ID-based selection */
-  mapVehicles: Fzg[];
+  /** Map vehicles and tactical units for ID-based selection */
+  mapVehicles: AssignableUnit[];
   /** Set of vehicle names from Kostenersatz (predefined fleet not yet on map) */
   kostenersatzVehicleNames: Set<string>;
   /** Loading state from Kostenersatz vehicles */
@@ -15,14 +15,14 @@ export interface UseVehicleSuggestionsResult {
 
 /**
  * Provides vehicle data for autocomplete:
- * 1. Map vehicles (Fzg items) - have IDs, can be directly referenced
+ * 1. Map vehicles and tactical units - have IDs, can be directly referenced
  * 2. Kostenersatz vehicles (predefined fleet) - must be added to map first
  *
- * @param mapVehicles - All Fzg items currently on the map
+ * @param mapVehicles - All vehicles and tactical units currently on the map
  * @returns Vehicle data for autocomplete selection
  */
 export function useVehicleSuggestions(
-  mapVehicles: Fzg[] = []
+  mapVehicles: AssignableUnit[] = []
 ): UseVehicleSuggestionsResult {
   const { vehicles: kostenersatzVehicles, loading } = useKostenersatzVehicles();
 

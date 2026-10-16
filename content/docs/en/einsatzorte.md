@@ -6,7 +6,7 @@ Operation sites are used to manage individual locations within an operation. Eac
 
 - Create operation sites with address and description
 - **Status management with colour coding** Open (yellow), action needed (red), in progress (orange), done (green), no action (green)
-- **Assign vehicles per site** From map vehicles or cost-recovery suggestions
+- **Assign vehicles and tactical units per site** From map vehicles, tactical units or cost-recovery suggestions
 - **Timestamps** Alert time, start time, completion time
 - **Automatic email import of operation sites** For the FFN group, every 60 seconds
 - Deduplication via order number
@@ -34,10 +34,18 @@ Every new operation site — whether created on this page or on the map — appe
 Tip: The status colours help with a quick overview: red = urgent, orange = in progress, green = done.
 :::
 
-### Assign vehicles
+### Assign vehicles and units
 
 1. Open the vehicle dropdown on the operation site
-2. Pick a vehicle from the list or create a new one
+2. Pick a vehicle or tactical unit from the list or create a new vehicle — units are marked with their kind (platoon, group, …)
+
+If the operation site has coordinates, the vehicle or unit is moved there on the map when it is assigned.
+
+### Layer per site
+
+With the **Layer per site** switch at the top of the page, each operation site gets a layer of its own as soon as the first vehicle or unit is assigned to it. Assigned resources and the site's marker sit in that layer and can be shown and hidden together on the map. Anything withdrawn falls back to the **Einsatz** layer.
+
+The switch applies to the whole operation and starts off, which keeps the layer list manageable for large operations with many sites. Switching it on applies existing assignments; switching it off keeps the layers.
 
 Vehicles and tactical units can also be assigned on the **Operational resources** page in the **Location** column of the strength table.
 

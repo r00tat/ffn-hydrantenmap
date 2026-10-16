@@ -11,7 +11,11 @@ import Tooltip from '@mui/material/Tooltip';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NavigateButton from '../common/NavigateButton';
-import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
+import {
+  AssignableUnit,
+  FirecallLocation,
+  LocationStatus,
+} from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
 import VehicleAutocomplete from './VehicleAutocomplete';
@@ -29,7 +33,7 @@ interface EinsatzorteRowProps {
   onAdd?: (location: Partial<FirecallLocation>) => void;
   /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
   readOnly?: boolean;
-  mapVehicles: Fzg[];
+  mapVehicles: AssignableUnit[];
   kostenersatzVehicleNames: Set<string>;
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
   onMapVehicleSelected?: (vehicleId: string, vehicleName: string, location: FirecallLocation) => void;

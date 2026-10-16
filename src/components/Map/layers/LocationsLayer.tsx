@@ -9,15 +9,32 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import L from 'leaflet';
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { LayerGroup, useMap } from 'react-leaflet';
+import { useFirecallLayers } from '../../../hooks/useFirecallLayers';
 import useFirecallLocations from '../../../hooks/useFirecallLocations';
 import EinsatzortEditDialog from '../../Einsatzorte/EinsatzortEditDialog';
+import { locationsForLayer } from '../../Einsatzorte/locationLayers';
 import FirecallElement from '../../FirecallItems/elements/FirecallElement';
 import { FirecallItem, FirecallLocation } from '../../firebase/firestore';
 
-export default function LocationsLayer() {
-  const { locations, updateLocation } = useFirecallLocations();
+/**
+ * Die Einsatzorte auf der Karte. Mit `layerId` nur die Einsatzorte dieser
+ * Ebene (Ebene je Einsatzort, siehe docs/einsatzort-ebenen.md); ohne die
+ * übrigen — auch die, deren Ebene gelöscht wurde.
+ */
+export default function LocationsLayer({ layerId }: { layerId?: string }) {
+  const { locations: allLocations, updateLocation } = useFirecallLocations();
+  const layersMap = useFirecallLayers();
+  const locations = useMemo(
+    () =>
+      locationsForLayer(
+        allLocations,
+        layerId,
+        new Set(Object.keys(layersMap)),
+      ),
+    [allLocations, layerId, layersMap],
+  );
   const router = useRouter();
   const map = useMap();
 
@@ -124,10 +141,14 @@ export default function LocationsLayer() {
           <ListItemText>Einsatzorte</ListItemText>
         </MenuItem>
       </Menu>
-      <EinsatzortEditDialog
-        location={editLocation}
-        onClose={() => setEditLocation(undefined)}
-      />
+      {/* Erst beim Öffnen einhängen — mit Ebene je Einsatzort gibt es diese
+          Schicht einmal je Ebene. */}
+      {editLocation && (
+        <EinsatzortEditDialog
+          location={editLocation}
+          onClose={() => setEditLocation(undefined)}
+        />
+      )}
     </LayerGroup>
   );
 }

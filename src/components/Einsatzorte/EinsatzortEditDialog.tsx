@@ -17,8 +17,9 @@ import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import { useVehicleSuggestions } from '../../hooks/useVehicleSuggestions';
+import useLocationLayers from '../../hooks/useLocationLayers';
 import useVehicles from '../../hooks/useVehicles';
-import { FirecallLocation, Fzg } from '../firebase/firestore';
+import { AssignableUnit, FirecallLocation, Fzg } from '../firebase/firestore';
 import EinsatzorteCard from './EinsatzorteCard';
 import {
   getLocationDisplayName,
@@ -72,12 +73,17 @@ export default function EinsatzortEditDialog({
   const tCommon = useTranslations('common');
   const firecall = useFirecall();
   const { updateLocation, deleteLocation } = useFirecallLocations();
-  const { vehicles: firecallVehicles } = useVehicles();
+  const { vehicles: firecallVehicles, tacticalUnits } = useVehicles();
+  const assignableUnits = useMemo<AssignableUnit[]>(
+    () => [...firecallVehicles, ...tacticalUnits],
+    [firecallVehicles, tacticalUnits],
+  );
   const { mapVehicles, kostenersatzVehicleNames } =
-    useVehicleSuggestions(firecallVehicles);
+    useVehicleSuggestions(assignableUnits);
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
   const { saveHistory } = useSaveHistory();
+  const locationLayers = useLocationLayers();
 
   const [working, setWorking] = useState<FirecallLocation | undefined>(
     location,
@@ -134,11 +140,17 @@ export default function EinsatzortEditDialog({
 
         let vehicleId: string;
         let vehicleDisplayName: string;
+        const layer = await locationLayers.layerFor(loc);
 
         if (existingVehicle && existingVehicle.id) {
           vehicleId = existingVehicle.id;
           vehicleDisplayName = existingVehicle.name;
-          await updateFirecallItem({ ...existingVehicle, lat, lng });
+          await updateFirecallItem({
+            ...existingVehicle,
+            lat,
+            lng,
+            ...(layer ? { layer } : {}),
+          });
         } else {
           const newVehicle: Fzg = {
             name: vehicleName,
@@ -146,6 +158,7 @@ export default function EinsatzortEditDialog({
             fw: 'Neusiedl am See',
             lat,
             lng,
+            layer,
           };
           const docRef = await addFirecallItem(newVehicle);
           vehicleId = docRef.id;
@@ -171,6 +184,7 @@ export default function EinsatzortEditDialog({
       updateFirecallItem,
       addFirecallItem,
       handleLocalChange,
+      locationLayers,
     ],
   );
 
@@ -192,12 +206,17 @@ export default function EinsatzortEditDialog({
             vehicles: { ...currentVehicles, [vehicleId]: vehicleName },
           });
         }
+
+        // Fahrzeug bzw. Einheit auf der Karte zum Einsatzort versetzen und
+        // in seine Ebene legen
+        const unit = assignableUnits.find((u) => u.id === vehicleId);
+        if (unit) await locationLayers.placeItem(unit, loc);
       } catch (err) {
         console.error(`Failed to assign vehicle "${vehicleName}":`, err);
         setError(`Fehler beim Zuordnen von ${vehicleName}`);
       }
     },
-    [saveHistory, handleLocalChange],
+    [saveHistory, handleLocalChange, assignableUnits, locationLayers],
   );
 
   const handleCreateVehicle = useCallback(
@@ -216,6 +235,7 @@ export default function EinsatzortEditDialog({
           fw: fw || undefined,
           lat,
           lng,
+          layer: await locationLayers.layerFor(loc),
         };
         const docRef = await addFirecallItem(newVehicle);
         const vehicleId = docRef.id;
@@ -233,7 +253,7 @@ export default function EinsatzortEditDialog({
         setError(`Fehler beim Erstellen von ${name}`);
       }
     },
-    [firecall, saveHistory, addFirecallItem, handleLocalChange],
+    [firecall, saveHistory, addFirecallItem, handleLocalChange, locationLayers],
   );
 
   const handleSave = useCallback(async () => {
@@ -257,6 +277,8 @@ export default function EinsatzortEditDialog({
         for (const [vId, vName] of Object.entries(oldVehicles)) {
           if (!(vId in newVehicles)) {
             addDiaryEntry(vehicleRemovedEntry(vName, working));
+            const unit = assignableUnits.find((u) => u.id === vId);
+            if (unit) await locationLayers.releaseItem(unit, location);
           }
         }
         for (const [vId, vName] of Object.entries(newVehicles)) {
@@ -272,7 +294,15 @@ export default function EinsatzortEditDialog({
     } finally {
       setSaving(false);
     }
-  }, [location, working, updateLocation, addDiaryEntry, onClose]);
+  }, [
+    location,
+    working,
+    updateLocation,
+    addDiaryEntry,
+    onClose,
+    assignableUnits,
+    locationLayers,
+  ]);
 
   return (
     <Dialog open={!!location} onClose={onClose} maxWidth="md" fullWidth>

@@ -1,4 +1,5 @@
 import type { FirecallLayers } from '../../../hooks/useFirecallLayers';
+import { escapeHtml } from '../../../common/html';
 import type { FirecallItem } from '../../firebase/firestore';
 
 /**
@@ -18,8 +19,16 @@ import type { FirecallItem } from '../../firebase/firestore';
 /** Die Überlagerung mit den Objekten ohne eigene Ebene. */
 export const BASE_OVERLAY_NAME = 'Einsatz';
 
-/** Der Name, unter dem eine Ebene in der Layer-Steuerung steht. */
-export const layerOverlayName = (name: string): string => `Einsatz ${name}`;
+/**
+ * Der Name, unter dem eine Ebene in der Layer-Steuerung steht.
+ *
+ * Maskiert, weil Leaflet den Namen per `innerHTML` einsetzt und Ebenennamen
+ * Benutzereingaben sind — mit „Ebene je Einsatzort" auch Einsatzort-Namen aus
+ * dem E-Mail-Import. Die Ereignisse `overlayadd`/`overlayremove` melden
+ * denselben maskierten Namen zurück, der Abgleich bleibt also stimmig.
+ */
+export const layerOverlayName = (name: string): string =>
+  `Einsatz ${escapeHtml(name)}`;
 
 /** Zustände, die aus `overlayadd`/`overlayremove` bekannt sind. */
 export type OverlayStates = Readonly<Record<string, boolean>>;

@@ -1,5 +1,6 @@
 'use client';
 
+import { escapeHtml } from '../../../common/html';
 import { LayersControl, TileLayer, WMSTileLayer } from 'react-leaflet';
 import { useFirecallMapLayers } from '../../../hooks/useFirecallMapLayers';
 import {
@@ -91,7 +92,8 @@ export default function CustomMapLayers() {
       {configs.map((config, index) => (
         <LayersControl.Overlay
           key={mapLayerConfigKey(config)}
-          name={config.name}
+          // Leaflet setzt den Namen per innerHTML ein; er ist Benutzereingabe.
+          name={escapeHtml(config.name)}
           checked={config.enabled === true}
         >
           <LayerErrorBoundary name={config.name}>

@@ -234,6 +234,9 @@ export interface TacticalUnit extends FirecallItem {
   abruecken?: string;
 }
 
+/** Was einem Einsatzort zugeordnet werden kann: Fahrzeuge und taktische Einheiten. */
+export type AssignableUnit = Fzg | TacticalUnit;
+
 export interface Rohr extends FirecallItem {
   art: 'C' | 'B' | 'Wasserwerfer' | string;
   durchfluss?: number;
@@ -641,6 +644,13 @@ export interface Firecall {
    * Drive später umbenannt wird.
    */
   driveFolderId?: string;
+  /**
+   * „Ebene je Einsatzort": Wer einem Einsatzort ein Fahrzeug oder eine Einheit
+   * zuordnet, legt es in die Ebene des Einsatzorts. Fehlt das Feld, ist es
+   * aus — bei großen Einsätzen mit vielen Einsatzorten würden die Ebenen
+   * sonst unübersichtlich (siehe docs/einsatzort-ebenen.md).
+   */
+  locationLayers?: boolean;
   autoSnapshotInterval?: number; // Minutes, 0 = disabled, default 5
   blaulichtSmsAlarmId?: string; // Legacy: primärer Alarm (bleibt für Abwärtskompatibilität)
   blaulichtSmsAlarmIds?: string[]; // Quelle der Wahrheit für zugeordnete Alarme
@@ -748,6 +758,13 @@ export interface FirecallLocation {
   // Status
   status: LocationStatus;
   vehicles: Record<string, string>;
+
+  /**
+   * Die Ebene dieses Einsatzorts, wenn am Einsatz „Ebene je Einsatzort"
+   * eingeschaltet ist. Angelegt bei der ersten Zuordnung, siehe
+   * docs/einsatzort-ebenen.md.
+   */
+  layer?: string;
 
   // Times
   alarmTime?: string;
