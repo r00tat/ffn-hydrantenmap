@@ -18,6 +18,7 @@ import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
+import RestoreItemButton from '../../RestoreItemButton';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallArea } from '../FirecallArea';
 import PointContextMenu from '../PointContextMenu';
@@ -222,6 +223,7 @@ export default function AreaMarker({
               </Tooltip>
             )}
             <PopupNavigateButton lat={record.lat} lng={record.lng} />
+            <RestoreItemButton item={record.data()} />
           </div>
 
           {record.popupFn()}

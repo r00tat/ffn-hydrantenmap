@@ -1,11 +1,16 @@
 'use client';
 
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import Accordion from '@mui/material/Accordion';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { where } from 'firebase/firestore';
 import { useMemo } from 'react';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
+import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 import FirecallItemCard from '../FirecallItems/FirecallItemCard';
 import {
   FIRECALL_COLLECTION_ID,
@@ -20,53 +25,58 @@ const byDeletionDesc = (a: FirecallItem, b: FirecallItem) =>
 
 /**
  * Gelöschte Ebenen und Elemente des Einsatzes zum Wiederherstellen. Gelöscht
- * wird weich (`deleted: true`), die Dokumente sind also noch da. Nur
- * eingeblendet, solange die Ansicht offen ist — die Abfrage läuft sonst nicht.
+ * wird weich (`deleted: true`), die Dokumente sind also noch da. Ein eigener,
+ * zugeklappter Abschnitt unter den Ebenen; die Zahl im Kopf zeigt, ob es
+ * überhaupt etwas zurückzuholen gibt.
  */
 export default function DeletedItemsSection() {
   const firecallId = useFirecallId();
+  // Im Verlauf die gelöschten Elemente des gewählten Snapshots — der Snapshot
+  // sichert auch gelöschte Dokumente mit.
+  const historyPathSegments = useHistoryPathSegments();
   const queryConstraints = useMemo(() => [where('deleted', '==', true)], []);
 
   const deletedLayers = useFirebaseCollection<FirecallLayer>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_LAYERS_COLLECTION_ID],
+    pathSegments: [firecallId, ...historyPathSegments, FIRECALL_LAYERS_COLLECTION_ID],
     queryConstraints,
   });
   const deletedItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
+    pathSegments: [firecallId, ...historyPathSegments, FIRECALL_ITEMS_COLLECTION_ID],
     queryConstraints,
   });
 
   const sorted = useMemo(
-    () => [
-      ...[...deletedLayers].sort(byDeletionDesc),
-      ...[...deletedItems].sort(byDeletionDesc),
-    ],
-    [deletedLayers, deletedItems]
+    () => [...[...deletedLayers].sort(byDeletionDesc), ...[...deletedItems].sort(byDeletionDesc)],
+    [deletedLayers, deletedItems],
   );
 
   return (
-    <>
-      <Typography variant="h5" sx={{ mt: 3 }}>
-        Gelöschte Elemente
-      </Typography>
-      {sorted.length === 0 ? (
-        <Typography color="text.secondary">
-          Keine gelöschten Elemente.
-        </Typography>
-      ) : (
-        <Grid container spacing={2}>
-          {sorted.map((item) => (
-            <FirecallItemCard
-              item={item}
-              key={`${item.type}-${item.id}`}
-              compact
-              size={{ xs: 12, sm: 6, md: 4, lg: 3 }}
-            />
-          ))}
-        </Grid>
-      )}
-    </>
+    <Accordion sx={{ mt: 3 }} disableGutters>
+      <AccordionSummary
+        expandIcon={<ExpandMoreIcon />}
+        aria-controls="deleted-items-content"
+        id="deleted-items-header"
+      >
+        <Typography variant="h5">Gelöschte Elemente ({sorted.length})</Typography>
+      </AccordionSummary>
+      <AccordionDetails id="deleted-items-content">
+        {sorted.length === 0 ? (
+          <Typography color="text.secondary">Keine gelöschten Elemente.</Typography>
+        ) : (
+          <Grid container spacing={2}>
+            {sorted.map((item) => (
+              <FirecallItemCard
+                item={item}
+                key={`${item.type}-${item.id}`}
+                compact
+                size={{ xs: 12, sm: 6, md: 4, lg: 3 }}
+              />
+            ))}
+          </Grid>
+        )}
+      </AccordionDetails>
+    </Accordion>
   );
 }

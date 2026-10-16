@@ -57,14 +57,24 @@ trägt die Markierung nicht und bleibt gelöscht.
 Alle laufen über `useFirecallItemRestore`, das immer `deleted: false` setzt
 und `restore` protokolliert.
 
-- **Gelöschte Elemente (Ebenen-Ansicht):** Schalter „Gelöschte Elemente
-  anzeigen" für Admins — globaler Admin oder `gruppe.manage` in der Gruppe des
-  Einsatzes. Die Abfrage auf `deleted == true` läuft nur, solange der
-  Schalter an ist.
+- **Gelöschte Elemente (Ebenen-Ansicht):** zugeklappter Abschnitt
+  „Gelöschte Elemente (n)" unter den Ebenen, für Admins — globaler Admin oder
+  `gruppe.manage` in der Gruppe des Einsatzes. Kein Schalter mehr: hinter dem
+  Schalter war der Abschnitt nicht zu finden. Die Zahl im Kopf zeigt, ob es
+  etwas zurückzuholen gibt; dafür läuft die Abfrage auf `deleted == true`,
+  solange die Ansicht offen ist. Im Verlaufsmodus zeigt der Abschnitt die
+  gelöschten Elemente **des Snapshots** — `useSaveHistory` sichert gelöschte
+  Dokumente mit.
 - **Verlauf-Snapshot:** Im Verlaufsmodus hat jede Element-Karte
-  „Wiederherstellen". Der Stand aus dem Snapshot ersetzt den aktuellen
+  „Wiederherstellen", ebenso das Popup des Elements auf der Karte
+  (`RestoreItemButton` in `FirecallItemPopup` sowie in den Popups von Fläche
+  und Leitung). Der Stand aus dem Snapshot ersetzt den aktuellen
   vollständig (`merge: false`); bei einer Zeichnung ersetzen die gesicherten
   Striche die aktuellen, sonst bliebe ein Mischbild.
+
+Zurück kommt immer der **gewählte Stand**: im Verlaufsmodus der des Snapshots
+(mit `historyId`), auch bei einem Element, das im Snapshot oder seither
+gelöscht ist; im aktuellen Stand der aktuelle.
 - **Audit-Log:** „Vorherigen Stand wiederherstellen" an `update`- und
   `delete`-Einträgen mit Vorzustand. Hier wird **zusammengeführt**
   (`merge: true`), weil der Vorzustand oft nur die geänderten Felder enthält
