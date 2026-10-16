@@ -10,6 +10,7 @@ import useFirecallLocations from '../../../hooks/useFirecallLocations';
 import LocationsLayer from './LocationsLayer';
 import MarkerClusterLayer from './MarkerClusterLayer';
 import HeatmapOverlayLayer from './HeatmapOverlayLayer';
+import { layerOverlayName } from '../Gelaende3d/visibleItems';
 import HeatmapLegendEntry from '../HeatmapLegendEntry';
 import { FirecallLayer as FirecallLayerType } from '../../firebase/firestore';
 
@@ -17,7 +18,7 @@ const PANE_BASE_Z_INDEX = 400;
 const DEFAULT_PANE_NAME = 'firecall-default';
 
 function getOverlayName(layer: FirecallLayerType): string {
-  return `Einsatz ${layer.name} ${layer.heatmapConfig?.visualizationMode === 'interpolation' ? 'Interpolation' : 'Heatmap'}`;
+  return `${layerOverlayName(layer.name)} ${layer.heatmapConfig?.visualizationMode === 'interpolation' ? 'Interpolation' : 'Heatmap'}`;
 }
 
 /**
@@ -206,7 +207,7 @@ function LayerPaneEntry({
 
   return (
     <LayersControl.Overlay
-      name={`Einsatz ${layer.name}`}
+      name={layerOverlayName(layer.name)}
       checked={defaultChecked}
     >
       {layer.grouped === 'true' && withLocations ? (

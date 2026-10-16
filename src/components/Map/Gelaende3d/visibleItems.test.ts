@@ -70,3 +70,12 @@ describe('visibleItems', () => {
     expect(result.map((entry) => entry.id)).toEqual(['i-ohne']);
   });
 });
+
+describe('layerOverlayName', () => {
+  it('maskiert HTML im Ebenennamen, weil Leaflet ihn per innerHTML einsetzt', () => {
+    expect(layerOverlayName('<img src=x onerror=alert(1)>')).toBe(
+      'Einsatz &lt;img src=x onerror=alert(1)&gt;',
+    );
+    expect(layerOverlayName('Keller Hauptplatz')).toBe('Einsatz Keller Hauptplatz');
+  });
+});
