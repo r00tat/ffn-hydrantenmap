@@ -20,11 +20,11 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useCallback, useContext, useMemo, useState } from 'react';
-import { FirecallItem, FirecallLocation } from '../firebase/firestore';
+import { FirecallItem, FirecallLocation, Fzg } from '../firebase/firestore';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallContext } from '../../hooks/useFirecall';
-import useLocationLayers from '../../hooks/useLocationLayers';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import {
   StrengthGroup,
@@ -35,16 +35,8 @@ import {
 import {
   currentLocationId,
   locationLabel,
-  moveItemToLocation,
 } from './location-assignment';
-import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
-import {
-  getLocationDisplayName,
-  unitLabel,
-  vehicleAssignedEntry,
-  vehicleRemovedEntry,
-} from '../Einsatzorte/locationDiary';
-import useLocationDiary from '../Einsatzorte/useLocationDiary';
+import useAssignToLocation from '../Einsatzorte/useAssignToLocation';
 
 const BASE_COLUMNS = 8;
 
@@ -54,6 +46,10 @@ interface Editing {
   onEdit: (row: StrengthRow) => void;
   /** `locationId` leer heißt: von jedem Einsatzort abziehen. */
   onAssign: (row: StrengthRow, locationId: string) => void;
+  /** Die taktischen Einheiten des Einsatzes — leer heißt: keine Spalte „Einheit". */
+  units: FirecallItem[];
+  /** `unitId` leer heißt: aus der Einheit lösen. */
+  onUnitChange: (row: StrengthRow, unitId: string) => void;
 }
 
 function LocationSelect({
@@ -97,6 +93,40 @@ function LocationSelect({
   );
 }
 
+function UnitSelect({
+  row,
+  units,
+  onUnitChange,
+}: {
+  row: StrengthRow;
+  units: FirecallItem[];
+  onUnitChange: Editing['onUnitChange'];
+}) {
+  const t = useTranslations('einsatzmittel');
+  return (
+    <Select
+      displayEmpty
+      variant="standard"
+      size="small"
+      value={row.parentId ?? ''}
+      onChange={(e) => onUnitChange(row, e.target.value)}
+      inputProps={{ 'aria-label': t('unitFor', { name: row.name }) }}
+      sx={{ minWidth: 100, maxWidth: 200, fontSize: 'body2.fontSize' }}
+    >
+      <MenuItem value="">
+        <Typography variant="body2" color="text.secondary" component="span">
+          {t('noUnit')}
+        </Typography>
+      </MenuItem>
+      {units.map((u) => (
+        <MenuItem key={u.id} value={u.id}>
+          {u.name}
+        </MenuItem>
+      ))}
+    </Select>
+  );
+}
+
 function StrengthRows({
   rows,
   editing,
@@ -109,7 +139,10 @@ function StrengthRows({
     <>
       {rows.map((row, i) => (
         <TableRow key={row.id || i}>
-          <TableCell>{row.name}</TableCell>
+          {/* Fahrzeuge einer Einheit stehen eingerückt unter ihr. */}
+          <TableCell sx={row.parentId ? { pl: 4 } : undefined}>
+            {row.name}
+          </TableCell>
           <TableCell>{row.fw || ''}</TableCell>
           <TableCell>{row.typ}</TableCell>
           <TableCell align="right">{row.mann}</TableCell>
@@ -117,6 +150,19 @@ function StrengthRows({
           <TableCell>{row.alarmierung ? formatTimestamp(row.alarmierung) : ''}</TableCell>
           <TableCell>{row.eintreffen ? formatTimestamp(row.eintreffen) : ''}</TableCell>
           <TableCell>{row.abruecken ? formatTimestamp(row.abruecken) : ''}</TableCell>
+          {editing && editing.units.length > 0 && (
+            <TableCell>
+              {/* Nur ein Fahrzeug gehört einer Einheit an — der Typ der
+                  Zeile ist dafür nicht eindeutig, die Einheit-ID schon. */}
+              {row.id && !editing.units.some((u) => u.id === row.id) && (
+                <UnitSelect
+                  row={row}
+                  units={editing.units}
+                  onUnitChange={editing.onUnitChange}
+                />
+              )}
+            </TableCell>
+          )}
           {editing && editing.locations.length > 0 && (
             <TableCell>
               {row.id && (
@@ -266,7 +312,9 @@ function StrengthTableView({
   if (fullSummary.rows.length === 0) return null;
 
   const showLocations = !!editing && editing.locations.length > 0;
-  const extraColumns = (showLocations ? 1 : 0) + (editing ? 1 : 0);
+  const showUnits = !!editing && editing.units.length > 0;
+  const extraColumns =
+    (showUnits ? 1 : 0) + (showLocations ? 1 : 0) + (editing ? 1 : 0);
   const columns = BASE_COLUMNS + extraColumns;
   // Die Gesamtzeile füllt hinter den Summen bis zum Ende auf.
   const trailing = 3 + extraColumns;
@@ -294,6 +342,7 @@ function StrengthTableView({
             <TableCell>{t('cols.alarmierung')}</TableCell>
             <TableCell>{t('cols.eintreffen')}</TableCell>
             <TableCell>{t('cols.abruecken')}</TableCell>
+            {showUnits && <TableCell>{t('cols.unit')}</TableCell>}
             {showLocations && <TableCell>{t('cols.location')}</TableCell>}
             {editing && <TableCell padding="none" />}
           </TableRow>
@@ -348,53 +397,36 @@ function EditableStrengthTable({
     (row: StrengthRow) => setEditItem(items.find((i) => i.id === row.id)),
     [items],
   );
-  const addDiaryEntry = useLocationDiary();
-  const { saveHistory } = useSaveHistory();
-  const locationLayers = useLocationLayers();
-
-  // Wie auf der Seite „Einsatzorte": erst den Verlaufsstand sichern, dann
-  // zuordnen und jeden Wechsel ins Einsatztagebuch schreiben.
+  const assign = useAssignToLocation(locations, updateLocation, items);
   const onAssign = useCallback(
-    async (row: StrengthRow, locationId: string) => {
-      const move = moveItemToLocation(locations, row, locationId);
-      if (move.updates.length === 0) return;
+    (row: StrengthRow, locationId: string) => assign(row, locationId),
+    [assign],
+  );
 
-      const anlass = move.assignedTo
-        ? `Status vor ${row.name} zu Einsatzort ${getLocationDisplayName(move.assignedTo)} zugeordnet`
-        : `Status vor ${row.name} von Einsatzort abgezogen`;
-      await saveHistory(anlass);
-
-      for (const update of move.updates) {
-        void updateLocation(update.id, { vehicles: update.vehicles });
-      }
-      for (const location of move.removedFrom) {
-        void addDiaryEntry(vehicleRemovedEntry(unitLabel(row), location));
-      }
-      const item = items.find((i) => i.id === row.id);
-      if (move.assignedTo) {
-        void addDiaryEntry(
-          vehicleAssignedEntry(unitLabel(row), move.assignedTo),
-        );
-        // Auf der Karte zum Einsatzort versetzen und in seine Ebene legen
-        if (item) void locationLayers.placeItem(item, move.assignedTo);
-      } else if (item) {
-        for (const location of move.removedFrom) {
-          void locationLayers.releaseItem(item, location);
-        }
+  const updateItem = useFirecallItemUpdate();
+  const units = useMemo(
+    () => items.filter((i) => i.type === 'tacticalUnit' && i.id),
+    [items],
+  );
+  // Ein Fahrzeug, das einer Einheit beitritt, steht danach dort, wo sie
+  // steht — sonst zöge es beim nächsten Versetzen von einem anderen Ort mit.
+  const onUnitChange = useCallback(
+    async (row: StrengthRow, unitId: string) => {
+      const item = items.find((i) => i.id === row.id) as Fzg | undefined;
+      if (!item) return;
+      const updated: Fzg = { ...item, tacticalUnitId: unitId || undefined };
+      await updateItem(updated);
+      const unit = units.find((u) => u.id === unitId);
+      const unitLocation = unit ? currentLocationId(locations, unit) : '';
+      if (unitLocation && unitLocation !== currentLocationId(locations, row)) {
+        await onAssign(row, unitLocation);
       }
     },
-    [
-      addDiaryEntry,
-      items,
-      locationLayers,
-      locations,
-      saveHistory,
-      updateLocation,
-    ],
+    [items, locations, onAssign, units, updateItem],
   );
   const editing = useMemo(
-    () => ({ locations, onEdit, onAssign }),
-    [locations, onEdit, onAssign],
+    () => ({ locations, onEdit, onAssign, units, onUnitChange }),
+    [locations, onEdit, onAssign, units, onUnitChange],
   );
 
   return (

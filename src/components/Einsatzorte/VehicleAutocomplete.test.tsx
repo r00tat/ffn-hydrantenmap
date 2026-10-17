@@ -36,6 +36,27 @@ describe('VehicleAutocomplete', () => {
     expect(onMapVehicleSelected).toHaveBeenCalledWith('u1', 'Kräfte Nord');
   });
 
+  it('nimmt beim Entfernen einer Einheit ihre Fahrzeuge mit', async () => {
+    const onChange = vi.fn();
+    const tlfInZug: Fzg = { ...tlf, tacticalUnitId: 'u1' };
+    const rlf: Fzg = { id: 'v2', name: 'RLF', type: 'vehicle' };
+    const { container } = renderWithIntl(
+      <VehicleAutocomplete
+        value={{ u1: 'Kräfte Nord', v1: 'TLFA 4000', v2: 'RLF' }}
+        onChange={onChange}
+        mapVehicles={[tlfInZug, rlf, zug]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    const zugChip = screen.getByText('Kräfte Nord').closest('.MuiChip-root');
+    const deleteIcon = zugChip?.querySelector('.MuiChip-deleteIcon');
+    expect(container).toContainElement(deleteIcon as HTMLElement);
+    await userEvent.click(deleteIcon as Element);
+
+    expect(onChange).toHaveBeenCalledWith({ v2: 'RLF' });
+  });
+
   it('bietet eine schon zugeordnete Einheit nicht noch einmal an', async () => {
     renderWithIntl(
       <VehicleAutocomplete

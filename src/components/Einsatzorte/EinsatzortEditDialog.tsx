@@ -27,6 +27,7 @@ import {
   vehicleAssignedEntry,
   vehicleRemovedEntry,
 } from './locationDiary';
+import { unitWithVehicles } from '../pages/location-assignment';
 import useLocationDiary from './useLocationDiary';
 
 type EditableKey = keyof FirecallLocation;
@@ -202,16 +203,22 @@ export default function EinsatzortEditDialog({
         );
         const currentVehicles =
           (loc.vehicles as Record<string, string>) || {};
-        if (!currentVehicles[vehicleId]) {
-          handleLocalChange({
-            vehicles: { ...currentVehicles, [vehicleId]: vehicleName },
-          });
+        // Eine taktische Einheit bringt ihre Fahrzeuge mit.
+        const unit = assignableUnits.find((u) => u.id === vehicleId);
+        const moving = unit ? unitWithVehicles(unit, assignableUnits) : [];
+        const added = Object.fromEntries(
+          moving
+            .filter((m) => m.id && !currentVehicles[m.id])
+            .map((m) => [m.id!, m.name]),
+        );
+        if (!currentVehicles[vehicleId]) added[vehicleId] = vehicleName;
+        if (Object.keys(added).length > 0) {
+          handleLocalChange({ vehicles: { ...currentVehicles, ...added } });
         }
 
         // Fahrzeug bzw. Einheit auf der Karte zum Einsatzort versetzen und
         // in seine Ebene legen
-        const unit = assignableUnits.find((u) => u.id === vehicleId);
-        if (unit) await locationLayers.placeItem(unit, loc);
+        for (const m of moving) await locationLayers.placeItem(m, loc);
       } catch (err) {
         console.error(`Failed to assign vehicle "${vehicleName}":`, err);
         setError(`Fehler beim Zuordnen von ${vehicleName}`);

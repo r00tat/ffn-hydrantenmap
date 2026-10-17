@@ -3010,7 +3010,8 @@
       "eintreffen": "Eintreffen",
       "abruecken": "Abrücken",
       "force": "Kräfte",
-      "location": "Einsatzort"
+      "location": "Einsatzort",
+      "unit": "Einheit"
     },
     "editItem": "{name} bearbeiten",
     "locationFor": "Einsatzort von {name}",
@@ -3034,6 +3035,8 @@
       "name": "Bezeichnung",
       "unitType": "Art",
       "fw": "Feuerwehr / Organisation",
+      "unit": "Einheit",
+      "noUnit": "keine Einheit",
       "crew": "Besatzung 1:?",
       "strength": "Stärke",
       "ats": "ATS",
@@ -3041,6 +3044,23 @@
       "arrived": "Eingetroffen",
       "add": "Hinzufügen",
       "added": "{name} hinzugefügt"
+    },
+    "unitFor": "Einheit von {name}",
+    "noUnit": "keine Einheit",
+    "overview": {
+      "unassigned": "ohne Einsatzort",
+      "strength": "{count, plural, one {# Person} other {# Personen}}",
+      "empty": "Noch keine Einsatzmittel",
+      "status": {
+        "alerted": "alarmiert",
+        "arrived": "eingetroffen",
+        "departed": "abgerückt"
+      }
+    },
+    "view": {
+      "label": "Ansicht",
+      "table": "Tabelle",
+      "locations": "Nach Einsatzort"
     }
   },
   "einsaetze": {

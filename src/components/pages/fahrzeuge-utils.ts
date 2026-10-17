@@ -28,6 +28,13 @@ export interface StrengthRow {
   abruecken?: string;
   /** Einsatzmittel einer fremden Organisation — Rettung, Polizei, Nachbarwehr. */
   fremd: boolean;
+  /** Am Fahrzeug: die taktische Einheit, unter der es in der Tabelle steht. */
+  parentId?: string;
+  /**
+   * An der Einheit: wie viele Fahrzeuge unter ihr stehen. Dann ist ihre
+   * Stärke die Summe der Fahrzeuge und zählt in den Summen nicht noch einmal.
+   */
+  childCount?: number;
 }
 
 /** Eine Gruppe von Zeilen mit ihren Summen. */
@@ -60,9 +67,12 @@ function summarize(rows: StrengthRow[]): StrengthGroup {
   for (const row of rows) {
     typCounts[row.typ] = (typCounts[row.typ] || 0) + 1;
   }
+  // Eine Einheit mit Fahrzeugen zeigt deren Summe — gezählt werden die
+  // Fahrzeuge selbst, sonst stünde jede Person zweimal in der Gesamtstärke.
+  const counted = rows.filter((r) => !r.childCount);
   return {
-    totalMann: rows.reduce((sum, r) => sum + r.mann, 0),
-    totalAts: rows.reduce((sum, r) => sum + r.ats, 0),
+    totalMann: counted.reduce((sum, r) => sum + r.mann, 0),
+    totalAts: counted.reduce((sum, r) => sum + r.ats, 0),
     totalUnits: rows.length,
     totalFw: new Set(rows.map((r) => r.fw).filter(Boolean)).size,
     typCounts,
@@ -105,6 +115,7 @@ export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAs
         eintreffen: v.eintreffen,
         abruecken: v.abruecken,
         fremd: isFremdesFahrzeug(v),
+        ...(v.tacticalUnitId ? { parentId: v.tacticalUnitId } : {}),
       });
     } else if (item.type === 'tacticalUnit') {
       const u = item as TacticalUnit;
@@ -123,7 +134,51 @@ export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAs
     }
   }
 
-  return summarizeSplit(rows);
+  const unitIds = new Set(
+    items.filter((i) => i.type === 'tacticalUnit' && i.id).map((i) => i.id),
+  );
+  return summarizeSplit(nestUnderUnits(rows, unitIds));
+}
+
+/**
+ * Stellt die Fahrzeuge direkt unter ihre taktische Einheit und rechnet deren
+ * Stärke aus den Fahrzeugen. Ein Fahrzeug, dessen Einheit nicht (mehr) im
+ * Einsatz steht, bleibt ohne Einheit an seinem Platz.
+ *
+ * Eine Einheit aus lauter fremden Fahrzeugen ist selbst fremd — sonst stünde
+ * sie bei den eigenen Kräften, ihre Fahrzeuge aber unter „Fremdkräfte".
+ */
+function nestUnderUnits(
+  rows: StrengthRow[],
+  unitIds: Set<string | undefined>,
+): StrengthRow[] {
+  const children = new Map<string, StrengthRow[]>();
+  const top: StrengthRow[] = [];
+  for (const { parentId, ...row } of rows) {
+    if (parentId && unitIds.has(parentId)) {
+      children.set(parentId, [...(children.get(parentId) ?? []), { ...row, parentId }]);
+    } else {
+      top.push(row);
+    }
+  }
+
+  const result: StrengthRow[] = [];
+  for (const row of top) {
+    const kids = (row.id && children.get(row.id)) || [];
+    if (kids.length === 0) {
+      result.push(row);
+      continue;
+    }
+    result.push({
+      ...row,
+      mann: kids.reduce((sum, k) => sum + k.mann, 0),
+      ats: kids.reduce((sum, k) => sum + k.ats, 0),
+      fremd: kids.every((k) => k.fremd),
+      childCount: kids.length,
+    });
+    result.push(...kids);
+  }
+  return result;
 }
 
 /**
@@ -147,13 +202,27 @@ export function filterStrength(
   const terms = query.toLocaleLowerCase('de').split(/\s+/).filter(Boolean);
   if (terms.length === 0) return summary;
 
-  const rows = summary.rows.filter((row) => {
-    const text = [row.name, row.fw, row.typ, extraText?.(row)]
-      .filter(Boolean)
-      .join(' ')
-      .toLocaleLowerCase('de');
-    return terms.every((term) => text.includes(term));
-  });
+  const matches = new Set(
+    summary.rows
+      .filter((row) => {
+        const text = [row.name, row.fw, row.typ, extraText?.(row)]
+          .filter(Boolean)
+          .join(' ')
+          .toLocaleLowerCase('de');
+        return terms.every((term) => text.includes(term));
+      })
+      .map((row) => row.id),
+  );
+  // Zur passenden Einheit gehören ihre Fahrzeuge, zum passenden Fahrzeug
+  // seine Einheit — sonst fehlte der Zeile ihr Zusammenhang. Die Einheit
+  // zählt in den Summen ohnehin nicht doppelt (siehe `summarize`).
+  const rows = summary.rows.filter(
+    (row) =>
+      matches.has(row.id) ||
+      (row.parentId !== undefined && matches.has(row.parentId)) ||
+      (!!row.childCount &&
+        summary.rows.some((r) => r.parentId === row.id && matches.has(r.id))),
+  );
 
   return summarizeSplit(rows);
 }

@@ -47,6 +47,10 @@ const saveHistory = vi.fn();
 vi.mock('../../hooks/firecallHistory/useSaveHistory', () => ({
   useSaveHistory: () => ({ saveHistory, saveInProgress: false }),
 }));
+const updateItem = vi.fn();
+vi.mock('../../hooks/useFirecallItemUpdate', () => ({
+  default: () => updateItem,
+}));
 vi.mock('../FirecallItems/FirecallItemUpdateDialog', () => ({
   default: ({ item }: { item: FirecallItem }) => (
     <div role="dialog">Dialog {item.name}</div>
@@ -200,6 +204,51 @@ describe('StrengthTable — bearbeitbar', () => {
     expect(releaseItem).toHaveBeenCalledWith(
       TLF_WITH_ID,
       expect.objectContaining({ id: 'l1' }),
+    );
+  });
+
+  it('nimmt beim Versetzen einer Einheit ihre Fahrzeuge mit', async () => {
+    const user = userEvent.setup();
+    const tlfInZug = { ...TLF_WITH_ID, tacticalUnitId: 'u1' } as FirecallItem;
+    renderWithIntl(<StrengthTable items={[ZUG, tlfInZug]} editable />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Einsatzort von 1. Zug' }));
+    await user.click(screen.getByRole('option', { name: 'Seestraße 5' }));
+
+    expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
+    expect(updateLocation).toHaveBeenCalledWith('l2', {
+      vehicles: { u1: '1. Zug', v1: 'TLF' },
+    });
+    expect(addDiaryEntry.mock.calls.map((c) => c[0])).toEqual([
+      'TLF FF Neusiedl von Einsatzort Keller Hauptplatz abgezogen',
+      '1. Zug mit TLF FF Neusiedl zu Einsatzort Seestraße 5 zugeordnet',
+    ]);
+    expect(placeItem).toHaveBeenCalledWith(ZUG, expect.objectContaining({ id: 'l2' }));
+    expect(placeItem).toHaveBeenCalledWith(
+      tlfInZug,
+      expect.objectContaining({ id: 'l2' }),
+    );
+  });
+
+  it('zeigt die Fahrzeuge unter ihrer Einheit und rechnet die Stärke aus ihnen', () => {
+    const tlfInZug = { ...TLF_WITH_ID, tacticalUnitId: 'u1' } as FirecallItem;
+    renderWithIntl(<StrengthTable items={[tlfInZug, ZUG]} editable />);
+    const rows = screen.getAllByRole('row').map((r) => r.textContent || '');
+    const zugIndex = rows.findIndex((t) => t.startsWith('1. Zug'));
+    expect(rows[zugIndex + 1]).toContain('TLF');
+    expect(within(totalRow('Gesamt')).getByText('6')).toBeInTheDocument();
+  });
+
+  it('ordnet ein Fahrzeug einer Einheit zu', async () => {
+    const user = userEvent.setup();
+    updateItem.mockReset();
+    renderWithIntl(<StrengthTable items={[TLF_WITH_ID, ZUG]} editable />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Einheit von TLF' }));
+    await user.click(screen.getByRole('option', { name: '1. Zug' }));
+
+    expect(updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'v1', tacticalUnitId: 'u1' }),
     );
   });
 

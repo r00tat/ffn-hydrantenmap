@@ -29,6 +29,8 @@ export class FirecallVehicle extends FirecallItemBase {
   fremd?: string;
   /** Farbe des Balkens; ohne Angabe gilt die Vorgabe nach Zugehörigkeit. */
   color?: string;
+  /** Die taktische Einheit, unter der das Fahrzeug fährt. */
+  tacticalUnitId?: string;
   /** Anzahl der zugeordneten Personen (nicht persistiert) */
   crewCount?: number;
   /** Anzahl der zugeordneten Atemschutzträger (nicht persistiert) */
@@ -48,6 +50,7 @@ export class FirecallVehicle extends FirecallItemBase {
         abruecken: this.abruecken,
         fremd: this.fremd,
         color: this.color,
+        tacticalUnitId: this.tacticalUnitId,
       } = firecallItem);
     }
   }
@@ -115,6 +118,7 @@ export class FirecallVehicle extends FirecallItemBase {
       abruecken: this.abruecken,
       fremd: this.fremd,
       color: this.color,
+      tacticalUnitId: this.tacticalUnitId,
     } as Fzg;
   }
 

@@ -17,6 +17,8 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
+import useAssignToLocation from '../Einsatzorte/useAssignToLocation';
+import { unitWithVehicles } from './location-assignment';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useEmailImport from '../../hooks/useEmailImport';
 import useVehicles from '../../hooks/useVehicles';
@@ -68,6 +70,12 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
   const assignableUnits = useMemo<AssignableUnit[]>(
     () => [...firecallVehicles, ...tacticalUnits],
     [firecallVehicles, tacticalUnits],
+  );
+
+  const assignToLocation = useAssignToLocation(
+    locations,
+    updateLocation,
+    assignableUnits,
   );
 
   // Suggestions from Kostenersatz, map vehicles and tactical units
@@ -362,6 +370,18 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
       location: FirecallLocation,
     ) => {
       try {
+        // Eine Einheit mit Fahrzeugen zieht als Ganzes um — wie in der
+        // Tabelle auf der Seite „Einsatzmittel".
+        const selected = assignableUnits.find((u) => u.id === vehicleId);
+        if (
+          selected &&
+          location.id &&
+          unitWithVehicles(selected, assignableUnits).length > 1
+        ) {
+          await assignToLocation(selected, location.id);
+          return;
+        }
+
         const locationDisplayName = getLocationDisplayName(location);
         await saveHistory(
           `Status vor ${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`,
@@ -392,7 +412,14 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
         setSnackbar(`Fehler beim Zuordnen von ${vehicleName}`);
       }
     },
-    [saveHistory, updateLocation, assignableUnits, locationLayers, addDiaryEntry],
+    [
+      saveHistory,
+      updateLocation,
+      assignableUnits,
+      locationLayers,
+      addDiaryEntry,
+      assignToLocation,
+    ],
   );
 
   const handleCreateVehicle = useCallback(

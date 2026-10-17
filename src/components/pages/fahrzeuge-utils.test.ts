@@ -394,3 +394,93 @@ describe('filterStrength', () => {
     expect(result.eigene.rows).toEqual([]);
   });
 });
+
+describe('calculateStrength — Fahrzeuge unter einer taktischen Einheit', () => {
+  const zug = {
+    id: 'u1',
+    name: 'Zug Nord',
+    type: 'tacticalUnit',
+    mann: 20,
+    ats: 9,
+  } as FirecallItem;
+  const tlf = {
+    id: 'v1',
+    name: 'TLF',
+    type: 'vehicle',
+    besatzung: '8',
+    ats: 4,
+    tacticalUnitId: 'u1',
+  } as FirecallItem;
+  const klf = {
+    id: 'v2',
+    name: 'KLF',
+    type: 'vehicle',
+    besatzung: '2',
+    ats: 0,
+    tacticalUnitId: 'u1',
+  } as FirecallItem;
+
+  it('reiht die Fahrzeuge direkt unter ihre Einheit', () => {
+    const result = calculateStrength([tlf, zug, klf]);
+    expect(result.rows.map((r) => r.id)).toEqual(['u1', 'v1', 'v2']);
+    expect(result.rows[1].parentId).toBe('u1');
+    expect(result.rows[2].parentId).toBe('u1');
+    expect(result.rows[0].childCount).toBe(2);
+  });
+
+  it('nimmt als Stärke der Einheit die Summe ihrer Fahrzeuge', () => {
+    const result = calculateStrength([zug, tlf, klf]);
+    expect(result.rows[0].mann).toBe(9 + 3);
+    expect(result.rows[0].ats).toBe(4);
+  });
+
+  it('zählt jede Person in der Gesamtsumme nur einmal', () => {
+    const result = calculateStrength([zug, tlf, klf]);
+    expect(result.totalMann).toBe(12);
+    expect(result.totalAts).toBe(4);
+    expect(result.totalUnits).toBe(3);
+  });
+
+  it('behält die gepflegte Stärke einer Einheit ohne Fahrzeuge', () => {
+    const result = calculateStrength([zug]);
+    expect(result.rows[0].mann).toBe(20);
+    expect(result.rows[0].childCount).toBeUndefined();
+  });
+
+  it('führt ein Fahrzeug, dessen Einheit fehlt, ohne Einheit', () => {
+    const result = calculateStrength([tlf]);
+    expect(result.rows[0].parentId).toBeUndefined();
+    expect(result.totalMann).toBe(9);
+  });
+
+  it('zählt eine Einheit aus lauter fremden Fahrzeugen zu den Fremdkräften', () => {
+    const result = calculateStrength([
+      zug,
+      { ...tlf, fremd: 'true' } as FirecallItem,
+    ]);
+    expect(result.fremde.rows.map((r) => r.id)).toEqual(['u1', 'v1']);
+    expect(result.eigene.rows).toEqual([]);
+    expect(result.fremde.totalMann).toBe(9);
+  });
+});
+
+describe('filterStrength — Einheiten mit Fahrzeugen', () => {
+  const items = [
+    { id: 'u1', name: 'Zug Nord', type: 'tacticalUnit' },
+    { id: 'v1', name: 'TLF', type: 'vehicle', besatzung: '8', tacticalUnitId: 'u1' },
+    { id: 'v2', name: 'KLF', type: 'vehicle', besatzung: '2', tacticalUnitId: 'u1' },
+    { id: 'v3', name: 'RLF', type: 'vehicle', besatzung: '5' },
+  ] as FirecallItem[];
+
+  it('zeigt zur passenden Einheit ihre Fahrzeuge', () => {
+    const result = filterStrength(calculateStrength(items), 'nord');
+    expect(result.rows.map((r) => r.id)).toEqual(['u1', 'v1', 'v2']);
+    expect(result.totalMann).toBe(12);
+  });
+
+  it('zeigt zum passenden Fahrzeug seine Einheit, ohne doppelt zu zählen', () => {
+    const result = filterStrength(calculateStrength(items), 'TLF');
+    expect(result.rows.map((r) => r.id)).toEqual(['u1', 'v1']);
+    expect(result.totalMann).toBe(9);
+  });
+});

@@ -198,9 +198,15 @@ export default function VehicleAutocomplete({
     (vehicleId: string) => {
       const updated = { ...value };
       delete updated[vehicleId];
+      // Mit der Einheit gehen ihre Fahrzeuge — sie stehen mit ihr dort.
+      for (const unit of mapVehicles) {
+        if (unit.type === 'vehicle' && unit.tacticalUnitId === vehicleId && unit.id) {
+          delete updated[unit.id];
+        }
+      }
       onChange(updated);
     },
-    [value, onChange]
+    [value, onChange, mapVehicles]
   );
 
   // Convert value Record to array for display. Der gespeicherte Name ist nur

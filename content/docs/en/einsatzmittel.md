@@ -8,6 +8,8 @@ The operational resources page gives an overview of all vehicles and resources d
 - **Quick entry** for further vehicles and tactical units right on the page
 - **Strength table** With total crew size and breathing apparatus wearers (ATS)
 - Grouping by layers
+- **Overview by location** with units, vehicles, status and strength
+- **Vehicles under tactical units** — a unit moves together with its vehicles
 - Compact card view for each vehicle
 - CSV export of all operational resources
 - Edit vehicles and view details
@@ -78,6 +80,18 @@ vehicles of other fire brigades without a crew assignment.
 3. Pick a location in the selection — **no location** removes the assignment
 
 A vehicle or unit is always at **one** location only: picking another one withdraws it from the previous one. If the location has coordinates, it is moved there on the map. Every assignment and withdrawal is written to the operational diary, as on the **Locations** page.
+
+### Assign vehicles to a tactical unit
+
+1. In the quick entry, first add the **Tactical unit**, e.g. "FW Neusiedl" as a platoon — it does not need a separate fire brigade field
+2. The row then switches to **Vehicle** with the new unit preselected under **Unit**: type its vehicles one after another
+3. Assign existing vehicles in the **Unit** column of the table or in the vehicle's edit dialog
+
+Vehicles appear indented under their unit in the table. The unit's strength is the sum of its vehicles and is not counted twice in the total. Assigning the unit to another location — in the table or on the **Locations** page — moves its vehicles along; removing it from a location removes them too.
+
+### Overview by location
+
+Above the table, switch between **By location** and **Table**. The overview shows, per location, the units with their vehicles, whether they are alerted, arrived or departed, and the location's strength. Anything not yet assigned to a location is listed under **no location**.
 
 ### View vehicles by layer
 

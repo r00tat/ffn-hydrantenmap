@@ -3010,7 +3010,8 @@
       "eintreffen": "Arrived at",
       "abruecken": "Departed at",
       "force": "Forces",
-      "location": "Location"
+      "location": "Location",
+      "unit": "Unit"
     },
     "editItem": "Edit {name}",
     "locationFor": "Location of {name}",
@@ -3034,6 +3035,8 @@
       "name": "Name",
       "unitType": "Type",
       "fw": "Fire brigade / organisation",
+      "unit": "Unit",
+      "noUnit": "no unit",
       "crew": "Crew 1:?",
       "strength": "Strength",
       "ats": "SCBA",
@@ -3041,6 +3044,23 @@
       "arrived": "Arrived",
       "add": "Add",
       "added": "{name} added"
+    },
+    "unitFor": "Unit of {name}",
+    "noUnit": "no unit",
+    "overview": {
+      "unassigned": "no location",
+      "strength": "{count, plural, one {# person} other {# people}}",
+      "empty": "No resources yet",
+      "status": {
+        "alerted": "alerted",
+        "arrived": "arrived",
+        "departed": "departed"
+      }
+    },
+    "view": {
+      "label": "View",
+      "table": "Table",
+      "locations": "By location"
     }
   },
   "einsaetze": {
