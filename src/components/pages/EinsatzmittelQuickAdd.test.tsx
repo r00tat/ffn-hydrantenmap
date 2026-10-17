@@ -78,6 +78,10 @@ describe('EinsatzmittelQuickAdd', () => {
 
     await user.click(screen.getByRole('button', { name: 'Taktische Einheit' }));
     expect(screen.queryByRole('checkbox', { name: 'Fremd' })).not.toBeInTheDocument();
+    // Die Einheit heißt, wie sie gemeldet wird — keine Feuerwehr daneben.
+    expect(
+      screen.queryByRole('combobox', { name: 'Feuerwehr / Organisation' }),
+    ).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Stärke'), '1:8');
     await user.type(screen.getByLabelText('ATS'), '4');
@@ -89,10 +93,60 @@ describe('EinsatzmittelQuickAdd', () => {
       type: 'tacticalUnit',
       name: '1. Zug',
       unitType: 'zug',
-      fw: 'Neusiedl am See',
       mann: 9,
       ats: 4,
     });
+    expect(addItem.mock.calls[0][0]).not.toHaveProperty('fw');
+  });
+
+  it('legt nach einer Einheit gleich ihre Fahrzeuge an', async () => {
+    const user = userEvent.setup();
+    addItem.mockResolvedValueOnce({ id: 'u-new' });
+    render(<EinsatzmittelQuickAdd items={existing} />);
+
+    await user.click(screen.getByRole('button', { name: 'Taktische Einheit' }));
+    await user.type(
+      screen.getByRole('combobox', { name: 'Bezeichnung' }),
+      'FW Neusiedl{Enter}',
+    );
+    await waitFor(() => expect(addItem).toHaveBeenCalledTimes(1));
+
+    // Danach steht die Eingabe auf „Fahrzeug" unter der neuen Einheit.
+    expect(screen.getByRole('button', { name: 'Fahrzeug' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.type(
+      screen.getByRole('combobox', { name: 'Bezeichnung' }),
+      'RLF{Enter}',
+    );
+    await waitFor(() => expect(addItem).toHaveBeenCalledTimes(2));
+    expect(addItem.mock.calls[1][0]).toMatchObject({
+      type: 'vehicle',
+      name: 'RLF',
+      tacticalUnitId: 'u-new',
+    });
+  });
+
+  it('ordnet ein Fahrzeug einer bestehenden Einheit zu', async () => {
+    const user = userEvent.setup();
+    render(
+      <EinsatzmittelQuickAdd
+        items={[
+          ...existing,
+          { id: 'u1', type: 'tacticalUnit', name: 'Zug Nord' } as FirecallItem,
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole('combobox', { name: 'Einheit' }));
+    await user.click(screen.getByRole('option', { name: 'Zug Nord' }));
+    await user.type(
+      screen.getByRole('combobox', { name: 'Bezeichnung' }),
+      'TLF{Enter}',
+    );
+    await waitFor(() => expect(addItem).toHaveBeenCalledTimes(1));
+    expect(addItem.mock.calls[0][0]).toMatchObject({ tacticalUnitId: 'u1' });
   });
 
   it('legt eigene Fahrzeuge mit einem Klick auf den Chip an', async () => {

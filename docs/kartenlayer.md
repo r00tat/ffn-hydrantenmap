@@ -167,6 +167,99 @@ für die gibt es nur den Kachel-Cache. Deshalb bleibt „Hochwasser
 Oberflächenwasser" an `tiles.lfrz.gv.at` gebunden, obwohl der Dienst keine
 Capabilities kennt.
 
+## Luftraum von Austro Control (`sdigeo-free.austrocontrol.at`)
+
+Betrifft `luftraum_austrocontrol` („Luftraum Austro Control (keine
+UAS-Geozonen)"), standardmäßig aus. Entstanden aus #875: gewünscht waren die
+UAS-Geozonen von Dronespace. Die Ebene ist ein **Ersatz**, nicht diese
+Geozonen — siehe unten, warum.
+
+GeoServer mit WMS 1.1.1/1.3.0, Capabilities:
+
+```text
+https://sdigeo-free.austrocontrol.at/geoserver/free/wms?service=WMS&version=1.3.0&request=GetCapabilities
+```
+
+Ein WFS liegt unter `…/geoserver/free/wfs`. Die Layer-Namen stehen ohne
+Präfix (`R`, nicht `free:R`), weil die Adresse schon auf den Workspace `free`
+zeigt; mit Präfix geht es auch.
+
+### Gewählte Layer
+
+Ein einziger WMS-Layer mit kombiniertem `LAYERS`-Wert, in dieser Reihenfolge
+(spätere zeichnen oben):
+
+| Layer | Titel in den Capabilities | Warum |
+| --- | --- | --- |
+| `CTR` | Control zone | Kontrollzonen der Flughäfen — rund um Wien-Schwechat reicht sie bis an den Bezirk Neusiedl |
+| `MCTR` | Military control zone | Militärische Kontrollzonen |
+| `MATZ` | Military aerodrome traffic zone | Militärische Flugplatzverkehrszonen |
+| `R` | Restricted area | Flugbeschränkungsgebiete |
+| `D` | Danger area | Gefahrengebiete |
+| `TRA` | Temporary reserved airspace | Zeitweise reservierte Lufträume |
+| `MODEL_AF` | Model airfield — increased UAS operation above 120 m | Modellflugplätze |
+| `NATIONALPARKS` | National parks — Austria | Nationalparks (Neusiedler See – Seewinkel) |
+
+Bewusst weggelassen: `TMA`/`CTA`/`UTA` (beginnen weit über Drohnenhöhe und
+überdecken das halbe Land), `RAS-*` (Segelflug-, Paragleit-, Tiefflugstrecken —
+für die Drohne im Einsatz Rauschen), Flugplätze, Navigationsanlagen und
+Hindernisse. Wer sie braucht, legt sie als eigene Kartenebene an; der Dienst
+steht dafür in [knownWmsServices.ts](../src/common/knownWmsServices.ts).
+
+### Nutzungsbedingungen
+
+Capabilities: `Fees NONE`, `AccessConstraints NONE`, kein Login. Der Hinweis
+unter <https://sdimd-free.austrocontrol.at> verlangt für **kommerzielle**
+Nutzung eine Genehmigung; die Feuerwehr nutzt die Daten nicht kommerziell.
+Quellenangabe „© Austro Control" steht in der `attribution` der Ebene.
+
+### Eigenheit: `Origin`-Header gibt 403
+
+Jede Anfrage mit einem fremden `Origin`-Header beantwortet der Dienst mit
+`403 Invalid CORS request` — auch ein GetMap. Ohne `Origin` kommt
+`200 image/png`. Nachgemessen:
+
+| Anfrage | Antwort |
+| --- | --- |
+| GetMap, 512×512, 1.1.1/`SRS=EPSG:3857` oder 1.3.0/`CRS=EPSG:3857`, ohne `Origin` | `200 image/png` |
+| dasselbe mit `Referer: https://<unsere Domain>/` | `200 image/png` |
+| dasselbe mit `Origin: https://<unsere Domain>` | `403` |
+
+Folgen:
+
+- **Karte:** Leaflet lädt Kacheln als `<img>` ohne `crossOrigin`; der Browser
+  sendet dabei keinen `Origin`. Geht.
+- **Service Worker:** Keine eigene Regel. Die Kacheln fallen in Serwists
+  Auffangregel `cross-origin` (`NetworkFirst`, 10 s, 32 Einträge, eine Stunde)
+  wie die WMS-Kacheln des Landes. Der `fetch()` im Worker übernimmt den Modus
+  `no-cors` des `<img>`, sendet also ebenfalls keinen `Origin`. Vorgeladen
+  (Precache, „Für offline vorbereiten") wird nichts.
+- **3D-Ansicht:** Die Textur lädt mit `crossOrigin = 'anonymous'`, um das
+  Canvas nicht einzufärben — das schickt `Origin` und scheitert. Die Kacheln
+  werden wie jede fehlende Kachel übergangen; der Luftraum fehlt in der 3D-
+  Textur, sonst passiert nichts.
+- **GetCapabilities im Browser** scheitert aus demselben Grund. Die Import-
+  Hilfe der eigenen Kartenebenen holt sie über den Server und ist nicht
+  betroffen.
+
+### Warum nicht die echten UAS-Geozonen
+
+Die verbindlichen Geozonen für Drohnen veröffentlicht Austro Control als
+ED-269-Datensatz und zeigt sie im Viewer <https://utm.dronespace.at/avm/>. Den
+Link nennt die Quellenangabe der Ebene, damit der Unterschied auf der Karte
+selbst steht.
+
+- **ED-269-Datensatz:** Ohne eingeräumte Nutzungsrechte, also urheberrechtlich
+  nicht zur Weitergabe frei, und ohne stabile Download-Adresse — er müsste von
+  Hand bezogen und eingespielt werden und wäre dann veraltet.
+- **API hinter `utm.dronespace.at`:** Eine interne Schnittstelle des Viewers,
+  weder dokumentiert noch freigegeben; sie kann sich jederzeit ändern, und ein
+  Abgreifen wäre wieder eine Nutzung ohne Recht.
+
+Die Lufträume des SDI-WMS decken sich weitgehend mit den Geozonen (CTR, R, D,
+Modellflugplätze, Nationalparks), aber nicht vollständig und nicht in den
+Höhen- und Zeitangaben. Für eine Drohnenfreigabe gilt immer Dronespace.
+
 ## Offline vorladen
 
 Der Knopf „Für offline vorbereiten" (siehe
@@ -182,6 +275,7 @@ deren Bedingungen es nicht untersagen. Die Auswahl steht in
 | OpenTopoMap | **nein** | Ehrenamtlich betriebene Server; gleiche Linie wie OSM. |
 | Land Burgenland (WMS) | nein | Rendert jede Kachel neu; keine Aussage zum Vorladen. |
 | WISA-Hochwasser | nein | Keine Aussage zum Vorladen; die Adressen hängen an Leaflets BBOX-Formatierung und ließen sich nicht verlässlich nachbauen. |
+| Austro Control (Luftraum) | nein | GeoServer rendert jede Kachel neu; keine Aussage zum Vorladen. Abrufe aus dem Browser mit `fetch()` schicken `Origin` und bekämen ohnehin `403`. |
 
 Die URL-Vorlagen in `offlineTiles.ts` müssen **exakt** denen in `tiles.ts`
 entsprechen, sonst trifft der Cache nie — ein Test vergleicht beide. Wer eine

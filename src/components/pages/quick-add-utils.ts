@@ -21,6 +21,8 @@ export interface QuickAddInput {
   fremd: boolean;
   /** Die Kräfte sind schon da: Eintreffen ist jetzt. */
   arrived: boolean;
+  /** Nur am Fahrzeug — die taktische Einheit, unter der es fährt. */
+  tacticalUnitId?: string;
 }
 
 export interface QuickAddContext {
@@ -102,7 +104,9 @@ export function buildQuickAddItem(
       type: 'tacticalUnit',
       name,
       unitType: input.unitType,
-      fw,
+      // Keine Feuerwehr: Eine Einheit wird so gemeldet, wie sie heißt —
+      // „FW Neusiedl" als Zug. Die Feuerwehr des Fahrzeugs im Feld daneben
+      // hängte sonst ein zweites „Neusiedl am See" an die Bezeichnung.
       mann: parseTotalStrength(input.strength),
       ats,
       alarmierung,
@@ -123,6 +127,7 @@ export function buildQuickAddItem(
     besatzung: besatzung ? String(besatzung) : undefined,
     ats,
     fremd: input.fremd ? 'true' : undefined,
+    tacticalUnitId: input.tacticalUnitId || undefined,
     alarmierung,
     eintreffen,
     datum,

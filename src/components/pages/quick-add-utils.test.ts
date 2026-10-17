@@ -136,7 +136,6 @@ describe('buildQuickAddItem', () => {
       type: 'tacticalUnit',
       name: '1. Zug',
       unitType: 'gruppe',
-      fw: 'Weiden am See',
       mann: 9,
       ats: 3,
       alarmierung: NOW.toISOString(),
@@ -144,5 +143,30 @@ describe('buildQuickAddItem', () => {
       lat: 47.9,
       lng: 16.8,
     });
+  });
+
+  it('trägt an der Einheit keine Feuerwehr ein — die steckt in der Bezeichnung', () => {
+    const item = buildQuickAddItem(
+      input({ kind: 'tacticalUnit', name: 'FW Neusiedl', fw: 'Neusiedl am See' }),
+      CTX,
+    ) as TacticalUnit;
+    expect(item.name).toBe('FW Neusiedl');
+    expect(item.fw).toBeUndefined();
+  });
+
+  it('ordnet ein Fahrzeug der gewählten Einheit zu', () => {
+    const item = buildQuickAddItem(
+      input({ tacticalUnitId: 'u1' }),
+      CTX,
+    ) as Fzg;
+    expect(item.tacticalUnitId).toBe('u1');
+  });
+
+  it('ordnet eine Einheit keiner Einheit zu', () => {
+    const item = buildQuickAddItem(
+      input({ kind: 'tacticalUnit', tacticalUnitId: 'u1' }),
+      CTX,
+    );
+    expect(item).not.toHaveProperty('tacticalUnitId');
   });
 });

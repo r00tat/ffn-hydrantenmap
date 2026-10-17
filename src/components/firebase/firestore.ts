@@ -193,6 +193,12 @@ export interface Fzg extends FirecallItem {
    * `vehicleMarkerColor()`.
    */
   color?: string;
+  /**
+   * Die taktische Einheit, unter der das Fahrzeug fährt. Die Einheit zählt
+   * dann die Stärke ihrer Fahrzeuge, und wer sie einem Einsatzort zuordnet,
+   * nimmt die Fahrzeuge mit (siehe docs/einsatzmittel-staerke.md).
+   */
+  tacticalUnitId?: string;
   type: 'vehicle';
 }
 

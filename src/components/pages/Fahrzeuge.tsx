@@ -9,6 +9,8 @@ import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useContext, useMemo, useState } from 'react';
@@ -24,6 +26,7 @@ import {
 } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useVehicles from '../../hooks/useVehicles';
+import useFirecallLocations from '../../hooks/useFirecallLocations';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { CrewAssignment, FirecallItem } from '../firebase/firestore';
 import { downloadRowsAsCsv } from '../firebase/download';
@@ -33,6 +36,7 @@ import { getItemInstance } from '../FirecallItems/elements';
 import { FirecallVehicle } from '../FirecallItems/elements/FirecallVehicle';
 import EinsatzmittelQuickAdd from './EinsatzmittelQuickAdd';
 import StrengthTable from './StrengthTable';
+import EinsatzmittelOverview from './EinsatzmittelOverview';
 import { calculateStrength } from './fahrzeuge-utils';
 
 function downloadEinsatzmittel(
@@ -252,6 +256,11 @@ export default function Fahrzeuge() {
   // Ohne gewählten Einsatz landete ein neues Element unter `call/unknown`.
   const firecallId = useFirecallId();
   const canAdd = canWrite && firecallId !== 'unknown';
+  const { locations } = useFirecallLocations();
+  // Ohne Wahl: mit Einsatzorten die Gliederung nach Einsatzort, sonst die
+  // Tabelle — eine Ansicht nach Einsatzort ohne Einsatzorte wäre eine Liste.
+  const [chosenView, setChosenView] = useState<'table' | 'locations'>();
+  const view = chosenView ?? (locations.length > 0 ? 'locations' : 'table');
 
   const groupedByLayer = useMemo(() => {
     const groups: SimpleMap<FirecallItem[]> = {};
@@ -302,7 +311,23 @@ export default function Fahrzeuge() {
 
       {canAdd && <EinsatzmittelQuickAdd items={displayItems} />}
 
-      <StrengthTable items={displayItems} editable={canAdd} />
+      <ToggleButtonGroup
+        exclusive
+        size="small"
+        value={view}
+        onChange={(_e, value) => value && setChosenView(value)}
+        aria-label={t('view.label')}
+        sx={{ mb: 2 }}
+      >
+        <ToggleButton value="locations">{t('view.locations')}</ToggleButton>
+        <ToggleButton value="table">{t('view.table')}</ToggleButton>
+      </ToggleButtonGroup>
+
+      {view === 'locations' ? (
+        <EinsatzmittelOverview items={displayItems} locations={locations} />
+      ) : (
+        <StrengthTable items={displayItems} editable={canAdd} filterable />
+      )}
 
       {Object.entries(layers).map(([layerId, layer]) => {
         const items = groupedByLayer[layerId] || [];

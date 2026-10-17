@@ -11,6 +11,7 @@ Die Karte zeigt Hydranten und andere wichtige Punkte im Einsatzgebiet an. Du kan
 - **Verschiedene Basiskarten** Orthofoto, Basemap, Basemap grau, OpenStreetMap, OpenTopoMap
 - **Overlay-Layer** Einsatzorte, Entfernung, Umkreis, Position, Stromausfälle, Pegelstände, Wetterstationen, Adressen
 - **WMS-Layer** Hochwasser, Risikogebiete, Überflutungsgebiete (bereitgestellt vom Land Burgenland)
+- **Luftraum Austro Control** Kontrollzonen, Flugbeschränkungs- und Gefahrengebiete, Modellflugplätze und Nationalparks – **nicht** die verbindlichen UAS-Geozonen
 - **Eigene Kartenebenen** Selbst angelegte WMS- und Kachel-Dienste je Einsatz, im Layer-Control unter „Karte: …" (siehe [Ebenen](/docs/ebenen))
 - **Standort suchen** Adresse oder Ort eingeben und auf der Karte anzeigen lassen
 - **Bearbeitungsmodus mit Zeichenwerkzeugen** Elemente auf der Karte platzieren, Linien und Flächen zeichnen
@@ -53,6 +54,10 @@ Die Karte unterstützt verschiedene Basiskarten und zusätzliche Overlay-Layer, 
 Die WMS-Layer (Hochwasser, Risikogebiete, Überflutungsgebiete) werden vom Land Burgenland bereitgestellt und zeigen aktuelle Geodaten.
 :::
 
+:::warning
+Das Overlay **Luftraum Austro Control (keine UAS-Geozonen)** zeigt Lufträume aus den frei verfügbaren Luftfahrtdaten von Austro Control: Kontrollzonen (CTR, MCTR, MATZ), Flugbeschränkungs- und Gefahrengebiete (R, D), zeitweise reservierte Lufträume (TRA), Modellflugplätze und Nationalparks. Das sind **nicht** die verbindlichen UAS-Geozonen für Drohnenflüge – Höhen, Zeiten und einzelne Zonen können abweichen. Vor einem Drohnenflug prüfst du die Geozonen immer in der offiziellen Karte von Dronespace: [utm.dronespace.at/avm](https://utm.dronespace.at/avm/).
+:::
+
 ### Standort suchen
 
 Mit der Suchfunktion kannst du schnell zu einer bestimmten Adresse oder einem Ort auf der Karte navigieren.
@@ -74,6 +79,21 @@ Im Bearbeitungsmodus kannst du Elemente zum aktiven Einsatz auf der Karte hinzuf
 
 :::info
 Aktiviere den Bearbeitungsmodus nur, wenn du Änderungen vornehmen möchtest. Im Ansichtsmodus kannst du die Karte schneller bedienen.
+:::
+
+### Mehrere Elemente auswählen und verschieben
+
+Im Bearbeitungsmodus kannst du mehrere Elemente auf einmal markieren und gemeinsam verschieben.
+
+1. **Rahmen ziehen:** Halte die **Umschalttaste** gedrückt und ziehe mit der Maus einen Rahmen über die Karte. Alle Elemente im Rahmen werden ausgewählt — eine Linie oder Fläche, sobald einer ihrer Punkte im Rahmen liegt
+2. **Einzeln ergänzen:** Umschalt + Klick auf ein Element nimmt es in die Auswahl auf oder wieder heraus
+3. **Auf dem Tablet oder Handy:** Tippe oben in der Mitte der Karte auf das Symbol **Mehrfachauswahl**. Solange es aktiv ist, zieht ein Wischen einen Rahmen statt die Karte zu verschieben, und Tippen auf ein Element wählt es aus oder ab. Zoomen mit zwei Fingern geht weiterhin
+4. Ausgewählte Elemente sind blau gestrichelt umrandet, oben steht die Anzahl
+5. **Verschieben:** Ziehe eines der ausgewählten Elemente oder den runden blauen Griff mit dem Pfeilkreuz in der Mitte der Auswahl. Alle ausgewählten Elemente wandern um dieselbe Strecke mit, Linien und Flächen als Ganzes
+6. **Auswahl aufheben:** Klick ins Leere auf der Karte, die **Esc**-Taste oder das Kreuz an der Anzahl
+
+:::info
+Vor dem Verschieben wird automatisch ein Verlaufsstand gespeichert. Über den Verlauf kannst du die alte Lage wiederherstellen. Nur Elemente eingeblendeter Ebenen werden ausgewählt und verschoben; gesperrte Elemente, Zeichnungen und Wasserstände gehen nicht mit.
 :::
 
 ### Koordinaten eingeben

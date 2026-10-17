@@ -314,6 +314,35 @@ export const overlayLayers: TileConfigs = {
     },
   },
 
+  // Lufträume aus dem freien SDI-WMS von Austro Control — als Ersatz für die
+  // UAS-Geozonen, deren ED-269-Datensatz keine Nutzungsrechte hat. Es sind
+  // NICHT die verbindlichen Geozonen; das steht deshalb im Namen und in der
+  // Quellenangabe, samt Link auf den offiziellen Dronespace-Viewer.
+  // Der Dienst lehnt jede Anfrage mit fremdem `Origin`-Header mit 403 ab:
+  // Leaflets <img>-Kacheln gehen durch, CORS-Abrufe (3D-Textur, Capabilities
+  // im Browser) nicht. Layerwahl und Bedingungen: docs/kartenlayer.md
+  luftraum_austrocontrol: {
+    name: 'Luftraum Austro Control (keine UAS-Geozonen)',
+    url: 'https://sdigeo-free.austrocontrol.at/geoserver/free/wms?',
+    type: 'WMS',
+    description:
+      'Kontrollzonen, Flugbeschränkungs-, Gefahren- und Reservierungsgebiete, Modellflugplätze, Nationalparks',
+    options: {
+      maxNativeZoom: 19,
+      maxZoom: 24,
+      attribution:
+        '&copy; <a href="https://sdimd-free.austrocontrol.at">Austro Control</a> — Lufträume, <b>nicht</b> die verbindlichen UAS-Geozonen: <a href="https://utm.dronespace.at/avm/">Dronespace</a>',
+      format: 'image/png',
+      layers: 'CTR,MCTR,MATZ,R,D,TRA,MODEL_AF,NATIONALPARKS',
+      transparent: true,
+      uppercase: true,
+      bounds: [
+        [46.35877, 8.782379],
+        [49.037872, 17.189532],
+      ],
+    },
+  },
+
   floodarea_river: {
     name: 'Hochwasser Überflutung Flüsse',
     // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=hwrisiko_gefahren_ueff&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1877293.7544226,6097840.7076294,1878516.746875,6099063.7000818&WIDTH=512&HEIGHT=512

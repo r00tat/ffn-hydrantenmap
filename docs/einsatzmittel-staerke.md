@@ -202,3 +202,49 @@ für Fahrzeuge; sie tragen dieselben drei Zeitfelder, die Stärke steht als
 
 Position ist die Einsatzadresse wie beim Personal-Board; wer das Element auf der Karte
 genauer haben will, verschiebt es dort.
+
+## Fahrzeuge unter einer taktischen Einheit
+
+Ein Fahrzeug gehört über `Fzg.tacticalUnitId` zu einer taktischen Einheit. Das Feld
+steht am **Fahrzeug**, nicht als Liste an der Einheit: Ein Fahrzeug gehört höchstens
+einer Einheit an, und so bleibt jede Zuordnung ein Schreibvorgang an einem Dokument —
+offline zwei Listen gegeneinander abzugleichen hieße, dass der letzte Schreiber die
+Zuordnung des anderen verwirft.
+
+**Stärke.** Hat eine Einheit Fahrzeuge, ist ihre Stärke die Summe der Fahrzeuge
+(`nestUnderUnits()` in [fahrzeuge-utils.ts](../src/components/pages/fahrzeuge-utils.ts)),
+und ihr eingetragenes `mann` tritt zurück. Die Zeile der Einheit trägt dann
+`childCount` und zählt in keiner Summe mit — sonst stünde jede Person zweimal in der
+Gesamtstärke. Ohne Fahrzeuge bleibt es beim eingetragenen `mann`, damit eine als „1:8"
+gemeldete Einheit ohne erfasste Fahrzeuge weiter zählt. Eine Einheit aus lauter fremden
+Fahrzeugen ist selbst fremd; sonst stünde sie bei den eigenen Kräften und ihre
+Fahrzeuge unter „Fremdkräfte". Der Filter der Tabelle nimmt zur passenden Einheit ihre
+Fahrzeuge mit und zum passenden Fahrzeug seine Einheit.
+
+**Versetzen.** Wer eine Einheit einem Einsatzort zuordnet — in der Tabelle, auf der
+Seite „Einsatzorte" oder im Dialog des Einsatzorts —, nimmt ihre Fahrzeuge mit
+(`unitWithVehicles()` und `moveItemsToLocation()` in
+[location-assignment.ts](../src/components/pages/location-assignment.ts), ausgeführt von
+[useAssignToLocation.ts](../src/components/Einsatzorte/useAssignToLocation.ts)). Je
+Einsatzort entsteht genau eine Änderung an `vehicles`, sonst überschriebe die zweite
+Schreiboperation die erste. Im Einsatztagebuch steht ein Eintrag „1. Zug mit TLF …
+zugeordnet" und je bisherigem Einsatzort einer mit dem, was dort abgezogen wurde. Ein
+Fahrzeug, das einer Einheit beitritt, wird an deren Einsatzort versetzt. Ein einzeln
+woandershin geschicktes Fahrzeug bleibt in der Einheit; die Übersicht nach Einsatzort
+zeigt es dort, wo es steht.
+
+**Schnelleingabe.** Die taktische Einheit hat dort kein Feld „Feuerwehr" mehr: Ein Zug
+heißt im Einsatz „FW Neusiedl" oder „1. Zug Nord", und die Organisation in ein zweites
+Feld zu zerlegen, war nur Tipparbeit. Nach dem Anlegen einer Einheit springt die Zeile
+auf „Fahrzeug" mit der neuen Einheit vorgewählt, sodass ihre Fahrzeuge direkt
+hintereinander folgen.
+
+## Übersicht nach Einsatzort
+
+Die Seite „Einsatzmittel" zeigt wahlweise die Tabelle oder je Einsatzort eine Karte
+([EinsatzmittelOverview.tsx](../src/components/pages/EinsatzmittelOverview.tsx), Logik in
+[einsatzmittel-overview.ts](../src/components/pages/einsatzmittel-overview.ts)). Gibt es
+Einsatzorte, ist die Übersicht voreingestellt. Die Tabelle beantwortet „wie viele", die
+Übersicht „was steht wo": Einheiten mit ihren Fahrzeugen, der Stand aus den Zeitfeldern
+(der späteste erfasste zählt) und die Stärke je Einsatzort nach denselben Regeln wie
+die Tabelle. Einsatzorte ohne Einsatzmittel fallen weg, nicht zugeordnete stehen am Ende.
