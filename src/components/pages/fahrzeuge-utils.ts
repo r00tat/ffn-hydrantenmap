@@ -70,6 +70,15 @@ function summarize(rows: StrengthRow[]): StrengthGroup {
   };
 }
 
+/** Gesamtsumme und die Trennung in eigene und fremde Kräfte. */
+function summarizeSplit(rows: StrengthRow[]): StrengthSummary {
+  return {
+    ...summarize(rows),
+    eigene: summarize(rows.filter((r) => !r.fremd)),
+    fremde: summarize(rows.filter((r) => r.fremd)),
+  };
+}
+
 export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAssignment[] = []): StrengthSummary {
   const { crewCount: crewCountMap, atsCount: atsCountMap } =
     countCrewByVehicle(crewAssignments);
@@ -114,9 +123,37 @@ export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAs
     }
   }
 
-  return {
-    ...summarize(rows),
-    eigene: summarize(rows.filter((r) => !r.fremd)),
-    fremde: summarize(rows.filter((r) => r.fremd)),
-  };
+  return summarizeSplit(rows);
+}
+
+/**
+ * Schränkt die Stärke auf die Zeilen ein, die zum Suchbegriff passen.
+ *
+ * Gesucht wird ohne Groß- und Kleinschreibung als Teilwort in Bezeichnung,
+ * Feuerwehr und Typ, dazu in `extraText` — etwa dem Einsatzort, den die Zeile
+ * selbst nicht kennt. Mehrere Wörter müssen alle vorkommen, damit
+ * „Neusiedl TLF" nur das TLF aus Neusiedl findet.
+ *
+ * Die Summen werden über die **gefilterten** Zeilen neu gerechnet: Wer nach
+ * einer Feuerwehr filtert, will deren Stärke sehen. Eine Gesamtsumme über
+ * Zeilen, die nicht dastehen, ließe sich in der Tabelle nicht nachvollziehen.
+ * Ohne Suchbegriff kommt die Zusammenfassung unverändert zurück.
+ */
+export function filterStrength(
+  summary: StrengthSummary,
+  query: string,
+  extraText?: (row: StrengthRow) => string,
+): StrengthSummary {
+  const terms = query.toLocaleLowerCase('de').split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return summary;
+
+  const rows = summary.rows.filter((row) => {
+    const text = [row.name, row.fw, row.typ, extraText?.(row)]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase('de');
+    return terms.every((term) => text.includes(term));
+  });
+
+  return summarizeSplit(rows);
 }

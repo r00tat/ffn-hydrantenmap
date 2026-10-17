@@ -1,7 +1,11 @@
 'use client';
 
+import ClearIcon from '@mui/icons-material/Clear';
 import EditIcon from '@mui/icons-material/Edit';
+import SearchIcon from '@mui/icons-material/Search';
+import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Table from '@mui/material/Table';
@@ -11,6 +15,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
+import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
@@ -21,7 +26,12 @@ import { FirecallContext } from '../../hooks/useFirecall';
 import useLocationLayers from '../../hooks/useLocationLayers';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
-import { StrengthGroup, StrengthRow, calculateStrength } from './fahrzeuge-utils';
+import {
+  StrengthGroup,
+  StrengthRow,
+  calculateStrength,
+  filterStrength,
+} from './fahrzeuge-utils';
 import {
   currentLocationId,
   locationLabel,
@@ -180,22 +190,80 @@ function SectionRow({ label, columns }: { label: string; columns: number }) {
   );
 }
 
+function StrengthFilter({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const t = useTranslations('einsatzmittel');
+  return (
+    <TextField
+      size="small"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={t('filterPlaceholder')}
+      sx={{ mb: 1, width: { xs: '100%', sm: 320 } }}
+      slotProps={{
+        htmlInput: { 'aria-label': t('filter') },
+        input: {
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon fontSize="small" />
+            </InputAdornment>
+          ),
+          endAdornment: value ? (
+            <InputAdornment position="end">
+              <IconButton
+                size="small"
+                aria-label={t('clearFilter')}
+                onClick={() => onChange('')}
+              >
+                <ClearIcon fontSize="small" />
+              </IconButton>
+            </InputAdornment>
+          ) : undefined,
+        },
+      }}
+    />
+  );
+}
+
 function StrengthTableView({
   items,
   editing,
+  filterable = false,
 }: {
   items: FirecallItem[];
   editing?: Editing;
+  filterable?: boolean;
 }) {
   const t = useTranslations('einsatzmittel');
   const { crewAssignments } = useContext(FirecallContext);
-  const summary = useMemo(
+  const [filter, setFilter] = useState('');
+  const fullSummary = useMemo(
     () => calculateStrength(items, crewAssignments),
     [items, crewAssignments]
   );
+  const locations = editing?.locations;
+  // Summen und Abschnitte folgen dem Filter (siehe `filterStrength`). Der
+  // Einsatzort steht nicht an der Zeile; gesucht wird nach seinem Namen, so
+  // wie ihn die Spalte zeigt.
+  const summary = useMemo(
+    () =>
+      filterStrength(fullSummary, filter, (row) => {
+        const id = locations ? currentLocationId(locations, row) : '';
+        const location = id ? locations?.find((l) => l.id === id) : undefined;
+        return location ? locationLabel(location) : '';
+      }),
+    [fullSummary, filter, locations],
+  );
   const { rows, eigene, fremde } = summary;
 
-  if (rows.length === 0) return null;
+  // Ohne Einsatzmittel keine Tabelle; passt nur nichts zum Filter, bleibt sie
+  // samt Suchfeld stehen, damit sich der Filter wieder leeren lässt.
+  if (fullSummary.rows.length === 0) return null;
 
   const showLocations = !!editing && editing.locations.length > 0;
   const extraColumns = (showLocations ? 1 : 0) + (editing ? 1 : 0);
@@ -210,6 +278,11 @@ function StrengthTableView({
 
   return (
     <TableContainer component={Paper} sx={{ mb: 3 }}>
+      {filterable && (
+        <Box sx={{ px: 2, pt: 2 }}>
+          <StrengthFilter value={filter} onChange={setFilter} />
+        </Box>
+      )}
       <Table size="small">
         <TableHead>
           <TableRow>
@@ -238,8 +311,16 @@ function StrengthTableView({
               <StrengthRows rows={fremde.rows} editing={editing} />
               <TotalRow label={t('foreignForcesTotal')} group={fremde} trailing={trailing} />
             </>
-          ) : (
+          ) : rows.length > 0 ? (
             <StrengthRows rows={rows} editing={editing} />
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns}>
+                <Typography variant="body2" color="text.secondary">
+                  {t('noFilterMatch')}
+                </Typography>
+              </TableCell>
+            </TableRow>
           )}
           <TotalRow label={t('total')} group={summary} trailing={trailing} />
         </TableBody>
@@ -253,7 +334,13 @@ function StrengthTableView({
  * Einsatzorten. Eigene Komponente, damit Druckansicht und Einsatzdetails
  * kein Abo auf die Einsatzorte brauchen.
  */
-function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
+function EditableStrengthTable({
+  items,
+  filterable,
+}: {
+  items: FirecallItem[];
+  filterable?: boolean;
+}) {
   const { locations, updateLocation } = useFirecallLocations();
   const [editItem, setEditItem] = useState<FirecallItem>();
 
@@ -312,7 +399,11 @@ function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
 
   return (
     <>
-      <StrengthTableView items={items} editing={editing} />
+      <StrengthTableView
+        items={items}
+        editing={editing}
+        filterable={filterable}
+      />
       {editItem && (
         <FirecallItemUpdateDialog
           item={editItem}
@@ -326,14 +417,20 @@ function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
 export default function StrengthTable({
   items,
   editable = false,
+  filterable = false,
 }: {
   items: FirecallItem[];
   /** Bearbeiten und Einsatzorte zuordnen — nur auf der Seite „Einsatzmittel". */
   editable?: boolean;
+  /**
+   * Suchfeld über der Tabelle — nur auf der Seite „Einsatzmittel". Druckansicht
+   * und Einsatzdetails zeigen immer alle Einsatzmittel.
+   */
+  filterable?: boolean;
 }) {
   return editable ? (
-    <EditableStrengthTable items={items} />
+    <EditableStrengthTable items={items} filterable={filterable} />
   ) : (
-    <StrengthTableView items={items} />
+    <StrengthTableView items={items} filterable={filterable} />
   );
 }

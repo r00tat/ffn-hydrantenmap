@@ -48,6 +48,17 @@ Das neue Element liegt an der Einsatzadresse. Alarmierungszeit, Beschreibung ode
 Tipp: Die Stärketabelle aktualisiert sich automatisch, wenn Fahrzeuge hinzugefügt oder Besatzungsstärken geändert werden.
 :::
 
+### Stärketabelle filtern
+
+1. In das Suchfeld über der Stärketabelle tippen, etwa den Namen einer Feuerwehr oder eine Fahrzeugbezeichnung
+2. Gesucht wird ohne Rücksicht auf Groß- und Kleinschreibung in **Bezeichnung**, **FW**, **Typ** und **Einsatzort**
+3. Mehrere Wörter müssen alle vorkommen: `Neusiedl TLF` findet nur das TLF aus Neusiedl
+4. Mit dem **×** im Suchfeld den Filter wieder leeren
+
+:::info
+Die Summenzeilen rechnen nur über die angezeigten Zeilen — so zeigt ein Filter auf eine Feuerwehr deren Stärke. Druckansicht und CSV-Export enthalten immer alle Einsatzmittel.
+:::
+
 ### Besatzung und ATS-Träger automatisch zählen
 
 1. Personen im Besatzungs-Board (Einsatz-Details) einem Fahrzeug zuordnen

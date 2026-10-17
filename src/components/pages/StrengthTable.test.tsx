@@ -210,3 +210,70 @@ describe('StrengthTable — bearbeitbar', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Dialog 1. Zug');
   });
 });
+
+describe('StrengthTable — filterbar', () => {
+  const TLF_WITH_ID = { ...TLF, id: 'v1' } as FirecallItem;
+  const KLF = {
+    id: 'v2',
+    name: 'KLF',
+    fw: 'FF Weiden',
+    type: 'vehicle',
+    besatzung: '3',
+  } as unknown as FirecallItem;
+
+  it('zeigt das Suchfeld nur mit filterable', () => {
+    renderWithIntl(<StrengthTable items={[TLF]} />);
+    expect(
+      screen.queryByRole('textbox', { name: 'Einsatzmittel filtern' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('filtert nach Feuerwehr und rechnet die Summe über die Treffer', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StrengthTable items={[TLF, KLF, RTW]} filterable />);
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Einsatzmittel filtern' }),
+      'weiden',
+    );
+
+    expect(screen.getByText('KLF')).toBeInTheDocument();
+    expect(screen.queryByText('TLF')).not.toBeInTheDocument();
+    expect(screen.queryByText('RTW')).not.toBeInTheDocument();
+    // Ohne gefilterte Fremdkräfte kein leerer Abschnitt.
+    expect(screen.queryByText('Fremdkräfte')).not.toBeInTheDocument();
+    expect(within(totalRow('Gesamt')).getByText('4')).toBeInTheDocument();
+  });
+
+  it('findet nach dem Einsatzort', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <StrengthTable items={[TLF_WITH_ID, KLF]} editable filterable />,
+    );
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Einsatzmittel filtern' }),
+      'hauptplatz',
+    );
+
+    expect(screen.getByRole('combobox', { name: 'Einsatzort von TLF' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Einsatzort von KLF' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('meldet, wenn nichts passt, und leert den Filter wieder', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StrengthTable items={[TLF, KLF]} filterable />);
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Einsatzmittel filtern' }),
+      'xyz',
+    );
+    expect(screen.getByText('Keine Einsatzmittel passen zum Filter')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter leeren' }));
+    expect(screen.getByText('TLF')).toBeInTheDocument();
+    expect(screen.getByText('KLF')).toBeInTheDocument();
+  });
+});

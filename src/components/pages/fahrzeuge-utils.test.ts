@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateStrength } from './fahrzeuge-utils';
+import { calculateStrength, filterStrength } from './fahrzeuge-utils';
 import { CrewAssignment, FirecallItem } from '../firebase/firestore';
 
 describe('calculateStrength', () => {
@@ -333,5 +333,64 @@ describe('calculateStrength — Element-ID', () => {
       { id: 'u1', name: '1. Zug', type: 'tacticalUnit' },
     ] as FirecallItem[];
     expect(calculateStrength(items).rows.map((r) => r.id)).toEqual(['v1', 'u1']);
+  });
+});
+
+describe('filterStrength', () => {
+  const items: FirecallItem[] = [
+    { id: 'v1', name: 'TLF', fw: 'FF Neusiedl', type: 'vehicle', besatzung: '5', ats: 2 } as any,
+    { id: 'v2', name: 'KLF', fw: 'FF Weiden', type: 'vehicle', besatzung: '3', ats: 0 } as any,
+    { id: 'v3', name: 'RTW', fw: 'Rotes Kreuz', type: 'vehicle', besatzung: '1', fremd: 'true' } as any,
+    { id: 'u1', name: '1. Gruppe', type: 'tacticalUnit', unitType: 'gruppe', mann: 8, ats: 4 } as any,
+  ];
+  const summary = calculateStrength(items);
+
+  it('lässt ohne Suchbegriff alles stehen', () => {
+    expect(filterStrength(summary, '')).toBe(summary);
+    expect(filterStrength(summary, '   ')).toBe(summary);
+  });
+
+  it('findet nach Bezeichnung, ohne Groß- und Kleinschreibung', () => {
+    const result = filterStrength(summary, 'tlf');
+    expect(result.rows.map((r) => r.name)).toEqual(['TLF']);
+  });
+
+  it('findet nach Feuerwehr als Teilwort', () => {
+    const result = filterStrength(summary, 'weid');
+    expect(result.rows.map((r) => r.name)).toEqual(['KLF']);
+  });
+
+  it('findet nach dem Typ der Zeile', () => {
+    const typ = summary.rows.find((r) => r.id === 'u1')!.typ;
+    const result = filterStrength(summary, typ);
+    expect(result.rows.map((r) => r.id)).toContain('u1');
+  });
+
+  it('verlangt jedes Wort des Suchbegriffs', () => {
+    expect(filterStrength(summary, 'ff tlf').rows.map((r) => r.name)).toEqual(['TLF']);
+    expect(filterStrength(summary, 'weiden tlf').rows).toEqual([]);
+  });
+
+  it('bezieht zusätzlichen Text je Zeile ein, etwa den Einsatzort', () => {
+    const result = filterStrength(summary, 'hauptplatz', (row) =>
+      row.id === 'v2' ? 'Keller Hauptplatz' : '',
+    );
+    expect(result.rows.map((r) => r.name)).toEqual(['KLF']);
+  });
+
+  it('rechnet die Summen über die gefilterten Zeilen', () => {
+    const result = filterStrength(summary, 'ff');
+    expect(result.totalUnits).toBe(2);
+    expect(result.totalMann).toBe(6 + 4);
+    expect(result.totalAts).toBe(2);
+    expect(result.totalFw).toBe(2);
+    expect(result.eigene.totalUnits).toBe(2);
+    expect(result.fremde.rows).toEqual([]);
+  });
+
+  it('teilt gefilterte Fremdkräfte weiter ab', () => {
+    const result = filterStrength(summary, 'kreuz');
+    expect(result.fremde.rows.map((r) => r.name)).toEqual(['RTW']);
+    expect(result.eigene.rows).toEqual([]);
   });
 });

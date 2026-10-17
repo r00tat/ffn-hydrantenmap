@@ -3023,6 +3023,10 @@
     "foreignForcesTotal": "Summe Fremdkräfte",
     "forceOwn": "eigen",
     "forceForeign": "fremd",
+    "filter": "Einsatzmittel filtern",
+    "filterPlaceholder": "Bezeichnung, Feuerwehr, Typ …",
+    "clearFilter": "Filter leeren",
+    "noFilterMatch": "Keine Einsatzmittel passen zum Filter",
     "quickAdd": {
       "title": "Kräfte hinzufügen",
       "vehicle": "Fahrzeug",
