@@ -11,6 +11,7 @@ Die Karte zeigt Hydranten und andere wichtige Punkte im Einsatzgebiet an. Du kan
 - **Verschiedene Basiskarten** Orthofoto, Basemap, Basemap grau, OpenStreetMap, OpenTopoMap
 - **Overlay-Layer** Einsatzorte, Entfernung, Umkreis, Position, Stromausfälle, Pegelstände, Wetterstationen, Adressen
 - **WMS-Layer** Hochwasser, Risikogebiete, Überflutungsgebiete (bereitgestellt vom Land Burgenland)
+- **Luftraum Austro Control** Kontrollzonen, Flugbeschränkungs- und Gefahrengebiete, Modellflugplätze und Nationalparks – **nicht** die verbindlichen UAS-Geozonen
 - **Eigene Kartenebenen** Selbst angelegte WMS- und Kachel-Dienste je Einsatz, im Layer-Control unter „Karte: …" (siehe [Ebenen](/docs/ebenen))
 - **Standort suchen** Adresse oder Ort eingeben und auf der Karte anzeigen lassen
 - **Bearbeitungsmodus mit Zeichenwerkzeugen** Elemente auf der Karte platzieren, Linien und Flächen zeichnen
@@ -51,6 +52,10 @@ Die Karte unterstützt verschiedene Basiskarten und zusätzliche Overlay-Layer, 
 
 :::info
 Die WMS-Layer (Hochwasser, Risikogebiete, Überflutungsgebiete) werden vom Land Burgenland bereitgestellt und zeigen aktuelle Geodaten.
+:::
+
+:::warning
+Das Overlay **Luftraum Austro Control (keine UAS-Geozonen)** zeigt Lufträume aus den frei verfügbaren Luftfahrtdaten von Austro Control: Kontrollzonen (CTR, MCTR, MATZ), Flugbeschränkungs- und Gefahrengebiete (R, D), zeitweise reservierte Lufträume (TRA), Modellflugplätze und Nationalparks. Das sind **nicht** die verbindlichen UAS-Geozonen für Drohnenflüge – Höhen, Zeiten und einzelne Zonen können abweichen. Vor einem Drohnenflug prüfst du die Geozonen immer in der offiziellen Karte von Dronespace: [utm.dronespace.at/avm](https://utm.dronespace.at/avm/).
 :::
 
 ### Standort suchen
