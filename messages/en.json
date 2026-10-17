@@ -4857,5 +4857,13 @@
       "notMigrated": "This user has not been migrated yet and still has the old cost recovery flag. Run step 2 under “Permissions (migration)” first — that is where you choose the groups in which they keep cost recovery.",
       "unknown": "That did not work: {message}"
     }
+  },
+  "mapSelection": {
+    "boxMode": "Multi-select",
+    "boxModeOn": "Multi-select: dragging draws a box, tapping selects items. On desktop, hold Shift instead.",
+    "boxModeOff": "End multi-select",
+    "selectedCount": "{count, plural, one {# item selected} other {# items selected}}",
+    "clear": "Clear selection",
+    "moveHandle": "Move selection"
   }
 }

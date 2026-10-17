@@ -1,6 +1,14 @@
+import { useLeafletContext } from '@react-leaflet/core';
 import { where } from 'firebase/firestore';
 import L from 'leaflet';
-import React, { useCallback, useContext, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from 'react';
 import { getHeatmapColor } from '../../../common/heatmap';
 import { countCrewByVehicle } from '../../../common/vehicle-utils';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
@@ -25,6 +33,7 @@ import copyAndSaveFirecallItems from '../../../hooks/copyLayer';
 import { sortByZIndex, useFirecallLayers } from '../../../hooks/useFirecallLayers';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import ItemContextMenu from '../../FirecallItems/ItemContextMenu';
+import { useMapSelectionStore } from '../selection/MapSelectionContext';
 
 export interface FirecallLayerOptions {
   layer?: FirecallLayer;
@@ -96,6 +105,24 @@ export default function FirecallItemsLayer({
     ],
     filterFn,
   });
+
+  // Für die Mehrfachauswahl: welche Elemente diese Ebene gerade zeigt. Ob sie
+  // eingeblendet ist, entscheidet die Leaflet-Ebene, in der sie hängt — die
+  // Komponente bleibt auch bei ausgeblendetem Overlay gemountet.
+  const selectionStore = useMapSelectionStore();
+  const { map, layerContainer } = useLeafletContext();
+  const registrationKey = useId();
+  const historyMode = historyPathSegments.length > 0;
+  useEffect(() => {
+    if (!selectionStore || historyMode) return;
+    return selectionStore.register(registrationKey, {
+      items: records,
+      isVisible: () =>
+        !layerContainer ||
+        (layerContainer as unknown) === map ||
+        map.hasLayer(layerContainer as L.Layer),
+    });
+  }, [selectionStore, historyMode, registrationKey, records, map, layerContainer]);
 
   const heatmapConfig = layer?.heatmapConfig;
   const dataSchema = layer?.dataSchema;

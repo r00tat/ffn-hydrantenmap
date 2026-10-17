@@ -261,3 +261,23 @@ div.mobile-map {
 .ffn-rotate-label:empty {
   display: none;
 }
+
+/* Mehrfachauswahl auf der Karte (src/components/Map/selection/) */
+.leaflet-marker-icon.firecall-item-multiselected {
+  outline: 3px dashed #1976d2;
+  outline-offset: 2px;
+  border-radius: 4px;
+  filter: drop-shadow(0 0 4px rgba(25, 118, 210, 0.9));
+}
+
+.leaflet-marker-icon.multiselect-move-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: #1976d2;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: move;
+}

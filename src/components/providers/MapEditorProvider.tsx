@@ -10,6 +10,7 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import { MapEditorContext, MapEditorOptions } from '../../hooks/useMapEditor';
 import { firestore } from '../firebase/firebase';
+import { MapSelectionProvider } from '../Map/selection/MapSelectionContext';
 import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_HISTORY_COLLECTION_ID,
@@ -109,7 +110,9 @@ export default function MapEditorProvider({
 
   return (
     <MapEditorContext.Provider value={options}>
-      {children}
+      {/* Mehrfachauswahl der Karte: eigener Store, damit eine Änderung der
+          Auswahl nicht alle Verbraucher des Editor-Kontexts neu rendert. */}
+      <MapSelectionProvider>{children}</MapSelectionProvider>
     </MapEditorContext.Provider>
   );
 }
