@@ -3021,6 +3021,10 @@
     "foreignForcesTotal": "Other organisations total",
     "forceOwn": "own",
     "forceForeign": "other",
+    "filter": "Filter resources",
+    "filterPlaceholder": "Name, fire brigade, type …",
+    "clearFilter": "Clear filter",
+    "noFilterMatch": "No resources match the filter",
     "quickAdd": {
       "title": "Add resources",
       "vehicle": "Vehicle",

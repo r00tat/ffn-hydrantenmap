@@ -48,6 +48,17 @@ The new item is placed at the incident address. Alarm time, description or posit
 Tip: The strength table updates automatically when vehicles are added or crew sizes change.
 :::
 
+### Filter the strength table
+
+1. Type into the search field above the strength table, e.g. the name of a fire brigade or a vehicle
+2. The search ignores case and looks at **name**, **FW**, **type** and **location**
+3. Several words must all match: `Neusiedl TLF` finds only the TLF from Neusiedl
+4. Use the **×** in the search field to clear the filter
+
+:::info
+The total rows only add up the rows shown — filtering for one fire brigade shows its strength. The print view and the CSV export always contain all resources.
+:::
+
 ### Count crew and ATS wearers automatically
 
 1. Assign people to a vehicle on the crew board (operation details)
