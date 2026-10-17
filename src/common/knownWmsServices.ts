@@ -56,6 +56,14 @@ export const KNOWN_WMS_SERVICES: KnownWmsService[] = [
     capabilitiesUrl:
       'https://inspire.lfrz.gv.at/000801/wms?service=WMS&version=1.3.0&request=GetCapabilities',
   },
+  {
+    id: 'austrocontrol-luftraum',
+    name: 'Austro Control — Luftfahrtdaten (SDI frei)',
+    beschreibung:
+      'Lufträume (CTR, R, D, TRA, …), Flugplätze, Hindernisse, Luftfahrtkarten — nicht die verbindlichen UAS-Geozonen',
+    capabilitiesUrl:
+      'https://sdigeo-free.austrocontrol.at/geoserver/free/wms?service=WMS&version=1.3.0&request=GetCapabilities',
+  },
 ];
 
 /** Der bekannte Dienst zu einer Adresse, falls es einer ist. */

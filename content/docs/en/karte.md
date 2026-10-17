@@ -11,6 +11,7 @@ The map shows hydrants and other important points in the operation area. You can
 - **Different base maps** Orthophoto, Basemap, Basemap grey, OpenStreetMap, OpenTopoMap
 - **Overlay layers** Operation sites, distance, radius, position, power outages, water levels, weather stations, addresses
 - **WMS layers** Floods, risk zones, inundation areas (provided by the state of Burgenland)
+- **Airspace Austro Control** Control zones, restricted and danger areas, model airfields and national parks – **not** the binding UAS geozones
 - **Custom map layers** Self-created WMS and tile services per operation, shown in the layer control under “Karte: …” (see [Ebenen](/docs/ebenen))
 - **Search a location** Enter an address or place name and view it on the map
 - **Editing mode with drawing tools** Place items on the map, draw lines and polygons
@@ -51,6 +52,10 @@ The map supports different base maps and additional overlay layers that you can 
 
 :::info
 The WMS layers (floods, risk zones, inundation areas) are provided by the state of Burgenland and show current geodata.
+:::
+
+:::warning
+The overlay **Luftraum Austro Control (keine UAS-Geozonen)** shows airspaces from Austro Control's freely available aviation data: control zones (CTR, MCTR, MATZ), restricted and danger areas (R, D), temporary reserved airspaces (TRA), model airfields and national parks. These are **not** the binding UAS geozones for drone flights – altitudes, times and individual zones may differ. Before a drone flight, always check the geozones on Dronespace's official map: [utm.dronespace.at/avm](https://utm.dronespace.at/avm/).
 :::
 
 ### Search a location
