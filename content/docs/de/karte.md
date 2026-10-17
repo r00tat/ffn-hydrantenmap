@@ -81,6 +81,21 @@ Im Bearbeitungsmodus kannst du Elemente zum aktiven Einsatz auf der Karte hinzuf
 Aktiviere den Bearbeitungsmodus nur, wenn du Änderungen vornehmen möchtest. Im Ansichtsmodus kannst du die Karte schneller bedienen.
 :::
 
+### Mehrere Elemente auswählen und verschieben
+
+Im Bearbeitungsmodus kannst du mehrere Elemente auf einmal markieren und gemeinsam verschieben.
+
+1. **Rahmen ziehen:** Halte die **Umschalttaste** gedrückt und ziehe mit der Maus einen Rahmen über die Karte. Alle Elemente im Rahmen werden ausgewählt — eine Linie oder Fläche, sobald einer ihrer Punkte im Rahmen liegt
+2. **Einzeln ergänzen:** Umschalt + Klick auf ein Element nimmt es in die Auswahl auf oder wieder heraus
+3. **Auf dem Tablet oder Handy:** Tippe oben in der Mitte der Karte auf das Symbol **Mehrfachauswahl**. Solange es aktiv ist, zieht ein Wischen einen Rahmen statt die Karte zu verschieben, und Tippen auf ein Element wählt es aus oder ab. Zoomen mit zwei Fingern geht weiterhin
+4. Ausgewählte Elemente sind blau gestrichelt umrandet, oben steht die Anzahl
+5. **Verschieben:** Ziehe eines der ausgewählten Elemente oder den runden blauen Griff mit dem Pfeilkreuz in der Mitte der Auswahl. Alle ausgewählten Elemente wandern um dieselbe Strecke mit, Linien und Flächen als Ganzes
+6. **Auswahl aufheben:** Klick ins Leere auf der Karte, die **Esc**-Taste oder das Kreuz an der Anzahl
+
+:::info
+Vor dem Verschieben wird automatisch ein Verlaufsstand gespeichert. Über den Verlauf kannst du die alte Lage wiederherstellen. Nur Elemente eingeblendeter Ebenen werden ausgewählt und verschoben; gesperrte Elemente, Zeichnungen und Wasserstände gehen nicht mit.
+:::
+
 ### Koordinaten eingeben
 
 Kommen die Koordinaten von außen — etwa von Polizei oder Landessicherheitszentrale —, lässt sich ein Element direkt dort anlegen, statt es auf der Karte zu suchen.

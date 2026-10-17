@@ -1,7 +1,7 @@
 import { doc } from 'firebase/firestore';
 import { setDocLocal } from '../../../../lib/firestoreClient';
 import L from 'leaflet';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
 import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
@@ -18,6 +18,13 @@ import {
 } from '../../../firebase/firestore';
 import { logAuditChange } from '../../../../hooks/useAuditLog';
 import { FirecallItemBase } from '../FirecallItemBase';
+import {
+  useIsItemSelected,
+  useMapSelectionStore,
+  useSelectionPreviewDelta,
+} from '../../../Map/selection/MapSelectionContext';
+import useMoveSelection from '../../../Map/selection/useMoveSelection';
+import { withSelectedClass } from '../../../Map/selection/selectedIcon';
 
 export interface MarkerRenderOptions {
   /* do not show the popup */
@@ -141,7 +148,10 @@ export function FirecallItemMarkerDefault({
    * eine neue SVG-Data-URL, und ein neues Icon-Objekt lässt react-leaflet
    * `setIcon` rufen — das Marker-Element würde 60-mal pro Sekunde ersetzt.
    */
-  const icon = useMemo(() => record.icon(heatmapColor), [record, heatmapColor]);
+  const baseIcon = useMemo(
+    () => record.icon(heatmapColor),
+    [record, heatmapColor]
+  );
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [startPos, setStartPos] = useState<L.LatLng>(
@@ -152,6 +162,25 @@ export function FirecallItemMarkerDefault({
   );
   const { editable, selectFirecallItem, selectedFirecallItem } =
     useMapEditor();
+
+  /**
+   * Mehrfachauswahl (docs/karte-mehrfachauswahl.md). Nur Elemente des Einsatzes
+   * nehmen teil: Vorschau-Marker (`disableClick`) und Marker, die ihre Lage
+   * selbst speichern (`onDragEnd`, etwa die Einsatzorte), bleiben außen vor.
+   */
+  const selectionStore = useMapSelectionStore();
+  const takesPart =
+    !!selectionStore && !!record.id && !disableClick && !onDragEnd;
+  const isSelected = useIsItemSelected(takesPart ? record.id : undefined);
+  const previewDelta = useSelectionPreviewDelta(record);
+  const { previewMove, moveSelection } = useMoveSelection();
+  const icon = useMemo(
+    () => (isSelected ? withSelectedClass(baseIcon) : baseIcon),
+    [isSelected, baseIcon]
+  );
+  /** Ausgangslage und Art des laufenden Zuges. */
+  const dragRef = useRef<{ origin: L.LatLng; group: boolean }>(undefined);
+  const dragFrame = useRef<number>(undefined);
 
   useEffect(() => {
     if (record.lat && record.lng) {
@@ -217,20 +246,78 @@ export function FirecallItemMarkerDefault({
     !!record.id &&
     selectedFirecallItem?.id === record.id;
 
+  const shownPos = useMemo(
+    () =>
+      previewDelta
+        ? L.latLng(
+            startPos.lat + previewDelta.lat,
+            startPos.lng + previewDelta.lng
+          )
+        : startPos,
+    [startPos, previewDelta]
+  );
+
   return (
     <>
       <RotatedMarker
-        position={startPos}
+        position={shownPos}
         title={record.titleFn()}
         icon={icon}
         draggable={editable && record.draggable}
         autoPan={false}
         eventHandlers={{
           ...record.eventHandlers,
+          dragstart: (event) => {
+            // Ist das gezogene Element Teil einer Mehrfachauswahl, geht die
+            // ganze Auswahl mit.
+            const state = selectionStore?.getState();
+            dragRef.current = {
+              origin: (event.target as L.Marker).getLatLng(),
+              group:
+                takesPart &&
+                !!state &&
+                !!record.id &&
+                state.selectedIds.has(record.id) &&
+                state.selectedIds.size > 1,
+            };
+          },
+          drag: (event) => {
+            const drag = dragRef.current;
+            if (!drag?.group || !record.id) return;
+            const moved = (event.target as L.Marker).getLatLng();
+            if (dragFrame.current !== undefined) {
+              cancelAnimationFrame(dragFrame.current);
+            }
+            const id = record.id;
+            dragFrame.current = requestAnimationFrame(() => {
+              dragFrame.current = undefined;
+              previewMove(
+                {
+                  lat: moved.lat - drag.origin.lat,
+                  lng: moved.lng - drag.origin.lng,
+                },
+                id
+              );
+            });
+          },
           dragend: (event) => {
             const position = (event.target as L.Marker)?.getLatLng();
             setStartPos(position);
-            if (onDragEnd) {
+            const drag = dragRef.current;
+            dragRef.current = undefined;
+            if (dragFrame.current !== undefined) {
+              cancelAnimationFrame(dragFrame.current);
+              dragFrame.current = undefined;
+            }
+            if (drag?.group && record.id && position) {
+              void moveSelection(
+                {
+                  lat: position.lat - drag.origin.lat,
+                  lng: position.lng - drag.origin.lng,
+                },
+                record.id
+              );
+            } else if (onDragEnd) {
               if (position) onDragEnd(record.data(), position);
             } else {
               updateFircallItemPos(firecallId, event, record, email);
@@ -239,7 +326,21 @@ export function FirecallItemMarkerDefault({
           ...(disableClick
             ? {}
             : {
-                click: () => {
+                click: (event: L.LeafletMouseEvent) => {
+                  // Umschalt-Klick (oder Tippen im Auswahlmodus) nimmt das
+                  // Element in die Mehrfachauswahl auf oder heraus.
+                  if (
+                    editable &&
+                    takesPart &&
+                    record.id &&
+                    (event.originalEvent?.shiftKey ||
+                      selectionStore?.getState().boxMode)
+                  ) {
+                    selectionStore?.toggle(record.id);
+                    const marker = event.target as L.Marker;
+                    setTimeout(() => marker.closePopup(), 0);
+                    return;
+                  }
                   selectFirecallItem(record);
                 },
               }),
@@ -260,7 +361,7 @@ export function FirecallItemMarkerDefault({
       </RotatedMarker>
       {showRotationHandle && (
         <RotationHandle
-          position={startPos}
+          position={shownPos}
           iconOptions={icon.options}
           rotation={rotationAngle}
           onPreview={handleRotationPreview}

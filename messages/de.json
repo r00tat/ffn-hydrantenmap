@@ -4883,5 +4883,13 @@
       "notMigrated": "Der Benutzer ist noch nicht migriert und hat die alte Kostenersatz-Freischaltung. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus — dort legst du fest, in welchen Gruppen er Kostenersatz behält.",
       "unknown": "Das hat nicht geklappt: {message}"
     }
+  },
+  "mapSelection": {
+    "boxMode": "Mehrfachauswahl",
+    "boxModeOn": "Mehrfachauswahl: Ziehen markiert einen Rahmen, Tippen wählt Elemente. Am Desktop geht das auch mit gedrückter Umschalttaste.",
+    "boxModeOff": "Mehrfachauswahl beenden",
+    "selectedCount": "{count, plural, one {# Element ausgewählt} other {# Elemente ausgewählt}}",
+    "clear": "Auswahl aufheben",
+    "moveHandle": "Auswahl verschieben"
   }
 }
