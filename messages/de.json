@@ -1045,6 +1045,8 @@
     "done": "Erledigt",
     "noCoords": "Keine Koordinaten",
     "addVehicle": "Fahrzeug oder Einheit hinzufügen...",
+    "unitStrength": "Stärke: {value}",
+    "unitLead": "Führung: {value}",
     "title": "Einsatzorte - {name}",
     "noFirecall": "Kein Einsatz ausgewählt",
     "checkEmails": "E-Mails prüfen",

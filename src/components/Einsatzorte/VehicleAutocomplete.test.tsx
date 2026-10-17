@@ -50,3 +50,48 @@ describe('VehicleAutocomplete', () => {
     expect(screen.queryByRole('option', { name: /Kräfte Nord/ })).toBeNull();
   });
 });
+
+describe('VehicleAutocomplete – zugeordnete Einheiten', () => {
+  it('zeigt den aktuellen Namen statt der gespeicherten Momentaufnahme', () => {
+    renderWithIntl(
+      <VehicleAutocomplete
+        value={{ v1: 'TLF' }}
+        onChange={vi.fn()}
+        mapVehicles={[tlf, zug]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    expect(screen.getByText('TLFA 4000')).toBeInTheDocument();
+    expect(screen.queryByText('TLF')).toBeNull();
+  });
+
+  it('behält den gespeicherten Namen, wenn das Element nicht mehr da ist', () => {
+    renderWithIntl(
+      <VehicleAutocomplete
+        value={{ weg: 'KDO' }}
+        onChange={vi.fn()}
+        mapVehicles={[tlf]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    expect(screen.getByText('KDO')).toBeInTheDocument();
+  });
+
+  it('zeigt beim Überfahren die Feuerwehr und die Besatzung', async () => {
+    renderWithIntl(
+      <VehicleAutocomplete
+        value={{ v1: 'TLFA 4000' }}
+        onChange={vi.fn()}
+        mapVehicles={[{ ...tlf, besatzung: '8' }]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    await userEvent.hover(screen.getByText('TLFA 4000'));
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('FF Musterdorf');
+    expect(tooltip).toHaveTextContent('1:8');
+  });
+});

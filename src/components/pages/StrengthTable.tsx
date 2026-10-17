@@ -30,6 +30,7 @@ import {
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import {
   getLocationDisplayName,
+  unitLabel,
   vehicleAssignedEntry,
   vehicleRemovedEntry,
 } from '../Einsatzorte/locationDiary';
@@ -280,11 +281,13 @@ function EditableStrengthTable({ items }: { items: FirecallItem[] }) {
         void updateLocation(update.id, { vehicles: update.vehicles });
       }
       for (const location of move.removedFrom) {
-        void addDiaryEntry(vehicleRemovedEntry(row.name, location));
+        void addDiaryEntry(vehicleRemovedEntry(unitLabel(row), location));
       }
       const item = items.find((i) => i.id === row.id);
       if (move.assignedTo) {
-        void addDiaryEntry(vehicleAssignedEntry(row.name, move.assignedTo));
+        void addDiaryEntry(
+          vehicleAssignedEntry(unitLabel(row), move.assignedTo),
+        );
         // Auf der Karte zum Einsatzort versetzen und in seine Ebene legen
         if (item) void locationLayers.placeItem(item, move.assignedTo);
       } else if (item) {

@@ -1045,6 +1045,8 @@
     "done": "Done",
     "noCoords": "No coordinates",
     "addVehicle": "Add vehicle or unit...",
+    "unitStrength": "Strength: {value}",
+    "unitLead": "Lead: {value}",
     "title": "Operation sites - {name}",
     "noFirecall": "No operation selected",
     "checkEmails": "Check emails",

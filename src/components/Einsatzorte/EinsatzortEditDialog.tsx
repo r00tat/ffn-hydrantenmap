@@ -22,6 +22,7 @@ import useVehicles from '../../hooks/useVehicles';
 import { AssignableUnit, FirecallLocation, Fzg } from '../firebase/firestore';
 import EinsatzorteCard from './EinsatzorteCard';
 import {
+  assignedUnitLabel,
   getLocationDisplayName,
   vehicleAssignedEntry,
   vehicleRemovedEntry,
@@ -276,14 +277,24 @@ export default function EinsatzortEditDialog({
         const newVehicles = diff.vehicles as Record<string, string>;
         for (const [vId, vName] of Object.entries(oldVehicles)) {
           if (!(vId in newVehicles)) {
-            addDiaryEntry(vehicleRemovedEntry(vName, working));
+            addDiaryEntry(
+              vehicleRemovedEntry(
+                assignedUnitLabel(vId, vName, assignableUnits),
+                working,
+              ),
+            );
             const unit = assignableUnits.find((u) => u.id === vId);
             if (unit) await locationLayers.releaseItem(unit, location);
           }
         }
         for (const [vId, vName] of Object.entries(newVehicles)) {
           if (!(vId in (oldVehicles as Record<string, string>))) {
-            addDiaryEntry(vehicleAssignedEntry(vName, working));
+            addDiaryEntry(
+              vehicleAssignedEntry(
+                assignedUnitLabel(vId, vName, assignableUnits),
+                working,
+              ),
+            );
           }
         }
       }

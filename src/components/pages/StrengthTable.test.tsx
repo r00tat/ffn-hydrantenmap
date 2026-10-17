@@ -167,8 +167,8 @@ describe('StrengthTable — bearbeitbar', () => {
     expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
     expect(updateLocation).toHaveBeenCalledWith('l2', { vehicles: { v1: 'TLF' } });
     expect(addDiaryEntry.mock.calls.map((c) => c[0])).toEqual([
-      'TLF von Einsatzort Keller Hauptplatz abgezogen',
-      'TLF zu Einsatzort Seestraße 5 zugeordnet',
+      'TLF FF Neusiedl von Einsatzort Keller Hauptplatz abgezogen',
+      'TLF FF Neusiedl zu Einsatzort Seestraße 5 zugeordnet',
     ]);
   });
 
@@ -195,7 +195,7 @@ describe('StrengthTable — bearbeitbar', () => {
 
     expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
     expect(addDiaryEntry).toHaveBeenCalledWith(
-      'TLF von Einsatzort Keller Hauptplatz abgezogen',
+      'TLF FF Neusiedl von Einsatzort Keller Hauptplatz abgezogen',
     );
     expect(releaseItem).toHaveBeenCalledWith(
       TLF_WITH_ID,
