@@ -21,10 +21,13 @@ import FirecallShareLinkForm, {
   type FirecallShareLinkFormValues,
 } from './FirecallShareLinkForm';
 import FirecallShareLinkList from './FirecallShareLinkList';
+import FirecallShareLinkQr from './FirecallShareLinkQr';
 import useFirecallShareLinks from './useFirecallShareLinks';
 
 export interface FirecallShareDialogProps {
   firecallId: string;
+  /** Erscheint im Begleittext, wenn der Link samt QR-Code geteilt wird. */
+  firecallName?: string;
   onClose: () => void;
 }
 
@@ -44,6 +47,7 @@ type Mode =
  */
 export default function FirecallShareDialog({
   firecallId,
+  firecallName,
   onClose,
 }: FirecallShareDialogProps) {
   const t = useTranslations('firecallShare');
@@ -54,6 +58,8 @@ export default function FirecallShareDialog({
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [values, setValues] = useState<FirecallShareLinkFormValues>();
   const [link, setLink] = useState<string>();
+  /** Name des Gasts zum angezeigten Link — für den Dateinamen des QR-Codes. */
+  const [linkName, setLinkName] = useState<string>();
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string>();
   const [pendingDeactivation, setPendingDeactivation] =
@@ -69,8 +75,9 @@ export default function FirecallShareDialog({
   }, []);
 
   const showLink = useCallback(
-    async (value: string) => {
+    async (value: string, name?: string) => {
       setLink(value);
+      setLinkName(name);
       setCopied(await copyLink(value));
     },
     [copyLink]
@@ -80,6 +87,7 @@ export default function FirecallShareDialog({
     setMode({ kind: 'list' });
     setValues(undefined);
     setLink(undefined);
+    setLinkName(undefined);
     setCopied(false);
     setError(undefined);
   }, []);
@@ -89,7 +97,7 @@ export default function FirecallShareDialog({
     setError(undefined);
     try {
       if (mode.kind === 'create') {
-        await showLink(await create(values));
+        await showLink(await create(values), values.name);
       } else if (mode.kind === 'edit') {
         await update(mode.link.uid, {
           name: values.name,
@@ -109,7 +117,7 @@ export default function FirecallShareDialog({
     async (existing: FirecallShareLink) => {
       setError(undefined);
       try {
-        await showLink(await issueUrl(existing.uid));
+        await showLink(await issueUrl(existing.uid), existing.name);
       } catch (err: unknown) {
         setError(
           t('copyError', { error: (err as Error)?.message ?? String(err) })
@@ -187,6 +195,12 @@ export default function FirecallShareDialog({
                 </IconButton>
               </Tooltip>
             </Stack>
+            <FirecallShareLinkQr
+              url={link}
+              guestName={linkName}
+              firecallName={firecallName}
+              onCopyLink={copyLink}
+            />
           </>
         )}
 

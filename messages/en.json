@@ -3368,7 +3368,15 @@
     "deactivateTitle": "Deactivate access?",
     "deactivateText": "{name}'s link will stop working. The entry stays in the list and can be reactivated.",
     "updateError": "Update failed: {error}",
-    "copyError": "Could not create the link: {error}"
+    "copyError": "Could not create the link: {error}",
+    "qrTitle": "QR code for the operation link",
+    "shareQr": "Share QR code and link",
+    "downloadQr": "Download QR code",
+    "shareText": "Access to the operation “{name}” in the Einsatzkarte:",
+    "shareTextGeneric": "Access to the operation in the Einsatzkarte:",
+    "shareFallback": "Sharing is not supported here: QR code downloaded and link copied.",
+    "shareFallbackNoCopy": "Sharing is not supported here: QR code downloaded. Please copy the link above manually.",
+    "qrError": "QR code could not be shared: {error}"
   },
   "errors": {
     "title": "Something went wrong",

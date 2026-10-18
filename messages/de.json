@@ -3368,7 +3368,15 @@
     "deactivateTitle": "Zugang deaktivieren?",
     "deactivateText": "Der Link von {name} funktioniert danach nicht mehr. Der Zugang bleibt in der Liste und kann wieder aktiviert werden.",
     "updateError": "Änderung fehlgeschlagen: {error}",
-    "copyError": "Link konnte nicht erzeugt werden: {error}"
+    "copyError": "Link konnte nicht erzeugt werden: {error}",
+    "qrTitle": "QR-Code zum Einsatz-Link",
+    "shareQr": "QR-Code und Link teilen",
+    "downloadQr": "QR-Code herunterladen",
+    "shareText": "Zugang zum Einsatz „{name}“ in der Einsatzkarte:",
+    "shareTextGeneric": "Zugang zum Einsatz in der Einsatzkarte:",
+    "shareFallback": "Teilen wird hier nicht unterstützt: QR-Code heruntergeladen und Link kopiert.",
+    "shareFallbackNoCopy": "Teilen wird hier nicht unterstützt: QR-Code heruntergeladen. Bitte den Link oben manuell kopieren.",
+    "qrError": "QR-Code konnte nicht geteilt werden: {error}"
   },
   "errors": {
     "title": "Etwas ist schiefgelaufen",

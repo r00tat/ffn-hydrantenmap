@@ -252,6 +252,7 @@ function EinsatzCard({
       {shareDialogOpen && einsatz.id && (
         <FirecallShareDialog
           firecallId={einsatz.id}
+          firecallName={einsatz.name}
           onClose={() => setShareDialogOpen(false)}
         />
       )}
