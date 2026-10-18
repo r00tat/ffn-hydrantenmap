@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getCountFromServer,
   getDoc,
   getDocs,
   orderBy,
@@ -189,6 +190,23 @@ async function settleReporting<T>(
   });
 }
 
+/**
+ * Teile der Sicherung, die beim Export weggelassen werden dürfen.
+ *
+ * Genau die drei, die einen großen Einsatz groß und langsam machen: Jeder
+ * Verlaufseintrag ist eine Kopie aller Elemente samt Strichen, das Audit-Log
+ * wächst mit jeder einzelnen Änderung, und Anhänge landen als Base64 in der
+ * Datei. Was die Lage selbst ausmacht — Elemente, Ebenen, Einsatzorte,
+ * Tagebuch, Atemschutz — bleibt immer drin.
+ */
+export type BackupSection = 'history' | 'auditlog' | 'attachments';
+
+export const BACKUP_SECTIONS: readonly BackupSection[] = [
+  'history',
+  'auditlog',
+  'attachments',
+];
+
 /** Exported drawing item with embedded strokes */
 export interface ExportDrawingItem extends FirecallItem {
   type: 'drawing';
@@ -224,6 +242,12 @@ export interface ExportFirecallAttachment {
 export interface FirecallExport extends Firecall {
   /** Format der Datei, siehe `BACKUP_VERSION`. */
   backupVersion?: number;
+  /**
+   * Beim Export bewusst weggelassene Teile. Fehlt das Feld, ist die Sicherung
+   * vollständig. Steht in der Datei, damit der Import ein leeres `history`
+   * nicht für einen Einsatz ohne Verlauf hält.
+   */
+  omitted?: BackupSection[];
   items: FirecallItem[];
   chat: ChatMessage[];
   layers: FirecallLayer[];
@@ -382,6 +406,12 @@ async function exportHistorySnapshot(
 }
 
 export interface ExportFirecallOptions {
+  /**
+   * Diese Teile weder lesen noch in die Datei schreiben. Ohne Anhänge bleiben
+   * die Storage-Verweise stehen — der Import übernimmt sie wie bei einer alten
+   * Sicherung ohne eingebettete Dateien.
+   */
+  omit?: readonly BackupSection[];
   onWarning?: BackupWarningHandler;
   onProgress?: BackupProgressHandler;
 }
@@ -400,7 +430,10 @@ export async function exportFirecall(
   firecallId: string,
   options: ExportFirecallOptions = {}
 ): Promise<FirecallExport> {
-  const { onWarning, onProgress } = options;
+  const { onWarning, onProgress, omit = [] } = options;
+  const withHistory = !omit.includes('history');
+  const withAuditlog = !omit.includes('auditlog');
+  const withAttachments = !omit.includes('attachments');
   const progress = new ProgressReporter(onProgress);
   // Wie viel zu tun ist, weiß erst der nächste Schritt.
   progress.report('structure');
@@ -425,6 +458,10 @@ export async function exportFirecall(
       }
     );
 
+  // Weggelassenes wird gar nicht erst gelesen — beim Verlauf und beim
+  // Audit-Log eines großen Einsatzes ist genau das der langsame Teil.
+  const skip = <T,>() => Promise.resolve([] as T[]);
+
   // Die zwölf Untersammlungen hängen nicht voneinander ab — nacheinander
   // abgefragt wären das zwölf Round-Trips hintereinander.
   const [
@@ -446,10 +483,14 @@ export async function exportFirecall(
     readCollection<ChatMessage>('chat'),
     readCollection<FirecallLayer>(FIRECALL_LAYERS_COLLECTION_ID),
     readCollection<FirecallMapLayer>(FIRECALL_MAP_LAYERS_COLLECTION_ID),
-    readCollection<FirecallHistory>(FIRECALL_HISTORY_COLLECTION_ID),
+    withHistory
+      ? readCollection<FirecallHistory>(FIRECALL_HISTORY_COLLECTION_ID)
+      : skip<FirecallHistory>(),
     readCollection<FirecallLocation>(FIRECALL_LOCATIONS_COLLECTION_ID),
     readKostenersatz(),
-    readCollection<AuditLogEntry>(FIRECALL_AUDITLOG_COLLECTION_ID),
+    withAuditlog
+      ? readCollection<AuditLogEntry>(FIRECALL_AUDITLOG_COLLECTION_ID)
+      : skip<AuditLogEntry>(),
     readCollection<CrewAssignment>(FIRECALL_CREW_COLLECTION_ID),
     readCollection<AtemschutzTrupp>(ATEMSCHUTZ_TRUPP_COLLECTION_ID),
     readCollection<AtemschutzAusgabe>(ATEMSCHUTZ_AUSGABE_COLLECTION_ID),
@@ -461,8 +502,9 @@ export async function exportFirecall(
   progress.setTotal(
     drawings.length +
       history.length +
-      countItemAttachments(items) +
-      (firecall.attachments?.length ?? 0)
+      (withAttachments
+        ? countItemAttachments(items) + (firecall.attachments?.length ?? 0)
+        : 0)
   );
   progress.report('structure');
 
@@ -471,7 +513,7 @@ export async function exportFirecall(
     items.map(async (item) => {
       if (item.type === 'marker') {
         const m = item as FcMarker;
-        if (m.attachments) {
+        if (m.attachments && withAttachments) {
           m.attachments = await settleReporting<FcAttachment>(
             m.attachments.map((attachment) => ({
               label: attachmentLabel(attachment),
@@ -512,7 +554,7 @@ export async function exportFirecall(
 
   // Export firecall-level attachments
   let firecallAttachments: ExportFirecallAttachment[] | undefined;
-  if (firecall.attachments && firecall.attachments.length > 0) {
+  if (withAttachments && firecall.attachments && firecall.attachments.length > 0) {
     firecallAttachments = await settleReporting<ExportFirecallAttachment>(
       firecall.attachments.map((url) => ({
         label: displayFileName(url.split('/').pop() ?? url),
@@ -527,6 +569,9 @@ export async function exportFirecall(
   return {
     ...firecall,
     backupVersion: BACKUP_VERSION,
+    ...(omit.length > 0
+      ? { omitted: BACKUP_SECTIONS.filter((s) => omit.includes(s)) }
+      : {}),
     items: exportItems,
     chat,
     layers,
@@ -539,6 +584,34 @@ export async function exportFirecall(
     atemschutzTrupps,
     atemschutzAusgaben,
     firecallAttachments,
+  };
+}
+
+/**
+ * Größe der weglassbaren Teile, damit im Export-Dialog sichtbar ist, was die
+ * Datei groß macht.
+ *
+ * Über Aggregationsabfragen — die kosten einen Lesevorgang je 1000 Einträge
+ * statt einen je Dokument. Anhänge werden nicht gezählt: Dafür müssten alle
+ * Elemente gelesen werden, bei einem großen Einsatz also genau das, was der
+ * Dialog vermeiden helfen soll. Ohne Netz bleibt das Ergebnis leer, statt den
+ * Export zu blockieren.
+ */
+export async function countBackupSections(
+  firecallId: string
+): Promise<Partial<Record<'history' | 'auditlog', number>>> {
+  const firecallDoc = doc(firestore, FIRECALL_COLLECTION_ID, firecallId);
+  const count = (path: string) =>
+    getCountFromServer(collection(firecallDoc, path)).then(
+      (snapshot) => snapshot.data().count
+    );
+  const [history, auditlog] = await Promise.allSettled([
+    count(FIRECALL_HISTORY_COLLECTION_ID),
+    count(FIRECALL_AUDITLOG_COLLECTION_ID),
+  ]);
+  return {
+    ...(history.status === 'fulfilled' ? { history: history.value } : {}),
+    ...(auditlog.status === 'fulfilled' ? { auditlog: auditlog.value } : {}),
   };
 }
 
@@ -729,6 +802,8 @@ export async function importFirecall(
     firecallAttachments,
     id,
     backupVersion,
+    // Nur ein Vermerk der Datei, kein Feld des Einsatzes.
+    omitted,
     // Die Kopie hat keine eigenen Fahrtenbuch-Einträge. Bliebe der Zähler
     // stehen, meldete die Einsatz-Übersicht erfasste Fahrten, die es nicht
     // gibt — und niemand trägt sie mehr ein. `fahrtenbuchRoute` bleibt: der

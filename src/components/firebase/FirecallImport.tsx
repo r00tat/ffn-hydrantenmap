@@ -1,6 +1,7 @@
 'use client';
 
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -39,6 +40,12 @@ async function readFileAsJson(file: File): Promise<FirecallExport> {
   return JSON.parse(result);
 }
 
+const OMITTED_SECTION_KEYS = {
+  history: 'sectionHistory',
+  auditlog: 'sectionAuditlog',
+  attachments: 'sectionAttachments',
+} as const;
+
 export default function FirecallImport() {
   const t = useTranslations('backup');
   const tCommon = useTranslations('common');
@@ -50,6 +57,13 @@ export default function FirecallImport() {
   const [pending, setPending] = useState<FirecallExport>();
   const [targetGroup, setTargetGroup] = useState('');
   const [progress, setProgress] = useState<BackupProgress>();
+  const omittedText = useMemo(
+    () =>
+      (pending?.omitted ?? [])
+        .map((section) => t(OMITTED_SECTION_KEYS[section]))
+        .join(', '),
+    [pending, t]
+  );
   const importInProgress = progress !== undefined;
 
   // Pseudo-Gruppen wie `allUsers` sind keine Mandanten und dürfen nie als
@@ -170,6 +184,12 @@ export default function FirecallImport() {
             <Typography variant="body2" color="text.secondary" gutterBottom>
               {t('fileGroup', { group: pending.group })}
             </Typography>
+          )}
+          {omittedText && (
+            // Ein leerer Verlauf sähe sonst aus wie ein Einsatz ohne Verlauf.
+            <Alert severity="info" sx={{ mt: 1 }}>
+              {t('importOmitted', { sections: omittedText })}
+            </Alert>
           )}
           <FormControl fullWidth variant="standard" sx={{ mt: 2 }}>
             <InputLabel id="firecall-import-group-label">

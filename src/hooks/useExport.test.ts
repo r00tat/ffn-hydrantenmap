@@ -32,6 +32,9 @@ vi.mock('firebase/firestore', () => ({
     })
   ),
   getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+  getCountFromServer: vi.fn(() =>
+    Promise.resolve({ data: () => ({ count: 0 }) })
+  ),
   collection: vi.fn((...args: unknown[]) => ({
     path: args.filter((a) => typeof a === 'string').join('/'),
   })),
@@ -78,10 +81,12 @@ import {
   type ExportFirecallAttachment,
   BACKUP_VERSION,
   blobFromBase64String,
+  countBackupSections,
   exportFirecall,
   importFirecall,
 } from './useExport';
-import { getDocs } from 'firebase/firestore';
+import { getCountFromServer, getDoc, getDocs } from 'firebase/firestore';
+import type { FcMarker } from '../components/firebase/firestore';
 import { getBlob, getMetadata, ref } from 'firebase/storage';
 import { addDoc, updateDoc } from '../lib/firestoreClient';
 import { uploadFile } from '../components/inputs/FileUploader';
@@ -430,6 +435,116 @@ describe('useExport', () => {
 
       expect(warnings).toHaveLength(1);
       expect(warnings[0].code).toBe('attachmentDownloadFailed');
+    });
+
+    it('lässt den Verlauf auf Wunsch weg, ohne ihn zu lesen', async () => {
+      const getDocsMock = getDocs as Mock;
+      getDocsMock.mockImplementation((col: { path?: string }) =>
+        Promise.resolve({
+          docs:
+            col?.path === 'history'
+              ? [{ id: 'h1', data: () => ({ description: 'Snapshot' }) }]
+              : [],
+        })
+      );
+
+      const result = await exportFirecall('test-id', { omit: ['history'] });
+
+      expect(result.history).toEqual([]);
+      expect(result.omitted).toEqual(['history']);
+      const paths = getDocsMock.mock.calls.map(
+        ([col]) => (col as { path?: string }).path
+      );
+      expect(paths).not.toContain('history');
+    });
+
+    it('lässt das Audit-Log auf Wunsch weg, ohne es zu lesen', async () => {
+      const getDocsMock = getDocs as Mock;
+      getDocsMock.mockResolvedValue({ docs: [] });
+
+      const result = await exportFirecall('test-id', { omit: ['auditlog'] });
+
+      expect(result.auditlog).toEqual([]);
+      expect(result.omitted).toEqual(['auditlog']);
+      const paths = getDocsMock.mock.calls.map(
+        ([col]) => (col as { path?: string }).path
+      );
+      expect(paths).not.toContain('auditlog');
+    });
+
+    it('lädt ohne Anhänge nichts aus dem Storage und behält die Verweise', async () => {
+      (getDoc as Mock).mockResolvedValueOnce({
+        data: () => ({
+          name: 'Test Einsatz',
+          attachments: ['/firecall/old/files/uuid-lage.pdf'],
+        }),
+      });
+      (getDocs as Mock).mockImplementation((col: { path?: string }) =>
+        Promise.resolve({
+          docs:
+            col?.path === 'item'
+              ? [
+                  {
+                    id: 'm1',
+                    data: () => ({
+                      name: 'Marker',
+                      type: 'marker',
+                      attachments: ['/firecall/old/files/uuid-plan.pdf'],
+                    }),
+                  },
+                ]
+              : [],
+        })
+      );
+
+      const progress: BackupProgress[] = [];
+      const result = await exportFirecall('test-id', {
+        omit: ['attachments'],
+        onProgress: (p) => progress.push(p),
+      });
+
+      expect(getBlob).not.toHaveBeenCalled();
+      expect(result.firecallAttachments).toBeUndefined();
+      expect(result.attachments).toEqual(['/firecall/old/files/uuid-lage.pdf']);
+      expect((result.items[0] as FcMarker).attachments).toEqual([
+        '/firecall/old/files/uuid-plan.pdf',
+      ]);
+      // Nicht geladene Anhänge zählen auch nicht zur Gesamtzahl.
+      expect(progress[progress.length - 1].total).toBe(0);
+    });
+
+    it('vermerkt ohne Auswahl nichts als weggelassen', async () => {
+      (getDocs as Mock).mockResolvedValue({ docs: [] });
+
+      const result = await exportFirecall('test-id');
+
+      expect(result.omitted).toBeUndefined();
+    });
+  });
+
+  describe('countBackupSections', () => {
+    it('zählt Verlauf und Audit-Log über Aggregationsabfragen', async () => {
+      (getCountFromServer as Mock).mockImplementation(
+        (col: { path?: string }) =>
+          Promise.resolve({
+            data: () => ({ count: col?.path === 'history' ? 120 : 4500 }),
+          })
+      );
+
+      const counts = await countBackupSections('test-id');
+
+      expect(counts).toEqual({ history: 120, auditlog: 4500 });
+      // Die Elemente werden fürs Zählen nicht gelesen — bei 45.000 Stück wäre
+      // genau das der teure Teil.
+      expect(getDocs).not.toHaveBeenCalled();
+    });
+
+    it('liefert ohne Netz einfach keine Zahlen', async () => {
+      (getCountFromServer as Mock).mockRejectedValue(new Error('offline'));
+
+      const counts = await countBackupSections('test-id');
+
+      expect(counts).toEqual({});
     });
   });
 
@@ -815,6 +930,26 @@ describe('useExport', () => {
 
       const created = (addDoc as Mock).mock.calls[0][1] as Record<string, any>;
       expect(created.group).toBe('ffnd');
+    });
+
+    it('schreibt den Vermerk über weggelassene Teile nicht an den Einsatz', async () => {
+      await importFirecall({
+        name: 'Ohne Verlauf',
+        omitted: ['history', 'attachments'],
+        attachments: ['/firecall/old/files/uuid-lage.pdf'],
+        items: [],
+        chat: [],
+        layers: [],
+        history: [],
+        locations: [],
+        kostenersatz: [],
+        auditlog: [],
+      });
+
+      const created = (addDoc as Mock).mock.calls[0][1] as Record<string, any>;
+      expect(created).not.toHaveProperty('omitted');
+      // Ohne eingebettete Anhänge bleiben die Verweise stehen.
+      expect(created.attachments).toEqual(['/firecall/old/files/uuid-lage.pdf']);
     });
 
     it('should import the strokes of a drawing inside a history snapshot', async () => {

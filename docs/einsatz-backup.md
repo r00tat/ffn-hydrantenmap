@@ -28,6 +28,38 @@ Das Einsatz-Dokument selbst plus alle Untersammlungen unter `call/{id}`:
 Anhänge — die des Einsatzes und die an Markern — werden aus dem Storage geladen
 und als Base64 in die Datei geschrieben. Der Import lädt sie wieder hoch.
 
+## Teile weglassen
+
+Der Download-Knopf öffnet zuerst einen Dialog. Dort lassen sich drei Teile
+abwählen; vorbelegt ist die vollständige Sicherung:
+
+| Teil | Warum er groß ist |
+| --- | --- |
+| Verlauf (`history`) | Jeder Eintrag ist eine Kopie *aller* Elemente samt Strichen. 100 Snapshots eines Einsatzes mit 400 Elementen sind 40.000 Dokumente, also das Hundertfache der eigentlichen Lage. |
+| Audit-Log (`auditlog`) | Ein Eintrag je Änderung, jeweils mit Stand davor und danach. Wächst mit jeder Verschiebung auf der Karte. |
+| Dateianhänge | Werden als Base64 eingebettet und kosten je Datei einen Download beim Export und einen Upload beim Import. |
+
+Auslöser war eine Übung mit rund 45.000 Dokumenten in der Sicherung, bei der
+Export und Import entsprechend lange dauerten. Was die Lage selbst ausmacht,
+lässt sich bewusst nicht abwählen: Elemente samt Einsatztagebuch, Ebenen,
+Einsatzorte, Chat, Besatzung, Atemschutz und Kostenersatz sind klein im
+Vergleich und ohne sie wäre die Kopie kein Einsatz mehr.
+
+- **Weggelassenes wird gar nicht erst gelesen.** Die Untersammlung wird
+  übersprungen, nicht gelesen und dann verworfen, denn beim Verlauf ist genau
+  das Lesen der langsame Teil.
+- **Ohne Anhänge bleiben die Storage-Verweise stehen.** Die Kopie verhält sich
+  dann wie eine alte Sicherung ohne eingebettete Dateien (siehe „Was der Import
+  ändert"). Sie zeigt die Dateien des Quell-Einsatzes, solange es ihn gibt.
+- **Die Datei vermerkt, was fehlt** (`omitted`). Ein leeres `history` sieht
+  sonst aus wie ein Einsatz, der nie einen Verlauf hatte. Der Import zeigt den
+  Vermerk als Hinweis an und schreibt ihn nicht an den neuen Einsatz.
+- **Der Dialog zeigt die Größe** von Verlauf und Audit-Log über
+  `getCountFromServer`, also einen Lesevorgang je 1000 Einträge. Die Anhänge
+  zählt er nicht, denn dafür müssten alle Elemente gelesen werden, und das ist
+  genau das, was der Dialog vermeiden helfen soll. Ohne Netz fehlen die
+  Zahlen einfach.
+
 `backupVersion` steht für das Format der Datei. Dateien ohne das Feld stammen
 aus der Zeit davor und gelten als Version 1. Ist die Version höher als die der
 laufenden App, warnt der Import — die Datei kann Daten enthalten, die er nicht
