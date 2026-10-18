@@ -109,8 +109,9 @@ jedem Einsatz der eigenen Wehr wäre Ballast.
 Warum überhaupt getrennt: „Wie viele eigene Leute habe ich" und „wer ist sonst
 noch da" sind zwei Fragen, und eine Zahl, die beides vermengt, beantwortet
 keine von beiden. Die eigene Feuerwehr (`fw`) taugt dafür nicht als Merkmal —
-eine Nachbarwehr trägt dort ebenfalls einen Feuerwehrnamen und ist trotzdem
-nicht die eigene Mannschaft.
+auch eine Fremdorganisation trägt dort einen Namen, und mehrere Feuerwehren im
+Einsatz sind alle Feuerwehr. Fremd ist, was keine Feuerwehr ist — gesetzt wird der
+Schalter von Hand.
 
 Der Schalter hängt am **Fahrzeug**. Eine taktische Einheit (`tacticalUnit`)
 kennt ihn nicht und zählt daher zu den eigenen Kräften; wer fremde Einheiten
@@ -185,9 +186,16 @@ taktische Einheiten ohne Dialog an. Sie hält sich an die beiden Konventionen ob
 - Leere Felder bleiben weg statt als `0` gespeichert zu werden — eine `0` am Fahrzeug
   überschriebe den Rückfall auf die Besatzungszuordnung.
 
-Der Schalter **Fremd** folgt der Feuerwehr (`defaultFremd()`): an, sobald eine andere als
-die Feuerwehr des Einsatzes eingetragen ist, weil eine Nachbarwehr nicht die eigene
-Mannschaft ist. Ein Klick legt ihn fest, bis die Feuerwehr wieder geändert wird. Feuerwehr,
+Der Schalter **Fremd** steht auf aus und schaltet sich nicht selbst ein. „Fremd" heißt
+Fremdorganisation — Rettung, Polizei, Bundesheer —, und eine Nachbarwehr ist Feuerwehr,
+keine Fremdorganisation. Eine Vorgabe aus dem Feld „Feuerwehr" (an bei jeder anderen als
+der eigenen Wehr) hat deshalb jede nachrückende Feuerwehr fälschlich unter die
+Fremdkräfte sortiert; wer eine Fremdorganisation einträgt, schaltet von Hand ein. Das Feld
+**Feuerwehr / Organisation** beginnt leer und wird bei jedem Wechsel auf „Fahrzeug" — von
+Hand oder nach dem Anlegen einer Einheit — wieder geleert, Fremd geht dabei wieder aus: Nachrückende Kräfte sind in
+größeren Einsätzen nicht immer die eigene Feuerwehr, und eine stillschweigend vorbelegte
+eigene Wehr landete sonst an fremden Fahrzeugen. Die eigene Feuerwehr steht als erster
+Vorschlag in der Liste. Feuerwehr,
 Fremd und „Eingetroffen" bleiben nach dem Anlegen stehen — nachrückende Kräfte sind meist
 mehrere Fahrzeuge derselben Organisation. Die Chips der eigenen Fahrzeuge legen dagegen
 immer eigene Kräfte ohne Stärkeangabe an, auch wenn im Feld gerade eine Nachbarwehr steht.
@@ -202,3 +210,77 @@ für Fahrzeuge; sie tragen dieselben drei Zeitfelder, die Stärke steht als
 
 Position ist die Einsatzadresse wie beim Personal-Board; wer das Element auf der Karte
 genauer haben will, verschiebt es dort.
+
+## Fahrzeuge unter einer taktischen Einheit
+
+Ein Fahrzeug gehört über `Fzg.tacticalUnitId` zu einer taktischen Einheit. Das Feld
+steht am **Fahrzeug**, nicht als Liste an der Einheit: Ein Fahrzeug gehört höchstens
+einer Einheit an, und so bleibt jede Zuordnung ein Schreibvorgang an einem Dokument —
+offline zwei Listen gegeneinander abzugleichen hieße, dass der letzte Schreiber die
+Zuordnung des anderen verwirft.
+
+**Einheiten unter Einheiten.** Dasselbe Feld trägt auch die Einheit
+(`TacticalUnit.tacticalUnitId`): Eine KHD-Bereitschaft hat zwei Züge, die Züge ihre
+Fahrzeuge. Ein Baum statt einer festen Ebene, weil die Gliederung der Formationen
+(Trupp, Gruppe, Zug, Bereitschaft, Abschnitt …) je nach Einsatz verschieden tief ist.
+Gelesen wird der Baum an jeder Stelle über
+[unit-tree.ts](../src/components/pages/unit-tree.ts): `parentMap()` behandelt einen
+Verweis auf eine fehlende Einheit und einen **Zyklus** gleich — als „ohne Einheit". Die
+Oberfläche bietet einer Einheit weder sich selbst noch etwas unter ihr an
+(`parentCandidates()`), ein Zyklus kann aber entstehen, wenn zwei Geräte offline
+gleichzeitig umhängen. Dann stehen die betroffenen Einheiten oben, statt dass eine
+Rekursion hängt oder Zeilen verschwinden.
+
+**Stärke.** Hängt etwas an einer Einheit, ist ihre Stärke die Summe darunter
+(`nestUnderUnits()` in [fahrzeuge-utils.ts](../src/components/pages/fahrzeuge-utils.ts)),
+und ihr eingetragenes `mann` tritt zurück. Das gilt auf jeder Ebene: Die Bereitschaft
+summiert ihre Züge, ein Zug seine Fahrzeuge — gezählt wird nur die unterste Ebene, ein
+Zug ohne Fahrzeuge also mit seinem gemeldeten `mann`. Die Zeile der Einheit trägt dann
+`childCount` und zählt in keiner Summe mit — sonst stünde jede Person zweimal in der
+Gesamtstärke. Ohne Fahrzeuge bleibt es beim eingetragenen `mann`, damit eine als „1:8"
+gemeldete Einheit ohne erfasste Fahrzeuge weiter zählt. Eine Einheit aus lauter fremden
+Fahrzeugen ist selbst fremd; sonst stünde sie bei den eigenen Kräften und ihre
+Fahrzeuge unter „Fremdkräfte". Der Filter der Tabelle nimmt zur passenden Einheit alles
+unter ihr mit und zum passenden Fahrzeug die ganze Kette der Einheiten darüber. Die
+Tabelle rückt jede Ebene weiter ein (`depth` an der Zeile).
+
+**Versetzen.** Wer eine Einheit einem Einsatzort zuordnet — in der Tabelle, auf der
+Seite „Einsatzorte" oder im Dialog des Einsatzorts —, nimmt alles unter ihr mit, auch
+die Züge einer Bereitschaft samt deren Fahrzeugen
+(`unitWithVehicles()` und `moveItemsToLocation()` in
+[location-assignment.ts](../src/components/pages/location-assignment.ts), ausgeführt von
+[useAssignToLocation.ts](../src/components/Einsatzorte/useAssignToLocation.ts)). Je
+Einsatzort entsteht genau eine Änderung an `vehicles`, sonst überschriebe die zweite
+Schreiboperation die erste. Im Einsatztagebuch steht ein Eintrag „1. Zug mit TLF …
+zugeordnet" und je bisherigem Einsatzort einer mit dem, was dort abgezogen wurde. Ein
+Fahrzeug oder eine Einheit, die einer Einheit beitritt, wird an deren Einsatzort
+versetzt. Ein einzeln
+woandershin geschicktes Fahrzeug bleibt in der Einheit; die Übersicht nach Einsatzort
+zeigt es dort, wo es steht.
+
+**Schnelleingabe.** Die taktische Einheit hat dort kein Feld „Feuerwehr" mehr: Ein Zug
+heißt im Einsatz „FW Neusiedl" oder „1. Zug Nord", und die Organisation in ein zweites
+Feld zu zerlegen, war nur Tipparbeit. Nach dem Anlegen einer Einheit springt die Zeile
+auf „Fahrzeug" mit der neuen Einheit vorgewählt, sodass ihre Fahrzeuge direkt
+hintereinander folgen. Bei „Taktische Einheit" heißt dieselbe Auswahl „Übergeordnete
+Einheit": Wer dort die Bereitschaft wählt, legt den Zug darunter an. Die Wahl bleibt
+stehen, wie beim Fahrzeug — für den zweiten Zug wählst du die Bereitschaft wieder,
+weil die Zeile nach dem ersten Zug auf diesen gesprungen ist. Eine Heuristik „eine Ebene
+höher" hätte bei drei Ebenen ebenso oft falsch geraten.
+
+## Übersicht nach Einsatzort
+
+Die Seite „Einsatzmittel" zeigt wahlweise die Tabelle oder je Einsatzort eine Karte
+([EinsatzmittelOverview.tsx](../src/components/pages/EinsatzmittelOverview.tsx), Logik in
+[einsatzmittel-overview.ts](../src/components/pages/einsatzmittel-overview.ts)). Gibt es
+Einsatzorte, ist die Übersicht voreingestellt. Die Tabelle beantwortet „wie viele", die
+Übersicht „was steht wo": Einheiten mit ihren Fahrzeugen, der Stand aus den Zeitfeldern
+(der späteste erfasste zählt) und die Stärke je Einsatzort nach denselben Regeln wie
+die Tabelle. Einsatzorte ohne Einsatzmittel fallen weg, nicht zugeordnete stehen am Ende.
+
+Mit Schreibrecht trägt jede Zeile dieselbe Einsatzort-Auswahl wie die Tabelle
+([LocationSelect.tsx](../src/components/pages/LocationSelect.tsx)), und die Zuordnung
+läuft über denselben Hook `useAssignToLocation`: Tagebuch, Position auf der Karte und
+die Fahrzeuge einer Einheit gehen genauso mit. Zwei Wege mit eigener Logik würden
+auseinanderlaufen — die Übersicht bekommt deshalb nur `onAssign` hereingereicht und
+bleibt ohne ihn reine Anzeige.

@@ -116,6 +116,50 @@ describe('overlayLayers', () => {
   });
 });
 
+describe('alle Ebenen der Karte', () => {
+  // Map.tsx reicht `subdomains` durch; `undefined` überschreibt Leaflets
+  // Vorgabe, und der erste Kachelabruf scheitert an `subdomains.length`.
+  it.each(Object.entries({ ...availableLayers, ...overlayLayers }))(
+    '%s setzt subdomains',
+    (_key, layer) => {
+      expect(layer.options.subdomains?.length).toBeGreaterThan(0);
+    },
+  );
+});
+
+describe('Luftraum von Austro Control', () => {
+  const layer = overlayLayers.luftraum_austrocontrol;
+
+  it('ist ein transparentes WMS-Overlay, das standardmäßig aus ist', () => {
+    expect(layer).toBeDefined();
+    expect(isWmsLayer(layer)).toBe(true);
+    expect(layer.url).toBe(
+      'https://sdigeo-free.austrocontrol.at/geoserver/free/wms?'
+    );
+    expect(layer.enabled).not.toBe(true);
+    expect(layer.options.transparent).toBe(true);
+    expect(layer.options.format).toBe('image/png');
+    expect(wmsTileSize(layer)).toBe(DEFAULT_WMS_TILE_SIZE);
+  });
+
+  it('fasst die für Drohnenflüge wichtigen Lufträume zusammen', () => {
+    const names = String(layer.options.layers).split(',');
+    expect(names).toEqual(
+      expect.arrayContaining(['CTR', 'MCTR', 'MATZ', 'R', 'D', 'TRA'])
+    );
+  });
+
+  it('heißt kurz nach Luftraum und Quelle', () => {
+    expect(layer.name).toBe('Luftraum Austro Control');
+  });
+
+  it('nennt Austro Control als Quelle und verweist auf die verbindlichen Geozonen', () => {
+    const attribution = String(layer.options.attribution);
+    expect(attribution).toContain('Austro Control');
+    expect(attribution).toContain('https://utm.dronespace.at/avm/');
+  });
+});
+
 describe('wmsTileSize', () => {
   it('liefert den Standard, wenn die Konfiguration nichts vorgibt', () => {
     const config: TileConfig = {

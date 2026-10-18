@@ -4,14 +4,55 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useState } from 'react';
+import {
+  einsatzmittelKategorie,
+  formatBesatzung,
+  parseBesatzung,
+} from '../../common/vehicle-utils';
 import { AssignableUnit, TACTICAL_UNIT_LABELS } from '../firebase/firestore';
+import { descendantIds } from '../pages/unit-tree';
 
 function unitCaption(unit: AssignableUnit): string | undefined {
   if (unit.type !== 'tacticalUnit') return undefined;
   return unit.unitType ? TACTICAL_UNIT_LABELS[unit.unitType] : 'Einheit';
+}
+
+/** Die Stärke, wie sie am Element gepflegt ist — leer, wenn nichts erfasst ist. */
+function unitStrength(unit: AssignableUnit): string | undefined {
+  if (unit.type === 'tacticalUnit') {
+    return unit.mann ? String(unit.mann) : undefined;
+  }
+  const besatzung = parseBesatzung(unit.besatzung);
+  if (besatzung <= 0) return undefined;
+  return formatBesatzung(besatzung, einsatzmittelKategorie(unit)) || undefined;
+}
+
+/**
+ * Was der Chip am Einsatzort beim Überfahren zeigt. Der Chip selbst trägt nur
+ * die Bezeichnung — bei mehreren Feuerwehren mit einem „RLF" ist erst hier zu
+ * sehen, welches gemeint ist.
+ */
+function UnitDetails({ unit }: { unit: AssignableUnit }) {
+  const t = useTranslations('einsatzorte');
+  const caption = unitCaption(unit);
+  const strength = unitStrength(unit);
+  const fuehrung = unit.type === 'tacticalUnit' ? unit.fuehrung : undefined;
+  return (
+    <Box>
+      <Typography variant="body2" component="div" sx={{ fontWeight: 'bold' }}>
+        {unit.name}
+      </Typography>
+      {unit.fw && <div>{unit.fw}</div>}
+      {caption && <div>{caption}</div>}
+      {strength && <div>{t('unitStrength', { value: strength })}</div>}
+      {fuehrung && <div>{t('unitLead', { value: fuehrung })}</div>}
+      {unit.beschreibung && <div>{unit.beschreibung}</div>}
+    </Box>
+  );
 }
 
 interface VehicleAutocompleteProps {
@@ -158,15 +199,26 @@ export default function VehicleAutocomplete({
     (vehicleId: string) => {
       const updated = { ...value };
       delete updated[vehicleId];
+      // Mit der Einheit geht alles unter ihr — Züge einer Bereitschaft samt
+      // deren Fahrzeugen. Es steht mit ihr dort.
+      for (const id of descendantIds(vehicleId, mapVehicles)) {
+        delete updated[id];
+      }
       onChange(updated);
     },
-    [value, onChange]
+    [value, onChange, mapVehicles]
   );
 
-  // Convert value Record to array for display
+  // Convert value Record to array for display. Der gespeicherte Name ist nur
+  // eine Momentaufnahme der Zuordnung — angezeigt wird das aktuelle Element,
+  // damit eine Umbenennung auch am Einsatzort ankommt.
   const selectedVehicles = useMemo(
-    () => Object.entries(value).map(([id, name]) => ({ id, name })),
-    [value]
+    () =>
+      Object.entries(value).map(([id, storedName]) => {
+        const unit = mapVehicles.find((v) => v.id === id);
+        return { id, name: unit?.name || storedName, unit };
+      }),
+    [value, mapVehicles]
   );
 
   return (
@@ -174,16 +226,26 @@ export default function VehicleAutocomplete({
       {/* Selected vehicles as chips */}
       {selectedVehicles.length > 0 && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-          {selectedVehicles.map(({ id, name }) => (
-            <Chip
-              key={id}
-              label={name}
-              size="small"
-              variant="outlined"
-              onDelete={disabled ? undefined : () => removeVehicle(id)}
-              disabled={disabled}
-            />
-          ))}
+          {selectedVehicles.map(({ id, name, unit }) => {
+            const chip = (
+              <Chip
+                key={id}
+                label={name}
+                size="small"
+                variant="outlined"
+                onDelete={disabled ? undefined : () => removeVehicle(id)}
+                disabled={disabled}
+              />
+            );
+            if (!unit) return chip;
+            // Ein deaktivierter Chip feuert keine Events — der Tooltip
+            // braucht deshalb den span-Wrapper (siehe CLAUDE.md).
+            return (
+              <Tooltip key={id} title={<UnitDetails unit={unit} />}>
+                <span>{chip}</span>
+              </Tooltip>
+            );
+          })}
         </Box>
       )}
 

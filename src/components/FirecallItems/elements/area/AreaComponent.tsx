@@ -24,6 +24,11 @@ import { FirecallArea } from '../FirecallArea';
 import PointContextMenu from '../PointContextMenu';
 import { nearestInsertIndex } from '../connection/pointGeometry';
 import { useStickyPointMarkers } from '../connection/useStickyPointMarkers';
+import { translatePositions } from '../../../Map/selection/multiSelect';
+import {
+  SELECTED_PATH_OPTIONS,
+  useShapeSelection,
+} from '../../../Map/selection/useShapeSelection';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
@@ -79,10 +84,18 @@ export default function AreaMarker({
     record.positions,
   ]);
 
+  // Mehrfachauswahl: Hervorhebung und Vorschau beim Verschieben der Gruppe.
+  const selection = useShapeSelection(record);
+  const shownPositions = useMemo(
+    () =>
+      selection.delta ? translatePositions(positions, selection.delta) : positions,
+    [positions, selection.delta]
+  );
+
   return (
     <>
       {(record.alwaysShowMarker === 'true' || stickyMarkers.visible) &&
-        positions.map((p, index) => (
+        shownPositions.map((p, index) => (
           <Marker
             key={index}
             position={p}
@@ -161,15 +174,17 @@ export default function AreaMarker({
           </Marker>
         ))}
       <Polygon
-        positions={positions}
+        positions={shownPositions}
         {...(pane ? { pane } : {})}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: 0.8,
           fillOpacity: ((record as any)?.opacity || 50.0) / 100,
+          ...(selection.selected ? SELECTED_PATH_OPTIONS : {}),
         }}
         eventHandlers={{
           click: (event) => {
+            if (selection.handleSelectClick(event)) return;
             stickyMarkers.markOwnClick(event);
             // nearestInsertIndex also handles clicks on the area fill (not just
             // exactly on an edge), so a new point can be added anywhere on the

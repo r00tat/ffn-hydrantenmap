@@ -2,12 +2,12 @@ import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-function sanitizeFilename(name: string): string {
+export function sanitizeFilename(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? name;
   return base.replace(/\.\.+/g, '_').replace(/^\.+/, '_') || 'download';
 }
 
-async function blobToBase64(blob: Blob): Promise<string> {
+export async function blobToBase64(blob: Blob): Promise<string> {
   if (typeof FileReader !== 'undefined') {
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();

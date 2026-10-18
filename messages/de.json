@@ -1045,6 +1045,8 @@
     "done": "Erledigt",
     "noCoords": "Keine Koordinaten",
     "addVehicle": "Fahrzeug oder Einheit hinzufügen...",
+    "unitStrength": "Stärke: {value}",
+    "unitLead": "Führung: {value}",
     "title": "Einsatzorte - {name}",
     "noFirecall": "Kein Einsatz ausgewählt",
     "checkEmails": "E-Mails prüfen",
@@ -3008,7 +3010,8 @@
       "eintreffen": "Eintreffen",
       "abruecken": "Abrücken",
       "force": "Kräfte",
-      "location": "Einsatzort"
+      "location": "Einsatzort",
+      "unit": "Einheit"
     },
     "editItem": "{name} bearbeiten",
     "locationFor": "Einsatzort von {name}",
@@ -3021,6 +3024,10 @@
     "foreignForcesTotal": "Summe Fremdkräfte",
     "forceOwn": "eigen",
     "forceForeign": "fremd",
+    "filter": "Einsatzmittel filtern",
+    "filterPlaceholder": "Bezeichnung, Feuerwehr, Typ …",
+    "clearFilter": "Filter leeren",
+    "noFilterMatch": "Keine Einsatzmittel passen zum Filter",
     "quickAdd": {
       "title": "Kräfte hinzufügen",
       "vehicle": "Fahrzeug",
@@ -3028,6 +3035,9 @@
       "name": "Bezeichnung",
       "unitType": "Art",
       "fw": "Feuerwehr / Organisation",
+      "unit": "Einheit",
+      "noUnit": "keine Einheit",
+      "parentUnit": "Übergeordnete Einheit",
       "crew": "Besatzung 1:?",
       "strength": "Stärke",
       "ats": "ATS",
@@ -3035,6 +3045,24 @@
       "arrived": "Eingetroffen",
       "add": "Hinzufügen",
       "added": "{name} hinzugefügt"
+    },
+    "unitFor": "Einheit von {name}",
+    "parentUnit": "Übergeordnete Einheit",
+    "noUnit": "keine Einheit",
+    "overview": {
+      "unassigned": "ohne Einsatzort",
+      "strength": "{count, plural, one {# Person} other {# Personen}}",
+      "empty": "Noch keine Einsatzmittel",
+      "status": {
+        "alerted": "alarmiert",
+        "arrived": "eingetroffen",
+        "departed": "abgerückt"
+      }
+    },
+    "view": {
+      "label": "Ansicht",
+      "table": "Tabelle",
+      "locations": "Nach Einsatzort"
     }
   },
   "einsaetze": {
@@ -3352,7 +3380,15 @@
     "deactivateTitle": "Zugang deaktivieren?",
     "deactivateText": "Der Link von {name} funktioniert danach nicht mehr. Der Zugang bleibt in der Liste und kann wieder aktiviert werden.",
     "updateError": "Änderung fehlgeschlagen: {error}",
-    "copyError": "Link konnte nicht erzeugt werden: {error}"
+    "copyError": "Link konnte nicht erzeugt werden: {error}",
+    "qrTitle": "QR-Code zum Einsatz-Link",
+    "shareQr": "QR-Code und Link teilen",
+    "downloadQr": "QR-Code herunterladen",
+    "shareText": "Zugang zum Einsatz „{name}“ in der Einsatzkarte:",
+    "shareTextGeneric": "Zugang zum Einsatz in der Einsatzkarte:",
+    "shareFallback": "Teilen wird hier nicht unterstützt: QR-Code heruntergeladen und Link kopiert.",
+    "shareFallbackNoCopy": "Teilen wird hier nicht unterstützt: QR-Code heruntergeladen. Bitte den Link oben manuell kopieren.",
+    "qrError": "QR-Code konnte nicht geteilt werden: {error}"
   },
   "errors": {
     "title": "Etwas ist schiefgelaufen",
@@ -4869,5 +4905,13 @@
       "notMigrated": "Der Benutzer ist noch nicht migriert und hat die alte Kostenersatz-Freischaltung. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus — dort legst du fest, in welchen Gruppen er Kostenersatz behält.",
       "unknown": "Das hat nicht geklappt: {message}"
     }
+  },
+  "mapSelection": {
+    "boxMode": "Mehrfachauswahl",
+    "boxModeOn": "Mehrfachauswahl: Ziehen markiert einen Rahmen, Tippen wählt Elemente. Am Desktop geht das auch mit gedrückter Umschalttaste.",
+    "boxModeOff": "Mehrfachauswahl beenden",
+    "selectedCount": "{count, plural, one {# Element ausgewählt} other {# Elemente ausgewählt}}",
+    "clear": "Auswahl aufheben",
+    "moveHandle": "Auswahl verschieben"
   }
 }

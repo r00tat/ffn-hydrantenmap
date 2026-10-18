@@ -17,6 +17,26 @@ vi.mock('../../app/actions/firecallShareLinks', () => ({
   issueFirecallShareLinkUrl: (...args: unknown[]) => issueUrl(...args),
 }));
 
+const shareLinkWithQr = vi.fn();
+const downloadBlob = vi.fn();
+
+vi.mock('./shareLinkWithQr', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./shareLinkWithQr')>()),
+  shareLinkWithQr: (...args: unknown[]) => shareLinkWithQr(...args),
+}));
+
+// jsdom kann kein Canvas rastern — das PNG wird hier nur durchgereicht.
+vi.mock('../Fahrtenbuch/admin/shareLinkQr', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../Fahrtenbuch/admin/shareLinkQr')
+  >()),
+  svgToPngBlob: vi.fn(async () => new Blob(['png'], { type: 'image/png' })),
+}));
+
+vi.mock('../firebase/download', () => ({
+  downloadBlob: (...args: unknown[]) => downloadBlob(...args),
+}));
+
 const { default: FirecallShareDialog } = await import('./FirecallShareDialog');
 
 const writeText = vi.fn().mockResolvedValue(undefined);
@@ -45,6 +65,8 @@ beforeEach(() => {
   issueUrl.mockResolvedValue({
     link: 'https://karte.example.at/einsatz/fc1?token=fresh',
   });
+  shareLinkWithQr.mockResolvedValue('shared');
+  downloadBlob.mockResolvedValue(undefined);
 });
 
 /**
@@ -63,7 +85,11 @@ function setupUser() {
 
 function render(onClose = vi.fn()) {
   return renderWithIntl(
-    <FirecallShareDialog firecallId="fc1" onClose={onClose} />
+    <FirecallShareDialog
+      firecallId="fc1"
+      firecallName="Brand Hauptstraße"
+      onClose={onClose}
+    />
   );
 }
 
@@ -218,5 +244,80 @@ describe('FirecallShareDialog', () => {
     expect(
       await screen.findByText(/Änderung fehlgeschlagen: expired/)
     ).toBeVisible();
+  });
+
+  it('shows a QR code for an issued link', async () => {
+    const user = setupUser();
+    listLinks.mockResolvedValue([link()]);
+    render();
+
+    await user.click(await screen.findByRole('button', { name: 'Link kopieren' }));
+
+    expect(await screen.findByTitle('QR-Code zum Einsatz-Link')).toBeInTheDocument();
+  });
+
+  it('shares the QR code together with the link', async () => {
+    const user = setupUser();
+    listLinks.mockResolvedValue([link()]);
+    render();
+
+    await user.click(await screen.findByRole('button', { name: 'Link kopieren' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'QR-Code und Link teilen' })
+    );
+
+    await waitFor(() => expect(shareLinkWithQr).toHaveBeenCalled());
+    const [options] = shareLinkWithQr.mock.lastCall as [
+      { url: string; text: string; filename: string; qrPng: Blob },
+    ];
+    expect(options.url).toBe('https://karte.example.at/einsatz/fc1?token=fresh');
+    expect(options.text).toContain('Brand Hauptstraße');
+    expect(options.filename).toBe('einsatz-link-orf.png');
+    expect(options.qrPng.type).toBe('image/png');
+  });
+
+  it('falls back to download and copy without a share sheet', async () => {
+    const user = setupUser();
+    listLinks.mockResolvedValue([link()]);
+    shareLinkWithQr.mockResolvedValue('unsupported');
+    render();
+
+    await user.click(await screen.findByRole('button', { name: 'Link kopieren' }));
+    writeText.mockClear();
+    await user.click(
+      await screen.findByRole('button', { name: 'QR-Code und Link teilen' })
+    );
+
+    await waitFor(() =>
+      expect(downloadBlob).toHaveBeenCalledWith(
+        expect.any(Blob),
+        'einsatz-link-orf.png'
+      )
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      'https://karte.example.at/einsatz/fc1?token=fresh'
+    );
+    expect(
+      await screen.findByText(/QR-Code heruntergeladen und Link kopiert/)
+    ).toBeVisible();
+  });
+
+  it('downloads the QR code as image', async () => {
+    const user = setupUser();
+    listLinks.mockResolvedValue([link()]);
+    render();
+
+    await user.click(await screen.findByRole('button', { name: 'Link kopieren' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'QR-Code herunterladen' })
+    );
+
+    await waitFor(() =>
+      expect(downloadBlob).toHaveBeenCalledWith(
+        expect.any(Blob),
+        'einsatz-link-orf.png'
+      )
+    );
+    expect(shareLinkWithQr).not.toHaveBeenCalled();
   });
 });

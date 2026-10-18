@@ -3,7 +3,6 @@ import { FirecallItem, Fzg, TacticalUnit } from '../firebase/firestore';
 import {
   buildQuickAddItem,
   collectFwOptions,
-  defaultFremd,
   parseTotalStrength,
   QuickAddInput,
 } from './quick-add-utils';
@@ -38,21 +37,6 @@ describe('parseTotalStrength', () => {
     ['0', undefined],
   ])('liest „%s" als %s', (raw, expected) => {
     expect(parseTotalStrength(raw)).toBe(expected);
-  });
-});
-
-describe('defaultFremd', () => {
-  it('ist für die eigene Feuerwehr aus', () => {
-    expect(defaultFremd('Neusiedl am See', 'Neusiedl am See')).toBe(false);
-    expect(defaultFremd(' neusiedl am see ', 'Neusiedl am See')).toBe(false);
-  });
-
-  it('ist ohne Feuerwehr aus', () => {
-    expect(defaultFremd('', 'Neusiedl am See')).toBe(false);
-  });
-
-  it('ist für eine andere Organisation an', () => {
-    expect(defaultFremd('Weiden am See', 'Neusiedl am See')).toBe(true);
   });
 });
 
@@ -136,7 +120,6 @@ describe('buildQuickAddItem', () => {
       type: 'tacticalUnit',
       name: '1. Zug',
       unitType: 'gruppe',
-      fw: 'Weiden am See',
       mann: 9,
       ats: 3,
       alarmierung: NOW.toISOString(),
@@ -144,5 +127,30 @@ describe('buildQuickAddItem', () => {
       lat: 47.9,
       lng: 16.8,
     });
+  });
+
+  it('trägt an der Einheit keine Feuerwehr ein — die steckt in der Bezeichnung', () => {
+    const item = buildQuickAddItem(
+      input({ kind: 'tacticalUnit', name: 'FW Neusiedl', fw: 'Neusiedl am See' }),
+      CTX,
+    ) as TacticalUnit;
+    expect(item.name).toBe('FW Neusiedl');
+    expect(item.fw).toBeUndefined();
+  });
+
+  it('ordnet ein Fahrzeug der gewählten Einheit zu', () => {
+    const item = buildQuickAddItem(
+      input({ tacticalUnitId: 'u1' }),
+      CTX,
+    ) as Fzg;
+    expect(item.tacticalUnitId).toBe('u1');
+  });
+
+  it('stellt eine Einheit unter die gewählte Einheit', () => {
+    const item = buildQuickAddItem(
+      input({ kind: 'tacticalUnit', tacticalUnitId: 'b1' }),
+      CTX,
+    );
+    expect(item).toMatchObject({ type: 'tacticalUnit', tacticalUnitId: 'b1' });
   });
 });

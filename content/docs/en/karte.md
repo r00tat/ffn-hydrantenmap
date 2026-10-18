@@ -11,6 +11,7 @@ The map shows hydrants and other important points in the operation area. You can
 - **Different base maps** Orthophoto, Basemap, Basemap grey, OpenStreetMap, OpenTopoMap
 - **Overlay layers** Operation sites, distance, radius, position, power outages, water levels, weather stations, addresses
 - **WMS layers** Floods, risk zones, inundation areas (provided by the state of Burgenland)
+- **Airspace Austro Control** Control zones, restricted and danger areas, model airfields and national parks – **not** the binding UAS geozones
 - **Custom map layers** Self-created WMS and tile services per operation, shown in the layer control under “Karte: …” (see [Ebenen](/docs/ebenen))
 - **Search a location** Enter an address or place name and view it on the map
 - **Editing mode with drawing tools** Place items on the map, draw lines and polygons
@@ -53,6 +54,10 @@ The map supports different base maps and additional overlay layers that you can 
 The WMS layers (floods, risk zones, inundation areas) are provided by the state of Burgenland and show current geodata.
 :::
 
+:::warning
+The overlay **Luftraum Austro Control** shows airspaces from Austro Control's freely available aviation data: control zones (CTR, MCTR, MATZ), restricted and danger areas (R, D), temporary reserved airspaces (TRA), model airfields and national parks. These are **not** the binding UAS geozones for drone flights – altitudes, times and individual zones may differ. Before a drone flight, always check the geozones on Dronespace's official map: [utm.dronespace.at/avm](https://utm.dronespace.at/avm/).
+:::
+
 ### Search a location
 
 The search function lets you quickly navigate to a specific address or place on the map.
@@ -74,6 +79,21 @@ In editing mode you can add, move and edit items belonging to the active operati
 
 :::info
 Only enable editing mode when you want to make changes. In view mode the map responds more quickly.
+:::
+
+### Select and move several items
+
+In editing mode you can select several items at once and move them together.
+
+1. **Draw a box:** Hold **Shift** and drag a box across the map with the mouse. Every item inside the box is selected — a line or area as soon as one of its points lies inside
+2. **Add or remove single items:** Shift + click on an item toggles it in the selection
+3. **On a tablet or phone:** Tap the **multi-select** icon at the top centre of the map. While it is active, swiping draws a box instead of panning the map, and tapping an item selects or deselects it. Pinch zoom still works
+4. Selected items have a dashed blue outline, and the number of selected items is shown at the top
+5. **Move:** Drag one of the selected items or the round blue handle with the four arrows in the middle of the selection. All selected items move by the same distance, lines and areas as a whole
+6. **Clear the selection:** Click an empty spot on the map, press **Esc** or use the cross next to the count
+
+:::info
+A history snapshot is saved automatically before the move, so you can restore the previous positions from the history. Only items on visible layers are selected and moved; locked items, drawings and water level items are left out.
 :::
 
 ### Enter coordinates

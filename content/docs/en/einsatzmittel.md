@@ -8,6 +8,8 @@ The operational resources page gives an overview of all vehicles and resources d
 - **Quick entry** for further vehicles and tactical units right on the page
 - **Strength table** With total crew size and breathing apparatus wearers (ATS)
 - Grouping by layers
+- **Overview by location** with units, vehicles, status and strength
+- **Vehicles under tactical units** — a unit moves together with its vehicles
 - Compact card view for each vehicle
 - CSV export of all operational resources
 - Edit vehicles and view details
@@ -33,7 +35,8 @@ The cursor then returns to the name; fire brigade, **External** and **Arrived** 
 
 - **Crew 1:?** on a vehicle is the crew without the commander — `8` or `1:8` means nine people
 - **Strength** on a tactical unit is the total strength — `9`, `1:8` or `1/8/9` mean nine people
-- **External** switches on as soon as another brigade than your own is entered, and can be toggled
+- **Fire brigade / organisation** starts empty for vehicles — your own brigade is the first suggestion in the list
+- Turn **External** on only for other organisations (ambulance, police …), not for other fire brigades
 - **Arrived** sets the arrival time to now, otherwise the alert time is set to now — so every new vehicle and unit appears as "alerted" or "arrived" in the operational diary
 - Your own vehicles can also be added with one click on their chip
 
@@ -46,6 +49,17 @@ The new item is placed at the incident address. Alarm time, description or posit
 
 :::info
 Tip: The strength table updates automatically when vehicles are added or crew sizes change.
+:::
+
+### Filter the strength table
+
+1. Type into the search field above the strength table, e.g. the name of a fire brigade or a vehicle
+2. The search ignores case and looks at **name**, **FW**, **type** and **location**
+3. Several words must all match: `Neusiedl TLF` finds only the TLF from Neusiedl
+4. Use the **×** in the search field to clear the filter
+
+:::info
+The total rows only add up the rows shown — filtering for one fire brigade shows its strength. The print view and the CSV export always contain all resources.
 :::
 
 ### Count crew and ATS wearers automatically
@@ -67,6 +81,28 @@ vehicles of other fire brigades without a crew assignment.
 3. Pick a location in the selection — **no location** removes the assignment
 
 A vehicle or unit is always at **one** location only: picking another one withdraws it from the previous one. If the location has coordinates, it is moved there on the map. Every assignment and withdrawal is written to the operational diary, as on the **Locations** page.
+
+### Assign vehicles to a tactical unit
+
+1. In the quick entry, first add the **Tactical unit**, e.g. "FW Neusiedl" as a platoon — it does not need a separate fire brigade field
+2. The row then switches to **Vehicle** with the new unit preselected under **Unit**: type its vehicles one after another
+3. Assign existing vehicles in the **Unit** column of the table or in the vehicle's edit dialog
+
+Vehicles appear indented under their unit in the table. The unit's strength is the sum of its vehicles and is not counted twice in the total. Assigning the unit to another location — in the table or on the **Locations** page — moves its vehicles along; removing it from a location removes them too.
+
+### Units under units
+
+A unit can itself belong to another unit, e.g. a **KHD Bereitschaft** (disaster relief company) with two platoons and their vehicles below:
+
+1. Add the company as a **Tactical unit**
+2. Switch to **Tactical unit** again, choose the company under **Parent unit** and add the 1st platoon — the row then switches to **Vehicle** under the 1st platoon
+3. For the 2nd platoon, choose the company as parent unit again
+
+Move existing units in the **Unit** column of the table or in the edit dialog. The company's strength is the sum of its platoons; moving the company or removing it from a location takes its platoons and vehicles along.
+
+### Overview by location
+
+Above the table, switch between **By location** and **Table**. The overview shows, per location, the units with their vehicles, whether they are alerted, arrived or departed, and the location's strength. Anything not yet assigned to a location is listed under **no location**. Use the selection next to each vehicle and unit to assign it to a location right here — a unit takes its vehicles along.
 
 ### View vehicles by layer
 

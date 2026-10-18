@@ -47,6 +47,10 @@ const saveHistory = vi.fn();
 vi.mock('../../hooks/firecallHistory/useSaveHistory', () => ({
   useSaveHistory: () => ({ saveHistory, saveInProgress: false }),
 }));
+const updateItem = vi.fn();
+vi.mock('../../hooks/useFirecallItemUpdate', () => ({
+  default: () => updateItem,
+}));
 vi.mock('../FirecallItems/FirecallItemUpdateDialog', () => ({
   default: ({ item }: { item: FirecallItem }) => (
     <div role="dialog">Dialog {item.name}</div>
@@ -167,8 +171,8 @@ describe('StrengthTable — bearbeitbar', () => {
     expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
     expect(updateLocation).toHaveBeenCalledWith('l2', { vehicles: { v1: 'TLF' } });
     expect(addDiaryEntry.mock.calls.map((c) => c[0])).toEqual([
-      'TLF von Einsatzort Keller Hauptplatz abgezogen',
-      'TLF zu Einsatzort Seestraße 5 zugeordnet',
+      'TLF FF Neusiedl von Einsatzort Keller Hauptplatz abgezogen',
+      'TLF FF Neusiedl zu Einsatzort Seestraße 5 zugeordnet',
     ]);
   });
 
@@ -195,11 +199,82 @@ describe('StrengthTable — bearbeitbar', () => {
 
     expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
     expect(addDiaryEntry).toHaveBeenCalledWith(
-      'TLF von Einsatzort Keller Hauptplatz abgezogen',
+      'TLF FF Neusiedl von Einsatzort Keller Hauptplatz abgezogen',
     );
     expect(releaseItem).toHaveBeenCalledWith(
       TLF_WITH_ID,
       expect.objectContaining({ id: 'l1' }),
+    );
+  });
+
+  it('nimmt beim Versetzen einer Einheit ihre Fahrzeuge mit', async () => {
+    const user = userEvent.setup();
+    const tlfInZug = { ...TLF_WITH_ID, tacticalUnitId: 'u1' } as FirecallItem;
+    renderWithIntl(<StrengthTable items={[ZUG, tlfInZug]} editable />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Einsatzort von 1. Zug' }));
+    await user.click(screen.getByRole('option', { name: 'Seestraße 5' }));
+
+    expect(updateLocation).toHaveBeenCalledWith('l1', { vehicles: {} });
+    expect(updateLocation).toHaveBeenCalledWith('l2', {
+      vehicles: { u1: '1. Zug', v1: 'TLF' },
+    });
+    expect(addDiaryEntry.mock.calls.map((c) => c[0])).toEqual([
+      'TLF FF Neusiedl von Einsatzort Keller Hauptplatz abgezogen',
+      '1. Zug mit TLF FF Neusiedl zu Einsatzort Seestraße 5 zugeordnet',
+    ]);
+    expect(placeItem).toHaveBeenCalledWith(ZUG, expect.objectContaining({ id: 'l2' }));
+    expect(placeItem).toHaveBeenCalledWith(
+      tlfInZug,
+      expect.objectContaining({ id: 'l2' }),
+    );
+  });
+
+  it('zeigt die Fahrzeuge unter ihrer Einheit und rechnet die Stärke aus ihnen', () => {
+    const tlfInZug = { ...TLF_WITH_ID, tacticalUnitId: 'u1' } as FirecallItem;
+    renderWithIntl(<StrengthTable items={[tlfInZug, ZUG]} editable />);
+    const rows = screen.getAllByRole('row').map((r) => r.textContent || '');
+    const zugIndex = rows.findIndex((t) => t.startsWith('1. Zug'));
+    expect(rows[zugIndex + 1]).toContain('TLF');
+    expect(within(totalRow('Gesamt')).getByText('6')).toBeInTheDocument();
+  });
+
+  it('ordnet ein Fahrzeug einer Einheit zu', async () => {
+    const user = userEvent.setup();
+    updateItem.mockReset();
+    renderWithIntl(<StrengthTable items={[TLF_WITH_ID, ZUG]} editable />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Einheit von TLF' }));
+    await user.click(screen.getByRole('option', { name: '1. Zug' }));
+
+    expect(updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'v1', tacticalUnitId: 'u1' }),
+    );
+  });
+
+  it('stellt eine Einheit unter eine andere, aber nie unter sich selbst', async () => {
+    const user = userEvent.setup();
+    updateItem.mockReset();
+    const bereitschaft = {
+      id: 'b1',
+      name: 'KHD Bereitschaft',
+      type: 'tacticalUnit',
+    } as unknown as FirecallItem;
+    const zugUnter = { ...ZUG, tacticalUnitId: 'b1' } as FirecallItem;
+    renderWithIntl(
+      <StrengthTable items={[bereitschaft, zugUnter, TLF_WITH_ID]} editable />,
+    );
+
+    // Die Bereitschaft darf nicht unter ihren eigenen Zug — eine andere
+    // Einheit gibt es nicht, also auch keine Auswahl.
+    expect(
+      screen.queryByRole('combobox', { name: 'Einheit von KHD Bereitschaft' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: 'Einheit von 1. Zug' }));
+    await user.click(screen.getByRole('option', { name: 'keine Einheit' }));
+    expect(updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'u1', tacticalUnitId: undefined }),
     );
   });
 
@@ -208,5 +283,72 @@ describe('StrengthTable — bearbeitbar', () => {
     renderWithIntl(<StrengthTable items={[TLF_WITH_ID, ZUG]} editable />);
     await user.click(screen.getByRole('button', { name: '1. Zug bearbeiten' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Dialog 1. Zug');
+  });
+});
+
+describe('StrengthTable — filterbar', () => {
+  const TLF_WITH_ID = { ...TLF, id: 'v1' } as FirecallItem;
+  const KLF = {
+    id: 'v2',
+    name: 'KLF',
+    fw: 'FF Weiden',
+    type: 'vehicle',
+    besatzung: '3',
+  } as unknown as FirecallItem;
+
+  it('zeigt das Suchfeld nur mit filterable', () => {
+    renderWithIntl(<StrengthTable items={[TLF]} />);
+    expect(
+      screen.queryByRole('textbox', { name: 'Einsatzmittel filtern' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('filtert nach Feuerwehr und rechnet die Summe über die Treffer', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StrengthTable items={[TLF, KLF, RTW]} filterable />);
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Einsatzmittel filtern' }),
+      'weiden',
+    );
+
+    expect(screen.getByText('KLF')).toBeInTheDocument();
+    expect(screen.queryByText('TLF')).not.toBeInTheDocument();
+    expect(screen.queryByText('RTW')).not.toBeInTheDocument();
+    // Ohne gefilterte Fremdkräfte kein leerer Abschnitt.
+    expect(screen.queryByText('Fremdkräfte')).not.toBeInTheDocument();
+    expect(within(totalRow('Gesamt')).getByText('4')).toBeInTheDocument();
+  });
+
+  it('findet nach dem Einsatzort', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <StrengthTable items={[TLF_WITH_ID, KLF]} editable filterable />,
+    );
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Einsatzmittel filtern' }),
+      'hauptplatz',
+    );
+
+    expect(screen.getByRole('combobox', { name: 'Einsatzort von TLF' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Einsatzort von KLF' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('meldet, wenn nichts passt, und leert den Filter wieder', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<StrengthTable items={[TLF, KLF]} filterable />);
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Einsatzmittel filtern' }),
+      'xyz',
+    );
+    expect(screen.getByText('Keine Einsatzmittel passen zum Filter')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter leeren' }));
+    expect(screen.getByText('TLF')).toBeInTheDocument();
+    expect(screen.getByText('KLF')).toBeInTheDocument();
   });
 });
