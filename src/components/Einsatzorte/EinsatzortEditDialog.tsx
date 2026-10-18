@@ -22,10 +22,12 @@ import useVehicles from '../../hooks/useVehicles';
 import { AssignableUnit, FirecallLocation, Fzg } from '../firebase/firestore';
 import EinsatzorteCard from './EinsatzorteCard';
 import {
+  assignedUnitLabel,
   getLocationDisplayName,
   vehicleAssignedEntry,
   vehicleRemovedEntry,
 } from './locationDiary';
+import { unitWithVehicles } from '../pages/location-assignment';
 import useLocationDiary from './useLocationDiary';
 
 type EditableKey = keyof FirecallLocation;
@@ -201,16 +203,22 @@ export default function EinsatzortEditDialog({
         );
         const currentVehicles =
           (loc.vehicles as Record<string, string>) || {};
-        if (!currentVehicles[vehicleId]) {
-          handleLocalChange({
-            vehicles: { ...currentVehicles, [vehicleId]: vehicleName },
-          });
+        // Eine taktische Einheit bringt ihre Fahrzeuge mit.
+        const unit = assignableUnits.find((u) => u.id === vehicleId);
+        const moving = unit ? unitWithVehicles(unit, assignableUnits) : [];
+        const added = Object.fromEntries(
+          moving
+            .filter((m) => m.id && !currentVehicles[m.id])
+            .map((m) => [m.id!, m.name]),
+        );
+        if (!currentVehicles[vehicleId]) added[vehicleId] = vehicleName;
+        if (Object.keys(added).length > 0) {
+          handleLocalChange({ vehicles: { ...currentVehicles, ...added } });
         }
 
         // Fahrzeug bzw. Einheit auf der Karte zum Einsatzort versetzen und
         // in seine Ebene legen
-        const unit = assignableUnits.find((u) => u.id === vehicleId);
-        if (unit) await locationLayers.placeItem(unit, loc);
+        for (const m of moving) await locationLayers.placeItem(m, loc);
       } catch (err) {
         console.error(`Failed to assign vehicle "${vehicleName}":`, err);
         setError(`Fehler beim Zuordnen von ${vehicleName}`);
@@ -276,14 +284,24 @@ export default function EinsatzortEditDialog({
         const newVehicles = diff.vehicles as Record<string, string>;
         for (const [vId, vName] of Object.entries(oldVehicles)) {
           if (!(vId in newVehicles)) {
-            addDiaryEntry(vehicleRemovedEntry(vName, working));
+            addDiaryEntry(
+              vehicleRemovedEntry(
+                assignedUnitLabel(vId, vName, assignableUnits),
+                working,
+              ),
+            );
             const unit = assignableUnits.find((u) => u.id === vId);
             if (unit) await locationLayers.releaseItem(unit, location);
           }
         }
         for (const [vId, vName] of Object.entries(newVehicles)) {
           if (!(vId in (oldVehicles as Record<string, string>))) {
-            addDiaryEntry(vehicleAssignedEntry(vName, working));
+            addDiaryEntry(
+              vehicleAssignedEntry(
+                assignedUnitLabel(vId, vName, assignableUnits),
+                working,
+              ),
+            );
           }
         }
       }

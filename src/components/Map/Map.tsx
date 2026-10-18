@@ -20,6 +20,7 @@ import { LeitungsProvider } from './Leitungen/context';
 import { DrawingProvider } from './Drawing/DrawingContext';
 import DrawingCanvas from './Drawing/DrawingCanvas';
 import DrawingToolbar from './Drawing/DrawingToolbar';
+import MapMultiSelect from './selection/MapMultiSelect';
 import MapActionButtons from './MapActionButtons';
 import ScaleRatioControl from './ScaleRatioControl';
 import MapSidebar from './MapSidebar';
@@ -244,6 +245,7 @@ export default function Map() {
             <Leitungen />
             <DrawingCanvas />
             <DrawingToolbar />
+            <MapMultiSelect />
           </DrawingProvider>
         </LeitungsProvider>
         <PositionAction />

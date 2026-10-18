@@ -21,6 +21,8 @@ export interface QuickAddInput {
   fremd: boolean;
   /** Die Kräfte sind schon da: Eintreffen ist jetzt. */
   arrived: boolean;
+  /** Nur am Fahrzeug — die taktische Einheit, unter der es fährt. */
+  tacticalUnitId?: string;
 }
 
 export interface QuickAddContext {
@@ -53,17 +55,6 @@ export function parseTotalStrength(raw: string): number | undefined {
   if (values.some((v) => !Number.isFinite(v))) return undefined;
   const total = values.reduce((sum, v) => sum + v, 0);
   return total > 0 ? total : undefined;
-}
-
-/**
- * Vorgabe für den Schalter „Fremdorganisation": an, sobald eine andere als die
- * eigene Feuerwehr eingetragen ist. Eine Nachbarwehr ist nicht die eigene
- * Mannschaft (docs/einsatzmittel-staerke.md) — wer sie trotzdem eigen führen
- * will, schaltet um.
- */
-export function defaultFremd(fw: string, ownFw: string): boolean {
-  const normalized = fw.trim().toLowerCase();
-  return normalized !== '' && normalized !== ownFw.trim().toLowerCase();
 }
 
 /** Feuerwehren für die Vorschlagsliste: die eigene zuerst, dann die schon im Einsatz. */
@@ -102,9 +93,13 @@ export function buildQuickAddItem(
       type: 'tacticalUnit',
       name,
       unitType: input.unitType,
-      fw,
+      // Keine Feuerwehr: Eine Einheit wird so gemeldet, wie sie heißt —
+      // „FW Neusiedl" als Zug. Die Feuerwehr des Fahrzeugs im Feld daneben
+      // hängte sonst ein zweites „Neusiedl am See" an die Bezeichnung.
       mann: parseTotalStrength(input.strength),
       ats,
+      // Die Einheit darüber — der Zug unter seiner Bereitschaft.
+      tacticalUnitId: input.tacticalUnitId || undefined,
       alarmierung,
       eintreffen,
       datum,
@@ -123,6 +118,7 @@ export function buildQuickAddItem(
     besatzung: besatzung ? String(besatzung) : undefined,
     ats,
     fremd: input.fremd ? 'true' : undefined,
+    tacticalUnitId: input.tacticalUnitId || undefined,
     alarmierung,
     eintreffen,
     datum,

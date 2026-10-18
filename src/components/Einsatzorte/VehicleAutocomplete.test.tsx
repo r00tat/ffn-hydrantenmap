@@ -36,6 +36,52 @@ describe('VehicleAutocomplete', () => {
     expect(onMapVehicleSelected).toHaveBeenCalledWith('u1', 'Kräfte Nord');
   });
 
+  it('nimmt beim Entfernen einer Einheit ihre Fahrzeuge mit', async () => {
+    const onChange = vi.fn();
+    const tlfInZug: Fzg = { ...tlf, tacticalUnitId: 'u1' };
+    const rlf: Fzg = { id: 'v2', name: 'RLF', type: 'vehicle' };
+    const { container } = renderWithIntl(
+      <VehicleAutocomplete
+        value={{ u1: 'Kräfte Nord', v1: 'TLFA 4000', v2: 'RLF' }}
+        onChange={onChange}
+        mapVehicles={[tlfInZug, rlf, zug]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    const zugChip = screen.getByText('Kräfte Nord').closest('.MuiChip-root');
+    const deleteIcon = zugChip?.querySelector('.MuiChip-deleteIcon');
+    expect(container).toContainElement(deleteIcon as HTMLElement);
+    await userEvent.click(deleteIcon as Element);
+
+    expect(onChange).toHaveBeenCalledWith({ v2: 'RLF' });
+  });
+
+  it('nimmt beim Entfernen einer Bereitschaft ihre Züge samt Fahrzeugen mit', async () => {
+    const onChange = vi.fn();
+    const bereitschaft: TacticalUnit = {
+      id: 'b1',
+      name: 'KHD Bereitschaft',
+      type: 'tacticalUnit',
+      unitType: 'bereitschaft',
+    };
+    const zugUnter: TacticalUnit = { ...zug, tacticalUnitId: 'b1' };
+    const tlfInZug: Fzg = { ...tlf, tacticalUnitId: 'u1' };
+    renderWithIntl(
+      <VehicleAutocomplete
+        value={{ b1: 'KHD Bereitschaft', u1: 'Kräfte Nord', v1: 'TLFA 4000' }}
+        onChange={onChange}
+        mapVehicles={[bereitschaft, zugUnter, tlfInZug]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    const chip = screen.getByText('KHD Bereitschaft').closest('.MuiChip-root');
+    await userEvent.click(chip?.querySelector('.MuiChip-deleteIcon') as Element);
+
+    expect(onChange).toHaveBeenCalledWith({});
+  });
+
   it('bietet eine schon zugeordnete Einheit nicht noch einmal an', async () => {
     renderWithIntl(
       <VehicleAutocomplete
@@ -48,5 +94,50 @@ describe('VehicleAutocomplete', () => {
 
     await userEvent.click(screen.getByRole('combobox'));
     expect(screen.queryByRole('option', { name: /Kräfte Nord/ })).toBeNull();
+  });
+});
+
+describe('VehicleAutocomplete – zugeordnete Einheiten', () => {
+  it('zeigt den aktuellen Namen statt der gespeicherten Momentaufnahme', () => {
+    renderWithIntl(
+      <VehicleAutocomplete
+        value={{ v1: 'TLF' }}
+        onChange={vi.fn()}
+        mapVehicles={[tlf, zug]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    expect(screen.getByText('TLFA 4000')).toBeInTheDocument();
+    expect(screen.queryByText('TLF')).toBeNull();
+  });
+
+  it('behält den gespeicherten Namen, wenn das Element nicht mehr da ist', () => {
+    renderWithIntl(
+      <VehicleAutocomplete
+        value={{ weg: 'KDO' }}
+        onChange={vi.fn()}
+        mapVehicles={[tlf]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    expect(screen.getByText('KDO')).toBeInTheDocument();
+  });
+
+  it('zeigt beim Überfahren die Feuerwehr und die Besatzung', async () => {
+    renderWithIntl(
+      <VehicleAutocomplete
+        value={{ v1: 'TLFA 4000' }}
+        onChange={vi.fn()}
+        mapVehicles={[{ ...tlf, besatzung: '8' }]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    await userEvent.hover(screen.getByText('TLFA 4000'));
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('FF Musterdorf');
+    expect(tooltip).toHaveTextContent('1:8');
   });
 });

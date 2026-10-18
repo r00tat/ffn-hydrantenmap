@@ -23,17 +23,13 @@ import VehicleQuickAddChips from '../FirecallItems/VehicleQuickAddChips';
 import {
   FirecallItem,
   Fzg,
+  TacticalUnit,
   TACTICAL_UNIT_LABELS,
   TACTICAL_UNIT_TYPES,
   TacticalUnitType,
 } from '../firebase/firestore';
 import { useSnackbar } from '../providers/SnackbarProvider';
-import {
-  buildQuickAddItem,
-  collectFwOptions,
-  defaultFremd,
-  QuickAddKind,
-} from './quick-add-utils';
+import { buildQuickAddItem, collectFwOptions, QuickAddKind } from './quick-add-utils';
 
 // Ohne expliziten Hint wählt Chromium unter Android IME_ACTION_NEXT, behandelt
 // die Aktion selbst und schickt kein Tastenereignis — Enter erreichte das
@@ -49,11 +45,7 @@ const ENTER_HINT = { enterKeyHint: 'done' } as const;
  * meist mehrere Fahrzeuge derselben Organisation sind. Alles Weitere
  * (Alarmierungszeit, Beschreibung, Position) bleibt dem Bearbeiten-Dialog.
  */
-export default function EinsatzmittelQuickAdd({
-  items,
-}: {
-  items: FirecallItem[];
-}) {
+export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[] }) {
   const t = useTranslations('einsatzmittel.quickAdd');
   const firecall = useFirecall();
   const addFirecallItem = useFirecallItemAdd();
@@ -65,26 +57,46 @@ export default function EinsatzmittelQuickAdd({
 
   const [kind, setKind] = useState<QuickAddKind>('vehicle');
   const [name, setName] = useState('');
-  const [fw, setFw] = useState(ownFw);
+  // Bewusst leer: Im Einsatz kommen genauso Nachbarwehren und andere
+  // Organisationen — die eigene Feuerwehr steht als erster Vorschlag in der Liste.
+  const [fw, setFw] = useState('');
   const [strength, setStrength] = useState('');
   const [ats, setAts] = useState('');
   const [unitType, setUnitType] = useState<TacticalUnitType>('zug');
-  // `null` folgt der Feuerwehr; erst ein Klick auf den Schalter legt ihn fest.
-  const [fremdOverride, setFremdOverride] = useState<boolean | null>(null);
+  // „Fremd" heißt Fremdorganisation (Rettung, Polizei …) — eine Nachbarwehr ist
+  // es nicht. Deshalb aus, bis jemand den Schalter anklickt.
+  const [fremd, setFremd] = useState(false);
   const [arrived, setArrived] = useState(true);
+  // Die Einheit, unter der neue Fahrzeuge angelegt werden. Bleibt stehen wie
+  // die Feuerwehr: Meist folgen einer Einheit mehrere Fahrzeuge.
+  const [tacticalUnitId, setTacticalUnitId] = useState('');
+  // Eine eben angelegte Einheit steht erst nach dem Snapshot in `items` —
+  // bis dahin hält sie die Auswahl selbst.
+  const [pendingUnit, setPendingUnit] = useState<TacticalUnit>();
 
-  const fremd = fremdOverride ?? defaultFremd(fw, ownFw);
+  // Beim Wechsel auf „Fahrzeug" beginnt die Feuerwehr wieder leer.
+  const switchKind = useCallback((value: QuickAddKind) => {
+    setKind(value);
+    if (value === 'vehicle') {
+      setFw('');
+      setFremd(false);
+    }
+  }, []);
 
   const fwOptions = useMemo(() => collectFwOptions(items, ownFw), [items, ownFw]);
   const nameOptions = useMemo(
     () => (kind === 'vehicle' ? fleet.map((v) => v.name) : []),
     [fleet, kind],
   );
+  const units = useMemo(() => {
+    const list = items.filter((i): i is TacticalUnit => i.type === 'tacticalUnit' && !!i.id);
+    if (pendingUnit && !list.some((u) => u.id === pendingUnit.id)) {
+      list.push(pendingUnit);
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }, [items, pendingUnit]);
   const existingOwnVehicleNames = useMemo(
-    () =>
-      items
-        .filter((i) => i.type === 'vehicle' && (i as Fzg).fw === ownFw)
-        .map((i) => i.name),
+    () => items.filter((i) => i.type === 'vehicle' && (i as Fzg).fw === ownFw).map((i) => i.name),
     [items, ownFw],
   );
 
@@ -106,6 +118,7 @@ export default function EinsatzmittelQuickAdd({
           unitType,
           fremd: overrides.fremd ?? fremd,
           arrived,
+          tacticalUnitId,
         },
         {
           now: new Date(),
@@ -114,16 +127,38 @@ export default function EinsatzmittelQuickAdd({
         },
       );
       if (!item) return false;
+      let id: string | undefined;
       try {
-        await addFirecallItem(item);
+        id = (await addFirecallItem(item))?.id;
       } catch {
         // Die Meldung zeigt `useFirecallItemAdd` selbst.
         return false;
       }
       showSnackbar(t('added', { name: item.name }), 'success');
+      // Nach einer Einheit kommen ihre Fahrzeuge: gleich auf „Fahrzeug" unter
+      // der neuen Einheit umschalten.
+      if (item.type === 'tacticalUnit' && id) {
+        setPendingUnit({ ...item, id } as TacticalUnit);
+        setTacticalUnitId(id);
+        switchKind('vehicle');
+      }
       return true;
     },
-    [addFirecallItem, arrived, ats, firecall, fremd, fw, kind, showSnackbar, strength, t, unitType],
+    [
+      addFirecallItem,
+      arrived,
+      ats,
+      firecall,
+      fremd,
+      fw,
+      kind,
+      showSnackbar,
+      strength,
+      switchKind,
+      t,
+      tacticalUnitId,
+      unitType,
+    ],
   );
 
   const handleSubmit = useCallback(
@@ -168,7 +203,7 @@ export default function EinsatzmittelQuickAdd({
           size="small"
           value={kind}
           onChange={(_, value: QuickAddKind | null) => {
-            if (value) setKind(value);
+            if (value) switchKind(value);
           }}
         >
           <ToggleButton value="vehicle">
@@ -218,27 +253,54 @@ export default function EinsatzmittelQuickAdd({
           </TextField>
         )}
 
-        <Autocomplete
-          freeSolo
-          size="small"
-          options={fwOptions}
-          inputValue={fw}
-          onInputChange={(_, value) => {
-            setFw(value);
-            setFremdOverride(null);
-          }}
-          sx={{ flex: '2 1 180px' }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label={t('fw')}
-              slotProps={{
-                ...params.slotProps,
-                htmlInput: { ...params.slotProps.htmlInput, ...ENTER_HINT },
-              }}
-            />
-          )}
-        />
+        {/* Am Fahrzeug die Einheit, an der Einheit die darüber — dieselbe
+            Auswahl, damit eine Bereitschaft und ihre Züge hintereinander
+            entstehen. */}
+        {units.length > 0 && (
+          <TextField
+            select
+            size="small"
+            label={kind === 'vehicle' ? t('unit') : t('parentUnit')}
+            value={tacticalUnitId}
+            onChange={(e) => setTacticalUnitId(e.target.value)}
+            sx={{ flex: '1 1 160px' }}
+            // `displayEmpty` zeigt „keine Einheit" im Feld — das Label muss
+            // dann oben am Rahmen stehen, sonst liegen beide Texte übereinander.
+            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+          >
+            <MenuItem value="">
+              <em>{t('noUnit')}</em>
+            </MenuItem>
+            {units.map((u) => (
+              <MenuItem key={u.id} value={u.id}>
+                {u.name}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+
+        {kind === 'vehicle' && (
+          <Autocomplete
+            freeSolo
+            size="small"
+            options={fwOptions}
+            inputValue={fw}
+            onInputChange={(_, value) => {
+              setFw(value);
+            }}
+            sx={{ flex: '2 1 180px' }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t('fw')}
+                slotProps={{
+                  ...params.slotProps,
+                  htmlInput: { ...params.slotProps.htmlInput, ...ENTER_HINT },
+                }}
+              />
+            )}
+          />
+        )}
 
         <TextField
           size="small"
@@ -265,7 +327,7 @@ export default function EinsatzmittelQuickAdd({
               <Checkbox
                 size="small"
                 checked={fremd}
-                onChange={(e) => setFremdOverride(e.target.checked)}
+                onChange={(e) => setFremd(e.target.checked)}
               />
             }
             label={t('fremd')}
@@ -283,12 +345,7 @@ export default function EinsatzmittelQuickAdd({
           label={t('arrived')}
         />
 
-        <Button
-          type="submit"
-          variant="contained"
-          startIcon={<AddIcon />}
-          disabled={!name.trim()}
-        >
+        <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={!name.trim()}>
           {t('add')}
         </Button>
       </Box>
