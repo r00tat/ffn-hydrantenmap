@@ -3,7 +3,6 @@ import { FirecallItem, Fzg, TacticalUnit } from '../firebase/firestore';
 import {
   buildQuickAddItem,
   collectFwOptions,
-  defaultFremd,
   parseTotalStrength,
   QuickAddInput,
 } from './quick-add-utils';
@@ -38,21 +37,6 @@ describe('parseTotalStrength', () => {
     ['0', undefined],
   ])('liest „%s" als %s', (raw, expected) => {
     expect(parseTotalStrength(raw)).toBe(expected);
-  });
-});
-
-describe('defaultFremd', () => {
-  it('ist für die eigene Feuerwehr aus', () => {
-    expect(defaultFremd('Neusiedl am See', 'Neusiedl am See')).toBe(false);
-    expect(defaultFremd(' neusiedl am see ', 'Neusiedl am See')).toBe(false);
-  });
-
-  it('ist ohne Feuerwehr aus', () => {
-    expect(defaultFremd('', 'Neusiedl am See')).toBe(false);
-  });
-
-  it('ist für eine andere Organisation an', () => {
-    expect(defaultFremd('Weiden am See', 'Neusiedl am See')).toBe(true);
   });
 });
 

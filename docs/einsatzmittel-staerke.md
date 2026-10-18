@@ -109,8 +109,9 @@ jedem Einsatz der eigenen Wehr wäre Ballast.
 Warum überhaupt getrennt: „Wie viele eigene Leute habe ich" und „wer ist sonst
 noch da" sind zwei Fragen, und eine Zahl, die beides vermengt, beantwortet
 keine von beiden. Die eigene Feuerwehr (`fw`) taugt dafür nicht als Merkmal —
-eine Nachbarwehr trägt dort ebenfalls einen Feuerwehrnamen und ist trotzdem
-nicht die eigene Mannschaft.
+auch eine Fremdorganisation trägt dort einen Namen, und mehrere Feuerwehren im
+Einsatz sind alle Feuerwehr. Fremd ist, was keine Feuerwehr ist — gesetzt wird der
+Schalter von Hand.
 
 Der Schalter hängt am **Fahrzeug**. Eine taktische Einheit (`tacticalUnit`)
 kennt ihn nicht und zählt daher zu den eigenen Kräften; wer fremde Einheiten
@@ -185,9 +186,16 @@ taktische Einheiten ohne Dialog an. Sie hält sich an die beiden Konventionen ob
 - Leere Felder bleiben weg statt als `0` gespeichert zu werden — eine `0` am Fahrzeug
   überschriebe den Rückfall auf die Besatzungszuordnung.
 
-Der Schalter **Fremd** folgt der Feuerwehr (`defaultFremd()`): an, sobald eine andere als
-die Feuerwehr des Einsatzes eingetragen ist, weil eine Nachbarwehr nicht die eigene
-Mannschaft ist. Ein Klick legt ihn fest, bis die Feuerwehr wieder geändert wird. Feuerwehr,
+Der Schalter **Fremd** steht auf aus und schaltet sich nicht selbst ein. „Fremd" heißt
+Fremdorganisation — Rettung, Polizei, Bundesheer —, und eine Nachbarwehr ist Feuerwehr,
+keine Fremdorganisation. Eine Vorgabe aus dem Feld „Feuerwehr" (an bei jeder anderen als
+der eigenen Wehr) hat deshalb jede nachrückende Feuerwehr fälschlich unter die
+Fremdkräfte sortiert; wer eine Fremdorganisation einträgt, schaltet von Hand ein. Das Feld
+**Feuerwehr / Organisation** beginnt leer und wird bei jedem Wechsel auf „Fahrzeug" — von
+Hand oder nach dem Anlegen einer Einheit — wieder geleert, Fremd geht dabei wieder aus: Nachrückende Kräfte sind in
+größeren Einsätzen nicht immer die eigene Feuerwehr, und eine stillschweigend vorbelegte
+eigene Wehr landete sonst an fremden Fahrzeugen. Die eigene Feuerwehr steht als erster
+Vorschlag in der Liste. Feuerwehr,
 Fremd und „Eingetroffen" bleiben nach dem Anlegen stehen — nachrückende Kräfte sind meist
 mehrere Fahrzeuge derselben Organisation. Die Chips der eigenen Fahrzeuge legen dagegen
 immer eigene Kräfte ohne Stärkeangabe an, auch wenn im Feld gerade eine Nachbarwehr steht.

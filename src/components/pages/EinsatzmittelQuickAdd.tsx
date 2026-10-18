@@ -29,7 +29,7 @@ import {
   TacticalUnitType,
 } from '../firebase/firestore';
 import { useSnackbar } from '../providers/SnackbarProvider';
-import { buildQuickAddItem, collectFwOptions, defaultFremd, QuickAddKind } from './quick-add-utils';
+import { buildQuickAddItem, collectFwOptions, QuickAddKind } from './quick-add-utils';
 
 // Ohne expliziten Hint wählt Chromium unter Android IME_ACTION_NEXT, behandelt
 // die Aktion selbst und schickt kein Tastenereignis — Enter erreichte das
@@ -57,12 +57,15 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
 
   const [kind, setKind] = useState<QuickAddKind>('vehicle');
   const [name, setName] = useState('');
-  const [fw, setFw] = useState(ownFw);
+  // Bewusst leer: Im Einsatz kommen genauso Nachbarwehren und andere
+  // Organisationen — die eigene Feuerwehr steht als erster Vorschlag in der Liste.
+  const [fw, setFw] = useState('');
   const [strength, setStrength] = useState('');
   const [ats, setAts] = useState('');
   const [unitType, setUnitType] = useState<TacticalUnitType>('zug');
-  // `null` folgt der Feuerwehr; erst ein Klick auf den Schalter legt ihn fest.
-  const [fremdOverride, setFremdOverride] = useState<boolean | null>(null);
+  // „Fremd" heißt Fremdorganisation (Rettung, Polizei …) — eine Nachbarwehr ist
+  // es nicht. Deshalb aus, bis jemand den Schalter anklickt.
+  const [fremd, setFremd] = useState(false);
   const [arrived, setArrived] = useState(true);
   // Die Einheit, unter der neue Fahrzeuge angelegt werden. Bleibt stehen wie
   // die Feuerwehr: Meist folgen einer Einheit mehrere Fahrzeuge.
@@ -71,7 +74,14 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
   // bis dahin hält sie die Auswahl selbst.
   const [pendingUnit, setPendingUnit] = useState<TacticalUnit>();
 
-  const fremd = fremdOverride ?? defaultFremd(fw, ownFw);
+  // Beim Wechsel auf „Fahrzeug" beginnt die Feuerwehr wieder leer.
+  const switchKind = useCallback((value: QuickAddKind) => {
+    setKind(value);
+    if (value === 'vehicle') {
+      setFw('');
+      setFremd(false);
+    }
+  }, []);
 
   const fwOptions = useMemo(() => collectFwOptions(items, ownFw), [items, ownFw]);
   const nameOptions = useMemo(
@@ -130,7 +140,7 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
       if (item.type === 'tacticalUnit' && id) {
         setPendingUnit({ ...item, id } as TacticalUnit);
         setTacticalUnitId(id);
-        setKind('vehicle');
+        switchKind('vehicle');
       }
       return true;
     },
@@ -144,6 +154,7 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
       kind,
       showSnackbar,
       strength,
+      switchKind,
       t,
       tacticalUnitId,
       unitType,
@@ -192,7 +203,7 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
           size="small"
           value={kind}
           onChange={(_, value: QuickAddKind | null) => {
-            if (value) setKind(value);
+            if (value) switchKind(value);
           }}
         >
           <ToggleButton value="vehicle">
@@ -271,7 +282,6 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
             inputValue={fw}
             onInputChange={(_, value) => {
               setFw(value);
-              setFremdOverride(null);
             }}
             sx={{ flex: '2 1 180px' }}
             renderInput={(params) => (
@@ -312,7 +322,7 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
               <Checkbox
                 size="small"
                 checked={fremd}
-                onChange={(e) => setFremdOverride(e.target.checked)}
+                onChange={(e) => setFremd(e.target.checked)}
               />
             }
             label={t('fremd')}

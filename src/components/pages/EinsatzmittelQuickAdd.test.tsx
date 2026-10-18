@@ -48,7 +48,8 @@ describe('EinsatzmittelQuickAdd', () => {
     const fw = screen.getByRole('combobox', { name: 'Feuerwehr / Organisation' });
     await user.clear(fw);
     await user.type(fw, 'Weiden am See');
-    expect(screen.getByRole('checkbox', { name: 'Fremd' })).toBeChecked();
+    // Eine Nachbarwehr ist Feuerwehr, keine Fremdorganisation.
+    expect(screen.getByRole('checkbox', { name: 'Fremd' })).not.toBeChecked();
 
     await user.type(screen.getByLabelText('Besatzung 1:?'), '1:5');
     const name = screen.getByRole('combobox', { name: 'Bezeichnung' });
@@ -60,16 +61,51 @@ describe('EinsatzmittelQuickAdd', () => {
       name: 'RLFA 3000',
       fw: 'Weiden am See',
       besatzung: '5',
-      fremd: 'true',
       lat: 47.9,
       lng: 16.8,
     });
     expect(addItem.mock.calls[0][0].eintreffen).toBeDefined();
+    expect(addItem.mock.calls[0][0].fremd).toBeUndefined();
 
     await waitFor(() => expect(name).toHaveValue(''));
     expect(name).toHaveFocus();
     expect(fw).toHaveValue('Weiden am See');
     expect(screen.getByLabelText('Besatzung 1:?')).toHaveValue('');
+  });
+
+  it('lässt die Feuerwehr beim Fahrzeug leer', async () => {
+    const user = userEvent.setup();
+    render(<EinsatzmittelQuickAdd items={existing} />);
+
+    const fw = () => screen.getByRole('combobox', { name: 'Feuerwehr / Organisation' });
+    expect(fw()).toHaveValue('');
+    expect(screen.getByRole('checkbox', { name: 'Fremd' })).not.toBeChecked();
+
+    await user.type(fw(), 'Weiden am See');
+    await user.click(screen.getByRole('button', { name: 'Taktische Einheit' }));
+    await user.click(screen.getByRole('button', { name: 'Fahrzeug' }));
+    expect(fw()).toHaveValue('');
+  });
+
+  it('markiert eine Fremdorganisation nur auf Klick', async () => {
+    const user = userEvent.setup();
+    render(<EinsatzmittelQuickAdd items={existing} />);
+
+    await user.type(
+      screen.getByRole('combobox', { name: 'Feuerwehr / Organisation' }),
+      'Rotes Kreuz',
+    );
+    const fremd = screen.getByRole('checkbox', { name: 'Fremd' });
+    expect(fremd).not.toBeChecked();
+    await user.click(fremd);
+    await user.type(screen.getByRole('combobox', { name: 'Bezeichnung' }), 'RTW{Enter}');
+
+    await waitFor(() => expect(addItem).toHaveBeenCalledTimes(1));
+    expect(addItem.mock.calls[0][0]).toMatchObject({
+      name: 'RTW',
+      fw: 'Rotes Kreuz',
+      fremd: 'true',
+    });
   });
 
   it('legt eine taktische Einheit mit Gesamtstärke an', async () => {
@@ -116,6 +152,9 @@ describe('EinsatzmittelQuickAdd', () => {
       'aria-pressed',
       'true',
     );
+    expect(
+      screen.getByRole('combobox', { name: 'Feuerwehr / Organisation' }),
+    ).toHaveValue('');
     await user.type(
       screen.getByRole('combobox', { name: 'Bezeichnung' }),
       'RLF{Enter}',

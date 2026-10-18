@@ -35,7 +35,8 @@ Danach steht der Cursor wieder in der Bezeichnung; Feuerwehr, **Fremd** und **Ei
 
 - **Besatzung 1:?** am Fahrzeug ist die Mannschaft ohne Kommandant — `8` oder `1:8` ergibt neun Personen
 - **Stärke** an der taktischen Einheit ist die Gesamtstärke — `9`, `1:8` oder `1/8/9` ergeben neun Personen
-- **Fremd** schaltet sich ein, sobald eine andere als die eigene Feuerwehr eingetragen ist, und lässt sich umschalten
+- **Feuerwehr / Organisation** ist beim Fahrzeug leer — die eigene Feuerwehr steht als erster Vorschlag in der Liste
+- **Fremd** schaltest du nur für Fremdorganisationen ein (Rettung, Polizei …), nicht für andere Feuerwehren
 - **Eingetroffen** setzt die Eintreffzeit auf jetzt, sonst wird die Alarmierungszeit auf jetzt gesetzt — so steht jedes neue Fahrzeug und jede neue Einheit als „alarmiert" bzw. „eingetroffen" im Einsatztagebuch
 - Die eigenen Fahrzeuge lassen sich zusätzlich mit einem Klick auf ihren Chip anlegen
 

@@ -57,17 +57,6 @@ export function parseTotalStrength(raw: string): number | undefined {
   return total > 0 ? total : undefined;
 }
 
-/**
- * Vorgabe für den Schalter „Fremdorganisation": an, sobald eine andere als die
- * eigene Feuerwehr eingetragen ist. Eine Nachbarwehr ist nicht die eigene
- * Mannschaft (docs/einsatzmittel-staerke.md) — wer sie trotzdem eigen führen
- * will, schaltet um.
- */
-export function defaultFremd(fw: string, ownFw: string): boolean {
-  const normalized = fw.trim().toLowerCase();
-  return normalized !== '' && normalized !== ownFw.trim().toLowerCase();
-}
-
 /** Feuerwehren für die Vorschlagsliste: die eigene zuerst, dann die schon im Einsatz. */
 export function collectFwOptions(items: FirecallItem[], ownFw: string): string[] {
   const others = new Set<string>();
