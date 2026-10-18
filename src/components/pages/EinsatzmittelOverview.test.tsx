@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import type { FirecallItem, FirecallLocation } from '../firebase/firestore';
@@ -64,5 +65,29 @@ describe('EinsatzmittelOverview', () => {
     expect(within(card('Seestraße 5')).getByText('alarmiert')).toBeInTheDocument();
     expect(within(card('ohne Einsatzort')).getByText('RLF')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Leer' })).not.toBeInTheDocument();
+    // Ohne Schreibrecht nur Anzeige
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('ordnet ein Fahrzeug einem Einsatzort zu', async () => {
+    const user = userEvent.setup();
+    const onAssign = vi.fn();
+    renderWithIntl(
+      <EinsatzmittelOverview
+        items={[zug, tlf, klf, rlf]}
+        locations={locations}
+        onAssign={onAssign}
+      />,
+    );
+
+    const select = screen.getByRole('combobox', { name: 'Einsatzort von RLF' });
+    await user.click(select);
+    await user.click(screen.getByRole('option', { name: 'Keller' }));
+    expect(onAssign).toHaveBeenCalledWith(rlf, 'l1');
+
+    // Auch die Einheit samt Fahrzeugen lässt sich versetzen — und abziehen.
+    await user.click(screen.getByRole('combobox', { name: 'Einsatzort von 1. Zug' }));
+    await user.click(screen.getByRole('option', { name: 'kein Einsatzort' }));
+    expect(onAssign).toHaveBeenLastCalledWith(zug, '');
   });
 });

@@ -92,7 +92,7 @@ Die Fahrzeuge stehen in der Tabelle eingerückt unter ihrer Einheit. Die Stärke
 
 ### Übersicht nach Einsatzort
 
-Über der Tabelle schaltest du zwischen **Nach Einsatzort** und **Tabelle** um. Die Übersicht zeigt je Einsatzort die Einheiten mit ihren Fahrzeugen, ob sie alarmiert, eingetroffen oder abgerückt sind, und die Stärke des Einsatzorts. Was noch keinem Einsatzort zugeordnet ist, steht unter **ohne Einsatzort**.
+Über der Tabelle schaltest du zwischen **Nach Einsatzort** und **Tabelle** um. Die Übersicht zeigt je Einsatzort die Einheiten mit ihren Fahrzeugen, ob sie alarmiert, eingetroffen oder abgerückt sind, und die Stärke des Einsatzorts. Was noch keinem Einsatzort zugeordnet ist, steht unter **ohne Einsatzort**. Über die Auswahl neben jedem Fahrzeug und jeder Einheit ordnest du sie auch hier einem Einsatzort zu — eine Einheit nimmt ihre Fahrzeuge mit.
 
 ### Fahrzeuge nach Ebenen ansehen
 

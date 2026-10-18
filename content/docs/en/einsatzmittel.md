@@ -92,7 +92,7 @@ Vehicles appear indented under their unit in the table. The unit's strength is t
 
 ### Overview by location
 
-Above the table, switch between **By location** and **Table**. The overview shows, per location, the units with their vehicles, whether they are alerted, arrived or departed, and the location's strength. Anything not yet assigned to a location is listed under **no location**.
+Above the table, switch between **By location** and **Table**. The overview shows, per location, the units with their vehicles, whether they are alerted, arrived or departed, and the location's strength. Anything not yet assigned to a location is listed under **no location**. Use the selection next to each vehicle and unit to assign it to a location right here — a unit takes its vehicles along.
 
 ### View vehicles by layer
 

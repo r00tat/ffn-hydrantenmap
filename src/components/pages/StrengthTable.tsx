@@ -32,10 +32,8 @@ import {
   calculateStrength,
   filterStrength,
 } from './fahrzeuge-utils';
-import {
-  currentLocationId,
-  locationLabel,
-} from './location-assignment';
+import LocationSelect from './LocationSelect';
+import { currentLocationId, locationLabel } from './location-assignment';
 import useAssignToLocation from '../Einsatzorte/useAssignToLocation';
 
 const BASE_COLUMNS = 8;
@@ -50,47 +48,6 @@ interface Editing {
   units: FirecallItem[];
   /** `unitId` leer heißt: aus der Einheit lösen. */
   onUnitChange: (row: StrengthRow, unitId: string) => void;
-}
-
-function LocationSelect({
-  row,
-  locations,
-  onAssign,
-}: {
-  row: StrengthRow;
-  locations: FirecallLocation[];
-  onAssign: Editing['onAssign'];
-}) {
-  const t = useTranslations('einsatzmittel');
-  // Eine Einheit steht immer nur an einem Einsatzort — deshalb eine
-  // Einfachauswahl; ein neuer Ort zieht sie vom bisherigen ab.
-  const selected = useMemo(
-    () => currentLocationId(locations, row),
-    [locations, row],
-  );
-
-  return (
-    <Select
-      displayEmpty
-      variant="standard"
-      size="small"
-      value={selected}
-      onChange={(e) => onAssign(row, e.target.value)}
-      inputProps={{ 'aria-label': t('locationFor', { name: row.name }) }}
-      sx={{ minWidth: 120, maxWidth: 240, fontSize: 'body2.fontSize' }}
-    >
-      <MenuItem value="">
-        <Typography variant="body2" color="text.secondary" component="span">
-          {t('noLocation')}
-        </Typography>
-      </MenuItem>
-      {locations.map((l) => (
-        <MenuItem key={l.id} value={l.id}>
-          {locationLabel(l)}
-        </MenuItem>
-      ))}
-    </Select>
-  );
 }
 
 function UnitSelect({
@@ -176,9 +133,9 @@ function StrengthRows({
             <TableCell>
               {row.id && (
                 <LocationSelect
-                  row={row}
+                  item={row}
                   locations={editing.locations}
-                  onAssign={editing.onAssign}
+                  onAssign={(locationId) => editing.onAssign(row, locationId)}
                 />
               )}
             </TableCell>

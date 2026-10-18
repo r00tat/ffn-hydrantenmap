@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl';
 import { useContext, useMemo } from 'react';
 import { FirecallContext } from '../../hooks/useFirecall';
 import { AssignableUnit, FirecallItem, FirecallLocation } from '../firebase/firestore';
+import LocationSelect from './LocationSelect';
 import { locationLabel } from './location-assignment';
 import {
   DeploymentStatus,
@@ -17,6 +18,14 @@ import {
   groupByLocation,
 } from './einsatzmittel-overview';
 import { StrengthRow, calculateStrength } from './fahrzeuge-utils';
+
+/** Ohne `onAssign` bleibt die Übersicht reine Anzeige. */
+type OnAssign = (item: FirecallItem, locationId: string) => void;
+
+interface Assigning {
+  locations: FirecallLocation[];
+  onAssign: OnAssign;
+}
 
 const STATUS_COLOR: Record<DeploymentStatus, 'warning' | 'success' | 'default'> = {
   alerted: 'warning',
@@ -28,10 +37,12 @@ function ItemLine({
   item,
   row,
   nested = false,
+  assigning,
 }: {
   item: FirecallItem;
   row?: StrengthRow;
   nested?: boolean;
+  assigning?: Assigning;
 }) {
   const t = useTranslations('einsatzmittel.overview');
   // Fahrzeug und Einheit tragen beide Zeiten und Feuerwehr.
@@ -41,6 +52,7 @@ function ItemLine({
     <Box
       sx={{
         display: 'flex',
+        flexWrap: 'wrap',
         alignItems: 'center',
         gap: 1,
         pl: nested ? 3 : 0,
@@ -68,6 +80,13 @@ function ItemLine({
           {row.mann}
         </Typography>
       )}
+      {assigning && item.id && (
+        <LocationSelect
+          item={item}
+          locations={assigning.locations}
+          onAssign={(locationId) => assigning.onAssign(item, locationId)}
+        />
+      )}
     </Box>
   );
 }
@@ -75,15 +94,23 @@ function ItemLine({
 function Entry({
   entry,
   rows,
+  assigning,
 }: {
   entry: OverviewEntry;
   rows: Map<string | undefined, StrengthRow>;
+  assigning?: Assigning;
 }) {
   return (
     <Box sx={{ mb: 0.5 }}>
-      <ItemLine item={entry.item} row={rows.get(entry.item.id)} />
+      <ItemLine item={entry.item} row={rows.get(entry.item.id)} assigning={assigning} />
       {entry.children.map((child) => (
-        <ItemLine key={child.id} item={child} row={rows.get(child.id)} nested />
+        <ItemLine
+          key={child.id}
+          item={child}
+          row={rows.get(child.id)}
+          nested
+          assigning={assigning}
+        />
       ))}
     </Box>
   );
@@ -97,11 +124,18 @@ function Entry({
 export default function EinsatzmittelOverview({
   items,
   locations,
+  onAssign,
 }: {
   items: FirecallItem[];
   locations: FirecallLocation[];
+  /** Versetzt ein Einsatzmittel; eine Einheit nimmt ihre Fahrzeuge mit. */
+  onAssign?: OnAssign;
 }) {
   const t = useTranslations('einsatzmittel.overview');
+  const assigning = useMemo(
+    () => (onAssign ? { locations, onAssign } : undefined),
+    [locations, onAssign],
+  );
   const { crewAssignments } = useContext(FirecallContext);
   const groups = useMemo(() => groupByLocation(items, locations), [items, locations]);
   const rows = useMemo(
@@ -135,7 +169,7 @@ export default function EinsatzmittelOverview({
                 </Typography>
               </Box>
               {group.entries.map((entry) => (
-                <Entry key={entry.item.id} entry={entry} rows={rows} />
+                <Entry key={entry.item.id} entry={entry} rows={rows} assigning={assigning} />
               ))}
             </Paper>
           </Grid>

@@ -37,6 +37,7 @@ import { FirecallVehicle } from '../FirecallItems/elements/FirecallVehicle';
 import EinsatzmittelQuickAdd from './EinsatzmittelQuickAdd';
 import StrengthTable from './StrengthTable';
 import EinsatzmittelOverview from './EinsatzmittelOverview';
+import useAssignToLocation from '../Einsatzorte/useAssignToLocation';
 import { calculateStrength } from './fahrzeuge-utils';
 
 function downloadEinsatzmittel(
@@ -256,7 +257,10 @@ export default function Fahrzeuge() {
   // Ohne gewählten Einsatz landete ein neues Element unter `call/unknown`.
   const firecallId = useFirecallId();
   const canAdd = canWrite && firecallId !== 'unknown';
-  const { locations } = useFirecallLocations();
+  const { locations, updateLocation } = useFirecallLocations();
+  // Wie in der Tabelle: dieselbe Zuordnung samt Tagebuch, Karte und Fahrzeugen
+  // einer Einheit — nur mit Schreibrecht.
+  const assign = useAssignToLocation(locations, updateLocation, displayItems);
   // Ohne Wahl: mit Einsatzorten die Gliederung nach Einsatzort, sonst die
   // Tabelle — eine Ansicht nach Einsatzort ohne Einsatzorte wäre eine Liste.
   const [chosenView, setChosenView] = useState<'table' | 'locations'>();
@@ -324,7 +328,11 @@ export default function Fahrzeuge() {
       </ToggleButtonGroup>
 
       {view === 'locations' ? (
-        <EinsatzmittelOverview items={displayItems} locations={locations} />
+        <EinsatzmittelOverview
+          items={displayItems}
+          locations={locations}
+          onAssign={canAdd ? assign : undefined}
+        />
       ) : (
         <StrengthTable items={displayItems} editable={canAdd} filterable />
       )}

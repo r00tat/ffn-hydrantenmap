@@ -256,3 +256,10 @@ Einsatzorte, ist die Übersicht voreingestellt. Die Tabelle beantwortet „wie v
 Übersicht „was steht wo": Einheiten mit ihren Fahrzeugen, der Stand aus den Zeitfeldern
 (der späteste erfasste zählt) und die Stärke je Einsatzort nach denselben Regeln wie
 die Tabelle. Einsatzorte ohne Einsatzmittel fallen weg, nicht zugeordnete stehen am Ende.
+
+Mit Schreibrecht trägt jede Zeile dieselbe Einsatzort-Auswahl wie die Tabelle
+([LocationSelect.tsx](../src/components/pages/LocationSelect.tsx)), und die Zuordnung
+läuft über denselben Hook `useAssignToLocation`: Tagebuch, Position auf der Karte und
+die Fahrzeuge einer Einheit gehen genauso mit. Zwei Wege mit eigener Logik würden
+auseinanderlaufen — die Übersicht bekommt deshalb nur `onAssign` hereingereicht und
+bleibt ohne ihn reine Anzeige.
