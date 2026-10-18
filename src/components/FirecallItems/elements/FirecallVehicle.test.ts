@@ -23,6 +23,7 @@ vi.mock('../../../hooks/useMapEditor', () => ({
 }));
 
 import { FirecallVehicle } from './FirecallVehicle';
+import type { Fzg } from '../../firebase/firestore';
 
 describe('FirecallVehicle', () => {
   it('sets type to vehicle', () => {
@@ -201,5 +202,17 @@ describe('FirecallVehicle: Fremdfahrzeug und Farbe', () => {
     expect(new FirecallVehicle({ name: 'TLF', type: 'vehicle' } as any).isFremd()).toBe(
       false
     );
+  });
+});
+
+describe('FirecallVehicle — taktische Einheit', () => {
+  it('führt die Einheit im Datensatz mit', () => {
+    const tlf = new FirecallVehicle({
+      name: 'TLF',
+      type: 'vehicle',
+      tacticalUnitId: 'u1',
+    } as Fzg);
+    expect(tlf.data().tacticalUnitId).toBe('u1');
+    expect(tlf.copy().data().tacticalUnitId).toBe('u1');
   });
 });

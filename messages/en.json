@@ -1045,6 +1045,8 @@
     "done": "Done",
     "noCoords": "No coordinates",
     "addVehicle": "Add vehicle or unit...",
+    "unitStrength": "Strength: {value}",
+    "unitLead": "Lead: {value}",
     "title": "Operation sites - {name}",
     "noFirecall": "No operation selected",
     "checkEmails": "Check emails",
@@ -3008,7 +3010,8 @@
       "eintreffen": "Arrived at",
       "abruecken": "Departed at",
       "force": "Forces",
-      "location": "Location"
+      "location": "Location",
+      "unit": "Unit"
     },
     "editItem": "Edit {name}",
     "locationFor": "Location of {name}",
@@ -3021,6 +3024,10 @@
     "foreignForcesTotal": "Other organisations total",
     "forceOwn": "own",
     "forceForeign": "other",
+    "filter": "Filter resources",
+    "filterPlaceholder": "Name, fire brigade, type …",
+    "clearFilter": "Clear filter",
+    "noFilterMatch": "No resources match the filter",
     "quickAdd": {
       "title": "Add resources",
       "vehicle": "Vehicle",
@@ -3028,6 +3035,9 @@
       "name": "Name",
       "unitType": "Type",
       "fw": "Fire brigade / organisation",
+      "unit": "Unit",
+      "noUnit": "no unit",
+      "parentUnit": "Parent unit",
       "crew": "Crew 1:?",
       "strength": "Strength",
       "ats": "SCBA",
@@ -3035,6 +3045,24 @@
       "arrived": "Arrived",
       "add": "Add",
       "added": "{name} added"
+    },
+    "unitFor": "Unit of {name}",
+    "parentUnit": "Parent unit",
+    "noUnit": "no unit",
+    "overview": {
+      "unassigned": "no location",
+      "strength": "{count, plural, one {# person} other {# people}}",
+      "empty": "No resources yet",
+      "status": {
+        "alerted": "alerted",
+        "arrived": "arrived",
+        "departed": "departed"
+      }
+    },
+    "view": {
+      "label": "View",
+      "table": "Table",
+      "locations": "By location"
     }
   },
   "einsaetze": {
@@ -4865,5 +4893,13 @@
       "notMigrated": "This user has not been migrated yet and still has the old cost recovery flag. Run step 2 under “Permissions (migration)” first — that is where you choose the groups in which they keep cost recovery.",
       "unknown": "That did not work: {message}"
     }
+  },
+  "mapSelection": {
+    "boxMode": "Multi-select",
+    "boxModeOn": "Multi-select: dragging draws a box, tapping selects items. On desktop, hold Shift instead.",
+    "boxModeOff": "End multi-select",
+    "selectedCount": "{count, plural, one {# item selected} other {# items selected}}",
+    "clear": "Clear selection",
+    "moveHandle": "Move selection"
   }
 }

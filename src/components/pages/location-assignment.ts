@@ -1,7 +1,8 @@
 import { FirecallItem, FirecallLocation } from '../firebase/firestore';
+import { descendantIds } from './unit-tree';
 import { getLocationDisplayName } from '../Einsatzorte/locationDiary';
 
-interface AssignableItem {
+export interface AssignableItem {
   id?: string;
   name: string;
 }
@@ -79,6 +80,63 @@ export function moveItemToLocation(
     move.assignedTo = target;
   }
   return move;
+}
+
+interface UnitItem extends AssignableItem {
+  type?: string;
+  tacticalUnitId?: string;
+}
+
+/**
+ * Das Element samt allem, was mit ihm zieht: An einer taktischen Einheit
+ * hängt alles unter ihr (`tacticalUnitId`) — Fahrzeuge und Unter-Einheiten
+ * samt deren Fahrzeugen. Ein Fahrzeug steht für sich.
+ */
+export function unitWithVehicles<T extends UnitItem>(item: T, items: T[]): T[] {
+  if (item.type !== 'tacticalUnit' || !item.id) return [item];
+  const byId = new Map(items.filter((i) => i.id).map((i) => [i.id, i]));
+  return [
+    item,
+    ...descendantIds(item.id, items)
+      .map((id) => byId.get(id))
+      .filter((i): i is T => !!i),
+  ];
+}
+
+/**
+ * Wie `moveItemToLocation`, für mehrere Elemente auf einmal — eine Einheit
+ * mit ihren Fahrzeugen. Je Einsatzort entsteht genau eine Änderung, sonst
+ * überschriebe die zweite Schreiboperation die erste.
+ */
+export function moveItemsToLocation(
+  locations: FirecallLocation[],
+  items: AssignableItem[],
+  targetId: string,
+): LocationMove {
+  let current = locations;
+  const changed = new Map<string, Record<string, string>>();
+  const removedFrom = new Map<string, FirecallLocation>();
+  let assignedTo: FirecallLocation | undefined;
+
+  for (const item of items) {
+    const move = moveItemToLocation(current, item, targetId);
+    for (const update of move.updates) changed.set(update.id, update.vehicles);
+    for (const location of move.removedFrom) {
+      if (location.id) removedFrom.set(location.id, location);
+    }
+    assignedTo = assignedTo ?? move.assignedTo;
+    current = current.map((l) =>
+      l.id && changed.has(l.id) ? { ...l, vehicles: changed.get(l.id)! } : l,
+    );
+  }
+
+  return {
+    updates: [...changed].map(([id, vehicles]) => ({ id, vehicles })),
+    removedFrom: [...removedFrom.values()],
+    assignedTo: assignedTo
+      ? locations.find((l) => l.id === assignedTo?.id)
+      : undefined,
+  };
 }
 
 function withoutItem(

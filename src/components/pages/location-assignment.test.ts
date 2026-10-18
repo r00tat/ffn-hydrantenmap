@@ -5,7 +5,9 @@ import {
   isAssignedToLocation,
   locationLabel,
   moveItemToLocation,
+  moveItemsToLocation,
   positionAtLocation,
+  unitWithVehicles,
 } from './location-assignment';
 
 function loc(
@@ -113,5 +115,79 @@ describe('positionAtLocation', () => {
     expect(
       positionAtLocation(vehicle, loc('a', {}, { lat: 47.9, lng: 16.8 })),
     ).toBeUndefined();
+  });
+});
+
+describe('unitWithVehicles', () => {
+  it('liefert die Einheit samt ihrer Fahrzeuge', () => {
+    const items = [
+      { id: 'u1', name: 'Zug Nord', type: 'tacticalUnit' },
+      { id: 'v1', name: 'TLF', type: 'vehicle', tacticalUnitId: 'u1' },
+      { id: 'v2', name: 'RLF', type: 'vehicle' },
+    ];
+    expect(unitWithVehicles(items[0], items).map((i) => i.id)).toEqual([
+      'u1',
+      'v1',
+    ]);
+  });
+
+  it('nimmt Unter-Einheiten samt ihrer Fahrzeuge mit', () => {
+    const items = [
+      { id: 'b1', name: 'KHD Bereitschaft', type: 'tacticalUnit' },
+      { id: 'z1', name: '1. Zug', type: 'tacticalUnit', tacticalUnitId: 'b1' },
+      { id: 'v1', name: 'TLF', type: 'vehicle', tacticalUnitId: 'z1' },
+      { id: 'z2', name: '2. Zug', type: 'tacticalUnit', tacticalUnitId: 'b1' },
+      { id: 'v2', name: 'RLF', type: 'vehicle' },
+    ];
+    expect(unitWithVehicles(items[0], items).map((i) => i.id)).toEqual([
+      'b1',
+      'z1',
+      'v1',
+      'z2',
+    ]);
+    expect(unitWithVehicles(items[1], items).map((i) => i.id)).toEqual(['z1', 'v1']);
+  });
+
+  it('kappt einen Zyklus, statt endlos zu laufen', () => {
+    const items = [
+      { id: 'a', name: 'A', type: 'tacticalUnit', tacticalUnitId: 'b' },
+      { id: 'b', name: 'B', type: 'tacticalUnit', tacticalUnitId: 'a' },
+    ];
+    expect(unitWithVehicles(items[0], items).map((i) => i.id)).toEqual(['a']);
+  });
+
+  it('liefert ein Fahrzeug allein', () => {
+    const tlf = { id: 'v1', name: 'TLF', type: 'vehicle' };
+    expect(unitWithVehicles(tlf, [tlf])).toEqual([tlf]);
+  });
+});
+
+describe('moveItemsToLocation', () => {
+  const zug = { id: 'u1', name: 'Zug Nord' };
+  const tlf = { id: 'v1', name: 'TLF' };
+  const klf = { id: 'v2', name: 'KLF' };
+
+  it('versetzt mehrere Elemente mit einer Änderung je Einsatzort', () => {
+    const locations = [
+      loc('a', { u1: 'Zug Nord', v1: 'TLF' }),
+      loc('b', { v2: 'KLF', x: 'RLF' }),
+      loc('c', {}),
+    ];
+    const move = moveItemsToLocation(locations, [zug, tlf, klf], 'c');
+    const byId = Object.fromEntries(move.updates.map((u) => [u.id, u.vehicles]));
+    expect(byId).toEqual({
+      a: {},
+      b: { x: 'RLF' },
+      c: { u1: 'Zug Nord', v1: 'TLF', v2: 'KLF' },
+    });
+    expect(move.assignedTo?.id).toBe('c');
+    expect(move.removedFrom.map((l) => l.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('zieht mit leerem Ziel alle ab', () => {
+    const locations = [loc('a', { u1: 'Zug Nord', v1: 'TLF' })];
+    const move = moveItemsToLocation(locations, [zug, tlf], '');
+    expect(move.updates).toEqual([{ id: 'a', vehicles: {} }]);
+    expect(move.assignedTo).toBeUndefined();
   });
 });

@@ -45,6 +45,11 @@ import HoseLengthOverlay from './HoseLengthOverlay';
 import { versorgungsart } from './pendel/pendelRoute';
 import { nearestInsertIndex } from './pointGeometry';
 import { useStickyPointMarkers } from './useStickyPointMarkers';
+import { translatePositions } from '../../../Map/selection/multiSelect';
+import {
+  SELECTED_PATH_OPTIONS,
+  useShapeSelection,
+} from '../../../Map/selection/useShapeSelection';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
@@ -144,6 +149,23 @@ export default function ConnectionMarker({
   //
   // `record` ist bei jedem Render eine neue Instanz und taugt nicht als
   // Abhängigkeit; stattdessen die Felder, aus denen sich das Ergebnis ergibt.
+  // Mehrfachauswahl: Hervorhebung und Vorschau, solange die Gruppe gezogen
+  // wird. Der Straßenverlauf wird für die Vorschau mitverschoben, gespeichert
+  // wird er danach neu berechnet.
+  const selection = useShapeSelection(record);
+  const shownPositions = useMemo(
+    () =>
+      selection.delta ? translatePositions(positions, selection.delta) : positions,
+    [positions, selection.delta]
+  );
+  const shownLinePositions = useMemo(
+    () =>
+      selection.delta
+        ? translatePositions(linePositions, selection.delta)
+        : linePositions,
+    [linePositions, selection.delta]
+  );
+
   const foerderung = record.get<string>('foerderung');
   const foerderungUmgekehrt = record.get<string>('foerderungUmgekehrt');
   const foerderMenge = record.get<number>('foerderMenge');
@@ -218,7 +240,7 @@ export default function ConnectionMarker({
 
   return (
     <>
-      {positions
+      {shownPositions
         .filter(([pLat, pLng]) => pLat && pLng)
         .map(
           (p, index) =>
@@ -318,16 +340,18 @@ export default function ConnectionMarker({
             )
         )}
       <Polyline
-        positions={(dragPositions ?? linePositions).filter(
+        positions={(dragPositions ?? shownLinePositions).filter(
           ([pLat, pLng]) => pLat && pLng
         )}
         {...(pane ? { pane } : {})}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: ((record as any)?.opacity || 100.0) / 100,
+          ...(selection.selected ? SELECTED_PATH_OPTIONS : {}),
         }}
         eventHandlers={{
           click: (event) => {
+            if (selection.handleSelectClick(event)) return;
             stickyMarkers.markOwnClick(event);
             // nearestInsertIndex handles clicks anywhere near the line, so a new
             // point can be added via left-click without hitting a segment exactly.
@@ -438,7 +462,7 @@ export default function ConnectionMarker({
           suchen. */}
       {(showLabel || (record.type === 'connection' && mode !== 'pendel')) && (
         <HoseLengthOverlay
-          positions={dragPositions ?? linePositions}
+          positions={dragPositions ?? shownLinePositions}
           dimension={
             record.type === 'connection'
               ? record.get<string>('dimension') || 'B'

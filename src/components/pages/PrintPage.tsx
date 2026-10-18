@@ -42,6 +42,7 @@ import DynamicMap from '../Map/PositionedMap';
 import { useDiaries } from '../pages/EinsatzTagebuch';
 import { useGeschaeftsbuchEintraege } from '../pages/Geschaeftsbuch';
 import EinsatzTagebuchPrint from '../pages/EinsatzTagebuchPrint';
+import { assignedUnitLabel } from '../Einsatzorte/locationDiary';
 import GeschaeftsbuchPrint from '../pages/GeschaeftsbuchPrint';
 import {
   PrintAtemschutz,
@@ -459,7 +460,14 @@ export default function PrintPage() {
                   <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{loc.startTime || ''}</td>
                   <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{loc.doneTime || ''}</td>
                   <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>
-                    {Object.values(loc.vehicles || {}).join(', ')}
+                    {Object.entries(loc.vehicles || {})
+                      .map(([id, name]) =>
+                        assignedUnitLabel(id, name, [
+                          ...vehicles,
+                          ...tacticalUnits,
+                        ]),
+                      )
+                      .join(', ')}
                   </td>
                 </tr>
               ))}

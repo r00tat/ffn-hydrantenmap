@@ -17,6 +17,8 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
+import useAssignToLocation from '../Einsatzorte/useAssignToLocation';
+import { unitWithVehicles } from './location-assignment';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useEmailImport from '../../hooks/useEmailImport';
 import useVehicles from '../../hooks/useVehicles';
@@ -35,8 +37,10 @@ import EinsatzorteTable, {
 } from '../Einsatzorte/EinsatzorteTable';
 import EinsatzorteCard from '../Einsatzorte/EinsatzorteCard';
 import {
+  assignedUnitLabel,
   getLocationDisplayName,
   locationCreatedEntry,
+  unitLabel,
   vehicleAssignedEntry,
   vehicleRemovedEntry,
 } from '../Einsatzorte/locationDiary';
@@ -66,6 +70,12 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
   const assignableUnits = useMemo<AssignableUnit[]>(
     () => [...firecallVehicles, ...tacticalUnits],
     [firecallVehicles, tacticalUnits],
+  );
+
+  const assignToLocation = useAssignToLocation(
+    locations,
+    updateLocation,
+    assignableUnits,
   );
 
   // Suggestions from Kostenersatz, map vehicles and tactical units
@@ -214,7 +224,12 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
               oldVehicles,
             )) {
               if (!(vehicleId in updates.vehicles)) {
-                addDiaryEntry(vehicleRemovedEntry(vehicleName, location));
+                addDiaryEntry(
+                  vehicleRemovedEntry(
+                    assignedUnitLabel(vehicleId, vehicleName, assignableUnits),
+                    location,
+                  ),
+                );
                 const unit = assignableUnits.find((u) => u.id === vehicleId);
                 if (unit) await locationLayers.releaseItem(unit, location);
               }
@@ -276,12 +291,14 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
 
         let vehicleId: string;
         let vehicleDisplayName: string;
+        let diaryName: string;
         const layer = await locationLayers.layerFor(location);
 
         if (existingVehicle && existingVehicle.id) {
           // Vehicle exists: update position and use existing ID
           vehicleId = existingVehicle.id;
           vehicleDisplayName = existingVehicle.name;
+          diaryName = unitLabel(existingVehicle);
 
           console.info(
             `Updating existing vehicle "${vehicleName}" position to ${lat}, ${lng}`,
@@ -313,6 +330,7 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
           const docRef = await addFirecallItem(newVehicle);
           vehicleId = docRef.id;
           vehicleDisplayName = vehicleName;
+          diaryName = unitLabel(newVehicle);
 
           setSnackbar(`${vehicleName} auf Karte hinzugefügt`);
         }
@@ -327,7 +345,7 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
         }
 
         // Diary entry for vehicle assignment
-        addDiaryEntry(vehicleAssignedEntry(vehicleDisplayName, location));
+        addDiaryEntry(vehicleAssignedEntry(diaryName, location));
       } catch (error) {
         console.error(`Failed to add/update vehicle "${vehicleName}":`, error);
         setSnackbar(`Fehler beim Aktualisieren von ${vehicleName}`);
@@ -352,6 +370,18 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
       location: FirecallLocation,
     ) => {
       try {
+        // Eine Einheit mit Fahrzeugen zieht als Ganzes um — wie in der
+        // Tabelle auf der Seite „Einsatzmittel".
+        const selected = assignableUnits.find((u) => u.id === vehicleId);
+        if (
+          selected &&
+          location.id &&
+          unitWithVehicles(selected, assignableUnits).length > 1
+        ) {
+          await assignToLocation(selected, location.id);
+          return;
+        }
+
         const locationDisplayName = getLocationDisplayName(location);
         await saveHistory(
           `Status vor ${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`,
@@ -371,13 +401,25 @@ export default function Einsatzorte({ hideTitle = false }: EinsatzorteProps) {
         if (unit) await locationLayers.placeItem(unit, location);
 
         // Diary entry for vehicle assignment
-        addDiaryEntry(vehicleAssignedEntry(vehicleName, location));
+        addDiaryEntry(
+          vehicleAssignedEntry(
+            assignedUnitLabel(vehicleId, vehicleName, assignableUnits),
+            location,
+          ),
+        );
       } catch (error) {
         console.error(`Failed to assign vehicle "${vehicleName}":`, error);
         setSnackbar(`Fehler beim Zuordnen von ${vehicleName}`);
       }
     },
-    [saveHistory, updateLocation, assignableUnits, locationLayers, addDiaryEntry],
+    [
+      saveHistory,
+      updateLocation,
+      assignableUnits,
+      locationLayers,
+      addDiaryEntry,
+      assignToLocation,
+    ],
   );
 
   const handleCreateVehicle = useCallback(

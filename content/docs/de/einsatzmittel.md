@@ -8,6 +8,8 @@ Die Einsatzmittel-Seite bietet eine Übersicht aller im Einsatz eingesetzten Fah
 - **Schnelleingabe** für weitere Fahrzeuge und taktische Einheiten direkt auf der Seite
 - **Stärketabelle** Mit Gesamtbesatzung und Atemschutzträger (ATS)
 - Gruppierung nach Ebenen
+- **Übersicht nach Einsatzort** mit Einheiten, Fahrzeugen, Stand und Stärke
+- **Fahrzeuge unter taktischen Einheiten** — die Einheit zieht mit ihren Fahrzeugen um
 - Kompakte Kartenansicht pro Fahrzeug
 - CSV-Export aller Einsatzmittel
 - Fahrzeuge bearbeiten und Details einsehen
@@ -33,7 +35,8 @@ Danach steht der Cursor wieder in der Bezeichnung; Feuerwehr, **Fremd** und **Ei
 
 - **Besatzung 1:?** am Fahrzeug ist die Mannschaft ohne Kommandant — `8` oder `1:8` ergibt neun Personen
 - **Stärke** an der taktischen Einheit ist die Gesamtstärke — `9`, `1:8` oder `1/8/9` ergeben neun Personen
-- **Fremd** schaltet sich ein, sobald eine andere als die eigene Feuerwehr eingetragen ist, und lässt sich umschalten
+- **Feuerwehr / Organisation** ist beim Fahrzeug leer — die eigene Feuerwehr steht als erster Vorschlag in der Liste
+- **Fremd** schaltest du nur für Fremdorganisationen ein (Rettung, Polizei …), nicht für andere Feuerwehren
 - **Eingetroffen** setzt die Eintreffzeit auf jetzt, sonst wird die Alarmierungszeit auf jetzt gesetzt — so steht jedes neue Fahrzeug und jede neue Einheit als „alarmiert" bzw. „eingetroffen" im Einsatztagebuch
 - Die eigenen Fahrzeuge lassen sich zusätzlich mit einem Klick auf ihren Chip anlegen
 
@@ -46,6 +49,17 @@ Das neue Element liegt an der Einsatzadresse. Alarmierungszeit, Beschreibung ode
 
 :::info
 Tipp: Die Stärketabelle aktualisiert sich automatisch, wenn Fahrzeuge hinzugefügt oder Besatzungsstärken geändert werden.
+:::
+
+### Stärketabelle filtern
+
+1. In das Suchfeld über der Stärketabelle tippen, etwa den Namen einer Feuerwehr oder eine Fahrzeugbezeichnung
+2. Gesucht wird ohne Rücksicht auf Groß- und Kleinschreibung in **Bezeichnung**, **FW**, **Typ** und **Einsatzort**
+3. Mehrere Wörter müssen alle vorkommen: `Neusiedl TLF` findet nur das TLF aus Neusiedl
+4. Mit dem **×** im Suchfeld den Filter wieder leeren
+
+:::info
+Die Summenzeilen rechnen nur über die angezeigten Zeilen — so zeigt ein Filter auf eine Feuerwehr deren Stärke. Druckansicht und CSV-Export enthalten immer alle Einsatzmittel.
 :::
 
 ### Besatzung und ATS-Träger automatisch zählen
@@ -67,6 +81,28 @@ praktisch für Fahrzeuge anderer Feuerwehren ohne Besatzungszuordnung.
 3. Einsatzort in der Auswahl wählen — mit **kein Einsatzort** wird die Zuordnung aufgehoben
 
 Ein Fahrzeug oder eine Einheit steht immer nur an **einem** Einsatzort: Wer einen anderen wählt, zieht es vom bisherigen ab. Hat der Einsatzort Koordinaten, wird es auf der Karte dorthin versetzt. Jede Zuordnung und jedes Abziehen steht wie auf der Seite **Einsatzorte** im Einsatztagebuch.
+
+### Fahrzeuge einer taktischen Einheit zuordnen
+
+1. In der Schnelleingabe zuerst die **Taktische Einheit** anlegen, z. B. „FW Neusiedl" als Zug — eine eigene Feuerwehr-Angabe braucht sie nicht
+2. Danach steht die Zeile auf **Fahrzeug** mit der neuen Einheit unter **Einheit**: die Fahrzeuge einfach hintereinander eintippen
+3. Bestehende Fahrzeuge ordnest du in der Tabelle in der Spalte **Einheit** oder im Bearbeiten-Dialog des Fahrzeugs zu
+
+Die Fahrzeuge stehen in der Tabelle eingerückt unter ihrer Einheit. Die Stärke der Einheit ist die Summe ihrer Fahrzeuge und wird in der Gesamtsumme nicht doppelt gezählt. Wird die Einheit einem anderen Einsatzort zugeordnet — in der Tabelle oder auf der Seite **Einsatzorte** —, ziehen ihre Fahrzeuge mit; wird sie von einem Einsatzort entfernt, auch.
+
+### Einheiten unter Einheiten
+
+Eine Einheit kann selbst unter einer anderen stehen, z. B. eine **KHD-Bereitschaft** mit zwei Zügen und darunter deren Fahrzeugen:
+
+1. Die Bereitschaft als **Taktische Einheit** anlegen
+2. Wieder auf **Taktische Einheit** wechseln, unter **Übergeordnete Einheit** die Bereitschaft wählen und den 1. Zug anlegen — danach steht die Zeile auf **Fahrzeug** unter dem 1. Zug
+3. Für den 2. Zug wieder die Bereitschaft als übergeordnete Einheit wählen
+
+Bestehende Einheiten hängst du in der Spalte **Einheit** der Tabelle oder im Bearbeiten-Dialog um. Die Stärke der Bereitschaft ist die Summe ihrer Züge, wer die Bereitschaft versetzt oder von einem Einsatzort entfernt, nimmt Züge und Fahrzeuge mit.
+
+### Übersicht nach Einsatzort
+
+Über der Tabelle schaltest du zwischen **Nach Einsatzort** und **Tabelle** um. Die Übersicht zeigt je Einsatzort die Einheiten mit ihren Fahrzeugen, ob sie alarmiert, eingetroffen oder abgerückt sind, und die Stärke des Einsatzorts. Was noch keinem Einsatzort zugeordnet ist, steht unter **ohne Einsatzort**. Über die Auswahl neben jedem Fahrzeug und jeder Einheit ordnest du sie auch hier einem Einsatzort zu — eine Einheit nimmt ihre Fahrzeuge mit.
 
 ### Fahrzeuge nach Ebenen ansehen
 
