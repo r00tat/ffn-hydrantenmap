@@ -116,6 +116,17 @@ describe('overlayLayers', () => {
   });
 });
 
+describe('alle Ebenen der Karte', () => {
+  // Map.tsx reicht `subdomains` durch; `undefined` überschreibt Leaflets
+  // Vorgabe, und der erste Kachelabruf scheitert an `subdomains.length`.
+  it.each(Object.entries({ ...availableLayers, ...overlayLayers }))(
+    '%s setzt subdomains',
+    (_key, layer) => {
+      expect(layer.options.subdomains?.length).toBeGreaterThan(0);
+    },
+  );
+});
+
 describe('Luftraum von Austro Control', () => {
   const layer = overlayLayers.luftraum_austrocontrol;
 

@@ -333,6 +333,7 @@ export const overlayLayers: TileConfigs = {
       attribution:
         '&copy; <a href="https://sdimd-free.austrocontrol.at">Austro Control</a> — Lufträume, <b>nicht</b> die verbindlichen UAS-Geozonen: <a href="https://utm.dronespace.at/avm/">Dronespace</a>',
       format: 'image/png',
+      subdomains: [''],
       layers: 'CTR,MCTR,MATZ,R,D,TRA,MODEL_AF,NATIONALPARKS',
       transparent: true,
       uppercase: true,
