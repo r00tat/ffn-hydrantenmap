@@ -138,7 +138,16 @@ function StrengthRows({
   return (
     <>
       {rows.map((row, i) => (
-        <TableRow key={row.id || i}>
+        // Abwechselnde Hintergründe, damit sich eine Zeile über die breite
+        // Tabelle hinweg verfolgen lässt. Die Zeile unter dem Zeiger bekommt einen
+        // kräftigeren Ton — `hover` von MUI nähme denselben wie der Streifen.
+        <TableRow
+          key={row.id || i}
+          sx={{
+            backgroundColor: i % 2 === 1 ? 'action.hover' : undefined,
+            '&:hover': { backgroundColor: 'action.focus' },
+          }}
+        >
           {/* Fahrzeuge einer Einheit stehen eingerückt unter ihr. */}
           <TableCell sx={row.parentId ? { pl: 4 } : undefined}>
             {row.name}
@@ -228,7 +237,7 @@ function SectionRow({ label, columns }: { label: string; columns: number }) {
     <TableRow>
       <TableCell
         colSpan={columns}
-        sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}
+        sx={{ fontWeight: 'bold', backgroundColor: 'action.selected' }}
       >
         {label}
       </TableCell>
