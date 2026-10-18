@@ -55,7 +55,7 @@ The WMS layers (floods, risk zones, inundation areas) are provided by the state 
 :::
 
 :::warning
-The overlay **Luftraum Austro Control (keine UAS-Geozonen)** shows airspaces from Austro Control's freely available aviation data: control zones (CTR, MCTR, MATZ), restricted and danger areas (R, D), temporary reserved airspaces (TRA), model airfields and national parks. These are **not** the binding UAS geozones for drone flights – altitudes, times and individual zones may differ. Before a drone flight, always check the geozones on Dronespace's official map: [utm.dronespace.at/avm](https://utm.dronespace.at/avm/).
+The overlay **Luftraum Austro Control** shows airspaces from Austro Control's freely available aviation data: control zones (CTR, MCTR, MATZ), restricted and danger areas (R, D), temporary reserved airspaces (TRA), model airfields and national parks. These are **not** the binding UAS geozones for drone flights – altitudes, times and individual zones may differ. Before a drone flight, always check the geozones on Dronespace's official map: [utm.dronespace.at/avm](https://utm.dronespace.at/avm/).
 :::
 
 ### Search a location

@@ -55,7 +55,7 @@ Die WMS-Layer (Hochwasser, Risikogebiete, Überflutungsgebiete) werden vom Land 
 :::
 
 :::warning
-Das Overlay **Luftraum Austro Control (keine UAS-Geozonen)** zeigt Lufträume aus den frei verfügbaren Luftfahrtdaten von Austro Control: Kontrollzonen (CTR, MCTR, MATZ), Flugbeschränkungs- und Gefahrengebiete (R, D), zeitweise reservierte Lufträume (TRA), Modellflugplätze und Nationalparks. Das sind **nicht** die verbindlichen UAS-Geozonen für Drohnenflüge – Höhen, Zeiten und einzelne Zonen können abweichen. Vor einem Drohnenflug prüfst du die Geozonen immer in der offiziellen Karte von Dronespace: [utm.dronespace.at/avm](https://utm.dronespace.at/avm/).
+Das Overlay **Luftraum Austro Control** zeigt Lufträume aus den frei verfügbaren Luftfahrtdaten von Austro Control: Kontrollzonen (CTR, MCTR, MATZ), Flugbeschränkungs- und Gefahrengebiete (R, D), zeitweise reservierte Lufträume (TRA), Modellflugplätze und Nationalparks. Das sind **nicht** die verbindlichen UAS-Geozonen für Drohnenflüge – Höhen, Zeiten und einzelne Zonen können abweichen. Vor einem Drohnenflug prüfst du die Geozonen immer in der offiziellen Karte von Dronespace: [utm.dronespace.at/avm](https://utm.dronespace.at/avm/).
 :::
 
 ### Standort suchen

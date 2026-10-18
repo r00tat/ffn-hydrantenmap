@@ -316,13 +316,13 @@ export const overlayLayers: TileConfigs = {
 
   // Lufträume aus dem freien SDI-WMS von Austro Control — als Ersatz für die
   // UAS-Geozonen, deren ED-269-Datensatz keine Nutzungsrechte hat. Es sind
-  // NICHT die verbindlichen Geozonen; das steht deshalb im Namen und in der
+  // NICHT die verbindlichen Geozonen; das steht deshalb in der
   // Quellenangabe, samt Link auf den offiziellen Dronespace-Viewer.
   // Der Dienst lehnt jede Anfrage mit fremdem `Origin`-Header mit 403 ab:
   // Leaflets <img>-Kacheln gehen durch, CORS-Abrufe (3D-Textur, Capabilities
   // im Browser) nicht. Layerwahl und Bedingungen: docs/kartenlayer.md
   luftraum_austrocontrol: {
-    name: 'Luftraum Austro Control (keine UAS-Geozonen)',
+    name: 'Luftraum Austro Control',
     url: 'https://sdigeo-free.austrocontrol.at/geoserver/free/wms?',
     type: 'WMS',
     description:

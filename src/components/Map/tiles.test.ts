@@ -149,9 +149,8 @@ describe('Luftraum von Austro Control', () => {
     );
   });
 
-  it('sagt im Namen, dass es nicht die verbindlichen UAS-Geozonen sind', () => {
-    expect(layer.name).toMatch(/Luftraum/);
-    expect(layer.name).toMatch(/keine UAS-Geozonen/);
+  it('heißt kurz nach Luftraum und Quelle', () => {
+    expect(layer.name).toBe('Luftraum Austro Control');
   });
 
   it('nennt Austro Control als Quelle und verweist auf die verbindlichen Geozonen', () => {
