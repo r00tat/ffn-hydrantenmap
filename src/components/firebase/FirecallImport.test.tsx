@@ -226,6 +226,18 @@ describe('FirecallImport', () => {
     await waitFor(() => expect(showSnackbarMock).toHaveBeenCalled());
   });
 
+  it('weist auf eine unvollständige Sicherung hin', async () => {
+    renderWithIntl(<FirecallImport />);
+
+    await chooseFile(
+      backupFile({ ...backup, omitted: ['history', 'attachments'] })
+    );
+
+    expect(
+      await screen.findByText(/weggelassen wurde: Verlauf, Dateianhänge/)
+    ).toBeInTheDocument();
+  });
+
   it('reports a failed import', async () => {
     importFirecallMock.mockRejectedValue(new Error('permission denied'));
 

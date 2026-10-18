@@ -3082,7 +3082,19 @@
     "warningAttachmentUploadFailed": "Attachment “{file}” could not be uploaded.",
     "warningNewerBackupVersion": "The file comes from a newer version of the app — data may be missing.",
     "warningAuditlogSkipped": "{count, plural, one {# audit log entry by another user was} other {# audit log entries by other users were}} not imported — only an admin may do that.",
-    "warningKostenersatzSkipped": "{count, plural, one {# cost recovery calculation was} other {# cost recovery calculations were}} not imported — this requires the \"Cost recovery\" role in the target group."
+    "warningKostenersatzSkipped": "{count, plural, one {# cost recovery calculation was} other {# cost recovery calculations were}} not imported — this requires the \"Cost recovery\" role in the target group.",
+    "exportTitle": "Back up Einsatz",
+    "exportIntro": "What should the backup contain? Without the large parts the file is created faster and imported faster later.",
+    "exportAlwaysIncluded": "Items including the diary, layers, locations, chat, crew, breathing apparatus and Kostenersatz are always included.",
+    "exportAction": "Download",
+    "sectionHistory": "History",
+    "sectionHistoryHelp": "Saved states of the situation. Each entry is a copy of all items — usually the largest part of the file for long operations.",
+    "sectionAuditlog": "Audit log",
+    "sectionAuditlogHelp": "Every single change with its state before and after. Needed to trace or restore changes.",
+    "sectionAttachments": "File attachments",
+    "sectionAttachmentsHelp": "Embedded into the file. Without them the copy points to the files of the original Einsatz and loses them once it is deleted.",
+    "sectionCount": "{count, plural, one {# entry} other {# entries}}",
+    "importOmitted": "This backup is incomplete, omitted: {sections}."
   },
   "geschaeftsbuch": {
     "title": "Business log",
