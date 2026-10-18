@@ -3037,6 +3037,7 @@
       "fw": "Fire brigade / organisation",
       "unit": "Unit",
       "noUnit": "no unit",
+      "parentUnit": "Parent unit",
       "crew": "Crew 1:?",
       "strength": "Strength",
       "ats": "SCBA",
@@ -3046,6 +3047,7 @@
       "added": "{name} added"
     },
     "unitFor": "Unit of {name}",
+    "parentUnit": "Parent unit",
     "noUnit": "no unit",
     "overview": {
       "unassigned": "no location",

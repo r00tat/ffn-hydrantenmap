@@ -38,6 +38,7 @@ export class FirecallTacticalUnit extends FirecallItemBase {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
+  tacticalUnitId?: string;
 
   public constructor(firecallItem?: TacticalUnit) {
     super(firecallItem);
@@ -51,6 +52,7 @@ export class FirecallTacticalUnit extends FirecallItemBase {
         alarmierung: this.alarmierung,
         eintreffen: this.eintreffen,
         abruecken: this.abruecken,
+        tacticalUnitId: this.tacticalUnitId,
       } = firecallItem);
       this.unitType = firecallItem.unitType ?? 'zug';
     }
@@ -105,6 +107,7 @@ export class FirecallTacticalUnit extends FirecallItemBase {
       alarmierung: this.alarmierung,
       eintreffen: this.eintreffen,
       abruecken: this.abruecken,
+      tacticalUnitId: this.tacticalUnitId,
     } as TacticalUnit;
   }
 

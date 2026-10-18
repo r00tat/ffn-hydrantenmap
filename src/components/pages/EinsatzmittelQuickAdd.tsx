@@ -253,11 +253,14 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
           </TextField>
         )}
 
-        {kind === 'vehicle' && units.length > 0 && (
+        {/* Am Fahrzeug die Einheit, an der Einheit die darüber — dieselbe
+            Auswahl, damit eine Bereitschaft und ihre Züge hintereinander
+            entstehen. */}
+        {units.length > 0 && (
           <TextField
             select
             size="small"
-            label={t('unit')}
+            label={kind === 'vehicle' ? t('unit') : t('parentUnit')}
             value={tacticalUnitId}
             onChange={(e) => setTacticalUnitId(e.target.value)}
             sx={{ flex: '1 1 160px' }}

@@ -219,25 +219,42 @@ einer Einheit an, und so bleibt jede Zuordnung ein Schreibvorgang an einem Dokum
 offline zwei Listen gegeneinander abzugleichen hieße, dass der letzte Schreiber die
 Zuordnung des anderen verwirft.
 
-**Stärke.** Hat eine Einheit Fahrzeuge, ist ihre Stärke die Summe der Fahrzeuge
+**Einheiten unter Einheiten.** Dasselbe Feld trägt auch die Einheit
+(`TacticalUnit.tacticalUnitId`): Eine KHD-Bereitschaft hat zwei Züge, die Züge ihre
+Fahrzeuge. Ein Baum statt einer festen Ebene, weil die Gliederung der Formationen
+(Trupp, Gruppe, Zug, Bereitschaft, Abschnitt …) je nach Einsatz verschieden tief ist.
+Gelesen wird der Baum an jeder Stelle über
+[unit-tree.ts](../src/components/pages/unit-tree.ts): `parentMap()` behandelt einen
+Verweis auf eine fehlende Einheit und einen **Zyklus** gleich — als „ohne Einheit". Die
+Oberfläche bietet einer Einheit weder sich selbst noch etwas unter ihr an
+(`parentCandidates()`), ein Zyklus kann aber entstehen, wenn zwei Geräte offline
+gleichzeitig umhängen. Dann stehen die betroffenen Einheiten oben, statt dass eine
+Rekursion hängt oder Zeilen verschwinden.
+
+**Stärke.** Hängt etwas an einer Einheit, ist ihre Stärke die Summe darunter
 (`nestUnderUnits()` in [fahrzeuge-utils.ts](../src/components/pages/fahrzeuge-utils.ts)),
-und ihr eingetragenes `mann` tritt zurück. Die Zeile der Einheit trägt dann
+und ihr eingetragenes `mann` tritt zurück. Das gilt auf jeder Ebene: Die Bereitschaft
+summiert ihre Züge, ein Zug seine Fahrzeuge — gezählt wird nur die unterste Ebene, ein
+Zug ohne Fahrzeuge also mit seinem gemeldeten `mann`. Die Zeile der Einheit trägt dann
 `childCount` und zählt in keiner Summe mit — sonst stünde jede Person zweimal in der
 Gesamtstärke. Ohne Fahrzeuge bleibt es beim eingetragenen `mann`, damit eine als „1:8"
 gemeldete Einheit ohne erfasste Fahrzeuge weiter zählt. Eine Einheit aus lauter fremden
 Fahrzeugen ist selbst fremd; sonst stünde sie bei den eigenen Kräften und ihre
-Fahrzeuge unter „Fremdkräfte". Der Filter der Tabelle nimmt zur passenden Einheit ihre
-Fahrzeuge mit und zum passenden Fahrzeug seine Einheit.
+Fahrzeuge unter „Fremdkräfte". Der Filter der Tabelle nimmt zur passenden Einheit alles
+unter ihr mit und zum passenden Fahrzeug die ganze Kette der Einheiten darüber. Die
+Tabelle rückt jede Ebene weiter ein (`depth` an der Zeile).
 
 **Versetzen.** Wer eine Einheit einem Einsatzort zuordnet — in der Tabelle, auf der
-Seite „Einsatzorte" oder im Dialog des Einsatzorts —, nimmt ihre Fahrzeuge mit
+Seite „Einsatzorte" oder im Dialog des Einsatzorts —, nimmt alles unter ihr mit, auch
+die Züge einer Bereitschaft samt deren Fahrzeugen
 (`unitWithVehicles()` und `moveItemsToLocation()` in
 [location-assignment.ts](../src/components/pages/location-assignment.ts), ausgeführt von
 [useAssignToLocation.ts](../src/components/Einsatzorte/useAssignToLocation.ts)). Je
 Einsatzort entsteht genau eine Änderung an `vehicles`, sonst überschriebe die zweite
 Schreiboperation die erste. Im Einsatztagebuch steht ein Eintrag „1. Zug mit TLF …
 zugeordnet" und je bisherigem Einsatzort einer mit dem, was dort abgezogen wurde. Ein
-Fahrzeug, das einer Einheit beitritt, wird an deren Einsatzort versetzt. Ein einzeln
+Fahrzeug oder eine Einheit, die einer Einheit beitritt, wird an deren Einsatzort
+versetzt. Ein einzeln
 woandershin geschicktes Fahrzeug bleibt in der Einheit; die Übersicht nach Einsatzort
 zeigt es dort, wo es steht.
 
@@ -245,7 +262,11 @@ zeigt es dort, wo es steht.
 heißt im Einsatz „FW Neusiedl" oder „1. Zug Nord", und die Organisation in ein zweites
 Feld zu zerlegen, war nur Tipparbeit. Nach dem Anlegen einer Einheit springt die Zeile
 auf „Fahrzeug" mit der neuen Einheit vorgewählt, sodass ihre Fahrzeuge direkt
-hintereinander folgen.
+hintereinander folgen. Bei „Taktische Einheit" heißt dieselbe Auswahl „Übergeordnete
+Einheit": Wer dort die Bereitschaft wählt, legt den Zug darunter an. Die Wahl bleibt
+stehen, wie beim Fahrzeug — für den zweiten Zug wählst du die Bereitschaft wieder,
+weil die Zeile nach dem ersten Zug auf diesen gesprungen ist. Eine Heuristik „eine Ebene
+höher" hätte bei drei Ebenen ebenso oft falsch geraten.
 
 ## Übersicht nach Einsatzort
 

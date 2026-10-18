@@ -146,11 +146,11 @@ describe('buildQuickAddItem', () => {
     expect(item.tacticalUnitId).toBe('u1');
   });
 
-  it('ordnet eine Einheit keiner Einheit zu', () => {
+  it('stellt eine Einheit unter die gewählte Einheit', () => {
     const item = buildQuickAddItem(
-      input({ kind: 'tacticalUnit', tacticalUnitId: 'u1' }),
+      input({ kind: 'tacticalUnit', tacticalUnitId: 'b1' }),
       CTX,
     );
-    expect(item).not.toHaveProperty('tacticalUnitId');
+    expect(item).toMatchObject({ type: 'tacticalUnit', tacticalUnitId: 'b1' });
   });
 });

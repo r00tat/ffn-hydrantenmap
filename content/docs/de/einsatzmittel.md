@@ -90,6 +90,16 @@ Ein Fahrzeug oder eine Einheit steht immer nur an **einem** Einsatzort: Wer eine
 
 Die Fahrzeuge stehen in der Tabelle eingerückt unter ihrer Einheit. Die Stärke der Einheit ist die Summe ihrer Fahrzeuge und wird in der Gesamtsumme nicht doppelt gezählt. Wird die Einheit einem anderen Einsatzort zugeordnet — in der Tabelle oder auf der Seite **Einsatzorte** —, ziehen ihre Fahrzeuge mit; wird sie von einem Einsatzort entfernt, auch.
 
+### Einheiten unter Einheiten
+
+Eine Einheit kann selbst unter einer anderen stehen, z. B. eine **KHD-Bereitschaft** mit zwei Zügen und darunter deren Fahrzeugen:
+
+1. Die Bereitschaft als **Taktische Einheit** anlegen
+2. Wieder auf **Taktische Einheit** wechseln, unter **Übergeordnete Einheit** die Bereitschaft wählen und den 1. Zug anlegen — danach steht die Zeile auf **Fahrzeug** unter dem 1. Zug
+3. Für den 2. Zug wieder die Bereitschaft als übergeordnete Einheit wählen
+
+Bestehende Einheiten hängst du in der Spalte **Einheit** der Tabelle oder im Bearbeiten-Dialog um. Die Stärke der Bereitschaft ist die Summe ihrer Züge, wer die Bereitschaft versetzt oder von einem Einsatzort entfernt, nimmt Züge und Fahrzeuge mit.
+
 ### Übersicht nach Einsatzort
 
 Über der Tabelle schaltest du zwischen **Nach Einsatzort** und **Tabelle** um. Die Übersicht zeigt je Einsatzort die Einheiten mit ihren Fahrzeugen, ob sie alarmiert, eingetroffen oder abgerückt sind, und die Stärke des Einsatzorts. Was noch keinem Einsatzort zugeordnet ist, steht unter **ohne Einsatzort**. Über die Auswahl neben jedem Fahrzeug und jeder Einheit ordnest du sie auch hier einem Einsatzort zu — eine Einheit nimmt ihre Fahrzeuge mit.

@@ -421,8 +421,10 @@ export default function FirecallItemDialog({
                   flushRef={dataFieldsRef}
                 />
               )}
-              {item.type === 'vehicle' && (
+              {(item.type === 'vehicle' || item.type === 'tacticalUnit') && (
                 <VehicleUnitSelect
+                  itemId={item.id}
+                  isUnit={item.type === 'tacticalUnit'}
                   value={item.get<string>('tacticalUnitId')}
                   onChange={(unitId) => setItemField('tacticalUnitId', unitId)}
                 />

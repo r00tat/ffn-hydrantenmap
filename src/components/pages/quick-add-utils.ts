@@ -98,6 +98,8 @@ export function buildQuickAddItem(
       // hängte sonst ein zweites „Neusiedl am See" an die Bezeichnung.
       mann: parseTotalStrength(input.strength),
       ats,
+      // Die Einheit darüber — der Zug unter seiner Bereitschaft.
+      tacticalUnitId: input.tacticalUnitId || undefined,
       alarmierung,
       eintreffen,
       datum,

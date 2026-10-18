@@ -131,6 +131,31 @@ describe('unitWithVehicles', () => {
     ]);
   });
 
+  it('nimmt Unter-Einheiten samt ihrer Fahrzeuge mit', () => {
+    const items = [
+      { id: 'b1', name: 'KHD Bereitschaft', type: 'tacticalUnit' },
+      { id: 'z1', name: '1. Zug', type: 'tacticalUnit', tacticalUnitId: 'b1' },
+      { id: 'v1', name: 'TLF', type: 'vehicle', tacticalUnitId: 'z1' },
+      { id: 'z2', name: '2. Zug', type: 'tacticalUnit', tacticalUnitId: 'b1' },
+      { id: 'v2', name: 'RLF', type: 'vehicle' },
+    ];
+    expect(unitWithVehicles(items[0], items).map((i) => i.id)).toEqual([
+      'b1',
+      'z1',
+      'v1',
+      'z2',
+    ]);
+    expect(unitWithVehicles(items[1], items).map((i) => i.id)).toEqual(['z1', 'v1']);
+  });
+
+  it('kappt einen Zyklus, statt endlos zu laufen', () => {
+    const items = [
+      { id: 'a', name: 'A', type: 'tacticalUnit', tacticalUnitId: 'b' },
+      { id: 'b', name: 'B', type: 'tacticalUnit', tacticalUnitId: 'a' },
+    ];
+    expect(unitWithVehicles(items[0], items).map((i) => i.id)).toEqual(['a']);
+  });
+
   it('liefert ein Fahrzeug allein', () => {
     const tlf = { id: 'v1', name: 'TLF', type: 'vehicle' };
     expect(unitWithVehicles(tlf, [tlf])).toEqual([tlf]);

@@ -32,7 +32,7 @@ describe('groupByLocation', () => {
     );
     expect(groups.map((g) => g.location?.id)).toEqual(['a', undefined]);
     expect(groups[0].entries.map((e) => e.item.id)).toEqual(['u1']);
-    expect(groups[0].entries[0].children.map((c) => c.id)).toEqual(['v1', 'v2']);
+    expect(groups[0].entries[0].children.map((c) => c.item.id)).toEqual(['v1', 'v2']);
     expect(groups[1].entries.map((e) => e.item.id)).toEqual(['v3']);
   });
 
@@ -44,6 +44,19 @@ describe('groupByLocation', () => {
     expect(groups[0].entries[0].children).toEqual([]);
     expect(groups[1].location?.id).toBe('b');
     expect(groups[1].entries.map((e) => e.item.id)).toEqual(['v1']);
+  });
+
+  it('zeigt Züge unter ihrer Bereitschaft und Fahrzeuge unter ihrem Zug', () => {
+    const bereitschaft = { id: 'b1', name: 'KHD Bereitschaft', type: 'tacticalUnit' } as FirecallItem;
+    const zugUnter = { ...zug, tacticalUnitId: 'b1' } as FirecallItem;
+    const groups = groupByLocation(
+      [bereitschaft, zugUnter, tlf],
+      [loc('a', { b1: 'KHD Bereitschaft', u1: 'Zug Nord', v1: 'TLF' })],
+    );
+    const [entry] = groups[0].entries;
+    expect(entry.item.id).toBe('b1');
+    expect(entry.children.map((c) => c.item.id)).toEqual(['u1']);
+    expect(entry.children[0].children.map((c) => c.item.id)).toEqual(['v1']);
   });
 
   it('lässt Einsatzorte ohne Einsatzmittel weg', () => {

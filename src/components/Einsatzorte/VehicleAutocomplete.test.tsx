@@ -57,6 +57,31 @@ describe('VehicleAutocomplete', () => {
     expect(onChange).toHaveBeenCalledWith({ v2: 'RLF' });
   });
 
+  it('nimmt beim Entfernen einer Bereitschaft ihre Züge samt Fahrzeugen mit', async () => {
+    const onChange = vi.fn();
+    const bereitschaft: TacticalUnit = {
+      id: 'b1',
+      name: 'KHD Bereitschaft',
+      type: 'tacticalUnit',
+      unitType: 'bereitschaft',
+    };
+    const zugUnter: TacticalUnit = { ...zug, tacticalUnitId: 'b1' };
+    const tlfInZug: Fzg = { ...tlf, tacticalUnitId: 'u1' };
+    renderWithIntl(
+      <VehicleAutocomplete
+        value={{ b1: 'KHD Bereitschaft', u1: 'Kräfte Nord', v1: 'TLFA 4000' }}
+        onChange={onChange}
+        mapVehicles={[bereitschaft, zugUnter, tlfInZug]}
+        kostenersatzVehicleNames={new Set()}
+      />,
+    );
+
+    const chip = screen.getByText('KHD Bereitschaft').closest('.MuiChip-root');
+    await userEvent.click(chip?.querySelector('.MuiChip-deleteIcon') as Element);
+
+    expect(onChange).toHaveBeenCalledWith({});
+  });
+
   it('bietet eine schon zugeordnete Einheit nicht noch einmal an', async () => {
     renderWithIntl(
       <VehicleAutocomplete

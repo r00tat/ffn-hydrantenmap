@@ -14,6 +14,7 @@ import {
   parseBesatzung,
 } from '../../common/vehicle-utils';
 import { AssignableUnit, TACTICAL_UNIT_LABELS } from '../firebase/firestore';
+import { descendantIds } from '../pages/unit-tree';
 
 function unitCaption(unit: AssignableUnit): string | undefined {
   if (unit.type !== 'tacticalUnit') return undefined;
@@ -198,11 +199,10 @@ export default function VehicleAutocomplete({
     (vehicleId: string) => {
       const updated = { ...value };
       delete updated[vehicleId];
-      // Mit der Einheit gehen ihre Fahrzeuge — sie stehen mit ihr dort.
-      for (const unit of mapVehicles) {
-        if (unit.type === 'vehicle' && unit.tacticalUnitId === vehicleId && unit.id) {
-          delete updated[unit.id];
-        }
+      // Mit der Einheit geht alles unter ihr — Züge einer Bereitschaft samt
+      // deren Fahrzeugen. Es steht mit ihr dort.
+      for (const id of descendantIds(vehicleId, mapVehicles)) {
+        delete updated[id];
       }
       onChange(updated);
     },

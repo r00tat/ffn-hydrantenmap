@@ -252,6 +252,32 @@ describe('StrengthTable — bearbeitbar', () => {
     );
   });
 
+  it('stellt eine Einheit unter eine andere, aber nie unter sich selbst', async () => {
+    const user = userEvent.setup();
+    updateItem.mockReset();
+    const bereitschaft = {
+      id: 'b1',
+      name: 'KHD Bereitschaft',
+      type: 'tacticalUnit',
+    } as unknown as FirecallItem;
+    const zugUnter = { ...ZUG, tacticalUnitId: 'b1' } as FirecallItem;
+    renderWithIntl(
+      <StrengthTable items={[bereitschaft, zugUnter, TLF_WITH_ID]} editable />,
+    );
+
+    // Die Bereitschaft darf nicht unter ihren eigenen Zug — eine andere
+    // Einheit gibt es nicht, also auch keine Auswahl.
+    expect(
+      screen.queryByRole('combobox', { name: 'Einheit von KHD Bereitschaft' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: 'Einheit von 1. Zug' }));
+    await user.click(screen.getByRole('option', { name: 'keine Einheit' }));
+    expect(updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'u1', tacticalUnitId: undefined }),
+    );
+  });
+
   it('öffnet den Bearbeiten-Dialog der Zeile', async () => {
     const user = userEvent.setup();
     renderWithIntl(<StrengthTable items={[TLF_WITH_ID, ZUG]} editable />);

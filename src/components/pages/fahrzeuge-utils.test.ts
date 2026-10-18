@@ -484,3 +484,69 @@ describe('filterStrength — Einheiten mit Fahrzeugen', () => {
     expect(result.totalMann).toBe(9);
   });
 });
+
+describe('calculateStrength — Einheiten unter Einheiten', () => {
+  const bereitschaft = {
+    id: 'b1',
+    name: 'KHD Bereitschaft',
+    type: 'tacticalUnit',
+    unitType: 'bereitschaft',
+    mann: 99,
+  } as FirecallItem;
+  const zug1 = { id: 'z1', name: '1. Zug', type: 'tacticalUnit', tacticalUnitId: 'b1' } as FirecallItem;
+  const zug2 = {
+    id: 'z2',
+    name: '2. Zug',
+    type: 'tacticalUnit',
+    mann: 7,
+    ats: 2,
+    tacticalUnitId: 'b1',
+  } as FirecallItem;
+  const tlf = { id: 'v1', name: 'TLF', type: 'vehicle', besatzung: '8', ats: 4, tacticalUnitId: 'z1' } as FirecallItem;
+  const klf = { id: 'v2', name: 'KLF', type: 'vehicle', besatzung: '2', tacticalUnitId: 'z1' } as FirecallItem;
+
+  it('reiht Züge unter die Bereitschaft und Fahrzeuge unter ihren Zug', () => {
+    const result = calculateStrength([klf, zug2, tlf, zug1, bereitschaft]);
+    expect(result.rows.map((r) => [r.id, r.depth ?? 0])).toEqual([
+      ['b1', 0],
+      ['z2', 1],
+      ['z1', 1],
+      ['v2', 2],
+      ['v1', 2],
+    ]);
+    expect(result.rows.find((r) => r.id === 'z1')?.parentId).toBe('b1');
+    expect(result.rows.find((r) => r.id === 'b1')?.childCount).toBe(2);
+  });
+
+  it('rechnet die Stärke über alle Ebenen ohne Doppelzählung', () => {
+    const result = calculateStrength([bereitschaft, zug1, zug2, tlf, klf]);
+    const byId = new Map(result.rows.map((r) => [r.id, r]));
+    // 1. Zug aus seinen Fahrzeugen, 2. Zug mit gepflegter Stärke
+    expect(byId.get('z1')?.mann).toBe(9 + 3);
+    expect(byId.get('b1')?.mann).toBe(12 + 7);
+    expect(byId.get('b1')?.ats).toBe(4 + 2);
+    expect(result.totalMann).toBe(19);
+    expect(result.totalAts).toBe(6);
+  });
+
+  it('übersteht einen Zyklus in den Daten', () => {
+    const a = { id: 'a', name: 'A', type: 'tacticalUnit', mann: 3, tacticalUnitId: 'b' } as FirecallItem;
+    const b = { id: 'b', name: 'B', type: 'tacticalUnit', mann: 4, tacticalUnitId: 'a' } as FirecallItem;
+    const result = calculateStrength([a, b]);
+    expect(result.rows.map((r) => r.id).sort()).toEqual(['a', 'b']);
+    expect(result.totalMann).toBe(7);
+  });
+
+  it('filtert mit der ganzen Kette darüber und dem Zweig darunter', () => {
+    const summary = calculateStrength([bereitschaft, zug1, zug2, tlf, klf]);
+    expect(filterStrength(summary, 'TLF').rows.map((r) => r.id)).toEqual(['b1', 'z1', 'v1']);
+    expect(filterStrength(summary, 'TLF').totalMann).toBe(9);
+    expect(filterStrength(summary, 'KHD').rows.map((r) => r.id)).toEqual([
+      'b1',
+      'z1',
+      'v1',
+      'v2',
+      'z2',
+    ]);
+  });
+});

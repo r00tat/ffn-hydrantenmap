@@ -102,6 +102,16 @@ describe('FirecallTacticalUnit', () => {
     expect(icon.options.iconUrl).toContain('Gruppe.png');
   });
 
+  it('behält die übergeordnete Einheit', () => {
+    const zug = new FirecallTacticalUnit({
+      name: '1. Zug',
+      type: 'tacticalUnit',
+      tacticalUnitId: 'b1',
+    });
+    expect(zug.data().tacticalUnitId).toBe('b1');
+    expect(zug.copy().data().tacticalUnitId).toBe('b1');
+  });
+
   it('selectValues includes unitType options', () => {
     const unit = new FirecallTacticalUnit();
     const sv = unit.selectValues();

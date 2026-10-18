@@ -36,12 +36,12 @@ const STATUS_COLOR: Record<DeploymentStatus, 'warning' | 'success' | 'default'> 
 function ItemLine({
   item,
   row,
-  nested = false,
+  depth = 0,
   assigning,
 }: {
   item: FirecallItem;
   row?: StrengthRow;
-  nested?: boolean;
+  depth?: number;
   assigning?: Assigning;
 }) {
   const t = useTranslations('einsatzmittel.overview');
@@ -55,13 +55,14 @@ function ItemLine({
         flexWrap: 'wrap',
         alignItems: 'center',
         gap: 1,
-        pl: nested ? 3 : 0,
+        pl: 3 * depth,
         py: 0.25,
       }}
     >
       <Typography
         variant="body2"
-        sx={{ fontWeight: nested ? 'normal' : 'bold', flexGrow: 1 }}
+        // Einheiten fett, Fahrzeuge normal — auf jeder Ebene.
+        sx={{ fontWeight: item.type === 'tacticalUnit' ? 'bold' : 'normal', flexGrow: 1 }}
         component="div"
       >
         {item.name}
@@ -94,21 +95,28 @@ function ItemLine({
 function Entry({
   entry,
   rows,
+  depth = 0,
   assigning,
 }: {
   entry: OverviewEntry;
   rows: Map<string | undefined, StrengthRow>;
+  depth?: number;
   assigning?: Assigning;
 }) {
   return (
-    <Box sx={{ mb: 0.5 }}>
-      <ItemLine item={entry.item} row={rows.get(entry.item.id)} assigning={assigning} />
+    <Box sx={{ mb: depth === 0 ? 0.5 : 0 }}>
+      <ItemLine
+        item={entry.item}
+        row={rows.get(entry.item.id)}
+        depth={depth}
+        assigning={assigning}
+      />
       {entry.children.map((child) => (
-        <ItemLine
-          key={child.id}
-          item={child}
-          row={rows.get(child.id)}
-          nested
+        <Entry
+          key={child.item.id}
+          entry={child}
+          rows={rows}
+          depth={depth + 1}
           assigning={assigning}
         />
       ))}
@@ -150,7 +158,11 @@ export default function EinsatzmittelOverview({
     <Grid container spacing={2} sx={{ mb: 3 }}>
       {groups.map((group) => {
         const title = group.location ? locationLabel(group.location) : t('unassigned');
-        const ids = group.entries.flatMap((e) => [e.item, ...e.children]).map((i) => i.id);
+        const flatten = (e: OverviewEntry): FirecallItem[] => [
+          e.item,
+          ...e.children.flatMap(flatten),
+        ];
+        const ids = group.entries.flatMap(flatten).map((i) => i.id);
         // Wie in der Tabelle: Eine Einheit mit Fahrzeugen zählt nicht selbst,
         // sonst stünde jede Person zweimal in der Summe.
         const mann = ids

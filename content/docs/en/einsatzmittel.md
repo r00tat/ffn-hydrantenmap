@@ -90,6 +90,16 @@ A vehicle or unit is always at **one** location only: picking another one withdr
 
 Vehicles appear indented under their unit in the table. The unit's strength is the sum of its vehicles and is not counted twice in the total. Assigning the unit to another location — in the table or on the **Locations** page — moves its vehicles along; removing it from a location removes them too.
 
+### Units under units
+
+A unit can itself belong to another unit, e.g. a **KHD Bereitschaft** (disaster relief company) with two platoons and their vehicles below:
+
+1. Add the company as a **Tactical unit**
+2. Switch to **Tactical unit** again, choose the company under **Parent unit** and add the 1st platoon — the row then switches to **Vehicle** under the 1st platoon
+3. For the 2nd platoon, choose the company as parent unit again
+
+Move existing units in the **Unit** column of the table or in the edit dialog. The company's strength is the sum of its platoons; moving the company or removing it from a location takes its platoons and vehicles along.
+
 ### Overview by location
 
 Above the table, switch between **By location** and **Table**. The overview shows, per location, the units with their vehicles, whether they are alerted, arrived or departed, and the location's strength. Anything not yet assigned to a location is listed under **no location**. Use the selection next to each vehicle and unit to assign it to a location right here — a unit takes its vehicles along.

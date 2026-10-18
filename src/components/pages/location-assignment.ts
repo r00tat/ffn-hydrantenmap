@@ -1,4 +1,5 @@
 import { FirecallItem, FirecallLocation } from '../firebase/firestore';
+import { descendantIds } from './unit-tree';
 import { getLocationDisplayName } from '../Einsatzorte/locationDiary';
 
 export interface AssignableItem {
@@ -88,15 +89,17 @@ interface UnitItem extends AssignableItem {
 
 /**
  * Das Element samt allem, was mit ihm zieht: An einer taktischen Einheit
- * hängen ihre Fahrzeuge (`tacticalUnitId`), ein Fahrzeug steht für sich.
+ * hängt alles unter ihr (`tacticalUnitId`) — Fahrzeuge und Unter-Einheiten
+ * samt deren Fahrzeugen. Ein Fahrzeug steht für sich.
  */
 export function unitWithVehicles<T extends UnitItem>(item: T, items: T[]): T[] {
   if (item.type !== 'tacticalUnit' || !item.id) return [item];
+  const byId = new Map(items.filter((i) => i.id).map((i) => [i.id, i]));
   return [
     item,
-    ...items.filter(
-      (i) => i.type === 'vehicle' && i.tacticalUnitId === item.id,
-    ),
+    ...descendantIds(item.id, items)
+      .map((id) => byId.get(id))
+      .filter((i): i is T => !!i),
   ];
 }
 

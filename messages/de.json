@@ -3037,6 +3037,7 @@
       "fw": "Feuerwehr / Organisation",
       "unit": "Einheit",
       "noUnit": "keine Einheit",
+      "parentUnit": "Übergeordnete Einheit",
       "crew": "Besatzung 1:?",
       "strength": "Stärke",
       "ats": "ATS",
@@ -3046,6 +3047,7 @@
       "added": "{name} hinzugefügt"
     },
     "unitFor": "Einheit von {name}",
+    "parentUnit": "Übergeordnete Einheit",
     "noUnit": "keine Einheit",
     "overview": {
       "unassigned": "ohne Einsatzort",

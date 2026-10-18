@@ -1,10 +1,14 @@
-import { FirecallItem, FirecallLocation, Fzg } from '../firebase/firestore';
+import { FirecallItem, FirecallLocation } from '../firebase/firestore';
 import { currentLocationId } from './location-assignment';
+import { parentMap, TreeItem } from './unit-tree';
 
-/** Eine Zeile der Übersicht: Einsatzmittel, darunter die Fahrzeuge einer Einheit. */
+/**
+ * Eine Zeile der Übersicht: Einsatzmittel, darunter was an ihm hängt — an
+ * einer Bereitschaft die Züge, an einem Zug die Fahrzeuge.
+ */
 export interface OverviewEntry {
   item: FirecallItem;
-  children: FirecallItem[];
+  children: OverviewEntry[];
 }
 
 /** Die Einsatzmittel eines Einsatzorts — ohne `location` die nicht zugeordneten. */
@@ -19,10 +23,10 @@ function isAssignable(item: FirecallItem): boolean {
 
 /**
  * Gliedert die Einsatzmittel nach Einsatzort, je Einsatzort die taktischen
- * Einheiten mit ihren Fahrzeugen.
+ * Einheiten mit allem, was unter ihnen hängt.
  *
- * Ein Fahrzeug steht unter seiner Einheit, solange beide am selben
- * Einsatzort stehen. Wurde es einzeln woandershin geschickt, zeigt die
+ * Ein Fahrzeug oder eine Einheit steht unter ihrer Einheit, solange beide
+ * am selben Einsatzort stehen. Wurde es einzeln woandershin geschickt, zeigt die
  * Übersicht es dort — sie soll beantworten, was wo steht, nicht wer zu wem
  * gehört. Einsatzorte ohne Einsatzmittel fallen weg, die nicht zugeordneten
  * stehen am Ende.
@@ -35,12 +39,10 @@ export function groupByLocation(
   const locationOf = new Map(
     assignable.map((i) => [i.id, currentLocationId(locations, i)]),
   );
-  const unitIds = new Set(
-    assignable.filter((i) => i.type === 'tacticalUnit').map((i) => i.id),
-  );
+  const parents = parentMap(assignable as TreeItem[]);
   const parentOf = (item: FirecallItem): string | undefined => {
-    const parentId = (item as Fzg).tacticalUnitId;
-    if (!parentId || !unitIds.has(parentId)) return undefined;
+    const parentId = item.id ? parents.get(item.id) : undefined;
+    if (!parentId) return undefined;
     return locationOf.get(parentId) === locationOf.get(item.id)
       ? parentId
       : undefined;
@@ -48,12 +50,11 @@ export function groupByLocation(
 
   const entriesFor = (locationId: string): OverviewEntry[] => {
     const here = assignable.filter((i) => locationOf.get(i.id) === locationId);
-    return here
-      .filter((i) => !parentOf(i))
-      .map((item) => ({
-        item,
-        children: here.filter((c) => c.id && parentOf(c) === item.id),
-      }));
+    const entry = (item: FirecallItem): OverviewEntry => ({
+      item,
+      children: here.filter((c) => c.id && parentOf(c) === item.id).map(entry),
+    });
+    return here.filter((i) => !parentOf(i)).map(entry);
   };
 
   const groups: LocationGroup[] = locations

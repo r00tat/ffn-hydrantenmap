@@ -238,6 +238,12 @@ export interface TacticalUnit extends FirecallItem {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
+  /**
+   * Die Einheit darüber, etwa die Bereitschaft eines Zugs. Ihre Stärke
+   * enthält dann die dieser Einheit, und sie zieht beim Versetzen mit
+   * (siehe docs/einsatzmittel-staerke.md).
+   */
+  tacticalUnitId?: string;
 }
 
 /** Was einem Einsatzort zugeordnet werden kann: Fahrzeuge und taktische Einheiten. */

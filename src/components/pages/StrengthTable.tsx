@@ -20,7 +20,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useCallback, useContext, useMemo, useState } from 'react';
-import { FirecallItem, FirecallLocation, Fzg } from '../firebase/firestore';
+import { AssignableUnit, FirecallItem, FirecallLocation } from '../firebase/firestore';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallContext } from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
@@ -33,6 +33,7 @@ import {
   filterStrength,
 } from './fahrzeuge-utils';
 import LocationSelect from './LocationSelect';
+import { parentCandidates } from './unit-tree';
 import { currentLocationId, locationLabel } from './location-assignment';
 import useAssignToLocation from '../Einsatzorte/useAssignToLocation';
 
@@ -60,6 +61,8 @@ function UnitSelect({
   onUnitChange: Editing['onUnitChange'];
 }) {
   const t = useTranslations('einsatzmittel');
+  // Eine Einheit nicht unter sich selbst oder etwas unter ihr — sonst Zyklus.
+  const candidates = useMemo(() => parentCandidates(row.id, units), [row.id, units]);
   return (
     <Select
       displayEmpty
@@ -75,7 +78,7 @@ function UnitSelect({
           {t('noUnit')}
         </Typography>
       </MenuItem>
-      {units.map((u) => (
+      {candidates.map((u) => (
         <MenuItem key={u.id} value={u.id}>
           {u.name}
         </MenuItem>
@@ -105,8 +108,8 @@ function StrengthRows({
             '&:hover': { backgroundColor: 'action.focus' },
           }}
         >
-          {/* Fahrzeuge einer Einheit stehen eingerückt unter ihr. */}
-          <TableCell sx={row.parentId ? { pl: 4 } : undefined}>
+          {/* Was unter einer Einheit steht, ist je Ebene weiter eingerückt. */}
+          <TableCell sx={row.depth ? { pl: 2 + 2 * row.depth } : undefined}>
             {row.name}
           </TableCell>
           <TableCell>{row.fw || ''}</TableCell>
@@ -118,9 +121,10 @@ function StrengthRows({
           <TableCell>{row.abruecken ? formatTimestamp(row.abruecken) : ''}</TableCell>
           {editing && editing.units.length > 0 && (
             <TableCell>
-              {/* Nur ein Fahrzeug gehört einer Einheit an — der Typ der
-                  Zeile ist dafür nicht eindeutig, die Einheit-ID schon. */}
-              {row.id && !editing.units.some((u) => u.id === row.id) && (
+              {/* Fahrzeuge und Einheiten hängen an einer Einheit — der Zug
+                  an seiner Bereitschaft. Nur die oberste Einheit hat keine
+                  Auswahl, wenn es keine andere gibt. */}
+              {row.id && parentCandidates(row.id, editing.units).length > 0 && (
                 <UnitSelect
                   row={row}
                   units={editing.units}
@@ -374,13 +378,14 @@ function EditableStrengthTable({
     () => items.filter((i) => i.type === 'tacticalUnit' && i.id),
     [items],
   );
-  // Ein Fahrzeug, das einer Einheit beitritt, steht danach dort, wo sie
-  // steht — sonst zöge es beim nächsten Versetzen von einem anderen Ort mit.
+  // Was einer Einheit beitritt, steht danach dort, wo sie steht — sonst zöge
+  // es beim nächsten Versetzen von einem anderen Ort mit. Eine Einheit nimmt
+  // dabei alles unter ihr mit (`onAssign`).
   const onUnitChange = useCallback(
     async (row: StrengthRow, unitId: string) => {
-      const item = items.find((i) => i.id === row.id) as Fzg | undefined;
+      const item = items.find((i) => i.id === row.id) as AssignableUnit | undefined;
       if (!item) return;
-      const updated: Fzg = { ...item, tacticalUnitId: unitId || undefined };
+      const updated: AssignableUnit = { ...item, tacticalUnitId: unitId || undefined };
       await updateItem(updated);
       const unit = units.find((u) => u.id === unitId);
       const unitLocation = unit ? currentLocationId(locations, unit) : '';

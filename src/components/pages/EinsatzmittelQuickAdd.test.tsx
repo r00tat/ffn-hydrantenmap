@@ -167,6 +167,30 @@ describe('EinsatzmittelQuickAdd', () => {
     });
   });
 
+  it('legt einen Zug unter einer bestehenden Bereitschaft an', async () => {
+    const user = userEvent.setup();
+    render(
+      <EinsatzmittelQuickAdd
+        items={[
+          ...existing,
+          { id: 'b1', type: 'tacticalUnit', name: 'KHD Bereitschaft' } as FirecallItem,
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Taktische Einheit' }));
+    await user.click(screen.getByRole('combobox', { name: 'Übergeordnete Einheit' }));
+    await user.click(screen.getByRole('option', { name: 'KHD Bereitschaft' }));
+    await user.type(screen.getByRole('combobox', { name: 'Bezeichnung' }), '1. Zug{Enter}');
+
+    await waitFor(() => expect(addItem).toHaveBeenCalledTimes(1));
+    expect(addItem.mock.calls[0][0]).toMatchObject({
+      type: 'tacticalUnit',
+      name: '1. Zug',
+      tacticalUnitId: 'b1',
+    });
+  });
+
   it('ordnet ein Fahrzeug einer bestehenden Einheit zu', async () => {
     const user = userEvent.setup();
     render(

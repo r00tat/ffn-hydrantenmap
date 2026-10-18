@@ -5,6 +5,7 @@ import {
   TacticalUnit,
   TACTICAL_UNIT_LABELS,
 } from '../firebase/firestore';
+import { parentMap, TreeItem } from './unit-tree';
 import {
   countCrewByVehicle,
   einsatzmittelKategorie,
@@ -28,11 +29,13 @@ export interface StrengthRow {
   abruecken?: string;
   /** Einsatzmittel einer fremden Organisation — Rettung, Polizei, Nachbarwehr. */
   fremd: boolean;
-  /** Am Fahrzeug: die taktische Einheit, unter der es in der Tabelle steht. */
+  /** Die taktische Einheit, unter der Fahrzeug oder Einheit in der Tabelle steht. */
   parentId?: string;
+  /** Ebene im Baum der Einheiten; fehlt auf oberster Ebene. */
+  depth?: number;
   /**
-   * An der Einheit: wie viele Fahrzeuge unter ihr stehen. Dann ist ihre
-   * Stärke die Summe der Fahrzeuge und zählt in den Summen nicht noch einmal.
+   * An der Einheit: wie viele Elemente direkt unter ihr stehen. Dann ist ihre
+   * Stärke die Summe darunter und zählt in den Summen nicht noch einmal.
    */
   childCount?: number;
 }
@@ -134,28 +137,27 @@ export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAs
     }
   }
 
-  const unitIds = new Set(
-    items.filter((i) => i.type === 'tacticalUnit' && i.id).map((i) => i.id),
-  );
-  return summarizeSplit(nestUnderUnits(rows, unitIds));
+  return summarizeSplit(nestUnderUnits(rows, items));
 }
 
 /**
- * Stellt die Fahrzeuge direkt unter ihre taktische Einheit und rechnet deren
- * Stärke aus den Fahrzeugen. Ein Fahrzeug, dessen Einheit nicht (mehr) im
- * Einsatz steht, bleibt ohne Einheit an seinem Platz.
+ * Stellt Fahrzeuge und Einheiten unter ihre taktische Einheit — über beliebig
+ * viele Ebenen, etwa Bereitschaft → Zug → Fahrzeug — und rechnet die Stärke
+ * einer Einheit aus allem unter ihr. Gezählt wird so nur die unterste Ebene:
+ * ein Fahrzeug, oder eine Einheit ohne etwas darunter mit ihrer gepflegten
+ * Stärke. Ein Element, dessen Einheit nicht (mehr) im Einsatz steht, bleibt
+ * ohne Einheit an seinem Platz (siehe `parentMap`).
  *
  * Eine Einheit aus lauter fremden Fahrzeugen ist selbst fremd — sonst stünde
  * sie bei den eigenen Kräften, ihre Fahrzeuge aber unter „Fremdkräfte".
  */
-function nestUnderUnits(
-  rows: StrengthRow[],
-  unitIds: Set<string | undefined>,
-): StrengthRow[] {
+function nestUnderUnits(rows: StrengthRow[], items: FirecallItem[]): StrengthRow[] {
+  const parents = parentMap(items as TreeItem[]);
   const children = new Map<string, StrengthRow[]>();
   const top: StrengthRow[] = [];
-  for (const { parentId, ...row } of rows) {
-    if (parentId && unitIds.has(parentId)) {
+  for (const { parentId: _ignored, ...row } of rows) {
+    const parentId = row.id ? parents.get(row.id) : undefined;
+    if (parentId) {
       children.set(parentId, [...(children.get(parentId) ?? []), { ...row, parentId }]);
     } else {
       top.push(row);
@@ -163,21 +165,28 @@ function nestUnderUnits(
   }
 
   const result: StrengthRow[] = [];
-  for (const row of top) {
-    const kids = (row.id && children.get(row.id)) || [];
-    if (kids.length === 0) {
-      result.push(row);
-      continue;
-    }
-    result.push({
+  const emit = (row: StrengthRow, depth: number): StrengthRow => {
+    const index = result.length;
+    result.push(row);
+    const kids = ((row.id && children.get(row.id)) || []).map((k) =>
+      emit(k, depth + 1),
+    );
+    const nested: StrengthRow = {
       ...row,
-      mann: kids.reduce((sum, k) => sum + k.mann, 0),
-      ats: kids.reduce((sum, k) => sum + k.ats, 0),
-      fremd: kids.every((k) => k.fremd),
-      childCount: kids.length,
-    });
-    result.push(...kids);
-  }
+      ...(depth > 0 ? { depth } : {}),
+      ...(kids.length > 0
+        ? {
+            mann: kids.reduce((sum, k) => sum + k.mann, 0),
+            ats: kids.reduce((sum, k) => sum + k.ats, 0),
+            fremd: kids.every((k) => k.fremd),
+            childCount: kids.length,
+          }
+        : {}),
+    };
+    result[index] = nested;
+    return nested;
+  };
+  for (const row of top) emit(row, 0);
   return result;
 }
 
@@ -213,16 +222,29 @@ export function filterStrength(
       })
       .map((row) => row.id),
   );
-  // Zur passenden Einheit gehören ihre Fahrzeuge, zum passenden Fahrzeug
-  // seine Einheit — sonst fehlte der Zeile ihr Zusammenhang. Die Einheit
-  // zählt in den Summen ohnehin nicht doppelt (siehe `summarize`).
-  const rows = summary.rows.filter(
-    (row) =>
-      matches.has(row.id) ||
-      (row.parentId !== undefined && matches.has(row.parentId)) ||
-      (!!row.childCount &&
-        summary.rows.some((r) => r.parentId === row.id && matches.has(r.id))),
+  // Zur passenden Einheit gehört alles unter ihr, zum passenden Fahrzeug die
+  // Kette der Einheiten darüber — sonst fehlte der Zeile ihr Zusammenhang.
+  // Die Einheiten zählen in den Summen ohnehin nicht doppelt (`summarize`).
+  const parentOf = new Map(
+    summary.rows.filter((r) => r.id && r.parentId).map((r) => [r.id, r.parentId]),
   );
+  const ancestors = (id: string | undefined): string[] => {
+    const chain: string[] = [];
+    for (let p = parentOf.get(id); p && !chain.includes(p); p = parentOf.get(p)) {
+      chain.push(p);
+    }
+    return chain;
+  };
+  const shown = new Set<string | undefined>();
+  for (const row of summary.rows) {
+    if (matches.has(row.id)) {
+      shown.add(row.id);
+      for (const id of ancestors(row.id)) shown.add(id);
+    } else if (ancestors(row.id).some((id) => matches.has(id))) {
+      shown.add(row.id);
+    }
+  }
+  const rows = summary.rows.filter((row) => shown.has(row.id));
 
   return summarizeSplit(rows);
 }
