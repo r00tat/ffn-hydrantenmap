@@ -264,7 +264,9 @@ export default function EinsatzmittelQuickAdd({ items }: { items: FirecallItem[]
             value={tacticalUnitId}
             onChange={(e) => setTacticalUnitId(e.target.value)}
             sx={{ flex: '1 1 160px' }}
-            slotProps={{ select: { displayEmpty: true } }}
+            // `displayEmpty` zeigt „keine Einheit" im Feld — das Label muss
+            // dann oben am Rahmen stehen, sonst liegen beide Texte übereinander.
+            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
           >
             <MenuItem value="">
               <em>{t('noUnit')}</em>

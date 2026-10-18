@@ -191,6 +191,21 @@ describe('EinsatzmittelQuickAdd', () => {
     });
   });
 
+  it('legt das Label der Einheit über „keine Einheit", nicht darauf', () => {
+    render(
+      <EinsatzmittelQuickAdd
+        items={[...existing, { id: 'u1', type: 'tacticalUnit', name: 'Zug Nord' } as FirecallItem]}
+      />,
+    );
+    const select = screen.getByRole('combobox', { name: 'Einheit' });
+    expect(select).toHaveTextContent('keine Einheit');
+    // MUI rendert das Label einer Auswahl als <div>, verknüpft über aria-labelledby.
+    const labelId = select.getAttribute('aria-labelledby')?.split(' ')[0] ?? '';
+    const label = document.getElementById(labelId);
+    expect(label).toHaveTextContent('Einheit');
+    expect(label).toHaveAttribute('data-shrink', 'true');
+  });
+
   it('ordnet ein Fahrzeug einer bestehenden Einheit zu', async () => {
     const user = userEvent.setup();
     render(
