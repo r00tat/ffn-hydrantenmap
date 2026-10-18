@@ -593,6 +593,7 @@ export default function EinsatzDetails() {
       {shareDialogOpen && firecall.id && (
         <FirecallShareDialog
           firecallId={firecall.id}
+          firecallName={firecall.name}
           onClose={() => setShareDialogOpen(false)}
         />
       )}
