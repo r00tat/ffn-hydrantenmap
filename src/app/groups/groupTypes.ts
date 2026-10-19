@@ -24,6 +24,13 @@ export interface Group {
    * schief und markierte jede eigene Füllung als zu verrechnen.
    */
   feuerwehrName?: string;
+  /**
+   * Elterngruppe in der Hierarchie (etwa Abschnitt über Feuerwehr). Wer
+   * Mitglied dieser Gruppe ist, wird beim Vergeben auch Mitglied aller
+   * Elterngruppen; die Auswertung kennt die Hierarchie nicht. `null` = bewusst
+   * keine Elterngruppe. Siehe `src/common/groupHierarchy.ts`.
+   */
+  parentId?: string | null;
 }
 
 // Die Sperrliste steht in `common/`, damit die reine Berechtigungslogik sie

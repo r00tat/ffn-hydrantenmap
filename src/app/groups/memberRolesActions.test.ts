@@ -9,7 +9,9 @@ const {
   listUsersMock,
   userDocs,
   groupDocs,
+  getGroupsMock,
 } = vi.hoisted(() => ({
+  getGroupsMock: vi.fn(async () => [] as unknown[]),
   permissionRequiredMock: vi.fn(),
   adminRequiredMock: vi.fn(),
   changeUserRolesMock: vi.fn(),
@@ -26,6 +28,9 @@ vi.mock('../auth', () => ({
 vi.mock('../../server/auth/changeUserRoles', () => ({
   changeUserRoles: (uid: string, change: unknown, user: unknown) =>
     changeUserRolesMock(uid, change, user),
+}));
+vi.mock('./groupHelpers', () => ({
+  getGroups: () => getGroupsMock(),
 }));
 vi.mock('../api/users/listUsers', () => ({
   listUsers: () => listUsersMock(),
@@ -258,6 +263,37 @@ describe('addMemberAction', () => {
     await expect(addMemberAction('gibtsnicht', 'u2')).rejects.toThrow(
       /does not exist/,
     );
+  });
+});
+
+describe('Gruppenhierarchie', () => {
+  const HIERARCHY = [
+    { id: 'abschnitt', name: 'Abschnitt' },
+    { id: 'ffnd', name: 'FF', parentId: 'abschnitt' },
+    { id: 'zug', name: 'Zug', parentId: 'ffnd' },
+  ];
+
+  it('nimmt ein neues Mitglied auch in die fehlenden Elterngruppen auf', async () => {
+    getGroupsMock.mockResolvedValueOnce(HIERARCHY);
+    groupDocs.zug = { name: 'Zug' };
+    userDocs.u2 = { groupRoles: { abschnitt: [] } };
+
+    expect(await addMemberAction('zug', 'u2')).toEqual({ success: true });
+    expect(changeUserRolesMock.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+      ['u2', { kind: 'addMember', groupId: 'zug' }],
+      ['u2', { kind: 'addMember', groupId: 'ffnd' }],
+    ]);
+  });
+
+  it('entfernt kein Mitglied, das über eine Untergruppe dazugehört', async () => {
+    getGroupsMock.mockResolvedValueOnce(HIERARCHY);
+    userDocs.u1 = { groupRoles: { abschnitt: [], ffnd: [], zug: [] } };
+
+    expect(await removeMemberAction('ffnd', 'u1')).toEqual({
+      success: false,
+      error: 'memberOfSubgroup',
+    });
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
   });
 });
 

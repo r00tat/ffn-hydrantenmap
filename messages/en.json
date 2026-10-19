@@ -1160,7 +1160,8 @@
     "firecallGuestFor": "Access limited to operation {firecall}",
     "firecallWrite": "Write access to the operation",
     "firecallWriteHint": "Takes effect the next time the access is refreshed (within 45 minutes).",
-    "rolesHint": "This only sets the membership. Roles per group are assigned under Groups → Members and roles."
+    "rolesHint": "This only sets the membership. Roles per group are assigned under Groups → Members and roles.",
+    "groupViaSubgroup": "via a sub group"
   },
   "header": {
     "appTitle": "Operations Map",
@@ -2935,7 +2936,11 @@
     "fahrtenbuchLinkAction": "Go to logbook administration",
     "groupAdmins": "Group admins",
     "groupAdminsHint": "Group admins handle all administrative tasks within this group — logbook, equipment, personnel, clothing, group settings and assigning the other roles. Only group members can be selected; assign the other roles under “Members and roles”.",
-    "roles": "Members and roles of {name}"
+    "roles": "Members and roles of {name}",
+    "parentGroup": "Parent group",
+    "noParentGroup": "none",
+    "parentGroupHint": "Members of this group automatically become members of all parent groups.",
+    "memberViaSubgroup": "via a sub group"
   },
   "tokens": {
     "title": "API tokens",
@@ -4903,7 +4908,8 @@
       "unknownUser": "The user does not exist.",
       "firecallGuest": "Operation guests cannot become members.",
       "notMigrated": "This user has not been migrated yet and still has the old cost recovery flag. Run step 2 under “Permissions (migration)” first — that is where you choose the groups in which they keep cost recovery.",
-      "unknown": "That did not work: {message}"
+      "unknown": "That did not work: {message}",
+      "memberOfSubgroup": "The user is a member of a sub group and therefore of this group too. Remove them from the sub group first."
     }
   },
   "mapSelection": {

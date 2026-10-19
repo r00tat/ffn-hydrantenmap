@@ -9,7 +9,9 @@ const {
   userDocGetMock,
   invalidateMock,
   setUserMembershipsMock,
+  getGroupsMock,
 } = vi.hoisted(() => ({
+  getGroupsMock: vi.fn(async () => [] as unknown[]),
   setCustomUserClaimsMock: vi.fn(
     async (_uid: string, _claims: Record<string, unknown>) => undefined
   ),
@@ -33,6 +35,10 @@ vi.mock('../../../../server/firebase/admin', () => ({
 vi.mock('../../../../server/auth/changeUserRoles', () => ({
   setUserMemberships: (uid: string, groupIds: string[], user: unknown) =>
     setUserMembershipsMock(uid, groupIds, user),
+}));
+
+vi.mock('../../../groups/groupHelpers', () => ({
+  getGroups: () => getGroupsMock(),
 }));
 
 vi.mock('../../../../server/auth/userSessionCache', () => ({
@@ -142,6 +148,25 @@ describe('updateUser — Mitgliedschaft', () => {
     expect(setCustomUserClaimsMock.mock.calls[0][1]).toMatchObject({
       groups: ['ffnd', 'b', 'allUsers'],
     });
+  });
+
+  it('nimmt die Elterngruppen der gewählten Gruppen mit auf', async () => {
+    storedUser({ groupRoles: {} });
+    getGroupsMock.mockResolvedValueOnce([
+      { id: 'abschnitt', name: 'Abschnitt' },
+      { id: 'ffnd', name: 'FF', parentId: 'abschnitt' },
+    ]);
+    setUserMembershipsMock.mockResolvedValue({ ffnd: [], abschnitt: [] });
+
+    await updateUser('member-uid', { authorized: true } as UserRecordExtended, [
+      'ffnd',
+    ]);
+
+    expect(setUserMembershipsMock).toHaveBeenCalledWith(
+      'member-uid',
+      ['ffnd', 'abschnitt'],
+      expect.anything(),
+    );
   });
 
   it('bildet den Claim eines migrierten Benutzers aus groupRoles', async () => {

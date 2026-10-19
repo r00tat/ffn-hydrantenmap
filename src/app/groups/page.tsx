@@ -29,6 +29,7 @@ import {
 } from './GroupAction';
 import GroupDialog from './GroupDialog';
 import { Group, KNOWN_GROUPS } from './groupTypes';
+import { orderGroupsAsTree } from '../../common/groupHierarchy';
 import { isTenantGroupId } from '../../common/tenantGroups';
 
 interface UserRowButtonParams {
@@ -117,6 +118,8 @@ function Groups() {
   const [groups, getGroups, users] = useGroupList();
   const showSnackbar = useSnackbar();
 
+  const groupTree = useMemo(() => orderGroupsAsTree(groups), [groups]);
+
   const missingKnownGroups = useMemo(() => {
     const existingIds = new Set(groups.map((g) => g.id));
     return KNOWN_GROUPS.filter((kg) => kg.id && !existingIds.has(kg.id));
@@ -194,7 +197,7 @@ function Groups() {
             <hr />
           </Grid>
 
-          {groups.map((group) => (
+          {groupTree.map(({ group, depth }) => (
             <React.Fragment key={`group-${group.id}`}>
               <Grid size={{ xs: 2, md: 2, lg: 2 }}>
                 <GroupRowButtons
@@ -204,7 +207,13 @@ function Groups() {
                 />
               </Grid>
               <Grid size={{ xs: 5, md: 3, lg: 3 }}>{group.id}</Grid>
-              <Grid size={{ xs: 5, md: 3, lg: 3 }}>{group.name}</Grid>
+              <Grid size={{ xs: 5, md: 3, lg: 3 }}>
+                {/* Untergruppen eingerückt unter ihrer Elterngruppe. */}
+                <Box component="span" sx={{ pl: depth * 2 }}>
+                  {depth > 0 && '└ '}
+                  {group.name}
+                </Box>
+              </Grid>
 
               <Grid size={{ xs: 12, md: 4, lg: 4 }}>{group.description}</Grid>
               <Grid size={{ xs: 12 }}>
@@ -220,6 +229,7 @@ function Groups() {
         <GroupDialog
           group={editGroup}
           users={users}
+          groups={groups}
           onClose={async (group, assigendUsers, groupAdmins) => {
             setShowEditDialog(false);
             if (group && assigendUsers) {

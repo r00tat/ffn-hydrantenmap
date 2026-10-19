@@ -143,6 +143,40 @@ diese Stellen verlinken dorthin.
   Bug-Reports, gelöschte Elemente, die Migration der Berechtigungen — sind
   nicht auf eine Gruppe begrenzt.
 
+## Gruppenhierarchie
+
+Eine Gruppe kann über `parentId` unter einer anderen stehen (etwa Bezirk →
+Abschnitt → Feuerwehr). **Wer Mitglied einer Gruppe ist, ist auch Mitglied
+aller Gruppen darüber** — ohne Rollen, sofern er dort noch keine hat.
+
+**Die Hierarchie wirkt nur beim Vergeben, nicht beim Auswerten.** Die
+Elterngruppen landen ganz normal in `groupRoles` am Benutzer und damit im
+Claim `groups`. Firestore-Regeln, Guards und `can()` bleiben unverändert und
+kennen die Hierarchie nicht. Das hält die Regeln ohne zusätzliches `get()` und
+macht jede Mitgliedschaft am Benutzerdokument ablesbar. Der Preis: Die
+Hierarchie muss an jedem Schreibweg nachgezogen werden.
+
+| Schreibweg | was passiert |
+| --- | --- |
+| Benutzerdialog (`updateUser`) | die gewählten Gruppen werden um ihre Elterngruppen ergänzt; Elterngruppen gewählter Gruppen sind im Dialog angehakt und gesperrt |
+| Gruppendialog (`updateGroupAction`) | neue Mitglieder bekommen die Elterngruppen dazu; Mitglieder einer Untergruppe bleiben Mitglied und sind gesperrt. Wird eine Gruppe unter eine andere gehängt, bekommen alle ihre Mitglieder die neuen Elterngruppen |
+| „Mitglieder und Rollen" (`addMemberAction`, `removeMemberAction`) | Aufnehmen ergänzt die Elterngruppen; Entfernen lehnt ab (`memberOfSubgroup`), solange der Benutzer in einer Untergruppe ist |
+
+**Entfernen kaskadiert bewusst nicht.** Wer aus einer Elterngruppe genommen
+werden soll, aber noch in einer Untergruppe ist, wird zuerst dort entfernt —
+ein stilles Mitlöschen nähme ihm die Rollen der Untergruppe. Umgekehrt bleibt
+nach dem Entfernen aus einer Untergruppe die Mitgliedschaft in der
+Elterngruppe stehen; sie ist dann eine eigene.
+
+Die reinen Funktionen stehen in
+[`src/common/groupHierarchy.ts`](../src/common/groupHierarchy.ts). Sie sind
+gegen Zyklen und fehlende Elterngruppen abgesichert, obwohl
+`updateGroupAction` eine Untergruppe oder die Gruppe selbst als Elterngruppe
+ablehnt (`isValidParent`). `allUsers` und `kostenersatz` stehen außerhalb der
+Hierarchie. Beim Löschen einer Gruppe rücken ihre Untergruppen eine Ebene nach
+oben. Angezeigt werden Gruppen in Baumreihenfolge (`orderGroupsAsTree`):
+Untergruppen eingerückt direkt unter ihrer Elterngruppe.
+
 ## Ablage am Benutzerdokument
 
 ```ts

@@ -24,6 +24,11 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  isValidParent,
+  orderGroupsAsTree,
+} from '../../common/groupHierarchy';
+import { isTenantGroupId } from '../../common/tenantGroups';
 import { effectiveGroupRoles } from '../../common/userGroupRoles';
 import { UserRecordExtended } from '../../common/users';
 import {
@@ -38,6 +43,7 @@ import {
   getOebfvConfig,
   saveOebfvConfig,
 } from '../kennzeichen/configActions';
+import { inheritedMemberIds } from './groupMembership';
 import { Group } from './groupTypes';
 
 export interface GroupDialoggOptions {
@@ -48,6 +54,8 @@ export interface GroupDialoggOptions {
   ) => void;
   group: Group;
   users: UserRecordExtended[];
+  /** Alle Gruppen — für die Wahl der Elterngruppe und die Hierarchie. */
+  groups: Group[];
 }
 
 export const groupTextFields: { [key: string]: string } = {
@@ -72,6 +80,7 @@ export default function GroupDialogg({
   onClose,
   group: groupDefault,
   users,
+  groups,
 }: GroupDialoggOptions) {
   const tGroups = useTranslations('groups');
   const [open, setOpen] = useState(true);
@@ -130,7 +139,32 @@ export default function GroupDialogg({
         .map((user) => user.uid),
     [group.id, users]
   );
-  const [assigendUsers, setAssigendUsers] = useState<string[]>(initialUsers);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>(initialUsers);
+  // Mitglieder einer Untergruppe sind zwingend auch hier Mitglied: angehakt
+  // und gesperrt. Entfernen geht nur in der Untergruppe.
+  const inheritedUsers = useMemo(
+    () =>
+      group.id
+        ? inheritedMemberIds(
+            group.id,
+            users.map((user) => ({ id: user.uid, data: user })),
+            groups
+          )
+        : [],
+    [group.id, users, groups]
+  );
+  const assigendUsers = useMemo(
+    () => [...new Set([...selectedUsers, ...inheritedUsers])],
+    [selectedUsers, inheritedUsers]
+  );
+  const parentOptions = useMemo(
+    () =>
+      orderGroupsAsTree(groups).filter(({ group: candidate }) =>
+        isValidParent(group.id, candidate.id, groups)
+      ),
+    [group.id, groups]
+  );
+  const canHaveParent = !group.id || isTenantGroupId(group.id);
 
   const initialAdmins = useMemo(
     () =>
@@ -214,6 +248,37 @@ export default function GroupDialogg({
           />
         ))}
 
+        {canHaveParent && (
+          <FormControl fullWidth variant="standard" sx={{ mt: 1, mb: 2 }}>
+            <InputLabel id="group-parent-label">
+              {tGroups('parentGroup')}
+            </InputLabel>
+            <Select
+              labelId="group-parent-label"
+              id="group-parent"
+              value={group.parentId || ''}
+              onChange={(event) =>
+                setGroup((prev) => ({
+                  ...prev,
+                  parentId: event.target.value || null,
+                }))
+              }
+            >
+              <MenuItem value="">
+                <em>{tGroups('noParentGroup')}</em>
+              </MenuItem>
+              {parentOptions.map(({ group: candidate, depth }) => (
+                <MenuItem key={candidate.id} value={candidate.id}>
+                  <span style={{ paddingLeft: depth * 16 }}>
+                    {candidate.name}
+                  </span>
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>{tGroups('parentGroupHint')}</FormHelperText>
+          </FormControl>
+        )}
+
         <FormControl fullWidth variant="standard">
           <InputLabel id={`firecall-item-users-label`}>
             Benutzer der Gruppe
@@ -237,19 +302,29 @@ export default function GroupDialogg({
               const {
                 target: { value },
               } = event;
-              setAssigendUsers(
+              setSelectedUsers(
                 typeof value === 'string' ? value.split(',') : value
               );
             }}
           >
-            {users.map((user) => (
-              <MenuItem key={`user-for-group-${user.uid}`} value={user.uid}>
-                <Checkbox checked={assigendUsers.indexOf(user.uid) > -1} />
-                <ListItemText
-                  primary={`${user.displayName || ''} (${user.email})`}
-                />
-              </MenuItem>
-            ))}
+            {users.map((user) => {
+              const inherited = inheritedUsers.includes(user.uid);
+              return (
+                <MenuItem
+                  key={`user-for-group-${user.uid}`}
+                  value={user.uid}
+                  disabled={inherited}
+                >
+                  <Checkbox checked={assigendUsers.indexOf(user.uid) > -1} />
+                  <ListItemText
+                    primary={`${user.displayName || ''} (${user.email})`}
+                    secondary={
+                      inherited ? tGroups('memberViaSubgroup') : undefined
+                    }
+                  />
+                </MenuItem>
+              );
+            })}
           </Select>
         </FormControl>
 

@@ -1,3 +1,4 @@
+import { orderGroupsAsTree } from '../../common/groupHierarchy';
 import { ALL_USERS_GROUP_ID, type Group } from './groupTypes';
 
 /**
@@ -15,6 +16,12 @@ export function compareGroupsForUser(a: Group, b: Group): number {
   return (a.name || '').localeCompare(b.name || '');
 }
 
+/**
+ * In Baumreihenfolge: Untergruppen direkt unter ihrer Elterngruppe,
+ * Geschwister wie oben sortiert.
+ */
 export function sortGroupsForUser(groups: Group[]): Group[] {
-  return [...groups].sort(compareGroupsForUser);
+  return orderGroupsAsTree(groups, compareGroupsForUser).map(
+    ({ group }) => group
+  );
 }

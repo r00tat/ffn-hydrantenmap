@@ -3,6 +3,10 @@ import 'server-only';
 
 import { isFirecallGuest } from '../../common/firecallGuest';
 import {
+  ancestorGroupIds,
+  descendantGroupIds,
+} from '../../common/groupHierarchy';
+import {
   canAssignRole,
   isRoleId,
   type RoleId,
@@ -30,6 +34,7 @@ import { firestore } from '../../server/firebase/admin';
 import { ApiException } from '../api/errors';
 import { listUsers } from '../api/users/listUsers';
 import { actionAdminRequired, actionPermissionRequired } from '../auth';
+import { getGroups } from './groupHelpers';
 import { assertTenantGroup } from './groupTypes';
 
 export interface MemberRolesData {
@@ -48,7 +53,9 @@ export type MemberRolesError =
   | 'unknownUser'
   | 'firecallGuest'
   /** Wartet noch auf die Kostenersatz-Auswahl der Migration (Schritt 2). */
-  | 'notMigrated';
+  | 'notMigrated'
+  /** Ist Mitglied einer Untergruppe und damit zwingend auch dieser Gruppe. */
+  | 'memberOfSubgroup';
 
 export type MemberRolesResult<T = object> =
   | ({ success: true } & T)
@@ -159,6 +166,13 @@ export async function addMemberAction(
   }
 
   await changeUserRoles(uid, { kind: 'addMember', groupId }, user);
+  // Wer Mitglied einer Gruppe ist, ist auch Mitglied aller Elterngruppen.
+  // Frisch gelesen, weil das Dokument von oben die Änderung nicht kennt.
+  const memberOf = effectiveGroupRoles(user);
+  for (const ancestorId of ancestorGroupIds(groupId, await getGroups())) {
+    if (Object.prototype.hasOwnProperty.call(memberOf, ancestorId)) continue;
+    await changeUserRoles(uid, { kind: 'addMember', groupId: ancestorId });
+  }
   return { success: true };
 }
 
@@ -174,6 +188,16 @@ export async function removeMemberAction(
   if (!user) return { success: false, error: 'unknownUser' };
   if (awaitsKostenersatzChoice(user)) {
     return { success: false, error: 'notMigrated' };
+  }
+
+  // Die Mitgliedschaft folgt aus der Untergruppe; erst dort entfernen.
+  const memberOf = effectiveGroupRoles(user);
+  if (
+    descendantGroupIds(groupId, await getGroups()).some((id) =>
+      Object.prototype.hasOwnProperty.call(memberOf, id),
+    )
+  ) {
+    return { success: false, error: 'memberOfSubgroup' };
   }
 
   await changeUserRoles(uid, { kind: 'removeMember', groupId }, user);

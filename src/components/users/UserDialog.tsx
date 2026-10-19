@@ -23,7 +23,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   sendPasswordResetEmailAction,
   setUserPasswordAction,
@@ -31,6 +31,12 @@ import {
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { feuerwehren } from '../../common/feuerwehren';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
+import {
+  impliedGroupIds,
+  orderGroupsAsTree,
+  withAncestorGroups,
+  type HierarchyGroup,
+} from '../../common/groupHierarchy';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended, userTextFields } from '../../common/users';
@@ -56,6 +62,12 @@ export interface UserRecordExtendedDialogOptions {
   onClose: (item?: UserRecordExtended, memberGroupIds?: string[]) => void;
   user: UserRecordExtended;
   groups: { [key: string]: string };
+  /**
+   * Gruppen samt `parentId`. Damit stehen Untergruppen eingerückt unter ihrer
+   * Elterngruppe, und die Elterngruppen gewählter Gruppen sind angehakt und
+   * gesperrt.
+   */
+  groupHierarchy?: HierarchyGroup[];
 }
 
 function generatePassword() {
@@ -214,6 +226,7 @@ export default function UserRecordExtendedDialog({
   onClose,
   user: userDefault,
   groups,
+  groupHierarchy = [],
 }: UserRecordExtendedDialogOptions) {
   const t = useTranslations('userDialog');
   const [open, setOpen] = useState(true);
@@ -224,8 +237,27 @@ export default function UserRecordExtendedDialog({
   );
   // Nur Mandanten: `allUsers` bekommt jeder, und Kostenersatz ist keine
   // Gruppe mehr, sondern eine Rolle je Gruppe.
-  const tenantGroups = Object.entries(groups).filter(([key]) =>
-    isTenantGroupId(key)
+  const tenantGroups = useMemo(
+    () =>
+      orderGroupsAsTree(
+        Object.entries(groups)
+          .filter(([key]) => isTenantGroupId(key))
+          .map(([id, name]) => ({
+            id,
+            name,
+            parentId: groupHierarchy.find((g) => g.id === id)?.parentId,
+          }))
+      ),
+    [groups, groupHierarchy]
+  );
+  // Wer in einer Untergruppe ist, ist auch in allen Gruppen darüber.
+  const effectiveGroups = useMemo(
+    () => withAncestorGroups(memberGroups, groupHierarchy),
+    [memberGroups, groupHierarchy]
+  );
+  const lockedGroups = useMemo(
+    () => impliedGroupIds(memberGroups, groupHierarchy),
+    [memberGroups, groupHierarchy]
   );
 
   const onChange =
@@ -312,7 +344,7 @@ export default function UserRecordExtendedDialog({
             labelId="user-group-checkbox-label"
             id="user-group-checkbox"
             multiple
-            value={memberGroups}
+            value={effectiveGroups}
             onChange={handleGroupChange}
             input={<OutlinedInput label={t('groupLabel')} />}
             renderValue={(selected) =>
@@ -323,10 +355,20 @@ export default function UserRecordExtendedDialog({
             }
             MenuProps={MenuProps}
           >
-            {tenantGroups.map(([key, name]) => (
-              <MenuItem key={key} value={key}>
-                <Checkbox checked={memberGroups.includes(key)} />
-                <ListItemText primary={name} />
+            {tenantGroups.map(({ group: { id: key = '', name }, depth }) => (
+              <MenuItem
+                key={key}
+                value={key}
+                disabled={lockedGroups.has(key)}
+                sx={{ pl: 2 + depth * 2 }}
+              >
+                <Checkbox checked={effectiveGroups.includes(key)} />
+                <ListItemText
+                  primary={name}
+                  secondary={
+                    lockedGroups.has(key) ? t('groupViaSubgroup') : undefined
+                  }
+                />
               </MenuItem>
             ))}
           </Select>
@@ -398,7 +440,7 @@ export default function UserRecordExtendedDialog({
         <Button
           onClick={() => {
             setOpen(false);
-            onClose(user, memberGroups);
+            onClose(user, effectiveGroups);
           }}
         >
           Aktualisieren
