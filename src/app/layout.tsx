@@ -16,6 +16,7 @@ import type { Metadata, Viewport } from 'next';
 import { getLocale } from 'next-intl/server';
 import React from 'react';
 import { appIconPath, withEnvironmentPrefix } from '../common/appEnvironment';
+import { APP_NAME as BASE_APP_NAME, buildDocumentTitle } from '../common/documentTitle';
 import { SERWIST_SW_URL } from '../common/serviceWorker';
 import AppProviders from '../components/providers/AppProviders';
 import IntlClientProvider from '../components/providers/IntlClientProvider';
@@ -24,9 +25,11 @@ import { appViewport } from './viewportConfig';
 
 // In der Dev-Umgebung vorangestellt gekennzeichnet, damit Tab und installierte
 // PWA von der Produktion unterscheidbar sind — s. common/appEnvironment.ts.
-const APP_NAME = withEnvironmentPrefix('Einsatzkarte FFN');
-const APP_DEFAULT_TITLE = withEnvironmentPrefix('Einsatzkarte FFN');
-const APP_TITLE_TEMPLATE = withEnvironmentPrefix('%s - PWA App');
+// Den Titel der einzelnen Seite setzt im Client die Seitenleiste
+// (`AppDrawer`), weil die Abschnitte eines Einsatzes ohne Router wechseln.
+const APP_NAME = withEnvironmentPrefix(BASE_APP_NAME);
+const APP_DEFAULT_TITLE = buildDocumentTitle();
+const APP_TITLE_TEMPLATE = buildDocumentTitle('%s');
 const APP_DESCRIPTION = 'Hydranten und Einsatzkarte der FF Neusiedl am See';
 
 export const metadata: Metadata = {

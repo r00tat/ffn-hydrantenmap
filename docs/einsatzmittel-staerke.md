@@ -284,3 +284,23 @@ läuft über denselben Hook `useAssignToLocation`: Tagebuch, Position auf der Ka
 die Fahrzeuge einer Einheit gehen genauso mit. Zwei Wege mit eigener Logik würden
 auseinanderlaufen — die Übersicht bekommt deshalb nur `onAssign` hereingereicht und
 bleibt ohne ihn reine Anzeige.
+
+## Sortierung je Ebene
+
+Unter der Tabelle stehen die Einsatzmittel nach Ebene gruppiert. Jede Ebene
+hat eine eigene Wahl der Reihenfolge
+([einsatzmittel-sort.ts](../src/components/pages/einsatzmittel-sort.ts)):
+
+- **Zeit** — nach `datum`, wie vor der Wahl. Bleibt Vorgabe, weil die Liste
+  so in der Reihenfolge des Eintreffens wächst.
+- **Feuerwehr** — nach `fw`, darin nach Name. Ohne Feuerwehr zuletzt.
+- **Einheit** — entlang des Einheitenbaums (`unit-tree.ts`): die Einheit,
+  darunter ihre Unter-Einheiten und Fahrzeuge, jeweils nach Name. Ohne
+  Einheit zuletzt. Den Baum liest die Sortierung aus **allen** Einsatzmitteln,
+  nicht nur aus denen der Ebene — die Einheit über einem Fahrzeug darf auf
+  einer anderen Ebene liegen und bestimmt trotzdem seinen Platz.
+
+Die Wahl gilt je Ebene und nur, solange die Seite offen ist: Auf einer Ebene
+mit Nachbarwehren hilft die Feuerwehr, auf einer mit KHD-Zügen die Einheit.
+Ein Speichern am Einsatz hätte die Wahl auf allen Geräten umgestellt, auch
+bei dem, der gerade nach Zeit liest.

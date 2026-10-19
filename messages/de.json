@@ -3088,6 +3088,12 @@
       "label": "Ansicht",
       "table": "Tabelle",
       "locations": "Nach Einsatzort"
+    },
+    "layerSort": {
+      "label": "Sortierung",
+      "time": "Zeit",
+      "fw": "Feuerwehr",
+      "unit": "Einheit"
     }
   },
   "einsaetze": {

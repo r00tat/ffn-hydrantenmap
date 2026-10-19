@@ -39,6 +39,11 @@ import StrengthTable from './StrengthTable';
 import EinsatzmittelOverview from './EinsatzmittelOverview';
 import useAssignToLocation from '../Einsatzorte/useAssignToLocation';
 import { calculateStrength } from './fahrzeuge-utils';
+import {
+  EINSATZMITTEL_SORT_MODES,
+  type EinsatzmittelSortMode,
+  sortEinsatzmittel,
+} from './einsatzmittel-sort';
 
 function downloadEinsatzmittel(
   items: FirecallItem[],
@@ -189,20 +194,32 @@ function CompactItemCard({
 function LayerGroup({
   layerName,
   items,
+  allItems,
   defaultExpanded,
 }: {
   layerName: string;
   items: FirecallItem[];
+  /** Alle Einsatzmittel — die Einheit eines Fahrzeugs kann woanders liegen. */
+  allItems: FirecallItem[];
   defaultExpanded: boolean;
 }) {
+  const t = useTranslations('einsatzmittel');
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [editItem, setEditItem] = useState<FirecallItem | null>(null);
+  // Je Ebene eigens wählbar: Auf einer Ebene mit Nachbarwehren hilft die
+  // Feuerwehr, auf einer mit KHD-Zügen die Einheit.
+  const [sortMode, setSortMode] = useState<EinsatzmittelSortMode>('time');
+  const sortedItems = useMemo(
+    () => sortEinsatzmittel(items, sortMode, allItems),
+    [items, sortMode, allItems],
+  );
 
   return (
     <Box sx={{ mb: 2 }}>
       <Box
         sx={{
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
           cursor: 'pointer',
           py: 0.5,
@@ -224,11 +241,26 @@ function LayerGroup({
         <Typography variant="h6" sx={{ flex: 1 }}>
           {layerName}
         </Typography>
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={sortMode}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(_e, value) => value && setSortMode(value)}
+          aria-label={t('layerSort.label')}
+          sx={{ mr: 1 }}
+        >
+          {EINSATZMITTEL_SORT_MODES.map((mode) => (
+            <ToggleButton key={mode} value={mode}>
+              {t(`layerSort.${mode}`)}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
         <Chip label={items.length} size="small" sx={{ mr: 1 }} />
       </Box>
       <Collapse in={expanded} timeout={300}>
         <Grid container spacing={1} sx={{ mt: 0.5 }}>
-          {items.map((item) => (
+          {sortedItems.map((item) => (
             <CompactItemCard
               key={item.id}
               item={item}
@@ -282,11 +314,6 @@ export default function Fahrzeuge() {
       } else {
         groups['default'].push(item);
       }
-    }
-
-    // Sort items within each group by datum
-    for (const key of Object.keys(groups)) {
-      groups[key].sort((a, b) => a.datum?.localeCompare(b.datum || '') || 0);
     }
 
     return groups;
@@ -345,6 +372,7 @@ export default function Fahrzeuge() {
             key={layerId}
             layerName={layer.name}
             items={items}
+            allItems={displayItems}
             defaultExpanded={true}
           />
         );
@@ -354,6 +382,7 @@ export default function Fahrzeuge() {
         <LayerGroup
           layerName={t('unassigned')}
           items={groupedByLayer['default']}
+          allItems={displayItems}
           defaultExpanded={true}
         />
       )}

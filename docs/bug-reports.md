@@ -30,6 +30,12 @@ Alternativ im Admin-Panel unter `/admin/bug-reports`
 ([src/app/admin/bug-reports/](../src/app/admin/bug-reports/)), wo sich auch Status und
 Empfänger-E-Mails (`appConfig/bugReport`) pflegen lassen.
 
+Der **Direkt-Link** der Benachrichtigungsmail zeigt auf `/admin/bug-reports/<id>`
+([[id]/page.tsx](../src/app/admin/bug-reports/[id]/page.tsx)): dieselbe Liste, der Report
+im Detaildialog schon geöffnet. Beim Schließen geht die Adresse zurück auf die Liste,
+sonst öffnete ein Neuladen den Report wieder. Die Route gab es anfangs nicht; die Mails
+verlinkten trotzdem dorthin und landeten auf einer 404-Seite.
+
 ### Bearbeitung: Felder, Verlauf, Kommentare
 
 Neben dem Status sind `githubIssue`, `assignee` und `internalNote` am Report pflegbar.

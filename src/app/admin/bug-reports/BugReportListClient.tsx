@@ -34,7 +34,11 @@ import { listBugReportsAction } from './bugReportAdminActions';
 interface BugReportListClientProps {
   initialReports: BugReport[];
   initialConfig: BugReportConfig;
+  /** Beim Aufruf über den Direkt-Link `/admin/bug-reports/<id>` geöffnet. */
+  initialSelectedId?: string;
 }
+
+const LIST_PATH = '/admin/bug-reports';
 
 type KindFilter = 'all' | BugReportKind;
 type StatusFilter = 'all' | BugReportStatus;
@@ -70,6 +74,7 @@ function attachmentCount(report: BugReport): number {
 export default function BugReportListClient({
   initialReports,
   initialConfig,
+  initialSelectedId,
 }: BugReportListClientProps) {
   const showSnackbar = useSnackbar();
   const t = useTranslations('bugReport');
@@ -78,7 +83,9 @@ export default function BugReportListClient({
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialSelectedId ?? null,
+  );
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -128,6 +135,11 @@ export default function BugReportListClient({
 
   const handleDialogClose = useCallback(() => {
     setSelectedId(null);
+    // Vom Direkt-Link zurück auf die Liste, sonst öffnete ein Neuladen den
+    // eben geschlossenen Report wieder.
+    if (window.location.pathname !== LIST_PATH) {
+      window.history.replaceState(null, '', LIST_PATH);
+    }
   }, []);
 
   const handleStatusChanged = useCallback(() => {

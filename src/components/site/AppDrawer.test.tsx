@@ -197,6 +197,37 @@ describe('AppDrawer aktive Seite', () => {
   });
 });
 
+describe('AppDrawer Tab-Titel', () => {
+  it('trägt die aktive Seite in den Tab-Titel ein', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIRESTORE_DB', '');
+    pathnameMock.mockReturnValue('/einsatz/f1/einsatzmittel');
+    firecallIdMock.mockReturnValue('f1');
+    renderDrawer();
+    expect(document.title).toBe('Einsatzmittel - Einsatzkarte FFN');
+    vi.unstubAllEnvs();
+  });
+
+  it('folgt einem Seitenwechsel ohne Neuladen', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIRESTORE_DB', '');
+    pathnameMock.mockReturnValue('/einsatz/f1/einsatzmittel');
+    firecallIdMock.mockReturnValue('f1');
+    const { rerender } = renderDrawer();
+    pathnameMock.mockReturnValue('/einsatz/f1/einsatzorte');
+    rerender();
+    expect(document.title).toBe('Einsatzorte - Einsatzkarte FFN');
+    vi.unstubAllEnvs();
+  });
+
+  it('fällt ohne passenden Menüpunkt auf den App-Namen zurück', () => {
+    vi.stubEnv('NEXT_PUBLIC_FIRESTORE_DB', '');
+    pathnameMock.mockReturnValue('/gibt-es-nicht');
+    firecallIdMock.mockReturnValue('unknown');
+    renderDrawer();
+    expect(document.title).toBe('Einsatzkarte FFN');
+    vi.unstubAllEnvs();
+  });
+});
+
 describe('AppDrawer Berechtigungen', () => {
   it('zeigt Nicht-Admins in der Administration nur die Tokens', async () => {
     pathnameMock.mockReturnValue('/');

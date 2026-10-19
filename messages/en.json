@@ -3088,6 +3088,12 @@
       "label": "View",
       "table": "Table",
       "locations": "By location"
+    },
+    "layerSort": {
+      "label": "Sort order",
+      "time": "Time",
+      "fw": "Fire brigade",
+      "unit": "Unit"
     }
   },
   "einsaetze": {
