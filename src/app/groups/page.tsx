@@ -24,6 +24,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -68,13 +69,21 @@ import {
 } from './groupTree';
 import { Group, KNOWN_GROUPS } from './groupTypes';
 
-function useGroupList(): [Group[], () => Promise<Group[]>, UserRecordExtended[]] {
+function useGroupList(): [
+  Group[],
+  () => Promise<Group[]>,
+  UserRecordExtended[],
+  boolean,
+] {
   const [groups, setGroups] = useState<Group[]>([]);
   const [users, setUsers] = useState<UserRecordExtended[]>([]);
+  // Bis zum ersten Laden ist die leere Liste nicht „keine Gruppen“.
+  const [loaded, setLoaded] = useState(false);
   const getGroups = useCallback(async () => {
     const [newGroups, newUsers] = await Promise.all([getGroupsAction(), getUsers()]);
     setGroups(newGroups);
     setUsers(newUsers);
+    setLoaded(true);
     return newGroups;
   }, []);
 
@@ -84,7 +93,7 @@ function useGroupList(): [Group[], () => Promise<Group[]>, UserRecordExtended[]]
     })();
   }, [getGroups]);
 
-  return [groups, getGroups, users];
+  return [groups, getGroups, users, loaded];
 }
 
 export default function GroupsPage() {
@@ -98,7 +107,7 @@ export default function GroupsPage() {
 function Groups() {
   const t = useTranslations('groups');
   const router = useRouter();
-  const [groups, getGroups, users] = useGroupList();
+  const [groups, getGroups, users, loaded] = useGroupList();
   const [deleting, setDeleting] = useState<Group>();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -211,7 +220,7 @@ function Groups() {
             <RefreshIcon />
           </IconButton>
         </Tooltip>
-        {missingKnownGroups.length > 0 && (
+        {loaded && missingKnownGroups.length > 0 && (
           <Tooltip
             title={t('createKnownTooltip', {
               names: missingKnownGroups.map((g) => g.name).join(', '),
@@ -272,7 +281,14 @@ function Groups() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.length === 0 && (
+              {!loaded && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <CircularProgress size={28} aria-label={t('loading')} />
+                  </TableCell>
+                </TableRow>
+              )}
+              {loaded && rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4}>
                     <Typography color="text.secondary">
