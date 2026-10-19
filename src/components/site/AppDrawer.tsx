@@ -66,9 +66,10 @@ import ListItemText from '@mui/material/ListItemText';
 import { useTranslations } from 'next-intl';
 import FirecallLink from './FirecallLink';
 import { usePathname } from 'next/navigation';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecall, useFirecallId } from '../../hooks/useFirecall';
+import { buildDocumentTitle } from '../../common/documentTitle';
 import { can, memberGroupIds } from '../../common/permissions';
 import { useCan, useCanAny } from '../../hooks/usePermissions';
 import { useBugReport } from '../bugReport/BugReportProvider';
@@ -158,8 +159,8 @@ function findActive(
   groups: DrawerGroup[],
   firecallId: string | undefined,
   pathname: string,
-): { key?: string; group?: string } {
-  let best: { key?: string; group?: string } = {};
+): { key?: string; group?: string; text?: string } {
+  let best: { key?: string; group?: string; text?: string } = {};
   let bestLength = -1;
 
   const consider = (item: DrawerLink, group?: string) => {
@@ -168,7 +169,7 @@ function findActive(
     // Bei gleich langem Ziel gewinnt der erste Eintrag der Reihenfolge.
     if (href.length <= bestLength) return;
     bestLength = href.length;
-    best = { key: itemKey(item.text, group), group };
+    best = { key: itemKey(item.text, group), group, text: item.text };
   };
 
   directItems.forEach((item) => consider(item));
@@ -619,6 +620,25 @@ export default function AppDrawer({
 
   const active = findActive(directItems, groups, firecallId, pathname ?? '');
   const activeGroup = active.group;
+  const documentTitle = buildDocumentTitle(active.text);
+
+  // Tab-Titel aus dem aktiven Menüpunkt. Über die Metadaten von Next ginge
+  // das nicht: Die Abschnitte eines Einsatzes wechseln per `pushState` ohne
+  // Router (s. `common/firecallNavigation.ts`). Der Observer setzt den Titel
+  // erneut, falls Next den `<title>` beim Seitenwechsel nachträglich ersetzt.
+  useEffect(() => {
+    const apply = () => {
+      if (document.title !== documentTitle) document.title = documentTitle;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    return () => observer.disconnect();
+  }, [documentTitle]);
 
   // Der Aufklapp-Zustand wird zusammen mit der Gruppe gespeichert, für die er
   // gilt. Führt die aktuelle Seite in eine andere Gruppe, ist der gemerkte
