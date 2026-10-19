@@ -335,7 +335,7 @@ export default function UserRecordExtendedDialog({
           <FormControlLabel
             control={
               <Switch
-                checked={user.authorized}
+                checked={!!user.authorized}
                 onChange={onChangeSwitch('authorized')}
               />
             }
