@@ -41,7 +41,8 @@ import {
   OebfvConfigPublic,
   deleteOebfvConfig,
   getOebfvConfig,
-  getOebfvTokenGroupIds,
+  getOebfvTokenGroups,
+  type OebfvTokenGroup,
   saveOebfvConfig,
   transferOebfvTokenAction,
 } from '../kennzeichen/configActions';
@@ -100,7 +101,7 @@ export default function GroupDialogg({
   const [oebfvConfig, setOebfvConfig] = useState<OebfvConfigPublic | null>(null);
   const [oebfvToken, setOebfvToken] = useState('');
   const [showOebfvToken, setShowOebfvToken] = useState(false);
-  const [oebfvTokenGroups, setOebfvTokenGroups] = useState<string[]>([]);
+  const [oebfvTokenGroups, setOebfvTokenGroups] = useState<OebfvTokenGroup[]>([]);
   const [oebfvSource, setOebfvSource] = useState('');
   const [oebfvTransferInfo, setOebfvTransferInfo] = useState<string>();
 
@@ -124,8 +125,10 @@ export default function GroupDialogg({
     getOebfvConfig(groupId)
       .then((existing) => setOebfvConfig(existing))
       .catch((err) => console.error('Failed to load ÖBFV config:', err));
-    getOebfvTokenGroupIds()
-      .then((ids) => setOebfvTokenGroups(ids.filter((id) => id !== groupId)))
+    getOebfvTokenGroups()
+      .then((tokenGroups) =>
+        setOebfvTokenGroups(tokenGroups.filter((g) => g.groupId !== groupId))
+      )
       .catch((err) => console.error('Failed to load ÖBFV groups:', err));
   }, [groupId]);
 
@@ -141,7 +144,9 @@ export default function GroupDialogg({
     try {
       const result = await transferOebfvTokenAction(oebfvSource, groupId);
       setOebfvConfig(await getOebfvConfig(groupId));
-      setOebfvTokenGroups((ids) => ids.filter((id) => id !== oebfvSource));
+      setOebfvTokenGroups((tokenGroups) =>
+        tokenGroups.filter((g) => g.groupId !== oebfvSource)
+      );
       setOebfvSource('');
       const skipped = [...result.notMember, ...result.notMigrated];
       setOebfvTransferInfo(
@@ -549,9 +554,11 @@ export default function GroupDialogg({
                   value={oebfvSource}
                   onChange={(e) => setOebfvSource(e.target.value)}
                 >
-                  {oebfvTokenGroups.map((id) => (
+                  {oebfvTokenGroups.map(({ groupId: id, name }) => (
                     <MenuItem key={id} value={id}>
-                      {groups.find((g) => g.id === id)?.name ?? id}
+                      {name ??
+                        groups.find((g) => g.id === id)?.name ??
+                        tGroups('oebfvUnknownGroup', { id })}
                     </MenuItem>
                   ))}
                 </Select>

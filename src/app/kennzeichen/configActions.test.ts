@@ -10,6 +10,7 @@ const {
   setMock,
   deleteMock,
   usersGetMock,
+  groupNames,
 } = vi.hoisted(() => ({
   adminMock: vi.fn(),
   userMock: vi.fn(),
@@ -18,6 +19,7 @@ const {
   setMock: vi.fn(),
   deleteMock: vi.fn(),
   usersGetMock: vi.fn(),
+  groupNames: new Map<string, string>(),
 }));
 
 vi.mock('../auth', () => ({
@@ -33,8 +35,14 @@ vi.mock('../../server/auth/changeUserRoles', () => ({
 }));
 vi.mock('../../server/firebase/admin', () => ({
   firestore: {
+    getAll: async (...refs: { id: string }[]) =>
+      refs.map(({ id }) => ({
+        exists: groupNames.has(id),
+        data: () => ({ name: groupNames.get(id) }),
+      })),
     collection: (name: string) => {
       if (name === 'user') return { get: () => usersGetMock() };
+      if (name === 'groups') return { doc: (id: string) => ({ id }) };
       return {
         get: async () => ({
           docs: [...configs].map(([id, data]) => ({ id, data: () => data })),
@@ -54,6 +62,7 @@ vi.mock('../../server/firebase/admin', () => ({
 
 import {
   getGroupsWithOebfvConfig,
+  getOebfvTokenGroups,
   transferOebfvTokenAction,
 } from './configActions';
 
@@ -65,6 +74,7 @@ const userDoc = (id: string, data: Record<string, unknown>) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   configs.clear();
+  groupNames.clear();
   adminMock.mockResolvedValue({ user: { email: 'admin@example.org' } });
 });
 
@@ -88,6 +98,20 @@ describe('getGroupsWithOebfvConfig', () => {
     userMock.mockResolvedValue({ user: { isAdmin: true } });
 
     expect(await getGroupsWithOebfvConfig()).toEqual(['ffnd', 'ffxy']);
+  });
+});
+
+describe('getOebfvTokenGroups', () => {
+  it('liefert die Gruppen mit Token samt Namen, auch wenn die Gruppe fehlt', async () => {
+    configs.set('kz', { tokenEncrypted: 'x' });
+    configs.set('weg', { tokenEncrypted: 'y' });
+    configs.set('leer', {});
+    groupNames.set('kz', 'Kennzeichenabfrage');
+
+    expect(await getOebfvTokenGroups()).toEqual([
+      { groupId: 'kz', name: 'Kennzeichenabfrage' },
+      { groupId: 'weg' },
+    ]);
   });
 });
 

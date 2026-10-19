@@ -2965,7 +2965,8 @@
     "dragHint": "Drag a group by its handle onto another group to place it there. Its members also become members of the new parent groups.",
     "moved": "“{name}” is now below “{parent}”.",
     "movedToRoot": "“{name}” is now at the top level.",
-    "moveFailed": "Moving failed: {message}"
+    "moveFailed": "Moving failed: {message}",
+    "oebfvUnknownGroup": "Deleted group ({id})"
   },
   "tokens": {
     "title": "API tokens",

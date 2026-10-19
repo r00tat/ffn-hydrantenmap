@@ -10,7 +10,10 @@ import {
   effectiveGroupRoles,
   type UserRolesSource,
 } from '../../common/userGroupRoles';
-import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
+import {
+  GROUP_COLLECTION_ID,
+  USER_COLLECTION_ID,
+} from '../../components/firebase/firestore';
 import { changeUserRoles } from '../../server/auth/changeUserRoles';
 import { ApiException } from '../api/errors';
 import { assertTenantGroup } from '../groups/groupTypes';
@@ -105,11 +108,31 @@ export async function getGroupsWithOebfvConfig(): Promise<string[]> {
     .filter((groupId) => can(session.user, groupId, 'kennzeichen.query'));
 }
 
+export interface OebfvTokenGroup {
+  groupId: string;
+  /** Fehlt, wenn die Gruppe zum Token nicht mehr existiert. */
+  name?: string;
+}
+
 // Admin-only: groups that hold a token, for taking one over in another group.
-export async function getOebfvTokenGroupIds(): Promise<string[]> {
+// Mit Namen vom Server: Der Token kann an einer Gruppe hängen, die es nicht
+// mehr gibt — dann fehlt sie in jeder Gruppenliste des Browsers.
+export async function getOebfvTokenGroups(): Promise<OebfvTokenGroup[]> {
   await actionAdminRequired();
   const snapshot = await firestore.collection(OEBFV_CONFIG_COLLECTION).get();
-  return snapshot.docs.filter((d) => !!d.data().tokenEncrypted).map((d) => d.id);
+  const groupIds = snapshot.docs
+    .filter((d) => !!d.data().tokenEncrypted)
+    .map((d) => d.id);
+  if (groupIds.length === 0) return [];
+  const groupDocs = await firestore.getAll(
+    ...groupIds.map((id) => firestore.collection(GROUP_COLLECTION_ID).doc(id)),
+  );
+  return groupIds.map((groupId, index) => {
+    const name = groupDocs[index]?.exists
+      ? (groupDocs[index].data()?.name as string | undefined)
+      : undefined;
+    return name ? { groupId, name } : { groupId };
+  });
 }
 
 export interface OebfvTokenTransferResult extends TokenTransferPlan {

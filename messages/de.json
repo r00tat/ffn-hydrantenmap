@@ -2965,7 +2965,8 @@
     "dragHint": "Ziehe eine Gruppe am Griff auf eine andere Gruppe, um sie dort einzuordnen. Ihre Mitglieder werden dabei auch Mitglied der neuen Elterngruppen.",
     "moved": "„{name}“ liegt jetzt unter „{parent}“.",
     "movedToRoot": "„{name}“ liegt jetzt auf der obersten Ebene.",
-    "moveFailed": "Verschieben fehlgeschlagen: {message}"
+    "moveFailed": "Verschieben fehlgeschlagen: {message}",
+    "oebfvUnknownGroup": "Gelöschte Gruppe ({id})"
   },
   "tokens": {
     "title": "API Token",
