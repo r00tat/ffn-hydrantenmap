@@ -46,6 +46,7 @@ halten. Umbenennen ist eine Datenmigration.
 | `bekleidung.read` | Bekleidung sehen |
 | `bekleidung.manage` | Bekleidung pflegen, Import |
 | `kostenersatz.use` | Kostenersatz an Einsätzen der Gruppe (Berechnung, PDF, Mail, SumUp), Füllungen verrechnen, Mailvorlagen |
+| `kennzeichen.query` | ÖBFV-Kennzeichenabfrage mit dem Token der Gruppe (siehe [Kennzeichenabfrage je Gruppe](#kennzeichenabfrage-je-gruppe)) |
 | `gruppe.manage` | Stammdaten, Share-Links, Atemschutz-Admin, Wochenbericht, Mängel löschen, PDF-Import, fremde Füllungen korrigieren |
 | `rollen.assign` | Rollen in dieser Gruppe vergeben (siehe [Wer vergibt was](#wer-vergibt-was)) |
 
@@ -67,11 +68,12 @@ Ebenfalls fest im Code (`ROLES`):
 | `geraetemeister` | `fahrtenbuch.manage`, `geraete.manage`, `personal.manage` | Fahrzeuge, Beladung, Lager |
 | `bekleidungswart` | `bekleidung.read`, `bekleidung.manage` | Einsatz- und Dienstbekleidung |
 | `kostenersatz` | `kostenersatz.use` | Abrechnung nach Tarifordnung, Füllungsrechnungen |
+| `kennzeichenabfrage` | `kennzeichen.query` | Fahrzeug- und Halterdaten im Einsatz |
 
 Mitglied ohne Zusatzrolle ist, wer die Gruppe mit leerer Rollenliste hat.
 
 **Der Gruppen-Admin schließt Gerätemeister und Bekleidungswart ein**, aber
-**nicht den Kostenersatz**. Das entspricht dem Stand vor der Umstellung: Ein
+**nicht den Kostenersatz** und **nicht die Kennzeichenabfrage**. Das entspricht dem Stand vor der Umstellung: Ein
 Gruppen-Admin ohne Freischaltung sah keinen Kostenersatz, und wer Rechnungen
 an Dritte stellt, soll das ausdrücklich zugeteilt bekommen. Umgekehrt kommt
 ein Gerätemeister nicht an Gruppeneinstellungen, Share-Links, PDF-Import oder
@@ -161,6 +163,7 @@ Hierarchie muss an jedem Schreibweg nachgezogen werden.
 | --- | --- |
 | Benutzerdialog (`updateUser`) | die gewählten Gruppen werden um ihre Elterngruppen ergänzt; Elterngruppen gewählter Gruppen sind im Dialog angehakt und gesperrt |
 | Gruppendialog (`updateGroupAction`) | neue Mitglieder bekommen die Elterngruppen dazu; Mitglieder einer Untergruppe bleiben Mitglied und sind gesperrt. Wird eine Gruppe unter eine andere gehängt, bekommen alle ihre Mitglieder die neuen Elterngruppen |
+| Ziehen in der Gruppenübersicht (`setGroupParentAction`) | ändert nur `parentId`, mit derselben Prüfung (`isValidParent`); die Mitglieder der Gruppe und ihrer Untergruppen bekommen die neuen Elterngruppen. Die Zielprüfung im Browser (`dropTargetParent`) hebt nur gültige Ziele hervor |
 | „Mitglieder und Rollen" (`addMemberAction`, `removeMemberAction`) | Aufnehmen ergänzt die Elterngruppen; Entfernen lehnt ab (`memberOfSubgroup`), solange der Benutzer in einer Untergruppe ist |
 
 **Entfernen kaskadiert bewusst nicht.** Wer aus einer Elterngruppe genommen
@@ -421,6 +424,33 @@ dort deshalb nur für Nicht-Admins, ebenso in der PDF-Route
 könnte aber weder PDF noch Mail erzeugen. Ob solche Einsätze überhaupt
 existieren, ist vor dem Aufräum-PR zu klären (siehe
 [Nach dem Release](#nach-dem-release)).
+
+## Kennzeichenabfrage je Gruppe
+
+Der ÖBFV-Token liegt an einer Gruppe (`oebfvKennzeichenConfig/{groupId}`,
+gepflegt im Gruppendialog). Abfragen darf, wer **in dieser Gruppe** das Recht
+`kennzeichen.query` hat — Rolle `kennzeichenabfrage` oder globaler Admin
+(`queryKennzeichen`, `getGroupsWithOebfvConfig`, Menüpunkt über
+`useCanAny`).
+
+Bis dahin genügte die Mitgliedschaft in der Gruppe mit dem Token. Dafür gab es
+eine eigene Gruppe „Kennzeichenabfrage“, die nichts als den Token und die
+Freigeschalteten trug — dieselbe Schein-Gruppe wie früher `kostenersatz`.
+Halterdaten sind aber keine Gruppenöffentlichkeit, und jede Abfrage wird
+protokolliert; deshalb ein eigenes Recht statt der Mitgliedschaft, und
+deshalb nicht im Gruppen-Admin enthalten.
+
+**Umzug:** Im Gruppendialog der Zielgruppe (ohne eigenen Token) steht „Token
+übernehmen von“. `transferOebfvTokenAction` verschiebt den Token und gibt jedem
+Mitglied der Quellgruppe, das auch Mitglied der Zielgruppe ist, dort die Rolle
+`kennzeichenabfrage` — wer vorher abfragen durfte, darf es danach. Wer nicht
+Mitglied der Zielgruppe ist, wird nicht still aufgenommen, sondern gemeldet;
+ebenso noch nicht migrierte Benutzer. Ein vorhandener Token der Zielgruppe
+wird nie überschrieben. Danach kann die leere Quellgruppe gelöscht werden.
+
+**Zeitfenster nach dem Deploy:** Bis zum Umzug fragt nur ab, wer die Rolle in
+der Gruppe mit dem Token hat, und der globale Admin. Den Umzug direkt nach dem
+Deploy machen.
 
 ## Kostenersatz je Gruppe
 

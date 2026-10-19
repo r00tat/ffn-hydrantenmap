@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { orderGroupsAsTree } from '../../common/groupHierarchy';
-import { visibleGroupTree } from './groupTree';
+import {
+  dropTargetParent,
+  groupDropId,
+  ROOT_DROP_ID,
+  visibleGroupTree,
+} from './groupTree';
 
 const tree = orderGroupsAsTree([
   { id: 'bezirk', name: 'Bezirk' },
@@ -49,5 +54,39 @@ describe('visibleGroupTree', () => {
     expect(ids(visibleGroupTree(withDescription, 'nord', new Set()))).toEqual([
       'x',
     ]);
+  });
+});
+
+describe('dropTargetParent', () => {
+  const groups = [
+    { id: 'bezirk', name: 'Bezirk' },
+    { id: 'abschnitt', name: 'Abschnitt 1', parentId: 'bezirk' },
+    { id: 'ffa', name: 'FF Alpha', parentId: 'abschnitt' },
+    { id: 'solo', name: 'Solo' },
+    { id: 'allUsers', name: 'Alle Benutzer' },
+  ];
+
+  it('macht die Gruppe zur Untergruppe der Zielgruppe', () => {
+    expect(dropTargetParent('solo', groupDropId('abschnitt'), groups)).toBe(
+      'abschnitt'
+    );
+    expect(dropTargetParent('ffa', groupDropId('solo'), groups)).toBe('solo');
+  });
+
+  it('setzt die Gruppe auf der Ablagefläche oben auf die oberste Ebene', () => {
+    expect(dropTargetParent('ffa', ROOT_DROP_ID, groups)).toBeNull();
+  });
+
+  it('ignoriert Ablegen ohne Änderung', () => {
+    expect(dropTargetParent('ffa', groupDropId('abschnitt'), groups)).toBeUndefined();
+    expect(dropTargetParent('solo', ROOT_DROP_ID, groups)).toBeUndefined();
+    expect(dropTargetParent('solo', undefined, groups)).toBeUndefined();
+  });
+
+  it('verbietet die Gruppe selbst, eigene Untergruppen und Pseudo-Gruppen', () => {
+    expect(dropTargetParent('bezirk', groupDropId('bezirk'), groups)).toBeUndefined();
+    expect(dropTargetParent('bezirk', groupDropId('ffa'), groups)).toBeUndefined();
+    expect(dropTargetParent('solo', groupDropId('allUsers'), groups)).toBeUndefined();
+    expect(dropTargetParent('allUsers', groupDropId('solo'), groups)).toBeUndefined();
   });
 });

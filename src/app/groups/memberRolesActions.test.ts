@@ -115,6 +115,7 @@ describe('getMemberRolesAction', () => {
       geraetemeister: true,
       bekleidungswart: true,
       kostenersatz: false,
+      kennzeichenabfrage: false,
     });
     expect(data.canManageMembers).toBe(false);
   });

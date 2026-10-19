@@ -2648,7 +2648,7 @@
     "authorityLabel": "Behörde",
     "plateLabel": "Vormerkzeichen",
     "searchButton": "Suchen",
-    "noConfig": "Für Ihre Gruppe ist kein Token konfiguriert. Ein Administrator kann den ÖBFV-Token in der Gruppenverwaltung hinterlegen.",
+    "noConfig": "Für Ihre Gruppe ist kein Token konfiguriert oder Ihnen fehlt die Rolle „Kennzeichenabfrage“. Ein Administrator hinterlegt den ÖBFV-Token in der Gruppenverwaltung, die Rolle vergibt er unter „Mitglieder und Rollen“.",
     "noResult": "Keine Zulassung gefunden.",
     "resultTitle": "Daten aus Zulassung",
     "vehicleHeading": "Fahrzeug {n}",
@@ -2952,7 +2952,20 @@
     "breadcrumbs": "Navigation",
     "editGroup": "Gruppe bearbeiten",
     "subgroups": "Untergruppen",
-    "noSubgroups": "keine"
+    "noSubgroups": "keine",
+    "oebfvRoleHint": "Abfragen darf, wer in dieser Gruppe die Rolle „Kennzeichenabfrage“ hat — die Mitgliedschaft allein genügt nicht.",
+    "oebfvTransferFrom": "Token übernehmen von",
+    "oebfvTransferHint": "Verschiebt den Token hierher. Wer in der anderen Gruppe abfragen durfte und hier Mitglied ist, bekommt hier die Rolle Kennzeichenabfrage.",
+    "oebfvTransfer": "Token übernehmen",
+    "oebfvTransferDone": "Token übernommen, Rolle an {count, plural, =0 {niemanden} one {# Mitglied} other {# Mitglieder}} vergeben.",
+    "oebfvTransferSkipped": "Nicht hier Mitglied oder noch nicht migriert, daher ohne Rolle: {names}.",
+    "oebfvTransferFailed": "Übernahme fehlgeschlagen: {message}",
+    "dragHandle": "„{name}“ verschieben",
+    "dropRoot": "Hier ablegen: oberste Ebene",
+    "dragHint": "Ziehe eine Gruppe am Griff auf eine andere Gruppe, um sie dort einzuordnen. Ihre Mitglieder werden dabei auch Mitglied der neuen Elterngruppen.",
+    "moved": "„{name}“ liegt jetzt unter „{parent}“.",
+    "movedToRoot": "„{name}“ liegt jetzt auf der obersten Ebene.",
+    "moveFailed": "Verschieben fehlgeschlagen: {message}"
   },
   "tokens": {
     "title": "API Token",
@@ -3808,7 +3821,8 @@
       "gruppenadmin": "Gruppen-Admin",
       "geraetemeister": "Gerätemeister",
       "bekleidungswart": "Bekleidungswart",
-      "kostenersatz": "Kostenersatz"
+      "kostenersatz": "Kostenersatz",
+      "kennzeichenabfrage": "Kennzeichenabfrage"
     }
   },
   "adminMcp": {
@@ -4869,7 +4883,7 @@
     "cancel": "Abbrechen",
     "explanationTitle": "Was die Rollen dürfen",
     "explanationIntro": "Rollen gelten nur in dieser Gruppe. Ein Mitglied kann mehrere Rollen haben; es erhält die Rechte aller zusammen.",
-    "linkHint": "Gerätemeister, Bekleidungswarte und Kostenersatz vergibst du je Gruppe unter „Mitglieder und Rollen“.",
+    "linkHint": "Gerätemeister, Bekleidungswarte, Kostenersatz und Kennzeichenabfrage vergibst du je Gruppe unter „Mitglieder und Rollen“.",
     "linkAction": "Rollen vergeben",
     "roles": {
       "gruppenadmin": {
@@ -4887,6 +4901,10 @@
       "kostenersatz": {
         "name": "Kostenersatz",
         "description": "Erstellt Kostenersatz-Berechnungen an Einsätzen der Gruppe und die Verrechnung der Flaschenfüllungen."
+      },
+      "kennzeichenabfrage": {
+        "name": "Kennzeichenabfrage",
+        "description": "Fragt Fahrzeug- und Halterdaten beim ÖBFV ab, mit dem Token dieser Gruppe."
       }
     },
     "permissions": {
@@ -4911,6 +4929,9 @@
       },
       "rollen": {
         "assign": "Rollen vergeben"
+      },
+      "kennzeichen": {
+        "query": "Kennzeichen abfragen"
       }
     },
     "errors": {

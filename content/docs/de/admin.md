@@ -5,7 +5,7 @@ Der Admin-Bereich bietet erweiterte Verwaltungsfunktionen für Administratoren. 
 ## Funktionen
 
 - Benutzerverwaltung: Benutzer anzeigen, freischalten, Feuerwehren zuordnen
-- Mitglieder und Rollen: Rollen je Feuerwehr vergeben (Gruppen-Admin, Gerätemeister, Bekleidungswart, Kostenersatz)
+- Mitglieder und Rollen: Rollen je Feuerwehr vergeben (Gruppen-Admin, Gerätemeister, Bekleidungswart, Kostenersatz, Kennzeichenabfrage)
 - Berechtigungen: Migration der Rollen und „Rechte neu ableiten"
 - Gruppenverwaltung: Gruppen erstellen und verwalten
 - Admin-Aktionen: Datenbank-Wartung, Benutzer-Reparatur, Daten zwischen Umgebungen kopieren
@@ -39,6 +39,11 @@ Der Admin-Bereich bietet erweiterte Verwaltungsfunktionen für Administratoren. 
 4. Ein Klick auf eine Gruppe öffnet ihre **Detailseite** mit übergeordneter
    Gruppe, Untergruppen, „Bearbeiten" und den Mitgliedern samt Rollen. Über
    die Navigationszeile oben geht es zurück zur Übersicht.
+5. Zum Umhängen ziehst du eine Gruppe am Griff (⋮⋮) auf eine andere Gruppe —
+   sie wird deren Untergruppe. Auf der Fläche „Hier ablegen: oberste Ebene“,
+   die beim Ziehen oben erscheint, löst du sie aus ihrer Elterngruppe.
+   Ungültige Ziele (die Gruppe selbst, ihre Untergruppen, Systemgruppen)
+   bleiben blass.
 
 Wer Mitglied einer Untergruppe ist, wird automatisch auch Mitglied aller
 übergeordneten Gruppen. In der Gruppenauswahl eines Benutzers sind diese
@@ -51,12 +56,16 @@ Rollen gelten immer **in einer Feuerwehr**. Vergeben werden sie im Abschnitt
 
 - **Gruppen-Admin** Verwaltung der Feuerwehr: Einstellungen, Freigabe-Links,
   Atemschutz-Verwaltung; schließt Gerätemeister und Bekleidungswart ein, nicht
-  aber den Kostenersatz
+  aber Kostenersatz und Kennzeichenabfrage
 - **Gerätemeister** Fahrtenbuch korrigieren, Fahrzeuge, Personen, Geräte &
   Material
 - **Bekleidungswart** Bekleidung sehen und pflegen
 - **Kostenersatz** Kostenersatz an Einsätzen der Feuerwehr, Verrechnung der
   Füllungen
+- **Kennzeichenabfrage** Fahrzeug- und Halterdaten über den ÖBFV-Token der
+  Feuerwehr abfragen. Den Token hinterlegst du im Gruppendialog; liegt er noch
+  an einer anderen Gruppe, übernimmst du ihn dort mit „Token übernehmen von“ —
+  wer bisher abfragen durfte, bekommt die Rolle dabei automatisch.
 
 Administratoren vergeben alle Rollen und nehmen Benutzer in Feuerwehren auf.
 Gruppen-Admins vergeben in ihrer Feuerwehr die übrigen Rollen — aber nur

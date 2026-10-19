@@ -41,7 +41,7 @@ vi.mock('../../server/firebase/admin', () => ({
   },
 }));
 
-import { updateGroupAction } from './GroupAction';
+import { setGroupParentAction, updateGroupAction } from './GroupAction';
 
 function userDoc(id: string, data: Record<string, unknown>) {
   return { id, data: () => data };
@@ -221,6 +221,82 @@ describe('updateGroupAction', () => {
 
     await updateGroupAction(GROUP, [], []);
 
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('setGroupParentAction', () => {
+  const HIERARCHY = [
+    { id: 'bezirk', name: 'Bezirk' },
+    { id: 'abschnitt', name: 'Abschnitt', parentId: 'bezirk' },
+    { id: 'ffnd', name: 'FF' },
+    { id: 'zug', name: 'Zug', parentId: 'ffnd' },
+  ];
+
+  it('verlangt den globalen Admin', async () => {
+    actionAdminRequiredMock.mockRejectedValue(new Error('admin required'));
+
+    await expect(setGroupParentAction('ffnd', 'abschnitt')).rejects.toThrow(
+      'admin required',
+    );
+    expect(groupSetMock).not.toHaveBeenCalled();
+  });
+
+  it('hängt die Gruppe um und nimmt ihre Mitglieder samt Untergruppe in die neuen Elterngruppen auf', async () => {
+    groupsGetMock.mockResolvedValue(groupDocs(...HIERARCHY));
+    usersGetMock.mockResolvedValue({
+      docs: [
+        userDoc('u1', { groupRoles: { ffnd: [] } }),
+        userDoc('u2', { groupRoles: { ffnd: [], zug: ['geraetemeister'] } }),
+        userDoc('u3', { groupRoles: { bezirk: [] } }),
+      ],
+    });
+
+    const result = await setGroupParentAction('ffnd', 'abschnitt');
+
+    expect(result).toEqual({ groupId: 'ffnd', notMigrated: [] });
+    expect(groupSetMock).toHaveBeenCalledWith(
+      { parentId: 'abschnitt' },
+      { merge: true },
+    );
+    expect(changeUserRolesMock.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+      ['u1', { kind: 'addMember', groupId: 'abschnitt' }],
+      ['u1', { kind: 'addMember', groupId: 'bezirk' }],
+      ['u2', { kind: 'addMember', groupId: 'abschnitt' }],
+      ['u2', { kind: 'addMember', groupId: 'bezirk' }],
+    ]);
+  });
+
+  it('setzt die Gruppe auf die oberste Ebene, ohne Mitgliedschaften zu entfernen', async () => {
+    groupsGetMock.mockResolvedValue(groupDocs(...HIERARCHY));
+    usersGetMock.mockResolvedValue({
+      docs: [userDoc('u1', { groupRoles: { abschnitt: [], bezirk: [] } })],
+    });
+
+    await setGroupParentAction('abschnitt', null);
+
+    expect(groupSetMock).toHaveBeenCalledWith({ parentId: null }, { merge: true });
+    expect(changeUserRolesMock).not.toHaveBeenCalled();
+  });
+
+  it('lehnt eine eigene Untergruppe als Ziel ab', async () => {
+    groupsGetMock.mockResolvedValue(groupDocs(...HIERARCHY));
+
+    await expect(setGroupParentAction('ffnd', 'zug')).rejects.toThrow(
+      'invalid parent group',
+    );
+    expect(groupSetMock).not.toHaveBeenCalled();
+  });
+
+  it('meldet nicht migrierte Benutzer, statt sie zu ändern', async () => {
+    groupsGetMock.mockResolvedValue(groupDocs(...HIERARCHY));
+    usersGetMock.mockResolvedValue({
+      docs: [userDoc('u4', { groups: ['allUsers', 'ffnd', 'kostenersatz'] })],
+    });
+
+    const result = await setGroupParentAction('ffnd', 'abschnitt');
+
+    expect(result.notMigrated).toEqual(['u4']);
     expect(changeUserRolesMock).not.toHaveBeenCalled();
   });
 });

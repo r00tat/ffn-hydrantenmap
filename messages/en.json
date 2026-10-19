@@ -2648,7 +2648,7 @@
     "authorityLabel": "Authority",
     "plateLabel": "Plate number",
     "searchButton": "Search",
-    "noConfig": "No token configured for your group. An administrator can set the ÖBFV token in group management.",
+    "noConfig": "No token is configured for your group, or you lack the “Licence plate lookup” role. An administrator sets the ÖBFV token in group management and assigns the role under “Members and roles”.",
     "noResult": "No registration found.",
     "resultTitle": "Registration data",
     "vehicleHeading": "Vehicle {n}",
@@ -2952,7 +2952,20 @@
     "breadcrumbs": "Navigation",
     "editGroup": "Edit group",
     "subgroups": "Sub groups",
-    "noSubgroups": "none"
+    "noSubgroups": "none",
+    "oebfvRoleHint": "Lookups require the “Licence plate lookup” role in this group — membership alone is not enough.",
+    "oebfvTransferFrom": "Take over token from",
+    "oebfvTransferHint": "Moves the token here. Whoever could query in the other group and is a member here gets the licence plate lookup role here.",
+    "oebfvTransfer": "Take over token",
+    "oebfvTransferDone": "Token taken over, role given to {count, plural, =0 {nobody} one {# member} other {# members}}.",
+    "oebfvTransferSkipped": "Not a member here or not yet migrated, so no role: {names}.",
+    "oebfvTransferFailed": "Takeover failed: {message}",
+    "dragHandle": "Move “{name}”",
+    "dropRoot": "Drop here: top level",
+    "dragHint": "Drag a group by its handle onto another group to place it there. Its members also become members of the new parent groups.",
+    "moved": "“{name}” is now below “{parent}”.",
+    "movedToRoot": "“{name}” is now at the top level.",
+    "moveFailed": "Moving failed: {message}"
   },
   "tokens": {
     "title": "API tokens",
@@ -3808,7 +3821,8 @@
       "gruppenadmin": "Group admin",
       "geraetemeister": "Equipment officer",
       "bekleidungswart": "Clothing officer",
-      "kostenersatz": "Cost recovery"
+      "kostenersatz": "Cost recovery",
+      "kennzeichenabfrage": "Licence plate lookup"
     }
   },
   "adminMcp": {
@@ -4869,7 +4883,7 @@
     "cancel": "Cancel",
     "explanationTitle": "What the roles allow",
     "explanationIntro": "Roles apply to this group only. A member can hold several roles and gets the permissions of all of them.",
-    "linkHint": "Equipment officers, clothing officers and cost recovery are assigned per group under “Members and roles”.",
+    "linkHint": "Equipment officers, clothing officers, cost recovery and licence plate lookup are assigned per group under “Members and roles”.",
     "linkAction": "Assign roles",
     "roles": {
       "gruppenadmin": {
@@ -4887,6 +4901,10 @@
       "kostenersatz": {
         "name": "Cost recovery",
         "description": "Creates cost recovery calculations for the group's operations and the billing of cylinder fillings."
+      },
+      "kennzeichenabfrage": {
+        "name": "Licence plate lookup",
+        "description": "Looks up vehicle and owner data at the ÖBFV, using this group's token."
       }
     },
     "permissions": {
@@ -4911,6 +4929,9 @@
       },
       "rollen": {
         "assign": "Assign roles"
+      },
+      "kennzeichen": {
+        "query": "Look up licence plates"
       }
     },
     "errors": {

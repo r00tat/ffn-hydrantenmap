@@ -66,6 +66,7 @@ const DATA = {
     geraetemeister: true,
     bekleidungswart: true,
     kostenersatz: false,
+    kennzeichenabfrage: false,
   },
   canManageMembers: false,
 };
@@ -94,7 +95,7 @@ describe('GroupDetailPage', () => {
     expect(geraetemeister).toBeEnabled();
     // Gesperrte Kästchen tragen dasselbe Label; der Tooltip erklärt warum.
     const boxes = screen.getAllByRole('checkbox');
-    expect(boxes.filter((b) => (b as HTMLInputElement).disabled)).toHaveLength(2);
+    expect(boxes.filter((b) => (b as HTMLInputElement).disabled)).toHaveLength(3);
     // Aufnehmen und Entfernen gibt es nur für den globalen Admin.
     expect(screen.queryByRole('button', { name: /Aufnehmen/ })).toBeNull();
     expect(getMock).toHaveBeenCalledWith('ffnd');

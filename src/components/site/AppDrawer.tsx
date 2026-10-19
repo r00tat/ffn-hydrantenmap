@@ -93,6 +93,8 @@ interface DrawerLink {
   atemschutzAdmin?: boolean;
   /** Sichtbar mit `bekleidung.read` in irgendeiner Gruppe. */
   bekleidung?: boolean;
+  /** Sichtbar mit `kennzeichen.query` in irgendeiner Gruppe. */
+  kennzeichen?: boolean;
   /**
    * Sichtbar mit `kostenersatz.use` in der Gruppe des geladenen Einsatzes —
    * die Berechnungen hängen am Einsatz, und nur dessen Gruppe zählt.
@@ -207,6 +209,7 @@ export default function AppDrawer({
   const canGroupAdmin = useCanAny('gruppe.manage');
   const canBillAnyGroup = useCanAny('kostenersatz.use');
   const canBekleidung = useCanAny('bekleidung.read');
+  const canKennzeichen = useCanAny('kennzeichen.query');
   const canKostenersatz = useCan(useFirecall().group, 'kostenersatz.use');
   // „Mitglieder und Rollen" liegt je Gruppe; der Eintrag führt in die erste
   // eigene Gruppe mit `rollen.assign`, dort schaltet die Seite selbst um. Ein
@@ -418,7 +421,12 @@ export default function AppDrawer({
       icon: <HandymanIcon />,
       children: [
         { text: t('blaulichtSms'), icon: <SmsIcon />, href: '/blaulicht-sms' },
-        { text: t('kennzeichen'), icon: <PinIcon />, href: '/kennzeichen' },
+        {
+          text: t('kennzeichen'),
+          icon: <PinIcon />,
+          href: '/kennzeichen',
+          kennzeichen: true,
+        },
         {
           // Eigener Menüpunkt: die Rettungskarte wird auch ohne vorherige
           // Kennzeichenabfrage gebraucht, etwa wenn nur das Fahrzeug vor
@@ -640,6 +648,7 @@ export default function AppDrawer({
       (!item.personalAdmin || canPersonalAdmin) &&
       (!item.atemschutzAdmin || canGroupAdmin || canBillAnyGroup) &&
       (!item.bekleidung || canBekleidung) &&
+      (!item.kennzeichen || canKennzeichen) &&
       (!item.kostenersatz || canKostenersatz) &&
       (isSignedIn || !item.signedInOnly),
     [
@@ -650,6 +659,7 @@ export default function AppDrawer({
       canGroupAdmin,
       canBillAnyGroup,
       canBekleidung,
+      canKennzeichen,
       canKostenersatz,
     ],
   );

@@ -2,6 +2,7 @@
 import 'server-only';
 
 import { getLocale } from 'next-intl/server';
+import { can } from '../../common/permissions';
 import { RescueSheetView } from '../../common/rescue/types';
 import { isLocale, DEFAULT_LOCALE } from '../../i18n/config';
 import { lookupRescueSheets } from '../../server/rescue/rescueSheetLookup';
@@ -101,7 +102,7 @@ async function runQuery(
 }
 
 /**
- * Query vehicle data for a plate. Guards membership, uses the group token,
+ * Query vehicle data for a plate. Guards `kennzeichen.query` in the group, uses the group token,
  * parses the result, and logs every query (success or failure).
  */
 export async function queryKennzeichen(
@@ -110,8 +111,9 @@ export async function queryKennzeichen(
   const session = await actionUserRequired();
   const { groupId, platePrefix, plateNumber, system } = input;
 
-  const userGroups = session.user.groups ?? [];
-  const authorized = session.user.isAdmin || userGroups.includes(groupId);
+  // Ein Recht in der Gruppe, deren Token abgefragt wird — nicht schon die
+  // Mitgliedschaft: Halterdaten sieht nur, wer dafür freigeschaltet ist.
+  const authorized = can(session.user, groupId, 'kennzeichen.query');
 
   const logBase = {
     user: session.user.email ?? 'unknown',

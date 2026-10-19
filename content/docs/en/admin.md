@@ -5,7 +5,7 @@ The admin area offers advanced management features for administrators. Here you 
 ## Features
 
 - User management: view users, authorize them, assign them to fire brigades
-- Members and roles: assign roles per fire brigade (group admin, equipment officer, clothing officer, cost recovery)
+- Members and roles: assign roles per fire brigade (group admin, equipment officer, clothing officer, cost recovery, licence plate lookup)
 - Permissions: migration of the roles and "Recompute permissions"
 - Group management: create and manage groups
 - Admin actions: database maintenance, user repair, copy data between environments
@@ -39,6 +39,10 @@ The admin area offers advanced management features for administrators. Here you 
 4. Clicking a group opens its **detail page** with parent group, sub groups,
    "Edit" and the members with their roles. The navigation line at the top
    leads back to the overview.
+5. To move a group, drag it by its handle (⋮⋮) onto another group — it
+   becomes a sub group there. Dropping it on "Drop here: top level", which
+   appears at the top while dragging, detaches it from its parent. Invalid
+   targets (the group itself, its sub groups, system groups) stay faded.
 
 Members of a sub group automatically become members of all parent groups. In
 a user's group selection these groups are checked and locked as long as the
@@ -51,12 +55,16 @@ Roles always apply **within one fire brigade**. They are assigned in the
 
 - **Group admin** Administration of the brigade: settings, share links,
   breathing apparatus administration; includes equipment officer and clothing
-  officer, but not cost recovery
+  officer, but not cost recovery or licence plate lookup
 - **Equipment officer** Correct the trip log, vehicles, people, equipment &
   material
 - **Clothing officer** View and maintain clothing
 - **Cost recovery** Cost recovery for the brigade's operations, billing of
   cylinder fillings
+- **Licence plate lookup** Look up vehicle and owner data with the brigade's
+  ÖBFV token. You store the token in the group dialog; if it still sits on
+  another group, take it over there with "Take over token from" — everyone
+  who could query before gets the role automatically.
 
 Administrators assign every role and add users to brigades. Group admins
 assign the other roles within their brigade — but only roles whose

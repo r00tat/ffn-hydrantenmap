@@ -121,12 +121,33 @@ export async function updateGroupAction(
     await changeUserRoles(uid, change, user);
   }
 
-  // Mitglieder einer Gruppe sind auch Mitglied aller Elterngruppen. Das gilt
-  // für neu aufgenommene Mitglieder ebenso wie für alle Mitglieder einer
-  // Gruppe, die gerade unter eine andere gehängt wurde. Frisch gelesen statt
-  // mit dem Dokument von oben, das die Änderung davor noch nicht kennt.
+  for (const uid of await addMissingAncestors(userDocs, changes, groups)) {
+    if (!notMigrated.includes(uid)) notMigrated.push(uid);
+  }
+
+  return { groupId, notMigrated };
+}
+
+type UserDocs = Parameters<typeof planAncestorChanges>[0];
+
+/**
+ * Mitglieder einer Gruppe sind auch Mitglied aller Elterngruppen. Das gilt
+ * für neu aufgenommene Mitglieder ebenso wie für alle Mitglieder einer
+ * Gruppe, die gerade unter eine andere gehängt wurde. Geschrieben wird mit
+ * frisch gelesenem Dokument, weil `userDocs` die Änderungen davor nicht kennt.
+ *
+ * Nicht migrierte Benutzer bleiben unverändert; zurück kommen die, denen
+ * dadurch eine Elterngruppe fehlt.
+ */
+async function addMissingAncestors(
+  userDocs: UserDocs,
+  changes: Parameters<typeof planAncestorChanges>[1],
+  groups: HierarchyGroup[]
+): Promise<string[]> {
   const skip = new Set(
-    userDocs.filter(({ data }) => awaitsKostenersatzChoice(data)).map(({ id }) => id)
+    userDocs
+      .filter(({ data }) => awaitsKostenersatzChoice(data))
+      .map(({ id }) => id)
   );
   for (const { uid, groupIds } of planAncestorChanges(
     userDocs,
@@ -138,7 +159,46 @@ export async function updateGroupAction(
       await changeUserRoles(uid, { kind: 'addMember', groupId: ancestorId });
     }
   }
+  return planAncestorChanges(
+    userDocs.filter(({ id }) => skip.has(id)),
+    changes,
+    groups
+  ).map(({ uid }) => uid);
+}
 
+/**
+ * Hängt eine Gruppe unter eine andere (Ziehen und Ablegen in der Übersicht)
+ * oder mit `null` auf die oberste Ebene. Die Mitglieder der Gruppe und ihrer
+ * Untergruppen werden Mitglied der neuen Elterngruppen; aus den bisherigen
+ * tritt niemand aus.
+ */
+export async function setGroupParentAction(
+  groupId: string,
+  parentId: string | null
+): Promise<GroupUpdateResult> {
+  await actionAdminRequired();
+
+  const allGroups = await getGroups();
+  if (!allGroups.some((g) => g.id === groupId)) {
+    throw new ApiException(`group ${groupId} does not exist`, { status: 404 });
+  }
+  if (!isValidParent(groupId, parentId, allGroups)) {
+    throw new ApiException(`invalid parent group ${parentId}`, { status: 400 });
+  }
+
+  console.info(`moving group ${groupId} below ${parentId ?? '(root)'}`);
+  await firestore
+    .collection(GROUP_COLLECTION_ID)
+    .doc(groupId)
+    .set({ parentId: parentId || null }, { merge: true });
+
+  const groups = allGroups.map((g) =>
+    g.id === groupId ? { ...g, parentId: parentId || null } : g
+  );
+  const userDocs = (
+    await firestore.collection(USER_COLLECTION_ID).get()
+  ).docs.map((user) => ({ id: user.id, data: user.data() }));
+  const notMigrated = await addMissingAncestors(userDocs, [], groups);
   return { groupId, notMigrated };
 }
 
