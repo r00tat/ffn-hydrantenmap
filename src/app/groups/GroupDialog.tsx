@@ -41,10 +41,7 @@ import {
   OebfvConfigPublic,
   deleteOebfvConfig,
   getOebfvConfig,
-  getOebfvTokenGroups,
-  type OebfvTokenGroup,
   saveOebfvConfig,
-  transferOebfvTokenAction,
 } from '../kennzeichen/configActions';
 import { inheritedMemberIds } from './groupMembership';
 import { Group } from './groupTypes';
@@ -101,9 +98,6 @@ export default function GroupDialogg({
   const [oebfvConfig, setOebfvConfig] = useState<OebfvConfigPublic | null>(null);
   const [oebfvToken, setOebfvToken] = useState('');
   const [showOebfvToken, setShowOebfvToken] = useState(false);
-  const [oebfvTokenGroups, setOebfvTokenGroups] = useState<OebfvTokenGroup[]>([]);
-  const [oebfvSource, setOebfvSource] = useState('');
-  const [oebfvTransferInfo, setOebfvTransferInfo] = useState<string>();
 
   const groupId = group.id;
 
@@ -125,51 +119,8 @@ export default function GroupDialogg({
     getOebfvConfig(groupId)
       .then((existing) => setOebfvConfig(existing))
       .catch((err) => console.error('Failed to load ÖBFV config:', err));
-    getOebfvTokenGroups()
-      .then((tokenGroups) =>
-        setOebfvTokenGroups(tokenGroups.filter((g) => g.groupId !== groupId))
-      )
-      .catch((err) => console.error('Failed to load ÖBFV groups:', err));
   }, [groupId]);
 
-  const userName = (uid: string) => {
-    const u = users.find((user) => user.uid === uid);
-    return u?.displayName || u?.email || uid;
-  };
-
-  // Den Token einer anderen Gruppe hierher übernehmen — wer dort abfragen
-  // durfte, bekommt hier die Rolle Kennzeichenabfrage.
-  const transferOebfvToken = async () => {
-    if (!groupId || !oebfvSource) return;
-    try {
-      const result = await transferOebfvTokenAction(oebfvSource, groupId);
-      setOebfvConfig(await getOebfvConfig(groupId));
-      setOebfvTokenGroups((tokenGroups) =>
-        tokenGroups.filter((g) => g.groupId !== oebfvSource)
-      );
-      setOebfvSource('');
-      const skipped = [...result.notMember, ...result.notMigrated];
-      setOebfvTransferInfo(
-        [
-          tGroups('oebfvTransferDone', { count: result.grant.length }),
-          skipped.length > 0
-            ? tGroups('oebfvTransferSkipped', {
-                names: skipped.map(userName).join(', '),
-              })
-            : '',
-        ]
-          .filter(Boolean)
-          .join(' ')
-      );
-    } catch (err) {
-      console.error('Failed to transfer ÖBFV token:', err);
-      setOebfvTransferInfo(
-        tGroups('oebfvTransferFailed', {
-          message: err instanceof Error ? err.message : String(err),
-        })
-      );
-    }
-  };
 
   const userMap = Object.fromEntries(users.map((user) => [user.uid, user]));
 
@@ -544,37 +495,6 @@ export default function GroupDialogg({
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               {tGroups('oebfvRoleHint')}
             </Typography>
-            {!oebfvConfig?.hasToken && oebfvTokenGroups.length > 0 && (
-              <FormControl fullWidth margin="dense" variant="standard">
-                <InputLabel id="oebfv-source-label">
-                  {tGroups('oebfvTransferFrom')}
-                </InputLabel>
-                <Select
-                  labelId="oebfv-source-label"
-                  value={oebfvSource}
-                  onChange={(e) => setOebfvSource(e.target.value)}
-                >
-                  {oebfvTokenGroups.map(({ groupId: id, name }) => (
-                    <MenuItem key={id} value={id}>
-                      {name ??
-                        groups.find((g) => g.id === id)?.name ??
-                        tGroups('oebfvUnknownGroup', { id })}
-                    </MenuItem>
-                  ))}
-                </Select>
-                <FormHelperText>{tGroups('oebfvTransferHint')}</FormHelperText>
-              </FormControl>
-            )}
-            {!oebfvConfig?.hasToken && oebfvSource && (
-              <Button size="small" onClick={transferOebfvToken}>
-                {tGroups('oebfvTransfer')}
-              </Button>
-            )}
-            {oebfvTransferInfo && (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                {oebfvTransferInfo}
-              </Typography>
-            )}
 
             {/* Der Fahrtenbuch-Link samt QR-Codes liegt in der
                 Fahrtenbuch-Verwaltung: Dort stehen die Fahrzeuge, für die ein

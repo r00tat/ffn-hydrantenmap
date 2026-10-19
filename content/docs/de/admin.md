@@ -63,9 +63,7 @@ Rollen gelten immer **in einer Feuerwehr**. Vergeben werden sie im Abschnitt
 - **Kostenersatz** Kostenersatz an Einsätzen der Feuerwehr, Verrechnung der
   Füllungen
 - **Kennzeichenabfrage** Fahrzeug- und Halterdaten über den ÖBFV-Token der
-  Feuerwehr abfragen. Den Token hinterlegst du im Gruppendialog; liegt er noch
-  an einer anderen Gruppe, übernimmst du ihn dort mit „Token übernehmen von“ —
-  wer bisher abfragen durfte, bekommt die Rolle dabei automatisch.
+  Feuerwehr abfragen. Den Token hinterlegst du im Gruppendialog.
 
 Administratoren vergeben alle Rollen und nehmen Benutzer in Feuerwehren auf.
 Gruppen-Admins vergeben in ihrer Feuerwehr die übrigen Rollen — aber nur

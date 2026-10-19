@@ -440,17 +440,18 @@ Halterdaten sind aber keine Gruppenöffentlichkeit, und jede Abfrage wird
 protokolliert; deshalb ein eigenes Recht statt der Mitgliedschaft, und
 deshalb nicht im Gruppen-Admin enthalten.
 
-**Umzug:** Im Gruppendialog der Zielgruppe (ohne eigenen Token) steht „Token
-übernehmen von“. `transferOebfvTokenAction` verschiebt den Token und gibt jedem
-Mitglied der Quellgruppe, das auch Mitglied der Zielgruppe ist, dort die Rolle
-`kennzeichenabfrage` — wer vorher abfragen durfte, darf es danach. Wer nicht
-Mitglied der Zielgruppe ist, wird nicht still aufgenommen, sondern gemeldet;
-ebenso noch nicht migrierte Benutzer. Ein vorhandener Token der Zielgruppe
-wird nie überschrieben. Danach kann die leere Quellgruppe gelöscht werden.
+**Umzug in Prod (einmalig, von Hand nach dem Deploy):** Der Token lag an der
+Schein-Gruppe „Kennzeichenabfrage“. Das Chiffrat ist nicht an die Gruppe
+gebunden (`encryptPassword` mit einem Schlüssel für alle) und lässt sich als
+Dokument nach `oebfvKennzeichenConfig/ffnd` kopieren. Die bisherigen Mitglieder
+der Schein-Gruppe bekommen in `ffnd` die Rolle `kennzeichenabfrage`, danach
+„Rechte neu ableiten“ und die leere Gruppe löschen. Erst **nach** dem Deploy:
+Älterer Code verwirft unbekannte Rollen beim nächsten Schreiben
+(`normalizeRoles`), und ein Token an `ffnd` gäbe mit der alten Prüfung jedem
+Mitglied von `ffnd` die Abfrage. Eine eigene Oberfläche dafür gibt es bewusst
+nicht — der Umzug kommt einmal vor.
 
-**Zeitfenster nach dem Deploy:** Bis zum Umzug fragt nur ab, wer die Rolle in
-der Gruppe mit dem Token hat, und der globale Admin. Den Umzug direkt nach dem
-Deploy machen.
+**Zeitfenster nach dem Deploy:** Bis zum Umzug fragt nur der globale Admin ab.
 
 ## Kostenersatz je Gruppe
 

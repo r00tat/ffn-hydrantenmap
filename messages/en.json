@@ -2954,19 +2954,13 @@
     "subgroups": "Sub groups",
     "noSubgroups": "none",
     "oebfvRoleHint": "Lookups require the “Licence plate lookup” role in this group — membership alone is not enough.",
-    "oebfvTransferFrom": "Take over token from",
-    "oebfvTransferHint": "Moves the token here. Whoever could query in the other group and is a member here gets the licence plate lookup role here.",
-    "oebfvTransfer": "Take over token",
-    "oebfvTransferDone": "Token taken over, role given to {count, plural, =0 {nobody} one {# member} other {# members}}.",
-    "oebfvTransferSkipped": "Not a member here or not yet migrated, so no role: {names}.",
-    "oebfvTransferFailed": "Takeover failed: {message}",
     "dragHandle": "Move “{name}”",
     "dropRoot": "Drop here: top level",
     "dragHint": "Drag a group by its handle onto another group to place it there. Its members also become members of the new parent groups.",
     "moved": "“{name}” is now below “{parent}”.",
     "movedToRoot": "“{name}” is now at the top level.",
     "moveFailed": "Moving failed: {message}",
-    "oebfvUnknownGroup": "Deleted group ({id})"
+    "loading": "Loading groups"
   },
   "tokens": {
     "title": "API tokens",

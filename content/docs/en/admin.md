@@ -62,9 +62,7 @@ Roles always apply **within one fire brigade**. They are assigned in the
 - **Cost recovery** Cost recovery for the brigade's operations, billing of
   cylinder fillings
 - **Licence plate lookup** Look up vehicle and owner data with the brigade's
-  ÖBFV token. You store the token in the group dialog; if it still sits on
-  another group, take it over there with "Take over token from" — everyone
-  who could query before gets the role automatically.
+  ÖBFV token. You store the token in the group dialog.
 
 Administrators assign every role and add users to brigades. Group admins
 assign the other roles within their brigade — but only roles whose
