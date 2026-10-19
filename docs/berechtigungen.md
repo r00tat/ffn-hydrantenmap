@@ -122,9 +122,10 @@ dieser Gruppe selbst haben. Damit ist `kostenersatz` für einen Gruppen-Admin
 erst vergebbar, wenn er die Rolle selbst hat. Das ist gewollt: Wer keinen
 Kostenersatz macht, gibt ihn nicht weiter.
 
-Vergeben wird in der Ansicht **„Mitglieder und Rollen"** je Gruppe (Matrix
-Mitglied × Rolle), erreichbar für den globalen Admin und die Gruppen-Admins
-dieser Gruppe. Sie ersetzt den Gerätemeister-Abschnitt in den Einstellungen
+Vergeben wird im Abschnitt **„Mitglieder und Rollen"** der Detailseite je
+Gruppe (`/groups/{groupId}`, Matrix Mitglied × Rolle), erreichbar für den
+globalen Admin und die Gruppen-Admins dieser Gruppe. Die frühere Adresse
+`/groups/{groupId}/rollen` leitet dorthin weiter. Sie ersetzt den Gerätemeister-Abschnitt in den Einstellungen
 der Fahrtenbuch-Verwaltung und den Reiter „Einstellungen" auf `/bekleidung`;
 diese Stellen verlinken dorthin.
 

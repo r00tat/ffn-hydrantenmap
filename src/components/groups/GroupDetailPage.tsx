@@ -1,16 +1,19 @@
 'use client';
 
+import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import IconButton from '@mui/material/IconButton';
+import MuiLink from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -24,12 +27,19 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ancestorGroupIds,
+  orderGroupsAsTree,
+} from '../../common/groupHierarchy';
 import { can, ROLE_IDS, ROLES, type RoleId } from '../../common/permissions';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import { getGroupsAction } from '../../app/groups/GroupAction';
 import type { Group } from '../../app/groups/groupTypes';
+import { getUsers } from '../../app/users/action';
+import type { UserRecordExtended } from '../../common/users';
 import {
   addMemberAction,
   getMemberRolesAction,
@@ -42,24 +52,29 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useCan } from '../../hooks/usePermissions';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import type { MemberCandidate, MemberRow } from './memberRoles';
+import useGroupEditor from './useGroupEditor';
 
 type Feedback = { severity: 'success' | 'error'; text: string };
 
 /**
- * Mitglieder und Rollen einer Gruppe: eine Matrix Mitglied × Rolle.
+ * Detailseite einer Gruppe: Lage im Baum (Elterngruppen, Untergruppen),
+ * Stammdaten und die Matrix Mitglied × Rolle.
  *
  * Erreichbar mit `rollen.assign` in der Gruppe (Gruppen-Admin, globaler
  * Admin). Welche Kästchen bedienbar sind, liefert der Server mit
  * (`canAssignRole`); er prüft beim Speichern ohnehin erneut. Mitglieder
- * aufnehmen und entfernen darf nur der globale Admin.
+ * aufnehmen und entfernen sowie die Gruppe bearbeiten darf nur der globale
+ * Admin.
  */
-export default function MemberRolesPage({ groupId }: { groupId: string }) {
+export default function GroupDetailPage({ groupId }: { groupId: string }) {
   const t = useTranslations('groupRoles');
+  const tGroups = useTranslations('groups');
   const router = useRouter();
   const allowed = useCan(groupId, 'rollen.assign');
   const { isAdmin, groupRoles } = useFirebaseLogin();
 
   const [groups, setGroups] = useState<Group[]>([]);
+  const [users, setUsers] = useState<UserRecordExtended[]>([]);
   const [data, setData] = useState<MemberRolesData | undefined>();
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -96,22 +111,66 @@ export default function MemberRolesPage({ groupId }: { groupId: string }) {
     load();
   }, [allowed, load]);
 
+  const loadGroups = useCallback(async () => {
+    try {
+      setGroups(await getGroupsAction());
+    } catch {
+      // Ohne Gruppenliste fehlen nur Baum und Umschalter.
+    }
+  }, []);
+
   useEffect(() => {
     if (!allowed) return;
+    (async () => {
+      await loadGroups();
+    })();
+  }, [allowed, loadGroups]);
+
+  // Bearbeiten darf nur der globale Admin; nur er braucht die Benutzerliste.
+  useEffect(() => {
+    if (!isAdmin) return;
     let active = true;
-    getGroupsAction()
-      .then((all) => active && setGroups(all))
+    getUsers()
+      .then((all) => active && setUsers(all))
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [allowed]);
+  }, [isAdmin]);
 
-  // Zur Auswahl stehen nur Gruppen, in denen der Benutzer Rollen vergeben darf.
+  const { edit, dialog } = useGroupEditor({
+    groups,
+    users,
+    onSaved: async () => {
+      await Promise.all([loadGroups(), load()]);
+    },
+  });
+
+  const group = groups.find((g) => g.id === groupId);
+  const groupName = group?.name || data?.groupName || groupId;
+  const ancestors = useMemo(
+    () =>
+      ancestorGroupIds(groupId, groups)
+        .reverse()
+        .map((id) => groups.find((g) => g.id === id))
+        .filter((g): g is Group => !!g),
+    [groupId, groups],
+  );
+  const parent = ancestors[ancestors.length - 1];
+  const children = useMemo(
+    () =>
+      groups
+        .filter((g) => g.parentId === groupId)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [groupId, groups],
+  );
+
+  // Zur Auswahl stehen nur Gruppen, in denen der Benutzer Rollen vergeben
+  // darf — in Baumreihenfolge, Untergruppen eingerückt.
   const switchable = useMemo(
     () =>
-      groups.filter(
-        (g) =>
+      orderGroupsAsTree(groups).filter(
+        ({ group: g }) =>
           !!g.id &&
           isTenantGroupId(g.id) &&
           can({ isAdmin, groupRoles }, g.id, 'rollen.assign'),
@@ -187,9 +246,33 @@ export default function MemberRolesPage({ groupId }: { groupId: string }) {
     }
   };
 
+  const breadcrumbs = (
+    <Breadcrumbs sx={{ mb: 1 }} aria-label={tGroups('breadcrumbs')}>
+      {isAdmin ? (
+        <MuiLink component={Link} href="/groups" underline="hover">
+          {tGroups('title')}
+        </MuiLink>
+      ) : (
+        <Typography color="text.secondary">{tGroups('title')}</Typography>
+      )}
+      {ancestors.map((g) => (
+        <MuiLink
+          key={g.id}
+          component={Link}
+          href={`/groups/${encodeURIComponent(g.id ?? '')}`}
+          underline="hover"
+        >
+          {g.name}
+        </MuiLink>
+      ))}
+      <Typography color="text.primary">{groupName}</Typography>
+    </Breadcrumbs>
+  );
+
   if (!allowed) {
     return (
       <Container maxWidth="lg" sx={{ py: 3 }}>
+        {breadcrumbs}
         <Typography variant="h4" gutterBottom>
           {t('title')}
         </Typography>
@@ -200,30 +283,101 @@ export default function MemberRolesPage({ groupId }: { groupId: string }) {
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
+      {breadcrumbs}
       <Stack
         direction="row"
         spacing={2}
-        sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}
+        sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
       >
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          {t('title')}
+          {groupName}
         </Typography>
+        {isAdmin && group && (
+          <Button
+            variant="outlined"
+            startIcon={<EditIcon />}
+            onClick={() => edit(group)}
+          >
+            {tGroups('editGroup')}
+          </Button>
+        )}
         <TextField
           select
           size="small"
           label={t('group')}
-          value={switchable.some((g) => g.id === groupId) ? groupId : ''}
-          onChange={(e) => router.push(`/groups/${e.target.value}/rollen`)}
+          value={switchable.some(({ group: g }) => g.id === groupId) ? groupId : ''}
+          onChange={(e) =>
+            router.push(`/groups/${encodeURIComponent(e.target.value)}`)
+          }
           disabled={switchable.length === 0}
           sx={{ minWidth: 220 }}
         >
-          {switchable.map((g) => (
-            <MenuItem key={g.id} value={g.id}>
+          {switchable.map(({ group: g, depth }) => (
+            <MenuItem key={g.id} value={g.id} sx={{ pl: 2 + depth * 2 }}>
               {g.name}
             </MenuItem>
           ))}
         </TextField>
       </Stack>
+
+      <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+        <Stack spacing={1.5}>
+          {group?.description && (
+            <Typography variant="body1">{group.description}</Typography>
+          )}
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 160 }}>
+              {tGroups('parentGroup')}
+            </Typography>
+            {parent ? (
+              <MuiLink
+                component={Link}
+                href={`/groups/${encodeURIComponent(parent.id ?? '')}`}
+                underline="hover"
+              >
+                {parent.name}
+              </MuiLink>
+            ) : (
+              <Typography variant="body2">{tGroups('noParentGroup')}</Typography>
+            )}
+          </Stack>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 160 }}>
+              {tGroups('subgroups')}
+            </Typography>
+            {children.length === 0 ? (
+              <Typography variant="body2">{tGroups('noSubgroups')}</Typography>
+            ) : (
+              children.map((child) => (
+                <Chip
+                  key={child.id}
+                  size="small"
+                  clickable
+                  component={Link}
+                  href={`/groups/${encodeURIComponent(child.id ?? '')}`}
+                  label={child.name}
+                />
+              ))
+            )}
+          </Stack>
+          {data && (
+            <Stack direction="row" spacing={1}>
+              <Typography variant="body2" color="text.secondary" sx={{ minWidth: 160 }}>
+                {tGroups('cols.members')}
+              </Typography>
+              <Typography variant="body2">{data.members.length}</Typography>
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
+
+      <Typography variant="h5" gutterBottom>
+        {t('title')}
+      </Typography>
 
       {data && (
         <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2 }}>
@@ -374,6 +528,8 @@ export default function MemberRolesPage({ groupId }: { groupId: string }) {
       )}
 
       <RoleExplanations />
+
+      {dialog}
 
       {removing && (
         <ConfirmDialog

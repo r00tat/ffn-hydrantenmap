@@ -238,7 +238,7 @@ describe('AppDrawer Berechtigungen', () => {
     await user.click(screen.getByText('Administration'));
     expect(
       screen.getByRole('link', { name: 'Mitglieder und Rollen' }),
-    ).toHaveAttribute('href', '/groups/ffnd/rollen');
+    ).toHaveAttribute('href', '/groups/ffnd');
   });
 
   it('verbirgt „Mitglieder und Rollen" ohne rollen.assign', async () => {

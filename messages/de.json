@@ -2928,19 +2928,31 @@
     "deleteTitle": "{name} löschen",
     "deleteConfirm": "{name} {description} wirklich löschen?",
     "cols": {
-      "id": "ID",
       "name": "Name",
-      "description": "Beschreibung"
+      "description": "Beschreibung",
+      "members": "Mitglieder"
     },
     "fahrtenbuchLinkHint": "Der Fahrtenbuch-Link samt QR-Codes wird in der Fahrtenbuch-Verwaltung gepflegt.",
     "fahrtenbuchLinkAction": "Zur Fahrtenbuch-Verwaltung",
     "groupAdmins": "Gruppen-Admins",
     "groupAdminsHint": "Gruppen-Admins übernehmen alle administrativen Aufgaben innerhalb dieser Gruppe — Fahrtenbuch, Geräte, Personal, Bekleidung, Gruppeneinstellungen und das Vergeben der übrigen Rollen. Wählbar sind nur Mitglieder der Gruppe; die weiteren Rollen vergibst du unter „Mitglieder und Rollen“.",
-    "roles": "Mitglieder und Rollen von {name}",
     "parentGroup": "Übergeordnete Gruppe",
     "noParentGroup": "keine",
     "parentGroupHint": "Mitglieder dieser Gruppe werden automatisch auch Mitglied der übergeordneten Gruppen.",
-    "memberViaSubgroup": "über eine Untergruppe"
+    "memberViaSubgroup": "über eine Untergruppe",
+    "refresh": "Neu laden",
+    "add": "Neue Gruppe",
+    "search": "Gruppe suchen",
+    "noMatch": "Keine Gruppe gefunden.",
+    "empty": "Es gibt noch keine Gruppen.",
+    "expand": "Untergruppen von {name} aufklappen",
+    "collapse": "Untergruppen von {name} zuklappen",
+    "systemGroup": "System",
+    "saveFailed": "Die Gruppe konnte nicht gespeichert werden: {message}",
+    "breadcrumbs": "Navigation",
+    "editGroup": "Gruppe bearbeiten",
+    "subgroups": "Untergruppen",
+    "noSubgroups": "keine"
   },
   "tokens": {
     "title": "API Token",

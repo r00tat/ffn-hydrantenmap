@@ -1,7 +1,6 @@
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
 import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -15,9 +14,7 @@ import FormGroup from '@mui/material/FormGroup';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import InputLabel from '@mui/material/InputLabel';
-import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
-import OutlinedInput from '@mui/material/OutlinedInput';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
@@ -29,30 +26,17 @@ import {
   setUserPasswordAction,
 } from '../../app/users/action';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import GroupTreeChecklist from '../groups/GroupTreeChecklist';
 import { feuerwehren } from '../../common/feuerwehren';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
 import {
   impliedGroupIds,
-  orderGroupsAsTree,
   withAncestorGroups,
   type HierarchyGroup,
 } from '../../common/groupHierarchy';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended, userTextFields } from '../../common/users';
-
-const ITEM_HEIGHT = 48;
-const ITEM_PADDING_TOP = 8;
-const MenuProps = {
-  slotProps: {
-    paper: {
-      style: {
-        maxHeight: ITEM_HEIGHT * 10 + ITEM_PADDING_TOP,
-        width: 250,
-      },
-    },
-  },
-};
 
 export interface UserRecordExtendedDialogOptions {
   /**
@@ -239,25 +223,26 @@ export default function UserRecordExtendedDialog({
   // Gruppe mehr, sondern eine Rolle je Gruppe.
   const tenantGroups = useMemo(
     () =>
-      orderGroupsAsTree(
-        Object.entries(groups)
-          .filter(([key]) => isTenantGroupId(key))
-          .map(([id, name]) => ({
-            id,
-            name,
-            parentId: groupHierarchy.find((g) => g.id === id)?.parentId,
-          }))
-      ),
+      Object.entries(groups)
+        .filter(([key]) => isTenantGroupId(key))
+        .map(([id, name]) => ({
+          id,
+          name,
+          parentId: groupHierarchy.find((g) => g.id === id)?.parentId,
+        })),
     [groups, groupHierarchy]
   );
+  // Ausdrücklich gewählt sind die Gruppen, die sich nicht schon aus einer
+  // Untergruppe ergeben. Wird die Untergruppe abgewählt, fallen ihre
+  // Elterngruppen mit weg — außer sie sind selbst angehakt.
+  const explicitGroups = useMemo(() => {
+    const implied = impliedGroupIds(memberGroups, groupHierarchy);
+    return memberGroups.filter((id) => !implied.has(id));
+  }, [memberGroups, groupHierarchy]);
   // Wer in einer Untergruppe ist, ist auch in allen Gruppen darüber.
   const effectiveGroups = useMemo(
-    () => withAncestorGroups(memberGroups, groupHierarchy),
-    [memberGroups, groupHierarchy]
-  );
-  const lockedGroups = useMemo(
-    () => impliedGroupIds(memberGroups, groupHierarchy),
-    [memberGroups, groupHierarchy]
+    () => withAncestorGroups(explicitGroups, groupHierarchy),
+    [explicitGroups, groupHierarchy]
   );
 
   const onChange =
@@ -285,13 +270,6 @@ export default function UserRecordExtendedDialog({
           } as unknown as UserRecordExtended)
       );
     };
-
-  const handleGroupChange = (event: SelectChangeEvent<string[]>) => {
-    const {
-      target: { value },
-    } = event;
-    setMemberGroups(typeof value === 'string' ? value.split(',') : value);
-  };
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
@@ -338,40 +316,17 @@ export default function UserRecordExtendedDialog({
             value={((user as any)[key] as string) || ''}
           />
         ))}
-        <FormControl sx={{ m: 1, width: 300 }}>
-          <InputLabel id="user-group-checkbox-label">{t('groups')}</InputLabel>
-          <Select
-            labelId="user-group-checkbox-label"
-            id="user-group-checkbox"
-            multiple
-            value={effectiveGroups}
-            onChange={handleGroupChange}
-            input={<OutlinedInput label={t('groupLabel')} />}
-            renderValue={(selected) =>
-              selected
-                .map((key) => groups[key])
-                .filter((v) => v)
-                .join(', ')
-            }
-            MenuProps={MenuProps}
-          >
-            {tenantGroups.map(({ group: { id: key = '', name }, depth }) => (
-              <MenuItem
-                key={key}
-                value={key}
-                disabled={lockedGroups.has(key)}
-                sx={{ pl: 2 + depth * 2 }}
-              >
-                <Checkbox checked={effectiveGroups.includes(key)} />
-                <ListItemText
-                  primary={name}
-                  secondary={
-                    lockedGroups.has(key) ? t('groupViaSubgroup') : undefined
-                  }
-                />
-              </MenuItem>
-            ))}
-          </Select>
+        <FormControl fullWidth sx={{ my: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+            {t('groups')}
+          </Typography>
+          <GroupTreeChecklist
+            groups={tenantGroups}
+            selected={explicitGroups}
+            onChange={setMemberGroups}
+            impliedLabel={t('groupViaSubgroup')}
+            aria-label={t('groups')}
+          />
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
             {t('rolesHint')}
           </Typography>

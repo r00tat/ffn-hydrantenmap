@@ -28,7 +28,7 @@ export default function MemberRolesLink({ groupId }: { groupId: string }) {
       </Typography>
       <Button
         component={Link}
-        href={`/groups/${encodeURIComponent(groupId)}/rollen`}
+        href={`/groups/${encodeURIComponent(groupId)}`}
         variant="outlined"
         startIcon={<ManageAccountsIcon />}
       >

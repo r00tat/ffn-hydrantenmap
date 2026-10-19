@@ -490,7 +490,7 @@ export default function AppDrawer({
               {
                 text: t('memberRoles'),
                 icon: <ManageAccountsIcon />,
-                href: `/groups/${rolesGroupId}/rollen`,
+                href: `/groups/${rolesGroupId}`,
               },
             ]
           : []),

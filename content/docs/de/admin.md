@@ -30,14 +30,24 @@ Der Admin-Bereich bietet erweiterte Verwaltungsfunktionen für Administratoren. 
 
 ### Gruppen verwalten
 
-1. Im Menü auf "Groups" klicken
-2. Gruppen erstellen/bearbeiten/löschen
-3. Alarm-SMS-Zugangsdaten pro Gruppe hinterlegen
+1. Im Menü auf "Gruppen" klicken
+2. Die Übersicht zeigt die Gruppen als Baum: Untergruppen stehen eingerückt
+   unter ihrer übergeordneten Gruppe und lassen sich auf- und zuklappen. Das
+   Suchfeld filtert nach Name und Beschreibung.
+3. Gruppen erstellen, bearbeiten oder löschen; im Dialog legst du auch die
+   **übergeordnete Gruppe** fest und hinterlegst die Alarm-SMS-Zugangsdaten
+4. Ein Klick auf eine Gruppe öffnet ihre **Detailseite** mit übergeordneter
+   Gruppe, Untergruppen, „Bearbeiten" und den Mitgliedern samt Rollen. Über
+   die Navigationszeile oben geht es zurück zur Übersicht.
+
+Wer Mitglied einer Untergruppe ist, wird automatisch auch Mitglied aller
+übergeordneten Gruppen. In der Gruppenauswahl eines Benutzers sind diese
+Gruppen angehakt und gesperrt, solange die Untergruppe gewählt ist.
 
 ### Rollen vergeben
 
-Rollen gelten immer **in einer Feuerwehr**. Vergeben werden sie in der Ansicht
-„Mitglieder und Rollen" der Feuerwehr:
+Rollen gelten immer **in einer Feuerwehr**. Vergeben werden sie im Abschnitt
+„Mitglieder und Rollen" auf der Detailseite der Feuerwehr:
 
 - **Gruppen-Admin** Verwaltung der Feuerwehr: Einstellungen, Freigabe-Links,
   Atemschutz-Verwaltung; schließt Gerätemeister und Bekleidungswart ein, nicht

@@ -31,8 +31,18 @@ The admin area offers advanced management features for administrators. Here you 
 ### Manage groups
 
 1. Click "Groups" in the menu
-2. Create/edit/delete groups
-3. Store Alarm SMS credentials per group
+2. The overview shows the groups as a tree: sub groups are indented below
+   their parent group and can be expanded and collapsed. The search field
+   filters by name and description.
+3. Create, edit or delete groups; the dialog also sets the **parent group**
+   and stores the Alarm SMS credentials
+4. Clicking a group opens its **detail page** with parent group, sub groups,
+   "Edit" and the members with their roles. The navigation line at the top
+   leads back to the overview.
+
+Members of a sub group automatically become members of all parent groups. In
+a user's group selection these groups are checked and locked as long as the
+sub group is selected.
 
 ### Assign roles
 

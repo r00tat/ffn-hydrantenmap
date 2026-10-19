@@ -2928,19 +2928,31 @@
     "deleteTitle": "Delete {name}",
     "deleteConfirm": "Really delete {name} {description}?",
     "cols": {
-      "id": "ID",
       "name": "Name",
-      "description": "Description"
+      "description": "Description",
+      "members": "Members"
     },
     "fahrtenbuchLinkHint": "The logbook link and its QR codes are managed in the logbook administration.",
     "fahrtenbuchLinkAction": "Go to logbook administration",
     "groupAdmins": "Group admins",
     "groupAdminsHint": "Group admins handle all administrative tasks within this group — logbook, equipment, personnel, clothing, group settings and assigning the other roles. Only group members can be selected; assign the other roles under “Members and roles”.",
-    "roles": "Members and roles of {name}",
     "parentGroup": "Parent group",
     "noParentGroup": "none",
     "parentGroupHint": "Members of this group automatically become members of all parent groups.",
-    "memberViaSubgroup": "via a sub group"
+    "memberViaSubgroup": "via a sub group",
+    "refresh": "Reload",
+    "add": "New group",
+    "search": "Search groups",
+    "noMatch": "No group found.",
+    "empty": "There are no groups yet.",
+    "expand": "Expand sub groups of {name}",
+    "collapse": "Collapse sub groups of {name}",
+    "systemGroup": "System",
+    "saveFailed": "The group could not be saved: {message}",
+    "breadcrumbs": "Navigation",
+    "editGroup": "Edit group",
+    "subgroups": "Sub groups",
+    "noSubgroups": "none"
   },
   "tokens": {
     "title": "API tokens",

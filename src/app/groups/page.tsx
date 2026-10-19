@@ -1,82 +1,50 @@
 'use client';
 
 import AddIcon from '@mui/icons-material/Add';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SearchIcon from '@mui/icons-material/Search';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Fab from '@mui/material/Fab';
-import Grid from '@mui/material/Grid';
+import Chip from '@mui/material/Chip';
+import Container from '@mui/material/Container';
 import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import MuiLink from '@mui/material/Link';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { orderGroupsAsTree } from '../../common/groupHierarchy';
+import { isTenantGroupId } from '../../common/tenantGroups';
+import { effectiveGroupRoles } from '../../common/userGroupRoles';
 import { UserRecordExtended } from '../../common/users';
 import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
-import { useSnackbar } from '../../components/providers/SnackbarProvider';
+import useGroupEditor from '../../components/groups/useGroupEditor';
 import AdminGuard from '../../components/site/AdminGuard';
 import { getUsers } from '../users/action';
 import {
   createKnownGroupsAction,
   deleteGroupAction,
   getGroupsAction,
-  updateGroupAction,
 } from './GroupAction';
-import GroupDialog from './GroupDialog';
+import { visibleGroupTree } from './groupTree';
 import { Group, KNOWN_GROUPS } from './groupTypes';
-import { orderGroupsAsTree } from '../../common/groupHierarchy';
-import { isTenantGroupId } from '../../common/tenantGroups';
-
-interface UserRowButtonParams {
-  row: Group;
-  editFn: (group: Group) => void;
-  deleteFn: (group: Group) => void;
-}
-function GroupRowButtons({ row, editFn, deleteFn }: UserRowButtonParams) {
-  const t = useTranslations('groups');
-  return (
-    <>
-      {/* Rollen gibt es nur in Mandanten, nicht in allUsers/kostenersatz. */}
-      {row.id && isTenantGroupId(row.id) && (
-        <Tooltip title={t('roles', { name: row.name })}>
-          <IconButton
-            component={Link}
-            href={`/groups/${encodeURIComponent(row.id)}/rollen`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ManageAccountsIcon />
-          </IconButton>
-        </Tooltip>
-      )}
-      <Tooltip title={t('edit', { name: row.name })}>
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            editFn(row);
-          }}
-        >
-          <EditIcon />
-        </IconButton>
-      </Tooltip>
-      <Tooltip title={t('delete', { name: row.name })}>
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            deleteFn(row);
-          }}
-          color="warning"
-        >
-          <DeleteIcon />
-        </IconButton>
-      </Tooltip>
-    </>
-  );
-}
 
 function useGroupList(): [
   Group[],
@@ -86,16 +54,18 @@ function useGroupList(): [
   const [groups, setGroups] = useState<Group[]>([]);
   const [users, setUsers] = useState<UserRecordExtended[]>([]);
   const getGroups = useCallback(async () => {
-    const newGroups = await getGroupsAction();
-    const users = await getUsers();
+    const [newGroups, newUsers] = await Promise.all([
+      getGroupsAction(),
+      getUsers(),
+    ]);
     setGroups(newGroups);
-    setUsers(users);
+    setUsers(newUsers);
     return newGroups;
   }, []);
 
   useEffect(() => {
     (async () => {
-      getGroups();
+      await getGroups();
     })();
   }, [getGroups]);
 
@@ -112,189 +82,253 @@ export default function GroupsPage() {
 
 function Groups() {
   const t = useTranslations('groups');
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [editGroup, setEditGroup] = useState<Group>();
+  const router = useRouter();
   const [groups, getGroups, users] = useGroupList();
-  const showSnackbar = useSnackbar();
+  const [deleting, setDeleting] = useState<Group>();
+  const [search, setSearch] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-  const groupTree = useMemo(() => orderGroupsAsTree(groups), [groups]);
+  const { edit, dialog } = useGroupEditor({
+    groups,
+    users,
+    onSaved: async () => {
+      await getGroups();
+    },
+  });
 
   const missingKnownGroups = useMemo(() => {
     const existingIds = new Set(groups.map((g) => g.id));
     return KNOWN_GROUPS.filter((kg) => kg.id && !existingIds.has(kg.id));
   }, [groups]);
 
-  const createKnownGroups = useCallback(async () => {
-    const created = await createKnownGroupsAction();
-    if (created.length > 0) {
-      console.info(`Created known groups: ${created.join(', ')}`);
+  const memberCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const user of users) {
+      for (const groupId of Object.keys(effectiveGroupRoles(user))) {
+        counts[groupId] = (counts[groupId] ?? 0) + 1;
+      }
     }
+    return counts;
+  }, [users]);
+
+  const rows = useMemo(
+    () => visibleGroupTree(orderGroupsAsTree(groups), search, collapsed),
+    [groups, search, collapsed]
+  );
+
+  const toggleCollapsed = (groupId: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+
+  const createKnownGroups = useCallback(async () => {
+    await createKnownGroupsAction();
     await getGroups();
   }, [getGroups]);
 
-  const editAction = useCallback(async (group: Group) => {
-    setEditGroup(group);
-    console.info(`edit group: ${JSON.stringify(group)}`);
-    setShowEditDialog(true);
-  }, []);
-  const showDeleteConfirm = useCallback(async (group: Group) => {
-    setEditGroup(group);
-    console.info(`confirm group delete: ${JSON.stringify(group)}`);
-    setIsConfirmOpen(true);
-  }, []);
-
-  const deleteAction = useCallback(
-    async (group: Group) => {
-      console.info(`delete group: ${JSON.stringify(group)}`);
-      if (group.id) {
-        await deleteGroupAction(group.id);
-        await getGroups();
-      }
-    },
-    [getGroups]
-  );
-
   return (
-    <>
-      <Box sx={{ p: 2, height: '70vh' }}>
-        <Typography variant="h3" gutterBottom>
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+      >
+        <Typography variant="h4" sx={{ flexGrow: 1 }}>
           {t('title')}
-          <IconButton onClick={() => getGroups()}>
+        </Typography>
+        <Tooltip title={t('refresh')}>
+          <IconButton onClick={() => getGroups()} aria-label={t('refresh')}>
             <RefreshIcon />
           </IconButton>
-          {missingKnownGroups.length > 0 && (
-            <Tooltip
-              title={t('createKnownTooltip', {
-                names: missingKnownGroups.map((g) => g.name).join(', '),
-              })}
+        </Tooltip>
+        {missingKnownGroups.length > 0 && (
+          <Tooltip
+            title={t('createKnownTooltip', {
+              names: missingKnownGroups.map((g) => g.name).join(', '),
+            })}
+          >
+            <Button
+              variant="outlined"
+              startIcon={<PlaylistAddIcon />}
+              onClick={createKnownGroups}
             >
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<PlaylistAddIcon />}
-                onClick={createKnownGroups}
-                sx={{ ml: 2 }}
-              >
-                {t('createKnown')}
-              </Button>
-            </Tooltip>
-          )}
-        </Typography>
-        <Grid container>
-          <Grid size={{ xs: 2, md: 2, lg: 2 }}></Grid>
-          <Grid size={{ xs: 5, md: 3, lg: 3 }}>
-            <b>{t('cols.id')}</b>
-          </Grid>
-          <Grid size={{ xs: 5, md: 3, lg: 3 }}>
-            <b>{t('cols.name')}</b>
-          </Grid>
+              {t('createKnown')}
+            </Button>
+          </Tooltip>
+        )}
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => edit({ name: '', description: '' })}
+        >
+          {t('add')}
+        </Button>
+      </Stack>
 
-          <Grid size={{ xs: 12, md: 4, lg: 4 }}>
-            <b>{t('cols.description')}</b>
-          </Grid>
-          <Grid size={{ xs: 12 }}>
-            <hr />
-          </Grid>
-
-          {groupTree.map(({ group, depth }) => (
-            <React.Fragment key={`group-${group.id}`}>
-              <Grid size={{ xs: 2, md: 2, lg: 2 }}>
-                <GroupRowButtons
-                  row={group}
-                  editFn={editAction}
-                  deleteFn={showDeleteConfirm}
-                />
-              </Grid>
-              <Grid size={{ xs: 5, md: 3, lg: 3 }}>{group.id}</Grid>
-              <Grid size={{ xs: 5, md: 3, lg: 3 }}>
-                {/* Untergruppen eingerückt unter ihrer Elterngruppe. */}
-                <Box component="span" sx={{ pl: depth * 2 }}>
-                  {depth > 0 && '└ '}
-                  {group.name}
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 4, lg: 4 }}>{group.description}</Grid>
-              <Grid size={{ xs: 12 }}>
-                <hr />
-              </Grid>
-            </React.Fragment>
-          ))}
-        </Grid>
-
-        {/* <DataGrid rows={groups} columns={columns} getRowId={(row) => row.id} /> */}
-      </Box>
-      {showEditDialog && editGroup && (
-        <GroupDialog
-          group={editGroup}
-          users={users}
-          groups={groups}
-          onClose={async (group, assigendUsers, groupAdmins) => {
-            setShowEditDialog(false);
-            if (group && assigendUsers) {
-              // A group without an id is new: updateGroupAction creates it and
-              // returns the generated id. Reopen the freshly created group in
-              // edit mode so the integration sections (Alarm-SMS / ÖBFV-Token),
-              // which require an existing group id, become available.
-              const wasNew = !group.id;
-              const { groupId: savedId, notMigrated } =
-                await updateGroupAction(group, assigendUsers, groupAdmins || []);
-              if (notMigrated.length > 0) {
-                showSnackbar(
-                  t('notMigrated', {
-                    names: notMigrated
-                      .map((uid) => {
-                        const u = users.find((user) => user.uid === uid);
-                        return u?.displayName || u?.email || uid;
-                      })
-                      .join(', '),
-                  }),
-                  'warning'
-                );
-              }
-              await getGroups();
-              if (wasNew && savedId) {
-                setEditGroup({ ...group, id: savedId });
-                setShowEditDialog(true);
-              }
-            } else {
-              await getGroups();
-            }
-          }}
-        />
-      )}
-
-      {isConfirmOpen && editGroup && (
-        <ConfirmDialog
-          title={t('deleteTitle', { name: editGroup?.name || '' })}
-          text={t('deleteConfirm', {
-            name: editGroup?.name || '',
-            description: editGroup?.description || '',
-          })}
-          onConfirm={(confirmed) => {
-            if (confirmed) {
-              deleteAction(editGroup);
-            }
-            setIsConfirmOpen(false);
-          }}
-        />
-      )}
-
-      <Fab
-        color="primary"
-        aria-label="add"
-        sx={{ position: 'fixed', bottom: 16, right: 16 }}
-        onClick={() => {
-          setShowEditDialog(true);
-          setEditGroup({
-            name: '',
-            description: '',
-          });
+      <TextField
+        size="small"
+        fullWidth
+        placeholder={t('search')}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        sx={{ mb: 2 }}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          },
         }}
-      >
-        <AddIcon />
-      </Fab>
-    </>
+      />
+
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>{t('cols.name')}</TableCell>
+              <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
+                {t('cols.description')}
+              </TableCell>
+              <TableCell align="right">{t('cols.members')}</TableCell>
+              <TableCell align="right" />
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4}>
+                  <Typography color="text.secondary">
+                    {search ? t('noMatch') : t('empty')}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+            {rows.map(({ group, depth, hasChildren, expanded }) => {
+              const href = `/groups/${encodeURIComponent(group.id ?? '')}`;
+              const tenant = isTenantGroupId(group.id);
+              return (
+                <TableRow
+                  key={group.id}
+                  hover
+                  sx={{ cursor: 'pointer' }}
+                  onClick={() => router.push(href)}
+                >
+                  <TableCell>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        pl: depth * 3,
+                      }}
+                    >
+                      {hasChildren ? (
+                        <IconButton
+                          size="small"
+                          aria-label={
+                            expanded
+                              ? t('collapse', { name: group.name })
+                              : t('expand', { name: group.name })
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (group.id) toggleCollapsed(group.id);
+                          }}
+                          // Bei aktiver Suche ist alles aufgeklappt.
+                          disabled={!!search}
+                        >
+                          {expanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+                        </IconButton>
+                      ) : (
+                        <Box sx={{ width: 34, flexShrink: 0 }} />
+                      )}
+                      <MuiLink
+                        component={Link}
+                        href={href}
+                        underline="hover"
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{ fontWeight: depth === 0 ? 600 : 400 }}
+                      >
+                        {group.name}
+                      </MuiLink>
+                      {!tenant && (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={t('systemGroup')}
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      display: { xs: 'none', md: 'table-cell' },
+                      color: 'text.secondary',
+                    }}
+                  >
+                    {group.description}
+                  </TableCell>
+                  <TableCell align="right">
+                    {tenant ? memberCounts[group.id ?? ''] ?? 0 : '—'}
+                  </TableCell>
+                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Tooltip title={t('edit', { name: group.name })}>
+                      <IconButton
+                        size="small"
+                        aria-label={t('edit', { name: group.name })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          edit(group);
+                        }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={t('delete', { name: group.name })}>
+                      <IconButton
+                        size="small"
+                        color="warning"
+                        aria-label={t('delete', { name: group.name })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleting(group);
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {dialog}
+
+      {deleting && (
+        <ConfirmDialog
+          title={t('deleteTitle', { name: deleting.name || '' })}
+          text={t('deleteConfirm', {
+            name: deleting.name || '',
+            description: deleting.description || '',
+          })}
+          onConfirm={async (confirmed) => {
+            const group = deleting;
+            setDeleting(undefined);
+            if (confirmed && group.id) {
+              await deleteGroupAction(group.id);
+              await getGroups();
+            }
+          }}
+        />
+      )}
+    </Container>
   );
 }
