@@ -4,7 +4,7 @@ import 'server-only';
 import { actionAdminRequired, actionUserRequired } from '../auth';
 import { firestore } from '../../server/firebase/admin';
 import { encryptPassword } from '../../server/blaulichtsms/encryption';
-import { filterGroupsByMembership } from '../blaulicht-sms/groupFilter';
+import { can } from '../../common/permissions';
 import { OEBFV_CONFIG_COLLECTION } from './tokenStore';
 
 export interface OebfvConfigPublic {
@@ -84,17 +84,13 @@ export async function hasOebfvConfig(groupId: string): Promise<boolean> {
   return doc.exists && !!doc.data()!.tokenEncrypted;
 }
 
-// User-accessible: configured group IDs the caller is a member of
-// (admins receive all). Used by the page to pick a group.
+// User-accessible: configured group IDs in which the caller holds
+// `kennzeichen.query` (admins receive all). Used by the page to pick a group.
 export async function getGroupsWithOebfvConfig(): Promise<string[]> {
   const session = await actionUserRequired();
   const snapshot = await firestore.collection(OEBFV_CONFIG_COLLECTION).get();
-  const all = snapshot.docs
+  return snapshot.docs
     .filter((d) => !!d.data().tokenEncrypted)
-    .map((d) => d.id);
-  return filterGroupsByMembership(
-    all,
-    session.user.groups ?? [],
-    session.user.isAdmin,
-  );
+    .map((d) => d.id)
+    .filter((groupId) => can(session.user, groupId, 'kennzeichen.query'));
 }

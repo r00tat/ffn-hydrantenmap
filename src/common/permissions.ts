@@ -23,14 +23,16 @@ export const PERMISSIONS = [
   'bekleidung.read',
   'bekleidung.manage',
   'kostenersatz.use',
+  'kennzeichen.query',
   'gruppe.manage',
   'rollen.assign',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 /**
- * Die Rollen. `gruppenadmin` enthält bewusst nicht `kostenersatz.use`: Ein
- * Gruppen-Admin ohne Freischaltung sieht keinen Kostenersatz.
+ * Die Rollen. `gruppenadmin` enthält bewusst weder `kostenersatz.use` noch
+ * `kennzeichen.query`: Ein Gruppen-Admin ohne Freischaltung sieht keinen
+ * Kostenersatz und fragt keine Halterdaten ab.
  */
 export const ROLES = {
   gruppenadmin: [
@@ -45,6 +47,7 @@ export const ROLES = {
   geraetemeister: ['fahrtenbuch.manage', 'geraete.manage', 'personal.manage'],
   bekleidungswart: ['bekleidung.read', 'bekleidung.manage'],
   kostenersatz: ['kostenersatz.use'],
+  kennzeichenabfrage: ['kennzeichen.query'],
 } as const satisfies Record<string, readonly Permission[]>;
 export type RoleId = keyof typeof ROLES;
 export const ROLE_IDS = Object.keys(ROLES) as RoleId[];
@@ -54,7 +57,7 @@ export const ROLE_IDS = Object.keys(ROLES) as RoleId[];
  * `getUserSessionData` die abgeleiteten Felder älterer Benutzerdokumente neu
  * schreibt — die Firestore-Regeln lesen nur diese.
  */
-export const ROLES_CATALOG_VERSION = 1;
+export const ROLES_CATALOG_VERSION = 2;
 
 /** Rollen je Gruppe. Ein Schlüssel bedeutet Mitgliedschaft, auch mit `[]`. */
 export type GroupRoles = Record<string, RoleId[]>;

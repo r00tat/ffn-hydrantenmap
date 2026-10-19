@@ -4,6 +4,7 @@ import { uniqueArray } from '../../../../common/arrayUtils';
 import { isTruthy } from '../../../../common/boolish';
 import { feuerwehren } from '../../../../common/feuerwehren';
 import { isFirecallGuest } from '../../../../common/firecallGuest';
+import { withAncestorGroups } from '../../../../common/groupHierarchy';
 import { isTenantGroupId } from '../../../../common/tenantGroups';
 import {
   awaitsKostenersatzChoice,
@@ -15,6 +16,7 @@ import { USER_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { firebaseAuth, firestore } from '../../../../server/firebase/admin';
 import { setUserMemberships } from '../../../../server/auth/changeUserRoles';
 import { userSessionCache } from '../../../../server/auth/userSessionCache';
+import { getGroups } from '../../../groups/groupHelpers';
 
 export interface UsersResponse {
   user: UserRecordExtended;
@@ -26,13 +28,17 @@ export interface UsersResponse {
  * Die Gruppen kommen **nicht** aus `user.groups`: Das alte Feld pflegt niemand
  * mehr, und wer nur die Freischaltung umschaltet, schickt es veraltet mit.
  * Die Mitgliedschaft ändert sich nur, wenn `memberGroupIds` übergeben wird,
- * und dann über `writeUserRoles()` (siehe `setUserMemberships`).
+ * und dann über `writeUserRoles()` (siehe `setUserMemberships`). Die
+ * Elterngruppen der gewählten Gruppen kommen dabei immer dazu.
  */
 export async function updateUser(
   uid: string,
   user: UserRecordExtended,
-  memberGroupIds?: string[]
+  requestedGroupIds?: string[]
 ) {
+  const memberGroupIds = requestedGroupIds
+    ? withAncestorGroups(requestedGroupIds, await getGroups())
+    : undefined;
   const userRef = firestore.collection(USER_COLLECTION_ID).doc(`${uid}`);
   const stored = await userRef.get();
   const storedData = ((stored.exists ? stored.data() : undefined) ??

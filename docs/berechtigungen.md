@@ -46,6 +46,7 @@ halten. Umbenennen ist eine Datenmigration.
 | `bekleidung.read` | Bekleidung sehen |
 | `bekleidung.manage` | Bekleidung pflegen, Import |
 | `kostenersatz.use` | Kostenersatz an Einsätzen der Gruppe (Berechnung, PDF, Mail, SumUp), Füllungen verrechnen, Mailvorlagen |
+| `kennzeichen.query` | ÖBFV-Kennzeichenabfrage mit dem Token der Gruppe (siehe [Kennzeichenabfrage je Gruppe](#kennzeichenabfrage-je-gruppe)) |
 | `gruppe.manage` | Stammdaten, Share-Links, Atemschutz-Admin, Wochenbericht, Mängel löschen, PDF-Import, fremde Füllungen korrigieren |
 | `rollen.assign` | Rollen in dieser Gruppe vergeben (siehe [Wer vergibt was](#wer-vergibt-was)) |
 
@@ -67,11 +68,12 @@ Ebenfalls fest im Code (`ROLES`):
 | `geraetemeister` | `fahrtenbuch.manage`, `geraete.manage`, `personal.manage` | Fahrzeuge, Beladung, Lager |
 | `bekleidungswart` | `bekleidung.read`, `bekleidung.manage` | Einsatz- und Dienstbekleidung |
 | `kostenersatz` | `kostenersatz.use` | Abrechnung nach Tarifordnung, Füllungsrechnungen |
+| `kennzeichenabfrage` | `kennzeichen.query` | Fahrzeug- und Halterdaten im Einsatz |
 
 Mitglied ohne Zusatzrolle ist, wer die Gruppe mit leerer Rollenliste hat.
 
 **Der Gruppen-Admin schließt Gerätemeister und Bekleidungswart ein**, aber
-**nicht den Kostenersatz**. Das entspricht dem Stand vor der Umstellung: Ein
+**nicht den Kostenersatz** und **nicht die Kennzeichenabfrage**. Das entspricht dem Stand vor der Umstellung: Ein
 Gruppen-Admin ohne Freischaltung sah keinen Kostenersatz, und wer Rechnungen
 an Dritte stellt, soll das ausdrücklich zugeteilt bekommen. Umgekehrt kommt
 ein Gerätemeister nicht an Gruppeneinstellungen, Share-Links, PDF-Import oder
@@ -122,9 +124,10 @@ dieser Gruppe selbst haben. Damit ist `kostenersatz` für einen Gruppen-Admin
 erst vergebbar, wenn er die Rolle selbst hat. Das ist gewollt: Wer keinen
 Kostenersatz macht, gibt ihn nicht weiter.
 
-Vergeben wird in der Ansicht **„Mitglieder und Rollen"** je Gruppe (Matrix
-Mitglied × Rolle), erreichbar für den globalen Admin und die Gruppen-Admins
-dieser Gruppe. Sie ersetzt den Gerätemeister-Abschnitt in den Einstellungen
+Vergeben wird im Abschnitt **„Mitglieder und Rollen"** der Detailseite je
+Gruppe (`/groups/{groupId}`, Matrix Mitglied × Rolle), erreichbar für den
+globalen Admin und die Gruppen-Admins dieser Gruppe. Die frühere Adresse
+`/groups/{groupId}/rollen` leitet dorthin weiter. Sie ersetzt den Gerätemeister-Abschnitt in den Einstellungen
 der Fahrtenbuch-Verwaltung und den Reiter „Einstellungen" auf `/bekleidung`;
 diese Stellen verlinken dorthin.
 
@@ -142,6 +145,41 @@ diese Stellen verlinken dorthin.
 - **`/admin/*` betreten.** Die Seiten dort — Datenpflege, Cluster, MCP,
   Bug-Reports, gelöschte Elemente, die Migration der Berechtigungen — sind
   nicht auf eine Gruppe begrenzt.
+
+## Gruppenhierarchie
+
+Eine Gruppe kann über `parentId` unter einer anderen stehen (etwa Bezirk →
+Abschnitt → Feuerwehr). **Wer Mitglied einer Gruppe ist, ist auch Mitglied
+aller Gruppen darüber** — ohne Rollen, sofern er dort noch keine hat.
+
+**Die Hierarchie wirkt nur beim Vergeben, nicht beim Auswerten.** Die
+Elterngruppen landen ganz normal in `groupRoles` am Benutzer und damit im
+Claim `groups`. Firestore-Regeln, Guards und `can()` bleiben unverändert und
+kennen die Hierarchie nicht. Das hält die Regeln ohne zusätzliches `get()` und
+macht jede Mitgliedschaft am Benutzerdokument ablesbar. Der Preis: Die
+Hierarchie muss an jedem Schreibweg nachgezogen werden.
+
+| Schreibweg | was passiert |
+| --- | --- |
+| Benutzerdialog (`updateUser`) | die gewählten Gruppen werden um ihre Elterngruppen ergänzt; Elterngruppen gewählter Gruppen sind im Dialog angehakt und gesperrt |
+| Gruppendialog (`updateGroupAction`) | neue Mitglieder bekommen die Elterngruppen dazu; Mitglieder einer Untergruppe bleiben Mitglied und sind gesperrt. Wird eine Gruppe unter eine andere gehängt, bekommen alle ihre Mitglieder die neuen Elterngruppen |
+| Ziehen in der Gruppenübersicht (`setGroupParentAction`) | ändert nur `parentId`, mit derselben Prüfung (`isValidParent`); die Mitglieder der Gruppe und ihrer Untergruppen bekommen die neuen Elterngruppen. Die Zielprüfung im Browser (`dropTargetParent`) hebt nur gültige Ziele hervor |
+| „Mitglieder und Rollen" (`addMemberAction`, `removeMemberAction`) | Aufnehmen ergänzt die Elterngruppen; Entfernen lehnt ab (`memberOfSubgroup`), solange der Benutzer in einer Untergruppe ist |
+
+**Entfernen kaskadiert bewusst nicht.** Wer aus einer Elterngruppe genommen
+werden soll, aber noch in einer Untergruppe ist, wird zuerst dort entfernt —
+ein stilles Mitlöschen nähme ihm die Rollen der Untergruppe. Umgekehrt bleibt
+nach dem Entfernen aus einer Untergruppe die Mitgliedschaft in der
+Elterngruppe stehen; sie ist dann eine eigene.
+
+Die reinen Funktionen stehen in
+[`src/common/groupHierarchy.ts`](../src/common/groupHierarchy.ts). Sie sind
+gegen Zyklen und fehlende Elterngruppen abgesichert, obwohl
+`updateGroupAction` eine Untergruppe oder die Gruppe selbst als Elterngruppe
+ablehnt (`isValidParent`). `allUsers` und `kostenersatz` stehen außerhalb der
+Hierarchie. Beim Löschen einer Gruppe rücken ihre Untergruppen eine Ebene nach
+oben. Angezeigt werden Gruppen in Baumreihenfolge (`orderGroupsAsTree`):
+Untergruppen eingerückt direkt unter ihrer Elterngruppe.
 
 ## Ablage am Benutzerdokument
 
@@ -386,6 +424,34 @@ dort deshalb nur für Nicht-Admins, ebenso in der PDF-Route
 könnte aber weder PDF noch Mail erzeugen. Ob solche Einsätze überhaupt
 existieren, ist vor dem Aufräum-PR zu klären (siehe
 [Nach dem Release](#nach-dem-release)).
+
+## Kennzeichenabfrage je Gruppe
+
+Der ÖBFV-Token liegt an einer Gruppe (`oebfvKennzeichenConfig/{groupId}`,
+gepflegt im Gruppendialog). Abfragen darf, wer **in dieser Gruppe** das Recht
+`kennzeichen.query` hat — Rolle `kennzeichenabfrage` oder globaler Admin
+(`queryKennzeichen`, `getGroupsWithOebfvConfig`, Menüpunkt über
+`useCanAny`).
+
+Bis dahin genügte die Mitgliedschaft in der Gruppe mit dem Token. Dafür gab es
+eine eigene Gruppe „Kennzeichenabfrage“, die nichts als den Token und die
+Freigeschalteten trug — dieselbe Schein-Gruppe wie früher `kostenersatz`.
+Halterdaten sind aber keine Gruppenöffentlichkeit, und jede Abfrage wird
+protokolliert; deshalb ein eigenes Recht statt der Mitgliedschaft, und
+deshalb nicht im Gruppen-Admin enthalten.
+
+**Umzug in Prod (einmalig, von Hand nach dem Deploy):** Der Token lag an der
+Schein-Gruppe „Kennzeichenabfrage“. Das Chiffrat ist nicht an die Gruppe
+gebunden (`encryptPassword` mit einem Schlüssel für alle) und lässt sich als
+Dokument nach `oebfvKennzeichenConfig/ffnd` kopieren. Die bisherigen Mitglieder
+der Schein-Gruppe bekommen in `ffnd` die Rolle `kennzeichenabfrage`, danach
+„Rechte neu ableiten“ und die leere Gruppe löschen. Erst **nach** dem Deploy:
+Älterer Code verwirft unbekannte Rollen beim nächsten Schreiben
+(`normalizeRoles`), und ein Token an `ffnd` gäbe mit der alten Prüfung jedem
+Mitglied von `ffnd` die Abfrage. Eine eigene Oberfläche dafür gibt es bewusst
+nicht — der Umzug kommt einmal vor.
+
+**Zeitfenster nach dem Deploy:** Bis zum Umzug fragt nur der globale Admin ab.
 
 ## Kostenersatz je Gruppe
 

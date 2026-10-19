@@ -1,12 +1,14 @@
-import MemberRolesPage from '../../../../components/groups/MemberRolesPage';
+import { redirect } from 'next/navigation';
 
+/**
+ * Frühere Adresse von „Mitglieder und Rollen". Die Matrix steht jetzt auf der
+ * Detailseite der Gruppe; Lesezeichen und alte Links landen dort.
+ */
 export default async function Page({
   params,
 }: {
   params: Promise<{ groupId: string }>;
 }) {
   const { groupId } = await params;
-  // `key`: Beim Wechsel der Gruppe über den Umschalter beginnt die Ansicht
-  // frisch, statt Meldungen und Auswahl der vorigen Gruppe zu zeigen.
-  return <MemberRolesPage key={groupId} groupId={groupId} />;
+  redirect(`/groups/${encodeURIComponent(groupId)}`);
 }

@@ -100,6 +100,7 @@ describe('assignableRoles', () => {
       geraetemeister: true,
       bekleidungswart: true,
       kostenersatz: true,
+      kennzeichenabfrage: true,
     });
   });
 
@@ -111,6 +112,7 @@ describe('assignableRoles', () => {
       geraetemeister: true,
       bekleidungswart: true,
       kostenersatz: false,
+      kennzeichenabfrage: false,
     });
   });
 
@@ -119,6 +121,6 @@ describe('assignableRoles', () => {
       Object.values(
         assignableRoles({ groupRoles: { ffnd: ['geraetemeister'] } }, 'ffnd'),
       ),
-    ).toEqual([false, false, false, false]);
+    ).toEqual([false, false, false, false, false]);
   });
 });

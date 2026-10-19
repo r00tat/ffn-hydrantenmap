@@ -23,7 +23,7 @@ describe('MemberRolesLink', () => {
 
     expect(screen.getByRole('link')).toHaveAttribute(
       'href',
-      '/groups/ffnd/rollen',
+      '/groups/ffnd',
     );
   });
 

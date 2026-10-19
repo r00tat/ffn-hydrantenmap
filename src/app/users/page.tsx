@@ -23,6 +23,7 @@ import { green, red } from '@mui/material/colors';
 import { useTranslations } from 'next-intl';
 import React, { useCallback, useMemo, useState } from 'react';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
+import { orderGroupsAsTree } from '../../common/groupHierarchy';
 import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended } from '../../common/users';
 import { useSnackbar } from '../../components/providers/SnackbarProvider';
@@ -99,12 +100,11 @@ function Users() {
     // queryConstraints: [orderBy('timestamp', order)],
   });
 
+  // In Baumreihenfolge: Untergruppen direkt unter ihrer Elterngruppe.
   const groups: { [key: string]: string } = useMemo(
     () =>
       Object.fromEntries(
-        groupsArray
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((g) => [g.id, g.name])
+        orderGroupsAsTree(groupsArray).map(({ group: g }) => [g.id, g.name])
       ),
     [groupsArray]
   );
@@ -365,6 +365,7 @@ function Users() {
         <UserRecordExtendedDialog
           user={editUser}
           groups={groups}
+          groupHierarchy={groupsArray}
           onClose={(user, memberGroupIds) => {
             setShowEditUserDialog(false);
             if (user) {

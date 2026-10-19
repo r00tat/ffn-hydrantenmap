@@ -50,4 +50,19 @@ describe('sortGroupsForUser', () => {
     ]);
     expect(result.map((x) => x.id)).toEqual(['a', 'b', 'z']);
   });
+
+  it('puts sub groups directly below their parent', () => {
+    const result = sortGroupsForUser([
+      g(ALL_USERS_GROUP_ID, 'Alle Benutzer'),
+      { id: 'ffa', name: 'Alpha', parentId: 'abschnitt' },
+      g('zz', 'Zulu'),
+      g('abschnitt', 'Abschnitt'),
+    ]);
+    expect(result.map((x) => x.id)).toEqual([
+      'abschnitt',
+      'ffa',
+      'zz',
+      ALL_USERS_GROUP_ID,
+    ]);
+  });
 });

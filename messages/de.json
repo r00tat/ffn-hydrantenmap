@@ -1160,7 +1160,8 @@
     "firecallGuestFor": "Zugang beschränkt auf Einsatz {firecall}",
     "firecallWrite": "Schreibzugriff auf den Einsatz",
     "firecallWriteHint": "Wirkt beim nächsten Aktualisieren des Zugangs (spätestens nach 45 Minuten).",
-    "rolesHint": "Hier legst du nur die Mitgliedschaft fest. Rollen je Gruppe vergibst du unter Gruppen → Mitglieder und Rollen."
+    "rolesHint": "Hier legst du nur die Mitgliedschaft fest. Rollen je Gruppe vergibst du unter Gruppen → Mitglieder und Rollen.",
+    "groupViaSubgroup": "über eine Untergruppe"
   },
   "header": {
     "appTitle": "Einsatzkarte",
@@ -2647,7 +2648,7 @@
     "authorityLabel": "Behörde",
     "plateLabel": "Vormerkzeichen",
     "searchButton": "Suchen",
-    "noConfig": "Für Ihre Gruppe ist kein Token konfiguriert. Ein Administrator kann den ÖBFV-Token in der Gruppenverwaltung hinterlegen.",
+    "noConfig": "Für Ihre Gruppe ist kein Token konfiguriert oder Ihnen fehlt die Rolle „Kennzeichenabfrage“. Ein Administrator hinterlegt den ÖBFV-Token in der Gruppenverwaltung, die Rolle vergibt er unter „Mitglieder und Rollen“.",
     "noResult": "Keine Zulassung gefunden.",
     "resultTitle": "Daten aus Zulassung",
     "vehicleHeading": "Fahrzeug {n}",
@@ -2927,15 +2928,39 @@
     "deleteTitle": "{name} löschen",
     "deleteConfirm": "{name} {description} wirklich löschen?",
     "cols": {
-      "id": "ID",
       "name": "Name",
-      "description": "Beschreibung"
+      "description": "Beschreibung",
+      "members": "Mitglieder"
     },
     "fahrtenbuchLinkHint": "Der Fahrtenbuch-Link samt QR-Codes wird in der Fahrtenbuch-Verwaltung gepflegt.",
     "fahrtenbuchLinkAction": "Zur Fahrtenbuch-Verwaltung",
     "groupAdmins": "Gruppen-Admins",
     "groupAdminsHint": "Gruppen-Admins übernehmen alle administrativen Aufgaben innerhalb dieser Gruppe — Fahrtenbuch, Geräte, Personal, Bekleidung, Gruppeneinstellungen und das Vergeben der übrigen Rollen. Wählbar sind nur Mitglieder der Gruppe; die weiteren Rollen vergibst du unter „Mitglieder und Rollen“.",
-    "roles": "Mitglieder und Rollen von {name}"
+    "parentGroup": "Übergeordnete Gruppe",
+    "noParentGroup": "keine",
+    "parentGroupHint": "Mitglieder dieser Gruppe werden automatisch auch Mitglied der übergeordneten Gruppen.",
+    "memberViaSubgroup": "über eine Untergruppe",
+    "refresh": "Neu laden",
+    "add": "Neue Gruppe",
+    "search": "Gruppe suchen",
+    "noMatch": "Keine Gruppe gefunden.",
+    "empty": "Es gibt noch keine Gruppen.",
+    "expand": "Untergruppen von {name} aufklappen",
+    "collapse": "Untergruppen von {name} zuklappen",
+    "systemGroup": "System",
+    "saveFailed": "Die Gruppe konnte nicht gespeichert werden: {message}",
+    "breadcrumbs": "Navigation",
+    "editGroup": "Gruppe bearbeiten",
+    "subgroups": "Untergruppen",
+    "noSubgroups": "keine",
+    "oebfvRoleHint": "Abfragen darf, wer in dieser Gruppe die Rolle „Kennzeichenabfrage“ hat — die Mitgliedschaft allein genügt nicht.",
+    "dragHandle": "„{name}“ verschieben",
+    "dropRoot": "Hier ablegen: oberste Ebene",
+    "dragHint": "Ziehe eine Gruppe am Griff auf eine andere Gruppe, um sie dort einzuordnen. Ihre Mitglieder werden dabei auch Mitglied der neuen Elterngruppen.",
+    "moved": "„{name}“ liegt jetzt unter „{parent}“.",
+    "movedToRoot": "„{name}“ liegt jetzt auf der obersten Ebene.",
+    "moveFailed": "Verschieben fehlgeschlagen: {message}",
+    "loading": "Gruppen werden geladen"
   },
   "tokens": {
     "title": "API Token",
@@ -3791,7 +3816,8 @@
       "gruppenadmin": "Gruppen-Admin",
       "geraetemeister": "Gerätemeister",
       "bekleidungswart": "Bekleidungswart",
-      "kostenersatz": "Kostenersatz"
+      "kostenersatz": "Kostenersatz",
+      "kennzeichenabfrage": "Kennzeichenabfrage"
     }
   },
   "adminMcp": {
@@ -4852,7 +4878,7 @@
     "cancel": "Abbrechen",
     "explanationTitle": "Was die Rollen dürfen",
     "explanationIntro": "Rollen gelten nur in dieser Gruppe. Ein Mitglied kann mehrere Rollen haben; es erhält die Rechte aller zusammen.",
-    "linkHint": "Gerätemeister, Bekleidungswarte und Kostenersatz vergibst du je Gruppe unter „Mitglieder und Rollen“.",
+    "linkHint": "Gerätemeister, Bekleidungswarte, Kostenersatz und Kennzeichenabfrage vergibst du je Gruppe unter „Mitglieder und Rollen“.",
     "linkAction": "Rollen vergeben",
     "roles": {
       "gruppenadmin": {
@@ -4870,6 +4896,10 @@
       "kostenersatz": {
         "name": "Kostenersatz",
         "description": "Erstellt Kostenersatz-Berechnungen an Einsätzen der Gruppe und die Verrechnung der Flaschenfüllungen."
+      },
+      "kennzeichenabfrage": {
+        "name": "Kennzeichenabfrage",
+        "description": "Fragt Fahrzeug- und Halterdaten beim ÖBFV ab, mit dem Token dieser Gruppe."
       }
     },
     "permissions": {
@@ -4894,6 +4924,9 @@
       },
       "rollen": {
         "assign": "Rollen vergeben"
+      },
+      "kennzeichen": {
+        "query": "Kennzeichen abfragen"
       }
     },
     "errors": {
@@ -4903,7 +4936,8 @@
       "unknownUser": "Den Benutzer gibt es nicht.",
       "firecallGuest": "Einsatz-Gäste können keine Mitglieder werden.",
       "notMigrated": "Der Benutzer ist noch nicht migriert und hat die alte Kostenersatz-Freischaltung. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus — dort legst du fest, in welchen Gruppen er Kostenersatz behält.",
-      "unknown": "Das hat nicht geklappt: {message}"
+      "unknown": "Das hat nicht geklappt: {message}",
+      "memberOfSubgroup": "Der Benutzer ist Mitglied einer Untergruppe und damit auch dieser Gruppe. Entferne ihn zuerst aus der Untergruppe."
     }
   },
   "mapSelection": {

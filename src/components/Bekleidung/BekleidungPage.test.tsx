@@ -100,7 +100,7 @@ describe('BekleidungPage', () => {
     await user.click(screen.getByRole('tab', { name: 'Einstellungen' }));
     expect(screen.getByRole('link', { name: 'Mitglieder und Rollen öffnen' })).toHaveAttribute(
       'href',
-      '/groups/ffnd/rollen',
+      '/groups/ffnd',
     );
   });
 

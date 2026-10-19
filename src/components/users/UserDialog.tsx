@@ -1,7 +1,6 @@
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
 import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -15,38 +14,29 @@ import FormGroup from '@mui/material/FormGroup';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import InputLabel from '@mui/material/InputLabel';
-import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
-import OutlinedInput from '@mui/material/OutlinedInput';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   sendPasswordResetEmailAction,
   setUserPasswordAction,
 } from '../../app/users/action';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import GroupTreeChecklist from '../groups/GroupTreeChecklist';
 import { feuerwehren } from '../../common/feuerwehren';
 import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
+import {
+  impliedGroupIds,
+  withAncestorGroups,
+  type HierarchyGroup,
+} from '../../common/groupHierarchy';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import { userMemberGroupIds } from '../../common/userGroupRoles';
 import { UserRecordExtended, userTextFields } from '../../common/users';
-
-const ITEM_HEIGHT = 48;
-const ITEM_PADDING_TOP = 8;
-const MenuProps = {
-  slotProps: {
-    paper: {
-      style: {
-        maxHeight: ITEM_HEIGHT * 10 + ITEM_PADDING_TOP,
-        width: 250,
-      },
-    },
-  },
-};
 
 export interface UserRecordExtendedDialogOptions {
   /**
@@ -56,6 +46,12 @@ export interface UserRecordExtendedDialogOptions {
   onClose: (item?: UserRecordExtended, memberGroupIds?: string[]) => void;
   user: UserRecordExtended;
   groups: { [key: string]: string };
+  /**
+   * Gruppen samt `parentId`. Damit stehen Untergruppen eingerückt unter ihrer
+   * Elterngruppe, und die Elterngruppen gewählter Gruppen sind angehakt und
+   * gesperrt.
+   */
+  groupHierarchy?: HierarchyGroup[];
 }
 
 function generatePassword() {
@@ -214,6 +210,7 @@ export default function UserRecordExtendedDialog({
   onClose,
   user: userDefault,
   groups,
+  groupHierarchy = [],
 }: UserRecordExtendedDialogOptions) {
   const t = useTranslations('userDialog');
   const [open, setOpen] = useState(true);
@@ -224,8 +221,28 @@ export default function UserRecordExtendedDialog({
   );
   // Nur Mandanten: `allUsers` bekommt jeder, und Kostenersatz ist keine
   // Gruppe mehr, sondern eine Rolle je Gruppe.
-  const tenantGroups = Object.entries(groups).filter(([key]) =>
-    isTenantGroupId(key)
+  const tenantGroups = useMemo(
+    () =>
+      Object.entries(groups)
+        .filter(([key]) => isTenantGroupId(key))
+        .map(([id, name]) => ({
+          id,
+          name,
+          parentId: groupHierarchy.find((g) => g.id === id)?.parentId,
+        })),
+    [groups, groupHierarchy]
+  );
+  // Ausdrücklich gewählt sind die Gruppen, die sich nicht schon aus einer
+  // Untergruppe ergeben. Wird die Untergruppe abgewählt, fallen ihre
+  // Elterngruppen mit weg — außer sie sind selbst angehakt.
+  const explicitGroups = useMemo(() => {
+    const implied = impliedGroupIds(memberGroups, groupHierarchy);
+    return memberGroups.filter((id) => !implied.has(id));
+  }, [memberGroups, groupHierarchy]);
+  // Wer in einer Untergruppe ist, ist auch in allen Gruppen darüber.
+  const effectiveGroups = useMemo(
+    () => withAncestorGroups(explicitGroups, groupHierarchy),
+    [explicitGroups, groupHierarchy]
   );
 
   const onChange =
@@ -253,13 +270,6 @@ export default function UserRecordExtendedDialog({
           } as unknown as UserRecordExtended)
       );
     };
-
-  const handleGroupChange = (event: SelectChangeEvent<string[]>) => {
-    const {
-      target: { value },
-    } = event;
-    setMemberGroups(typeof value === 'string' ? value.split(',') : value);
-  };
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
@@ -306,30 +316,17 @@ export default function UserRecordExtendedDialog({
             value={((user as any)[key] as string) || ''}
           />
         ))}
-        <FormControl sx={{ m: 1, width: 300 }}>
-          <InputLabel id="user-group-checkbox-label">{t('groups')}</InputLabel>
-          <Select
-            labelId="user-group-checkbox-label"
-            id="user-group-checkbox"
-            multiple
-            value={memberGroups}
-            onChange={handleGroupChange}
-            input={<OutlinedInput label={t('groupLabel')} />}
-            renderValue={(selected) =>
-              selected
-                .map((key) => groups[key])
-                .filter((v) => v)
-                .join(', ')
-            }
-            MenuProps={MenuProps}
-          >
-            {tenantGroups.map(([key, name]) => (
-              <MenuItem key={key} value={key}>
-                <Checkbox checked={memberGroups.includes(key)} />
-                <ListItemText primary={name} />
-              </MenuItem>
-            ))}
-          </Select>
+        <FormControl fullWidth sx={{ my: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+            {t('groups')}
+          </Typography>
+          <GroupTreeChecklist
+            groups={tenantGroups}
+            selected={explicitGroups}
+            onChange={setMemberGroups}
+            impliedLabel={t('groupViaSubgroup')}
+            aria-label={t('groups')}
+          />
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
             {t('rolesHint')}
           </Typography>
@@ -338,7 +335,7 @@ export default function UserRecordExtendedDialog({
           <FormControlLabel
             control={
               <Switch
-                checked={user.authorized}
+                checked={!!user.authorized}
                 onChange={onChangeSwitch('authorized')}
               />
             }
@@ -398,7 +395,7 @@ export default function UserRecordExtendedDialog({
         <Button
           onClick={() => {
             setOpen(false);
-            onClose(user, memberGroups);
+            onClose(user, effectiveGroups);
           }}
         >
           Aktualisieren

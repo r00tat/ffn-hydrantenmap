@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { planGroupRoleChanges } from './groupMembership';
+import {
+  inheritedMemberIds,
+  planAncestorChanges,
+  planGroupRoleChanges,
+} from './groupMembership';
 
 function user(id: string, data: Record<string, unknown>) {
   return { id, data };
@@ -105,6 +109,67 @@ describe('planGroupRoleChanges', () => {
         ['g1'],
         [],
       ),
+    ).toEqual([]);
+  });
+});
+
+const hierarchy = [
+  { id: 'abschnitt', name: 'Abschnitt' },
+  { id: 'ffa', name: 'FF Alpha', parentId: 'abschnitt' },
+  { id: 'ffb', name: 'FF Bravo', parentId: 'abschnitt' },
+];
+
+describe('inheritedMemberIds', () => {
+  it('liefert die Mitglieder der Untergruppen', () => {
+    expect(
+      inheritedMemberIds(
+        'abschnitt',
+        [
+          user('u1', { groupRoles: { ffa: [] } }),
+          user('u2', { groupRoles: { abschnitt: [] } }),
+          user('u3', { groupRoles: { ffb: ['gruppenadmin'] } }),
+          user('g1', { groupRoles: { ffa: [] }, firecall: 'f1' }),
+        ],
+        hierarchy,
+      ),
+    ).toEqual(['u1', 'u3']);
+  });
+
+  it('ist leer für eine Gruppe ohne Untergruppen', () => {
+    expect(
+      inheritedMemberIds('ffa', [user('u1', { groupRoles: { ffa: [] } })], hierarchy),
+    ).toEqual([]);
+  });
+});
+
+describe('planAncestorChanges', () => {
+  it('ergänzt die Elterngruppe für ein neues Mitglied der Untergruppe', () => {
+    const users = [user('u1', { groupRoles: {} })];
+    const changes = planGroupRoleChanges('ffa', users, ['u1'], []);
+    expect(planAncestorChanges(users, changes, hierarchy)).toEqual([
+      { uid: 'u1', groupIds: ['abschnitt'] },
+    ]);
+  });
+
+  it('ergänzt die Elterngruppe für bestehende Mitglieder einer neu eingehängten Gruppe', () => {
+    const users = [
+      user('u1', { groupRoles: { ffb: [] } }),
+      user('u2', { groupRoles: { ffb: [], abschnitt: [] } }),
+    ];
+    expect(planAncestorChanges(users, [], hierarchy)).toEqual([
+      { uid: 'u1', groupIds: ['abschnitt'] },
+    ]);
+  });
+
+  it('übergeht ausscheidende Mitglieder, Gäste und nicht migrierte Benutzer', () => {
+    const users = [
+      user('u1', { groupRoles: { ffa: [] } }),
+      user('u2', { groupRoles: { ffa: [] } }),
+      user('g1', { groupRoles: { ffa: [] }, firecall: 'f1' }),
+    ];
+    const changes = planGroupRoleChanges('ffa', users, ['u2'], []);
+    expect(
+      planAncestorChanges(users, changes, hierarchy, new Set(['u2'])),
     ).toEqual([]);
   });
 });

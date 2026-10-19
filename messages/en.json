@@ -1160,7 +1160,8 @@
     "firecallGuestFor": "Access limited to operation {firecall}",
     "firecallWrite": "Write access to the operation",
     "firecallWriteHint": "Takes effect the next time the access is refreshed (within 45 minutes).",
-    "rolesHint": "This only sets the membership. Roles per group are assigned under Groups → Members and roles."
+    "rolesHint": "This only sets the membership. Roles per group are assigned under Groups → Members and roles.",
+    "groupViaSubgroup": "via a sub group"
   },
   "header": {
     "appTitle": "Operations Map",
@@ -2647,7 +2648,7 @@
     "authorityLabel": "Authority",
     "plateLabel": "Plate number",
     "searchButton": "Search",
-    "noConfig": "No token configured for your group. An administrator can set the ÖBFV token in group management.",
+    "noConfig": "No token is configured for your group, or you lack the “Licence plate lookup” role. An administrator sets the ÖBFV token in group management and assigns the role under “Members and roles”.",
     "noResult": "No registration found.",
     "resultTitle": "Registration data",
     "vehicleHeading": "Vehicle {n}",
@@ -2927,15 +2928,39 @@
     "deleteTitle": "Delete {name}",
     "deleteConfirm": "Really delete {name} {description}?",
     "cols": {
-      "id": "ID",
       "name": "Name",
-      "description": "Description"
+      "description": "Description",
+      "members": "Members"
     },
     "fahrtenbuchLinkHint": "The logbook link and its QR codes are managed in the logbook administration.",
     "fahrtenbuchLinkAction": "Go to logbook administration",
     "groupAdmins": "Group admins",
     "groupAdminsHint": "Group admins handle all administrative tasks within this group — logbook, equipment, personnel, clothing, group settings and assigning the other roles. Only group members can be selected; assign the other roles under “Members and roles”.",
-    "roles": "Members and roles of {name}"
+    "parentGroup": "Parent group",
+    "noParentGroup": "none",
+    "parentGroupHint": "Members of this group automatically become members of all parent groups.",
+    "memberViaSubgroup": "via a sub group",
+    "refresh": "Reload",
+    "add": "New group",
+    "search": "Search groups",
+    "noMatch": "No group found.",
+    "empty": "There are no groups yet.",
+    "expand": "Expand sub groups of {name}",
+    "collapse": "Collapse sub groups of {name}",
+    "systemGroup": "System",
+    "saveFailed": "The group could not be saved: {message}",
+    "breadcrumbs": "Navigation",
+    "editGroup": "Edit group",
+    "subgroups": "Sub groups",
+    "noSubgroups": "none",
+    "oebfvRoleHint": "Lookups require the “Licence plate lookup” role in this group — membership alone is not enough.",
+    "dragHandle": "Move “{name}”",
+    "dropRoot": "Drop here: top level",
+    "dragHint": "Drag a group by its handle onto another group to place it there. Its members also become members of the new parent groups.",
+    "moved": "“{name}” is now below “{parent}”.",
+    "movedToRoot": "“{name}” is now at the top level.",
+    "moveFailed": "Moving failed: {message}",
+    "loading": "Loading groups"
   },
   "tokens": {
     "title": "API tokens",
@@ -3791,7 +3816,8 @@
       "gruppenadmin": "Group admin",
       "geraetemeister": "Equipment officer",
       "bekleidungswart": "Clothing officer",
-      "kostenersatz": "Cost recovery"
+      "kostenersatz": "Cost recovery",
+      "kennzeichenabfrage": "Licence plate lookup"
     }
   },
   "adminMcp": {
@@ -4852,7 +4878,7 @@
     "cancel": "Cancel",
     "explanationTitle": "What the roles allow",
     "explanationIntro": "Roles apply to this group only. A member can hold several roles and gets the permissions of all of them.",
-    "linkHint": "Equipment officers, clothing officers and cost recovery are assigned per group under “Members and roles”.",
+    "linkHint": "Equipment officers, clothing officers, cost recovery and licence plate lookup are assigned per group under “Members and roles”.",
     "linkAction": "Assign roles",
     "roles": {
       "gruppenadmin": {
@@ -4870,6 +4896,10 @@
       "kostenersatz": {
         "name": "Cost recovery",
         "description": "Creates cost recovery calculations for the group's operations and the billing of cylinder fillings."
+      },
+      "kennzeichenabfrage": {
+        "name": "Licence plate lookup",
+        "description": "Looks up vehicle and owner data at the ÖBFV, using this group's token."
       }
     },
     "permissions": {
@@ -4894,6 +4924,9 @@
       },
       "rollen": {
         "assign": "Assign roles"
+      },
+      "kennzeichen": {
+        "query": "Look up licence plates"
       }
     },
     "errors": {
@@ -4903,7 +4936,8 @@
       "unknownUser": "The user does not exist.",
       "firecallGuest": "Operation guests cannot become members.",
       "notMigrated": "This user has not been migrated yet and still has the old cost recovery flag. Run step 2 under “Permissions (migration)” first — that is where you choose the groups in which they keep cost recovery.",
-      "unknown": "That did not work: {message}"
+      "unknown": "That did not work: {message}",
+      "memberOfSubgroup": "The user is a member of a sub group and therefore of this group too. Remove them from the sub group first."
     }
   },
   "mapSelection": {

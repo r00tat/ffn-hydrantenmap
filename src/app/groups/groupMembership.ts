@@ -1,4 +1,9 @@
 import { isFirecallGuest } from '../../common/firecallGuest';
+import {
+  descendantGroupIds,
+  planAncestorMemberships,
+  type HierarchyGroup,
+} from '../../common/groupHierarchy';
 import type { RoleId } from '../../common/permissions';
 import {
   effectiveGroupRoles,
@@ -75,4 +80,52 @@ export function planGroupRoleChanges(
     }
   }
   return result;
+}
+
+function memberGroupIdsOf(user: UserRolesSource): string[] {
+  return Object.keys(effectiveGroupRoles(user));
+}
+
+/**
+ * Benutzer, die über eine Untergruppe Mitglied von `groupId` sein müssen. Im
+ * Gruppendialog sind sie angehakt und gesperrt; die Server Action behält sie
+ * als Mitglieder, auch wenn der Client sie nicht mitschickt.
+ */
+export function inheritedMemberIds(
+  groupId: string,
+  users: UserDoc[],
+  groups: HierarchyGroup[],
+): string[] {
+  const descendants = new Set(descendantGroupIds(groupId, groups));
+  if (!descendants.size) return [];
+  return users
+    .filter(
+      ({ data }) =>
+        !isFirecallGuest(data) &&
+        memberGroupIdsOf(data).some((id) => descendants.has(id)),
+    )
+    .map(({ id }) => id);
+}
+
+/**
+ * Die Elterngruppen, die nach `changes` je Benutzer noch fehlen. Benutzer aus
+ * `skip` (nicht migriert) und Einsatz-Gäste bleiben außen vor.
+ */
+export function planAncestorChanges(
+  users: UserDoc[],
+  changes: GroupRoleChange[],
+  groups: HierarchyGroup[],
+  skip: Set<string> = new Set(),
+): { uid: string; groupIds: string[] }[] {
+  const changeByUid = new Map(changes.map((c) => [c.uid, c.change]));
+  const memberships = users
+    .filter(({ id, data }) => !skip.has(id) && !isFirecallGuest(data))
+    .map(({ id, data }) => {
+      const groupIds = new Set(memberGroupIdsOf(data));
+      const change = changeByUid.get(id);
+      if (change?.kind === 'addMember') groupIds.add(change.groupId);
+      if (change?.kind === 'removeMember') groupIds.delete(change.groupId);
+      return { uid: id, groupIds: [...groupIds] };
+    });
+  return planAncestorMemberships(memberships, groups);
 }
