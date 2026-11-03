@@ -236,6 +236,23 @@ Füllstation kommt, sagt nichts darüber, ob das Gerät fest steht oder auf dem
 Anhänger liegt. Fehlt das Wort, bleibt der Standort offen und wird im
 Gerätedialog gesetzt, statt beim Import geraten zu werden.
 
+### Exporte ohne Klassenspalten
+
+Der Flaschenexport des Bezirks (588 Zeilen) hat **gar keine** Klassenspalten.
+Davor wurde dort jede Zeile Zubehör — und damit fehlte jede Flasche in der
+Flaschenauswahl des Füllprotokolls und im Scanner, die beide nur `typ:
+'flasche'` durchsuchen. Gibt keine Klasse den Typ her, liest
+`typAusKlassen()` ihn deshalb aus der Bezeichnung: „Atem-/Arbeits-/Druck-/
+Pressluftflasche" → Flasche, „…maske" → Maske, „Pressluftatmer" /
+„Atemschutzgerät" → Pressluftatmer, „Atemluftfüllstation" /
+„Atemluftkompressor" → Füllstation. Jedes Muster muss am Wortende stehen —
+„Atemluftflaschenventil" und „Maskentasche" bleiben Zubehör. Eine gesetzte
+Klasse geht immer vor.
+
+Bereits falsch eingeordnete Bestände korrigiert ein erneuter Import derselben
+Datei: Der Abgleich trifft die Zeilen über Sybos-ID bzw. Inventar-Nr., und das
+Aktualisieren schreibt `typ` mit.
+
 ### Inaktive Artikel werden übersprungen
 
 Eine Zeile mit `Status: inaktiv` wird gar nicht erst übernommen — für jeden
