@@ -177,7 +177,7 @@ const startGpsRecording = useCallback(async (lId: string, rate: SampleRateSpec) 
     }
   }, [gpsRecorder, isPositionSet, mode, position]);
 
-  // „Beenden"-Action der FGS-Notification: stoppt eine laufende
+  // „Tracking beenden" der FGS-Notification: stoppt eine laufende
   // GPS-/Radiacode-Aufzeichnung über den regulären stopRecording()-Pfad.
   useNotificationStopListener(() => {
     if (mode !== null || isRadiacodeTracking || isGpsTracking) {

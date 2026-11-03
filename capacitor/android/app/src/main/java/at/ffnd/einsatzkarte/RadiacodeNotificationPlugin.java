@@ -329,12 +329,17 @@ public class RadiacodeNotificationPlugin extends Plugin {
         }
     }
 
-    static void onStopRequested() {
+    /**
+     * Meldet „Tracking beenden" an JS.
+     *
+     * @return false, wenn kein Plugin (also kein WebView) das Event hören kann.
+     */
+    static boolean onStopRequested() {
         RadiacodeNotificationPlugin i = instance;
         Log.i(TAG, "onStopRequested hasInstance=" + (i != null));
-        if (i != null) {
-            i.notifyListeners("stopRequested", new JSObject());
-        }
+        if (i == null) return false;
+        i.notifyListeners("stopRequested", new JSObject());
+        return true;
     }
 
     public static void emitMeasurement(Measurement m) {
