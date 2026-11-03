@@ -78,6 +78,56 @@ describe('typAusKlassen', () => {
     expect(typAusKlassen({ klasse2: 'Pressluftatmer' })).toBe('zubehoer');
   });
 
+  it('nimmt ohne Klassenspalten den Typ aus der Bezeichnung', () => {
+    // Der Flaschenexport für den Bezirk hat gar keine Klassenspalten — ohne
+    // diesen Rückfall wurde jede Flasche Zubehör und fehlte im Füllprotokoll.
+    expect(
+      typAusKlassen({ bezeichnung: 'Atemluftflasche Stahl 6 l' }),
+    ).toBe('flasche');
+    expect(
+      typAusKlassen({ bezeichnung: '038.Atemluftflasche Stahl 6 l' }),
+    ).toBe('flasche');
+    expect(
+      typAusKlassen({ bezeichnung: 'Atemluftflasche Stahl 6 l - 2.24.15' }),
+    ).toBe('flasche');
+    // Arbeitsluft wird an derselben Füllstation gefüllt.
+    expect(
+      typAusKlassen({ bezeichnung: '013.Arbeitsluftflasche Stahl 4L' }),
+    ).toBe('flasche');
+    expect(
+      typAusKlassen({ bezeichnung: 'Vollatemmaske Normaldruck 2-8' }),
+    ).toBe('maske');
+    expect(typAusKlassen({ bezeichnung: 'Pressluftatmer PSS 5000' })).toBe(
+      'pressluftatmer',
+    );
+    expect(
+      typAusKlassen({ bezeichnung: 'Atemluftkompressor Mobil' }),
+    ).toBe('fuellstation');
+  });
+
+  it('lässt Zubehör mit ähnlichem Namen Zubehör bleiben', () => {
+    expect(typAusKlassen({ bezeichnung: 'Lungenautomat' })).toBe('zubehoer');
+    expect(
+      typAusKlassen({ bezeichnung: 'Lungenautomat mit Atemluftschlauch' }),
+    ).toBe('zubehoer');
+    expect(typAusKlassen({ bezeichnung: 'ATS-Filter - KRF-S' })).toBe(
+      'zubehoer',
+    );
+    expect(
+      typAusKlassen({ bezeichnung: 'Atemluftflaschenventil' }),
+    ).toBe('zubehoer');
+    expect(typAusKlassen({ bezeichnung: 'Maskentasche' })).toBe('zubehoer');
+  });
+
+  it('lässt eine gesetzte Klasse vor der Bezeichnung gehen', () => {
+    expect(
+      typAusKlassen({
+        klasse3: 'Zubehör',
+        bezeichnung: 'Atemluftflasche Stahl 6 l',
+      }),
+    ).toBe('zubehoer');
+  });
+
   it('ignoriert Groß-/Kleinschreibung und Randleerzeichen', () => {
     expect(typAusKlassen({ klasse3: '  atemluftflasche ' })).toBe('flasche');
     expect(typAusKlassen({ klasse1: ' ATEMLUFTERZEUGUNG ' })).toBe(
@@ -156,6 +206,23 @@ describe('parseBarcodes', () => {
 });
 
 describe('rowsToGeraete', () => {
+  it('erkennt Flaschen in einem Export ohne Klassenspalten', () => {
+    // Kopfzeile wie im Bezirksexport der Flaschen: keine Klasse, kein Status.
+    const geraete = rowsToGeraete([
+      ['ID', 'Bezeichnung', 'Inventar-Nr.', 'Zusatz-Inventar-Nr.', 'Dienststelle'],
+      ['', 'Atemluftflasche Stahl 6 l', '2018-FL-004', '2.18.4', 'Neusiedl am See'],
+      ['', 'Lungenautomat', '2018-LA-001', '', 'Neusiedl am See'],
+    ]);
+    expect(geraete[0]).toMatchObject({
+      typ: 'flasche',
+      inventarNr: '2018-FL-004',
+      nummer: '2.18.4',
+      volumenLiter: 6,
+      nenndruck: 300,
+    });
+    expect(geraete[1].typ).toBe('zubehoer');
+  });
+
   it('bildet eine vollständige Zeile ab', () => {
     const [geraet] = rowsToGeraete([
       KOPF,

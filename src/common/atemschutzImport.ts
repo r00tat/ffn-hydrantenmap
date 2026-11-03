@@ -82,6 +82,29 @@ function klassenSchluessel(wert?: string): string {
 }
 
 /**
+ * Der Typ aus dem Klartext der Bezeichnung — der Rückfall für einen Export
+ * ohne Klassenspalten.
+ *
+ * Jedes Muster endet mit einem Lookahead gegen weitere Buchstaben: Ein
+ * „Atemluftflaschenventil" oder eine „Maskentasche" sind Zubehör, keine
+ * Flasche bzw. Maske. Ein Präfix wie `038.` vor der Bezeichnung stört nicht,
+ * weil vorne keine Wortgrenze verlangt wird.
+ */
+const BEZEICHNUNG_TYP: [RegExp, AtemschutzGeraetTyp][] = [
+  [/(?:atemluft|arbeitsluft|druckluft|pressluft)flasche(?![a-zäöüß])/i, 'flasche'],
+  [/maske(?![a-zäöüß])/i, 'maske'],
+  [/(?:pressluftatmer|atemschutzger(?:ä|ae)t)(?![a-zäöüß])/i, 'pressluftatmer'],
+  [/(?:atemluftf(?:ü|ue)llstation|atemluftkompressor)(?![a-zäöüß])/i, 'fuellstation'],
+];
+
+function typAusBezeichnung(
+  bezeichnung?: string,
+): AtemschutzGeraetTyp | undefined {
+  const text = bezeichnung ?? '';
+  return BEZEICHNUNG_TYP.find(([muster]) => muster.test(text))?.[1];
+}
+
+/**
  * Die Klassenspalten des Exports auf den Typ.
  *
  * Klasse 3 entscheidet zuerst und allein über die Gerätetypen: Im Geräteexport
@@ -90,14 +113,21 @@ function klassenSchluessel(wert?: string): string {
  * Erst wenn Klasse 3 nichts hergibt, zählen die gröberen Klassen, und dort nur
  * die Atemlufterzeugung.
  *
- * Alles Übrige wird Zubehör: 33 der 214 Zeilen haben keine Klasse 3, und eine
- * leere Zeile stillschweigend zur Flasche zu machen wäre die gefährlichere
- * Annahme — eine Flasche taucht im Füllprotokoll auf.
+ * Danach entscheidet die Bezeichnung. Ein Export kann ganz ohne
+ * Klassenspalten kommen — der Flaschenexport des Bezirks hat keine —, und
+ * dann wurde jede „Atemluftflasche Stahl 6 l" Zubehör und fehlte in
+ * Füllprotokoll und Scanner. Die Muster sind eng gefasst: Nur eine Zeile, die
+ * sich selbst Flasche nennt, wird Flasche.
+ *
+ * Alles Übrige wird Zubehör: Eine unbekannte Zeile stillschweigend zur
+ * Flasche zu machen wäre die gefährlichere Annahme — eine Flasche taucht im
+ * Füllprotokoll auf.
  */
 export function typAusKlassen(klassen: {
   klasse1?: string;
   klasse2?: string;
   klasse3?: string;
+  bezeichnung?: string;
 }): AtemschutzGeraetTyp {
   const ausKlasse3 = KLASSE_TYP[klassenSchluessel(klassen.klasse3)];
   if (ausKlasse3) return ausKlasse3;
@@ -107,7 +137,7 @@ export function typAusKlassen(klassen: {
   ) {
     return 'fuellstation';
   }
-  return 'zubehoer';
+  return typAusBezeichnung(klassen.bezeichnung) ?? 'zubehoer';
 }
 
 /**
@@ -225,6 +255,7 @@ export function rowsToGeraete(rows: string[][]): ImportGeraet[] {
       klasse1: feld(row, ARTIKEL_SPALTEN.klasse1),
       klasse2: feld(row, ARTIKEL_SPALTEN.klasse2),
       klasse3: feld(row, ARTIKEL_SPALTEN.klasse3),
+      bezeichnung,
     });
     const zusatzInventarNr = feld(row, ARTIKEL_SPALTEN.zusatzInventarNr);
     const seriennummer = feld(row, ARTIKEL_SPALTEN.seriennummer);
