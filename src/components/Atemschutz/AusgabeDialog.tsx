@@ -126,11 +126,7 @@ export default function AusgabeDialog({
       // Der Mangel zuerst: Schlägt er fehl, soll die Ausgabe nicht mit einem
       // „Mangel" dastehen, zu dem es keinen Eintrag in der Mängelliste gibt.
       if (istMangel) {
-        patch.mangelId = await saveAtemschutzMangel(
-          groupId,
-          geraet.id as string,
-          mangel,
-        );
+        patch.mangelId = await saveAtemschutzMangel(groupId, geraet, mangel);
       }
 
       await onConfirm(patch);

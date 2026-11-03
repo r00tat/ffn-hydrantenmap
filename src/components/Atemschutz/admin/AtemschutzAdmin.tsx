@@ -89,7 +89,9 @@ export default function AtemschutzAdmin() {
   );
   const canManage = !!groupId && can({ isAdmin, groupRoles }, groupId, 'gruppe.manage');
   // Die Geräteliste liest nur, wer sie auch sieht.
-  const { geraete, feuerwehren } = useAtemschutzGeraete(canManage ? groupId : undefined);
+  const { geraete, feuerwehren } = useAtemschutzGeraete(
+    canManage && groupId ? [groupId] : [],
+  );
   const visibleTabs = visibleAdminTabs({
     canManage,
     canBill: !!groupId && can({ isAdmin, groupRoles }, groupId, 'kostenersatz.use'),

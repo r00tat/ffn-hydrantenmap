@@ -17,7 +17,7 @@ import { firestore } from '../../server/firebase/admin';
 import { actionErrorKey } from '../Fahrtenbuch/actionErrorKey';
 import { actionGroupMemberRequired } from '../Fahrtenbuch/authGuards';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
-import { loadGeraete } from './atemschutzStammdaten';
+import { loadForeignGeraete, loadGeraete } from './atemschutzStammdaten';
 import {
   buildFuellprotokollExport,
   type FuellprotokollTranslate,
@@ -144,11 +144,14 @@ export async function exportFuellprotokollPdf(
       .filter((f) => !zweck || zweckOf(f) === zweck)
       .filter((f) => !nurVerrechnen || f.verrechnen);
 
-    const [groupName, geraete, t] = await Promise.all([
+    const [groupName, eigene, fremde, t] = await Promise.all([
       loadGroupName(groupId),
       loadGeraete(groupId),
+      // Flaschen aus anderen Gruppen des Erfassers (siehe atemschutzsammelplatz.md).
+      loadForeignGeraete(groupId, gefiltert),
       getTranslations('atemschutz'),
     ]);
+    const geraete = [...eigene, ...fremde];
 
     // `t` ist über den Katalog typisiert; das Modell arbeitet mit freien
     // Schlüsseln, damit es ohne next-intl testbar bleibt.
@@ -229,6 +232,7 @@ export type FuellungAdminPatch = Partial<
 
 const ERLAUBTE_PATCH_FELDER = new Set<string>([
   'geraetId',
+  'geraetGroupId',
   'flaschenNummer',
   'feuerwehr',
   'anzahl',

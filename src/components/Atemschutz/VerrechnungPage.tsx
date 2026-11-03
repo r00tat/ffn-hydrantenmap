@@ -37,7 +37,9 @@ import { stammdatenLuecken } from '../../common/groupStammdaten';
 import { formatCurrency } from '../../common/kostenersatz';
 import useAtemschutzEmpfaenger from '../../hooks/useAtemschutzEmpfaenger';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
-import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
+import useAtemschutzGeraete, {
+  useAtemschutzSearchGroupIds,
+} from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzRechnungConfig from '../../hooks/useAtemschutzRechnungConfig';
 import useAtemschutzRechnungen from '../../hooks/useAtemschutzRechnungen';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
@@ -90,7 +92,9 @@ export default function VerrechnungPage() {
   const rechnungen = useAtemschutzRechnungen(groupId);
   const empfaenger = useAtemschutzEmpfaenger(groupId);
   const config = useAtemschutzRechnungConfig(groupId);
-  const { geraeteById, feuerwehren } = useAtemschutzGeraete(groupId);
+  const { geraeteById, feuerwehren } = useAtemschutzGeraete(
+    useAtemschutzSearchGroupIds(groupId),
+  );
   const feuerwehrName = useGroupFeuerwehrName(groupId);
   const stammdaten = useGroupStammdaten(groupId);
   const { rates } = useKostenersatzRates();

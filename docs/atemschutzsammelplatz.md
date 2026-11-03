@@ -271,6 +271,45 @@ Unbekannte oder leere Statuswerte werden importiert. Der Export kennt nur
 „aktiv" und „inaktiv"; an einem unerwarteten Wert stillschweigend Bestand zu
 verlieren wäre der schlechtere Ausgang.
 
+## Flaschensuche über alle Gruppen des Benutzers
+
+Die Ausrüstung liegt je Gruppe unter `groups/{groupId}/atemschutzGeraet`,
+gesucht wird aber nicht nur in einer Gruppe. Sammelplatz, Atemschutzüberwachung,
+Füllprotokoll, Verrechnung und Sybos-Übertrag laden die Geräte aus der
+**Arbeitsgruppe** (Gruppe des Einsatzes bzw. die im Füllprotokoll gewählte)
+und aus jeder weiteren Gruppe, in der der Benutzer Mitglied ist
+(`atemschutzSearchGroupIds`). Ein Einsatz unter „Bezirk ND“ findet so die in
+FFND importierten Flaschen, weil FFND-Mitglieder auch im Bezirk sind — ohne
+zweiten Import und ohne doppelten Bestand. Die Geräteverwaltung unter `/admin`
+bleibt bei genau einer Gruppe.
+
+- **Abfragen:** ein Listener je Gruppe (`useGroupsCollection`), im Client
+  zusammengeführt. Jeder Listener erfüllt für sich `member(groupId)`; die Regeln
+  bleiben unverändert. Eine Collection-Group-Abfrage hätte ein gespeichertes
+  `groupId` in jedem Dokument, eine Regel auf `resource.data` und einen eigenen
+  Index gebraucht. Der Offline-Cache wird für alle Gruppen des Benutzers
+  vorgewärmt (`warmGroupCache`).
+- **Herkunft am Gerät:** `groupId` am `AtemschutzGeraet` wird beim Laden aus dem
+  Pfad gesetzt und nie gespeichert. Die Geräte-IDs sind Auto-IDs und über
+  Gruppen eindeutig, Verweise (`geraetId` an Füllung, Trupp, Ausgabe) brauchen
+  deshalb keine Gruppe.
+- **Wohin geschrieben wird:** Die Füllung in die Arbeitsgruppe — ins
+  Füllprotokoll des Einsatzes bzw. der gewählten Gruppe. Ein **Mangel** dagegen
+  in die Gruppe des Geräts (`saveAtemschutzMangel`): Dort arbeitet der
+  Gerätemeister die Liste ab, und nur dort findet `createAtemschutzMangel` das
+  Gerät. Die offenen Mängel am Sammelplatz kommen deshalb ebenfalls aus allen
+  Suchgruppen (`useAtemschutzOpenMangel`).
+- **Herkunft an der Füllung:** Die Füllung speichert neben `geraetId` die
+  Gruppe der Flasche als `geraetGroupId`. Der Server kennt die Suchgruppen des
+  Erfassers nicht; PDF-Export und Rechnung laden deshalb den Bestand der
+  eigenen Gruppe und lesen die übrigen Flaschen gezielt per Pfad nach
+  (`loadForeignGeraete`, in der Rechnung innerhalb der Transaktion). Das
+  geschieht mit dem Admin SDK, also auch aus einer Gruppe, in der der Aufrufer
+  kein Mitglied ist — vertretbar, weil der Verweis an einer Füllung seiner
+  Gruppe steht, nur Kennung und Volumen verwendet werden und eine Auto-ID
+  nicht zu erraten ist. Fehlt `geraetGroupId` (alle älteren Zeilen), gilt die
+  Gruppe des Füllprotokolls.
+
 ## Warum das Füllprotokoll unter der Gruppe liegt
 
 Trupps und Ausrüstungsausgabe hängen am Einsatz — sie beginnen mit ihm und

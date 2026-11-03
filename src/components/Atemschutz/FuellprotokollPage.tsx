@@ -27,7 +27,9 @@ import {
 } from '../../common/atemschutz';
 import { buildFuellprotokollCsv, fuellungCsvZeile } from '../../common/fuellprotokollCsv';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
-import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
+import useAtemschutzGeraete, {
+  useAtemschutzSearchGroupIds,
+} from '../../hooks/useAtemschutzGeraete';
 import useFahrtenbuchFirecalls from '../../hooks/useFahrtenbuchFirecalls';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
@@ -101,7 +103,9 @@ export default function FuellprotokollPage() {
 
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const eigeneFeuerwehr = useGroupFeuerwehrName(groupId);
-  const { flaschen, fuellstationen, feuerwehren } = useAtemschutzGeraete(groupId);
+  const { flaschen, fuellstationen, feuerwehren } = useAtemschutzGeraete(
+    useAtemschutzSearchGroupIds(groupId),
+  );
   const firecalls = useFahrtenbuchFirecalls(groupId);
 
   const istGruppenAdmin = useCan(groupId, 'gruppe.manage');

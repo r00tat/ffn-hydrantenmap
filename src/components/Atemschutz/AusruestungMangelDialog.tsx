@@ -50,11 +50,7 @@ export default function AusruestungMangelDialog({
     setBusy(true);
     setFehler(undefined);
     try {
-      const mangelId = await saveAtemschutzMangel(
-        groupId,
-        geraet.id as string,
-        eingabe,
-      );
+      const mangelId = await saveAtemschutzMangel(groupId, geraet, eingabe);
       await onSaved(mangelId);
       onClose();
     } catch (err) {

@@ -29,6 +29,7 @@ import { loadStammdatenLogo } from '../../server/groups/stammdatenStore';
 import { buildMailMessage } from '../../server/mail/buildMailMessage';
 import { mailSender, sendRawMail } from '../../server/mail/sendRawMail';
 import { actionErrorKey } from '../Fahrtenbuch/actionErrorKey';
+import { loadForeignGeraete } from './atemschutzStammdaten';
 import FuellungRechnungPdf from './FuellungRechnungPdf';
 import {
   empfaengerRef,
@@ -133,16 +134,31 @@ export async function createFuellungRechnung(
       );
       const configDoc = await tx.get(rechnungConfigRef(groupId));
 
-      const eingaben: PositionEingabe[] = [];
-      fuellungDocs.forEach((doc, index) => {
+      const fuellungen = fuellungDocs.map((doc) => {
         if (!doc.exists) throw new Error('rechnungFuellungGone');
         const fuellung = { id: doc.id, ...doc.data() } as AtemschutzFuellung;
         if (!fuellung.verrechnen || fuellung.rechnungId) {
           throw new Error('rechnungFuellungTaken');
         }
+        return fuellung;
+      });
+      // Flaschen aus anderen Gruppen kennt `loadVolumen(groupId)` nicht; sie
+      // werden in derselben Transaktion gezielt gelesen, vor jedem Schreiben.
+      const fremde = await loadForeignGeraete(groupId, fuellungen, (...refs) =>
+        tx.getAll(...refs),
+      );
+      const volumenAlle = { ...volumen };
+      for (const geraet of fremde) {
+        if (geraet.id && typeof geraet.volumenLiter === 'number') {
+          volumenAlle[geraet.id] = geraet.volumenLiter;
+        }
+      }
+
+      const eingaben: PositionEingabe[] = [];
+      fuellungen.forEach((fuellung, index) => {
         eingaben.push({
           fuellung,
-          volumenLiter: fuellung.geraetId ? volumen[fuellung.geraetId] : undefined,
+          volumenLiter: fuellung.geraetId ? volumenAlle[fuellung.geraetId] : undefined,
           tarifId: FUELLUNG_TARIF_IDS.includes(positionen[index].tarifId ?? '')
             ? positionen[index].tarifId
             : undefined,

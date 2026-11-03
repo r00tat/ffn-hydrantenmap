@@ -81,6 +81,13 @@ export const DEFAULT_SICHTKONTROLLE: Sichtkontrolle = 'ok';
 
 export interface AtemschutzGeraet {
   id?: string;
+  /**
+   * Die Gruppe, der das Gerät gehört — **nicht gespeichert**, sondern beim
+   * Laden aus dem Pfad gesetzt (`useAtemschutzGeraete`). Die Suche reicht über
+   * alle Gruppen des Benutzers; ein Mangel gehört in die Gruppe des Geräts,
+   * nicht in die des Einsatzes.
+   */
+  groupId?: string;
   typ: AtemschutzGeraetTyp;
   /** Klartext aus dem Export, z.B. "Atemluftflasche CFK 6,8 l". */
   bezeichnung: string;
@@ -122,6 +129,13 @@ export interface AtemschutzFuellung {
   id?: string;
   /** Verweis in die Stammdaten, wenn die Flasche erkannt wurde. */
   geraetId?: string;
+  /**
+   * Gruppe der erkannten Flasche, wenn sie nicht die des Füllprotokolls ist
+   * oder sein muss: Die Suche reicht über alle Gruppen des Benutzers, und der
+   * Server (Export, Rechnung) schlägt die Flasche damit gezielt nach. Fehlt sie,
+   * gilt die Gruppe des Füllprotokolls — so lesen sich alle älteren Zeilen.
+   */
+  geraetGroupId?: string;
   flaschenNummer?: string;
   feuerwehr?: string;
   /** 1 im Regelfall; >1 ist die Sammelerfassung ohne Nummern. */
@@ -830,6 +844,8 @@ export function geraetDetails(
 /** Die Eingabe des Dialogs. Systemfelder stehen bewusst nicht darin. */
 export interface FuellungInput {
   geraetId?: string;
+  /** Gruppe der gewählten Flasche (`AtemschutzGeraet.groupId`). */
+  geraetGroupId?: string;
   flaschenNummer?: string;
   feuerwehr?: string;
   anzahl: number;
