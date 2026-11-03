@@ -21,7 +21,6 @@ import {
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecall, useFirecallId } from '../../hooks/useFirecall';
 import { useLiveLocationShare } from '../../hooks/useLiveLocationShare';
-import { useNotificationStopListener } from '../../hooks/radiacode/useNotificationStopListener';
 import {
   LiveLocationSettings,
   useLiveLocationSettings,
@@ -230,14 +229,6 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
       void start();
     });
   }, [uid, firecallId, start]);
-
-  // „Beenden"-Action der FGS-Notification: beendet das Live-Standort-Teilen
-  // über den regulären stop()-Pfad (hält den React-Status synchron).
-  useNotificationStopListener(() => {
-    if (isSharing) {
-      void stop();
-    }
-  });
 
   const canShare = isPositionSet && !!uid && firecallId !== 'unknown';
 

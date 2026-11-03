@@ -40,9 +40,25 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
+
+    /** Die laufende Activity, damit „App beenden" der Notification sie schließen kann. */
+    private static WeakReference<MainActivity> runningInstance = new WeakReference<>(null);
+
+    /**
+     * Schließt die App samt Eintrag in den letzten Apps. Aufgerufen vom
+     * Foreground-Service (Main-Thread), wenn „App beenden" angetippt wurde.
+     * Läuft keine Activity mehr, ist nichts zu tun.
+     */
+    static void finishRunningInstance() {
+        MainActivity activity = runningInstance.get();
+        if (activity != null && !activity.isFinishing()) {
+            activity.finishAndRemoveTask();
+        }
+    }
     private boolean errorDialogShown = false;
     private boolean allowInsecureSsl = false;
     private SwipeRefreshLayout swipeRefreshLayout = null;
@@ -90,6 +106,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppPermissionsPlugin.class);
 
         super.onCreate(savedInstanceState);
+        runningInstance = new WeakReference<>(this);
 
         // Force edge-to-edge
         Window window = getWindow();
