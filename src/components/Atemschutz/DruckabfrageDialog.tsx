@@ -17,6 +17,7 @@ import {
   truppLabel,
   validateDruckabfrage,
   type AtemschutzTrupp,
+  type Druckabfrage,
   type DruckabfrageInput,
 } from '../../common/atemschutz';
 import { fromLocalInput, toLocalInput } from '../../common/zeitEingabe';
@@ -47,8 +48,17 @@ export interface DruckabfrageDialogProps {
    * beendet die Warnungen, und das darf nicht aus Versehen passieren.
    */
   rueckzugGemeldet: boolean;
+  /**
+   * Eine schon erfasste Meldung, die korrigiert wird. Dann sind die Felder
+   * vorbelegt, Ankunft und Rückzug stehen zur Wahl, wenn **diese** Meldung
+   * sie trägt, und das Tagebuch bleibt unberührt — ein Eintrag dort ist
+   * geschrieben und wird nicht nachgezogen.
+   */
+  abfrage?: Druckabfrage;
   onClose: () => void;
   onSave: (input: DruckabfrageInput) => Promise<void>;
+  /** Nur beim Bearbeiten: die Meldung entfernen. */
+  onDelete?: () => Promise<void>;
 }
 
 /**
@@ -63,22 +73,34 @@ export default function DruckabfrageDialog({
   trupp,
   zielMeldungFehlt,
   rueckzugGemeldet,
+  abfrage,
   onClose,
   onSave,
+  onDelete,
 }: DruckabfrageDialogProps) {
+  const isEdit = !!abfrage;
+  // Beim Bearbeiten trägt womöglich genau diese Meldung die Ankunft oder den
+  // Rückzug — dann muss der Haken da sein, sonst ließe sich ein versehentlich
+  // gesetztes Ereignis nicht zurücknehmen.
+  const showZiel = zielMeldungFehlt || !!abfrage?.amZiel;
+  const showRueckzug = !rueckzugGemeldet || !!abfrage?.rueckzug;
   const t = useTranslations('atemschutz');
   const tCommon = useTranslations('common');
 
-  const [druck, setDruck] = useState('');
+  const [druck, setDruck] = useState(
+    typeof abfrage?.druck === 'number' ? String(abfrage.druck) : '',
+  );
   // Nie vorbelegt: Beides ist ein Ereignis *dieser* Meldung. Was schon
   // gemeldet ist, wird gar nicht erst angeboten — s. `zielMeldungFehlt`.
-  const [amZiel, setAmZiel] = useState(false);
-  const [rueckzug, setRueckzug] = useState(false);
-  const [bemerkung, setBemerkung] = useState('');
+  const [amZiel, setAmZiel] = useState(!!abfrage?.amZiel);
+  const [rueckzug, setRueckzug] = useState(!!abfrage?.rueckzug);
+  const [bemerkung, setBemerkung] = useState(abfrage?.bemerkung ?? '');
   // Vorbelegt mit jetzt, aber änderbar: Die Meldung kommt über Funk und wird
   // eine Minute später eingetippt — mit dem Erfassungszeitpunkt gerechnet,
   // sähe der Verbrauch zu niedrig aus.
-  const [zeit, setZeit] = useState(() => toLocalInput(new Date()));
+  const [zeit, setZeit] = useState(() =>
+    toLocalInput(abfrage ? new Date(abfrage.zeitpunkt) : new Date()),
+  );
   /**
    * Ob die Zeit von Hand geändert wurde.
    *
@@ -97,6 +119,8 @@ export default function DruckabfrageDialog({
    */
   const [tagebuch, setTagebuch] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** Löschen fragt im Dialog nach — `confirm()` gibt es nicht überall. */
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const druckWert = druck.trim()
     ? Number(druck.trim().replace(',', '.'))
@@ -107,15 +131,16 @@ export default function DruckabfrageDialog({
   //
   // Ohne weitere Bedingung: Beide Haken gibt es nur, solange das Ereignis
   // noch nicht gemeldet ist — gesetzt heißt hier also immer „neu".
-  const zwingend = amZiel || rueckzug;
+  // Beim Bearbeiten entsteht kein Tagebucheintrag; der Haken entfällt.
+  const zwingend = !isEdit && (amZiel || rueckzug);
   const input: DruckabfrageInput = {
     druck: druckWert,
     amZiel,
     rueckzug,
     bemerkung,
-    tagebuch: tagebuch || zwingend,
+    tagebuch: !isEdit && (tagebuch || zwingend),
     // Ohne Änderung kein Zeitpunkt im Input — dann gilt der Moment des
-    // Speicherns, samt Sekunden.
+    // Speicherns, samt Sekunden; beim Bearbeiten der erfasste Zeitpunkt.
     ...(zeitGeaendert ? { zeitpunkt: fromLocalInput(zeit) } : {}),
   };
   const fehler = validateDruckabfrage(input);
@@ -130,9 +155,24 @@ export default function DruckabfrageDialog({
     }
   };
 
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setSaving(true);
+    try {
+      await onDelete();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{t('ueberwachung.druckabfrageTitle')}</DialogTitle>
+      <DialogTitle>
+        {isEdit
+          ? t('ueberwachung.meldungBearbeitenTitle')
+          : t('ueberwachung.druckabfrageTitle')}
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">
@@ -162,7 +202,7 @@ export default function DruckabfrageDialog({
           {/* Nur solange die Ankunft fehlt. Ist sie gemeldet, hat diese
               Abfrage dazu nichts zu sagen — und ein vorbelegter Haken schrieb
               sie an jede weitere Zeile. */}
-          {zielMeldungFehlt && (
+          {showZiel && (
             <>
               <FormControlLabel
                 control={
@@ -179,7 +219,7 @@ export default function DruckabfrageDialog({
               {/* Nicht mehr, sobald dieselbe Meldung den Rückzug trägt: Dann
                   ist die Ankunft nachzutragen zwecklos, der Trupp kommt
                   zurück. */}
-              {!amZiel && !rueckzug && (
+              {!isEdit && !amZiel && !rueckzug && (
                 <Alert severity="info">
                   {t('ueberwachung.amZielFehltHinweis')}
                 </Alert>
@@ -189,7 +229,7 @@ export default function DruckabfrageDialog({
           {/* Die Gegenmeldung zur Ankunft, ebenfalls nur einmal. Ungemeldet
               nicht vorbelegt: Sie beendet die Warnungen, und das darf nicht
               aus Versehen passieren. */}
-          {!rueckzugGemeldet && (
+          {showRueckzug && (
             <>
               <FormControlLabel
                 control={
@@ -213,21 +253,46 @@ export default function DruckabfrageDialog({
             value={bemerkung}
             onChange={(e) => setBemerkung(e.target.value)}
           />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={tagebuch || zwingend}
-                disabled={zwingend}
-                onChange={(e) => setTagebuch(e.target.checked)}
+          {isEdit ? (
+            <Typography variant="caption" color="text.secondary">
+              {t('ueberwachung.korrekturTagebuchHinweis')}
+            </Typography>
+          ) : (
+            <>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={tagebuch || zwingend}
+                    disabled={zwingend}
+                    onChange={(e) => setTagebuch(e.target.checked)}
+                  />
+                }
+                label={t('ueberwachung.tagebuch')}
               />
-            }
-            label={t('ueberwachung.tagebuch')}
-          />
-          <Typography variant="caption" color="text.secondary">
-            {zwingend
-              ? t('ueberwachung.tagebuchImmer')
-              : t('ueberwachung.tagebuchHint')}
-          </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {zwingend
+                  ? t('ueberwachung.tagebuchImmer')
+                  : t('ueberwachung.tagebuchHint')}
+              </Typography>
+            </>
+          )}
+          {confirmDelete && (
+            <Alert
+              severity="warning"
+              action={
+                <Button
+                  color="inherit"
+                  size="small"
+                  disabled={saving}
+                  onClick={handleDelete}
+                >
+                  {tCommon('delete')}
+                </Button>
+              }
+            >
+              {t('ueberwachung.meldungLoeschenBestaetigen')}
+            </Alert>
+          )}
           {/* Vorher an „Druck ist getippt" gehängt, weil der leere Dialog
               sonst sofort meckerte. Jetzt hat der Fehler einen anderen Sinn:
               `leereMeldung` heißt „hier steht gar nichts" und darf erst
@@ -246,6 +311,16 @@ export default function DruckabfrageDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
+        {isEdit && onDelete && (
+          <Button
+            color="error"
+            disabled={saving || confirmDelete}
+            onClick={() => setConfirmDelete(true)}
+            sx={{ mr: 'auto' }}
+          >
+            {t('ueberwachung.meldungLoeschen')}
+          </Button>
+        )}
         <Button onClick={onClose}>{tCommon('cancel')}</Button>
         <Button
           variant="contained"

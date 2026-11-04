@@ -90,7 +90,16 @@ export interface TruppPlanContext {
 
 export type TruppWrite =
   | { art: 'add'; data: NeueBereitstellung }
-  | { art: 'update'; truppId: string; patch: TruppPatch }
+  | {
+      art: 'update';
+      truppId: string;
+      patch: TruppPatch;
+      /**
+       * Eine Meldung, die zusätzlich angehängt wird — nur beim nachgereichten
+       * Abmarschdruck mit einer echten Notiz (`planReport`).
+       */
+      report?: Druckabfrage;
+    }
   | { art: 'abfrage'; abfrage: Druckabfrage };
 
 export type TruppPlan =
@@ -505,6 +514,81 @@ function planStatus(
   }
 }
 
+/**
+ * Wie lange nach dem Abmarsch eine Druckmeldung noch als Abmarschdruck gilt,
+ * wenn keiner erfasst ist. Zwei Minuten: Länger braucht das Nachsprechen des
+ * Drucks am Funk nicht, und eine Abfrage nach dieser Zeit ist ein Messwert.
+ */
+export const DEPARTURE_PRESSURE_WINDOW_MS = 2 * 60 * 1000;
+
+/** Nennt die Notiz den Abmarsch („Abmarschdruck 300", „beim Abmarsch")? */
+const DEPARTURE_NOTE = /abmarsch/i;
+
+/**
+ * Ob eine Druckmeldung eigentlich der Abmarschdruck ist.
+ *
+ * Der Assistent schickte einen Trupp hinein, ohne den gesagten Druck
+ * mitzugeben, und trug ihn danach als Druckabfrage samt Bemerkung
+ * „Abmarschdruck" ein. Damit fehlte der Abmarschdruck — und mit ihm die
+ * Grundlage der Prognose —, und im Verlauf stand eine Zeile, die keine Abfrage
+ * war. Die Werkzeugbeschreibung sagt es dem Modell; das hier fängt es ab, wenn
+ * es sich nicht daran hält.
+ *
+ * Nur wenn eindeutig: kein Abmarschdruck, noch keine Abfrage mit Druck, keine
+ * Ankunft oder Rückzug, und die Meldung liegt kurz nach dem Abmarsch oder
+ * nennt ihn.
+ */
+function isDeparturePressure(
+  trupp: AtemschutzTrupp,
+  cmd: Extract<TruppCommand, { kind: 'report' }>,
+  jetzt: string,
+): boolean {
+  if (typeof cmd.pressure !== 'number') return false;
+  if (cmd.atTarget || cmd.withdrawing) return false;
+  if (typeof trupp.druckAbmarsch === 'number') return false;
+  if (sortierteAbfragen(trupp).some((a) => typeof a.druck === 'number')) return false;
+  if (cmd.note && DEPARTURE_NOTE.test(cmd.note)) return true;
+  if (!trupp.abmarschZeit) return false;
+  const seitAbmarsch = Date.parse(jetzt) - Date.parse(trupp.abmarschZeit);
+  return (
+    Number.isFinite(seitAbmarsch) &&
+    seitAbmarsch >= 0 &&
+    seitAbmarsch <= DEPARTURE_PRESSURE_WINDOW_MS
+  );
+}
+
+/** Der nachgereichte Abmarschdruck als Update statt als Abfrage. */
+function planDeparturePressure(
+  trupp: AtemschutzTrupp,
+  cmd: Extract<TruppCommand, { kind: 'report' }>,
+  ctx: TruppPlanContext,
+): TruppPlan {
+  const name = sprechName(trupp);
+  const druck = cmd.pressure as number;
+  const note = cmd.note?.trim();
+  // Eine Notiz, die nur den Abmarsch wiedergibt, ist mit dem Feld erledigt;
+  // alles andere ist eine echte Meldung und bleibt erhalten.
+  const report =
+    note && !DEPARTURE_NOTE.test(note)
+      ? buildDruckabfrage({ bemerkung: note }, { uid: ctx.uid, jetzt: ctx.jetzt })
+      : undefined;
+  return {
+    ok: true,
+    message: `${name}: Abmarschdruck ${druck} bar eingetragen${report ? `, Notiz „${note}"` : ''}.`,
+    write: {
+      art: 'update',
+      truppId: trupp.id as string,
+      patch: { status: trupp.status, druckAbmarsch: druck },
+      ...(report ? { report } : {}),
+    },
+    trupp,
+    tagebuch: report && cmd.logToDiary ? ['meldung'] : [],
+    // Der Abmarschdruck ist die Grundlage der Prognose und der Fristen.
+    warnung: true,
+    push: false,
+  };
+}
+
 function planReport(
   cmd: Extract<TruppCommand, { kind: 'report' }>,
   ctx: TruppPlanContext,
@@ -523,6 +607,9 @@ function planReport(
   const note = cmd.note?.trim();
   if (cmd.pressure === undefined && !cmd.atTarget && !cmd.withdrawing && !note) {
     return { ok: false, message: `Was soll ich für ${name} eintragen?` };
+  }
+  if (!druckFehler(cmd.pressure) && isDeparturePressure(trupp, cmd, ctx.jetzt)) {
+    return planDeparturePressure(trupp, cmd, ctx);
   }
   if (!cmd.recordAnyway) {
     const auffaellig = pruefeMeldung(trupp, cmd);

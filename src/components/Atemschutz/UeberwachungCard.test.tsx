@@ -51,6 +51,8 @@ interface RenderOptionen {
   istAktuell?: boolean;
   onErneutEinsatz?: () => void;
   onAnSammelplatz?: () => void;
+  onEditAbfrage?: (abfrage: Druckabfrage) => void;
+  onEditEvent?: (event: 'abmarsch' | 'rueckkehr') => void;
   pendingSync?: boolean;
 }
 
@@ -62,6 +64,8 @@ function render(
     istAktuell = true,
     onErneutEinsatz = vi.fn(),
     onAnSammelplatz = vi.fn(),
+    onEditAbfrage,
+    onEditEvent,
     pendingSync,
   }: RenderOptionen = {},
 ) {
@@ -81,6 +85,8 @@ function render(
       onRueckkehr={vi.fn()}
       onErneutEinsatz={onErneutEinsatz}
       onAnSammelplatz={onAnSammelplatz}
+      onEditAbfrage={onEditAbfrage}
+      onEditEvent={onEditEvent}
       pendingSync={pendingSync}
     />,
   );
@@ -458,5 +464,39 @@ describe('UeberwachungCard: Ankunft und Rückzug sind Ereignisse', () => {
   it('zeigt ohne offene Änderung kein Synchronisations-Symbol', () => {
     render(trupp({ abfragen: [abfrage(5, 250)] }));
     expect(screen.queryByRole('img', { name: /Noch nicht übertragen/ })).toBeNull();
+  });
+});
+
+describe('UeberwachungCard — Zeilen bearbeiten', () => {
+  it('öffnet für jede Zeile des Druckverlaufs die Korrektur', () => {
+    const onEditAbfrage = vi.fn();
+    const onEditEvent = vi.fn();
+    const meldung = abfrage(5, 250);
+    render(
+      trupp({
+        status: 'zurueck',
+        abfragen: [meldung],
+        rueckkehrZeit: nachAbmarsch(20).toISOString(),
+        druckRueckkehr: 120,
+      }),
+      { jetzt: nachAbmarsch(21), onEditAbfrage, onEditEvent },
+    );
+    const buttons = screen.getAllByRole('button', { name: 'Zeile bearbeiten' });
+    expect(buttons).toHaveLength(3);
+    fireEvent.click(buttons[0]);
+    expect(onEditEvent).toHaveBeenCalledWith('abmarsch');
+    fireEvent.click(buttons[1]);
+    expect(onEditAbfrage).toHaveBeenCalledWith(meldung);
+    fireEvent.click(buttons[2]);
+    expect(onEditEvent).toHaveBeenCalledWith('rueckkehr');
+  });
+
+  it('bietet ohne Schreibrecht nichts zum Bearbeiten an', () => {
+    render(trupp({ abfragen: [abfrage(5, 250)] }), {
+      canWrite: false,
+      onEditAbfrage: vi.fn(),
+      onEditEvent: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: 'Zeile bearbeiten' })).not.toBeInTheDocument();
   });
 });

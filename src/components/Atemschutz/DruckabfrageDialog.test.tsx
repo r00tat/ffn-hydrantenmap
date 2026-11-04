@@ -211,3 +211,65 @@ describe('DruckabfrageDialog als Statusmeldung', () => {
     expect(tagebuchHaken()).not.toBeDisabled();
   });
 });
+
+describe('DruckabfrageDialog — bearbeiten', () => {
+  const abfrage = {
+    zeitpunkt: '2026-09-02T10:05:12.000Z',
+    druck: 280,
+    amZiel: true,
+    bemerkung: 'vertippt',
+    erfasstVon: 'u1',
+  };
+
+  function renderEdit() {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    renderWithIntl(
+      <DruckabfrageDialog
+        open
+        trupp={{ ...trupp, abfragen: [abfrage] }}
+        abfrage={abfrage}
+        // Die Ankunft ist mit genau dieser Meldung erfasst — der Haken muss
+        // trotzdem da sein, sonst ließe sie sich nicht zurücknehmen.
+        zielMeldungFehlt={false}
+        rueckzugGemeldet={false}
+        onClose={vi.fn()}
+        onSave={onSave}
+        onDelete={onDelete}
+      />,
+    );
+    return { onSave, onDelete };
+  }
+
+  it('belegt die Felder mit der erfassten Meldung vor', () => {
+    renderEdit();
+    expect(screen.getByText('Meldung bearbeiten')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Geringster Druck/)).toHaveValue(280);
+    expect(ankunftHaken()).toBeChecked();
+    expect(screen.getByLabelText('Bemerkung')).toHaveValue('vertippt');
+    // Das Tagebuch wird beim Korrigieren nicht angefasst.
+    expect(
+      screen.queryByRole('checkbox', { name: /Einsatztagebuch/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('speichert den korrigierten Druck und behält den Zeitpunkt samt Sekunden', async () => {
+    const { onSave } = renderEdit();
+    fireEvent.change(screen.getByLabelText(/Geringster Druck/), {
+      target: { value: '208' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({ druck: 208, amZiel: true });
+    expect(onSave.mock.calls[0][0].zeitpunkt).toBeUndefined();
+  });
+
+  it('löscht erst nach der Bestätigung im Dialog', async () => {
+    const { onDelete } = renderEdit();
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung löschen' }));
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByText('Diese Meldung wirklich löschen?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalled());
+  });
+});

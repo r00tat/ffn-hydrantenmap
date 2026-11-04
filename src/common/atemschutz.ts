@@ -313,6 +313,13 @@ export interface Druckabfrage {
   bemerkung?: string;
   /** Wer abgefragt hat — `uid`, für die Nachvollziehbarkeit. */
   erfasstVon?: string;
+  /**
+   * Wer die Meldung zuletzt korrigiert hat (`uid`) und wann. Ein vertippter
+   * Druck wird berichtigt statt stehengelassen; der Vermerk zeigt, dass die
+   * Zeile nicht mehr die ursprüngliche Erfassung ist.
+   */
+  editedBy?: string;
+  editedAt?: string;
 }
 
 /**
@@ -1786,6 +1793,72 @@ export function buildDruckabfrage(
   const uid = ctx.uid?.trim();
   if (uid) abfrage.erfasstVon = uid;
   return abfrage;
+}
+
+/**
+ * Eine erfasste Meldung korrigieren.
+ *
+ * Gebaut wie eine neue Meldung aus der Eingabe des Dialogs — was dort geleert
+ * wurde, fehlt danach. Bleiben: der ursprüngliche Zeitpunkt samt Sekunden,
+ * wenn er nicht geändert wurde, und der Erfasser. Dazu kommt der Vermerk, wer
+ * korrigiert hat.
+ */
+export function editDruckabfrage(
+  previous: Druckabfrage,
+  input: DruckabfrageInput,
+  ctx: { uid: string; jetzt: string },
+): Druckabfrage {
+  const next = buildDruckabfrage(
+    { ...input, zeitpunkt: input.zeitpunkt?.trim() || previous.zeitpunkt },
+    { uid: '', jetzt: ctx.jetzt },
+  );
+  if (previous.erfasstVon) next.erfasstVon = previous.erfasstVon;
+  const uid = ctx.uid?.trim();
+  if (uid) next.editedBy = uid;
+  next.editedAt = ctx.jetzt;
+  return next;
+}
+
+/** Abmarsch und Rückkehr — die zwei Zeilen des Verlaufs, die am Trupp stehen. */
+export type TruppEvent = 'abmarsch' | 'rueckkehr';
+
+/** Die Felder am Trupp-Dokument je Ereignis. */
+export const TRUPP_EVENT_FIELDS = {
+  abmarsch: { time: 'abmarschZeit', pressure: 'druckAbmarsch' },
+  rueckkehr: { time: 'rueckkehrZeit', pressure: 'druckRueckkehr' },
+} as const satisfies Record<TruppEvent, { time: keyof AtemschutzTrupp; pressure: keyof AtemschutzTrupp }>;
+
+export interface TruppEventInput {
+  zeitpunkt: string;
+  druck?: number;
+}
+
+/**
+ * Prüft die Korrektur von Abmarsch oder Rückkehr. Der Druck darf fehlen (wie
+ * beim Erfassen), die Zeit nicht — ohne Abmarschzeit läuft keine Uhr. Und die
+ * Rückkehr liegt nach dem Abmarsch: Eine vertauschte Zeit ergäbe eine negative
+ * Einsatzdauer.
+ */
+export function validateTruppEventEdit(
+  trupp: Pick<AtemschutzTrupp, 'abmarschZeit' | 'rueckkehrZeit'>,
+  event: TruppEvent,
+  input: TruppEventInput,
+): string[] {
+  if (input.druck != null) {
+    if (!Number.isFinite(input.druck) || input.druck < 0 || input.druck > MAX_DRUCK_BAR) {
+      return ['druckInvalid'];
+    }
+  }
+  const zeit = Date.parse(input.zeitpunkt);
+  if (!input.zeitpunkt?.trim() || !Number.isFinite(zeit)) return ['zeitInvalid'];
+  const other = Date.parse(
+    (event === 'abmarsch' ? trupp.rueckkehrZeit : trupp.abmarschZeit) ?? '',
+  );
+  if (Number.isFinite(other)) {
+    if (event === 'abmarsch' && zeit > other) return ['zeitReihenfolge'];
+    if (event === 'rueckkehr' && zeit < other) return ['zeitReihenfolge'];
+  }
+  return [];
 }
 
 /**

@@ -318,6 +318,98 @@ describe('planTruppCommand — Meldung', () => {
     expect(plan).toMatchObject({ ok: false, message: expect.stringContaining('nicht im Einsatz') });
   });
 
+  describe('Abmarschdruck nachgereicht', () => {
+    // Abmarsch eine Minute vor JETZT, ohne Druck — so hat der Assistent den
+    // Trupp hineingeschickt, bevor er den Druck als Meldung nachschob.
+    const ohneDruck = (overrides: Partial<AtemschutzTrupp> = {}) =>
+      imEinsatz({
+        abmarschZeit: '2026-09-23T09:59:00.000Z',
+        druckAbmarsch: undefined,
+        ...overrides,
+      });
+
+    it('schreibt den Druck kurz nach dem Abmarsch als Abmarschdruck', () => {
+      const plan = planTruppCommand(
+        { kind: 'report', trupp: 'Trupp 1', pressure: 300 },
+        ctx([ohneDruck()]),
+      );
+      expect(plan).toMatchObject({
+        ok: true,
+        warnung: true,
+        tagebuch: [],
+        write: { art: 'update', truppId: 'id-1', patch: { druckAbmarsch: 300 } },
+      });
+      expect(plan.ok && plan.message).toContain('Abmarschdruck');
+    });
+
+    it('lässt eine Bemerkung weg, die nur den Abmarschdruck wiedergibt', () => {
+      const plan = planTruppCommand(
+        { kind: 'report', trupp: 'Trupp 1', pressure: 300, note: 'Abmarschdruck 300 bar' },
+        ctx([ohneDruck()]),
+      );
+      expect(plan).toMatchObject({
+        ok: true,
+        write: { art: 'update', patch: { druckAbmarsch: 300 } },
+      });
+      expect((plan as { write: { patch: object } }).write.patch).not.toHaveProperty('bemerkung');
+    });
+
+    it('nimmt auch eine spätere Meldung, wenn sie den Abmarsch nennt', () => {
+      const plan = planTruppCommand(
+        { kind: 'report', trupp: 'Trupp 1', pressure: 290, note: 'Abmarsch' },
+        ctx([ohneDruck({ abmarschZeit: '2026-09-23T09:45:00.000Z' })]),
+      );
+      expect(plan).toMatchObject({ ok: true, write: { art: 'update', patch: { druckAbmarsch: 290 } } });
+    });
+
+    it('bleibt eine Druckabfrage, wenn der Abmarsch länger her ist', () => {
+      const plan = planTruppCommand(
+        { kind: 'report', trupp: 'Trupp 1', pressure: 250 },
+        ctx([ohneDruck({ abmarschZeit: '2026-09-23T09:45:00.000Z' })]),
+      );
+      expect(plan).toMatchObject({ ok: true, write: { art: 'abfrage' } });
+    });
+
+    it('bleibt eine Druckabfrage, wenn der Abmarschdruck schon steht', () => {
+      const plan = planTruppCommand(
+        { kind: 'report', trupp: 'Trupp 1', pressure: 290 },
+        ctx([ohneDruck({ druckAbmarsch: 300 })]),
+      );
+      expect(plan).toMatchObject({ ok: true, write: { art: 'abfrage' } });
+    });
+
+    it('bleibt eine Druckabfrage, wenn schon ein Druck abgefragt wurde', () => {
+      const plan = planTruppCommand(
+        { kind: 'report', trupp: 'Trupp 1', pressure: 280 },
+        ctx([ohneDruck({ abfragen: [{ zeitpunkt: '2026-09-23T09:59:30.000Z', druck: 290 }] })]),
+      );
+      expect(plan).toMatchObject({ ok: true, write: { art: 'abfrage' } });
+    });
+
+    it('bleibt eine Meldung bei Ankunft oder Rückzug', () => {
+      const plan = planTruppCommand(
+        { kind: 'report', trupp: 'Trupp 1', pressure: 280, atTarget: true },
+        ctx([ohneDruck()]),
+      );
+      expect(plan).toMatchObject({ ok: true, write: { art: 'abfrage' } });
+    });
+
+    it('behält eine echte Notiz als Meldung neben dem Abmarschdruck', () => {
+      const plan = planTruppCommand(
+        { kind: 'report', trupp: 'Trupp 1', pressure: 300, note: 'starke Verrauchung' },
+        ctx([ohneDruck()]),
+      );
+      expect(plan).toMatchObject({
+        ok: true,
+        write: {
+          art: 'update',
+          patch: { druckAbmarsch: 300 },
+          report: { bemerkung: 'starke Verrauchung' },
+        },
+      });
+    });
+  });
+
   describe('Plausibilität', () => {
     const letzte = imEinsatz({
       abfragen: [{ zeitpunkt: '2026-09-23T09:50:00.000Z', druck: 240 }],

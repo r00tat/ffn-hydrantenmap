@@ -431,7 +431,9 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
       '(zugeteilt), send it in under breathing apparatus (imEinsatz — this ' +
       'starts the time monitoring), bring it back (zurueck), make a returned ' +
       'team ready again (bereit) or sign it off (abgemeldet). A returned team ' +
-      'sent in again gets a new deployment row automatically.',
+      'sent in again gets a new deployment row automatically. When the team ' +
+      'is sent in and a pressure is spoken, pass it as pressure in this same ' +
+      'call — the departure pressure is never a separate report.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -455,7 +457,9 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
           type: SchemaType.NUMBER,
           description:
             'Lowest cylinder pressure in the team in bar, as spoken — at ' +
-            'handover, departure or return depending on the state',
+            'handover (zugeteilt), departure (imEinsatz, the Abmarschdruck) or ' +
+            'return (zurueck) depending on the state. Always include it when ' +
+            'spoken; do not record it afterwards with recordAtemschutzTruppReport',
         },
         mission: {
           type: SchemaType.STRING,
@@ -484,7 +488,9 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
       'Record a radio report of a breathing apparatus team in action: a ' +
       'pressure reading, arrival at the target, the start of the withdrawal ' +
       'or a note ("starke Verrauchung"). A report may carry any of these. ' +
-      'Only for teams in state imEinsatz.',
+      'Only for teams in state imEinsatz. Not for the departure pressure ' +
+      '(Abmarschdruck) or the return pressure — those belong to ' +
+      'setAtemschutzTruppStatus.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -1013,11 +1019,17 @@ Aktionen:
   das ist nur ein Marker für den Sammelplatz.
 - setAtemschutzTruppStatus: Trupp zuteilen, in den Einsatz schicken ("geht
   unter Atemschutz", "Abmarsch"), zurückholen ("ist zurück", "wieder
-  draußen"), wieder bereitstellen oder abmelden.
+  draußen"), wieder bereitstellen oder abmelden. Wird beim Hineinschicken
+  ein Druck genannt ("Trupp 1 geht rein mit 300 bar", "Abmarschdruck 290"),
+  gehört er als pressure in DENSELBEN setAtemschutzTruppStatus-Aufruf. Der
+  Abmarschdruck ist KEINE Druckabfrage und KEINE Notiz - danach nicht noch
+  recordAtemschutzTruppReport aufrufen.
 - recordAtemschutzTruppReport: Druckabfrage oder Meldung eines Trupps im
   Einsatz ("Trupp 1 hat 210 bar", "am Ziel", "treten den Rückzug an",
   "starke Verrauchung"). Eine Notiz zum Trupp während des Einsatzes ist eine
-  solche Meldung. Druckwerte so weitergeben, wie sie gesagt wurden.
+  solche Meldung. Druckwerte so weitergeben, wie sie gesagt wurden. Nicht für
+  den Abmarschdruck und nicht für den Druck bei der Rückkehr - beide gehören
+  zu setAtemschutzTruppStatus.
   Meldet das Ergebnis eine Auffälligkeit und fragt "trotzdem eintragen?",
   frage den Benutzer und rufe erst nach seinem Ja mit recordAnyway erneut auf.
 - Die laufenden Trupps stehen im Kontext unter atemschutzTrupps. Fragen zum
