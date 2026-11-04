@@ -44,7 +44,7 @@ function MainContent({ email }: { email: string }) {
 
   // Load persisted selection
   useEffect(() => {
-    chrome.storage.local.get('selectedFirecallId', (result) => {
+    chrome.storage.local.get<{ selectedFirecallId?: string }>('selectedFirecallId', (result) => {
       if (result.selectedFirecallId) {
         setSelectedFirecallId(result.selectedFirecallId);
       }

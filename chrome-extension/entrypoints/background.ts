@@ -293,7 +293,7 @@ export default defineBackground({
         ),
       );
 
-      const { selectedFirecallId } = await chrome.storage.local.get(
+      const { selectedFirecallId } = await chrome.storage.local.get<{ selectedFirecallId?: string }>(
         'selectedFirecallId',
       );
       if (
@@ -342,7 +342,7 @@ export default defineBackground({
         case 'GET_CURRENT_FIRECALL': {
           await ensureAuthenticated();
           if (!currentUser) return { error: 'Not authenticated' };
-          const { selectedFirecallId } = await chrome.storage.local.get(
+          const { selectedFirecallId } = await chrome.storage.local.get<{ selectedFirecallId?: string }>(
             'selectedFirecallId',
           );
           if (!selectedFirecallId) return { firecall: null };
@@ -361,7 +361,7 @@ export default defineBackground({
         case 'GET_CREW_ASSIGNMENTS': {
           await ensureAuthenticated();
           if (!currentUser) return { error: 'Not authenticated' };
-          const { selectedFirecallId } = await chrome.storage.local.get(
+          const { selectedFirecallId } = await chrome.storage.local.get<{ selectedFirecallId?: string }>(
             'selectedFirecallId',
           );
           if (!selectedFirecallId) return { assignments: [] };
@@ -371,7 +371,7 @@ export default defineBackground({
         case 'GET_FIRECALL_VEHICLES': {
           await ensureAuthenticated();
           if (!currentUser) return { error: 'Not authenticated' };
-          const { selectedFirecallId } = await chrome.storage.local.get(
+          const { selectedFirecallId } = await chrome.storage.local.get<{ selectedFirecallId?: string }>(
             'selectedFirecallId',
           );
           if (!selectedFirecallId) return { vehicles: [] };
@@ -381,7 +381,7 @@ export default defineBackground({
         case 'GET_FIRECALL_GERAETE': {
           await ensureAuthenticated();
           if (!currentUser) return { error: 'Not authenticated' };
-          const { selectedFirecallId } = await chrome.storage.local.get(
+          const { selectedFirecallId } = await chrome.storage.local.get<{ selectedFirecallId?: string }>(
             'selectedFirecallId',
           );
           if (!selectedFirecallId) return { geraete: [] };

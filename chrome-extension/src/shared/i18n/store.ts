@@ -31,7 +31,7 @@ function readBrowserLanguage(): string | undefined {
 function readCachedLocale(): Promise<string | undefined> {
   return new Promise((resolve) => {
     try {
-      chrome.storage.local.get(STORAGE_KEY, (result) => {
+      chrome.storage.local.get<Record<string, string | undefined>>(STORAGE_KEY, (result) => {
         resolve(result?.[STORAGE_KEY]);
       });
     } catch {
