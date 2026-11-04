@@ -533,6 +533,15 @@
       "einsatzTitle": "Send team into action",
       "abmarschZeit": "Departure (connecting the air supply)",
       "druckabfrageTitle": "Pressure check / status",
+      "meldungBearbeitenTitle": "Edit report",
+      "abmarschBearbeitenTitle": "Edit departure",
+      "rueckkehrBearbeitenTitle": "Edit return",
+      "zeileBearbeiten": "Edit row",
+      "ereignisDruck": "Lowest pressure in the team (bar) — optional",
+      "ereignisZeit": "Time",
+      "meldungLoeschen": "Delete report",
+      "meldungLoeschenBestaetigen": "Really delete this report?",
+      "korrekturTagebuchHinweis": "A correction does not change an entry already in the operations diary.",
       "druck": "Lowest cylinder pressure (bar) — optional",
       "druckHint": "The wearer with the highest air consumption is decisive.",
       "druckOptionalHint": "Without a pressure the entry is saved as a status report.",
@@ -630,7 +639,9 @@
       },
       "errors": {
         "druckInvalid": "Pressure must be between 0 and 400 bar",
-        "leereMeldung": "Without a pressure the report needs an arrival, a withdrawal or a note"
+        "leereMeldung": "Without a pressure the report needs an arrival, a withdrawal or a note",
+        "zeitInvalid": "Please enter a time",
+        "zeitReihenfolge": "The return must be after the departure"
       },
       "push": {
         "truppOhneName": "Breathing apparatus team",
@@ -1161,7 +1172,10 @@
     "firecallWrite": "Write access to the operation",
     "firecallWriteHint": "Takes effect the next time the access is refreshed (within 45 minutes).",
     "rolesHint": "This only sets the membership. Roles per group are assigned under Groups → Members and roles.",
-    "groupViaSubgroup": "via a sub group"
+    "groupViaSubgroup": "via a sub group",
+    "homeGroup": "Home group",
+    "homeGroupNone": "None",
+    "homeGroupHint": "Preselected on group pages such as the filling log, equipment or the logbook and for new operations. Only groups the user is a member of."
   },
   "header": {
     "appTitle": "Operations Map",
@@ -1868,6 +1882,13 @@
     "claimsOutdated": "Your authorization has changed. Please sign out and back in so the new permissions take effect.",
     "groupsInDb": "Your current groups in the database: {groups}",
     "groupsInToken": "Your groups according to the login token: {groups}",
+    "homeGroup": {
+      "label": "Home group",
+      "none": "None",
+      "description": "Your home group is preselected on group pages such as the filling log, equipment or the logbook and for new operations. The switcher on a page only changes the group for that page.",
+      "saved": "Home group saved",
+      "error": "Could not save the home group"
+    },
     "language": {
       "sectionTitle": "Language",
       "description": "Choose the interface language. The setting is stored with your user profile.",
@@ -2622,6 +2643,8 @@
     "draftConfirm": "Apply",
     "draftDiscard": "Discard",
     "draftAdded": "{count, plural, one {Hose line added} other {# hose lines added}}",
+    "liveUnavailableRetry": "Live conversation not reachable right now – recording a single command. I'll try live again in a minute.",
+    "liveUnavailablePermanent": "Live conversation is not available here – recording a single command.",
     "draftFailed": "Hose line could not be created",
     "draftConfirmAll": "Apply all {count}",
     "draftDiscardAll": "Discard all",
@@ -4880,6 +4903,11 @@
     "removeConfirmTitle": "Remove {name}?",
     "removeConfirmText": "{name} loses the membership in {group} together with all roles there.",
     "memberRemoved": "{name} is no longer a member.",
+    "homeGroupForAll": "Set as home group for all members",
+    "homeGroupForAllTitle": "Set home group for all members?",
+    "homeGroupForAllText": "All members of {group} get this group as their home group. A different home group chosen before is overwritten.",
+    "homeGroupForAllConfirm": "Set",
+    "homeGroupForAllDone": "{count, plural, =0 {All members already have this group as their home group.} one {Home group set for one member.} other {Home group set for # members.}}",
     "remove": "Remove",
     "cancel": "Cancel",
     "explanationTitle": "What the roles allow",

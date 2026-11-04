@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { getMyGroupsFromServer } from '../app/groups/GroupAction';
 import { Group } from '../app/groups/groupTypes';
+import { normalizeHomeGroup } from '../common/homeGroup';
 import { memberGroupIds, type GroupRoles } from '../common/permissions';
 import { ALL_USERS_GROUP_ID } from '../common/tenantGroups';
 import { auth, firestore } from '../components/firebase/firebase';
@@ -77,6 +78,7 @@ function offlineAuthState(cached: OfflineAuthSnapshot): Partial<LoginData> {
     displayName: cached.displayName,
     photoURL: cached.photoURL,
     uid: cached.uid,
+    homeGroup: cached.homeGroup,
     offlineAuth: true,
     authSource: 'offlineCache',
   };
@@ -477,6 +479,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       firecallWrite: derivedFirecallWrite,
       expiresAt: sessionUser.firecallExpiresAt,
       myGroups,
+      homeGroup: loginStatus.homeGroup,
     });
   }, [
     sessionUser,
@@ -487,6 +490,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     loginStatus.email,
     loginStatus.displayName,
     loginStatus.photoURL,
+    loginStatus.homeGroup,
     derivedIsAuthorized,
     derivedIsAdmin,
     derivedGroups,
@@ -617,6 +621,13 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       async (snapshot) => {
         const userData = snapshot.data();
         if (!userData) return;
+
+        // Die Heimatgruppe ist keine Berechtigung: Sie wird bei jedem Snapshot
+        // übernommen, auch beim ersten, und braucht kein neues Token.
+        const homeGroup = normalizeHomeGroup(userData.homeGroup);
+        setLoginStatus((prev) =>
+          prev.homeGroup === homeGroup ? prev : { ...prev, homeGroup },
+        );
 
         const groupRoles = rolesOf(userData);
         const currentAuth: AuthState = {

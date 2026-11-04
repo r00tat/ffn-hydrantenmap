@@ -1,8 +1,10 @@
 'use client';
 
 import {
+  arrayRemove,
   arrayUnion,
   collection,
+  deleteField,
   doc,
   type CollectionReference,
 } from 'firebase/firestore';
@@ -12,6 +14,9 @@ import {
   ATEMSCHUTZ_TRUPP_COLLECTION_ID,
   mitUeberwachungsUid,
   tagebuchVermerk,
+  TRUPP_EVENT_FIELDS,
+  type TruppEvent,
+  type TruppEventInput,
   type AtemschutzAusgabe,
   type AtemschutzFuellung,
   type AtemschutzTrupp,
@@ -218,6 +223,62 @@ export async function addDruckabfrage(
       trupp.ueberwachungUids,
       actor.userId,
     ),
+    ...touched(actor),
+  });
+}
+
+/**
+ * Eine erfasste Meldung korrigieren.
+ *
+ * `arrayRemove` der alten und `arrayUnion` der neuen Fassung statt eines neu
+ * geschriebenen Arrays — aus demselben Grund wie bei `addDruckabfrage`: Die
+ * Meldung, die ein zweites Gerät gerade angehängt hat, bleibt erhalten. Zwei
+ * Schreibvorgänge, weil ein Update dasselbe Feld nicht zweimal verändern darf;
+ * sie gehen in dieser Reihenfolge hinaus. `arrayRemove` vergleicht den ganzen
+ * Eintrag — `previous` muss also genau die geladene Fassung sein.
+ */
+export async function replaceDruckabfrage(
+  firecallId: string,
+  truppId: string,
+  previous: Druckabfrage,
+  next: Druckabfrage,
+  actor: AtemschutzActor,
+): Promise<void> {
+  const ref = doc(truppCollection(firecallId), truppId);
+  updateDocLocal(ref, { abfragen: arrayRemove(previous), ...touched(actor) });
+  updateDocLocal(ref, { abfragen: arrayUnion(next), ...touched(actor) });
+}
+
+/** Eine Meldung entfernen — z. B. eine doppelt erfasste. */
+export async function deleteDruckabfrage(
+  firecallId: string,
+  truppId: string,
+  abfrage: Druckabfrage,
+  actor: AtemschutzActor,
+): Promise<void> {
+  updateDocLocal(doc(truppCollection(firecallId), truppId), {
+    abfragen: arrayRemove(abfrage),
+    ...touched(actor),
+  });
+}
+
+/**
+ * Zeit und Druck von Abmarsch oder Rückkehr korrigieren. Ein geleerter Druck
+ * wird gelöscht und nicht als `undefined` geschrieben — das lehnt Firestore im
+ * Browser ab.
+ */
+export async function updateTruppEvent(
+  firecallId: string,
+  truppId: string,
+  event: TruppEvent,
+  input: TruppEventInput,
+  actor: AtemschutzActor,
+): Promise<void> {
+  const fields = TRUPP_EVENT_FIELDS[event];
+  updateDocLocal(doc(truppCollection(firecallId), truppId), {
+    [fields.time]: input.zeitpunkt,
+    [fields.pressure]:
+      typeof input.druck === 'number' ? input.druck : deleteField(),
     ...touched(actor),
   });
 }

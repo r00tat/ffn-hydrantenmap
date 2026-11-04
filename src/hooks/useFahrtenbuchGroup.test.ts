@@ -52,6 +52,52 @@ describe('useFahrtenbuchGroup', () => {
     expect(result.current.groupId).toBe('ffxy');
   });
 
+  describe('Heimatgruppe', () => {
+    beforeEach(() => {
+      loginStatus.mockReturnValue({
+        isAuthorized: true,
+        isAdmin: false,
+        myGroups: MY_GROUPS,
+        groupRoles: { ffnd: [], ffxy: ['kostenersatz'] },
+        homeGroup: 'ffxy',
+      });
+    });
+
+    it('wählt die Heimatgruppe vor der zuletzt genutzten Gruppe', () => {
+      window.localStorage.setItem('fahrtenbuch.group', 'ffnd');
+      const { result } = renderHook(() => useFahrtenbuchGroup());
+      expect(result.current.groupId).toBe('ffxy');
+      expect(result.current.homeGroup).toBe('ffxy');
+    });
+
+    it('stellt die Heimatgruppe im Umschalter an den Anfang', () => {
+      const { result } = renderHook(() => useFahrtenbuchGroup());
+      expect(result.current.groups.map((g) => g.id)).toEqual(['ffxy', 'ffnd']);
+    });
+
+    it('wechselt mit dem Umschalter nur auf dieser Seite', () => {
+      const first = renderHook(() => useFahrtenbuchGroup());
+      act(() => first.result.current.setGroupId('ffnd'));
+      expect(first.result.current.groupId).toBe('ffnd');
+
+      // Die nächste Seite beginnt wieder bei der Heimatgruppe.
+      const next = renderHook(() => useFahrtenbuchGroup());
+      expect(next.result.current.groupId).toBe('ffxy');
+    });
+
+    it('übergeht die Heimatgruppe, wenn sie das verlangte Recht nicht hat', () => {
+      loginStatus.mockReturnValue({
+        isAuthorized: true,
+        isAdmin: false,
+        myGroups: MY_GROUPS,
+        groupRoles: { ffnd: ['kostenersatz'], ffxy: [] },
+        homeGroup: 'ffxy',
+      });
+      const { result } = renderHook(() => useFahrtenbuchGroup('kostenersatz.use'));
+      expect(result.current.groupId).toBe('ffnd');
+    });
+  });
+
   it('liefert keine Gruppe, wenn das Recht nirgends gilt', () => {
     const { result } = renderHook(() => useFahrtenbuchGroup('gruppe.manage'));
     expect(result.current.groups).toEqual([]);

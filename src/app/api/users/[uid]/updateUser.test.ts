@@ -10,6 +10,7 @@ const {
   invalidateMock,
   setUserMembershipsMock,
   getGroupsMock,
+  writeHomeGroupMock,
 } = vi.hoisted(() => ({
   getGroupsMock: vi.fn(async () => [] as unknown[]),
   setCustomUserClaimsMock: vi.fn(
@@ -21,6 +22,7 @@ const {
   userDocGetMock: vi.fn(),
   invalidateMock: vi.fn(),
   setUserMembershipsMock: vi.fn(),
+  writeHomeGroupMock: vi.fn(),
 }));
 
 vi.mock('../../../../server/firebase/admin', () => ({
@@ -35,6 +37,11 @@ vi.mock('../../../../server/firebase/admin', () => ({
 vi.mock('../../../../server/auth/changeUserRoles', () => ({
   setUserMemberships: (uid: string, groupIds: string[], user: unknown) =>
     setUserMembershipsMock(uid, groupIds, user),
+}));
+
+vi.mock('../../../../server/auth/homeGroup', () => ({
+  writeHomeGroup: (uid: string, requested: string | null, members?: string[]) =>
+    writeHomeGroupMock(uid, requested, members),
 }));
 
 vi.mock('../../../groups/groupHelpers', () => ({
@@ -196,6 +203,43 @@ describe('updateUser — Mitgliedschaft', () => {
   });
 });
 
+
+describe('updateUser — Heimatgruppe', () => {
+  beforeEach(() => {
+    writeHomeGroupMock.mockImplementation(async (_uid, requested) => ({
+      homeGroup: requested ?? undefined,
+    }));
+  });
+
+  it('lässt die Heimatgruppe unangetastet, wenn sie nicht mitkommt', async () => {
+    storedUser({ groupRoles: { ffnd: [] }, homeGroup: 'ffnd' });
+    await updateUser('member-uid', { authorized: true } as UserRecordExtended);
+    expect(writeHomeGroupMock).not.toHaveBeenCalled();
+  });
+
+  it('setzt sie gegen die Mitgliedschaft nach der Änderung', async () => {
+    storedUser({ groupRoles: { ffnd: [] } });
+    setUserMembershipsMock.mockResolvedValue({ ffnd: [], b: [] });
+    const result = await updateUser(
+      'member-uid',
+      { authorized: true, homeGroup: 'b' } as UserRecordExtended,
+      ['ffnd', 'b'],
+    );
+    expect(writeHomeGroupMock).toHaveBeenCalledWith('member-uid', 'b', ['ffnd', 'b']);
+    expect(result).toMatchObject({ homeGroup: 'b' });
+  });
+
+  it('entfernt sie, wenn der Benutzer die Gruppe verliert', async () => {
+    storedUser({ groupRoles: { ffnd: [], b: [] }, homeGroup: 'b' });
+    setUserMembershipsMock.mockResolvedValue({ ffnd: [] });
+    await updateUser(
+      'member-uid',
+      { authorized: true, homeGroup: 'b' } as UserRecordExtended,
+      ['ffnd'],
+    );
+    expect(writeHomeGroupMock).toHaveBeenCalledWith('member-uid', null, ['ffnd']);
+  });
+});
 
 describe('updateUser vor der Migration', () => {
   it('ändert die Gruppen eines Benutzers mit altem Kostenersatz nicht', async () => {

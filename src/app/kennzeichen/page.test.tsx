@@ -29,6 +29,12 @@ vi.mock('../../hooks/useFirecallItemAdd', () => ({
   default: () => addFirecallItem,
 }));
 
+const login = { homeGroup: undefined as string | undefined };
+vi.mock('../../hooks/useFirebaseLogin', () => ({
+  __esModule: true,
+  default: () => login,
+}));
+
 import KennzeichenPage from './page';
 import { getGroupsWithOebfvConfig } from './configActions';
 import { queryKennzeichen } from './queryActions';
@@ -57,7 +63,27 @@ describe('KennzeichenPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     firecallId.current = 'firecall1';
+    login.homeGroup = undefined;
     vi.mocked(getGroupsWithOebfvConfig).mockResolvedValue([]);
+  });
+
+  it('fragt über die Heimatgruppe ab, wenn sie einen Token hat', async () => {
+    login.homeGroup = 'ffxy';
+    vi.mocked(getGroupsWithOebfvConfig).mockResolvedValue(['ffnd', 'ffxy']);
+    vi.mocked(queryKennzeichen).mockResolvedValue({
+      vehicles: [vehicle],
+      rescueSheets: [],
+      noResult: false,
+      system: 'einsatz',
+    });
+
+    renderWithIntl(<KennzeichenPage />);
+    await search();
+
+    await waitFor(() => expect(queryKennzeichen).toHaveBeenCalled());
+    expect(vi.mocked(queryKennzeichen).mock.calls[0][0]).toMatchObject({
+      groupId: 'ffxy',
+    });
   });
 
   it('shows the no-config hint when no group has a token', async () => {

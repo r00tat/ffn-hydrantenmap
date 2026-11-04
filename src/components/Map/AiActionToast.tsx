@@ -11,7 +11,7 @@ import { speakMessage } from '../../common/speech';
 export interface AiToastState {
   open: boolean;
   message: string;
-  severity: 'success' | 'warning' | 'error';
+  severity: 'success' | 'info' | 'warning' | 'error';
   showUndo?: boolean;
   clarificationOptions?: string[];
   /** Anzahl der Leitungsvorschläge, die auf Bestätigung warten */

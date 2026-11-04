@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { homeGroupFirst, selectDefaultGroupId } from '../common/homeGroup';
 import { can, type Permission } from '../common/permissions';
 import { NON_TENANT_GROUP_IDS } from '../common/tenantGroups';
 import useFirebaseLogin from './useFirebaseLogin';
@@ -8,8 +9,11 @@ import useFirebaseLogin from './useFirebaseLogin';
 const STORAGE_KEY = 'fahrtenbuch.group';
 
 /**
- * Gruppen des Benutzers plus die Vorauswahl: zuletzt genutzte Gruppe aus dem
- * localStorage, sonst die erste Gruppe.
+ * Gruppen des Benutzers plus die Vorauswahl: auf dieser Seite gewählt, sonst
+ * die Heimatgruppe des Benutzers, sonst die zuletzt genutzte Gruppe aus dem
+ * localStorage, sonst die erste Gruppe (`selectDefaultGroupId`). Die manuelle
+ * Wahl gilt nur für die Seite — mit Heimatgruppe beginnt die nächste Seite
+ * wieder dort (docs/berechtigungen.md, „Heimatgruppe").
  *
  * `groupId` wird direkt beim Rendern aus `groups` und der optionalen manuellen
  * Auswahl abgeleitet statt über einen Effekt nachgezogen — das vermeidet einen
@@ -23,7 +27,7 @@ const STORAGE_KEY = 'fahrtenbuch.group';
  * herausgeben, und der Umschalter böte Gruppen an, die nur abgewiesen würden.
  */
 export default function useFahrtenbuchGroup(permission?: Permission) {
-  const { myGroups, isAdmin, groupRoles } = useFirebaseLogin();
+  const { myGroups, isAdmin, groupRoles, homeGroup } = useFirebaseLogin();
   const [manualGroupId, setManualGroupId] = useState<string | undefined>();
 
   // 'allUsers' (Pseudo-Gruppe in den Claims jedes Benutzers) und
@@ -32,25 +36,29 @@ export default function useFahrtenbuchGroup(permission?: Permission) {
   // und in `actionGroupMemberRequired`.
   const groups = useMemo(
     () =>
-      myGroups.filter(
-        (g): g is { id: string; name: string } =>
-          !!g.id &&
-          !NON_TENANT_GROUP_IDS.includes(g.id) &&
-          (!permission || can({ isAdmin, groupRoles }, g.id, permission)),
+      homeGroupFirst(
+        myGroups.filter(
+          (g): g is { id: string; name: string } =>
+            !!g.id &&
+            !NON_TENANT_GROUP_IDS.includes(g.id) &&
+            (!permission || can({ isAdmin, groupRoles }, g.id, permission)),
+        ),
+        homeGroup,
       ),
-    [myGroups, permission, isAdmin, groupRoles],
+    [myGroups, permission, isAdmin, groupRoles, homeGroup],
   );
 
-  const groupId = useMemo(() => {
-    if (groups.length === 0) return undefined;
-    if (manualGroupId && groups.some((g) => g.id === manualGroupId)) {
-      return manualGroupId;
-    }
-    const stored =
-      typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
-    if (stored && groups.some((g) => g.id === stored)) return stored;
-    return groups[0].id;
-  }, [groups, manualGroupId]);
+  const groupId = useMemo(
+    () =>
+      selectDefaultGroupId({
+        groupIds: groups.map((g) => g.id),
+        manualGroupId,
+        homeGroup,
+        storedGroupId:
+          typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null,
+      }),
+    [groups, manualGroupId, homeGroup],
+  );
 
   const setGroupId = useCallback(
     (id: string) => {
@@ -64,5 +72,5 @@ export default function useFahrtenbuchGroup(permission?: Permission) {
     [groups],
   );
 
-  return { groups, groupId, setGroupId };
+  return { groups, groupId, setGroupId, homeGroup };
 }

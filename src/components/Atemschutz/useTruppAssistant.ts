@@ -105,6 +105,11 @@ export default function useTruppAssistant(): TruppAssistant {
             truppId = plan.write.truppId;
             await updateTrupp(firecallId, truppId, plan.write.patch, actor);
             nachher = { ...(plan.trupp as AtemschutzTrupp), ...plan.write.patch };
+            // Nachgereichter Abmarschdruck mit einer echten Notiz: Die Notiz
+            // bleibt eine Meldung (`planReport`).
+            if (plan.write.report) {
+              await addDruckabfrage(firecallId, nachher as AtemschutzTrupp, plan.write.report, actor);
+            }
             break;
           }
           case 'abfrage': {
@@ -127,7 +132,12 @@ export default function useTruppAssistant(): TruppAssistant {
 
       // Die Nebenwirkungen scheitern nicht mit dem Befehl: Geschrieben ist
       // er schon, und der Zeitplan findet den Trupp auch ohne Termin.
-      const abfrage = plan.write.art === 'abfrage' ? plan.write.abfrage : undefined;
+      const abfrage =
+        plan.write.art === 'abfrage'
+          ? plan.write.abfrage
+          : plan.write.art === 'update'
+            ? plan.write.report
+            : undefined;
       for (const anlass of plan.tagebuch) {
         await schreibeTagebuch(nachher, anlass, abfrage);
       }

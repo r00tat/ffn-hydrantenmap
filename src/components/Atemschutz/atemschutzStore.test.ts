@@ -22,6 +22,8 @@ vi.mock('firebase/firestore', () => ({
     path: segments.join('/'),
   })),
   arrayUnion: vi.fn((...values: unknown[]) => ({ arrayUnion: values })),
+  arrayRemove: vi.fn((...values: unknown[]) => ({ arrayRemove: values })),
+  deleteField: vi.fn(() => ({ deleteField: true })),
   writeBatch: vi.fn(),
 }));
 
@@ -37,8 +39,11 @@ import {
   addDruckabfrage,
   addFuellung,
   addTrupp,
+  deleteDruckabfrage,
   deleteTrupp,
+  replaceDruckabfrage,
   updateTrupp,
+  updateTruppEvent,
   updateUeberwachung,
   vermerkeTagebuch,
 } from './atemschutzStore';
@@ -75,6 +80,41 @@ describe('atemschutzStore offline', () => {
       actor,
     );
     expect(hoisted.updateDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaceDruckabfrage entfernt die alte Meldung und hängt die neue an', async () => {
+    const alt = { zeitpunkt: actor.now, druck: 280 };
+    const neu = { zeitpunkt: actor.now, druck: 208, editedBy: 'uid-1' };
+    await replaceDruckabfrage('fc-1', 't-1', alt, neu, actor);
+    expect(hoisted.updateDoc).toHaveBeenCalledTimes(2);
+    expect(hoisted.updateDoc.mock.calls[0][1]).toMatchObject({
+      abfragen: { arrayRemove: [alt] },
+    });
+    expect(hoisted.updateDoc.mock.calls[1][1]).toMatchObject({
+      abfragen: { arrayUnion: [neu] },
+    });
+  });
+
+  it('deleteDruckabfrage entfernt genau diese Meldung', async () => {
+    const alt = { zeitpunkt: actor.now, druck: 280 };
+    await deleteDruckabfrage('fc-1', 't-1', alt, actor);
+    expect(hoisted.updateDoc).toHaveBeenCalledTimes(1);
+    expect(hoisted.updateDoc.mock.calls[0][1]).toMatchObject({
+      abfragen: { arrayRemove: [alt] },
+    });
+  });
+
+  it('updateTruppEvent schreibt Zeit und Druck und löscht einen geleerten Druck', async () => {
+    await updateTruppEvent('fc-1', 't-1', 'abmarsch', { zeitpunkt: actor.now, druck: 300 }, actor);
+    expect(hoisted.updateDoc.mock.calls[0][1]).toMatchObject({
+      abmarschZeit: actor.now,
+      druckAbmarsch: 300,
+    });
+    await updateTruppEvent('fc-1', 't-1', 'rueckkehr', { zeitpunkt: actor.now }, actor);
+    expect(hoisted.updateDoc.mock.calls[1][1]).toMatchObject({
+      rueckkehrZeit: actor.now,
+      druckRueckkehr: { deleteField: true },
+    });
   });
 
   it('the other writes return without server confirmation as well', async () => {

@@ -12,6 +12,7 @@ import { auth } from '../firebase/firebase';
 import LanguageSelector from '../i18n/LanguageSelector';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
 import HoehenmodellOffline from './HoehenmodellOffline';
+import HomeGroupSelector from './HomeGroupSelector';
 import OfflineMapPreparation from '../Map/OfflineMapPreparation';
 
 const CONTACT_EMAIL = 'hydrantenmap@ff-neusiedlamsee.at';
@@ -88,6 +89,7 @@ export default function ProfileUi() {
               </Link>
             </Typography>
           )}
+          <HomeGroupSelector />
           {/* Nur für freigeschaltete Benutzer: die Server Actions hinter der
               Verwaltung verlangen ohnehin actionUserRequired(). */}
           <PasskeyManager />

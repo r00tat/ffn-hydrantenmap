@@ -425,6 +425,46 @@ könnte aber weder PDF noch Mail erzeugen. Ob solche Einsätze überhaupt
 existieren, ist vor dem Aufräum-PR zu klären (siehe
 [Nach dem Release](#nach-dem-release)).
 
+## Heimatgruppe
+
+Wer in mehreren Gruppen Mitglied ist, landete auf jeder Gruppenseite
+(Füllprotokoll, Geräte, Fahrtenbuch, Bekleidung, …) auf einer anderen Gruppe:
+Vorausgewählt war die zuletzt *irgendwo* umgeschaltete Gruppe (ein
+gemeinsamer localStorage-Schlüssel) oder die erste der Liste, und eine Seite mit
+Rechtefilter fiel still auf eine andere zurück. Das Feld `homeGroup` am
+Benutzerdokument ist deshalb der feste Ausgangspunkt.
+
+- **Reihenfolge der Vorauswahl** (`selectDefaultGroupId` in
+  `src/common/homeGroup.ts`): auf dieser Seite gewählt > Heimatgruppe > zuletzt
+  genutzt > erste Gruppe. Jede Stufe zählt nur, wenn ihre Gruppe auf der Seite
+  zur Auswahl steht — verlangt eine Seite ein Recht, das in der Heimatgruppe
+  fehlt, gilt die nächste Stufe.
+- **Der Umschalter gilt nur für die Seite.** Würde er die Heimatgruppe
+  überschreiben, wäre sie wieder genau das Zufallsergebnis von vorher. Ohne
+  Heimatgruppe bleibt es beim bisherigen Verhalten.
+- **Keine Berechtigung, also nicht über `writeUserRoles()`.** Die Heimatgruppe
+  öffnet nichts; sie ist eine Vorauswahl. Geschrieben wird sie trotzdem nur
+  serverseitig (`writeHomeGroup`), weil der Client das Benutzerdokument nicht
+  schreiben darf: selbst auf `/profile`, vom Admin in der Benutzerverwaltung.
+  Gesetzt wird nur eine Gruppe mit Mitgliedschaft; verliert der Benutzer die
+  Gruppe in der Benutzerverwaltung, fällt die Heimatgruppe mit weg. Entzieht
+  ein anderer Weg die Mitgliedschaft, bleibt das Feld stehen und wird von der
+  Vorauswahl übergangen.
+- **Gelesen über den Listener auf das eigene Benutzerdokument**, nicht aus der
+  Sitzung: Eine Änderung braucht kein neues Token und wirkt sofort. Für den
+  Kaltstart ohne Netz liegt sie im Zwischenspeicher der Anmeldung.
+- **Für alle Mitglieder auf einmal** setzt der Gruppen-Admin sie in der
+  Gruppenkonfiguration (`/groups/{groupId}`, Knopf „Für alle Mitglieder als
+  Heimatgruppe setzen", Server Action `setHomeGroupForAllMembers`). Sonst
+  müsste jedes Mitglied einer Feuerwehr sie selbst im Profil nachziehen, und
+  die meisten täten es nie. Verlangt wird `gruppe.manage`, nicht
+  `rollen.assign`: Es ist eine Einstellung der Gruppe für ihre Mitglieder,
+  keine Rollenvergabe. Der Knopf **überschreibt** eine andere Heimatgruppe —
+  die Rückfrage sagt das —, lässt Einsatz-Gäste aus und schreibt nur, wer die
+  Gruppe noch nicht hat (`usersToAssignHomeGroup`). Gelesen wird dafür das
+  ganze Benutzerverzeichnis, weil die Mitgliedschaft als Schlüssel in
+  `groupRoles` steckt und sich nicht abfragen lässt.
+
 ## Kennzeichenabfrage je Gruppe
 
 Der ÖBFV-Token liegt an einer Gruppe (`oebfvKennzeichenConfig/{groupId}`,

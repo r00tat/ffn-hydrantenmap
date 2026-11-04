@@ -5,6 +5,9 @@ import {
   TRUPP_STATUSES,
   type AtemschutzGeraet,
   type AtemschutzTrupp,
+  type Druckabfrage,
+  editDruckabfrage,
+  validateTruppEventEdit,
   type FuellungInput,
   type TruppGeraet,
   type TruppInput,
@@ -1885,5 +1888,73 @@ describe('findSimilar', () => {
     // Bei vier Zeichen liegt fast jede Nummer ein Zeichen neben einer anderen.
     const short = geraet({ id: 'k', nummer: '2.16' });
     expect(findSimilar([short], '2.17')).toEqual([]);
+  });
+});
+
+describe('editDruckabfrage', () => {
+  const vorher: Druckabfrage = {
+    zeitpunkt: '2026-09-23T10:05:12.000Z',
+    druck: 250,
+    bemerkung: 'alt',
+    erfasstVon: 'u-erfasst',
+  };
+
+  it('übernimmt die Eingabe, behält Zeitpunkt und Erfasser und vermerkt die Änderung', () => {
+    const neu = editDruckabfrage(
+      vorher,
+      { druck: 205, bemerkung: '' },
+      { uid: 'u-korr', jetzt: '2026-09-23T10:20:00.000Z' },
+    );
+    expect(neu).toEqual({
+      zeitpunkt: '2026-09-23T10:05:12.000Z',
+      druck: 205,
+      erfasstVon: 'u-erfasst',
+      editedBy: 'u-korr',
+      editedAt: '2026-09-23T10:20:00.000Z',
+    });
+  });
+
+  it('nimmt einen geänderten Zeitpunkt und entfernt einen geleerten Druck', () => {
+    const neu = editDruckabfrage(
+      vorher,
+      { zeitpunkt: '2026-09-23T10:04:00.000Z', amZiel: true },
+      { uid: 'u', jetzt: '2026-09-23T10:20:00.000Z' },
+    );
+    expect(neu.zeitpunkt).toBe('2026-09-23T10:04:00.000Z');
+    expect(neu).not.toHaveProperty('druck');
+    expect(neu.amZiel).toBe(true);
+  });
+});
+
+describe('validateTruppEventEdit', () => {
+  const trupp = {
+    abmarschZeit: '2026-09-23T10:00:00.000Z',
+    rueckkehrZeit: '2026-09-23T10:30:00.000Z',
+  };
+
+  it('nimmt einen gültigen Druck und eine Zeit', () => {
+    expect(
+      validateTruppEventEdit(trupp, 'abmarsch', { zeitpunkt: '2026-09-23T10:01:00.000Z', druck: 300 }),
+    ).toEqual([]);
+  });
+
+  it('erlaubt einen leeren Druck, aber keine leere Zeit', () => {
+    expect(validateTruppEventEdit(trupp, 'rueckkehr', { zeitpunkt: '2026-09-23T10:31:00.000Z' })).toEqual([]);
+    expect(validateTruppEventEdit(trupp, 'rueckkehr', { zeitpunkt: '' })).toEqual(['zeitInvalid']);
+  });
+
+  it('weist einen Druck außerhalb des Bereichs ab', () => {
+    expect(
+      validateTruppEventEdit(trupp, 'abmarsch', { zeitpunkt: trupp.abmarschZeit, druck: 3000 }),
+    ).toEqual(['druckInvalid']);
+  });
+
+  it('weist eine Rückkehr vor dem Abmarsch und einen Abmarsch nach der Rückkehr ab', () => {
+    expect(
+      validateTruppEventEdit(trupp, 'rueckkehr', { zeitpunkt: '2026-09-23T09:59:00.000Z' }),
+    ).toEqual(['zeitReihenfolge']);
+    expect(
+      validateTruppEventEdit(trupp, 'abmarsch', { zeitpunkt: '2026-09-23T10:31:00.000Z' }),
+    ).toEqual(['zeitReihenfolge']);
   });
 });

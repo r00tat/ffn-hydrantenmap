@@ -24,7 +24,9 @@ import {
   truppGeraetLabel,
   truppLabel,
   type AtemschutzTrupp,
+  type Druckabfrage,
   type Geraetesatz,
+  type TruppEvent,
 } from '../../common/atemschutz';
 import {
   RESERVEDRUCK_BAR,
@@ -60,6 +62,10 @@ export interface UeberwachungCardProps {
   onErneutEinsatz: () => void;
   /** Zurückgekehrter Trupp geht zurück an den Sammelplatz. */
   onAnSammelplatz: () => void;
+  /** Eine erfasste Meldung korrigieren oder löschen. */
+  onEditAbfrage?: (abfrage: Druckabfrage) => void;
+  /** Zeit und Druck von Abmarsch oder Rückkehr korrigieren. */
+  onEditEvent?: (event: TruppEvent) => void;
   /**
    * Änderungen am Trupp (z. B. die letzte Druckabfrage) liegen erst auf dem
    * Gerät — `snapshot.metadata.hasPendingWrites`.
@@ -73,6 +79,8 @@ interface VerlaufZeile {
   zeitpunkt: string;
   druck?: number;
   label: string;
+  /** Was das Bearbeiten dieser Zeile öffnet. */
+  edit: () => void;
 }
 
 const FARBE: Record<Dringlichkeit, 'success' | 'warning' | 'error'> = {
@@ -97,6 +105,8 @@ export default function UeberwachungCard({
   onRueckkehr,
   onErneutEinsatz,
   onAnSammelplatz,
+  onEditAbfrage,
+  onEditEvent,
   pendingSync = false,
 }: UeberwachungCardProps) {
   const t = useTranslations('atemschutz');
@@ -122,6 +132,7 @@ export default function UeberwachungCard({
     ? faelligeWarnungen(trupp, jetzt, { vorgabe })
     : [];
   const abfragen = sortierteAbfragen(trupp);
+  const kannKorrigieren = canWrite && !!onEditAbfrage && !!onEditEvent;
   // Die *ersten* Meldungen je Ereignis — dieselbe Wahl wie in
   // `berechneStand`: „Flaschendruck bei Erreichen des Einsatzzieles" gibt es
   // einmal, eine spätere Zeile mit demselben Haken ist keine zweite Ankunft.
@@ -155,6 +166,7 @@ export default function UeberwachungCard({
             zeitpunkt: trupp.abmarschZeit,
             druck: trupp.druckAbmarsch,
             label: t('ueberwachung.abmarschUm'),
+            edit: () => onEditEvent?.('abmarsch'),
           },
         ]
       : []),
@@ -179,6 +191,7 @@ export default function UeberwachungCard({
         ]
           .filter(Boolean)
           .join(' · ') || (a.bemerkung ?? ''),
+      edit: () => onEditAbfrage?.(a),
     })),
     ...(trupp.rueckkehrZeit
       ? [
@@ -187,6 +200,7 @@ export default function UeberwachungCard({
             zeitpunkt: trupp.rueckkehrZeit,
             druck: trupp.druckRueckkehr,
             label: t('trupp.actions.rueckkehr'),
+            edit: () => onEditEvent?.('rueckkehr'),
           },
         ]
       : []),
@@ -522,7 +536,10 @@ export default function UeberwachungCard({
               sx={{
                 mt: 0.5,
                 display: 'grid',
-                gridTemplateColumns: 'auto auto 1fr',
+                gridTemplateColumns: kannKorrigieren
+                  ? 'auto auto 1fr auto'
+                  : 'auto auto 1fr',
+                alignItems: 'center',
                 columnGap: 1.5,
                 rowGap: 0.25,
                 fontVariantNumeric: 'tabular-nums',
@@ -544,6 +561,20 @@ export default function UeberwachungCard({
                   <Typography variant="body2" color="text.secondary">
                     {zeile.label}
                   </Typography>
+                  {/* Ein vertippter Druck verschiebt die Prognose — er muss
+                      sich berichtigen lassen, auch nach der Rückkehr. */}
+                  {kannKorrigieren && (
+                    <Tooltip title={t('ueberwachung.zeileBearbeiten')}>
+                      <IconButton
+                        size="small"
+                        aria-label={t('ueberwachung.zeileBearbeiten')}
+                        onClick={zeile.edit}
+                        sx={{ p: 0.25 }}
+                      >
+                        <EditIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Fragment>
               ))}
             </Box>

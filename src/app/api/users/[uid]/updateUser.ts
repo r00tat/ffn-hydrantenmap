@@ -15,6 +15,7 @@ import { FirebaseUserInfo, UserRecordExtended } from '../../../../common/users';
 import { USER_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { firebaseAuth, firestore } from '../../../../server/firebase/admin';
 import { setUserMemberships } from '../../../../server/auth/changeUserRoles';
+import { writeHomeGroup } from '../../../../server/auth/homeGroup';
 import { userSessionCache } from '../../../../server/auth/userSessionCache';
 import { getGroups } from '../../../groups/groupHelpers';
 
@@ -91,6 +92,15 @@ export async function updateUser(
     ? await setUserMemberships(uid, memberGroupIds, storedData)
     : undefined;
 
+  // Die Heimatgruppe nur, wenn der Aufrufer sie mitschickt — das Freischalten
+  // aus der Liste lässt sie stehen. Gegen die Mitgliedschaft *nach* der
+  // Änderung geprüft: Fällt die Heimatgruppe aus den Gruppen, fällt sie weg.
+  const homeGroup = await updateHomeGroup(
+    uid,
+    user.homeGroup,
+    memberGroupIds ?? userMemberGroupIds(storedData)
+  );
+
   setCustomClaimsForUser(uid, {
     // Aus dem gespeicherten Dokument, nicht aus dem Client: siehe oben.
     groups: claimGroupsForUser(storedData, groupRoles),
@@ -112,7 +122,26 @@ export async function updateUser(
   // Invalidierung bliebe eine Admin-Änderung bis zum Cache-Ablauf wirkungslos.
   userSessionCache.invalidate(uid);
 
-  return { ...newData, ...(groupRoles ? { groupRoles } : {}) };
+  return {
+    ...newData,
+    ...(groupRoles ? { groupRoles } : {}),
+    ...(homeGroup !== false ? { homeGroup } : {}),
+  };
+}
+
+/**
+ * @returns die neue Heimatgruppe (`undefined` = keine) oder `false`, wenn sie
+ * nicht angefasst wurde.
+ */
+async function updateHomeGroup(
+  uid: string,
+  requested: string | null | undefined,
+  members: string[]
+): Promise<string | undefined | false> {
+  if (requested === undefined) return false;
+  const wanted = requested && members.includes(requested) ? requested : null;
+  const result = await writeHomeGroup(uid, wanted, members);
+  return 'error' in result ? false : result.homeGroup;
 }
 
 function sameGroups(current: string[], desired: string[]) {

@@ -56,6 +56,8 @@ export interface OfflineAuthData {
    */
   expiresAt?: number;
   myGroups: Group[];
+  /** Heimatgruppe, damit die Vorauswahl auch beim Kaltstart ohne Netz stimmt. */
+  homeGroup?: string;
 }
 
 export interface OfflineAuthSnapshot extends OfflineAuthData {

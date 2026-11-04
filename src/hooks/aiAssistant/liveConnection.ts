@@ -25,6 +25,9 @@ const LIVE_WS_HOST = 'generativelanguage.googleapis.com';
  */
 export const LIVE_API_VERSION = 'v1alpha';
 
+/** Frist für Socket-Aufbau plus `setupComplete`. Im Normalfall unter einer Sekunde. */
+export const LIVE_HANDSHAKE_TIMEOUT_MS = 10_000;
+
 export function liveWebSocketUrl(token: string): string {
   const url = new URL(`wss://${LIVE_WS_HOST}`);
   url.pathname = `/ws/google.ai.generativelanguage.${LIVE_API_VERSION}.GenerativeService.BidiGenerateContentConstrained`;
@@ -111,6 +114,7 @@ async function payloadText(data: unknown): Promise<string | undefined> {
 export async function connectLiveSession(
   token: string,
   model: string,
+  { handshakeTimeoutMs = LIVE_HANDSHAKE_TIMEOUT_MS }: { handshakeTimeoutMs?: number } = {},
 ): Promise<LiveConnection> {
   const socket = new WebSocket(liveWebSocketUrl(token));
 
@@ -126,7 +130,18 @@ export async function connectLiveSession(
     notify = undefined;
   };
 
+  let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
   await new Promise<void>((resolve, reject) => {
+    // Ohne Frist hängt ein Aufbau im Funkloch beliebig lange: Der Benutzer
+    // sieht „hört zu", aber nichts kommt an, und der Rückfall auf den
+    // Einzelaufruf greift nie.
+    handshakeTimer = setTimeout(() => {
+      if (handshakeDone) return;
+      handshakeDone = true;
+      reject(new Error('Live-Sitzung: Zeitüberschreitung beim Verbindungsaufbau'));
+      socket.close();
+    }, handshakeTimeoutMs);
+
     const onMessage = async (event: Event) => {
       const text = await payloadText((event as MessageEvent).data);
       if (!text) {
@@ -187,7 +202,7 @@ export async function connectLiveSession(
       },
       { once: true },
     );
-  });
+  }).finally(() => clearTimeout(handshakeTimer));
 
   const sendRaw = (message: unknown) => {
     if (finished) {

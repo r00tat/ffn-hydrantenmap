@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CONVERSATION_PROMPT } from '../../common/ai';
 import { createLiveToken } from '../../app/actions/aiLiveToken';
+import { LiveUnavailableError } from './liveAvailability';
 import { FirecallItem } from '../../components/firebase/firestore';
 import {
   isLiveAudioSupported,
@@ -192,7 +193,7 @@ export default function useAiLiveAssistant(
     try {
       const { token, model, error, detail } = await createLiveToken();
       if (!token || !model) {
-        throw new Error(`Live-Token nicht verfügbar (${error}${detail ? `: ${detail}` : ''})`);
+        throw new LiveUnavailableError(error ?? 'failed', detail);
       }
       session = await connectLiveSession(token, model);
       sessionRef.current = session;

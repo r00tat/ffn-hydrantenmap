@@ -245,6 +245,18 @@ export default function UserRecordExtendedDialog({
     [explicitGroups, groupHierarchy]
   );
 
+  // Die Heimatgruppe steht nur unter den Gruppen, in denen der Benutzer nach
+  // dem Speichern Mitglied ist. Fällt sie heraus, gilt „keine" — der Server
+  // prüft dasselbe noch einmal.
+  const homeGroupOptions = useMemo(
+    () => tenantGroups.filter((g) => effectiveGroups.includes(g.id)),
+    [tenantGroups, effectiveGroups]
+  );
+  const homeGroup =
+    user.homeGroup && homeGroupOptions.some((g) => g.id === user.homeGroup)
+      ? user.homeGroup
+      : '';
+
   const onChange =
     (field: string) =>
     (event: React.ChangeEvent<HTMLInputElement> | SelectChangeEvent) => {
@@ -331,6 +343,29 @@ export default function UserRecordExtendedDialog({
             {t('rolesHint')}
           </Typography>
         </FormControl>
+        <FormControl fullWidth variant="standard" sx={{ my: 1 }}>
+          <InputLabel id="home-group-label" shrink>
+            {t('homeGroup')}
+          </InputLabel>
+          <Select
+            labelId="home-group-label"
+            id="user-home-group"
+            value={homeGroup}
+            label={t('homeGroup')}
+            displayEmpty
+            onChange={onChange('homeGroup')}
+          >
+            <MenuItem value="">{t('homeGroupNone')}</MenuItem>
+            {homeGroupOptions.map((g) => (
+              <MenuItem key={g.id} value={g.id}>
+                {g.name}
+              </MenuItem>
+            ))}
+          </Select>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            {t('homeGroupHint')}
+          </Typography>
+        </FormControl>
         <FormGroup>
           <FormControlLabel
             control={
@@ -395,7 +430,7 @@ export default function UserRecordExtendedDialog({
         <Button
           onClick={() => {
             setOpen(false);
-            onClose(user, effectiveGroups);
+            onClose({ ...user, homeGroup } as UserRecordExtended, effectiveGroups);
           }}
         >
           Aktualisieren

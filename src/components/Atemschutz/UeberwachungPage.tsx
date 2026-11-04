@@ -24,6 +24,7 @@ import {
   ATEMSCHUTZ_TRUPP_COLLECTION_ID,
   buildDruckabfrage,
   canTransition,
+  editDruckabfrage,
   entsendePatch,
   erneuterEinsatz,
   mitUeberwachungsUid,
@@ -35,7 +36,10 @@ import {
   sanitizeTruppGeraete,
   uebernahmePatch,
   type AtemschutzTrupp,
+  type Druckabfrage,
   type DruckabfrageInput,
+  type TruppEvent,
+  type TruppEventInput,
   type TruppGeraet,
   type TruppInput,
   type TruppPatch,
@@ -69,11 +73,15 @@ import useVehicles from '../../hooks/useVehicles';
 import {
   addDruckabfrage,
   addTrupp,
+  deleteDruckabfrage,
+  replaceDruckabfrage,
   updateTrupp,
+  updateTruppEvent,
   updateUeberwachung,
   type AtemschutzActor,
 } from './atemschutzStore';
 import TruppDialog from './TruppDialog';
+import TruppEventDialog from './TruppEventDialog';
 import TruppZeitDialog from './TruppZeitDialog';
 import TruppGeraeteDialog from './TruppGeraeteDialog';
 import DruckabfrageDialog from './DruckabfrageDialog';
@@ -151,7 +159,9 @@ type Dialog =
       /** Der Auftrag legt eine *neue* Bereitstellung an (Trupp war zurück). */
       neueZeile?: boolean;
     }
-  | { art: 'rueckkehr'; trupp: AtemschutzTrupp };
+  | { art: 'rueckkehr'; trupp: AtemschutzTrupp }
+  | { art: 'abfrageBearbeiten'; trupp: AtemschutzTrupp; abfrage: Druckabfrage }
+  | { art: 'ereignisBearbeiten'; trupp: AtemschutzTrupp; event: TruppEvent };
 
 /**
  * Atemschutzüberwachung — die Einsatzzeitkontrolle des Gruppenkommandanten.
@@ -619,6 +629,44 @@ export default function UeberwachungPage() {
     [actorNow, firecallId, planeWarnung, schreibeTagebuch],
   );
 
+  /*
+   * Korrekturen am Druckverlauf. Kein Tagebucheintrag — was dort steht, ist
+   * geschrieben und wird nicht nachgezogen. Aber neu planen: Ein berichtigter
+   * Druck oder eine berichtigte Zeit verschiebt Prognose und Fristen genauso
+   * wie eine neue Meldung.
+   */
+  const handleEditAbfrage = useCallback(
+    async (trupp: AtemschutzTrupp, previous: Druckabfrage, input: DruckabfrageInput) => {
+      if (!trupp.id) return;
+      const stamp = actorNow();
+      const next = editDruckabfrage(previous, input, {
+        uid: stamp.userId,
+        jetzt: stamp.now,
+      });
+      await replaceDruckabfrage(firecallId, trupp.id, previous, next, stamp);
+      await planeWarnung(trupp.id);
+    },
+    [actorNow, firecallId, planeWarnung],
+  );
+
+  const handleDeleteAbfrage = useCallback(
+    async (trupp: AtemschutzTrupp, abfrage: Druckabfrage) => {
+      if (!trupp.id) return;
+      await deleteDruckabfrage(firecallId, trupp.id, abfrage, actorNow());
+      await planeWarnung(trupp.id);
+    },
+    [actorNow, firecallId, planeWarnung],
+  );
+
+  const handleEditEvent = useCallback(
+    async (trupp: AtemschutzTrupp, event: TruppEvent, input: TruppEventInput) => {
+      if (!trupp.id) return;
+      await updateTruppEvent(firecallId, trupp.id, event, input, actorNow());
+      await planeWarnung(trupp.id);
+    },
+    [actorNow, firecallId, planeWarnung],
+  );
+
   const handleGeraete = useCallback(
     async (trupp: AtemschutzTrupp, truppGeraete: TruppGeraet[]) => {
       if (!trupp.id) return;
@@ -747,6 +795,12 @@ export default function UeberwachungPage() {
       }
       onBereitZumAbmarsch={() => void handleBereitZumAbmarsch(trupp)}
       onAnSammelplatz={() => void handleAnSammelplatz(trupp)}
+      onEditAbfrage={(abfrage) =>
+        setDialog({ art: 'abfrageBearbeiten', trupp, abfrage })
+      }
+      onEditEvent={(event) =>
+        setDialog({ art: 'ereignisBearbeiten', trupp, event })
+      }
       pendingSync={!!trupp.id && pendingTruppIds.has(trupp.id)}
     />
   );
@@ -1066,6 +1120,37 @@ export default function UeberwachungPage() {
           open
           onClose={() => setDialog(undefined)}
           onConfirm={(patch) => handleRueckkehr(dialog.trupp, patch)}
+        />
+      )}
+
+      {dialog?.art === 'abfrageBearbeiten' && (
+        <DruckabfrageDialog
+          key={`${dialog.trupp.id}-${dialog.abfrage.zeitpunkt}-bearbeiten`}
+          open
+          trupp={dialog.trupp}
+          abfrage={dialog.abfrage}
+          zielMeldungFehlt={
+            !sortierteAbfragen(dialog.trupp).some((a) => a.amZiel)
+          }
+          rueckzugGemeldet={sortierteAbfragen(dialog.trupp).some(
+            (a) => a.rueckzug,
+          )}
+          onClose={() => setDialog(undefined)}
+          onSave={(input) =>
+            handleEditAbfrage(dialog.trupp, dialog.abfrage, input)
+          }
+          onDelete={() => handleDeleteAbfrage(dialog.trupp, dialog.abfrage)}
+        />
+      )}
+
+      {dialog?.art === 'ereignisBearbeiten' && (
+        <TruppEventDialog
+          key={`${dialog.trupp.id}-${dialog.event}-bearbeiten`}
+          open
+          trupp={dialog.trupp}
+          event={dialog.event}
+          onClose={() => setDialog(undefined)}
+          onSave={(input) => handleEditEvent(dialog.trupp, dialog.event, input)}
         />
       )}
     </Container>

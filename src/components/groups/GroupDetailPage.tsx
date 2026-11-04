@@ -1,6 +1,7 @@
 'use client';
 
 import EditIcon from '@mui/icons-material/Edit';
+import HomeIcon from '@mui/icons-material/Home';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import Alert from '@mui/material/Alert';
@@ -48,6 +49,7 @@ import {
   type MemberRolesData,
   type MemberRolesError,
 } from '../../app/groups/memberRolesActions';
+import { setHomeGroupForAllMembers } from '../../app/actions/homeGroup';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useCan } from '../../hooks/usePermissions';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
@@ -71,6 +73,7 @@ export default function GroupDetailPage({ groupId }: { groupId: string }) {
   const tGroups = useTranslations('groups');
   const router = useRouter();
   const allowed = useCan(groupId, 'rollen.assign');
+  const canManageGroup = useCan(groupId, 'gruppe.manage');
   const { isAdmin, groupRoles } = useFirebaseLogin();
 
   const [groups, setGroups] = useState<Group[]>([]);
@@ -81,6 +84,7 @@ export default function GroupDetailPage({ groupId }: { groupId: string }) {
   const [feedback, setFeedback] = useState<Feedback | undefined>();
   const [candidate, setCandidate] = useState<MemberCandidate | null>(null);
   const [removing, setRemoving] = useState<MemberRow | undefined>();
+  const [confirmHomeGroup, setConfirmHomeGroup] = useState(false);
 
   const errorText = useCallback(
     (error: MemberRolesError | unknown) => {
@@ -246,6 +250,26 @@ export default function GroupDetailPage({ groupId }: { groupId: string }) {
     }
   };
 
+  const assignHomeGroup = async () => {
+    setBusy(true);
+    setFeedback(undefined);
+    try {
+      const result = await setHomeGroupForAllMembers(groupId);
+      if (!result.success) {
+        setFeedback({ severity: 'error', text: errorText('forbidden') });
+        return;
+      }
+      setFeedback({
+        severity: 'success',
+        text: t('homeGroupForAllDone', { count: result.updated }),
+      });
+    } catch (err) {
+      setFeedback({ severity: 'error', text: errorText(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const breadcrumbs = (
     <Breadcrumbs sx={{ mb: 1 }} aria-label={tGroups('breadcrumbs')}>
       {isAdmin ? (
@@ -371,6 +395,19 @@ export default function GroupDetailPage({ groupId }: { groupId: string }) {
               </Typography>
               <Typography variant="body2">{data.members.length}</Typography>
             </Stack>
+          )}
+          {canManageGroup && isTenantGroupId(groupId) && (
+            <Box>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<HomeIcon />}
+                disabled={busy}
+                onClick={() => setConfirmHomeGroup(true)}
+              >
+                {t('homeGroupForAll')}
+              </Button>
+            </Box>
           )}
         </Stack>
       </Paper>
@@ -530,6 +567,19 @@ export default function GroupDetailPage({ groupId }: { groupId: string }) {
       <RoleExplanations />
 
       {dialog}
+
+      {confirmHomeGroup && (
+        <ConfirmDialog
+          title={t('homeGroupForAllTitle')}
+          text={t('homeGroupForAllText', { group: groupName })}
+          yes={t('homeGroupForAllConfirm')}
+          no={t('cancel')}
+          onConfirm={(confirmed) => {
+            setConfirmHomeGroup(false);
+            if (confirmed) assignHomeGroup();
+          }}
+        />
+      )}
 
       {removing && (
         <ConfirmDialog

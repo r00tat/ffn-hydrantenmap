@@ -123,6 +123,34 @@ Frage nicht, auf die sie zielt. `sortierteAbfragen` dagegen gibt alle
 Meldungen heraus — der Verlauf zeigt sie, und „Trupp am Einsatzziel, kein
 Druck durchgegeben" muss als Ankunft erkannt werden.
 
+### Meldungen nachträglich korrigieren
+
+Jede Zeile des Druckverlaufs — Abmarsch, jede Meldung, Rückkehr — trägt mit
+Schreibrecht einen Stift. Anlass war ein vertippter Druck, der sich nicht mehr
+berichtigen ließ: Ein falscher Wert verschiebt die Prognose und die Fristen,
+und stehenlassen ist im Einsatz keine Option.
+
+- **Meldungen** öffnen `DruckabfrageDialog` im Bearbeitungsmodus, vorbelegt
+  mit der erfassten Zeile. Ankunft und Rückzug stehen auch dann zur Wahl, wenn
+  **diese** Meldung sie trägt — sonst ließe sich ein versehentlich gesetztes
+  Ereignis nicht zurücknehmen. Gelöscht wird nach einer Rückfrage im Dialog
+  (eine doppelt erfasste Meldung).
+- Geschrieben wird mit `arrayRemove` der geladenen und `arrayUnion` der neuen
+  Fassung (`replaceDruckabfrage`) — aus demselben Grund wie beim Anhängen: Die
+  Meldung, die ein zweites Gerät eben angehängt hat, bleibt erhalten. Zwei
+  Schreibvorgänge, weil ein Update dasselbe Feld nicht zweimal ändern darf.
+  `arrayRemove` vergleicht den ganzen Eintrag; hat ein anderes Gerät dieselbe
+  Meldung inzwischen selbst korrigiert, bleiben beide Fassungen stehen — sichtbar
+  und von Hand zu bereinigen, statt still verloren.
+- Die korrigierte Meldung behält Zeitpunkt (samt Sekunden, wenn er nicht
+  geändert wurde) und Erfasser und bekommt `editedBy`/`editedAt`.
+- **Abmarsch und Rückkehr** stehen als Felder am Trupp und öffnen
+  `TruppEventDialog`: Zeit und Druck, kein Zustandswechsel. Die Rückkehr muss
+  nach dem Abmarsch liegen.
+- Nach jeder Korrektur wird der Warntermin neu geplant wie nach einer neuen
+  Meldung. Ins Einsatztagebuch geht **nichts**; ein Eintrag, der dort schon
+  steht, wird nicht nachgezogen (der Dialog sagt das).
+
 ## Ein Druck je Abfrage, nicht einer je Person
 
 > „Der Atemschutztrupp hat sich bei der Festlegung des Rückmarschzeitpunktes
@@ -1200,6 +1228,25 @@ ihn aus. Dadurch sind Tagebuch, Warntermin und Push-Registrierung dieselben
 wie auf der Seite: Ein gesprochenes „geht rein" startet die Uhr mit
 Terminplanung, ein gesprochenes „zurück" schreibt die Rückkehr ins Tagebuch.
 
+### Der Abmarschdruck gehört zum Abmarsch
+
+Im Einsatz schickte der Assistent einen Trupp hinein, ohne den gesagten Druck
+mitzugeben, und trug ihn danach mit `recordAtemschutzTruppReport` als
+Druckabfrage samt Bemerkung „Abmarschdruck" ein. Damit fehlte der
+Abmarschdruck — die Grundlage der Prognose — und im Verlauf stand eine Zeile,
+die keine Abfrage war. Zwei Riegel:
+
+1. Werkzeugbeschreibung und Systemprompt sagen ausdrücklich: Der Druck beim
+   Hineinschicken ist `pressure` im **selben** `setAtemschutzTruppStatus`-Aufruf,
+   keine Meldung.
+2. Hält sich das Modell nicht daran, fängt `planReport` es ab: Hat der Trupp
+   noch keinen Abmarschdruck und noch keine Abfrage mit Druck, und kommt eine
+   Meldung mit Druck ohne Ankunft oder Rückzug, die höchstens zwei Minuten nach
+   dem Abmarsch liegt oder deren Notiz den Abmarsch nennt, wird der Druck als
+   `druckAbmarsch` geschrieben. Eine Notiz, die nur den Abmarsch wiedergibt,
+   entfällt; eine echte Notiz bleibt als Meldung ohne Druck. Später ist eine
+   Meldung ein Messwert und bleibt eine Abfrage.
+
 ### Welcher Trupp gemeint ist
 
 Gesprochen wird „Trupp 1", „Trupp Rot" oder „der Trupp mit Muster" (ein
@@ -1258,6 +1305,7 @@ und die serverseitige Warnung fällt für die Dauer der Störung aus.
 - **Sprache der Benachrichtigung.** Der Push ist deutsch, unabhängig vom Profil
   des Empfängers. Erst wenn der Lauf die Profile aller Empfänger liest, wäre
   eine Sprache je Gerät möglich.
-- **Kein Verlauf der Änderungen.** Wird eine Druckabfrage falsch erfasst, lässt
-  sie sich derzeit nicht korrigieren — sie ist Teil des Protokolls. Ob eine
-  Korrektur mit Vermerk nötig ist, zeigt der erste Einsatz.
+- **Kein Verlauf der Korrekturen.** Eine Meldung lässt sich korrigieren und
+  trägt dann `editedBy`/`editedAt`, der alte Wert bleibt aber nicht stehen.
+  Eine Korrektur zieht auch einen schon geschriebenen Tagebucheintrag
+  (Ankunft, Rückzug, Rückkehr mit Druck) nicht nach.
