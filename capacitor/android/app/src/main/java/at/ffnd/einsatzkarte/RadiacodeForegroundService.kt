@@ -78,6 +78,8 @@ class RadiacodeForegroundService : Service() {
         // aktuell aktiven Hintergrund-Modi (Radiacode/GPS-Track/Live-Share) über
         // die JS-Owner — der Service stoppt sich nach dem letzten Modus selbst.
         const val ACTION_STOP_REQUESTED = "at.ffnd.einsatzkarte.RADIACODE_STOP_REQUESTED"
+        // „App beenden" aus der Notification: baut alle Modi ab und schließt die App.
+        const val ACTION_EXIT_APP = "at.ffnd.einsatzkarte.EXIT_APP"
         const val ACTION_BLE_CONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_CONNECT"
         const val ACTION_BLE_DISCONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_DISCONNECT"
         const val ACTION_START_TRACK = "at.ffnd.einsatzkarte.RADIACODE_START_TRACK"
@@ -299,7 +301,8 @@ class RadiacodeForegroundService : Service() {
             bleSessionActive = true
         }
         if (action != null && action != ACTION_STOP &&
-            action != ACTION_DISCONNECT_REQUESTED && action != ACTION_STOP_REQUESTED
+            action != ACTION_DISCONNECT_REQUESTED && action != ACTION_STOP_REQUESTED &&
+            action != ACTION_EXIT_APP
         ) {
             ensureForeground()
         }
@@ -337,14 +340,32 @@ class RadiacodeForegroundService : Service() {
                 }
             }
             ACTION_STOP_REQUESTED -> {
-                // Generische „Beenden"-Action: JS-Owner beenden jeden aktiven
-                // Modus über ihren regulären Stop-Pfad (hält den React-Status
-                // konsistent). Der Service stoppt sich nach dem letzten Modus
-                // selbst — kein nativer Teardown hier, um die ACTION_STOP-Races
-                // (siehe oben) nicht zu reaktivieren. Läuft gar nichts mehr,
-                // ist die Notification verwaist und der Service geht sofort.
-                RadiacodeNotificationPlugin.onStopRequested()
-                stopServiceIfIdle("ACTION_STOP_REQUESTED")
+                // „Tracking beenden" aus der Notification: Der GpsProvider
+                // beendet die Aufzeichnung über seinen regulären Stop-Pfad (hält
+                // den React-Status konsistent) und schickt danach
+                // ACTION_STOP_TRACK/ACTION_STOP_GPS_TRACK. Lebt kein WebView
+                // mehr, der das Event hören könnte, stoppt der Service die
+                // Aufzeichnung selbst — sonst bliebe der Button wirkungslos.
+                if (!RadiacodeNotificationPlugin.onStopRequested()) {
+                    trackRecorder?.stop()
+                    trackRecorder = null
+                    gpsTrackRecorder?.stop()
+                    gpsTrackRecorder = null
+                }
+                if (!stopServiceIfIdle("ACTION_STOP_REQUESTED")) {
+                    updateNotificationForState()
+                }
+            }
+            ACTION_EXIT_APP -> {
+                // „App beenden": onDestroy baut Radiacode-Session,
+                // Aufzeichnungen und Live-Standort ab — wie beim Wegwischen der
+                // App aus den letzten Apps.
+                Log.i(TAG, "ACTION_EXIT_APP — App wird beendet")
+                MainActivity.finishRunningInstance()
+                stopHighAccuracyLocation()
+                releaseWakeLock()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
             ACTION_BLE_CONNECT -> {
                 val address = intent?.getStringExtra(EXTRA_DEVICE_ADDRESS)
@@ -1117,67 +1138,63 @@ class RadiacodeForegroundService : Service() {
             this, 0, tapIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val stop = resolveStopAction()
-        val stopIntent = Intent(this, RadiacodeForegroundService::class.java).apply {
-            action = stop.action
-        }
-        // request code je Action, damit der CONNECTED_DEVICE-Pfad
-        // (ACTION_DISCONNECT_REQUESTED) und der generische Stop-Pfad
-        // (ACTION_STOP_REQUESTED) sich nicht denselben PendingIntent teilen.
-        val stopRequestCode = if (stop.action == ACTION_DISCONNECT_REQUESTED) 1 else 2
-        val stopPending = PendingIntent.getService(
-            this, stopRequestCode, stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_einsatzkarte)
             .setContentTitle(title)
             .setContentText(body)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(tapPending)
-            .addAction(0, getString(stop.labelRes), stopPending)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .build()
+        resolveNotificationActions().forEachIndexed { index, a ->
+            val intent = Intent(this, RadiacodeForegroundService::class.java).apply {
+                action = a.action
+            }
+            // Eigener request code je Action, damit sich die Buttons nicht
+            // denselben PendingIntent teilen.
+            val pending = PendingIntent.getService(
+                this, index + 1, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.addAction(0, getString(a.labelRes), pending)
+        }
+        return builder.build()
     }
 
-    private data class StopAction(val labelRes: Int, val action: String)
+    private data class NotificationAction(val labelRes: Int, val action: String)
 
     /**
-     * Wählt Label und Intent-Action der Notification-„Beenden"-Action passend
-     * zu den aktuell laufenden Modi:
-     * - Radiacode aktiv (ggf. + weitere) → „Trennen" (trennt die BLE-Session
-     *   über den bestehenden disconnectRequested-Pfad).
-     * - sonst nur Live-Share → „Teilen beenden".
-     * - sonst nur GPS-/Track-Aufzeichnung → „Aufzeichnung beenden".
-     * - sonst mehrere Nicht-Radiacode-Modi → „Im Hintergrund beenden".
+     * Buttons der Notification passend zu den laufenden Modi:
+     * - Radiacode verbunden → „Radiacode trennen".
+     * - GPS- oder Radiacode-Aufzeichnung → „Tracking beenden".
+     * - sonst (Verbindungsaufbau, nur Live-Standort, nichts) → „App beenden".
+     *
+     * „Radiacode trennen" erscheint nur bei fertigem Handshake (`deviceReady`).
+     * Während Verbindungsaufbau oder Reconnect-Schleife (Gerät aus) war früher
+     * „Trennen" zu sehen, obwohl kein Gerät verbunden war.
      */
-    private fun resolveStopAction(): StopAction {
-        val track = gpsTrackRecorder != null || trackRecorder != null
-        val liveShare = liveLocationPusher != null
-        return when {
-            radiaCode != null || currentAddress != null -> StopAction(
-                R.string.radiacode_notification_action_disconnect,
-                ACTION_DISCONNECT_REQUESTED,
-            )
-            track && liveShare -> StopAction(
-                R.string.radiacode_notification_action_stop_background,
-                ACTION_STOP_REQUESTED,
-            )
-            liveShare -> StopAction(
-                R.string.radiacode_notification_action_stop_share,
-                ACTION_STOP_REQUESTED,
-            )
-            track -> StopAction(
-                R.string.radiacode_notification_action_stop_track,
-                ACTION_STOP_REQUESTED,
-            )
-            else -> StopAction(
+    private fun resolveNotificationActions(): List<NotificationAction> {
+        val actions = mutableListOf<NotificationAction>()
+        if (deviceReady) {
+            actions += NotificationAction(
                 R.string.radiacode_notification_action_disconnect,
                 ACTION_DISCONNECT_REQUESTED,
             )
         }
+        if (gpsTrackRecorder != null || trackRecorder != null) {
+            actions += NotificationAction(
+                R.string.radiacode_notification_action_stop_track,
+                ACTION_STOP_REQUESTED,
+            )
+        }
+        if (actions.isEmpty()) {
+            actions += NotificationAction(
+                R.string.radiacode_notification_action_exit_app,
+                ACTION_EXIT_APP,
+            )
+        }
+        return actions
     }
 
     private fun ensureChannel() {

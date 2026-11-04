@@ -5,12 +5,11 @@ import { RadiacodeNotification } from './radiacodeNotification';
 
 /**
  * Abonniert das native `stopRequested`-Event des Foreground-Service und ruft
- * `onStop` auf, wenn der Nutzer die „Beenden"-Action der Notification antippt.
+ * `onStop` auf, wenn der Nutzer „Tracking beenden" in der Notification antippt.
  *
- * Jeder Owner eines Hintergrund-Modus (Radiacode-BLE, GPS-Track, Live-Share)
- * verwendet diesen Hook mit seiner eigenen Stop-Funktion. So beendet ein Tap
- * auf die Notification jeden aktuell aktiven Modus über dessen bestehenden
- * Teardown-Pfad — der Service beendet sich, sobald der letzte Modus weg ist.
+ * Der GpsProvider beendet damit die GPS-/Radiacode-Aufzeichnung über seinen
+ * bestehenden Stop-Pfad. Radiacode trennen und „App beenden" laufen über
+ * eigene Wege (`disconnectRequested` bzw. nativ im Service).
  *
  * Der Handler wird in einem Ref gehalten, damit ein State-Wechsel im Owner
  * kein Re-Subscribe auslöst, aber beim Event-Eintritt immer die aktuelle
