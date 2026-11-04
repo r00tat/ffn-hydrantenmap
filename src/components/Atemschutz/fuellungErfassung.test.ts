@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FuellungInput } from '../../common/atemschutz';
-import { buildFuellungDocument } from './fuellungErfassung';
+import { buildFuellungDocument, foreignDeviceRefs } from './fuellungErfassung';
 
 const basis: FuellungInput = {
   flaschenNummer: '2.16.19',
@@ -85,5 +85,37 @@ describe('buildFuellungDocument', () => {
     expect(
       buildFuellungDocument(basis, { firecallId: '', now: 'T' }).zeitpunkt,
     ).toBe('T');
+  });
+});
+
+describe('Herkunft der Flasche', () => {
+  it('schreibt die Gruppe der erkannten Flasche mit', () => {
+    const doc = buildFuellungDocument(
+      { ...basis, geraetId: 'f1', geraetGroupId: 'ffnd' },
+      { firecallId: '', now: 'T' },
+    );
+    expect(doc.geraetGroupId).toBe('ffnd');
+  });
+
+  it('ohne erkannte Flasche keine Gruppe', () => {
+    const doc = buildFuellungDocument(
+      { ...basis, geraetGroupId: 'ffnd' },
+      { firecallId: '', now: 'T' },
+    );
+    expect('geraetGroupId' in doc).toBe(false);
+  });
+});
+
+describe('foreignDeviceRefs', () => {
+  it('nennt jede Flasche aus einer anderen Gruppe genau einmal', () => {
+    expect(
+      foreignDeviceRefs('bezirk', [
+        { geraetId: 'f1', geraetGroupId: 'ffnd' },
+        { geraetId: 'f1', geraetGroupId: 'ffnd' },
+        { geraetId: 'f2', geraetGroupId: 'bezirk' },
+        { geraetId: 'f3' },
+        { geraetGroupId: 'ffnd' },
+      ]),
+    ).toEqual([{ groupId: 'ffnd', geraetId: 'f1' }]);
   });
 });

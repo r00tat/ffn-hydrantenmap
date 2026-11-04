@@ -28,9 +28,11 @@ import { isFirecallGuest } from '../../common/firecallGuest';
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
 import OfflineListHint from '../site/OfflineListHint';
 import useAtemschutzFuellungen from '../../hooks/useAtemschutzFuellungen';
-import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
+import useAtemschutzGeraete, {
+  useAtemschutzSearchGroupIds,
+} from '../../hooks/useAtemschutzGeraete';
+import useAtemschutzOpenMangel from '../../hooks/useAtemschutzOpenMangel';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
-import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
@@ -101,8 +103,11 @@ export default function AtemschutzPage() {
   );
 
   const groupId = firecall?.group;
+  // Gesucht wird in allen Gruppen des Benutzers, protokolliert in der des
+  // Einsatzes — ein Bezirkseinsatz findet so die Flaschen der eigenen Wehr.
+  const searchGroupIds = useAtemschutzSearchGroupIds(groupId);
   const { flaschen, activeGeraete, fuellstationen, feuerwehren } =
-    useAtemschutzGeraete(groupId);
+    useAtemschutzGeraete(searchGroupIds);
   const { trupps, ausgabeByGeraet, fromCache } =
     useAtemschutzEinsatzdaten(firecallId);
   // Das Füllprotokoll liegt unter der Gruppe; hier wird es auf diesen Einsatz
@@ -112,10 +117,8 @@ export default function AtemschutzPage() {
   });
   const eigeneFeuerwehr = useGroupFeuerwehrName(groupId);
 
-  // Nur die Ausrüstungsmängel: Fahrzeugmängel gehören nicht an diese Liste.
-  const { openCountByGeraet } = useFahrtenbuchMangel(groupId, {
-    itemType: 'atemschutz',
-  });
+  // Nur die Ausrüstungsmängel, aus der Gruppe des jeweiligen Geräts.
+  const openCountByGeraet = useAtemschutzOpenMangel(searchGroupIds);
 
   const empfaengerVorschlaege = useMemo(() => {
     const namen = new Set<string>();

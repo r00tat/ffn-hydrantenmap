@@ -46,7 +46,9 @@ import {
 } from '../../common/atemschutzUeberwachung';
 import useAtemschutzEinsatzdaten from '../../hooks/useAtemschutzEinsatzdaten';
 import OfflineListHint from '../site/OfflineListHint';
-import useAtemschutzGeraete from '../../hooks/useAtemschutzGeraete';
+import useAtemschutzGeraete, {
+  useAtemschutzSearchGroupIds,
+} from '../../hooks/useAtemschutzGeraete';
 import useAtemschutzPersonSuggestions from '../../hooks/useAtemschutzPersonSuggestions';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
@@ -188,7 +190,7 @@ export default function UeberwachungPage() {
 
   const groupId = firecall?.group;
   const { flaschen, activeGeraete, feuerwehren } =
-    useAtemschutzGeraete(groupId);
+    useAtemschutzGeraete(useAtemschutzSearchGroupIds(groupId));
   const { trupps, fromCache } = useAtemschutzEinsatzdaten(firecallId);
   // Für den Sprach-Assistenten: Ohne die Elemente liefen dort `updateItem`,
   // `deleteItem` und `answerQuestion` stillschweigend ins Leere.

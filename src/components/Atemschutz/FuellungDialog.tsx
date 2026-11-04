@@ -306,6 +306,14 @@ export default function FuellungDialog({
 
   const input: FuellungInput = {
     geraetId: form.geraetId,
+    // Die Gruppe der Flasche, nicht die des Protokolls: Gesucht wird über alle
+    // Gruppen des Benutzers. Ist die Flasche nicht (mehr) in der Liste, bleibt
+    // die gespeicherte Herkunft stehen, solange die Zeile auf dieselbe zeigt.
+    geraetGroupId:
+      gewaehlt?.groupId ??
+      (form.geraetId && form.geraetId === fuellung?.geraetId
+        ? fuellung.geraetGroupId
+        : undefined),
     flaschenNummer: form.flaschenNummer,
     feuerwehr: form.feuerwehr,
     anzahl: hatFlaschennummer ? 1 : Number(form.anzahl) || 0,
@@ -380,7 +388,7 @@ export default function FuellungDialog({
       // Der Mangel zuerst: Schlägt er fehl, soll im Protokoll nicht „Mangel"
       // stehen, ohne dass er in der Mängelliste angekommen ist.
       const mangelId = mangelGeraet
-        ? await saveAtemschutzMangel(groupId, mangelGeraet.id as string, mangel)
+        ? await saveAtemschutzMangel(groupId, mangelGeraet, mangel)
         : undefined;
       await onSave(mangelId ? { ...input, mangelId } : input);
       onClose();

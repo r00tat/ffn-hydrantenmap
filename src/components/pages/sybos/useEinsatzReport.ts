@@ -5,7 +5,9 @@ import { getBlaulichtSmsAlarmById } from '../../../app/blaulicht-sms/actions';
 import type { BlaulichtSmsAlarm } from '../../../common/blaulichtsms';
 import { vorgabeGeraetesatz } from '../../../common/atemschutzUeberwachung';
 import useAtemschutzEinsatzdaten from '../../../hooks/useAtemschutzEinsatzdaten';
-import useAtemschutzGeraete from '../../../hooks/useAtemschutzGeraete';
+import useAtemschutzGeraete, {
+  useAtemschutzSearchGroupIds,
+} from '../../../hooks/useAtemschutzGeraete';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import useGeraete from '../../../hooks/useGeraete';
 import useOnline from '../../../hooks/useOnline';
@@ -76,7 +78,9 @@ export function useAtemschutzReport(firecall: Firecall) {
   const { trupps, ausgaben } = useAtemschutzEinsatzdaten(firecall.id);
   // Gerätesatz für die Druckkurve, wenn am Trupp keiner steht — wie auf der
   // Überwachungsseite aus dem Flaschenbestand der Gruppe.
-  const { flaschen } = useAtemschutzGeraete(firecall.group);
+  const { flaschen } = useAtemschutzGeraete(
+    useAtemschutzSearchGroupIds(firecall.group),
+  );
   const vorgabe = useMemo(() => vorgabeGeraetesatz(flaschen), [flaschen]);
 
   const truppRows = useMemo(() => buildTruppRows(trupps.protokoll), [trupps.protokoll]);

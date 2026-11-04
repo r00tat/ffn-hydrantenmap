@@ -23,6 +23,7 @@ import {
   GROUP_STAMMDATEN_DOC,
 } from '../common/groupStammdaten';
 import { KOSTENERSATZ_VEHICLES_COLLECTION } from '../common/kostenersatz';
+import { isTenantGroupId } from '../common/tenantGroups';
 import { FIRECALL_MAP_LAYERS_COLLECTION_ID } from '../common/mapLayers';
 import { queryClusters } from '../components/firebase/clusterQuery';
 import { firestore } from '../components/firebase/firebase';
@@ -158,6 +159,18 @@ export function warmGroupCache(
       // Eigene Flotte: ordnet in der Besatzung die eigenen Fahrzeuge vor
       // (useOwnFleet). Liegt nicht unter der Gruppe, sondern global.
       collectionTask(KOSTENERSATZ_VEHICLES_COLLECTION),
+    );
+  }
+
+  // Die Flaschensuche am Sammelplatz reicht über alle Gruppen des Benutzers
+  // (`atemschutzSearchGroupIds`) — offline fehlte sonst gerade der Bestand der
+  // eigenen Feuerwehr in einem Bezirkseinsatz.
+  for (const other of groups) {
+    if (other === groupId || !isTenantGroupId(other)) continue;
+    tasks.push(
+      collectionTask(
+        `${GROUP_COLLECTION_ID}/${other}/${ATEMSCHUTZ_GERAET_COLLECTION_ID}`,
+      ),
     );
   }
 

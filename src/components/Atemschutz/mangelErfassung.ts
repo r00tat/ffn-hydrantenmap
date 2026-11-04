@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { v4 as uuid } from 'uuid';
+import type { AtemschutzGeraet } from '../../common/atemschutz';
 import { MANGEL_MAX_IMAGE_BYTES } from '../../common/mangel';
 import {
   MangelImageError,
@@ -40,10 +41,16 @@ export function hatMangelEingabe(eingabe: MangelEingabe): boolean {
  * übersetzt beides.
  */
 export async function saveAtemschutzMangel(
-  groupId: string,
-  geraetId: string,
+  workGroupId: string,
+  geraet: Pick<AtemschutzGeraet, 'id' | 'groupId'>,
   eingabe: MangelEingabe,
 ): Promise<string> {
+  // Der Mangel gehört in die Gruppe des Geräts: Dort liest ihn der
+  // Gerätemeister, und nur dort findet die Server Action das Gerät. Die
+  // Arbeitsgruppe (Einsatz, Füllprotokoll) ist nur der Rückfall für ein Gerät,
+  // das ohne Herkunft geladen wurde.
+  const groupId = geraet.groupId ?? workGroupId;
+  const geraetId = geraet.id as string;
   const mangelId = uuid();
   let images: string[] = [];
   if (eingabe.images.length > 0) {

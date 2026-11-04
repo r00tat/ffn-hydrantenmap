@@ -85,6 +85,9 @@ describe('firestoreWarmup', () => {
     const calls = hoisted.getDocs.mock.calls.map((c) => c[0]);
     const paths = calls.map((q) => q.path);
     expect(paths).toContain('groups/g1/atemschutzGeraet');
+    // Die Flaschensuche reicht über alle Gruppen des Benutzers.
+    expect(paths).toContain('groups/g2/atemschutzGeraet');
+    expect(paths.filter((p) => p === 'groups/g1/atemschutzGeraet')).toHaveLength(1);
     expect(paths).toContain('groups/g1/vehicle');
     expect(paths).toContain('groups/g1/person');
     // Eigene Flotte für die Besatzungsgruppen (useOwnFleet).
@@ -118,6 +121,13 @@ describe('firestoreWarmup', () => {
       .map((c) => c[0])
       .filter((q) => q.path === 'call');
     expect(lists).toHaveLength(2);
+  });
+
+  it('wärmt keinen Gerätebestand von Nicht-Mandanten vor', async () => {
+    await warmGroupCache({ groups: ['allUsers', 'g1'] });
+    const paths = hoisted.getDocs.mock.calls.map((c) => c[0].path);
+    expect(paths).toContain('groups/g1/atemschutzGeraet');
+    expect(paths).not.toContain('groups/allUsers/atemschutzGeraet');
   });
 
   it('ohne Gruppe und Standort fragt es nichts Gruppenbezogenes ab', async () => {

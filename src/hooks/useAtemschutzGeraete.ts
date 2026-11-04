@@ -7,8 +7,9 @@ import {
   type AtemschutzGeraet,
   type AtemschutzGeraetTyp,
 } from '../common/atemschutz';
-import { GROUP_COLLECTION_ID } from '../components/firebase/firestore';
-import useFirebaseCollection from './useFirebaseCollection';
+import { atemschutzSearchGroupIds } from './atemschutzSearchGroups';
+import useFirebaseLogin from './useFirebaseLogin';
+import useGroupsCollection from './useGroupsCollection';
 
 export interface UseAtemschutzGeraeteResult {
   geraete: AtemschutzGeraet[];
@@ -21,28 +22,31 @@ export interface UseAtemschutzGeraeteResult {
   feuerwehren: string[];
 }
 
+const BEZEICHNUNG_ASC = [orderBy('bezeichnung', 'asc')];
+
 /**
- * Die Atemschutz-Ausrüstung einer Gruppe.
+ * Die Atemschutz-Ausrüstung einer oder mehrerer Gruppen.
  *
  * Lädt bewusst die ganze Liste und filtert im Speicher: Es sind einige hundert
- * Dokumente, und die Codesuche beim Scannen braucht ohnehin alle Kennungen auf
- * einmal — eine Abfrage je Scan wäre langsamer und bräuchte einen Index.
+ * Dokumente je Gruppe, und die Codesuche beim Scannen braucht ohnehin alle
+ * Kennungen auf einmal — eine Abfrage je Scan wäre langsamer und bräuchte
+ * einen Index.
+ *
+ * Jedes Gerät trägt `groupId`, die Gruppe, der es gehört. Die IDs sind
+ * Firestore-Auto-IDs und damit über Gruppen hinweg eindeutig; `geraeteById`
+ * braucht deshalb keinen zusammengesetzten Schlüssel.
  */
 export default function useAtemschutzGeraete(
-  groupId?: string,
+  groupIds: readonly string[],
 ): UseAtemschutzGeraeteResult {
-  const geraete = useFirebaseCollection<AtemschutzGeraet>({
-    // Leerer String heißt: keine Subscription. Ein leeres `pathSegments`
-    // allein abonnierte die Wurzel-Collection `groups`, die kein Client lesen
-    // darf — dieselbe Vorsichtsmaßnahme wie in `useFahrtenbuchVehicles`.
-    collectionName: groupId ? GROUP_COLLECTION_ID : '',
-    pathSegments: groupId ? [groupId, ATEMSCHUTZ_GERAET_COLLECTION_ID] : [],
-    queryConstraints: [orderBy('bezeichnung', 'asc')],
-  });
+  const geraete = useGroupsCollection<AtemschutzGeraet>(
+    groupIds,
+    ATEMSCHUTZ_GERAET_COLLECTION_ID,
+    BEZEICHNUNG_ASC,
+  );
 
   return useMemo(() => {
-    const list = groupId ? (geraete ?? []) : [];
-    const byNummer = [...list].sort((a, b) =>
+    const byNummer = [...geraete].sort((a, b) =>
       (a.nummer ?? a.bezeichnung).localeCompare(
         b.nummer ?? b.bezeichnung,
         'de',
@@ -62,5 +66,22 @@ export default function useAtemschutzGeraete(
         ...new Set(byNummer.map((g) => g.feuerwehr).filter(Boolean)),
       ].sort((a, b) => a.localeCompare(b, 'de')),
     };
-  }, [groupId, geraete]);
+  }, [geraete]);
+}
+
+/**
+ * Die Gruppen, in denen der Benutzer suchen darf, mit `groupId` als
+ * Arbeitsgruppe vorneweg — siehe `atemschutzSearchGroupIds`.
+ */
+export function useAtemschutzSearchGroupIds(groupId?: string): string[] {
+  const { groupRoles } = useFirebaseLogin();
+  // groupRoles ist je Render ein neues Objekt; der Schlüssel hält das Ergebnis stabil.
+  const rolesKey = JSON.stringify(groupRoles ?? {});
+  return useMemo(
+    () =>
+      atemschutzSearchGroupIds(groupId, {
+        groupRoles: JSON.parse(rolesKey),
+      }),
+    [groupId, rolesKey],
+  );
 }

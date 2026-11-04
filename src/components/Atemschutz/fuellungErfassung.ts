@@ -1,4 +1,4 @@
-import type { FuellungInput } from '../../common/atemschutz';
+import type { AtemschutzFuellung, FuellungInput } from '../../common/atemschutz';
 import type { NeueFuellung } from './atemschutzStore';
 
 export interface FuellungKontext {
@@ -33,6 +33,9 @@ export function buildFuellungDocument(
     input.firecallId !== undefined ? input.firecallName : kontext.firecallName;
   return {
     ...(input.geraetId ? { geraetId: input.geraetId } : {}),
+    ...(input.geraetId && input.geraetGroupId
+      ? { geraetGroupId: input.geraetGroupId }
+      : {}),
     ...(input.flaschenNummer?.trim()
       ? { flaschenNummer: input.flaschenNummer.trim() }
       : {}),
@@ -57,4 +60,27 @@ export function buildFuellungDocument(
     verrechnen: input.verrechnen,
     zweck: input.zweck,
   };
+}
+
+/** Eine Flasche, eindeutig über Gruppe und ID. */
+export interface DeviceRef {
+  groupId: string;
+  geraetId: string;
+}
+
+/**
+ * Die Flaschen, auf die Füllungen zeigen, die aber in einer anderen Gruppe als
+ * `groupId` liegen — jede genau einmal. Zeilen ohne `geraetGroupId` gehören zur
+ * eigenen Gruppe und stehen hier nicht.
+ */
+export function foreignDeviceRefs(
+  groupId: string,
+  fuellungen: ReadonlyArray<Pick<AtemschutzFuellung, 'geraetId' | 'geraetGroupId'>>,
+): DeviceRef[] {
+  const refs = new Map<string, DeviceRef>();
+  for (const { geraetId, geraetGroupId } of fuellungen) {
+    if (!geraetId || !geraetGroupId || geraetGroupId === groupId) continue;
+    refs.set(`${geraetGroupId}/${geraetId}`, { groupId: geraetGroupId, geraetId });
+  }
+  return [...refs.values()];
 }

@@ -56,6 +56,7 @@ vi.mock('../../hooks/useAtemschutzRechnungConfig', () => ({
 }));
 
 vi.mock('../../hooks/useAtemschutzGeraete', () => ({
+  useAtemschutzSearchGroupIds: (groupId?: string) => (groupId ? [groupId] : []),
   default: () => ({
     geraete: [],
     activeGeraete: [],
