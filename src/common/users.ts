@@ -26,6 +26,12 @@ export interface FirebaseUserInfo {
   groupPerms?: Record<string, Permission[]>;
   /** Vereinigung von `groupPerms` für globale Sammlungen (Tarife, Vorlagen). */
   permsAny?: Permission[];
+  /**
+   * Heimatgruppe: Vorauswahl der Gruppenseiten und neuer Einsätze. Keine
+   * Berechtigung; geschrieben nur über `writeHomeGroup()`
+   * (src/server/auth/homeGroup.ts). Leer heißt „keine Heimatgruppe".
+   */
+  homeGroup?: string;
   /** `ROLES_CATALOG_VERSION` zum Zeitpunkt der Ableitung. */
   rolesCatalogVersion?: number;
   /** @deprecated nur Migration, ersetzt durch die Rolle `geraetemeister`. */

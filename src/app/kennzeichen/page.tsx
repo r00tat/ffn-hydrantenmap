@@ -26,6 +26,8 @@ import type { Vehicle } from './parseVehicleData';
 import RescueSheetMatches from '../../components/Rettungskarten/RescueSheetMatches';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { selectDefaultGroupId } from '../../common/homeGroup';
 
 /** Outcome of writing the query result to the Einsatztagebuch. */
 type DiaryStatus = 'written' | 'failed' | 'no-firecall';
@@ -36,6 +38,7 @@ const KennzeichenPage = () => {
   const firecall = useFirecall();
   const firecallId = useFirecallId();
   const addFirecallItem = useFirecallItemAdd();
+  const { homeGroup } = useFirebaseLogin();
 
   const [groupId, setGroupId] = useState<string | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
@@ -49,20 +52,21 @@ const KennzeichenPage = () => {
   useEffect(() => {
     getGroupsWithOebfvConfig()
       .then((groups) => {
-        if (groups.length === 0) {
-          setGroupId(null);
-        } else if (firecall?.group && groups.includes(firecall.group)) {
-          setGroupId(firecall.group);
-        } else {
-          setGroupId(groups[0]);
-        }
+        // Die Gruppe des Einsatzes zuerst, dann die Heimatgruppe.
+        setGroupId(
+          selectDefaultGroupId({
+            groupIds: groups,
+            manualGroupId: firecall?.group,
+            homeGroup,
+          }) ?? null,
+        );
       })
       .catch((err) => {
         console.error('Failed to load ÖBFV groups:', err);
         setGroupId(null);
       })
       .finally(() => setConfigLoading(false));
-  }, [firecall?.group]);
+  }, [firecall?.group, homeGroup]);
 
   /**
    * Documents the query and its result in the Einsatztagebuch. Only called

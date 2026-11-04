@@ -40,6 +40,12 @@ export interface LoginData {
    * Sitzung bzw. im Zwischenspeicher, nicht in den Token-Claims.
    */
   groupRoles?: GroupRoles;
+  /**
+   * Heimatgruppe (`homeGroup` am Benutzerdokument): Vorauswahl der
+   * Gruppenseiten, siehe `src/common/homeGroup.ts`. Kommt aus dem Listener
+   * auf das eigene Benutzerdokument, nicht aus der Sitzung.
+   */
+  homeGroup?: string;
   isRefreshing?: boolean;
   myGroups: Group[];
   needsReLogin?: boolean;

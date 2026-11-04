@@ -533,6 +533,15 @@
       "einsatzTitle": "Trupp in den Einsatz schicken",
       "abmarschZeit": "Abmarsch (Anschließen der Luftversorgung)",
       "druckabfrageTitle": "Druckabfrage / Status",
+      "meldungBearbeitenTitle": "Meldung bearbeiten",
+      "abmarschBearbeitenTitle": "Abmarsch bearbeiten",
+      "rueckkehrBearbeitenTitle": "Rückkehr bearbeiten",
+      "zeileBearbeiten": "Zeile bearbeiten",
+      "ereignisDruck": "Geringster Druck im Trupp (bar) — optional",
+      "ereignisZeit": "Uhrzeit",
+      "meldungLoeschen": "Meldung löschen",
+      "meldungLoeschenBestaetigen": "Diese Meldung wirklich löschen?",
+      "korrekturTagebuchHinweis": "Eine Korrektur ändert keinen Eintrag, der schon im Einsatztagebuch steht.",
       "druck": "Geringster Druck im Trupp (bar) — optional",
       "druckHint": "Maßgeblich ist der Geräteträger mit dem größten Luftverbrauch.",
       "druckOptionalHint": "Ohne Druck wird die Meldung als Statusmeldung gespeichert.",
@@ -630,7 +639,9 @@
       },
       "errors": {
         "druckInvalid": "Druck muss zwischen 0 und 400 bar liegen",
-        "leereMeldung": "Ohne Druck braucht die Meldung eine Ankunft, einen Rückzug oder eine Bemerkung"
+        "leereMeldung": "Ohne Druck braucht die Meldung eine Ankunft, einen Rückzug oder eine Bemerkung",
+        "zeitInvalid": "Bitte eine Uhrzeit angeben",
+        "zeitReihenfolge": "Die Rückkehr muss nach dem Abmarsch liegen"
       },
       "push": {
         "truppOhneName": "Atemschutztrupp",
@@ -1161,7 +1172,10 @@
     "firecallWrite": "Schreibzugriff auf den Einsatz",
     "firecallWriteHint": "Wirkt beim nächsten Aktualisieren des Zugangs (spätestens nach 45 Minuten).",
     "rolesHint": "Hier legst du nur die Mitgliedschaft fest. Rollen je Gruppe vergibst du unter Gruppen → Mitglieder und Rollen.",
-    "groupViaSubgroup": "über eine Untergruppe"
+    "groupViaSubgroup": "über eine Untergruppe",
+    "homeGroup": "Heimatgruppe",
+    "homeGroupNone": "Keine",
+    "homeGroupHint": "Vorauswahl auf Gruppenseiten wie Füllprotokoll, Geräte oder Fahrtenbuch und für neue Einsätze. Nur Gruppen, in denen der Benutzer Mitglied ist."
   },
   "header": {
     "appTitle": "Einsatzkarte",
@@ -1868,6 +1882,13 @@
     "claimsOutdated": "Deine Autorisierung hat sich geändert. Um die neuen Rechte nutzen zu können, musst du dich aus- und neu einloggen.",
     "groupsInDb": "Deine aktuellen Gruppen laut Datenbank: {groups}",
     "groupsInToken": "Deine Gruppen laut Login: {groups}",
+    "homeGroup": {
+      "label": "Heimatgruppe",
+      "none": "Keine",
+      "description": "Deine Heimatgruppe ist auf Gruppenseiten wie Füllprotokoll, Geräte oder Fahrtenbuch und für neue Einsätze vorausgewählt. Der Umschalter auf einer Seite wechselt die Gruppe nur für diese Seite.",
+      "saved": "Heimatgruppe gespeichert",
+      "error": "Heimatgruppe konnte nicht gespeichert werden"
+    },
     "language": {
       "sectionTitle": "Sprache",
       "description": "Wähle die Sprache der Oberfläche. Die Einstellung wird mit deinem Benutzerprofil gespeichert.",
@@ -2622,6 +2643,8 @@
     "draftConfirm": "Übernehmen",
     "draftDiscard": "Verwerfen",
     "draftAdded": "{count, plural, one {Leitung übernommen} other {# Leitungen übernommen}}",
+    "liveUnavailableRetry": "Live-Gespräch gerade nicht erreichbar – ich nehme einen einzelnen Befehl auf. In einer Minute versuche ich Live wieder.",
+    "liveUnavailablePermanent": "Live-Gespräch ist hier nicht verfügbar – ich nehme einen einzelnen Befehl auf.",
     "draftFailed": "Leitung konnte nicht angelegt werden",
     "draftConfirmAll": "Alle {count} übernehmen",
     "draftDiscardAll": "Alle verwerfen",

@@ -28,6 +28,7 @@ import { GeoPositionObject } from '../../common/geo';
 import { FIRECALL_ARTEN, FirecallArt } from '../../common/firecallArt';
 import { parseTimestamp } from '../../common/time-format';
 import { defaultPosition } from '../../hooks/constants';
+import { selectDefaultGroupId } from '../../common/homeGroup';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useOnline from '../../hooks/useOnline';
 import { useFirecallSelect } from '../../hooks/useFirecall';
@@ -76,7 +77,7 @@ export default function EinsatzDialog({
   const [einsatz, setEinsatz] = useState<Firecall>(
     einsatzDefault || createDefaultEinsatz()
   );
-  const { email, myGroups } = useFirebaseLogin();
+  const { email, myGroups, homeGroup } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
   const showSnackbar = useSnackbar();
   const [saving, setSaving] = useState(false);
@@ -121,20 +122,24 @@ export default function EinsatzDialog({
       );
   }, [online]);
 
-  // For new Einsätze: default the group to the first one the user is a
-  // member of as soon as `myGroups` is available. Avoids a hardcoded
-  // default that may not match the user's permissions.
+  // For new Einsätze: default the group to the user's home group, otherwise
+  // the first one the user is a member of, as soon as `myGroups` is
+  // available. Avoids a hardcoded default that may not match the user's
+  // permissions.
   useEffect(() => {
     if (!isNewEinsatz) return;
     if (einsatz.group) return;
     if (myGroups.length === 0) return;
-    const defaultGroup = myGroups[0].id;
+    const defaultGroup = selectDefaultGroupId({
+      groupIds: myGroups.map((g) => g.id).filter((id): id is string => !!id),
+      homeGroup,
+    });
     if (!defaultGroup) return;
     setEinsatz((prev) =>
       prev.group ? prev : { ...prev, group: defaultGroup },
     );
     setSelectedGroup((prev) => prev || defaultGroup);
-  }, [isNewEinsatz, einsatz.group, myGroups]);
+  }, [isNewEinsatz, einsatz.group, myGroups, homeGroup]);
 
   // Fetch alarms when selected group changes and has credentials.
   // Whenever no fresh alarm gets auto-applied (group has no credentials,
