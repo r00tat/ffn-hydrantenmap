@@ -1,3 +1,5 @@
+import { isFirecallGuest } from './firecallGuest';
+import { userMemberGroupIds, type UserRolesSource } from './userGroupRoles';
 import { isTenantGroupId } from './tenantGroups';
 
 /**
@@ -78,4 +80,29 @@ export function homeGroupFirst<T extends { id?: string }>(
   const index = homeGroup ? groups.findIndex((g) => g.id === homeGroup) : -1;
   if (index <= 0) return groups;
   return [groups[index], ...groups.slice(0, index), ...groups.slice(index + 1)];
+}
+
+export interface HomeGroupUserSource {
+  uid: string;
+  data: UserRolesSource & { firecall?: string; homeGroup?: unknown };
+}
+
+/**
+ * Wer beim „Für alle Mitglieder als Heimatgruppe setzen" geschrieben wird:
+ * jedes Mitglied der Gruppe, das sie noch nicht als Heimatgruppe hat.
+ * Einsatz-Gäste bleiben draußen — sie sehen keine Gruppenseiten.
+ */
+export function usersToAssignHomeGroup(
+  users: HomeGroupUserSource[],
+  groupId: string,
+): string[] {
+  if (!isTenantGroupId(groupId)) return [];
+  return users
+    .filter(
+      ({ data }) =>
+        !isFirecallGuest(data) &&
+        normalizeHomeGroup(data.homeGroup) !== groupId &&
+        userMemberGroupIds(data).includes(groupId),
+    )
+    .map(({ uid }) => uid);
 }

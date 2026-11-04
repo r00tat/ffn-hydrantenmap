@@ -1,7 +1,11 @@
 import 'server-only';
 
 import { FieldValue } from 'firebase-admin/firestore';
-import { resolveHomeGroupWrite } from '../../common/homeGroup';
+import {
+  resolveHomeGroupWrite,
+  usersToAssignHomeGroup,
+  type HomeGroupUserSource,
+} from '../../common/homeGroup';
 import { userMemberGroupIds } from '../../common/userGroupRoles';
 import type { FirebaseUserInfo } from '../../common/users';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
@@ -50,4 +54,40 @@ export async function writeHomeGroup(
       await ref.update({ homeGroup: write.groupId });
       return { homeGroup: write.groupId };
   }
+}
+
+/** Firestore nimmt höchstens 500 Schreibvorgänge je Batch. */
+const BATCH_LIMIT = 500;
+
+/**
+ * Setzt `groupId` als Heimatgruppe bei allen Mitgliedern der Gruppe — der Knopf
+ * in der Gruppenkonfiguration. Überschreibt eine andere Heimatgruppe bewusst:
+ * Gedacht ist er für eine Feuerwehr, deren Mitglieder alle hier zu Hause sind
+ * und nicht jeder einzeln im Profil nachziehen soll.
+ *
+ * Gelesen wird das ganze Benutzerverzeichnis, weil die Mitgliedschaft in
+ * `groupRoles` als Schlüssel steckt (bzw. im alten Feld `groups`) und sich so
+ * nicht abfragen lässt. Bei der Größe einer Feuerwehr ist das unkritisch.
+ */
+export async function assignHomeGroupToMembers(
+  groupId: string,
+): Promise<{ updated: number }> {
+  const collection = firestore.collection(USER_COLLECTION_ID);
+  const snapshot = await collection.get();
+  const uids = usersToAssignHomeGroup(
+    snapshot.docs.map((doc) => ({
+      uid: doc.id,
+      data: (doc.data() ?? {}) as HomeGroupUserSource['data'],
+    })),
+    groupId,
+  );
+
+  for (let i = 0; i < uids.length; i += BATCH_LIMIT) {
+    const batch = firestore.batch();
+    for (const uid of uids.slice(i, i + BATCH_LIMIT)) {
+      batch.update(collection.doc(uid), { homeGroup: groupId });
+    }
+    await batch.commit();
+  }
+  return { updated: uids.length };
 }

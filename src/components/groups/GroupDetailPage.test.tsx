@@ -11,8 +11,10 @@ const {
   addMock,
   removeMock,
   editMock,
+  assignHomeGroupMock,
 } = vi.hoisted(() => ({
     editMock: vi.fn(),
+    assignHomeGroupMock: vi.fn(),
     firebaseLoginMock: vi.fn(),
     getMock: vi.fn(),
     setRoleMock: vi.fn(),
@@ -45,6 +47,10 @@ vi.mock('../../app/groups/memberRolesActions', () => ({
   setMemberRoleAction: (...args: unknown[]) => setRoleMock(...args),
   addMemberAction: (...args: unknown[]) => addMock(...args),
   removeMemberAction: (...args: unknown[]) => removeMock(...args),
+}));
+
+vi.mock('../../app/actions/homeGroup', () => ({
+  setHomeGroupForAllMembers: (groupId: string) => assignHomeGroupMock(groupId),
 }));
 
 import GroupDetailPage from './GroupDetailPage';
@@ -202,5 +208,37 @@ describe('GroupDetailPage', () => {
 
     await screen.findByRole('link', { name: 'Zug 1' });
     expect(screen.queryByRole('button', { name: 'Gruppe bearbeiten' })).toBeNull();
+  });
+
+  describe('Heimatgruppe für alle Mitglieder', () => {
+    it('setzt die Gruppe nach Rückfrage bei allen Mitgliedern', async () => {
+      assignHomeGroupMock.mockResolvedValue({ success: true, updated: 3 });
+      const user = userEvent.setup();
+      renderWithIntl(<GroupDetailPage groupId="ffnd" />);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Für alle Mitglieder als Heimatgruppe setzen' }),
+      );
+      // Erst die Rückfrage — es überschreibt die Heimatgruppe jedes Mitglieds.
+      expect(assignHomeGroupMock).not.toHaveBeenCalled();
+      await user.click(await screen.findByRole('button', { name: 'Setzen' }));
+
+      expect(assignHomeGroupMock).toHaveBeenCalledWith('ffnd');
+      expect(
+        await screen.findByText('Heimatgruppe bei 3 Mitgliedern gesetzt.'),
+      ).toBeInTheDocument();
+    });
+
+    it('tut nichts, wenn die Rückfrage abgebrochen wird', async () => {
+      const user = userEvent.setup();
+      renderWithIntl(<GroupDetailPage groupId="ffnd" />);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Für alle Mitglieder als Heimatgruppe setzen' }),
+      );
+      await user.click(await screen.findByRole('button', { name: 'Abbrechen' }));
+
+      expect(assignHomeGroupMock).not.toHaveBeenCalled();
+    });
   });
 });

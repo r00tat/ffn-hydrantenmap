@@ -453,6 +453,17 @@ Benutzerdokument ist deshalb der feste Ausgangspunkt.
 - **Gelesen über den Listener auf das eigene Benutzerdokument**, nicht aus der
   Sitzung: Eine Änderung braucht kein neues Token und wirkt sofort. Für den
   Kaltstart ohne Netz liegt sie im Zwischenspeicher der Anmeldung.
+- **Für alle Mitglieder auf einmal** setzt der Gruppen-Admin sie in der
+  Gruppenkonfiguration (`/groups/{groupId}`, Knopf „Für alle Mitglieder als
+  Heimatgruppe setzen", Server Action `setHomeGroupForAllMembers`). Sonst
+  müsste jedes Mitglied einer Feuerwehr sie selbst im Profil nachziehen, und
+  die meisten täten es nie. Verlangt wird `gruppe.manage`, nicht
+  `rollen.assign`: Es ist eine Einstellung der Gruppe für ihre Mitglieder,
+  keine Rollenvergabe. Der Knopf **überschreibt** eine andere Heimatgruppe —
+  die Rückfrage sagt das —, lässt Einsatz-Gäste aus und schreibt nur, wer die
+  Gruppe noch nicht hat (`usersToAssignHomeGroup`). Gelesen wird dafür das
+  ganze Benutzerverzeichnis, weil die Mitgliedschaft als Schlüssel in
+  `groupRoles` steckt und sich nicht abfragen lässt.
 
 ## Kennzeichenabfrage je Gruppe
 

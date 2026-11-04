@@ -4,6 +4,8 @@ import {
   normalizeHomeGroup,
   resolveHomeGroupWrite,
   selectDefaultGroupId,
+  usersToAssignHomeGroup,
+  type HomeGroupUserSource,
 } from './homeGroup';
 
 describe('selectDefaultGroupId', () => {
@@ -85,5 +87,27 @@ describe('homeGroupFirst', () => {
     const groups = [{ id: 'a' }, { id: 'b' }];
     expect(homeGroupFirst(groups, undefined)).toBe(groups);
     expect(homeGroupFirst(groups, 'x')).toBe(groups);
+  });
+});
+
+describe('usersToAssignHomeGroup', () => {
+  it('nimmt alle Mitglieder der Gruppe, die sie noch nicht als Heimatgruppe haben', () => {
+    const users: HomeGroupUserSource[] = [
+      { uid: 'a', data: { groupRoles: { abc: [] } } },
+      { uid: 'b', data: { groupRoles: { abc: ['gruppenadmin'], xyz: [] }, homeGroup: 'xyz' } },
+      { uid: 'c', data: { groupRoles: { abc: [] }, homeGroup: 'abc' } },
+      { uid: 'd', data: { groupRoles: { xyz: [] } } },
+    ];
+    expect(usersToAssignHomeGroup(users, 'abc')).toEqual(['a', 'b']);
+  });
+
+  it('lässt Einsatz-Gäste aus', () => {
+    const users: HomeGroupUserSource[] = [{ uid: 'g', data: { groupRoles: { abc: [] }, firecall: 'f1' } }];
+    expect(usersToAssignHomeGroup(users, 'abc')).toEqual([]);
+  });
+
+  it('setzt nie eine Pseudo-Gruppe', () => {
+    const users: HomeGroupUserSource[] = [{ uid: 'a', data: { groups: ['allUsers'] } }];
+    expect(usersToAssignHomeGroup(users, 'allUsers')).toEqual([]);
   });
 });
