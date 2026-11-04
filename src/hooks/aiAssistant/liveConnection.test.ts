@@ -121,6 +121,26 @@ describe('connectLiveSession', () => {
     await expect(pending).rejects.toThrow(/setupComplete/);
   });
 
+  it('gibt nach einer Frist auf, wenn der Handshake hängt', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = connectLiveSession('auth_tokens/abc', 'gemini-live', {
+        handshakeTimeoutMs: 5_000,
+      });
+      const socket = FakeWebSocket.instances.at(-1)!;
+      socket.accept();
+      const assertion = expect(pending).rejects.toThrow(/Zeitüberschreitung/);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      await assertion;
+      // Der hängende Socket darf nicht offen bleiben und später noch Ton schlucken.
+      expect(socket.closed).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('meldet den Grund, wenn der Server die Verbindung abweist', async () => {
     const pending = connectLiveSession('auth_tokens/abc', 'gemini-live');
     FakeWebSocket.instances.at(-1)!.fail('Invalid token');

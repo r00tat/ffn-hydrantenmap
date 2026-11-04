@@ -222,11 +222,25 @@ Application-Restriction), und den Key-String als Secret-Version unter
 ## Der Rückfall ist kein Notnagel
 
 Scheitert das Prägen des Tokens oder der Verbindungsaufbau, nimmt der Knopf
-still den Einzelaufruf und
-merkt sich das für den Rest der Sitzung
+sofort den Einzelaufruf
 ([AiAssistantButton.tsx](../src/components/Map/AiAssistantButton.tsx)). Der
 Benutzer spricht zu diesem Zeitpunkt bereits — eine Fehlermeldung hülfe ihm
-nicht, ein funktionierender Weg schon.
+nicht, ein funktionierender Weg schon. Ein kurzer Hinweis (`info`, wird nicht
+vorgelesen, sonst landete er in der Aufnahme) sagt nur, *dass* umgeschaltet
+wurde.
+
+**Wie lange der Rückfall gilt**
+([liveAvailability.ts](../src/hooks/aiAssistant/liveAvailability.ts)): Früher
+merkte sich der Knopf schon den ersten Fehlschlag bis zum Neuladen. Auf einem
+Tablet im Einsatz genügte dafür ein Funkloch beim Handshake, und danach war
+„Live nicht verfügbar", obwohl Token und Dienst in Ordnung waren — beobachtet
+an einem Gerät ohne Admin-Rechte, dessen Konto am selben Tag mehrere Tokens
+erfolgreich bekommen hatte. Seitdem wird unterschieden: `unconfigured` und
+`quota` bessern sich nicht von selbst und bleiben bis zum Neuladen beim
+Einzelaufruf; alles andere (Netz, Zeitüberschreitung, Fehler der API) wird
+nach einer Minute wieder mit Live versucht. Der Handshake hat dazu eine Frist
+von zehn Sekunden (`LIVE_HANDSHAKE_TIMEOUT_MS`) — ohne sie hing ein Aufbau im
+Funkloch unbegrenzt im Zustand „hört zu", und der Rückfall griff nie.
 
 Dass es diesen Weg weiterhin gibt, ist Absicht: Die kurzlebigen Tokens sind
 als Preview gekennzeichnet, das Live-Modell ebenfalls, und beides steht ohne

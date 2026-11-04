@@ -23,6 +23,7 @@ import { useOnlineOnly } from '../site/OnlineOnly';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { speakMessage } from '../../common/speech';
 import { LatencyRun, startLatencyRun } from '../../hooks/aiAssistant/latency';
+import { createLiveAvailability } from '../../hooks/aiAssistant/liveAvailability';
 
 interface AiAssistantButtonProps {
   firecallItems: FirecallItem[];
@@ -79,12 +80,13 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
 
   const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   /**
-   * Einmal gescheitert, bleibt es beim Einzelaufruf: Ist die Live-API im
-   * Projekt nicht freigeschaltet oder der Browser zu alt, scheitert jeder
-   * weitere Versuch genauso — und zwar erst beim Sprechen, wenn es am meisten
-   * stört.
+   * Ob der nächste Tipp Live versucht. Was sich nicht bessert (kein Live-Key,
+   * Kontingent aufgebraucht), bleibt beim Einzelaufruf; ein Netz- oder
+   * Verbindungsfehler nur für eine Minute. Vorher genügte ein einziger
+   * Fehlschlag, und das Gerät blieb bis zum Neuladen ohne Live — siehe
+   * `liveAvailability.ts`.
    */
-  const liveUnavailableRef = useRef(false);
+  const [liveAvailability] = useState(() => createLiveAvailability());
 
   const showResult = useCallback(async (result: AiAssistantResult, run?: LatencyRun) => {
     setToast({
@@ -189,16 +191,23 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
 
     playStartBeep();
 
-    if (live.isSupported && !liveUnavailableRef.current) {
+    if (live.isSupported && liveAvailability.canTry()) {
       try {
         await live.startConversation();
+        liveAvailability.recordSuccess();
         return;
       } catch (error) {
-        // Der Benutzer will sprechen — hier ist kein Platz für eine
-        // Fehlermeldung, nur für den Weg, der funktioniert.
+        // Der Benutzer will sprechen — deshalb geht es sofort im Einzelaufruf
+        // weiter. Der Hinweis sagt nur, *dass* umgeschaltet wurde: Ohne ihn
+        // sah es aus, als sei Live für diesen Benutzer gesperrt.
         console.warn('[AI] Live-Gespräch nicht verfügbar, weiter im Einzelaufruf:', error);
-        liveUnavailableRef.current = true;
+        const kind = liveAvailability.recordFailure(error);
         await live.endConversation();
+        setToast({
+          open: true,
+          message: t(kind === 'permanent' ? 'liveUnavailablePermanent' : 'liveUnavailableRetry'),
+          severity: 'info',
+        });
       }
     }
 
@@ -207,7 +216,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
     maxRecordingTimerRef.current = setTimeout(() => {
       void stopAndProcess('sprachbefehl (zeitlimit)');
     }, MAX_RECORDING_TIME_MS);
-  }, [live, recorderState, startRecording, stopAndProcess]);
+  }, [live, liveAvailability, recorderState, startRecording, stopAndProcess, t]);
 
   /**
    * „Fertig" — schließt den gesprochenen Beitrag sofort. Ohne das wartet der
