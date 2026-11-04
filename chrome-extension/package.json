@@ -15,27 +15,27 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^9.0.0",
-    "@mui/material": "^9.0.0",
-    "firebase": "12.11.0",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "@mui/icons-material": "^9.5.0",
+    "@mui/material": "^9.5.0",
+    "firebase": "13.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.304",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.3",
+    "@types/chrome": "^0.3.7",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@wxt-dev/module-react": "^1.2.2",
     "chrome-webstore-upload": "^4.0.3",
     "crx3": "^2.0.0",
-    "jsdom": "^29.0.2",
+    "jsdom": "^30.1.3",
     "typescript": "^6.0.3",
     "vite": "^8.3.5",
-    "vitest": "^4.1.11",
-    "wxt": "^0.21.3"
+    "vitest": "^5.1.0",
+    "wxt": "^0.21.5"
   },
   "overrides": {
-    "typescript-eslint": "8.59.0",
+    "typescript-eslint": "8.72.1",
     "@grpc/grpc-js": "^1.14.6"
   }
 }
