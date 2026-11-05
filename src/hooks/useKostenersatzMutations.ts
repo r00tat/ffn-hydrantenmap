@@ -197,7 +197,7 @@ export function useKostenersatzDuplicate(firecallIdOverride?: string) {
   return useCallback(
     async (original: KostenersatzCalculation) => {
       // Create a copy without id, reset status to draft, clear tracking fields
-      const { id, createdAt, createdBy, pdfUrl, emailSentAt, ...rest } = original;
+      const { id, createdAt, createdBy, pdfUrl, emailSentAt, emailVersand, ...rest } = original;
 
       const duplicated = {
         ...rest,

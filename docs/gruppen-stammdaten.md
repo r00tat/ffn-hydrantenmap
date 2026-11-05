@@ -34,9 +34,6 @@ fehlen. Das ist ein harter Stopp, kein Hinweis:
 - Füllungsrechnung: `createFuellungRechnung` weist ab, und auf der
   Verrechnungsseite ist der Knopf gesperrt.
 - Mailversand: keine Mail ohne den Anhang, den es nicht gibt.
-- SumUp-Zahlungseingang: die Berechnung bleibt Entwurf und lässt sich
-  nachschicken, sobald die Stammdaten stehen. Der Zahlungseingang selbst ist
-  davon unberührt.
 
 Der Grund ist immer derselbe: Ein Beleg ohne Absender und Konto sagt dem
 Empfänger weder, von wem die Forderung kommt, noch wohin er überweisen soll.

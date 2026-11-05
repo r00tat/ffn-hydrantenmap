@@ -3,7 +3,11 @@
  */
 
 import { absenderNameOf, type GroupStammdaten } from './groupStammdaten';
-import { formatCurrency, KostenersatzCalculation } from './kostenersatz';
+import {
+  formatCurrency,
+  KostenersatzCalculation,
+  KostenersatzEmailVersand,
+} from './kostenersatz';
 import { Firecall } from '../components/firebase/firestore';
 
 // ============================================================================
@@ -59,6 +63,10 @@ export interface SendEmailRequest {
 export interface SendEmailResponse {
   success: boolean;
   emailSentAt?: string;
+  /** Der Eintrag, den der Versand ans Protokoll angehängt hat. */
+  versand?: KostenersatzEmailVersand;
+  /** Gesetzt, wenn der Versand die Empfängeradresse geändert hat. */
+  recipientEmail?: string;
   error?: string;
   details?: string;
 }

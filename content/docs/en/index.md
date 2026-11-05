@@ -35,7 +35,7 @@ Welcome to the operations map documentation. Here you will find guides for every
 
 - **Trip log** [Record trips per vehicle, bulk entry for an operation, QR code without signing in, PDF export](/docs/fahrtenbuch)
 - **Equipment & supplies** [Equipment and stock items from Sybos, stock per location, consumption during operations, reorder notice](/docs/geraete)
-- **Cost recovery** [Create invoices, add line items, PDF export, email dispatch, SumUp payment](/docs/kostenersatz)
+- **Cost recovery** [Create invoices, add line items, PDF export, email dispatch](/docs/kostenersatz)
 - **Business log** [Document incoming/outgoing transactions, staff functions S1-S6, CSV export](/docs/geschaeftsbuch)
 - **Print** [Print operation reports with map, resources, log and business log](/docs/drucken)
 - **Administration** [User management, data import, system settings, audit log (admins only)](/docs/admin)

@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
 import {
+  getDisplayStatus,
   KostenersatzCalculation,
   KostenersatzRate,
   KostenersatzTemplate,
@@ -377,8 +378,8 @@ export function useKostenersatzStats(firecallId: string | undefined) {
     return {
       total: calculations.length,
       drafts: calculations.filter((c) => c.status === 'draft').length,
-      completed: calculations.filter((c) => c.status === 'completed').length,
-      sent: calculations.filter((c) => c.status === 'sent').length,
+      completed: calculations.filter((c) => getDisplayStatus(c) === 'completed').length,
+      sent: calculations.filter((c) => getDisplayStatus(c) === 'sent').length,
       totalSum: calculations.reduce((sum, c) => sum + c.totalSum, 0),
     };
   }, [calculations]);

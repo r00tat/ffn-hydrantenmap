@@ -112,8 +112,8 @@ oder überschrieben:
   das Original gelöscht wird. Eine alte Sicherungsdatei ohne eingebettete
   Anhänge behält ihre URLs — dort gibt es nichts hochzuladen.
 
-`blaulichtSmsAlarmIds` und die SumUp-Felder am Kostenersatz bleiben bewusst
-stehen: Die Kopie soll weiter auf dieselben Alarme zeigen.
+`blaulichtSmsAlarmIds` bleiben bewusst stehen: Die Kopie soll weiter auf
+dieselben Alarme zeigen.
 
 ## Dateinamen von Anhängen
 

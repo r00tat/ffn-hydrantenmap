@@ -3,6 +3,7 @@ import 'server-only';
 
 import { renderToBuffer } from '@react-pdf/renderer';
 import { gmail } from '@googleapis/gmail';
+import { FieldValue } from 'firebase-admin/firestore';
 import { actionFirecallPermissionRequired } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
 import {
@@ -14,7 +15,9 @@ import { createWorkspaceAuth } from '../../server/auth/workspace';
 import { buildMailMessage } from '../../server/mail/buildMailMessage';
 import KostenersatzPdf from './KostenersatzPdf';
 import {
+  isSameEmail,
   KostenersatzCalculation,
+  KostenersatzEmailVersand,
   KostenersatzRate,
   KOSTENERSATZ_RATES_COLLECTION,
   KOSTENERSATZ_SUBCOLLECTION,
@@ -58,7 +61,7 @@ export async function sendKostenersatzEmailAction(
   }
 
   // Kostenersatz-Recht in der Gruppe des Einsatzes — Gäste kommen nie durch.
-  const { firecall } = await actionFirecallPermissionRequired(
+  const { session, firecall } = await actionFirecallPermissionRequired(
     firecallId,
     'kostenersatz.use',
   );
@@ -184,17 +187,32 @@ export async function sendKostenersatzEmailAction(
       },
     });
 
-    // Update calculation status: sending the invoice closes the calculation.
+    // Sending the invoice closes the calculation. Every dispatch is appended
+    // to the log so it stays visible whether, when, how often and to whom the
+    // invoice went out.
     const emailSentAt = new Date().toISOString();
+    const versand: KostenersatzEmailVersand = {
+      sentAt: emailSentAt,
+      to,
+      ...(cc && cc.length > 0 ? { cc } : {}),
+      ...(session.user.email ? { sentBy: session.user.email } : {}),
+    };
+    // Eine im Dialog geänderte Adresse gilt ab jetzt für den Empfänger —
+    // sonst ginge der nächste Versand wieder an die alte.
+    const recipientChanged = !isSameEmail(calculation.recipient?.email, to);
     await calculationRef.update({
       status: 'completed',
       emailSentAt,
+      emailVersand: FieldValue.arrayUnion(versand),
+      ...(recipientChanged ? { 'recipient.email': to } : {}),
       updatedAt: emailSentAt,
     });
 
     return {
       success: true,
       emailSentAt,
+      versand,
+      ...(recipientChanged ? { recipientEmail: to } : {}),
     };
   } catch (error: any) {
     if (error instanceof StammdatenUnvollstaendigError) {

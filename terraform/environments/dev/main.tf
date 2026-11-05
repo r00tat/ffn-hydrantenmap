@@ -140,17 +140,13 @@ module "cloud_run" {
     MCP_WRITE_ENABLED = "true"
   }
 
-  # SumUp zeigt in dev auf die Sandbox-Zugangsdaten (Suffix _DEV), alles andere
-  # teilen sich beide Umgebungen — sie laufen im selben Projekt.
+  # Die Secrets teilen sich beide Umgebungen — sie laufen im selben Projekt.
   secret_env = {
     AUTH_SECRET              = "AUTH_SECRET"
     GOOGLE_SERVICE_ACCOUNT   = "GOOGLE_SERVICE_ACCOUNT"
     BLAULICHTSMS_USERNAME    = "BLAULICHTSMS_USERNAME"
     BLAULICHTSMS_PASSWORD    = "BLAULICHTSMS_PASSWORD"
     BLAULICHTSMS_CUSTOMER_ID = "BLAULICHTSMS_CUSTOMER_ID"
-    SUMUP_API_KEY            = "SUMUP_API_KEY_DEV"
-    SUMUP_AFFILIATE_KEY      = "SUMUP_AFFILIATE_KEY_DEV"
-    SUMUP_MERCHANT_CODE      = "SUMUP_MERCHANT_CODE_DEV"
     GEMINI_LIVE_API_KEY      = "GEMINI_LIVE_API_KEY"
   }
 
