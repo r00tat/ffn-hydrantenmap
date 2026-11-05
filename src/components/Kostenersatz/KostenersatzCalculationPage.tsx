@@ -3,6 +3,7 @@
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
@@ -19,6 +20,9 @@ import {
   createEmptyCalculation,
   createLineItem,
   effectiveStundenForRate,
+  getDisplayStatus,
+  getEmailHistory,
+  getStatusColor,
   KostenersatzCalculation,
   KostenersatzLineItem,
   KostenersatzCustomItem,
@@ -160,21 +164,19 @@ export default function KostenersatzCalculationPage({
     }
   }, [activeVersion, existingCalculation]);
 
-  // Sync SumUp payment status and calculation status from Firestore real-time updates
+  // Das Versandprotokoll schreibt nur die Server Action. Es wird aus Firestore
+  // übernommen, damit ein späteres Speichern der ganzen Berechnung (setDoc
+  // ohne merge) keinen Versand aus dem lokalen Stand verliert.
   useEffect(() => {
-    if (existingCalculation?.sumupPaymentStatus &&
-        existingCalculation.sumupPaymentStatus !== calculation.sumupPaymentStatus) {
-      setCalculation((prev) => ({
-        ...prev,
-        sumupPaymentStatus: existingCalculation.sumupPaymentStatus,
-        sumupPaidAt: existingCalculation.sumupPaidAt,
-        sumupTransactionCode: existingCalculation.sumupTransactionCode,
-      }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes calculation.sumupPaymentStatus to avoid infinite loop
-  }, [existingCalculation?.sumupPaymentStatus, existingCalculation?.sumupPaidAt, existingCalculation?.sumupTransactionCode]);
+    if (!existingCalculation) return;
+    setCalculation((prev) => ({
+      ...prev,
+      emailSentAt: existingCalculation.emailSentAt,
+      emailVersand: existingCalculation.emailVersand,
+    }));
+  }, [existingCalculation?.emailSentAt, existingCalculation?.emailVersand]); // eslint-disable-line react-hooks/exhaustive-deps -- only the server-owned dispatch fields
 
-  // Sync calculation status from Firestore (e.g. after auto-close on payment)
+  // Sync calculation status from Firestore (e.g. after sending from another device)
   useEffect(() => {
     if (existingCalculation?.status &&
         existingCalculation.status !== calculation.status &&
@@ -450,8 +452,8 @@ export default function KostenersatzCalculationPage({
   }, [existingCalculation?.id, calculation.id, calculation.recipient, firecallId]);
 
   // Persist the current calculation while preserving its status, returning the
-  // calculationId. Used before a SumUp payment and before sending the invoice
-  // email so the server always works with the latest data.
+  // calculationId. Used before sending the invoice email so the server always
+  // works with the latest data.
   const persistCalculation = useCallback(async (): Promise<string | undefined> => {
     setIsSaving(true);
     try {
@@ -474,7 +476,7 @@ export default function KostenersatzCalculationPage({
         return newId;
       }
     } catch (error) {
-      console.error('Error saving before payment:', error);
+      console.error('Error saving before sending:', error);
       return undefined;
     } finally {
       setIsSaving(false);
@@ -579,6 +581,11 @@ export default function KostenersatzCalculationPage({
 
   // Check local state status (which is updated after saves) to determine if editable
   const isEditable = calculation.status === 'draft';
+  const displayStatus = getDisplayStatus(calculation);
+  const emailHistory = useMemo(
+    () => getEmailHistory(calculation),
+    [calculation.emailSentAt, calculation.emailVersand], // eslint-disable-line react-hooks/exhaustive-deps -- only the dispatch fields matter
+  );
 
   // Template handlers
   const handleTemplateLoad = useCallback(
@@ -664,6 +671,17 @@ export default function KostenersatzCalculationPage({
             ? t('calculation.editTitle')
             : t('calculation.newTitle')}
         </Typography>
+        {(existingCalculation || calculation.id) && (
+          <Chip
+            label={
+              displayStatus === 'sent' && emailHistory.length > 1
+                ? `${t(`status.${displayStatus}`)} (${emailHistory.length}×)`
+                : t(`status.${displayStatus}`)
+            }
+            color={getStatusColor(displayStatus)}
+            size="small"
+          />
+        )}
         {calculationId && (
           <Tooltip title={t('calculation.shareLink')}>
             <IconButton onClick={handleShareLink} size="small">
@@ -736,10 +754,7 @@ export default function KostenersatzCalculationPage({
             <KostenersatzEmpfaengerTab
               recipient={calculation.recipient}
               onChange={handleRecipientChange}
-              firecallId={firecallId}
-              calculationId={existingCalculation?.id || calculation.id}
-              sumupPaymentStatus={calculation.sumupPaymentStatus}
-              onSaveBeforePayment={persistCalculation}
+              emailHistory={emailHistory}
             />
           </TabPanel>
         </Box>
@@ -838,9 +853,23 @@ export default function KostenersatzCalculationPage({
         <KostenersatzEmailDialog
           open={emailDialogOpen}
           onClose={() => setEmailDialogOpen(false)}
-          onSuccess={() => {
-            // Sending the invoice closes the calculation.
-            setCalculation((prev) => ({ ...prev, status: 'completed' }));
+          onSuccess={(result) => {
+            // Sending the invoice closes the calculation, logs the dispatch
+            // and takes over a recipient address changed in the dialog.
+            setCalculation((prev) => ({
+              ...prev,
+              status: 'completed',
+              emailSentAt: result.emailSentAt ?? prev.emailSentAt,
+              // The Firestore snapshot may already have brought the entry.
+              emailVersand:
+                result.versand &&
+                !prev.emailVersand?.some((e) => e.sentAt === result.versand!.sentAt)
+                  ? [...(prev.emailVersand ?? []), result.versand]
+                  : prev.emailVersand,
+              recipient: result.recipientEmail
+                ? { ...prev.recipient, email: result.recipientEmail }
+                : prev.recipient,
+            }));
             setSuccessMessage(t('emailSent'));
           }}
           calculation={calculation as KostenersatzCalculation}

@@ -36,6 +36,12 @@ vi.mock('../../server/firebase/admin', () => ({
   firestore: { collection: (...args: unknown[]) => mockCollection(...(args as [string])) },
 }));
 
+vi.mock('firebase-admin/firestore', () => ({
+  FieldValue: {
+    arrayUnion: (...values: unknown[]) => ({ __arrayUnion: values }),
+  },
+}));
+
 vi.mock('../firebase/firestore', () => ({
   FIRECALL_COLLECTION_ID: 'call',
   GROUP_COLLECTION_ID: 'groups',
@@ -120,7 +126,7 @@ describe('sendKostenersatzEmailAction', () => {
     process.env.GOOGLE_SERVICE_ACCOUNT = 'sa';
     process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT = 'me@example.com';
     actionAuthMock.mockResolvedValue({
-      session: { user: { id: 'u1' } },
+      session: { user: { id: 'u1', email: 'bearbeiter@example.com' } },
       firecall: { id: 'fc1', name: 'Einsatz 1', date: '2024-01-01', group: 'ffnd' },
     });
     configGet.mockResolvedValue({ exists: false });
@@ -160,5 +166,67 @@ describe('sendKostenersatzEmailAction', () => {
     const update = calcUpdate.mock.calls[0][0];
     expect(update.status).toBe('completed');
     expect(update.emailSentAt).toBeTruthy();
+  });
+
+  it('protokolliert Zeitpunkt, Empfänger, CC und Bearbeiter des Versands', async () => {
+    calcGet.mockResolvedValue({ exists: true, id: 'calc1', data: () => draftCalculation() });
+
+    const result = await sendKostenersatzEmailAction({
+      ...baseRequest,
+      cc: ['kopie@example.com'],
+    });
+
+    const update = calcUpdate.mock.calls[0][0];
+    const entry = {
+      sentAt: update.emailSentAt,
+      to: 'kunde@example.com',
+      cc: ['kopie@example.com'],
+      sentBy: 'bearbeiter@example.com',
+    };
+    expect(update.emailVersand).toEqual({ __arrayUnion: [entry] });
+    expect(result.versand).toEqual(entry);
+  });
+
+  it('lässt CC im Protokoll weg, wenn keine Kopie ging', async () => {
+    calcGet.mockResolvedValue({ exists: true, id: 'calc1', data: () => draftCalculation() });
+
+    await sendKostenersatzEmailAction(baseRequest);
+
+    const update = calcUpdate.mock.calls[0][0];
+    expect(update.emailVersand.__arrayUnion[0]).not.toHaveProperty('cc');
+  });
+
+  it('speichert eine geänderte Empfängeradresse am Empfänger', async () => {
+    calcGet.mockResolvedValue({ exists: true, id: 'calc1', data: () => draftCalculation() });
+
+    const result = await sendKostenersatzEmailAction({
+      ...baseRequest,
+      to: 'neu@example.com',
+    });
+
+    const update = calcUpdate.mock.calls[0][0];
+    expect(update['recipient.email']).toBe('neu@example.com');
+    expect(result.recipientEmail).toBe('neu@example.com');
+  });
+
+  it('lässt den Empfänger unverändert, wenn die Adresse gleich bleibt', async () => {
+    calcGet.mockResolvedValue({ exists: true, id: 'calc1', data: () => draftCalculation() });
+
+    await sendKostenersatzEmailAction({ ...baseRequest, to: ' Kunde@Example.com ' });
+
+    const update = calcUpdate.mock.calls[0][0];
+    expect(update).not.toHaveProperty('recipient.email');
+  });
+
+  it('setzt Reply-To nur, wenn eine Absenderadresse hinterlegt ist', async () => {
+    calcGet.mockResolvedValue({ exists: true, id: 'calc1', data: () => draftCalculation() });
+
+    await sendKostenersatzEmailAction(baseRequest);
+
+    const raw = Buffer.from(
+      sendMock.mock.calls[0][0].requestBody.raw.replace(/-/g, '+').replace(/_/g, '/'),
+      'base64',
+    ).toString();
+    expect(raw).not.toMatch(/Reply-To:/);
   });
 });

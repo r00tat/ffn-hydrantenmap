@@ -20,6 +20,7 @@ import { useTranslations } from 'next-intl';
 import { useState, MouseEvent } from 'react';
 import {
   formatCurrency,
+  getDisplayStatus,
   getStatusColor,
   KostenersatzCalculation,
 } from '../../common/kostenersatz';
@@ -128,9 +129,9 @@ export default function KostenersatzCard({
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 4 }}>
               <Chip
-                label={t(`status.${calculation.status}`)}
+                label={t(`status.${getDisplayStatus(calculation)}`)}
                 size="small"
-                color={getStatusColor(calculation.status)}
+                color={getStatusColor(getDisplayStatus(calculation))}
               />
             </Box>
           </Box>

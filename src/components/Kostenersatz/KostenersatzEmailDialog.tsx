@@ -25,6 +25,7 @@ import {
   isValidEmail,
   renderEmailTemplates,
   SendEmailRequest,
+  SendEmailResponse,
 } from '../../common/kostenersatzEmail';
 import { sendKostenersatzEmailAction } from './kostenersatzEmailAction';
 import useGroupFeuerwehrName from '../../hooks/useGroupFeuerwehrName';
@@ -36,7 +37,7 @@ import OnlineOnly from '../site/OnlineOnly';
 export interface KostenersatzEmailDialogProps {
   open: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (result: SendEmailResponse) => void;
   calculation: KostenersatzCalculation;
   firecall: Firecall;
   firecallId: string;
@@ -150,7 +151,7 @@ export default function KostenersatzEmailDialog({
         throw new Error(result.details || result.error || t('errorGeneric'));
       }
 
-      onSuccess?.();
+      onSuccess?.(result);
       onClose();
     } catch (err: any) {
       console.error('Error sending email:', err);

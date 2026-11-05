@@ -76,15 +76,14 @@ Du kannst die Abrechnung direkt per E-Mail versenden:
 
 Die PDF-Rechnung wird automatisch als Anhang beigefügt.
 
-### Zahlung per SumUp
+Mit dem Versand ist die Berechnung abgeschlossen; sie hat dann den Status
+**Versandt und abgeschlossen**. Du kannst sie jederzeit erneut versenden.
+Änderst du dabei im Dialog die Empfängeradresse, wird die neue Adresse beim
+Empfänger gespeichert.
 
-Abrechnungen können direkt per Kartenzahlung über SumUp beglichen werden:
-
-1. Abrechnung öffnen
-2. "Zahlung" Button klicken
-3. SumUp-Transaktion wird erstellt
-4. Kunde bezahlt per Karte
-5. Zahlung wird automatisch verifiziert
+Im Tab "Empfänger" steht unter **Versand**, wann und an wen die Abrechnung
+verschickt wurde, mit Kopie-Empfängern und dem Bearbeiter, der sie verschickt
+hat. So siehst du auch, wie oft sie schon versandt wurde.
 
 ### Speichern und Abschließen
 

@@ -76,15 +76,13 @@ You can send the invoice directly by email:
 
 The PDF invoice is added automatically as an attachment.
 
-### Payment via SumUp
+Sending closes the calculation; its status is then **Sent and completed**. You
+can send it again at any time. If you change the recipient address in the
+dialog, the new address is saved with the recipient.
 
-Invoices can be paid directly by card via SumUp:
-
-1. Open the invoice
-2. Click the "Payment" button
-3. A SumUp transaction is created
-4. The customer pays by card
-5. The payment is verified automatically
+In the "Recipient" tab, **Dispatch** lists when and to whom the invoice was
+sent, including CC recipients and who sent it. This also shows how often it has
+been sent.
 
 ### Save and close
 

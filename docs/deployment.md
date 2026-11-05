@@ -163,7 +163,7 @@ Workflows zeigt für dev dorthin. Die Environment-Roots bleiben, wie sie sind.
 Ersatzlos entfallen dann die Kunstgriffe, die es nur gibt, weil beide sich ein
 Projekt teilen: `name_suffix` im [cloud-scheduler](../terraform/modules/cloud-scheduler/),
 der zweite Eintrag in `local.cron_invoker_emails` samt `check`-Block, das `-dev`
-im Dienstnamen, die `SUMUP_*_DEV`-Secrets und die Firestore-Datenbank `ffndev`.
+im Dienstnamen und die Firestore-Datenbank `ffndev`.
 `CLOUDSDK_CORE_PROJECT`, `WORKLOAD_IDENTITY_PROVIDER`, `TERRAFORM_SERVICE_ACCOUNT`,
 `GOOGLE_SERVICE_ACCOUNT`, `IMAGE` und `RUN_SERVICE` wandern vom Repository- in
 den Environment-Scope.

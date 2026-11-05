@@ -303,7 +303,7 @@ export default function KostenersatzPdf({
           <View style={styles.infoRow}>
             <Text style={styles.label}>Bezahlung:</Text>
             <Text style={styles.value}>
-              {formatPaymentMethod(calculation.recipient.paymentMethod, calculation.sumupPaymentStatus)}
+              {formatPaymentMethod(calculation.recipient.paymentMethod)}
             </Text>
           </View>
         </View>

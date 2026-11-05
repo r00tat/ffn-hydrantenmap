@@ -2343,30 +2343,7 @@
       "phonePlaceholder": "+43 ...",
       "email": "Email",
       "emailPlaceholder": "email@example.com",
-      "paymentMethod": "Payment via",
-      "createOnlinePayment": "Create online payment",
-      "payInApp": "Pay in SumUp app",
-      "checkStatus": "Check status",
-      "paymentLinkTitle": "Payment link",
-      "paymentLinkScan": "Scan the QR code or share the link to complete the payment",
-      "copyLink": "Copy link",
-      "openInBrowser": "Open in browser",
-      "linkCopied": "Link copied",
-      "linkCopyFailed": "Could not copy link",
-      "paymentSaveError": "Failed to save the calculation",
-      "paymentCreateError": "Failed to create the payment",
-      "deepLinkError": "Failed to create the deep link",
-      "statusCheckError": "Failed to check the status",
-      "statusCheckErrorGeneric": "Failed to check the payment status",
-      "paymentStatus": "Payment status: {status}",
-      "chipPending": "Payment pending",
-      "chipPaid": "Paid",
-      "chipFailed": "Payment failed",
-      "chipExpired": "Payment expired",
-      "statusPending": "pending",
-      "statusPaid": "paid",
-      "statusFailed": "failed",
-      "statusExpired": "expired"
+      "paymentMethod": "Payment via"
     },
     "vehicleTab": {
       "title": "Vehicles",
@@ -2435,7 +2412,6 @@
       "tabVehicles": "Vehicles",
       "tabTemplates": "Templates",
       "tabEmail": "Email",
-      "tabSumup": "SumUp",
       "versions": "Tariff versions",
       "loadDefaults": "Load standard tariffs",
       "noVersions": "No versions yet. Load the standard tariffs.",
@@ -2532,14 +2508,16 @@
     "status": {
       "draft": "Draft",
       "completed": "Completed",
-      "sent": "Sent"
+      "sent": "Sent and completed"
     },
-    "payment": {
-      "sumupApp": "Card payment (SumUp)",
-      "paid": "Amount collected",
-      "failed": "Payment failed",
-      "expired": "Payment expired",
-      "pending": "Amount pending"
+    "emailHistory": {
+      "title": "Dispatch",
+      "titleCount": "Dispatch ({count}×)",
+      "none": "Not yet sent by email.",
+      "entry": "{date} to {to}",
+      "unknownRecipient": "recipient not recorded",
+      "cc": "CC: {cc}",
+      "sentBy": "by {user}"
     }
   },
   "wasserstand": {

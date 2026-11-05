@@ -9,6 +9,9 @@ import {
   effectiveStundenForRate,
   recalculateLineItem,
   kostenersatzShareLink,
+  getDisplayStatus,
+  getEmailHistory,
+  isSameEmail,
   KostenersatzRate,
   KostenersatzLineItem,
 } from './kostenersatz';
@@ -212,5 +215,70 @@ describe('kostenersatzShareLink', () => {
     expect(kostenersatzShareLink('', 'fc1', 'calc1')).toBe(
       '/einsatz/fc1/kostenersatz/calc1'
     );
+  });
+});
+
+describe('getDisplayStatus', () => {
+  it('zeigt einen Entwurf als Entwurf', () => {
+    expect(getDisplayStatus({ status: 'draft' })).toBe('draft');
+  });
+
+  it('zeigt eine abgeschlossene Berechnung ohne Versand als abgeschlossen', () => {
+    expect(getDisplayStatus({ status: 'completed' })).toBe('completed');
+  });
+
+  it('zeigt eine versandte Berechnung als versandt und abgeschlossen', () => {
+    expect(
+      getDisplayStatus({
+        status: 'completed',
+        emailVersand: [{ sentAt: '2026-11-01T10:00:00.000Z', to: 'a@example.com' }],
+      }),
+    ).toBe('sent');
+  });
+
+  it('erkennt den Versand auch an emailSentAt aus der Zeit vor dem Protokoll', () => {
+    expect(
+      getDisplayStatus({ status: 'completed', emailSentAt: '2026-01-01T10:00:00.000Z' }),
+    ).toBe('sent');
+  });
+
+  it('übernimmt den alten Status sent', () => {
+    expect(getDisplayStatus({ status: 'sent' })).toBe('sent');
+  });
+});
+
+describe('getEmailHistory', () => {
+  it('liefert die Versände nach Zeit aufsteigend', () => {
+    const history = getEmailHistory({
+      emailVersand: [
+        { sentAt: '2026-11-03T10:00:00.000Z', to: 'b@example.com' },
+        { sentAt: '2026-11-01T10:00:00.000Z', to: 'a@example.com' },
+      ],
+    });
+    expect(history.map((e) => e.to)).toEqual(['a@example.com', 'b@example.com']);
+  });
+
+  it('macht aus emailSentAt ohne Protokoll einen Eintrag ohne Empfänger', () => {
+    expect(getEmailHistory({ emailSentAt: '2026-01-01T10:00:00.000Z' })).toEqual([
+      { sentAt: '2026-01-01T10:00:00.000Z', to: '' },
+    ]);
+  });
+
+  it('ist leer, wenn nie versandt wurde', () => {
+    expect(getEmailHistory({})).toEqual([]);
+  });
+});
+
+describe('isSameEmail', () => {
+  it('vergleicht ohne Groß-/Kleinschreibung und Leerzeichen', () => {
+    expect(isSameEmail(' Kunde@Example.com ', 'kunde@example.com')).toBe(true);
+  });
+
+  it('erkennt eine geänderte Adresse', () => {
+    expect(isSameEmail('neu@example.com', 'alt@example.com')).toBe(false);
+  });
+
+  it('behandelt eine fehlende Adresse als leer', () => {
+    expect(isSameEmail(undefined, '')).toBe(true);
   });
 });

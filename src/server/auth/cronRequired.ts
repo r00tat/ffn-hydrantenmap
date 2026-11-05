@@ -14,8 +14,7 @@ import { getBaseUrl } from './baseUrl';
  * vorgesehen haben. Die Signatur allein genügt nicht — jedes Google-Konto
  * könnte sich eines für diese Audience ausstellen lassen.
  *
- * **Fail closed:** Ohne `CRON_INVOKER_EMAILS` wird abgelehnt. Anders als beim
- * SumUp-Webhook, der bei fehlendem Secret nur warnt: Diese Endpoints
+ * **Fail closed:** Ohne `CRON_INVOKER_EMAILS` wird abgelehnt: Diese Endpoints
  * verschicken Mails an gepflegte Verteilerlisten, ein offener Endpoint wäre ein
  * Mail-Relay.
  *

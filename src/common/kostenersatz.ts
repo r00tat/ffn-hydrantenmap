@@ -62,13 +62,41 @@ export interface KostenersatzTemplate {
 // Calculation Types
 // ============================================================================
 
+/**
+ * `sumup_online` und `sumup_app` sind nicht mehr wählbar, seit die
+ * SumUp-Anbindung entfernt ist. Sie bleiben im Typ, weil ältere Berechnungen
+ * sie gespeichert haben und weiter lesbar sein sollen.
+ */
 export type PaymentMethod =
   | 'bar'
   | 'kreditkarte'
   | 'rechnung'
   | 'sumup_online'
   | 'sumup_app';
+
+/** Verrechnungsarten, die beim Empfänger zur Auswahl stehen. */
+export const SELECTABLE_PAYMENT_METHODS: PaymentMethod[] = ['bar', 'kreditkarte', 'rechnung'];
+
+/**
+ * Gespeicherter Status. Das Versenden setzt `completed` und schreibt das
+ * Versandprotokoll; `sent` kommt nur in Altdaten vor. Angezeigt wird
+ * {@link getDisplayStatus}.
+ */
 export type CalculationStatus = 'draft' | 'completed' | 'sent';
+
+/** Status, wie ihn Liste und Berechnung anzeigen. `sent` = versandt und abgeschlossen. */
+export type CalculationDisplayStatus = 'draft' | 'completed' | 'sent';
+
+/**
+ * Ein Versand der Rechnung per E-Mail. Jeder Versand hängt einen Eintrag an,
+ * damit sichtbar bleibt, ob, wann, wie oft und an wen verschickt wurde.
+ */
+export interface KostenersatzEmailVersand {
+  sentAt: string; // ISO timestamp
+  to: string; // leer bei Versänden aus der Zeit vor dem Protokoll
+  cc?: string[];
+  sentBy?: string; // E-Mail des Bearbeiters
+}
 
 export interface KostenersatzRecipient {
   name: string;
@@ -129,15 +157,10 @@ export interface KostenersatzCalculation {
 
   // PDF/Email tracking
   pdfUrl?: string;
+  /** Zeitpunkt des letzten Versands. */
   emailSentAt?: string;
-
-  // SumUp payment tracking
-  sumupCheckoutId?: string;
-  sumupCheckoutRef?: string;
-  sumupPaymentStatus?: 'pending' | 'paid' | 'failed' | 'expired';
-  sumupPaidAt?: string;
-  sumupTransactionCode?: string;
-  sumupRedirectToken?: string;
+  /** Alle Versände, geschrieben nur von der Server Action. */
+  emailVersand?: KostenersatzEmailVersand[];
 }
 
 // ============================================================================
@@ -459,9 +482,8 @@ export function formatCurrency(value: number): string {
 
 /**
  * Format payment method for display.
- * For SumUp methods, optionally include payment status.
  */
-export function formatPaymentMethod(method: PaymentMethod, sumupPaymentStatus?: string): string {
+export function formatPaymentMethod(method: PaymentMethod): string {
   switch (method) {
     case 'bar':
       return 'Bar: Betrag eingehoben';
@@ -469,42 +491,53 @@ export function formatPaymentMethod(method: PaymentMethod, sumupPaymentStatus?: 
       return 'Kreditkarte: Betrag eingehoben';
     case 'rechnung':
       return 'Rechnung: Betrag ausständig';
-    case 'sumup_online': {
-      const label = 'Onlinezahlung (SumUp)';
-      if (sumupPaymentStatus === 'paid') return `${label}: Betrag eingehoben`;
-      if (sumupPaymentStatus === 'failed') return `${label}: Zahlung fehlgeschlagen`;
-      if (sumupPaymentStatus === 'expired') return `${label}: Zahlung abgelaufen`;
-      return `${label}: Betrag ausständig`;
-    }
-    case 'sumup_app': {
-      const label = 'Kartenzahlung (SumUp)';
-      if (sumupPaymentStatus === 'paid') return `${label}: Betrag eingehoben`;
-      if (sumupPaymentStatus === 'failed') return `${label}: Zahlung fehlgeschlagen`;
-      if (sumupPaymentStatus === 'expired') return `${label}: Zahlung abgelaufen`;
-      return `${label}: Betrag ausständig`;
-    }
+    // Altdaten aus der Zeit mit SumUp-Anbindung
+    case 'sumup_online':
+      return 'Onlinezahlung (SumUp)';
+    case 'sumup_app':
+      return 'Kartenzahlung (SumUp)';
   }
 }
 
 /**
- * Format calculation status for display
+ * Status für die Anzeige: Eine abgeschlossene Berechnung, die per E-Mail
+ * hinausging, heißt „versandt und abgeschlossen". Versände aus der Zeit vor
+ * dem Protokoll erkennt sie an `emailSentAt`.
  */
-export function formatStatus(status: CalculationStatus): string {
-  switch (status) {
-    case 'draft':
-      return 'Entwurf';
-    case 'completed':
-      return 'Abgeschlossen';
-    case 'sent':
-      return 'Gesendet';
+export function getDisplayStatus(
+  calculation: Pick<KostenersatzCalculation, 'status' | 'emailSentAt' | 'emailVersand'>,
+): CalculationDisplayStatus {
+  if (calculation.status === 'draft') return 'draft';
+  if (calculation.status === 'sent') return 'sent';
+  if (calculation.emailVersand?.length || calculation.emailSentAt) return 'sent';
+  return 'completed';
+}
+
+/**
+ * Versandprotokoll in zeitlicher Reihenfolge. Eine Berechnung, die vor dem
+ * Protokoll versandt wurde, kennt nur `emailSentAt` — daraus wird ein Eintrag
+ * ohne Empfänger.
+ */
+export function getEmailHistory(
+  calculation: Pick<KostenersatzCalculation, 'emailSentAt' | 'emailVersand'>,
+): KostenersatzEmailVersand[] {
+  const entries = calculation.emailVersand ?? [];
+  if (entries.length === 0) {
+    return calculation.emailSentAt ? [{ sentAt: calculation.emailSentAt, to: '' }] : [];
   }
+  return [...entries].sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+}
+
+/** Gleiche E-Mail-Adresse, ohne Rücksicht auf Groß-/Kleinschreibung und Leerzeichen. */
+export function isSameEmail(a: string | undefined, b: string | undefined): boolean {
+  return (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
 }
 
 /**
  * Get status color for MUI chips
  */
 export function getStatusColor(
-  status: CalculationStatus,
+  status: CalculationDisplayStatus,
 ): 'default' | 'primary' | 'success' {
   switch (status) {
     case 'draft':

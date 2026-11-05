@@ -59,7 +59,6 @@ import { useKostenersatzEmailConfig } from '../../hooks/useKostenersatzEmailConf
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import StammdatenSettings from '../groups/StammdatenSettings';
 import KostenersatzTemplateDialog from './KostenersatzTemplateDialog';
-import SumUpTransactionList from './SumUpTransactionList';
 import KostenersatzVehicleTab from './KostenersatzVehicleTab';
 import Alert from '@mui/material/Alert';
 
@@ -345,7 +344,6 @@ export default function KostenersatzAdminSettings() {
           <Tab label={t('tabVehicles')} />
           <Tab label={t('tabTemplates')} />
           <Tab label={t('tabEmail')} />
-          <Tab label={t('tabSumup')} />
           <Tab label={t('tabStammdaten')} />
         </Tabs>
       </Box>
@@ -654,13 +652,10 @@ export default function KostenersatzAdminSettings() {
       </Card>
       )}
 
-      {/* Tab 4: SumUp Transaktionen */}
-      {activeTab === 4 && <SumUpTransactionList />}
-
-      {/* Tab 5: Stammdaten der Gruppe — dieselbe Komponente wie in der
+      {/* Tab 4: Stammdaten der Gruppe — dieselbe Komponente wie in der
           Atemschutz-Verwaltung. Wer hier einen Beleg prüft, soll den
           Absender nicht in einem anderen Menü suchen müssen. */}
-      {activeTab === 5 && (
+      {activeTab === 4 && (
         <Card>
           <CardContent>
             {groups.length === 0 || !groupId ? (

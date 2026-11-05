@@ -286,11 +286,6 @@ export default function Datenschutz() {
       >
         <ul>
           <li>
-            <b>SumUp</b> – Bei Kartenzahlung eines Kostenersatzes werden Betrag
-            und Zahlungsreferenz an SumUp übermittelt. SumUp verarbeitet die
-            Zahlungsdaten als eigenständig Verantwortlicher.
-          </li>
-          <li>
             <b>Österreichischer Bundesfeuerwehrverband</b> – Bei einer
             Kennzeichen­abfrage wird das eingegebene Kennzeichen an die Abfrage
             des ÖBFV übermittelt.

@@ -45,7 +45,7 @@ halten. Umbenennen ist eine Datenmigration.
 | `personal.manage` | Personalstand der Gruppe auf `/personal` pflegen: Personen, Qualifikationen, Benutzerkonten (siehe [personal.md](personal.md)) |
 | `bekleidung.read` | Bekleidung sehen |
 | `bekleidung.manage` | Bekleidung pflegen, Import |
-| `kostenersatz.use` | Kostenersatz an Einsätzen der Gruppe (Berechnung, PDF, Mail, SumUp), Füllungen verrechnen, Mailvorlagen |
+| `kostenersatz.use` | Kostenersatz an Einsätzen der Gruppe (Berechnung, PDF, Mail), Füllungen verrechnen, Mailvorlagen |
 | `kennzeichen.query` | ÖBFV-Kennzeichenabfrage mit dem Token der Gruppe (siehe [Kennzeichenabfrage je Gruppe](#kennzeichenabfrage-je-gruppe)) |
 | `gruppe.manage` | Stammdaten, Share-Links, Atemschutz-Admin, Wochenbericht, Mängel löschen, PDF-Import, fremde Füllungen korrigieren |
 | `rollen.assign` | Rollen in dieser Gruppe vergeben (siehe [Wer vergibt was](#wer-vergibt-was)) |
@@ -376,7 +376,7 @@ Welche Aufgabe welches Recht verlangt, steht an der Aufrufstelle, nicht im
 Guard: Die Fahrtenbuch-Stammdaten verlangen `fahrtenbuch.manage` bzw. für
 Personen `personal.manage`, Geräte & Material `geraete.manage`, Bekleidung
 zum Pflegen `bekleidung.manage` und zum reinen Lesen `bekleidung.read`, die
-Füllungsverrechnung und SumUp `kostenersatz.use`, Gruppeneinstellungen
+Füllungsverrechnung `kostenersatz.use`, Gruppeneinstellungen
 `gruppe.manage`.
 
 Wege ohne NextAuth-Sitzung lesen die Mitgliedschaft ebenfalls aus
@@ -522,21 +522,11 @@ Regeltests sichern das ab.
 | Was | Regel bzw. Guard |
 | --- | --- |
 | Berechnungen `call/{id}/kostenersatz` | `hasPerm(Gruppe des Einsatzes, 'kostenersatz.use')` |
-| Server Actions und PDF-Route am Einsatz (Empfänger, Mail, SumUp, Zahlungsstatus, `/api/kostenersatz/pdf`) | `actionFirecallPermissionRequired(firecallId, 'kostenersatz.use')` |
-| Zahlungsbestätigung nach SumUp (`verifyPaymentAndComplete`) | **bewusst ohne Guard** — s. unten |
+| Server Actions und PDF-Route am Einsatz (Empfänger, Mail, `/api/kostenersatz/pdf`) | `actionFirecallPermissionRequired(firecallId, 'kostenersatz.use')` |
 | Verrechnung der Füllungen, Mailvorlagen (`groups/{g}/…`) | `hasPerm(g, 'kostenersatz.use')` bzw. `actionPermissionRequired` |
 | Tarif `kostenersatzVersions`, `kostenersatzRates` (global) | `hasPermAny('kostenersatz.use')` |
 | Vorlagen `kostenersatzTemplates` (global, `isShared` wie bisher) | `hasPermAny('kostenersatz.use')`; ändern und löschen nur Ersteller oder Admin |
 | Seiten `/einsatz/[id]/kostenersatz`, `/kostenersatz`, Drawer | `useCan(firecall.group, 'kostenersatz.use')` |
-
-**Die Zahlungsbestätigung bleibt ohne Sitzung.** `verifyPaymentAndComplete`
-([verifyPaymentAction.ts](../src/components/Kostenersatz/verifyPaymentAction.ts))
-ruft die Seite auf, auf die SumUp den Zahlungspflichtigen zurückleitet. Der hat
-kein Konto und keine Sitzung; ein Rollen-Guard sperrte genau ihn aus. Geschützt
-ist sie über das `sumupRedirectToken` je Checkout (zufällig, zeitkonstant
-verglichen), und sie tut nur eines: eine Zahlung, die SumUp als bezahlt meldet,
-an der Berechnung als bezahlt vermerken. Das ist keine Lücke der Rollen,
-sondern ein eigener Zugang mit eigenem Nachweis.
 
 Tarif und Vorlagen bleiben global: Das Landesgesetzblatt gilt landesweit
 gleich, und eine Vorlage für „Fahrzeugbergung mit KRF" ist nicht an eine
