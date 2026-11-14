@@ -174,6 +174,29 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             throw new Error('Candidate content is missing');
           }
 
+          // `content` kommt auch ohne `parts` zurück: wenn ein Filter die
+          // Ausgabe blockiert (`SAFETY`, `MALFORMED_FUNCTION_CALL` …) oder
+          // wenn das Modell nach einem Werkzeugergebnis nichts mehr zu sagen
+          // hat. Ein solcher Beitrag darf nicht in die Historie — er bräche
+          // die Hilfsfunktionen dort und die nächste Anfrage.
+          if (!modelContent.parts?.length) {
+            console.warn('[AI] Antwort ohne Inhalt:', {
+              finishReason: candidate.finishReason,
+              finishMessage: candidate.finishMessage,
+            });
+            setProcessingStatus('idle');
+            // Wie beim erreichten Schleifenlimit: Steht die Antwort schon im
+            // letzten Werkzeugergebnis, ist das kein Fehlschlag.
+            if (lastResult?.success) {
+              record(lastResult.message);
+              return { ...lastResult, isAnswer: true, drafts: pendingDrafts };
+            }
+            return {
+              success: false,
+              message: `Das Modell hat keine Antwort geliefert (${candidate.finishReason ?? 'ohne Grund'}).`,
+            };
+          }
+
           // Add model's response to session
           currentContents.push(modelContent);
 
