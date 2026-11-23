@@ -419,6 +419,63 @@ describe('globale Kostenersatz-Sammlungen (permsAny)', () => {
   });
 });
 
+describe('Unterlagen zu Risikoobjekten (risikoobjekt/{id}/dokument)', () => {
+  // ro1 ist für ffnd freigegeben, ro2 für other, ro3 für niemanden.
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, 'risikoobjekt/ro1'), { name: 'A', groups: ['ffnd'] });
+      await setDoc(doc(fs, 'risikoobjekt/ro2'), { name: 'B', groups: ['other'] });
+      await setDoc(doc(fs, 'risikoobjekt/ro3'), { name: 'C' });
+    });
+  });
+
+  const upload = (gruppe: string, objekt = 'ro1', id = 'd1') => ({
+    name: 'plan.pdf',
+    gruppe,
+    storagePath: `risikoobjekt/${objekt}/${id}-plan.pdf`,
+  });
+
+  it('Mitglieder einer freigegebenen Gruppe lesen, andere nicht', async () => {
+    await assertSucceeds(getDocs(collection(db(USERS.mitglied), 'risikoobjekt/ro1/dokument')));
+    await assertFails(getDocs(collection(db(USERS.mitglied), 'risikoobjekt/ro2/dokument')));
+    await assertFails(getDocs(collection(db(USERS.mitglied), 'risikoobjekt/ro3/dokument')));
+    await assertSucceeds(getDocs(collection(admin(), 'risikoobjekt/ro3/dokument')));
+  });
+
+  it('das Objekt selbst lesen weiterhin alle autorisierten Benutzer', async () => {
+    await assertSucceeds(read(db(USERS.fremd), 'risikoobjekt/ro1'));
+  });
+
+  it('Gruppen-Admin legt Unterlagen an Objekten seiner Gruppe an', async () => {
+    const fs = db(USERS.gruppenadmin);
+    await assertSucceeds(setDoc(doc(fs, 'risikoobjekt/ro1/dokument/d1'), upload('ffnd')));
+    // fremdes Objekt, fremde Gruppe, falscher Pfad, Drive-Kennung
+    await assertFails(setDoc(doc(fs, 'risikoobjekt/ro2/dokument/d1'), upload('ffnd', 'ro2')));
+    await assertFails(setDoc(doc(fs, 'risikoobjekt/ro2/dokument/d1'), upload('other', 'ro2')));
+    await assertFails(
+      setDoc(doc(fs, 'risikoobjekt/ro1/dokument/d2'), upload('ffnd', 'ro2', 'd2')),
+    );
+    await assertFails(
+      setDoc(doc(fs, 'risikoobjekt/ro1/dokument/d3'), { ...upload('ffnd', 'ro1', 'd3'), quelle: 'drive' }),
+    );
+  });
+
+  it('ohne das Recht kein Anlegen; Ändern und Löschen nur der Admin', async () => {
+    await assertFails(
+      setDoc(doc(db(USERS.mitglied), 'risikoobjekt/ro1/dokument/d1'), upload('ffnd')),
+    );
+    await assertSucceeds(write(admin(), 'risikoobjekt/ro1/dokument/d1'));
+    await assertFails(write(db(USERS.gruppenadmin), 'risikoobjekt/ro1/dokument/d1'));
+    await assertFails(deleteDoc(doc(db(USERS.gruppenadmin), 'risikoobjekt/ro1/dokument/d1')));
+    await assertSucceeds(deleteDoc(doc(admin(), 'risikoobjekt/ro1/dokument/d1')));
+  });
+
+  it('das Objekt schreibt niemand aus dem Client', async () => {
+    await assertFails(write(db(USERS.gruppenadmin), 'risikoobjekt/ro1'));
+  });
+});
+
 describe('Benutzerdokument', () => {
   it('nur das eigene ist lesbar, schreiben kann der Benutzer es nicht', async () => {
     await assertSucceeds(read(db(USERS.kostenersatz), 'user/kostenersatz'));

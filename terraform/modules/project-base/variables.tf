@@ -102,6 +102,9 @@ variable "project_services" {
     "storage.googleapis.com",
     "testing.googleapis.com",
     "texttospeech.googleapis.com",
+    # Texterkennung gescannter Objektpläne (files:asyncBatchAnnotate über den
+    # EU-Endpunkt). Siehe docs/objektplaene.md, „Texterkennung (OCR)".
+    "vision.googleapis.com",
     "picker.googleapis.com",
     "firebasevertexai.googleapis.com",
     # Live-Sitzung des Sprach-Assistenten. Sie spricht die Developer API

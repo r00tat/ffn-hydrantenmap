@@ -48,6 +48,15 @@ export interface RisikoObjekt extends WgsObject {
   ortschaft: string;
   risikogruppe: string;
   link?: string;
+  /**
+   * Gruppen, die die Unterlagen sehen; gepflegt von Gruppen-Admins dieser
+   * Gruppen (docs/objektplaene.md, „Freigabe an Gruppen").
+   */
+  groups?: string[];
+  /** `app` für in der App angelegte Objekte; der GIS-Import setzt nichts. */
+  quelle?: 'app';
+  createdBy?: string;
+  createdAt?: string;
 }
 
 export interface GefahrObjekt extends WgsObject {

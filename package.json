@@ -33,7 +33,7 @@
     "install:android:release": "npm run build:android:release && adb install -r capacitor/android/app/build/outputs/apk/release/app-release.apk",
     "install:android:prod": "(cd capacitor && npx cap sync android) && (cd capacitor/android && ./gradlew assembleRelease -PappVersionCode=$(git rev-list --count HEAD) -PappVersionName=$(git describe --tags --abbrev=0 --match='v*' | sed 's/^v//')) && adb install -r capacitor/android/app/build/outputs/apk/release/app-release.apk",
     "logs:android": "adb logcat -v time Capacitor:V Capacitor/Plugin:V chromium:V CapacitorBluetoothLe:V RadiacodeFg:V RadiacodeBT:V RadiacodeBTIo:V DataBufDecoder:* RadiacodeTrack:* Firestore:W Firestore:E FirebaseAuth:W *:S",
-    "test:rules": "firebase emulators:exec --config firebase/firebase.rules-test.json --project demo-hydranten-rules --only firestore '\"${npm_node_execpath:-node}\" node_modules/vitest/vitest.mjs run -c vitest.rules.config.ts'"
+    "test:rules": "firebase emulators:exec --config firebase/firebase.rules-test.json --project demo-hydranten-rules --only firestore,storage '\"${npm_node_execpath:-node}\" node_modules/vitest/vitest.mjs run -c vitest.rules.config.ts'"
   },
   "dependencies": {
     "@auth/core": "^0.41.3",

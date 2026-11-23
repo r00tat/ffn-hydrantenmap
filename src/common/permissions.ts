@@ -24,6 +24,7 @@ export const PERMISSIONS = [
   'bekleidung.manage',
   'kostenersatz.use',
   'kennzeichen.query',
+  'risikoobjekte.manage',
   'gruppe.manage',
   'rollen.assign',
 ] as const;
@@ -43,6 +44,7 @@ export const ROLES = {
     'personal.manage',
     'bekleidung.read',
     'bekleidung.manage',
+    'risikoobjekte.manage',
   ],
   geraetemeister: ['fahrtenbuch.manage', 'geraete.manage', 'personal.manage'],
   bekleidungswart: ['bekleidung.read', 'bekleidung.manage'],
@@ -57,7 +59,7 @@ export const ROLE_IDS = Object.keys(ROLES) as RoleId[];
  * `getUserSessionData` die abgeleiteten Felder älterer Benutzerdokumente neu
  * schreibt — die Firestore-Regeln lesen nur diese.
  */
-export const ROLES_CATALOG_VERSION = 2;
+export const ROLES_CATALOG_VERSION = 3;
 
 /** Rollen je Gruppe. Ein Schlüssel bedeutet Mitgliedschaft, auch mit `[]`. */
 export type GroupRoles = Record<string, RoleId[]>;

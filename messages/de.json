@@ -1248,7 +1248,8 @@
     "memberRoles": "Mitglieder und Rollen",
     "fuellprotokoll": "Füllprotokoll",
     "sybos": "Sybos-Übertrag",
-    "personal": "Personal"
+    "personal": "Personal",
+    "risikoobjekte": "Risikoobjekte"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -4895,7 +4896,7 @@
     "roles": {
       "gruppenadmin": {
         "name": "Gruppen-Admin",
-        "description": "Verwaltet die Gruppe: Einstellungen, Fahrtenbuch, Geräte, Personal und Bekleidung, und vergibt die übrigen Rollen. Kostenersatz gehört nicht dazu. Vergibt nur der Admin."
+        "description": "Verwaltet die Gruppe: Einstellungen, Fahrtenbuch, Geräte, Personal, Bekleidung und Risikoobjekte samt Plänen, und vergibt die übrigen Rollen. Kostenersatz gehört nicht dazu. Vergibt nur der Admin."
       },
       "geraetemeister": {
         "name": "Gerätemeister",
@@ -4939,6 +4940,9 @@
       },
       "kennzeichen": {
         "query": "Kennzeichen abfragen"
+      },
+      "risikoobjekte": {
+        "manage": "Risikoobjekte und Pläne pflegen"
       }
     },
     "errors": {
@@ -4959,5 +4963,113 @@
     "selectedCount": "{count, plural, one {# Element ausgewählt} other {# Elemente ausgewählt}}",
     "clear": "Auswahl aufheben",
     "moveHandle": "Auswahl verschieben"
+  },
+  "objektplan": {
+    "openPlans": "Pläne öffnen",
+    "legacyLink": "Einsatzunterlagen (Link)",
+    "searchLabel": "Melder oder Text suchen",
+    "searchHelper": "z. B. 3/05, MG 3 M 5 oder Heizraum – Enter öffnet den ersten Treffer",
+    "melderResults": "Melder",
+    "textResults": "Fundstellen im Text",
+    "documents": "Unterlagen",
+    "noDocuments": "Für dieses Objekt sind keine Unterlagen hinterlegt.",
+    "noDocumentsOffline": "Keine Unterlagen im Zwischenspeicher – ohne Netz nicht abrufbar.",
+    "noResults": "Nichts gefunden.",
+    "page": "Seite {page}",
+    "pageOf": "Seite {page} von {pages}",
+    "pages": "{count, plural, one {# Seite} other {# Seiten}}",
+    "melderCount": "{count, plural, one {# Melder} other {# Melder}}",
+    "hits": "{count, plural, one {# Treffer} other {# Treffer}}",
+    "statusOhneText": "PDF ohne Textebene (Scan) – nicht durchsuchbar",
+    "statusOhneTextShort": "Scan",
+    "statusFehler": "nicht lesbar",
+    "upload": "Unterlagen hochladen",
+    "uploadIndexed": "{count, plural, =0 {Hochgeladen, keine Melder erkannt} one {Hochgeladen, # Melder erkannt} other {Hochgeladen, # Melder erkannt}}",
+    "uploadRejectedType": "Nur PDF oder Bilder (JPEG, PNG, WebP, GIF)",
+    "uploadRejectedSize": "Größer als {max} MB",
+    "uploadFailed": "Hochladen fehlgeschlagen",
+    "deleteTitle": "Unterlage löschen?",
+    "deleteText": "„{name}“ wird für alle Benutzer entfernt.",
+    "previousPage": "Vorherige Seite",
+    "nextPage": "Nächste Seite",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "fitWidth": "Breite einpassen",
+    "openExternal": "In neuem Tab öffnen",
+    "loadFailed": "Die Unterlage konnte nicht geladen werden.",
+    "driveSource": "Drive",
+    "driveSyncRunning": "Abgleich mit Google Drive …",
+    "driveUnreadable": "Der Drive-Ordner ist für die App nicht lesbar.",
+    "driveSyncFailed": "Abgleich mit Google Drive fehlgeschlagen.",
+    "driveSyncPartial": "{count, plural, one {# Datei} other {# Dateien}} aus Drive konnten nicht übernommen werden.",
+    "notShared": "Die Pläne dieses Objekts sind für deine Gruppen nicht freigegeben.",
+    "ocrRun": "Text erkennen (OCR)",
+    "ocrRunning": "Scan – Text wird erkannt …",
+    "ocrDone": "{count, plural, =0 {Text erkannt, keine Melder gefunden} one {Text erkannt, # Melder gefunden} other {Text erkannt, # Melder gefunden}}",
+    "ocrNoText": "Scan – kein Text erkannt",
+    "ocrFailed": "Texterkennung fehlgeschlagen",
+    "ocrSource": "OCR"
+  },
+  "risikoobjekte": {
+    "title": "Risikoobjekte",
+    "searchLabel": "Objekt suchen",
+    "searchHelper": "Name, Adresse, Ortschaft, Risikogruppe oder Einsatzplan-Nr.",
+    "count": "{count, plural, one {# Objekt} other {# Objekte}}",
+    "planNumber": "Nr. {nummer}",
+    "driveLinked": "Pläne aus Google Drive",
+    "new": "Neues Objekt",
+    "edit": "Bearbeiten",
+    "newTitle": "Neues Risikoobjekt",
+    "editTitle": "Risikoobjekt bearbeiten",
+    "fields": {
+      "name": "Name",
+      "ortschaft": "Ortschaft",
+      "adresse": "Adresse",
+      "risikogruppe": "Risikogruppe",
+      "einsatzplanummer": "Einsatzplan-Nr.",
+      "description": "Beschreibung",
+      "link": "Link zu den Plänen",
+      "lat": "Breite",
+      "lng": "Länge"
+    },
+    "linkHelper": "Ordner oder Datei in Google Drive mit den Plänen",
+    "pickOnMap": "Auf Karte wählen",
+    "group": "Gruppe",
+    "sharing": "Freigegeben für",
+    "sharingHelper": "Mitglieder dieser Gruppen sehen die Pläne. Gruppen, in denen du nicht pflegen darfst, kannst du nicht ändern.",
+    "notShared": "nicht freigegeben",
+    "gisOnlyLink": "Dieses Objekt kommt aus dem GIS-Import. Du änderst nur den Link — alles andere überschreibt der nächste Import.",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "deleteConfirm": "Objekt mit allen Unterlagen endgültig löschen?",
+    "deleteConfirmButton": "Endgültig löschen",
+    "errors": {
+      "name": "Bitte einen Namen angeben.",
+      "position": "Bitte eine gültige Position angeben.",
+      "link": "Der Link muss mit http:// oder https:// beginnen.",
+      "tooLong": "Ein Feld ist zu lang.",
+      "forbidden": "Dafür fehlt dir das Recht.",
+      "notFound": "Das Objekt gibt es nicht mehr.",
+      "empty": "Mindestens eine Gruppe muss freigegeben bleiben.",
+      "notApp": "Objekte aus dem GIS-Import lassen sich nicht löschen.",
+      "unknown": "Speichern fehlgeschlagen.",
+      "notScan": "Das Dokument ist kein Scan ohne Text.",
+      "ocrFailed": "Texterkennung fehlgeschlagen."
+    },
+    "unshared": "{count, plural, one {# Objekt ist} other {# Objekte sind}} noch keiner Gruppe freigegeben. Ihre Pläne sehen nur Admins.",
+    "unsharedGroups": "Freigeben für",
+    "unsharedButton": "Alle freigeben",
+    "unsharedDone": "{count, plural, one {# Objekt} other {# Objekte}} freigegeben."
+  },
+  "risikoobjektMatch": {
+    "title": "Mögliche Risikoobjekte",
+    "hint": "Automatisch über Lage, Adresse und Name gefunden – bitte prüfen.",
+    "reasonAddress": "Adresse",
+    "reasonStreet": "Straße",
+    "reasonName": "Name",
+    "distanceNear": "< 50 m",
+    "distance": "{meters} m",
+    "distanceKm": "{km} km"
   }
 }

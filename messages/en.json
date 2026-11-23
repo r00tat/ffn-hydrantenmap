@@ -1248,7 +1248,8 @@
     "memberRoles": "Members and roles",
     "fuellprotokoll": "Filling log",
     "sybos": "Sybos transfer",
-    "personal": "Personnel"
+    "personal": "Personnel",
+    "risikoobjekte": "High-risk sites"
   },
   "fahrtenbuch": {
     "title": "Trip log",
@@ -4895,7 +4896,7 @@
     "roles": {
       "gruppenadmin": {
         "name": "Group admin",
-        "description": "Manages the group: settings, logbook, equipment, personnel and clothing, and assigns the other roles. Cost recovery is not included. Only the admin assigns it."
+        "description": "Manages the group: settings, logbook, equipment, personnel, clothing and high-risk sites with their plans, and assigns the other roles. Cost recovery is not included. Only the admin assigns it."
       },
       "geraetemeister": {
         "name": "Equipment officer",
@@ -4939,6 +4940,9 @@
       },
       "kennzeichen": {
         "query": "Look up licence plates"
+      },
+      "risikoobjekte": {
+        "manage": "Manage high-risk sites and plans"
       }
     },
     "errors": {
@@ -4959,5 +4963,113 @@
     "selectedCount": "{count, plural, one {# item selected} other {# items selected}}",
     "clear": "Clear selection",
     "moveHandle": "Move selection"
+  },
+  "objektplan": {
+    "openPlans": "Open plans",
+    "legacyLink": "Operational documents (link)",
+    "searchLabel": "Search detector or text",
+    "searchHelper": "e.g. 3/05, MG 3 M 5 or boiler room – Enter opens the first hit",
+    "melderResults": "Detectors",
+    "textResults": "Text matches",
+    "documents": "Documents",
+    "noDocuments": "No documents for this object.",
+    "noDocumentsOffline": "No cached documents – unavailable offline.",
+    "noResults": "Nothing found.",
+    "page": "Page {page}",
+    "pageOf": "Page {page} of {pages}",
+    "pages": "{count, plural, one {# page} other {# pages}}",
+    "melderCount": "{count, plural, one {# detector} other {# detectors}}",
+    "hits": "{count, plural, one {# hit} other {# hits}}",
+    "statusOhneText": "PDF without text layer (scan) – not searchable",
+    "statusOhneTextShort": "Scan",
+    "statusFehler": "unreadable",
+    "upload": "Upload documents",
+    "uploadIndexed": "{count, plural, =0 {Uploaded, no detectors found} one {Uploaded, # detector found} other {Uploaded, # detectors found}}",
+    "uploadRejectedType": "Only PDF or images (JPEG, PNG, WebP, GIF)",
+    "uploadRejectedSize": "Larger than {max} MB",
+    "uploadFailed": "Upload failed",
+    "deleteTitle": "Delete document?",
+    "deleteText": "“{name}” will be removed for all users.",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitWidth": "Fit width",
+    "openExternal": "Open in new tab",
+    "loadFailed": "The document could not be loaded.",
+    "driveSource": "Drive",
+    "driveSyncRunning": "Syncing with Google Drive …",
+    "driveUnreadable": "The app cannot read the Drive folder.",
+    "driveSyncFailed": "Sync with Google Drive failed.",
+    "driveSyncPartial": "{count, plural, one {# file} other {# files}} from Drive could not be imported.",
+    "notShared": "The plans of this site are not shared with your groups.",
+    "ocrRun": "Recognise text (OCR)",
+    "ocrRunning": "Scan – recognising text …",
+    "ocrDone": "{count, plural, =0 {Text recognised, no detectors found} one {Text recognised, # detector found} other {Text recognised, # detectors found}}",
+    "ocrNoText": "Scan – no text recognised",
+    "ocrFailed": "Text recognition failed",
+    "ocrSource": "OCR"
+  },
+  "risikoobjekte": {
+    "title": "High-risk sites",
+    "searchLabel": "Search site",
+    "searchHelper": "Name, address, town, risk group or plan no.",
+    "count": "{count, plural, one {# site} other {# sites}}",
+    "planNumber": "No. {nummer}",
+    "driveLinked": "Plans from Google Drive",
+    "new": "New site",
+    "edit": "Edit",
+    "newTitle": "New high-risk site",
+    "editTitle": "Edit high-risk site",
+    "fields": {
+      "name": "Name",
+      "ortschaft": "Town",
+      "adresse": "Address",
+      "risikogruppe": "Risk group",
+      "einsatzplanummer": "Plan no.",
+      "description": "Description",
+      "link": "Link to the plans",
+      "lat": "Latitude",
+      "lng": "Longitude"
+    },
+    "linkHelper": "Google Drive folder or file with the plans",
+    "pickOnMap": "Pick on map",
+    "group": "Group",
+    "sharing": "Shared with",
+    "sharingHelper": "Members of these groups see the plans. You cannot change groups you do not manage.",
+    "notShared": "not shared",
+    "gisOnlyLink": "This site comes from the GIS import. You only change the link — the next import overwrites everything else.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleteConfirm": "Permanently delete the site with all its documents?",
+    "deleteConfirmButton": "Delete permanently",
+    "errors": {
+      "name": "Please enter a name.",
+      "position": "Please enter a valid position.",
+      "link": "The link must start with http:// or https://.",
+      "tooLong": "A field is too long.",
+      "forbidden": "You lack the permission for this.",
+      "notFound": "The site no longer exists.",
+      "empty": "At least one group must stay shared.",
+      "notApp": "Sites from the GIS import cannot be deleted.",
+      "unknown": "Saving failed.",
+      "notScan": "The document is not a scan without text.",
+      "ocrFailed": "Text recognition failed."
+    },
+    "unshared": "{count, plural, one {# site is} other {# sites are}} not shared with any group yet. Only admins see their plans.",
+    "unsharedGroups": "Share with",
+    "unsharedButton": "Share all",
+    "unsharedDone": "{count, plural, one {# site} other {# sites}} shared."
+  },
+  "risikoobjektMatch": {
+    "title": "Possible risk sites",
+    "hint": "Found automatically by location, address and name – please check.",
+    "reasonAddress": "Address",
+    "reasonStreet": "Street",
+    "reasonName": "Name",
+    "distanceNear": "< 50 m",
+    "distance": "{meters} m",
+    "distanceKm": "{km} km"
   }
 }

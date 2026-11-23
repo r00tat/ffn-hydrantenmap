@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AirIcon from '@mui/icons-material/Air';
+import ApartmentIcon from '@mui/icons-material/Apartment';
 import ApiIcon from '@mui/icons-material/Api';
 import BadgeIcon from '@mui/icons-material/Badge';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
@@ -435,6 +436,13 @@ export default function AppDrawer({
           text: t('rettungskarten'),
           icon: <CarCrashIcon />,
           href: '/rettungskarten',
+        },
+        {
+          // Die Pläne eines Objekts auch ohne Suche auf der Karte — zur
+          // Vorbereitung und für Objekte außerhalb des Kartenausschnitts.
+          text: t('risikoobjekte'),
+          icon: <ApartmentIcon />,
+          href: '/risikoobjekte',
         },
         { text: t('ai'), icon: <AutoAwesomeIcon />, href: '/ai' },
       ],

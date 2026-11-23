@@ -45,6 +45,7 @@ export const APP_SHELL_PAGES: readonly string[] = [
   '/personal',
   '/kennzeichen',
   '/rettungskarten',
+  '/risikoobjekte',
   '/blaulicht-sms',
   '/ai',
   '/profile',

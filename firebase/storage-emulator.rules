@@ -1,0 +1,11 @@
+rules_version = '2';
+// Nur damit `npm run test:rules` den Storage-Emulator starten kann: Die CLI
+// verlangt eine Regeldatei innerhalb von firebase/. Die Tests laden die
+// echte storage.rules aus dem Projekt-Root über initializeTestEnvironment.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

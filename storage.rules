@@ -119,6 +119,52 @@ service firebase.storage {
     //
     // Geschrieben wird ausschließlich über das Admin-SDK im Import-Skript
     // (`npm run terrainImport`), nie aus der App.
+    // Unterlagen zu Risikoobjekten (Brandschutzpläne, Laufkarten, Fotos),
+    // siehe docs/objektplaene.md, „Freigabe an Gruppen".
+    //
+    // Lesen nur, wer Mitglied einer freigegebenen Gruppe ist. Die Freigabe
+    // steht als Metadatum `groups` (Komma-Liste) an jeder Datei, nicht nur am
+    // Objekt in Firestore: Ein `firestore.get` aus einer Storage-Regel trifft
+    // immer die Default-Datenbank und gäbe für die Dev-Datenbank `ffndev` die
+    // falsche Antwort (siehe Mangel-Bilder oben). Die Server Actions schreiben
+    // das Metadatum bei jeder Änderung der Freigabe an alle Dateien neu, der
+    // Drive-Abgleich und der Upload setzen es beim Anlegen.
+    //
+    // Anlegen: der Admin, oder ein Mitglied, das die Datei für eine seiner
+    // Gruppen ablegt — wie beim Logo der Gruppe. Das Recht
+    // `risikoobjekte.manage` steht nicht im Token; die eigentliche Schranke
+    // ist die Firestore-Regel des Dokuments, ohne das eine Datei in der App
+    // nicht auftaucht. Ersetzen und Löschen nur der Admin; Gruppen-Admins
+    // löschen über die Server Action. Jeder Dateiname trägt eine UUID, es gibt
+    // nichts zu überschreiben.
+    //
+    // Die Höchstgröße spiegelt OBJEKT_DOKUMENT_MAX_MB
+    // (src/common/objektplan/objektDokument.ts), ein Test vergleicht beide.
+    function objektFileGroups(metadata) {
+      return metadata == null ? [] : metadata.get('groups', '').split(',');
+    }
+    function tokenGroups() {
+      return request.auth.token.get('groups', []);
+    }
+    match /risikoobjekt/{objektId}/{fileName} {
+      allow read: if authorizedUser() && (
+        request.auth.token.get('isAdmin', false) == true
+        || tokenGroups().hasAny(objektFileGroups(resource.metadata))
+      );
+      allow create: if authorizedUser()
+        && request.resource.size < 100 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|image/(jpeg|png|webp|gif)')
+        && (
+          request.auth.token.get('isAdmin', false) == true
+          || tokenGroups().hasAny(objektFileGroups(request.resource.metadata))
+        );
+      allow update: if authorizedUser()
+        && request.auth.token.get('isAdmin', false) == true
+        && request.resource.size < 100 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|image/(jpeg|png|webp|gif)');
+      allow delete: if authorizedUser() && request.auth.token.get('isAdmin', false) == true;
+    }
+
     match /terrain/{allPaths=**} {
       allow read: if true;
       allow write: if false;
