@@ -46,9 +46,14 @@ let vertexAIInstance: VertexAI | null = null;
 async function getVertexAI(): Promise<VertexAI> {
   if (!vertexAIInstance) {
     const projectId = await getGcpProjectId();
+    // `gemini-4-hydrogen` gibt es nur in `global`, `us` und `eu`. Die
+    // EU-Multiregion hält die Verarbeitung der Alarmdepeschen in der EU; ihr
+    // Host folgt nicht dem Schema `<region>-aiplatform.googleapis.com`, das
+    // das SDK sonst selbst baut, und muss deshalb angegeben werden.
     vertexAIInstance = new VertexAI({
       project: projectId,
-      location: 'europe-west1',
+      location: 'eu',
+      apiEndpoint: 'aiplatform.eu.rep.googleapis.com',
       googleAuthOptions: getGoogleAuthOptions(),
     });
   }
@@ -127,7 +132,6 @@ async function getGeminiModel() {
   return (await getVertexAI()).getGenerativeModel({
     model: GEMINI_MODEL,
     generationConfig: {
-      temperature: 0.1, // Low temperature for deterministic extraction
       responseMimeType: 'application/json',
       responseSchema: einsatzResponseSchema,
     },

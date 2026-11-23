@@ -85,7 +85,14 @@ describe('useAiAssistant loop exhaustion', () => {
     // Ein Modell, das nie aufhört, Werkzeuge aufzurufen.
     (geminiModel.generateContent as any).mockResolvedValue({
       response: {
-        candidates: [{ content: { role: 'model', parts: [] } }],
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ functionCall: { name: 'searchWaterSupply', args: {} } }],
+            },
+          },
+        ],
         functionCalls: () => [{ name: 'searchWaterSupply', args: {} }],
         text: () => '',
       },
@@ -300,7 +307,14 @@ describe('useAiAssistant Sprachbefehl', () => {
     (geminiModel.generateContent as any)
       .mockResolvedValueOnce({
         response: {
-          candidates: [{ content: { role: 'model', parts: [] } }],
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'createDiary', args: { name: 'Meldung' } } }],
+              },
+            },
+          ],
           functionCalls: () => [{ name: 'createDiary', args: { name: 'Meldung' } }],
           text: () => '',
         },
@@ -396,5 +410,104 @@ describe('useAiAssistant kurze Aufnahme', () => {
     expect((geminiModel.generateContent as any)).not.toHaveBeenCalled();
     expect(answer.success).toBe(false);
     expect(answer.message).toContain('zu kurz');
+  });
+});
+
+describe('useAiAssistant Antwort ohne Inhalt', () => {
+  beforeEach(async () => {
+    localStorage.clear();
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { executeToolCall } = await import('./aiAssistant/toolHandlers');
+    (geminiModel.generateContent as any).mockReset();
+    (executeToolCall as any).mockReset();
+  });
+
+  /**
+   * So kommt eine blockierte oder leere Antwort zurück: `content` ohne
+   * `parts`. `text()` wirft bei einem blockierenden `finishReason`.
+   */
+  function emptyResponse(finishReason: string) {
+    return {
+      response: {
+        candidates: [{ content: { role: 'model' }, finishReason }],
+        functionCalls: () => undefined,
+        text: () => {
+          throw new Error(`Candidate was blocked due to ${finishReason}`);
+        },
+      },
+    };
+  }
+
+  it('meldet eine blockierte Antwort mit Grund statt abzustürzen', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any).mockResolvedValue(emptyResponse('SAFETY'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    const answer = await actAsync(() => result.current.processText('Gefahrgut Chlor'));
+
+    expect(answer.success).toBe(false);
+    expect(answer.message).toContain('SAFETY');
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
+    warn.mockRestore();
+  });
+
+  it('nimmt das Werkzeugergebnis, wenn nach dem Werkzeug nichts mehr kommt', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { executeToolCall } = await import('./aiAssistant/toolHandlers');
+    (geminiModel.generateContent as any)
+      .mockResolvedValueOnce({
+        response: {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'createDiary', args: {} } }],
+              },
+            },
+          ],
+          functionCalls: () => [{ name: 'createDiary', args: {} }],
+          text: () => '',
+        },
+      })
+      .mockResolvedValueOnce(emptyResponse('STOP'));
+    (executeToolCall as any).mockResolvedValue({
+      success: true,
+      message: 'Tagebucheintrag angelegt',
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    const answer = await actAsync(() => result.current.processText('Lage unverändert'));
+
+    expect(answer.success).toBe(true);
+    expect(answer.message).toBe('Tagebucheintrag angelegt');
+    warn.mockRestore();
+  });
+
+  it('schickt nach einer leeren Antwort keinen Beitrag ohne Teile mit', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any)
+      .mockResolvedValueOnce(emptyResponse('SAFETY'))
+      .mockResolvedValueOnce({
+        response: {
+          candidates: [{ content: { role: 'model', parts: [{ text: 'Verstanden' }] } }],
+          functionCalls: () => [],
+          text: () => 'Verstanden',
+        },
+      });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    await actAsync(() => result.current.processText('erster Befehl'));
+    await actAsync(() => result.current.processText('zweiter Befehl'));
+
+    const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
+    for (const content of secondRequest.contents) {
+      expect(content.parts?.length).toBeGreaterThan(0);
+    }
+    warn.mockRestore();
   });
 });

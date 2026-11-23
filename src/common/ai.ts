@@ -1,8 +1,21 @@
 /**
  * Shared AI/Gemini configuration constants.
  * Update the model name here to change it for both client and server.
+ *
+ * `gemini-4-hydrogen` (GA seit 2026-11-12) ist das schnelle Modell der
+ * Gemini-4-Familie und der empfohlene Nachfolger von `gemini-3.8-flash`.
+ * Was sich gegenüber 3.8 Flash ändert und hier beachtet ist:
+ *
+ * - Nur in `global`, `us` und `eu` verfügbar, nicht in Einzelregionen wie
+ *   `europe-west1` — der Server ruft deshalb den EU-Multiregion-Endpunkt auf.
+ * - `temperature`, `topP` und `topK` werden ignoriert; sie stehen deshalb
+ *   nirgends mehr in einer `generationConfig`.
+ * - Die Standard-Denkstufe ist `HIGH` (bei 3.8 Flash `MEDIUM`). Wo die
+ *   Antwortzeit zählt, ist sie ausdrücklich gesetzt (Sprach-Assistent: `LOW`).
+ * - Die Live-API kann Hydrogen nicht — `GEMINI_LIVE_MODEL` bleibt deshalb
+ *   ein eigenes Modell.
  */
-export const GEMINI_MODEL = 'gemini-3.8-flash';
+export const GEMINI_MODEL = 'gemini-4-hydrogen';
 
 /**
  * Modell der Live-Sitzung des Sprach-Assistenten.

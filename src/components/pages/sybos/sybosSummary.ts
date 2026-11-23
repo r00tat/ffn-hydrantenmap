@@ -42,7 +42,6 @@ Regeln:
 const summaryModel = getGenerativeModel(vertexAI, {
   model: GEMINI_MODEL,
   generationConfig: {
-    temperature: 0.2,
     responseMimeType: 'application/json',
     responseSchema: summarySchema,
   },
