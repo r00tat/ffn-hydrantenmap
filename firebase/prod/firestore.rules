@@ -90,6 +90,33 @@ service cloud.firestore {
     match /risikoobjekt/{doc=*} {
       allow read: if authorizedUser()
     }    
+    // Unterlagen zu einem Risikoobjekt mit Text und Melderindex
+    // (docs/objektplaene.md, „Freigabe an Gruppen"). Das Objekt selbst lesen
+    // alle; die Unterlagen nur Mitglieder der Gruppen in `groups` am Objekt.
+    // Ein Objekt ohne Freigabe sieht nur der Admin.
+    //
+    // Anlegen darf, wer `risikoobjekte.manage` in einer freigegebenen Gruppe
+    // hat; die Gruppe steht im Dokument (`gruppe`). Der Pfad der Datei muss zum
+    // Dokument passen, sonst zeigte eine Unterlage auf die eines anderen
+    // Objekts. Ändern und Löschen nur der Admin — Gruppen-Admins löschen über
+    // die Server Action, weil dazu auch die Datei in Storage gehört.
+    function objektGroups(objektId) {
+      return get(/databases/$(database)/documents/risikoobjekt/$(objektId)).data.get('groups', []);
+    }
+    match /risikoobjekt/{objektId}/dokument/{dokumentId} {
+      allow read: if adminUser()
+        || (authorizedUser() && objektGroups(objektId).hasAny(request.auth.token.groups));
+      allow create: if adminUser() || (
+        authorizedUser()
+        && request.resource.data.get('quelle', null) == null
+        && request.resource.data.get('gruppe', '') in objektGroups(objektId)
+        && hasPerm(request.resource.data.gruppe, 'risikoobjekte.manage')
+        && request.resource.data.storagePath is string
+        && request.resource.data.storagePath.matches(
+          'risikoobjekt/' + objektId + '/' + dokumentId + '-.+')
+      );
+      allow update, delete: if adminUser();
+    }
     match /gefahrobjekt/{doc=*} {
       allow read: if authorizedUser()
     }

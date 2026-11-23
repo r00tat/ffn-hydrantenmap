@@ -48,6 +48,7 @@ import {
 import DownloadAllButton from '../inputs/DownloadAllButton';
 import AttachmentGallery from '../inputs/AttachmentGallery';
 import EinsatzDriveFotos from '../drive/EinsatzDriveFotos';
+import RisikoobjektMatches from '../Objektplan/RisikoobjektMatches';
 import FileUploader from '../inputs/FileUploader';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import { KostenersatzList } from '../Kostenersatz';
@@ -391,6 +392,10 @@ export default function EinsatzDetails() {
           </Grid>
         )}
       </Grid>
+
+      {/* Mögliche Risikoobjekte zu Lage, Adresse und Name — erscheint nur
+          bei Treffern, damit man die Pläne nicht erst suchen muss. */}
+      <RisikoobjektMatches firecall={firecall} />
 
       {/* Ab hier alles aufklappbar und beim Öffnen der Seite zugeklappt:
           Die Übersicht oben soll ohne Scrollen lesbar sein. Die Abschnitte

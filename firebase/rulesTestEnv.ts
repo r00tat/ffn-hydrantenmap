@@ -21,6 +21,16 @@ export async function createRulesTestEnv(): Promise<RulesTestEnvironment> {
   });
 }
 
+export const STORAGE_RULES_PATH = path.join(import.meta.dirname, '..', 'storage.rules');
+
+/** Storage-Emulator mit `storage.rules` aus dem Projekt-Root. */
+export async function createStorageRulesTestEnv(): Promise<RulesTestEnvironment> {
+  return initializeTestEnvironment({
+    projectId: PROJECT_ID,
+    storage: { rules: readFileSync(STORAGE_RULES_PATH, 'utf8') },
+  });
+}
+
 /** Claims eines freigeschalteten Benutzers mit den angegebenen Gruppen. */
 export function memberToken(email: string, groups: string[]) {
   return {

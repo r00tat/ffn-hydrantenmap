@@ -47,6 +47,7 @@ halten. Umbenennen ist eine Datenmigration.
 | `bekleidung.manage` | Bekleidung pflegen, Import |
 | `kostenersatz.use` | Kostenersatz an Einsätzen der Gruppe (Berechnung, PDF, Mail), Füllungen verrechnen, Mailvorlagen |
 | `kennzeichen.query` | ÖBFV-Kennzeichenabfrage mit dem Token der Gruppe (siehe [Kennzeichenabfrage je Gruppe](#kennzeichenabfrage-je-gruppe)) |
+| `risikoobjekte.manage` | Risikoobjekte der Gruppe: anlegen, bearbeiten, an Gruppen freigeben, Unterlagen hochladen und löschen, Texterkennung (siehe [objektplaene.md](objektplaene.md#freigabe-an-gruppen)) |
 | `gruppe.manage` | Stammdaten, Share-Links, Atemschutz-Admin, Wochenbericht, Mängel löschen, PDF-Import, fremde Füllungen korrigieren |
 | `rollen.assign` | Rollen in dieser Gruppe vergeben (siehe [Wer vergibt was](#wer-vergibt-was)) |
 
@@ -64,7 +65,7 @@ Ebenfalls fest im Code (`ROLES`):
 
 | Rolle | Rechte | typische Aufgabe |
 | --- | --- | --- |
-| `gruppenadmin` | `gruppe.manage`, `rollen.assign`, `fahrtenbuch.manage`, `geraete.manage`, `personal.manage`, `bekleidung.read`, `bekleidung.manage` | Kommandant, Verwalter der Feuerwehr |
+| `gruppenadmin` | `gruppe.manage`, `rollen.assign`, `fahrtenbuch.manage`, `geraete.manage`, `personal.manage`, `bekleidung.read`, `bekleidung.manage`, `risikoobjekte.manage` | Kommandant, Verwalter der Feuerwehr |
 | `geraetemeister` | `fahrtenbuch.manage`, `geraete.manage`, `personal.manage` | Fahrzeuge, Beladung, Lager |
 | `bekleidungswart` | `bekleidung.read`, `bekleidung.manage` | Einsatz- und Dienstbekleidung |
 | `kostenersatz` | `kostenersatz.use` | Abrechnung nach Tarifordnung, Füllungsrechnungen |
