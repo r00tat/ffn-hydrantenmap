@@ -34,6 +34,7 @@ import RisikoObjektEditDialog from '../../components/Objektplan/RisikoObjektEdit
 import UnsharedRisikoObjekteBanner from '../../components/Objektplan/UnsharedRisikoObjekteBanner';
 import { usePlanObjekte } from '../../components/Objektplan/usePlanObjekte';
 import OfflineListHint from '../../components/site/OfflineListHint';
+import ObjektArtChip from '../../components/Objektplan/ObjektArtChip';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useCanAny } from '../../hooks/usePermissions';
 import { getGroupsAction } from '../groups/GroupAction';
@@ -162,9 +163,7 @@ export default function RisikoobjektePage() {
                         <>
                           {[o.ortschaft, o.adresse, o.risikogruppe].filter(Boolean).join(' · ')}
                           <Box component="span" sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
-                            {o.art === 'gefahrobjekt' && (
-                              <Chip size="small" color="info" label={t('art.gefahrobjekt')} component="span" />
-                            )}
+                            <ObjektArtChip art={o.art} />
                             {groups.length === 0 ? (
                               <Chip size="small" color="warning" variant="outlined" label={t('notShared')} component="span" />
                             ) : (

@@ -17,6 +17,7 @@ import useFirecallLocations from '../../hooks/useFirecallLocations';
 import type { Firecall, FirecallLocation } from '../firebase/firestore';
 import ObjektplanDialog from './ObjektplanDialog';
 import { usePlanObjekte } from './usePlanObjekte';
+import ObjektArtChip from './ObjektArtChip';
 
 /** Abfrage aus Einsatz und Einsatzorten: Lagen, Texte, Adressen. */
 export function buildMatchQuery(
@@ -48,7 +49,6 @@ export function buildMatchQuery(
  */
 export default function RisikoobjektMatches({ firecall }: { firecall: Firecall }) {
   const t = useTranslations('risikoobjektMatch');
-  const tObjekte = useTranslations('risikoobjekte');
   const { records } = usePlanObjekte();
   const { locations } = useFirecallLocations();
   const [selected, setSelected] = useState<PlanObjekt | null>(null);
@@ -80,14 +80,10 @@ export default function RisikoobjektMatches({ firecall }: { firecall: Firecall }
           <ListItemButton key={`${m.objekt.art}/${m.objekt.id}`} divider onClick={() => setSelected(m.objekt)}>
             <ListItemText
               primary={m.objekt.name}
-              secondary={[
-                m.objekt.adresse,
-                m.objekt.art === 'gefahrobjekt' ? tObjekte('art.gefahrobjekt') : m.objekt.risikogruppe,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+              secondary={[m.objekt.adresse, m.objekt.risikogruppe].filter(Boolean).join(' · ')}
             />
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', ml: 1 }}>
+              <ObjektArtChip art={m.objekt.art} />
               {m.address && (
                 <Chip
                   size="small"

@@ -23,8 +23,8 @@ Drive-Abgleich und „Neu einlesen".
   lassen nur die beiden Arten zu; andere Collections mit einer Untersammlung
   `dokument` bleiben zu (Regeltests in `firebase/`).
 - **Im Browser** liest `usePlanObjekte` beide Collections und kennzeichnet jedes
-  Objekt mit seiner Art (`PlanObjekt`). Gefährdete Objekte tragen in den Listen
-  einen Hinweis „Gefährdetes Objekt".
+  Objekt mit seiner Art (`PlanObjekt`). In den Listen zeigt ein Chip die Art
+  (`ObjektArtChip`): Risikoobjekt rot, gefährdetes Objekt orange.
 - **Neu angelegt** werden in der App nur Risikoobjekte; gefährdete Objekte
   kommen aus dem GIS und lassen sich verknüpfen und freigeben.
 - **Schlüssel der Texterkennung:** Risikoobjekte behalten
