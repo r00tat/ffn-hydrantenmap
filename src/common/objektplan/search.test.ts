@@ -63,6 +63,15 @@ describe('searchObjektDokumente', () => {
     expect(r.text.map((x) => [x.dokumentId, x.seite])).toEqual([['og', 1]]);
   });
 
+  it('findet die Gruppe, solange die Meldernummer noch fehlt', () => {
+    const r = searchObjektDokumente(docs, '3/');
+    expect(r.query).toEqual({ gruppe: 3 });
+    expect(r.melder.map((x) => [x.dokumentId, x.seite, x.entries.length])).toEqual([
+      ['eg', 1, 2],
+      ['og', 1, 1],
+    ]);
+  });
+
   it('sucht Wörter nur im Text', () => {
     const r = searchObjektDokumente(docs, 'heizraum');
     expect(r.query).toBeNull();

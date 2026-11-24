@@ -76,7 +76,9 @@ export function parseMelderQuery(input: string): MelderQuery | null {
     .toLowerCase()
     .replace(/meldergruppe|gruppe|mg/g, ' ')
     .replace(/melder|\bm(?=\s*\d)|\bm\b/g, ' ')
-    .trim();
+    .trim()
+    // „310/" beim Tippen: Gruppe steht, Meldernummer fehlt noch — wie „310".
+    .replace(/\s*[/\-.]$/, '');
   const m = normalized.match(/^(\d{1,4})(?:\s*[/\-.\s]\s*(\d{1,2})\s*[a-z]?)?$/);
   if (!m) return null;
   const gruppe = Number(m[1]);

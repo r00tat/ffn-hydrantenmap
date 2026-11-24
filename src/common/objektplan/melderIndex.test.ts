@@ -71,11 +71,16 @@ describe('parseMelderQuery', () => {
     ['12', { gruppe: 12 }],
     ['1003/04', { gruppe: 1003, melder: 4 }],
     ['1003', { gruppe: 1003 }],
+    // Gruppe eingetippt, Meldernummer noch nicht
+    ['310/', { gruppe: 310 }],
+    ['310 / ', { gruppe: 310 }],
+    ['3-', { gruppe: 3 }],
+    ['MG 3 M', { gruppe: 3 }],
   ])('%s', (input, expected) => {
     expect(parseMelderQuery(input)).toEqual(expected);
   });
 
-  it.each(['', 'Heizraum', '3/5/7', '12345', 'MG'])('kein Melder: %s', (input) => {
+  it.each(['', 'Heizraum', '3/5/7', '12345', 'MG', '/', '3//'])('kein Melder: %s', (input) => {
     expect(parseMelderQuery(input)).toBeNull();
   });
 });

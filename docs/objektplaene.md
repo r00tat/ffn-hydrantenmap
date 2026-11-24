@@ -94,6 +94,9 @@ Texterkennung (siehe unten).
   „Meldergruppe 12 Melder 3", „MG 12", „12"). Eine bloße Zahl ist zugleich
   Gruppe und Suchbegriff — sie kann auch eine Raumnummer sein. Ein vollständiger
   Melder sucht nicht zusätzlich im Text, sonst käme jede Kennung doppelt.
+  Ein Trennzeichen am Ende („310/", „3-") gilt als Gruppe: Die Suche läuft
+  beim Tippen, und zwischen Gruppe und Meldernummer sollen die Treffer der
+  Gruppe nicht verschwinden.
 - Treffer einer Gruppe werden **je Seite zusammengefasst** und gemeinsam
   markiert. Enter öffnet den ersten Treffer; ein weiteres Enter springt noch
   einmal hin (`jumpKey` am Viewer) — wer inzwischen weggezoomt oder gescrollt
