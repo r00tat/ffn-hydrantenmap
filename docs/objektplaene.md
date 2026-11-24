@@ -102,8 +102,12 @@ Texterkennung (siehe unten).
   Gereiht wird nach Güte (`melderMatchRank`): Gruppe genau, beginnt mit der
   Eingabe, endet darauf, enthält sie; erst danach Unterlage und Seite. Enter
   öffnet damit immer den genauesten Treffer. Bei einer Ziffer gibt es keine
-  Teiltreffer, „3" passte sonst auf fast jede Gruppe. Die Meldernummer muss
-  immer genau passen.
+  Teiltreffer, „3" passte sonst auf fast jede Gruppe. Teiltreffer gibt es nur
+  für eine **bloße Gruppennummer** („10", „MG 10", `partialGroup`): Wer „10/",
+  „10/1" oder „10/1E" tippt, hat die Gruppe vollständig eingegeben, dann passt
+  nur Gruppe 10 — sonst stünden 100/1E und 310/1E mit in der Liste. Die
+  Meldernummer muss immer genau passen; der Zusatz („E") zählt nicht, „10/1"
+  findet auch „10/1E".
 - Treffer einer Gruppe werden **je Seite zusammengefasst** und gemeinsam
   markiert — je Gruppe ein eigener Treffer, damit 310 nicht mit 10 zusammen
   aufleuchtet. Enter öffnet den ersten Treffer; ein weiteres Enter springt noch

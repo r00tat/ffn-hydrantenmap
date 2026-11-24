@@ -88,6 +88,15 @@ describe('searchObjektDokumente', () => {
     ]);
   });
 
+  it('sucht mit Melder nur in der genauen Gruppe', () => {
+    const plan = [
+      dok('a', { melder: [m('10/1E', 1), m('100/1E', 1), m('101/1E', 2), m('310/1E', 2)] }),
+    ];
+    const r = searchObjektDokumente(plan, '10/1E');
+    expect(r.melder.map((x) => x.entries.map((e) => e.kennung))).toEqual([['10/1E']]);
+    expect(searchObjektDokumente(plan, '10/').melder).toHaveLength(1);
+  });
+
   it('sucht Wörter nur im Text', () => {
     const r = searchObjektDokumente(docs, 'heizraum');
     expect(r.query).toBeNull();

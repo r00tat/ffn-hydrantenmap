@@ -66,16 +66,16 @@ describe('parseMelderQuery', () => {
     ['MG 3 M 5', { gruppe: 3, melder: 5 }],
     ['MG3/M5', { gruppe: 3, melder: 5 }],
     ['Meldergruppe 12 Melder 3', { gruppe: 12, melder: 3 }],
-    ['MG 12', { gruppe: 12 }],
-    ['Gruppe 12', { gruppe: 12 }],
-    ['12', { gruppe: 12 }],
+    ['MG 12', { gruppe: 12, partialGroup: true }],
+    ['Gruppe 12', { gruppe: 12, partialGroup: true }],
+    ['12', { gruppe: 12, partialGroup: true }],
     ['1003/04', { gruppe: 1003, melder: 4 }],
-    ['1003', { gruppe: 1003 }],
+    ['1003', { gruppe: 1003, partialGroup: true }],
     // Gruppe eingetippt, Meldernummer noch nicht
     ['310/', { gruppe: 310 }],
     ['310 / ', { gruppe: 310 }],
     ['3-', { gruppe: 3 }],
-    ['MG 3 M', { gruppe: 3 }],
+    ['MG 3 M', { gruppe: 3, partialGroup: true }],
   ])('%s', (input, expected) => {
     expect(parseMelderQuery(input)).toEqual(expected);
   });
@@ -94,23 +94,32 @@ describe('melderMatchRank', () => {
     box: [0, 0, 0.1, 0.1],
   });
 
+  const bare = { gruppe: 10, partialGroup: true } as const;
+
   it('reiht genau vor Anfang vor Ende vor Mitte', () => {
-    expect(melderMatchRank(at(10), { gruppe: 10 })).toBe(0);
-    expect(melderMatchRank(at(105), { gruppe: 10 })).toBe(1);
-    expect(melderMatchRank(at(310), { gruppe: 10 })).toBe(2);
-    expect(melderMatchRank(at(3101), { gruppe: 10 })).toBe(3);
-    expect(melderMatchRank(at(12), { gruppe: 10 })).toBeNull();
+    expect(melderMatchRank(at(10), bare)).toBe(0);
+    expect(melderMatchRank(at(105), bare)).toBe(1);
+    expect(melderMatchRank(at(310), bare)).toBe(2);
+    expect(melderMatchRank(at(3101), bare)).toBe(3);
+    expect(melderMatchRank(at(12), bare)).toBeNull();
   });
 
   it('sucht Teiltreffer erst ab zwei Ziffern', () => {
-    expect(melderMatchRank(at(3), { gruppe: 3 })).toBe(0);
-    expect(melderMatchRank(at(13), { gruppe: 3 })).toBeNull();
-    expect(melderMatchRank(at(30), { gruppe: 3 })).toBeNull();
+    expect(melderMatchRank(at(3), { gruppe: 3, partialGroup: true })).toBe(0);
+    expect(melderMatchRank(at(13), { gruppe: 3, partialGroup: true })).toBeNull();
+    expect(melderMatchRank(at(30), { gruppe: 3, partialGroup: true })).toBeNull();
+  });
+
+  it('verlangt die Gruppe genau, sobald Trennzeichen oder Melder folgen', () => {
+    expect(melderMatchRank(at(10, 1), { gruppe: 10, melder: 1 })).toBe(0);
+    expect(melderMatchRank(at(100, 1), { gruppe: 10, melder: 1 })).toBeNull();
+    expect(melderMatchRank(at(101, 1), { gruppe: 10, melder: 1 })).toBeNull();
+    expect(melderMatchRank(at(310, 1), { gruppe: 10, melder: 1 })).toBeNull();
+    expect(melderMatchRank(at(310), { gruppe: 10 })).toBeNull();
   });
 
   it('verlangt die Meldernummer genau', () => {
-    expect(melderMatchRank(at(310, 5), { gruppe: 10, melder: 5 })).toBe(2);
-    expect(melderMatchRank(at(310, 6), { gruppe: 10, melder: 5 })).toBeNull();
+    expect(melderMatchRank(at(10, 6), { gruppe: 10, melder: 5 })).toBeNull();
   });
 });
 
