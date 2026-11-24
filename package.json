@@ -5,6 +5,7 @@
   "scripts": {
     "predev": "node scripts/copyPdfjsAssets.mjs",
     "dev": "next dev",
+    "predev:https": "node scripts/copyPdfjsAssets.mjs",
     "dev:https": "next dev --experimental-https",
     "prebuild": "node scripts/copyPdfjsAssets.mjs",
     "build": "next build",

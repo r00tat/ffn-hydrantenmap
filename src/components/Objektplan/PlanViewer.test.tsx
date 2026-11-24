@@ -151,4 +151,27 @@ describe('PlanViewer – Darstellung und Bedienung', () => {
     expect(scroller.scrollLeft).toBe(100);
     expect(scroller.scrollTop).toBe(100);
   });
+
+  it('verschiebt den Plan mit gedrückter Maustaste', async () => {
+    await mount({});
+    const scroller = screen.getByTestId('plan-pages').parentElement!;
+    scroller.scrollLeft = 100;
+    scroller.scrollTop = 100;
+    fireEvent.mouseDown(scroller, { button: 0, clientX: 200, clientY: 200 });
+    fireEvent.mouseMove(window, { clientX: 150, clientY: 170 });
+    expect(scroller.scrollLeft).toBe(150);
+    expect(scroller.scrollTop).toBe(130);
+    fireEvent.mouseUp(window);
+    fireEvent.mouseMove(window, { clientX: 0, clientY: 0 });
+    expect(scroller.scrollLeft).toBe(150);
+  });
+
+  it('verschiebt nicht mit der rechten Maustaste', async () => {
+    await mount({});
+    const scroller = screen.getByTestId('plan-pages').parentElement!;
+    fireEvent.mouseDown(scroller, { button: 2, clientX: 200, clientY: 200 });
+    fireEvent.mouseMove(window, { clientX: 150, clientY: 170 });
+    expect(scroller.scrollLeft).toBe(0);
+  });
 });
+

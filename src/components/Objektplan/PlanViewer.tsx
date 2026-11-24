@@ -152,6 +152,27 @@ export default function PlanViewer({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
+  /** Plan mit gedrückter Maustaste verschieben, wie in einem Kartenviewer. */
+  const [dragging, setDragging] = useState(false);
+  const startMouseDrag = (e: React.MouseEvent) => {
+    const el = scrollRef.current;
+    if (e.button !== 0 || !el) return;
+    const start = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+    // Kein Markieren von Text während des Ziehens.
+    e.preventDefault();
+    setDragging(true);
+    const onMove = (ev: MouseEvent) => {
+      el.scrollLeft = start.left - (ev.clientX - start.x);
+      el.scrollTop = start.top - (ev.clientY - start.y);
+    };
+    const onUp = () => {
+      setDragging(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   const [blob, setBlob] = useState<{ id: string; blob: Blob } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -557,6 +578,7 @@ export default function PlanViewer({
       <Box
         ref={scrollRef}
         onScroll={updateScroll}
+        onMouseDown={startMouseDrag}
         onTouchStart={(e) => {
           if (e.touches.length !== 2) return;
           const rect = pagesRef.current?.getBoundingClientRect();
@@ -596,6 +618,7 @@ export default function PlanViewer({
           position: 'relative',
           bgcolor: 'grey.200',
           touchAction: 'pan-x pan-y',
+          cursor: dragging ? 'grabbing' : 'grab',
         }}
       >
         {isLoadError && (

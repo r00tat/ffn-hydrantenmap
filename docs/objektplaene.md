@@ -102,11 +102,14 @@ Cache lesen und verhält sich auf iOS und Android verschieden.
   aus, damit der Plan auf dem Handy den ganzen Bildschirm hat; der Zoom bleibt.
   „Breite einpassen" ist davon getrennt und setzt nur den Zoom zurück — beide
   in einem Knopf hatten Benutzer verwechselt.
+- **Verschieben mit der Maus:** Ziehen mit gedrückter linker Taste scrollt den
+  Plan (Cursor „grab"), auf Touch-Geräten wie gewohnt mit dem Finger.
 - **WebAssembly-Decoder:** pdfjs dekodiert JBIG2- und JPEG-2000-Bilder per
   WebAssembly und bekommt dafür `wasmUrl`. Fehlt sie, lässt pdfjs diese Bilder
   still weg — bei Scans aus Kopierern sind das oft gerade Linien und Schrift
   (OBI: nur der farbige Hintergrund blieb). `scripts/copyPdfjsAssets.mjs` legt
-  die Dateien vor `dev` und `build` nach `public/pdfjs/wasm/` (gitignored, damit
+  die Dateien samt ihren JavaScript-Rückfällen (`*_nowasm_fallback.js`) vor
+  `dev`, `dev:https` und `build` nach `public/pdfjs/wasm/` (gitignored, damit
   sie zur installierten pdfjs-Version passen); der Service Worker nimmt sie mit
   `public/**` in den Precache.
 
