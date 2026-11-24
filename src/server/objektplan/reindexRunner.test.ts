@@ -72,7 +72,7 @@ describe('reindexDokument', () => {
       },
     );
     const result = await reindexDokument(alt, d);
-    expect(d.ocr).toHaveBeenCalledWith('risikoobjekt/o/d1-Plan.pdf');
+    expect(d.ocr).toHaveBeenCalledWith('risikoobjekt/o/d1-Plan.pdf', 1);
     expect(result).toMatchObject({ ocr: true, seitenText: ['LEGENDE\n1003/04'] });
     expect(result.melder).toHaveLength(1);
   });

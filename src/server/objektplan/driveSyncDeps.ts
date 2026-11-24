@@ -108,7 +108,8 @@ export function driveSyncDeps(storageGroups: string): DriveSyncDeps {
     download,
     exportPdf,
     index: indexPdfOnServer,
-    ocr: (storagePath) => ocrStoragePdf(storagePath, storagePath.replace(/[^A-Za-z0-9_-]/g, '_')),
+    ocr: (storagePath, pageCount) =>
+      ocrStoragePdf(storagePath, storagePath.replace(/[^A-Za-z0-9_-]/g, '_'), pageCount),
     async saveFile(path, data, contentType) {
       const bucket = await getDefaultStorageBucket();
       await bucket.file(path).save(Buffer.from(data), {

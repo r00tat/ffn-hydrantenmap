@@ -171,6 +171,16 @@ in der App bleibt daneben möglich.
 - **Nacheinander, auf dem Server.** Die Bytes laufen hier doch über Cloud Run,
   aber nicht als Request, sondern als Download des Dienstes; ein Plan nach
   dem anderen, weil der Dienst 1 GiB hat.
+- **Texterkennung daneben, nicht dazwischen**
+  ([driveSyncRunner.ts](../src/server/objektplan/driveSyncRunner.ts)): Jeder
+  Plan wird gleich nach dem Indizieren als Dokument geschrieben und erscheint
+  damit sofort in der Liste. Braucht er OCR, läuft sie im Hintergrund weiter,
+  während der nächste Plan schon geladen wird; danach wird das Dokument mit dem
+  erkannten Text noch einmal geschrieben. Vision arbeitet außerhalb des
+  Dienstes, gleichzeitige Erkennungen kosten Cloud Run keinen Speicher. Der
+  Abgleich endet erst, wenn alle Erkennungen fertig sind. Bricht er vorher ab
+  (Zeitlimit), steht das Dokument ohne erkannten Text da — der Knopf „Text
+  erkennen (OCR)" oder „Neu einlesen" holt das nach.
 - **pdfjs unter Node:** Den Fake-Worker holt pdfjs sonst per dynamischem
   Import über `workerSrc` — den verfolgt das Bündeln nicht. Er wird deshalb
   vorab geladen und unter `globalThis.pdfjsWorker` abgelegt
@@ -234,11 +244,20 @@ Cloud Vision ([visionOcr.ts](../src/server/objektplan/visionOcr.ts)).
   erkennen (OCR)" in der Unterlagenliste. Nur wer das Objekt pflegt, löst sie aus
   (`ocrObjektDokumentAction`), und nur einmal je Dokument: `ocr: true`
   vermerkt den Versuch, auch wenn kein Text herauskam.
-- **`files:asyncBatchAnnotate` statt des synchronen Aufrufs**, weil dieser nur
-  fünf Seiten nimmt. Vision liest das PDF direkt aus dem Bucket und schreibt
+- **Kleine Pläne direkt, große asynchron** (`ocrPdf` in
+  [visionOcr.ts](../src/server/objektplan/visionOcr.ts)). Bis fünf Seiten geht
+  der synchrone Aufruf `files:annotate`: Vision liest das PDF aus dem Bucket und
+  antwortet in Sekunden. Der asynchrone Weg dauert auch für eine Seite 30–60 s,
+  fast nur Warteschlange bei Vision — die meisten Pläne sind ein- bis
+  zweiseitige Scans. Ist die Seitenzahl unbekannt (`seiten` fehlt), wird der
+  direkte Aufruf mit fünf Seiten versucht; meldet Vision mehr (`totalPages`),
+  geht es asynchron weiter.
+- **`files:asyncBatchAnnotate` für alles darüber**, weil der synchrone Aufruf
+  nur fünf Seiten nimmt. Vision liest das PDF direkt aus dem Bucket und schreibt
   das Ergebnis als JSON unter `ocr-ausgabe/` zurück; die Server Action fragt
   alle 3 s nach (höchstens 4 min), liest die Ausgabe und löscht sie. Die
-  Bytes laufen so nicht durch Cloud Run. Höchstens 200 Seiten je Plan.
+  Bytes laufen auf beiden Wegen nicht durch Cloud Run. Höchstens 200 Seiten je
+  Plan.
 - **EU-Endpunkt** `eu-vision.googleapis.com`: Die Pläne zeigen Grundrisse und
   Zugänge, die Verarbeitung bleibt in der EU.
 - **Melder über die Zeichen, nicht über den Seitentext**

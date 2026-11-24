@@ -14,6 +14,6 @@ export function reindexDeps(ocrKey: string): ReindexDeps {
       return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
     },
     index: indexPdfOnServer,
-    ocr: (storagePath) => ocrStoragePdf(storagePath, ocrKey),
+    ocr: (storagePath, pageCount) => ocrStoragePdf(storagePath, ocrKey, pageCount),
   };
 }

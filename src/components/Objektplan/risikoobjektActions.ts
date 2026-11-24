@@ -230,7 +230,11 @@ export async function ocrObjektDokumentAction(
   if (!dokument) return { ok: false, error: 'notFound' };
   if (!wantsOcr(dokument)) return { ok: false, error: 'notScan' };
   try {
-    const index = await ocrStoragePdf(dokument.storagePath, `${objektId}_${dokumentId}`);
+    const index = await ocrStoragePdf(
+      dokument.storagePath,
+      `${objektId}_${dokumentId}`,
+      dokument.seiten,
+    );
     const result = withOcrIndex(dokument, index);
     await writeObjektDokument(objektId, result);
     return {

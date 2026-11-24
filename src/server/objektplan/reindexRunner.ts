@@ -11,7 +11,7 @@ import type { PdfPlanIndex } from '../../common/objektplan/pdfIndex';
 export interface ReindexDeps {
   readFile(storagePath: string): Promise<Uint8Array>;
   index(data: Uint8Array): Promise<PdfPlanIndex>;
-  ocr?(storagePath: string): Promise<PdfPlanIndex>;
+  ocr?(storagePath: string, pageCount?: number): Promise<PdfPlanIndex>;
 }
 
 export async function reindexDokument(
@@ -34,7 +34,7 @@ export async function reindexDokument(
   let next = await describeObjektDokument(base, data, deps.index);
   if (wantsOcr(next) && deps.ocr) {
     try {
-      next = withOcrIndex(next, await deps.ocr(dokument.storagePath));
+      next = withOcrIndex(next, await deps.ocr(dokument.storagePath, next.seiten));
     } catch (err) {
       console.error('Texterkennung fehlgeschlagen', dokument.storagePath, err);
     }

@@ -32,9 +32,10 @@ export interface DriveSyncDeps {
   deleteDokument(objektId: string, dokumentId: string): Promise<void>;
   /**
    * Texterkennung der abgelegten Datei für Scans ohne Textebene. Fehlt sie,
-   * bleibt der Scan unindiziert.
+   * bleibt der Scan unindiziert. `pageCount` wählt den schnellen direkten Weg
+   * für kleine Pläne.
    */
-  ocr?(storagePath: string): Promise<PdfPlanIndex>;
+  ocr?(storagePath: string, pageCount?: number): Promise<PdfPlanIndex>;
 }
 
 export type DriveSyncResult =
@@ -76,7 +77,11 @@ export async function runDriveSync(
   let imported = 0;
   let failed = 0;
 
-  // Nacheinander: der Dienst hat 1 GiB, ein Plan kann 55 MB haben.
+  // Herunterladen und Indizieren nacheinander: der Dienst hat 1 GiB, ein Plan
+  // kann 55 MB haben. Die Texterkennung dagegen läuft bei Vision und braucht
+  // hier keinen Speicher — sie startet, sobald die Datei abgelegt ist, und der
+  // nächste Plan wartet nicht auf sie. Gewartet wird erst am Ende.
+  const pending: Promise<void>[] = [];
   for (const { file, dokumentId, replaces } of plan.importFiles) {
     try {
       const format = driveImportFormat(file);
@@ -84,7 +89,7 @@ export async function runDriveSync(
         ? await deps.exportPdf(file.id)
         : await deps.download(file.id);
       const storagePath = objektDokumentStoragePath(objektId, dokumentId, format.name);
-      let dokument = await describeObjektDokument(
+      const dokument = await describeObjektDokument(
         {
           id: dokumentId,
           name: format.name,
@@ -109,27 +114,36 @@ export async function runDriveSync(
       // Erst die Datei, dann das Dokument: ein Dokument ohne Datei zeigte
       // einen Plan an, der nicht lädt.
       await deps.saveFile(storagePath, data, format.contentType);
-      // Vision liest die Datei aus dem Bucket, deshalb erst nach dem Ablegen.
-      // Scheitert die Erkennung, bleibt der Scan ohne Text — der Plan selbst
-      // ist wichtiger als seine Durchsuchbarkeit. Auch ein PDF mit Textebene,
-      // aber ohne Melder geht durch die Erkennung (siehe `wantsOcr`).
-      if (wantsOcr(dokument) && deps.ocr) {
-        try {
-          dokument = withOcrIndex(dokument, await deps.ocr(storagePath));
-        } catch (err) {
-          console.error('Texterkennung fehlgeschlagen', objektId, file.name, err);
-        }
-      }
+      // Sofort anlegen: der Plan steht gleich in der Liste und lässt sich
+      // öffnen, auch wenn die Texterkennung noch läuft.
       await deps.writeDokument(objektId, dokument);
       if (replaces && replaces.storagePath !== storagePath) {
         await deleteFileQuietly(deps, replaces.storagePath);
       }
       imported += 1;
+      // Vision liest die Datei aus dem Bucket, deshalb erst nach dem Ablegen.
+      // Scheitert die Erkennung, bleibt der Scan ohne Text — der Plan selbst
+      // ist wichtiger als seine Durchsuchbarkeit. Auch ein PDF mit Textebene,
+      // aber ohne Melder geht durch die Erkennung (siehe `wantsOcr`).
+      if (wantsOcr(dokument) && deps.ocr) {
+        const ocr = deps.ocr;
+        pending.push(
+          (async () => {
+            try {
+              const index = await ocr(storagePath, dokument.seiten);
+              await deps.writeDokument(objektId, withOcrIndex(dokument, index));
+            } catch (err) {
+              console.error('Texterkennung fehlgeschlagen', objektId, file.name, err);
+            }
+          })(),
+        );
+      }
     } catch (err) {
       console.error('Drive-Datei nicht übernommen', objektId, file.id, file.name, err);
       failed += 1;
     }
   }
+  await Promise.all(pending);
 
   for (const dokument of plan.remove) {
     await deps.deleteDokument(objektId, dokument.id);
