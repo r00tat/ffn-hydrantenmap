@@ -2,8 +2,10 @@
  * Copies the WebAssembly decoders of pdfjs-dist (JBIG2, JPEG 2000, ICC colour
  * profiles) to public/pdfjs/wasm/, where the plan viewer loads them via
  * `wasmUrl`. Without them pdfjs silently drops JBIG2/JPX images, which are
- * common in scanned plans. Runs before `dev`, `dev:https` and `build`; the target is
- * gitignored so the files always match the installed pdfjs version.
+ * common in scanned plans. Chained into the `dev`, `dev:https` and `build`
+ * scripts — not a `pre*` hook, because `.npmrc` sets `ignore-scripts=true`,
+ * which silently disables those. The target is gitignored so the files always
+ * match the installed pdfjs version.
  * See docs/objektplaene.md, "Viewer".
  */
 import { copyFileSync, mkdirSync, readdirSync } from 'node:fs';

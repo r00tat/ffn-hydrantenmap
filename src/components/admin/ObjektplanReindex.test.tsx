@@ -4,9 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listMock = vi.fn();
 const reindexMock = vi.fn();
+const driveListMock = vi.fn();
+const syncMock = vi.fn();
 vi.mock('../Objektplan/risikoobjektActions', () => ({
+  listRisikoObjekteWithDriveLink: () => driveListMock(),
   listObjektDokumenteForReindex: () => listMock(),
   reindexObjektDokumentAction: (...args: unknown[]) => reindexMock(...args),
+  syncRisikoObjekteFromDrive: (ids: string[]) => syncMock(ids),
 }));
 
 import ObjektplanReindex from './ObjektplanReindex';
@@ -49,4 +53,46 @@ describe('ObjektplanReindex', () => {
     await waitFor(() => expect(reindexMock).toHaveBeenCalledTimes(3));
     expect(await screen.findByText('Done: 3 re-read, 0 failed.')).toBeInTheDocument();
   });
+
+  it('gleicht die Objekte mit Drive-Link in Dreierblöcken ab und lädt danach die Liste', async () => {
+    driveListMock.mockResolvedValue([
+      { id: 'o1', name: 'Hotel' },
+      { id: 'o2', name: 'Markt' },
+      { id: 'o3', name: 'Schule' },
+      { id: 'o4', name: 'Lager' },
+    ]);
+    syncMock
+      .mockResolvedValueOnce([
+        { id: 'o1', result: { status: 'ok', imported: 3, removed: 1, skipped: 2, failed: 0 } },
+        { id: 'o2', result: { status: 'nichtLesbar' } },
+        { id: 'o3', error: 'Drive kaputt' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'o4', result: { status: 'ok', imported: 1, removed: 0, skipped: 0, failed: 1 } },
+      ]);
+    render(<ObjektplanReindex />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sync all from Drive' }));
+    expect(await screen.findByText('Drive sync done: 4 imported, 1 removed, 3 failed.')).toBeInTheDocument();
+    expect(syncMock.mock.calls).toEqual([[['o1', 'o2', 'o3']], [['o4']]]);
+    expect(screen.getByText('Hotel: 3 imported, 1 removed, 2 unchanged, 0 failed')).toBeInTheDocument();
+    expect(screen.getByText('Markt: Drive folder not readable')).toBeInTheDocument();
+    expect(screen.getByText('Schule: failed (Drive kaputt)')).toBeInTheDocument();
+    expect(screen.getByText('Lager: 1 imported, 0 removed, 0 unchanged, 1 failed')).toBeInTheDocument();
+    // Danach steht die Liste zum Neu-Einlesen bereit.
+    expect(await screen.findByText('3 PDFs, 2 without detectors.')).toBeInTheDocument();
+  });
+
+  it('zählt einen abgebrochenen Block als fehlgeschlagen', async () => {
+    driveListMock.mockResolvedValue([
+      { id: 'o1', name: 'Hotel' },
+      { id: 'o2', name: 'Markt' },
+    ]);
+    syncMock.mockRejectedValueOnce(new Error('timeout'));
+    render(<ObjektplanReindex />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sync all from Drive' }));
+    expect(await screen.findByText('Drive sync done: 0 imported, 0 removed, 2 failed.')).toBeInTheDocument();
+    expect(screen.getByText('Hotel: failed (timeout)')).toBeInTheDocument();
+    expect(screen.getByText('Markt: failed (timeout)')).toBeInTheDocument();
+  });
 });
+

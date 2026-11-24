@@ -111,7 +111,14 @@ Cache lesen und verhält sich auf iOS und Android verschieden.
   die Dateien samt ihren JavaScript-Rückfällen (`*_nowasm_fallback.js`) vor
   `dev`, `dev:https` und `build` nach `public/pdfjs/wasm/` (gitignored, damit
   sie zur installierten pdfjs-Version passen); der Service Worker nimmt sie mit
-  `public/**` in den Precache.
+  `public/**` in den Precache. Der Aufruf steht **im Skript selbst**
+  (`node scripts/copyPdfjsAssets.mjs && next build`), nicht in einem
+  `prebuild`-Hook: `.npmrc` setzt `ignore-scripts=true`, und damit laufen
+  `pre*`/`post*`-Hooks bei `npm run` nicht — auch nicht im Docker-Build. Mit
+  dem Hook fehlten die Dateien in dev und prod (404), und gescannte Pläne mit
+  Farbebene und JBIG2-Maske (Autohaus Eisner) zeigten nur verwaschene Blöcke.
+  `scripts/packageScripts.test.ts` hält das fest. Wer lokal `npx next build`
+  statt `npm run build` aufruft, kopiert nichts.
 
 - Die Canvas-Fläche ist auf 16 Mio. Pixel begrenzt (iOS verweigert mehr);
   darüber wird mit geringerer Auflösung gerendert und gestreckt.
@@ -268,6 +275,23 @@ noch den alten Stand — der Drive-Abgleich holt sie erst bei einer neuen md5.
   derselben Action. Ein einzelner Aufruf für alle liefe bei 55-MB-Plänen und
   minutenlanger Texterkennung in das Zeitlimit von Cloud Run. Abbrechen geht
   zwischen zwei Plänen.
+- **Alle Drive-Ordner abgleichen:** „Sync all from Drive" unter `/admin/actions`
+  gleicht jedes Objekt mit Drive-Link ab (`listRisikoObjekteWithDriveLink`, nur
+  Admins), ohne dass jemand jedes Objekt öffnen muss. Wie beim Öffnen holt der
+  Abgleich neue und geänderte Dateien, indiziert sie und erkennt den Text, wo es
+  lohnt; unveränderte bleiben, wie sie sind. Danach lädt die Seite die Liste
+  zum Neu-Einlesen.
+- **Drei Objekte gleichzeitig, im Server:** Der Browser schickt Blöcke zu drei
+  Objekten an `syncRisikoObjekteFromDrive`, das sie mit `Promise.all`
+  gleichzeitig abgleicht. Gleichzeitig nur dort: Next.js schickt die Server
+  Actions eines Clients **nacheinander** ab, ein `Promise.all` im Browser
+  liefe still seriell. Der Abgleich wartet meist auf Drive, Storage und Cloud
+  Vision, das überlappt gut. Mehr als drei nicht, weil pdfjs jeden Plan beim
+  Indizieren ganz im Speicher hält und der Dienst 1 CPU und 1 GiB hat; die
+  Action nimmt höchstens acht je Aufruf. Ein Block dauert so lange wie sein
+  langsamstes Objekt, und jeder Block muss ins Zeitlimit von 300 s passen.
+  Ein Fehler betrifft nur sein Objekt; scheitert der ganze Aufruf, zählen alle
+  Objekte des Blocks als fehlgeschlagen.
 - **Der OCR-Vermerk fällt weg** ([reindexRunner.ts](../src/server/objektplan/reindexRunner.ts)):
   Index und `ocr` werden aus der Datei neu bestimmt, sonst verhinderte der alte
   Versuch einen neuen. Danach gilt `wantsOcr` wie beim Hochladen; scheitert die
