@@ -87,6 +87,7 @@ import {
   createRisikoObjekt,
   deleteObjektDokumentAction,
   deleteRisikoObjekt,
+  listRisikoObjekteWithDriveLink,
   listObjektDokumenteForReindex,
   ocrObjektDokumentAction,
   reindexObjektDokumentAction,
@@ -393,6 +394,25 @@ describe('listObjektDokumenteForReindex', () => {
     expect(await listObjektDokumenteForReindex()).toEqual([
       { objektId: 'g', objektName: 'g', dokumentId: 'd2', name: 'd2.pdf', indexStatus: 'ohneText', melder: 0, ocr: true },
       { objektId: 'g', objektName: 'g', dokumentId: 'd1', name: 'd1.pdf', indexStatus: 'ok', melder: 2, ocr: false },
+    ]);
+  });
+});
+
+describe('listRisikoObjekteWithDriveLink', () => {
+  it('ist dem Admin vorbehalten', async () => {
+    await expect(listRisikoObjekteWithDriveLink()).rejects.toThrow();
+  });
+
+  it('listet nur Objekte mit einem Drive-Link, nach Namen sortiert', async () => {
+    session.user.isAdmin = true;
+    const drive = 'https://drive.google.com/drive/folders/1ZZGoCghcnWT-rPviKC2wAEjIBvIHZk3N';
+    store.objekte.set('b', { ...gis('b', ['a']), name: 'Markt', link: drive });
+    store.objekte.set('a', { ...gis('a', ['a']), name: 'Hotel', link: drive });
+    store.objekte.set('c', { ...gis('c', ['a']), name: 'Schule', link: 'https://example.com/plan.pdf' });
+    store.objekte.set('d', gis('d', ['a']));
+    expect(await listRisikoObjekteWithDriveLink()).toEqual([
+      { id: 'a', name: 'Hotel' },
+      { id: 'b', name: 'Markt' },
     ]);
   });
 });

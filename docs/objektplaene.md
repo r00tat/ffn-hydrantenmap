@@ -268,6 +268,13 @@ noch den alten Stand — der Drive-Abgleich holt sie erst bei einer neuen md5.
   derselben Action. Ein einzelner Aufruf für alle liefe bei 55-MB-Plänen und
   minutenlanger Texterkennung in das Zeitlimit von Cloud Run. Abbrechen geht
   zwischen zwei Plänen.
+- **Alle Drive-Ordner abgleichen:** „Sync all from Drive" unter `/admin/actions`
+  gleicht jedes Objekt mit Drive-Link ab (`listRisikoObjekteWithDriveLink`, nur
+  Admins), ohne dass jemand jedes Objekt öffnen muss. Wie beim Öffnen holt der
+  Abgleich neue und geänderte Dateien, indiziert sie und erkennt den Text, wo es
+  lohnt; unveränderte bleiben, wie sie sind. Je Objekt ein Aufruf von
+  `syncObjektDokumenteFromDrive` aus dem Browser — aus demselben Grund wie beim
+  Neu-Einlesen. Danach lädt die Seite die Liste zum Neu-Einlesen.
 - **Der OCR-Vermerk fällt weg** ([reindexRunner.ts](../src/server/objektplan/reindexRunner.ts)):
   Index und `ocr` werden aus der Datei neu bestimmt, sonst verhinderte der alte
   Versuch einen neuen. Danach gilt `wantsOcr` wie beim Hochladen; scheitert die

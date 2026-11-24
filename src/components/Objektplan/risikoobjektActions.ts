@@ -16,6 +16,7 @@ import {
   type RisikoObjektInputError,
 } from '../../common/objektplan/risikoobjektAccess';
 import { objektDokumentKind, wantsOcr, type ObjektDokumentIndexStatus } from '../../common/objektplan/objektDokument';
+import { parseDriveLink } from '../../common/objektplan/driveSync';
 import { withOcrIndex } from '../../common/objektplan/ocrIndex';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import { ocrStoragePdf } from '../../server/objektplan/ocrDokument';
@@ -302,4 +303,17 @@ export async function listObjektDokumenteForReindex(): Promise<ReindexCandidate[
       a.objektName.localeCompare(b.objektName, 'de') ||
       a.name.localeCompare(b.name, 'de'),
   );
+}
+
+/**
+ * Alle Risikoobjekte mit einem Drive-Link, für den Abgleich aller Objekte
+ * unter Admin Actions. Abgeglichen wird je Objekt vom Browser aus
+ * (`syncObjektDokumenteFromDrive`), damit kein Aufruf ins Zeitlimit läuft.
+ */
+export async function listRisikoObjekteWithDriveLink(): Promise<Array<{ id: string; name: string }>> {
+  await actionAdminRequired();
+  return (await loadAllRisikoObjekte())
+    .filter((o) => parseDriveLink(o.link) !== null)
+    .map((o) => ({ id: o.id, name: o.name || o.id }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }

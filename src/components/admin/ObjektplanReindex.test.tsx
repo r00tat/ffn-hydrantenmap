@@ -4,7 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listMock = vi.fn();
 const reindexMock = vi.fn();
+const driveListMock = vi.fn();
+const syncMock = vi.fn();
+vi.mock('../Objektplan/objektplanActions', () => ({
+  syncObjektDokumenteFromDrive: (id: string) => syncMock(id),
+}));
 vi.mock('../Objektplan/risikoobjektActions', () => ({
+  listRisikoObjekteWithDriveLink: () => driveListMock(),
   listObjektDokumenteForReindex: () => listMock(),
   reindexObjektDokumentAction: (...args: unknown[]) => reindexMock(...args),
 }));
@@ -49,4 +55,23 @@ describe('ObjektplanReindex', () => {
     await waitFor(() => expect(reindexMock).toHaveBeenCalledTimes(3));
     expect(await screen.findByText('Done: 3 re-read, 0 failed.')).toBeInTheDocument();
   });
+
+  it('gleicht alle Objekte mit Drive-Link nacheinander ab und lädt danach die Liste', async () => {
+    driveListMock.mockResolvedValue([
+      { id: 'o1', name: 'Hotel' },
+      { id: 'o2', name: 'Markt' },
+    ]);
+    syncMock
+      .mockResolvedValueOnce({ status: 'ok', imported: 3, removed: 1, skipped: 2, failed: 0 })
+      .mockResolvedValueOnce({ status: 'nichtLesbar' });
+    render(<ObjektplanReindex />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sync all from Drive' }));
+    expect(await screen.findByText('Drive sync done: 3 imported, 1 removed, 1 failed.')).toBeInTheDocument();
+    expect(syncMock.mock.calls).toEqual([['o1'], ['o2']]);
+    expect(screen.getByText('Hotel: 3 imported, 1 removed, 2 unchanged, 0 failed')).toBeInTheDocument();
+    expect(screen.getByText('Markt: Drive folder not readable')).toBeInTheDocument();
+    // Danach steht die Liste zum Neu-Einlesen bereit.
+    expect(await screen.findByText('3 PDFs, 2 without detectors.')).toBeInTheDocument();
+  });
 });
+
