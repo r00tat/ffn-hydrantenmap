@@ -153,6 +153,32 @@ describe('ObjektplanDialog', () => {
     expect(screen.getByTestId('viewer')).toHaveTextContent('eg|2|');
   });
 
+  it('listet zwei Gruppen derselben Seite getrennt und wählt nur die angeklickte', () => {
+    const original = dokumente[0].melder;
+    dokumente[0].melder = [
+      { kennung: '10/1', gruppe: 10, melder: 1, seite: 1, box: [0.1, 0.1, 0.2, 0.2] },
+      { kennung: '310/1', gruppe: 310, melder: 1, seite: 1, box: [0.5, 0.5, 0.6, 0.6] },
+    ];
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      renderWithIntl(<ObjektplanDialog open onClose={vi.fn()} objekt={objekt} />);
+      fireEvent.change(screen.getByLabelText('Melder oder Text suchen'), {
+        target: { value: '10' },
+      });
+      const ten = screen.getByText('10/1').closest('[role="button"]');
+      const threeTen = screen.getByText('310/1').closest('[role="button"]');
+      fireEvent.click(screen.getByText('310/1'));
+      expect(screen.getByTestId('viewer')).toHaveTextContent('eg|1|[[0.5,0.5,0.6,0.6]]');
+      expect(threeTen).toHaveClass('Mui-selected');
+      expect(ten).not.toHaveClass('Mui-selected');
+      const keyWarnings = errorSpy.mock.calls.filter((c) => String(c[0]).includes('same key'));
+      expect(keyWarnings).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+      dokumente[0].melder = original;
+    }
+  });
+
   it('meldet, wenn nichts gefunden wird', () => {
     renderWithIntl(<ObjektplanDialog open onClose={vi.fn()} objekt={objekt} />);
     fireEvent.change(screen.getByLabelText('Melder oder Text suchen'), {

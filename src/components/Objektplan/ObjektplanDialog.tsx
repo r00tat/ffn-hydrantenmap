@@ -88,6 +88,11 @@ interface UploadState {
 
 const NO_DOKUMENTE: ObjektDokument[] = [];
 
+/** Gleiche Markierung nach Werten — ein neuer Firestore-Stand liefert neue Arrays. */
+function sameBox(a: PlanBox | undefined, b: PlanBox | undefined): boolean {
+  return a !== undefined && b !== undefined && a.every((v, i) => v === b[i]);
+}
+
 /** Zahl der Knöpfe neben einer Unterlage für jemanden, der das Objekt pflegt. */
 function actionCount(d: ObjektDokument): number {
   return (
@@ -362,11 +367,12 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
               {result.melder.length > 0 && <ListSubheader>{t('melderResults')}</ListSubheader>}
               {result.melder.map((r) => (
                 <ListItemButton
-                  key={`m-${r.dokumentId}-${r.seite}`}
+                  // Je Seite kann es mehrere Gruppen geben („10" findet 10 und 310).
+                  key={`m-${r.dokumentId}-${r.seite}-${r.entries[0]?.gruppe}`}
                   selected={
                     view?.dokumentId === r.dokumentId &&
                     view.page === r.seite &&
-                    view.highlights.length > 0
+                    sameBox(view.highlights[0], r.entries[0]?.box)
                   }
                   onClick={() =>
                     jumpTo({
