@@ -249,6 +249,29 @@ Cloud Vision ([visionOcr.ts](../src/server/objektplan/visionOcr.ts)).
   `project-base`). Der Dienst ruft sie mit seinem Service Account auf, der
   ohnehin den Bucket lesen und schreiben darf.
 
+## Neu einlesen
+
+Der Index entsteht beim Hochladen bzw. beim Drive-Abgleich und bleibt dann
+stehen. Wird die Erkennung besser (Melder mit vierstelliger Gruppe, OCR auch für
+PDFs mit Textebene ohne Melder, JBIG2-Masken), haben die vorhandenen Pläne
+noch den alten Stand — der Drive-Abgleich holt sie erst bei einer neuen md5.
+
+- **Je Plan:** Knopf „Neu einlesen" neben jeder PDF-Unterlage für alle, die das
+  Objekt pflegen (`reindexObjektDokumentAction`). Die Datei kommt aus Storage,
+  nicht noch einmal aus Drive; Herkunft, Ersteller und Drive-Kennungen bleiben.
+- **Alle Pläne:** unter `/admin/actions` („Find plan documents"). Die Liste
+  (`listObjektDokumenteForReindex`, nur Admins) zeigt alle PDFs, die ohne Melder
+  zuerst; eingelesen wird nacheinander vom Browser aus, je Plan ein Aufruf
+  derselben Action. Ein einzelner Aufruf für alle liefe bei 55-MB-Plänen und
+  minutenlanger Texterkennung in das Zeitlimit von Cloud Run. Abbrechen geht
+  zwischen zwei Plänen.
+- **Der OCR-Vermerk fällt weg** ([reindexRunner.ts](../src/server/objektplan/reindexRunner.ts)):
+  Index und `ocr` werden aus der Datei neu bestimmt, sonst verhinderte der alte
+  Versuch einen neuen. Danach gilt `wantsOcr` wie beim Hochladen; scheitert die
+  Texterkennung, bleibt der neue Index ohne sie.
+- **pdfjs auf dem Server** teilen sich Drive-Abgleich und Neu-Einlesen
+  ([pdfjsNode.ts](../src/server/objektplan/pdfjsNode.ts)).
+
 ## Bewusst noch nicht umgesetzt
 
 - **Meldersymbole ohne Nummer** auf Scans: Die Texterkennung findet nur

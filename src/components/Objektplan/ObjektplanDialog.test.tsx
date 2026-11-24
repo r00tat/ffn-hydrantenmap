@@ -57,7 +57,9 @@ vi.mock('./objektplanActions', () => ({
 
 const deleteActionMock = vi.fn();
 const ocrActionMock = vi.fn();
+const reindexActionMock = vi.fn();
 vi.mock('./risikoobjektActions', () => ({
+  reindexObjektDokumentAction: (...args: unknown[]) => reindexActionMock(...args),
   deleteObjektDokumentAction: (...args: unknown[]) => deleteActionMock(...args),
   ocrObjektDokumentAction: (...args: unknown[]) => ocrActionMock(...args),
 }));
@@ -291,5 +293,34 @@ describe('ObjektplanDialog', () => {
       target: { files: [new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' })] },
     });
     expect(await screen.findByText('Texterkennung fehlgeschlagen')).toBeInTheDocument();
+  });
+
+  it('liest einen Plan neu ein, wer das Objekt pflegt, und meldet das Ergebnis', async () => {
+    const { unmount } = renderWithIntl(
+      <ObjektplanDialog open onClose={vi.fn()} objekt={objekt} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Neu einlesen' })).not.toBeInTheDocument();
+    unmount();
+
+    firebaseLoginMock.mockReturnValue({ isAdmin: true, email: 'admin@example.com' });
+    reindexActionMock.mockResolvedValue({ ok: true, id: 'scan', indexStatus: 'ok', melder: 4, ocr: true });
+    renderWithIntl(<ObjektplanDialog open onClose={vi.fn()} objekt={objekt} />);
+    // Jede PDF-Unterlage, auch die mit gefundenen Meldern.
+    expect(screen.getAllByRole('button', { name: 'Neu einlesen' })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Neu einlesen' })[1]);
+    expect(
+      await screen.findByText('Lageplan.pdf: neu eingelesen, 4 Melder gefunden (mit OCR).'),
+    ).toBeInTheDocument();
+    expect(reindexActionMock).toHaveBeenCalledWith('ro1', 'scan');
+  });
+
+  it('meldet, wenn das Neu-Einlesen scheitert', async () => {
+    firebaseLoginMock.mockReturnValue({ isAdmin: true, email: 'admin@example.com' });
+    reindexActionMock.mockResolvedValue({ ok: false, error: 'reindexFailed' });
+    renderWithIntl(<ObjektplanDialog open onClose={vi.fn()} objekt={objekt} />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Neu einlesen' })[0]);
+    expect(
+      await screen.findByText('Erdgeschoss.pdf: Neu einlesen fehlgeschlagen.'),
+    ).toBeInTheDocument();
   });
 });

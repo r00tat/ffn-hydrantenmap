@@ -167,3 +167,17 @@ export async function deleteObjektDokumentCompletely(
 export async function writeObjektDokument(objektId: string, dokument: ObjektDokument): Promise<void> {
   await firestore.collection(objektDokumentCollectionPath(objektId)).doc(dokument.id).set(dokument);
 }
+
+/** Überblick der Unterlagen eines Objekts — ohne den Seitentext, der groß sein kann. */
+export async function loadObjektDokumentSummaries(
+  objektId: string,
+): Promise<Array<Pick<ObjektDokument, 'id' | 'name' | 'contentType' | 'indexStatus' | 'ocr' | 'melder'>>> {
+  const snap = await firestore
+    .collection(objektDokumentCollectionPath(objektId))
+    .select('name', 'contentType', 'indexStatus', 'ocr', 'melder')
+    .get();
+  return snap.docs.map((d) => ({
+    ...(d.data() as Pick<ObjektDokument, 'name' | 'contentType' | 'indexStatus' | 'ocr' | 'melder'>),
+    id: d.id,
+  }));
+}

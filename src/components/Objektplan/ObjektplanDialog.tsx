@@ -5,6 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DocumentScannerIcon from '@mui/icons-material/DocumentScanner';
 import ImageIcon from '@mui/icons-material/Image';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -58,6 +59,7 @@ import PlanViewer from './PlanViewer';
 import {
   deleteObjektDokumentAction,
   ocrObjektDokumentAction,
+  reindexObjektDokumentAction,
   type OcrActionResult,
 } from './risikoobjektActions';
 import { useDriveSync } from './useDriveSync';
@@ -85,6 +87,15 @@ interface UploadState {
 }
 
 const NO_DOKUMENTE: ObjektDokument[] = [];
+
+/** Zahl der Knöpfe neben einer Unterlage für jemanden, der das Objekt pflegt. */
+function actionCount(d: ObjektDokument): number {
+  return (
+    Number(objektDokumentKind(d.contentType) === 'pdf') +
+    Number(wantsOcr(d)) +
+    Number(d.quelle !== 'drive')
+  );
+}
 
 export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDialogProps) {
   const t = useTranslations('objektplan');
@@ -119,6 +130,41 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
       return { ok: false, error: 'ocrFailed' };
     } finally {
       setOcrRunning((prev) => prev.filter((id) => id !== dokumentId));
+    }
+  };
+  /** Ergebnis des letzten Neu-Einlesens, als Hinweis über der Liste. */
+  const [reindexNotice, setReindexNotice] = useState<{
+    severity: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  /**
+   * Liest eine Unterlage neu aus Storage ein (Index, bei Bedarf OCR) — für
+   * Pläne, die mit einer älteren Erkennung indiziert wurden.
+   */
+  const runReindex = async (dokument: ObjektDokument) => {
+    if (!objekt.id) return;
+    setOcrRunning((prev) => [...prev, dokument.id]);
+    setReindexNotice(null);
+    try {
+      const result = await reindexObjektDokumentAction(objekt.id, dokument.id);
+      setReindexNotice(
+        result.ok
+          ? {
+              severity: 'success',
+              text: t('reindexDone', {
+                name: dokument.name,
+                count: result.melder,
+                ocr: String(result.ocr),
+              }),
+            }
+          : { severity: 'error', text: t('reindexFailed', { name: dokument.name }) },
+      );
+    } catch (err) {
+      console.error('Neu einlesen fehlgeschlagen', dokument.id, err);
+      setReindexNotice({ severity: 'error', text: t('reindexFailed', { name: dokument.name }) });
+    } finally {
+      setOcrRunning((prev) => prev.filter((id) => id !== dokument.id));
     }
   };
   const fileInput = useRef<HTMLInputElement>(null);
@@ -403,10 +449,27 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
                 <ListItemText secondary={fromCache ? t('noDocumentsOffline') : t('noDocuments')} />
               </ListItem>
             )}
+            {reindexNotice && (
+              <ListItem>
+                <Alert
+                  severity={reindexNotice.severity}
+                  onClose={() => setReindexNotice(null)}
+                  sx={{ width: '100%' }}
+                >
+                  {reindexNotice.text}
+                </Alert>
+              </ListItem>
+            )}
             {dokumente.map((d) => (
               <ListItem
                 key={d.id}
                 disablePadding
+                // Platz für bis zu drei Knöpfe, sonst liegen sie über Name und Status.
+                sx={{
+                  '& > .MuiListItemButton-root': {
+                    pr: canManage ? 1 + 4.5 * actionCount(d) : undefined,
+                  },
+                }}
                 secondaryAction={
                   canManage ? (
                     <>
@@ -424,6 +487,20 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
                             </span>
                           </Tooltip>
                         )}
+                      {objektDokumentKind(d.contentType) === 'pdf' && (
+                        <Tooltip title={t('reindex')}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              aria-label={t('reindex')}
+                              disabled={ocrRunning.includes(d.id)}
+                              onClick={() => void runReindex(d)}
+                            >
+                              <RefreshIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
                       {/* Aus Drive Gekommenes käme beim nächsten Abgleich
                           wieder; gelöscht wird es dort. */}
                       {d.quelle !== 'drive' && (

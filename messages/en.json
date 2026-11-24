@@ -5010,7 +5010,10 @@
     "ocrDone": "{count, plural, =0 {Text recognised, no detectors found} one {Text recognised, # detector found} other {Text recognised, # detectors found}}",
     "ocrNoText": "Scan – no text recognised",
     "ocrFailed": "Text recognition failed",
-    "ocrSource": "OCR"
+    "ocrSource": "OCR",
+    "reindex": "Re-read",
+    "reindexDone": "{name}: re-read, {count, plural, =0 {no detectors} one {# detector} other {# detectors}} found{ocr, select, true { (with OCR)} other {}}.",
+    "reindexFailed": "{name}: re-reading failed."
   },
   "risikoobjekte": {
     "title": "High-risk sites",
@@ -5057,7 +5060,8 @@
       "notApp": "Sites from the GIS import cannot be deleted.",
       "unknown": "Saving failed.",
       "notScan": "The document is not a scan without text.",
-      "ocrFailed": "Text recognition failed."
+      "ocrFailed": "Text recognition failed.",
+      "reindexFailed": "Re-reading failed."
     },
     "unshared": "{count, plural, one {# site is} other {# sites are}} not shared with any group yet. Only admins see their plans.",
     "unsharedGroups": "Share with",

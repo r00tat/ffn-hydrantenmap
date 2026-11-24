@@ -13,9 +13,9 @@ import {
   objektDokumentCollectionPath,
   type ObjektDokument,
 } from '../../common/objektplan/objektDokument';
-import { indexPdf, type PdfjsLike } from '../../common/objektplan/pdfIndex';
 import type { DriveSyncDeps } from './driveSyncRunner';
 import { ocrStoragePdf } from './ocrDokument';
+import { indexPdfOnServer } from './pdfjsNode';
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const FILE_FIELDS = 'id,name,mimeType,md5Checksum,size,version,trashed';
@@ -99,19 +99,6 @@ async function exportPdf(fileId: string): Promise<Uint8Array> {
 }
 
 /**
- * Der Legacy-Build läuft unter Node und nimmt dort einen Fake-Worker im
- * selben Thread. Den holt pdfjs sonst per dynamischem Import über
- * `workerSrc` (`./pdf.worker.mjs`) — den verfolgt das Tracing des
- * Standalone-Builds nicht, im Container fehlte die Datei. Vorab geladen
- * und unter `globalThis.pdfjsWorker` abgelegt, nimmt pdfjs ihn von dort.
- */
-async function loadPdfjsForNode(): Promise<PdfjsLike> {
-  const g = globalThis as { pdfjsWorker?: unknown };
-  g.pdfjsWorker ??= await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
-  return (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as PdfjsLike;
-}
-
-/**
  * @param storageGroups Freigabe des Objekts als Metadatum der Dateien
  *   (`storageGroupsMetadata`) — die Storage-Regel prüft sie.
  */
@@ -120,7 +107,7 @@ export function driveSyncDeps(storageGroups: string): DriveSyncDeps {
     listFiles,
     download,
     exportPdf,
-    index: (data) => indexPdf(data, loadPdfjsForNode),
+    index: indexPdfOnServer,
     ocr: (storagePath) => ocrStoragePdf(storagePath, storagePath.replace(/[^A-Za-z0-9_-]/g, '_')),
     async saveFile(path, data, contentType) {
       const bucket = await getDefaultStorageBucket();

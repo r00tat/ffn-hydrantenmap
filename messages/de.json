@@ -5010,7 +5010,10 @@
     "ocrDone": "{count, plural, =0 {Text erkannt, keine Melder gefunden} one {Text erkannt, # Melder gefunden} other {Text erkannt, # Melder gefunden}}",
     "ocrNoText": "Scan – kein Text erkannt",
     "ocrFailed": "Texterkennung fehlgeschlagen",
-    "ocrSource": "OCR"
+    "ocrSource": "OCR",
+    "reindex": "Neu einlesen",
+    "reindexDone": "{name}: neu eingelesen, {count, plural, =0 {keine Melder} one {# Melder} other {# Melder}} gefunden{ocr, select, true { (mit OCR)} other {}}.",
+    "reindexFailed": "{name}: Neu einlesen fehlgeschlagen."
   },
   "risikoobjekte": {
     "title": "Risikoobjekte",
@@ -5057,7 +5060,8 @@
       "notApp": "Objekte aus dem GIS-Import lassen sich nicht löschen.",
       "unknown": "Speichern fehlgeschlagen.",
       "notScan": "Das Dokument ist kein Scan ohne Text.",
-      "ocrFailed": "Texterkennung fehlgeschlagen."
+      "ocrFailed": "Texterkennung fehlgeschlagen.",
+      "reindexFailed": "Neu einlesen fehlgeschlagen."
     },
     "unshared": "{count, plural, one {# Objekt ist} other {# Objekte sind}} noch keiner Gruppe freigegeben. Ihre Pläne sehen nur Admins.",
     "unsharedGroups": "Freigeben für",
