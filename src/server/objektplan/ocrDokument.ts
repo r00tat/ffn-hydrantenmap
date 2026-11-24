@@ -4,7 +4,7 @@ import { GoogleAuth } from 'google-auth-library';
 import { ocrIndexFromResponses } from '../../common/objektplan/ocrIndex';
 import type { PdfPlanIndex } from '../../common/objektplan/pdfIndex';
 import { getDefaultStorageBucket } from '../firebase/storageBucket';
-import { OCR_OUTPUT_PREFIX, ocrPdfInBucket, type VisionOcrDeps } from './visionOcr';
+import { OCR_OUTPUT_PREFIX, ocrPdf, type VisionOcrDeps } from './visionOcr';
 
 /**
  * Texterkennung eines PDFs im Standard-Bucket über Cloud Vision. Der Dienst
@@ -40,14 +40,22 @@ async function visionDeps(): Promise<VisionOcrDeps> {
   };
 }
 
-/** Erkennt den Text des PDFs unter `storagePath`; `key` trennt parallele Läufe. */
-export async function ocrStoragePdf(storagePath: string, key: string): Promise<PdfPlanIndex> {
+/**
+ * Erkennt den Text des PDFs unter `storagePath`; `key` trennt parallele Läufe.
+ * Mit `pageCount` bis fünf geht der Plan direkt an Vision statt über den Bucket.
+ */
+export async function ocrStoragePdf(
+  storagePath: string,
+  key: string,
+  pageCount?: number,
+): Promise<PdfPlanIndex> {
   const bucket = await getDefaultStorageBucket();
-  const pages = await ocrPdfInBucket(
+  const pages = await ocrPdf(
     bucket.name,
     storagePath,
     `${OCR_OUTPUT_PREFIX}/${key}/${Date.now()}`,
     await visionDeps(),
+    { pageCount },
   );
   return ocrIndexFromResponses(pages);
 }

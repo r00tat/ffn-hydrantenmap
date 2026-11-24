@@ -167,10 +167,41 @@ describe('runDriveSync', () => {
       order.push('ocr');
       return { seiten: 1, seitenText: ['Gruppe 2/07'], melder: [], textGekuerzt: false };
     });
+    deps.writeDokument.mockImplementation(async (_o: string, d: ObjektDokument) => {
+      order.push(d.ocr ? 'dokument mit Text' : 'dokument');
+      written.push(d);
+    });
     await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
-    expect(order).toEqual(['datei', 'ocr']);
-    expect(ocr).toHaveBeenCalledWith(`risikoobjekt/obj/drive-${pdf.id}-Brandschutzplan_gesamt.pdf`);
-    expect(written[0]).toMatchObject({ indexStatus: 'ok', ocr: true, seitenText: ['Gruppe 2/07'] });
+    // Der Plan steht sofort in der Liste, der Text kommt nach.
+    expect(order).toEqual(['datei', 'dokument', 'ocr', 'dokument mit Text']);
+    expect(ocr).toHaveBeenCalledWith(`risikoobjekt/obj/drive-${pdf.id}-Brandschutzplan_gesamt.pdf`, 1);
+    expect(written.at(-1)).toMatchObject({ indexStatus: 'ok', ocr: true, seitenText: ['Gruppe 2/07'] });
+  });
+
+  it('wartet mit dem nächsten Plan nicht auf die Texterkennung des vorigen', async () => {
+    const scan2: DriveFileInfo = { ...pdf, id: 'zyxwvutsrqponmlkjihgfedcba', name: 'Keller.pdf', md5Checksum: 'md5-2' };
+    const { deps, written } = fakeDeps([pdf, scan2]);
+    deps.index.mockResolvedValue({ seiten: 3, seitenText: ['', '', ''], melder: [], textGekuerzt: false });
+    const pending: Array<() => void> = [];
+    const ocr = vi.fn(
+      () =>
+        new Promise<{ seiten: number; seitenText: string[]; melder: []; textGekuerzt: boolean }>(
+          (resolve) =>
+            pending.push(() =>
+              resolve({ seiten: 3, seitenText: ['Gruppe 2/07', '', ''], melder: [], textGekuerzt: false }),
+            ),
+        ),
+    );
+    const done = runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
+    // Beide Erkennungen laufen, bevor die erste fertig ist.
+    await vi.waitFor(() => expect(pending).toHaveLength(2));
+    expect(deps.saveFile).toHaveBeenCalledTimes(2);
+    // Beide Pläne stehen schon in der Liste, noch ohne Text.
+    expect(written.map((d) => d.ocr)).toEqual([undefined, undefined]);
+    pending.forEach((resolve) => resolve());
+    expect(await done).toMatchObject({ status: 'ok', imported: 2, failed: 0 });
+    expect(written).toHaveLength(4);
+    expect(written.slice(2).every((d) => d.ocr === true)).toBe(true);
   });
 
   it('legt den Scan auch ab, wenn die Texterkennung scheitert', async () => {
@@ -181,6 +212,7 @@ describe('runDriveSync', () => {
     });
     const result = await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
     expect(result).toMatchObject({ imported: 1, failed: 0 });
+    expect(written).toHaveLength(1);
     expect(written[0]).toMatchObject({ indexStatus: 'ohneText' });
     expect(written[0].ocr).toBeUndefined();
   });
@@ -197,8 +229,8 @@ describe('runDriveSync', () => {
     }));
     await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
     expect(ocr).toHaveBeenCalled();
-    expect(written[0]).toMatchObject({ indexStatus: 'ok', ocr: true, seitenText: ['LEGENDE\n1003/04'] });
-    expect(written[0].melder).toHaveLength(1);
+    expect(written.at(-1)).toMatchObject({ indexStatus: 'ok', ocr: true, seitenText: ['LEGENDE\n1003/04'] });
+    expect(written.at(-1)?.melder).toHaveLength(1);
   });
 
   it('ruft die Texterkennung nicht für PDFs mit gefundenen Meldern auf', async () => {
