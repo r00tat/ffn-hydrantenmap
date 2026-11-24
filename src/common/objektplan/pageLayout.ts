@@ -89,3 +89,33 @@ export function zoomForMark(
   if (!(height > 0)) return 1;
   return Math.min(Math.max(MARK_TARGET_PX / height, 1), MARK_MAX_ZOOM);
 }
+
+/**
+ * Wohin ein Punkt der Spalte nach dem Zoomen wandert: auf dieselbe Stelle
+ * derselben Seite. Waagrecht wächst er mit der Seitenbreite, senkrecht mit
+ * der Seite, in der er liegt — der Abstand zwischen den Seiten wächst nicht
+ * mit. So bleibt beim Zwei-Finger-Zoom die Stelle zwischen den Fingern stehen.
+ */
+export function mapPointBetweenLayouts(
+  from: PageLayout,
+  to: PageLayout,
+  x: number,
+  y: number,
+): { x: number; y: number } {
+  if (from.pages.length === 0 || to.pages.length === 0) return { x, y };
+  let i = from.pages.findIndex((p, n) => {
+    const next = from.pages[n + 1];
+    return y < (next ? next.top : Infinity);
+  });
+  if (i < 0) i = from.pages.length - 1;
+  const a = from.pages[i];
+  const b = to.pages[Math.min(i, to.pages.length - 1)];
+  const scaleX = a.width > 0 ? b.width / a.width : 1;
+  const offset = y - a.top;
+  // Im Abstand unter der Seite bleibt der Versatz unverändert.
+  const mappedY =
+    offset <= a.height && a.height > 0
+      ? b.top + (offset / a.height) * b.height
+      : b.top + b.height + (offset - a.height);
+  return { x: x * scaleX, y: mappedY };
+}

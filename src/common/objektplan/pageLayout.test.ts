@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { layoutPages, pageAtScroll, pagesToRender, zoomForMark } from './pageLayout';
+import {
+  layoutPages,
+  mapPointBetweenLayouts,
+  pageAtScroll,
+  pagesToRender,
+  zoomForMark,
+} from './pageLayout';
 
 // A4 hoch (595 × 842) und A3 quer (1191 × 842).
 const sizes = [
@@ -72,5 +78,34 @@ describe('zoomForMark', () => {
   it('bleibt mindestens eingepasst und höchstens beim Höchstwert', () => {
     expect(zoomForMark([0, 0, 0.5, 0.5], 1000)).toBe(1);
     expect(zoomForMark([0, 0, 0.01, 0.001], 1000)).toBe(4);
+  });
+});
+
+describe('mapPointBetweenLayouts', () => {
+  const before = layoutPages(sizes, 400, 1, 8);
+  const after = layoutPages(sizes, 400, 2, 8);
+
+  it('hält einen Punkt auf derselben Stelle der Seite', () => {
+    // Mitte der zweiten Seite.
+    const p = before.pages[1];
+    const mapped = mapPointBetweenLayouts(before, after, 200, p.top + p.height / 2);
+    expect(mapped.x).toBeCloseTo(400);
+    expect(mapped.y).toBeCloseTo(after.pages[1].top + after.pages[1].height / 2);
+  });
+
+  it('wächst der Abstand zwischen den Seiten nicht mit', () => {
+    const mapped = mapPointBetweenLayouts(before, after, 0, before.pages[1].top);
+    expect(mapped.y).toBeCloseTo(after.pages[1].top);
+  });
+
+  it('ordnet einen Punkt im Abstand der Seite davor zu', () => {
+    const p = before.pages[0];
+    const mapped = mapPointBetweenLayouts(before, after, 0, p.top + p.height + 4);
+    expect(mapped.y).toBeCloseTo(after.pages[0].height + 4);
+  });
+
+  it('skaliert ohne Seiten einfach mit', () => {
+    const empty = { pages: [], totalHeight: 0 };
+    expect(mapPointBetweenLayouts(empty, empty, 10, 20)).toEqual({ x: 10, y: 20 });
   });
 });

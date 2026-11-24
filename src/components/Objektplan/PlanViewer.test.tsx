@@ -24,10 +24,13 @@ const fakePdf = {
 vi.mock('./objektDokumente', () => ({
   loadObjektDokumentBlob: vi.fn(async () => new Blob(['%PDF'], { type: 'application/pdf' })),
 }));
+const getDocument = vi.fn((_options: { data: Uint8Array; wasmUrl?: string }) => ({
+  promise: Promise.resolve(fakePdf),
+  destroy: vi.fn(),
+}));
 vi.mock('./pdfPlanIndex', () => ({
-  loadPdfjsLib: async () => ({
-    getDocument: () => ({ promise: Promise.resolve(fakePdf), destroy: vi.fn() }),
-  }),
+  loadPdfjsLib: async () => ({ getDocument }),
+  pdfjsWasmUrl: () => 'http://localhost/pdfjs/wasm/',
 }));
 
 let resize: ((entries: { contentRect: { width: number; height: number } }[]) => void) | undefined;
@@ -106,3 +109,69 @@ describe('PlanViewer – Sprung zum Treffer', () => {
     await screen.findByText('400%');
   });
 });
+
+describe('PlanViewer – Darstellung und Bedienung', () => {
+  it('gibt pdfjs den Pfad zu den WebAssembly-Decodern mit (JBIG2 in Scans)', async () => {
+    await mount({});
+    expect(getDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ wasmUrl: 'http://localhost/pdfjs/wasm/' }),
+    );
+  });
+
+  it('vergrößert den Plan über einen eigenen Knopf, ohne den Zoom zu ändern', async () => {
+    const onToggle = vi.fn();
+    const view = renderWithIntl(
+      <PlanViewer dokument={dokument} page={1} onToggleExpanded={onToggle} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Plan vergrößern (Suche ausblenden)' }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    view.rerender(
+      <PlanViewer dokument={dokument} page={1} expanded onToggleExpanded={onToggle} />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Suche und Unterlagen einblenden' }),
+    ).toBeInTheDocument();
+  });
+
+  it('zoomt mit zwei Fingern um den Punkt zwischen den Fingern', async () => {
+    await mount({});
+    const scroller = screen.getByTestId('plan-pages').parentElement!;
+    const touches = (a: number, b: number) => [
+      { clientX: 100 - a, clientY: 100 },
+      { clientX: 100 + b, clientY: 100 },
+    ];
+    fireEvent.touchStart(scroller, { touches: touches(20, 20) });
+    fireEvent.touchMove(scroller, { touches: touches(40, 40) });
+    expect(getComputedStyle(screen.getByTestId('plan-pages')).transformOrigin).toBe('100px 100px');
+    fireEvent.touchEnd(scroller, { touches: [] });
+    expect(screen.getByText('200%')).toBeInTheDocument();
+    // Der Punkt (100, 100) der Spalte liegt jetzt bei (200, 200) — die
+    // Scrollposition rückt um 100 px nach, damit er unter den Fingern bleibt.
+    expect(scroller.scrollLeft).toBe(100);
+    expect(scroller.scrollTop).toBe(100);
+  });
+
+  it('verschiebt den Plan mit gedrückter Maustaste', async () => {
+    await mount({});
+    const scroller = screen.getByTestId('plan-pages').parentElement!;
+    scroller.scrollLeft = 100;
+    scroller.scrollTop = 100;
+    fireEvent.mouseDown(scroller, { button: 0, clientX: 200, clientY: 200 });
+    fireEvent.mouseMove(window, { clientX: 150, clientY: 170 });
+    expect(scroller.scrollLeft).toBe(150);
+    expect(scroller.scrollTop).toBe(130);
+    fireEvent.mouseUp(window);
+    fireEvent.mouseMove(window, { clientX: 0, clientY: 0 });
+    expect(scroller.scrollLeft).toBe(150);
+  });
+
+  it('verschiebt nicht mit der rechten Maustaste', async () => {
+    await mount({});
+    const scroller = screen.getByTestId('plan-pages').parentElement!;
+    fireEvent.mouseDown(scroller, { button: 2, clientX: 200, clientY: 200 });
+    fireEvent.mouseMove(window, { clientX: 150, clientY: 170 });
+    expect(scroller.scrollLeft).toBe(0);
+  });
+});
+

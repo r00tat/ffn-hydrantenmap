@@ -13,6 +13,7 @@ import {
 } from '../../common/objektplan/driveSync';
 import {
   objektDokumentStoragePath,
+  wantsOcr,
   type ObjektDokument,
 } from '../../common/objektplan/objektDokument';
 import { withOcrIndex } from '../../common/objektplan/ocrIndex';
@@ -110,8 +111,9 @@ export async function runDriveSync(
       await deps.saveFile(storagePath, data, format.contentType);
       // Vision liest die Datei aus dem Bucket, deshalb erst nach dem Ablegen.
       // Scheitert die Erkennung, bleibt der Scan ohne Text — der Plan selbst
-      // ist wichtiger als seine Durchsuchbarkeit.
-      if (dokument.indexStatus === 'ohneText' && deps.ocr) {
+      // ist wichtiger als seine Durchsuchbarkeit. Auch ein PDF mit Textebene,
+      // aber ohne Melder geht durch die Erkennung (siehe `wantsOcr`).
+      if (wantsOcr(dokument) && deps.ocr) {
         try {
           dokument = withOcrIndex(dokument, await deps.ocr(storagePath));
         } catch (err) {

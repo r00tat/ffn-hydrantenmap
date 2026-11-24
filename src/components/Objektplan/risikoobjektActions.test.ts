@@ -12,7 +12,7 @@ const store = vi.hoisted(() => ({
   dokumentDeleted: [] as string[],
   dokumente: new Map<
     string,
-    { id: string; quelle?: 'drive'; storagePath: string; contentType?: string; indexStatus?: string; ocr?: boolean }
+    { id: string; quelle?: 'drive'; storagePath: string; contentType?: string; indexStatus?: string; ocr?: boolean; seitenText?: string[]; melder?: unknown[] }
   >(),
   dokumentWritten: [] as Array<Record<string, unknown>>,
 }));
@@ -22,7 +22,22 @@ vi.mock('../../server/objektplan/ocrDokument', () => ({
   ocrStoragePdf: (path: string, key: string) => ocr.run(path, key),
 }));
 
+const reindex = vi.hoisted(() => ({ run: vi.fn(), key: '' }));
+vi.mock('../../server/objektplan/reindexDeps', () => ({
+  reindexDeps: (key: string) => {
+    reindex.key = key;
+    return { marker: 'deps' };
+  },
+}));
+vi.mock('../../server/objektplan/reindexRunner', () => ({
+  reindexDokument: (d: unknown, deps: unknown) => reindex.run(d, deps),
+}));
+
 vi.mock('../../server/objektplan/risikoobjektStore', () => ({
+  loadObjektDokumentSummaries: async (objektId: string) =>
+    [...store.dokumente.values()]
+      .filter((d) => d.storagePath.startsWith(`risikoobjekt/${objektId}/`))
+      .map((d) => ({ ...d, name: `${d.id}.pdf` })),
   loadRisikoObjekt: async (id: string) => store.objekte.get(id),
   loadAllRisikoObjekte: async () => [...store.objekte.values()],
   newRisikoObjektId: () => 'neu1',
@@ -72,7 +87,9 @@ import {
   createRisikoObjekt,
   deleteObjektDokumentAction,
   deleteRisikoObjekt,
+  listObjektDokumenteForReindex,
   ocrObjektDokumentAction,
+  reindexObjektDokumentAction,
   setRisikoObjektGroups,
   shareUnsharedRisikoObjekte,
   updateRisikoObjekt,
@@ -114,6 +131,7 @@ beforeEach(() => {
   store.dokumente.clear();
   store.dokumentWritten.length = 0;
   ocr.run.mockReset();
+  reindex.run.mockReset();
   session.user.isAdmin = false;
   session.user.groupRoles = { a: ['gruppenadmin'], b: [] };
 });
@@ -250,9 +268,26 @@ describe('ocrObjektDokumentAction', () => {
     expect(store.dokumentWritten[0]).toMatchObject({ indexStatus: 'ok', ocr: true });
   });
 
-  it('nimmt nur PDFs ohne Textebene, die noch nicht erkannt wurden', async () => {
+  it('erkennt auch ein PDF mit Textebene ohne Melder und behält dessen Text', async () => {
     store.objekte.set('g', gis('g', ['a']));
-    store.dokumente.set('d1', { ...scan, indexStatus: 'ok' });
+    store.dokumente.set('d1', { ...scan, indexStatus: 'ok', seitenText: ['LEGENDE'], melder: [] });
+    ocr.run.mockResolvedValue({
+      seiten: 1,
+      seitenText: ['1003/04'],
+      melder: [{ kennung: '1003/04', gruppe: 1003, melder: 4, seite: 1, box: [0, 0, 0.1, 0.1] }],
+      textGekuerzt: false,
+    });
+    expect(await ocrObjektDokumentAction('g', 'd1')).toEqual({ ok: true, id: 'd1', hasText: true, melder: 1 });
+    expect(store.dokumentWritten[0]).toMatchObject({ seitenText: ['LEGENDE\n1003/04'], ocr: true });
+  });
+
+  it('nimmt nur PDFs ohne Melder, die noch nicht erkannt wurden', async () => {
+    store.objekte.set('g', gis('g', ['a']));
+    store.dokumente.set('d1', {
+      ...scan,
+      indexStatus: 'ok',
+      melder: [{ kennung: '1/02', gruppe: 1, melder: 2, seite: 1, box: [0, 0, 1, 1] }],
+    });
     store.dokumente.set('d2', { ...scan, id: 'd2', ocr: true });
     store.dokumente.set('d3', { ...scan, id: 'd3', contentType: 'image/jpeg', indexStatus: 'bild' });
     for (const id of ['d1', 'd2', 'd3']) {
@@ -272,5 +307,92 @@ describe('ocrObjektDokumentAction', () => {
     store.objekte.set('g', gis('g', ['b']));
     store.dokumente.set('d1', scan);
     expect(await ocrObjektDokumentAction('g', 'd1')).toEqual({ ok: false, error: 'forbidden' });
+  });
+});
+
+describe('reindexObjektDokumentAction', () => {
+  const plan = {
+    id: 'd1',
+    storagePath: 'risikoobjekt/g/d1-plan.pdf',
+    contentType: 'application/pdf',
+    indexStatus: 'ok',
+    ocr: true,
+    melder: [],
+  };
+
+  it('liest das Dokument neu ein und speichert das Ergebnis', async () => {
+    store.objekte.set('g', gis('g', ['a']));
+    store.dokumente.set('d1', plan);
+    reindex.run.mockResolvedValue({
+      ...plan,
+      ocr: true,
+      melder: [{ kennung: '1003/04' }, { kennung: '1003/05' }],
+    });
+    expect(await reindexObjektDokumentAction('g', 'd1')).toEqual({
+      ok: true,
+      id: 'd1',
+      indexStatus: 'ok',
+      melder: 2,
+      ocr: true,
+    });
+    expect(reindex.run).toHaveBeenCalledWith(plan, { marker: 'deps' });
+    expect(reindex.key).toBe('g_d1');
+    expect(store.dokumentWritten[0]).toMatchObject({ id: 'd1', ocr: true });
+  });
+
+  it('meldet ein Scheitern und lässt das Dokument stehen', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    store.objekte.set('g', gis('g', ['a']));
+    store.dokumente.set('d1', plan);
+    reindex.run.mockRejectedValue(new Error('No such object'));
+    expect(await reindexObjektDokumentAction('g', 'd1')).toEqual({ ok: false, error: 'reindexFailed' });
+    expect(store.dokumentWritten).toHaveLength(0);
+  });
+
+  it('verlangt das Pflegerecht am Objekt', async () => {
+    store.objekte.set('g', gis('g', ['b']));
+    store.dokumente.set('d1', plan);
+    expect(await reindexObjektDokumentAction('g', 'd1')).toEqual({ ok: false, error: 'forbidden' });
+    expect(reindex.run).not.toHaveBeenCalled();
+  });
+
+  it('kennt kein fehlendes Dokument', async () => {
+    store.objekte.set('g', gis('g', ['a']));
+    expect(await reindexObjektDokumentAction('g', 'dx')).toEqual({ ok: false, error: 'notFound' });
+  });
+});
+
+describe('listObjektDokumenteForReindex', () => {
+  it('ist dem Admin vorbehalten', async () => {
+    await expect(listObjektDokumenteForReindex()).rejects.toThrow();
+  });
+
+  it('listet alle PDFs mit Melderzahl und Status, die ohne Melder zuerst', async () => {
+    session.user.isAdmin = true;
+    store.objekte.set('g', gis('g', ['a']));
+    store.dokumente.set('d1', {
+      id: 'd1',
+      storagePath: 'risikoobjekt/g/d1.pdf',
+      contentType: 'application/pdf',
+      indexStatus: 'ok',
+      melder: [{}, {}],
+    });
+    store.dokumente.set('d2', {
+      id: 'd2',
+      storagePath: 'risikoobjekt/g/d2.pdf',
+      contentType: 'application/pdf',
+      indexStatus: 'ohneText',
+      ocr: true,
+    });
+    store.dokumente.set('d3', {
+      id: 'd3',
+      storagePath: 'risikoobjekt/g/d3.jpg',
+      contentType: 'image/jpeg',
+      indexStatus: 'bild',
+    });
+    expect(await listObjektDokumenteForReindex()).toEqual([
+      { objektId: 'g', objektName: 'g', dokumentId: 'd2', name: 'd2.pdf', indexStatus: 'ohneText', melder: 0, ocr: true },
+      { objektId: 'g', objektName: 'g', dokumentId: 'd1', name: 'd1.pdf', indexStatus: 'ok', melder: 2, ocr: false },
+    ]);
   });
 });

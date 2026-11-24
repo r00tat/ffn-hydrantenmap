@@ -205,3 +205,6 @@ certificates
 
 # Im Android-Release-Workflow erzeugter „Was ist neu"-Text für den Play Store.
 /play-release-notes.txt
+
+# pdfjs-Decoder, kopiert von scripts/copyPdfjsAssets.mjs
+/public/pdfjs/

@@ -15,15 +15,18 @@ import {
   type RisikoObjektInput,
   type RisikoObjektInputError,
 } from '../../common/objektplan/risikoobjektAccess';
-import { objektDokumentKind } from '../../common/objektplan/objektDokument';
+import { objektDokumentKind, wantsOcr, type ObjektDokumentIndexStatus } from '../../common/objektplan/objektDokument';
 import { withOcrIndex } from '../../common/objektplan/ocrIndex';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import { ocrStoragePdf } from '../../server/objektplan/ocrDokument';
+import { reindexDeps } from '../../server/objektplan/reindexDeps';
+import { reindexDokument } from '../../server/objektplan/reindexRunner';
 import {
   deleteObjektDokumentCompletely,
   deleteRisikoObjektCompletely,
   loadAllRisikoObjekte,
   loadObjektDokument,
+  loadObjektDokumentSummaries,
   loadRisikoObjekt,
   newRisikoObjektId,
   saveRisikoObjekt,
@@ -44,7 +47,8 @@ export type RisikoObjektActionError =
   | 'empty'
   | 'notApp'
   | 'notScan'
-  | 'ocrFailed';
+  | 'ocrFailed'
+  | 'reindexFailed';
 
 export type RisikoObjektActionResult =
   | { ok: true; id: string }
@@ -54,6 +58,22 @@ export type RisikoObjektActionResult =
 export type OcrActionResult =
   | { ok: true; id: string; hasText: boolean; melder: number }
   | { ok: false; error: RisikoObjektActionError };
+
+/** Ergebnis des Neu-Einlesens: Status, Zahl der Melder, ob die Texterkennung lief. */
+export type ReindexActionResult =
+  | { ok: true; id: string; indexStatus: ObjektDokumentIndexStatus; melder: number; ocr: boolean }
+  | { ok: false; error: RisikoObjektActionError };
+
+/** Eine Zeile der Admin-Übersicht zum Neu-Einlesen. */
+export interface ReindexCandidate {
+  objektId: string;
+  objektName: string;
+  dokumentId: string;
+  name: string;
+  indexStatus: ObjektDokumentIndexStatus;
+  melder: number;
+  ocr: boolean;
+}
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
 
@@ -186,8 +206,9 @@ export async function deleteObjektDokumentAction(
 }
 
 /**
- * Texterkennung für einen gescannten Plan (PDF ohne Textebene): nach dem
- * Upload aus dem Dialog und nachträglich für ältere Scans. Einmal je
+ * Texterkennung für einen gescannten Plan (PDF ohne Textebene) oder einen
+ * Plan, dessen Textebene keinen Melder enthält (siehe `wantsOcr`): nach dem
+ * Upload aus dem Dialog und nachträglich für ältere Unterlagen. Einmal je
  * Dokument — `ocr` vermerkt den Versuch, auch wenn kein Text herauskam.
  */
 export async function ocrObjektDokumentAction(
@@ -203,13 +224,7 @@ export async function ocrObjektDokumentAction(
   if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
   const dokument = await loadObjektDokument(objektId, dokumentId);
   if (!dokument) return { ok: false, error: 'notFound' };
-  if (
-    objektDokumentKind(dokument.contentType) !== 'pdf' ||
-    dokument.indexStatus !== 'ohneText' ||
-    dokument.ocr
-  ) {
-    return { ok: false, error: 'notScan' };
-  }
+  if (!wantsOcr(dokument)) return { ok: false, error: 'notScan' };
   try {
     const index = await ocrStoragePdf(dokument.storagePath, `${objektId}_${dokumentId}`);
     const result = withOcrIndex(dokument, index);
@@ -224,4 +239,67 @@ export async function ocrObjektDokumentAction(
     console.error('Texterkennung fehlgeschlagen', objektId, dokumentId, err);
     return { ok: false, error: 'ocrFailed' };
   }
+}
+
+/**
+ * Liest eine Unterlage neu aus Storage ein — Index und, wo sie lohnt,
+ * Texterkennung. Für Pläne, die vor einer Verbesserung der Erkennung
+ * indiziert wurden. Hintergrund: docs/objektplaene.md, „Neu einlesen".
+ */
+export async function reindexObjektDokumentAction(
+  objektId: string,
+  dokumentId: string,
+): Promise<ReindexActionResult> {
+  const session = await actionUserRequired();
+  if (!ID_PATTERN.test(objektId) || !ID_PATTERN.test(dokumentId)) {
+    return { ok: false, error: 'notFound' };
+  }
+  const objekt = await loadRisikoObjekt(objektId);
+  if (!objekt) return { ok: false, error: 'notFound' };
+  if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
+  const dokument = await loadObjektDokument(objektId, dokumentId);
+  if (!dokument) return { ok: false, error: 'notFound' };
+  try {
+    const result = await reindexDokument(dokument, reindexDeps(`${objektId}_${dokumentId}`));
+    await writeObjektDokument(objektId, result);
+    return {
+      ok: true,
+      id: dokumentId,
+      indexStatus: result.indexStatus,
+      melder: result.melder?.length ?? 0,
+      ocr: result.ocr === true,
+    };
+  } catch (err) {
+    console.error('Neu einlesen fehlgeschlagen', objektId, dokumentId, err);
+    return { ok: false, error: 'reindexFailed' };
+  }
+}
+
+/**
+ * Alle PDFs aller Risikoobjekte für das Neu-Einlesen unter Admin Actions.
+ * Die ohne Melder zuerst — bei ihnen lohnt es am ehesten.
+ */
+export async function listObjektDokumenteForReindex(): Promise<ReindexCandidate[]> {
+  await actionAdminRequired();
+  const result: ReindexCandidate[] = [];
+  for (const objekt of await loadAllRisikoObjekte()) {
+    for (const d of await loadObjektDokumentSummaries(objekt.id)) {
+      if (objektDokumentKind(d.contentType) !== 'pdf') continue;
+      result.push({
+        objektId: objekt.id,
+        objektName: objekt.name || objekt.id,
+        dokumentId: d.id,
+        name: d.name,
+        indexStatus: d.indexStatus,
+        melder: d.melder?.length ?? 0,
+        ocr: d.ocr === true,
+      });
+    }
+  }
+  return result.sort(
+    (a, b) =>
+      Number(a.melder > 0) - Number(b.melder > 0) ||
+      a.objektName.localeCompare(b.objektName, 'de') ||
+      a.name.localeCompare(b.name, 'de'),
+  );
 }

@@ -155,16 +155,39 @@ export function ocrIndexFromResponses(
  * Übernimmt das Ergebnis der Texterkennung ins Dokument. Bleibt der Text leer
  * (ein Foto ohne Schrift), bleibt es bei `ohneText` — vermerkt wird der
  * Versuch trotzdem, damit niemand ihn wiederholt.
+ *
+ * Hat das PDF schon eine Textebene (ein CAD-Export, dessen Melderkennungen
+ * als Linien gezeichnet sind), bleibt sie stehen: Der erkannte Text kommt je
+ * Seite dazu, die Melder ebenso. Beides zusammen hält die Obergrenze ein.
  */
-export function withOcrIndex(dokument: ObjektDokument, index: PdfPlanIndex): ObjektDokument {
-  const hasText = index.seitenText.some((t) => t.trim().length > 0);
+export function withOcrIndex(
+  dokument: ObjektDokument,
+  index: PdfPlanIndex,
+  maxTextChars: number = MAX_TEXT_CHARS,
+): ObjektDokument {
+  const layer = dokument.indexStatus === 'ok' ? (dokument.seitenText ?? []) : [];
+  const pageCount = Math.max(layer.length, index.seitenText.length);
+  let remaining = maxTextChars;
+  let textGekuerzt = index.textGekuerzt || !!(layer.length && dokument.textGekuerzt);
+  const seitenText: string[] = [];
+  for (let i = 0; i < pageCount; i++) {
+    let text = [layer[i]?.trim(), index.seitenText[i]?.trim()].filter(Boolean).join('\n');
+    if (text.length > remaining) {
+      text = text.slice(0, Math.max(0, remaining));
+      textGekuerzt = true;
+    }
+    remaining -= text.length;
+    seitenText.push(text);
+  }
+  const hasText = seitenText.some((t) => t.trim().length > 0);
+  const melder = [...(layer.length ? (dokument.melder ?? []) : []), ...index.melder];
   return {
     ...dokument,
     indexStatus: hasText ? 'ok' : 'ohneText',
     seiten: index.seiten || dokument.seiten,
-    seitenText: index.seitenText,
-    melder: index.melder,
+    seitenText,
+    melder,
     ocr: true,
-    ...(index.textGekuerzt ? { textGekuerzt: true } : {}),
+    ...(textGekuerzt ? { textGekuerzt: true } : {}),
   };
 }

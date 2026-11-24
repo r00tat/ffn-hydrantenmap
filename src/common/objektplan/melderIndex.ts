@@ -39,13 +39,13 @@ export interface MelderQuery {
 }
 
 /**
- * Gruppe mit bis zu drei Stellen, Melder mit bis zu zwei (eine Meldergruppe
+ * Gruppe mit bis zu vier Stellen (Siemens-Anlagen zählen ab `1001`), Melder mit bis zu zwei (eine Meldergruppe
  * fasst höchstens 32 Melder). Davor keine Ziffer und kein Schrägstrich,
  * danach weder Ziffer, Buchstabe noch Schrägstrich — so fallen
  * Telefonnummern (`02742/350`), Maßstäbe (`1/100`) und Daten (`17/05/2011`)
  * heraus.
  */
-const MELDER_PATTERN = /(?<![\d/])(\d{1,3})\/(\d{1,2})([A-Z])?(?![\dA-Za-z/])/g;
+const MELDER_PATTERN = /(?<![\d/])(\d{1,4})\/(\d{1,2})([A-Z])?(?![\dA-Za-z/])/g;
 
 export function findMelderInText(text: string): MelderMatch[] {
   const hits: MelderMatch[] = [];
@@ -77,7 +77,7 @@ export function parseMelderQuery(input: string): MelderQuery | null {
     .replace(/meldergruppe|gruppe|mg/g, ' ')
     .replace(/melder|\bm(?=\s*\d)|\bm\b/g, ' ')
     .trim();
-  const m = normalized.match(/^(\d{1,3})(?:\s*[/\-.\s]\s*(\d{1,2})\s*[a-z]?)?$/);
+  const m = normalized.match(/^(\d{1,4})(?:\s*[/\-.\s]\s*(\d{1,2})\s*[a-z]?)?$/);
   if (!m) return null;
   const gruppe = Number(m[1]);
   if (gruppe < 1) return null;

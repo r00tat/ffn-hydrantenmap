@@ -14,6 +14,7 @@ import {
   setCustomClaimsForAllUsers,
   setEmptyFirecallGroup,
 } from '../../app/admin/adminActions';
+import ObjektplanReindex from './ObjektplanReindex';
 
 export default function AdminActions() {
   const [status, setStatus] = useState('');
@@ -147,6 +148,7 @@ export default function AdminActions() {
             Find items in deleted layers that were not marked as deleted
           </Typography>
         </Box>
+        <ObjektplanReindex />
         {orphanedResults.map((result) => (
           <Box
             key={result.firecallId}

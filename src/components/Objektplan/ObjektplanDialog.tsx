@@ -5,6 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DocumentScannerIcon from '@mui/icons-material/DocumentScanner';
 import ImageIcon from '@mui/icons-material/Image';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -36,6 +37,7 @@ import type { Box as PlanBox } from '../../common/objektplan/melderIndex';
 import {
   OBJEKT_DOKUMENT_MAX_MB,
   objektDokumentKind,
+  wantsOcr,
   type ObjektDokument,
 } from '../../common/objektplan/objektDokument';
 import {
@@ -57,6 +59,7 @@ import PlanViewer from './PlanViewer';
 import {
   deleteObjektDokumentAction,
   ocrObjektDokumentAction,
+  reindexObjektDokumentAction,
   type OcrActionResult,
 } from './risikoobjektActions';
 import { useDriveSync } from './useDriveSync';
@@ -85,6 +88,15 @@ interface UploadState {
 
 const NO_DOKUMENTE: ObjektDokument[] = [];
 
+/** Zahl der Knöpfe neben einer Unterlage für jemanden, der das Objekt pflegt. */
+function actionCount(d: ObjektDokument): number {
+  return (
+    Number(objektDokumentKind(d.contentType) === 'pdf') +
+    Number(wantsOcr(d)) +
+    Number(d.quelle !== 'drive')
+  );
+}
+
 export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDialogProps) {
   const t = useTranslations('objektplan');
   const tCommon = useTranslations('common');
@@ -104,6 +116,8 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [toDelete, setToDelete] = useState<ObjektDokument | null>(null);
   const [ocrRunning, setOcrRunning] = useState<string[]>([]);
+  /** Plan über die ganze Breite, Suche und Liste ausgeblendet. */
+  const [planExpanded, setPlanExpanded] = useState(false);
 
   /** Texterkennung eines Scans; das Ergebnis kommt über die Dokumentliste. */
   const runOcr = async (dokumentId: string): Promise<OcrActionResult> => {
@@ -116,6 +130,41 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
       return { ok: false, error: 'ocrFailed' };
     } finally {
       setOcrRunning((prev) => prev.filter((id) => id !== dokumentId));
+    }
+  };
+  /** Ergebnis des letzten Neu-Einlesens, als Hinweis über der Liste. */
+  const [reindexNotice, setReindexNotice] = useState<{
+    severity: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  /**
+   * Liest eine Unterlage neu aus Storage ein (Index, bei Bedarf OCR) — für
+   * Pläne, die mit einer älteren Erkennung indiziert wurden.
+   */
+  const runReindex = async (dokument: ObjektDokument) => {
+    if (!objekt.id) return;
+    setOcrRunning((prev) => [...prev, dokument.id]);
+    setReindexNotice(null);
+    try {
+      const result = await reindexObjektDokumentAction(objekt.id, dokument.id);
+      setReindexNotice(
+        result.ok
+          ? {
+              severity: 'success',
+              text: t('reindexDone', {
+                name: dokument.name,
+                count: result.melder,
+                ocr: String(result.ocr),
+              }),
+            }
+          : { severity: 'error', text: t('reindexFailed', { name: dokument.name }) },
+      );
+    } catch (err) {
+      console.error('Neu einlesen fehlgeschlagen', dokument.id, err);
+      setReindexNotice({ severity: 'error', text: t('reindexFailed', { name: dokument.name }) });
+    } finally {
+      setOcrRunning((prev) => prev.filter((id) => id !== dokument.id));
     }
   };
   const fileInput = useRef<HTMLInputElement>(null);
@@ -193,8 +242,9 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
           },
           (p) => update(i, { progress: p }),
         );
-        if (dok.indexStatus === 'ohneText') {
-          // Ein Scan: Text und Melder erkennt Cloud Vision auf dem Server.
+        if (wantsOcr(dok)) {
+          // Ein Scan oder ein Plan ohne Melder in der Textebene: Text und
+          // Melder erkennt Cloud Vision auf dem Server.
           update(i, { status: 'running', progress: 1, message: t('ocrRunning') });
           const ocr = await runOcr(dok.id);
           update(i, {
@@ -271,7 +321,9 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
         }}
       >
         <Box
+          data-testid="objektplan-sidebar"
           sx={{
+            display: planExpanded ? 'none' : undefined,
             width: { md: 360 },
             maxHeight: { xs: '40vh', md: 'none' },
             overflow: 'auto',
@@ -397,16 +449,31 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
                 <ListItemText secondary={fromCache ? t('noDocumentsOffline') : t('noDocuments')} />
               </ListItem>
             )}
+            {reindexNotice && (
+              <ListItem>
+                <Alert
+                  severity={reindexNotice.severity}
+                  onClose={() => setReindexNotice(null)}
+                  sx={{ width: '100%' }}
+                >
+                  {reindexNotice.text}
+                </Alert>
+              </ListItem>
+            )}
             {dokumente.map((d) => (
               <ListItem
                 key={d.id}
                 disablePadding
+                // Platz für bis zu drei Knöpfe, sonst liegen sie über Name und Status.
+                sx={{
+                  '& > .MuiListItemButton-root': {
+                    pr: canManage ? 1 + 4.5 * actionCount(d) : undefined,
+                  },
+                }}
                 secondaryAction={
                   canManage ? (
                     <>
-                      {d.indexStatus === 'ohneText' &&
-                        !d.ocr &&
-                        objektDokumentKind(d.contentType) === 'pdf' && (
+                      {wantsOcr(d) && (
                           <Tooltip title={t('ocrRun')}>
                             <span>
                               <IconButton
@@ -420,6 +487,20 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
                             </span>
                           </Tooltip>
                         )}
+                      {objektDokumentKind(d.contentType) === 'pdf' && (
+                        <Tooltip title={t('reindex')}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              aria-label={t('reindex')}
+                              disabled={ocrRunning.includes(d.id)}
+                              onClick={() => void runReindex(d)}
+                            >
+                              <RefreshIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
                       {/* Aus Drive Gekommenes käme beim nächsten Abgleich
                           wieder; gelöscht wird es dort. */}
                       {d.quelle !== 'drive' && (
@@ -525,6 +606,8 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
               highlights={view.highlights}
               textTerm={view.textTerm}
               jumpKey={view.jumpKey}
+              expanded={planExpanded}
+              onToggleExpanded={() => setPlanExpanded((e) => !e)}
             />
           ) : (
             !loading &&
