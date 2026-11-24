@@ -6,13 +6,21 @@ import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
 import { useRef, useState } from 'react';
 import type { DriveSyncResult } from '../../server/objektplan/driveSyncRunner';
-import { syncObjektDokumenteFromDrive } from '../Objektplan/objektplanActions';
 import {
   listObjektDokumenteForReindex,
   listRisikoObjekteWithDriveLink,
   reindexObjektDokumentAction,
+  syncRisikoObjekteFromDrive,
   type ReindexCandidate,
 } from '../Objektplan/risikoobjektActions';
+
+/**
+ * Objekte je Aufruf, die der Server gleichzeitig abgleicht. Der Abgleich
+ * wartet meist auf Drive, Storage und die Texterkennung — das überlappt gut.
+ * Mehr nicht, weil pdfjs jeden Plan beim Indizieren ganz im Speicher hält und
+ * der Dienst nur 1 CPU und 1 GiB hat.
+ */
+const DRIVE_SYNC_PARALLEL = 3;
 
 function describeSync(result: DriveSyncResult): string {
   switch (result.status) {
@@ -65,25 +73,37 @@ export default function ObjektplanReindex() {
     let removed = 0;
     let failed = 0;
     setProgress({ done: 0, total: objekte.length });
-    for (const [i, o] of objekte.entries()) {
+    // Blöcke statt Einzelaufrufe: Next.js schickt Server Actions eines
+    // Clients nacheinander ab, gleichzeitig geht es nur im Server.
+    for (let start = 0; start < objekte.length; start += DRIVE_SYNC_PARALLEL) {
       if (stopRef.current) break;
-      let line: string;
+      const block = objekte.slice(start, start + DRIVE_SYNC_PARALLEL);
+      let lines: string[];
       try {
-        const result = await syncObjektDokumenteFromDrive(o.id);
-        if (result.status === 'ok') {
-          imported += result.imported;
-          removed += result.removed;
-          failed += result.failed;
-        } else if (result.status === 'nichtLesbar') {
-          failed += 1;
-        }
-        line = `${o.name}: ${describeSync(result)}`;
+        const entries = await syncRisikoObjekteFromDrive(block.map((o) => o.id));
+        lines = block.map((o) => {
+          const entry = entries.find((e) => e.id === o.id);
+          if (!entry || 'error' in entry) {
+            failed += 1;
+            return `${o.name}: failed (${entry?.error ?? 'no result'})`;
+          }
+          const { result } = entry;
+          if (result.status === 'ok') {
+            imported += result.imported;
+            removed += result.removed;
+            failed += result.failed;
+          } else if (result.status === 'nichtLesbar') {
+            failed += 1;
+          }
+          return `${o.name}: ${describeSync(result)}`;
+        });
       } catch (err) {
-        failed += 1;
-        line = `${o.name}: failed (${err instanceof Error ? err.message : String(err)})`;
+        const message = err instanceof Error ? err.message : String(err);
+        failed += block.length;
+        lines = block.map((o) => `${o.name}: failed (${message})`);
       }
-      setLog((prev) => [...prev, line]);
-      setProgress({ done: i + 1, total: objekte.length });
+      setLog((prev) => [...prev, ...lines]);
+      setProgress({ done: Math.min(start + block.length, objekte.length), total: objekte.length });
     }
     setProgress(null);
     setSummary(`Drive sync done: ${imported} imported, ${removed} removed, ${failed} failed.`);

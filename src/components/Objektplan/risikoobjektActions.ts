@@ -12,6 +12,7 @@ import {
   normalizeRisikoObjektInput,
   objektGroups,
   RISIKOOBJEKT_MANAGE,
+  storageGroupsMetadata,
   type RisikoObjektInput,
   type RisikoObjektInputError,
 } from '../../common/objektplan/risikoobjektAccess';
@@ -19,6 +20,8 @@ import { objektDokumentKind, wantsOcr, type ObjektDokumentIndexStatus } from '..
 import { parseDriveLink } from '../../common/objektplan/driveSync';
 import { withOcrIndex } from '../../common/objektplan/ocrIndex';
 import { isTenantGroupId } from '../../common/tenantGroups';
+import { driveSyncDeps } from '../../server/objektplan/driveSyncDeps';
+import { runDriveSync, type DriveSyncResult } from '../../server/objektplan/driveSyncRunner';
 import { ocrStoragePdf } from '../../server/objektplan/ocrDokument';
 import { reindexDeps } from '../../server/objektplan/reindexDeps';
 import { reindexDokument } from '../../server/objektplan/reindexRunner';
@@ -316,4 +319,50 @@ export async function listRisikoObjekteWithDriveLink(): Promise<Array<{ id: stri
     .filter((o) => parseDriveLink(o.link) !== null)
     .map((o) => ({ id: o.id, name: o.name || o.id }))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+/** Ergebnis des Abgleichs je Objekt: das Ergebnis oder die Fehlermeldung. */
+export type DriveSyncBatchEntry =
+  | { id: string; result: DriveSyncResult }
+  | { id: string; error: string };
+
+/**
+ * Höchstzahl Objekte je Aufruf. Der Client schickt kleinere Blöcke; die
+ * Grenze hält einen einzelnen Aufruf unter dem Zeitlimit und dem Speicher
+ * des Dienstes (pdfjs hält jeden Plan beim Indizieren ganz im Speicher).
+ */
+const DRIVE_SYNC_MAX_BATCH = 8;
+
+/**
+ * Mehrere Risikoobjekte gleichzeitig mit Drive abgleichen — für „Sync all
+ * from Drive" unter Admin Actions. Gleichzeitig nur hier im Server: Next.js
+ * schickt Server Actions eines Clients nacheinander ab, ein `Promise.all` im
+ * Browser liefe also doch seriell. Ein Fehler betrifft nur sein Objekt.
+ * Hintergrund: docs/objektplaene.md, „Neu einlesen".
+ */
+export async function syncRisikoObjekteFromDrive(ids: string[]): Promise<DriveSyncBatchEntry[]> {
+  await actionAdminRequired();
+  if (!Array.isArray(ids) || ids.length > DRIVE_SYNC_MAX_BATCH) {
+    throw new Error(`at most ${DRIVE_SYNC_MAX_BATCH} objects per call`);
+  }
+  return Promise.all(
+    ids.map(async (id): Promise<DriveSyncBatchEntry> => {
+      try {
+        if (typeof id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(id)) {
+          return { id, result: { status: 'keinDriveLink' } };
+        }
+        const objekt = await loadRisikoObjekt(id);
+        if (!objekt) return { id, result: { status: 'keinDriveLink' } };
+        const result = await runDriveSync(
+          id,
+          objekt.link,
+          driveSyncDeps(storageGroupsMetadata(objektGroups(objekt))),
+        );
+        return { id, result };
+      } catch (err) {
+        console.warn('Drive-Abgleich fehlgeschlagen', id, err);
+        return { id, error: err instanceof Error ? err.message : String(err) };
+      }
+    }),
+  );
 }

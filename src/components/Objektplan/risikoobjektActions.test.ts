@@ -33,6 +33,18 @@ vi.mock('../../server/objektplan/reindexRunner', () => ({
   reindexDokument: (d: unknown, deps: unknown) => reindex.run(d, deps),
 }));
 
+const driveSync = vi.hoisted(() => ({ run: vi.fn(), groups: [] as string[] }));
+vi.mock('../../server/objektplan/driveSyncDeps', () => ({
+  driveSyncDeps: (groups: string) => {
+    driveSync.groups.push(groups);
+    return { marker: 'driveDeps' };
+  },
+}));
+vi.mock('../../server/objektplan/driveSyncRunner', () => ({
+  runDriveSync: (id: string, link: string | undefined, deps: unknown) =>
+    driveSync.run(id, link, deps),
+}));
+
 vi.mock('../../server/objektplan/risikoobjektStore', () => ({
   loadObjektDokumentSummaries: async (objektId: string) =>
     [...store.dokumente.values()]
@@ -93,6 +105,7 @@ import {
   reindexObjektDokumentAction,
   setRisikoObjektGroups,
   shareUnsharedRisikoObjekte,
+  syncRisikoObjekteFromDrive,
   updateRisikoObjekt,
 } from './risikoobjektActions';
 
@@ -133,6 +146,8 @@ beforeEach(() => {
   store.dokumentWritten.length = 0;
   ocr.run.mockReset();
   reindex.run.mockReset();
+  driveSync.run.mockReset();
+  driveSync.groups.length = 0;
   session.user.isAdmin = false;
   session.user.groupRoles = { a: ['gruppenadmin'], b: [] };
 });
@@ -414,5 +429,61 @@ describe('listRisikoObjekteWithDriveLink', () => {
       { id: 'a', name: 'Hotel' },
       { id: 'b', name: 'Markt' },
     ]);
+  });
+});
+
+describe('syncRisikoObjekteFromDrive', () => {
+  const drive = 'https://drive.google.com/drive/folders/1ZZGoCghcnWT-rPviKC2wAEjIBvIHZk3N';
+  const ok = { status: 'ok', imported: 1, removed: 0, skipped: 2, failed: 0 } as const;
+
+  it('ist dem Admin vorbehalten', async () => {
+    await expect(syncRisikoObjekteFromDrive(['a'])).rejects.toThrow();
+    expect(driveSync.run).not.toHaveBeenCalled();
+  });
+
+  it('gleicht die Objekte gleichzeitig ab, nicht nacheinander', async () => {
+    session.user.isAdmin = true;
+    for (const id of ['a', 'b', 'c']) store.objekte.set(id, { ...gis(id, ['a']), link: drive });
+    const pending: Array<() => void> = [];
+    driveSync.run.mockImplementation(
+      () => new Promise((resolve) => pending.push(() => resolve(ok))),
+    );
+    const done = syncRisikoObjekteFromDrive(['a', 'b', 'c']);
+    // Alle drei laufen, bevor der erste fertig ist.
+    await vi.waitFor(() => expect(pending).toHaveLength(3));
+    pending.forEach((resolve) => resolve());
+    expect(await done).toEqual([
+      { id: 'a', result: ok },
+      { id: 'b', result: ok },
+      { id: 'c', result: ok },
+    ]);
+    expect(driveSync.run).toHaveBeenCalledWith('a', drive, { marker: 'driveDeps' });
+    expect(driveSync.groups).toEqual(['a', 'a', 'a']);
+  });
+
+  it('meldet einen Fehler je Objekt, ohne die anderen abzubrechen', async () => {
+    session.user.isAdmin = true;
+    store.objekte.set('a', { ...gis('a', ['a']), link: drive });
+    store.objekte.set('b', { ...gis('b', ['a']), link: drive });
+    driveSync.run.mockImplementation(async (id: string) => {
+      if (id === 'a') throw new Error('Drive kaputt');
+      return ok;
+    });
+    expect(await syncRisikoObjekteFromDrive(['a', 'b', 'fehlt'])).toEqual([
+      { id: 'a', error: 'Drive kaputt' },
+      { id: 'b', result: ok },
+      { id: 'fehlt', result: { status: 'keinDriveLink' } },
+    ]);
+  });
+
+  it('nimmt nur kleine Blöcke und gültige IDs an', async () => {
+    session.user.isAdmin = true;
+    await expect(
+      syncRisikoObjekteFromDrive(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']),
+    ).rejects.toThrow();
+    expect(await syncRisikoObjekteFromDrive(['../x'])).toEqual([
+      { id: '../x', result: { status: 'keinDriveLink' } },
+    ]);
+    expect(driveSync.run).not.toHaveBeenCalled();
   });
 });

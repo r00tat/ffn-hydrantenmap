@@ -279,9 +279,19 @@ noch den alten Stand — der Drive-Abgleich holt sie erst bei einer neuen md5.
   gleicht jedes Objekt mit Drive-Link ab (`listRisikoObjekteWithDriveLink`, nur
   Admins), ohne dass jemand jedes Objekt öffnen muss. Wie beim Öffnen holt der
   Abgleich neue und geänderte Dateien, indiziert sie und erkennt den Text, wo es
-  lohnt; unveränderte bleiben, wie sie sind. Je Objekt ein Aufruf von
-  `syncObjektDokumenteFromDrive` aus dem Browser — aus demselben Grund wie beim
-  Neu-Einlesen. Danach lädt die Seite die Liste zum Neu-Einlesen.
+  lohnt; unveränderte bleiben, wie sie sind. Danach lädt die Seite die Liste
+  zum Neu-Einlesen.
+- **Drei Objekte gleichzeitig, im Server:** Der Browser schickt Blöcke zu drei
+  Objekten an `syncRisikoObjekteFromDrive`, das sie mit `Promise.all`
+  gleichzeitig abgleicht. Gleichzeitig nur dort: Next.js schickt die Server
+  Actions eines Clients **nacheinander** ab, ein `Promise.all` im Browser
+  liefe still seriell. Der Abgleich wartet meist auf Drive, Storage und Cloud
+  Vision, das überlappt gut. Mehr als drei nicht, weil pdfjs jeden Plan beim
+  Indizieren ganz im Speicher hält und der Dienst 1 CPU und 1 GiB hat; die
+  Action nimmt höchstens acht je Aufruf. Ein Block dauert so lange wie sein
+  langsamstes Objekt, und jeder Block muss ins Zeitlimit von 300 s passen.
+  Ein Fehler betrifft nur sein Objekt; scheitert der ganze Aufruf, zählen alle
+  Objekte des Blocks als fehlgeschlagen.
 - **Der OCR-Vermerk fällt weg** ([reindexRunner.ts](../src/server/objektplan/reindexRunner.ts)):
   Index und `ocr` werden aus der Datei neu bestimmt, sonst verhinderte der alte
   Versuch einen neuen. Danach gilt `wantsOcr` wie beim Hochladen; scheitert die
