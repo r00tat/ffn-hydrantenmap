@@ -97,8 +97,16 @@ Texterkennung (siehe unten).
   Ein Trennzeichen am Ende („310/", „3-") gilt als Gruppe: Die Suche läuft
   beim Tippen, und zwischen Gruppe und Meldernummer sollen die Treffer der
   Gruppe nicht verschwinden.
+- **Teiltreffer der Gruppe ab zwei Ziffern:** „10" findet auch 105, 310 und
+  3101 — wer die Gruppe nicht ganz weiß oder sich vertippt, sieht sie trotzdem.
+  Gereiht wird nach Güte (`melderMatchRank`): Gruppe genau, beginnt mit der
+  Eingabe, endet darauf, enthält sie; erst danach Unterlage und Seite. Enter
+  öffnet damit immer den genauesten Treffer. Bei einer Ziffer gibt es keine
+  Teiltreffer, „3" passte sonst auf fast jede Gruppe. Die Meldernummer muss
+  immer genau passen.
 - Treffer einer Gruppe werden **je Seite zusammengefasst** und gemeinsam
-  markiert. Enter öffnet den ersten Treffer; ein weiteres Enter springt noch
+  markiert — je Gruppe ein eigener Treffer, damit 310 nicht mit 10 zusammen
+  aufleuchtet. Enter öffnet den ersten Treffer; ein weiteres Enter springt noch
   einmal hin (`jumpKey` am Viewer) — wer inzwischen weggezoomt oder gescrollt
   hat, findet so zurück, ohne die Suche neu einzugeben.
 - Fundstellen eines Suchbegriffs markiert der Viewer selbst über die Textebene

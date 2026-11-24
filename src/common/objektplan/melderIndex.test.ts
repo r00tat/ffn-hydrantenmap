@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findMelderInText,
-  matchesMelderQuery,
+  melderMatchRank,
   parseMelderQuery,
   searchPageTexts,
   textItemBox,
@@ -85,20 +85,32 @@ describe('parseMelderQuery', () => {
   });
 });
 
-describe('matchesMelderQuery', () => {
-  const entry: MelderEntry = {
-    kennung: '3/05E',
-    gruppe: 3,
-    melder: 5,
-    zusatz: 'E',
-    seite: 2,
+describe('melderMatchRank', () => {
+  const at = (gruppe: number, melder = 1): MelderEntry => ({
+    kennung: `${gruppe}/${melder}`,
+    gruppe,
+    melder,
+    seite: 1,
     box: [0, 0, 0.1, 0.1],
-  };
-  it('passt auf Gruppe und Melder', () => {
-    expect(matchesMelderQuery(entry, { gruppe: 3, melder: 5 })).toBe(true);
-    expect(matchesMelderQuery(entry, { gruppe: 3 })).toBe(true);
-    expect(matchesMelderQuery(entry, { gruppe: 3, melder: 6 })).toBe(false);
-    expect(matchesMelderQuery(entry, { gruppe: 30 })).toBe(false);
+  });
+
+  it('reiht genau vor Anfang vor Ende vor Mitte', () => {
+    expect(melderMatchRank(at(10), { gruppe: 10 })).toBe(0);
+    expect(melderMatchRank(at(105), { gruppe: 10 })).toBe(1);
+    expect(melderMatchRank(at(310), { gruppe: 10 })).toBe(2);
+    expect(melderMatchRank(at(3101), { gruppe: 10 })).toBe(3);
+    expect(melderMatchRank(at(12), { gruppe: 10 })).toBeNull();
+  });
+
+  it('sucht Teiltreffer erst ab zwei Ziffern', () => {
+    expect(melderMatchRank(at(3), { gruppe: 3 })).toBe(0);
+    expect(melderMatchRank(at(13), { gruppe: 3 })).toBeNull();
+    expect(melderMatchRank(at(30), { gruppe: 3 })).toBeNull();
+  });
+
+  it('verlangt die Meldernummer genau', () => {
+    expect(melderMatchRank(at(310, 5), { gruppe: 10, melder: 5 })).toBe(2);
+    expect(melderMatchRank(at(310, 6), { gruppe: 10, melder: 5 })).toBeNull();
   });
 });
 

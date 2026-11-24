@@ -72,6 +72,22 @@ describe('searchObjektDokumente', () => {
     ]);
   });
 
+  it('findet Gruppen, die die Nummer enthalten, genaue Treffer zuerst', () => {
+    const plan = [
+      dok('a', { melder: [m('310/1', 1), m('10/1', 2), m('105/2', 1), m('10/2', 1)] }),
+      dok('b', { melder: [m('10/3', 4), m('210/1', 1)] }),
+    ];
+    const r = searchObjektDokumente(plan, '10');
+    expect(r.melder.map((x) => [x.dokumentId, x.seite, x.entries.map((e) => e.kennung)])).toEqual([
+      ['a', 1, ['10/2']],
+      ['a', 2, ['10/1']],
+      ['b', 4, ['10/3']],
+      ['a', 1, ['105/2']],
+      ['a', 1, ['310/1']],
+      ['b', 1, ['210/1']],
+    ]);
+  });
+
   it('sucht Wörter nur im Text', () => {
     const r = searchObjektDokumente(docs, 'heizraum');
     expect(r.query).toBeNull();

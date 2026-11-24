@@ -89,9 +89,25 @@ export function parseMelderQuery(input: string): MelderQuery | null {
   return { gruppe, melder };
 }
 
-export function matchesMelderQuery(entry: MelderEntry, query: MelderQuery): boolean {
-  if (entry.gruppe !== query.gruppe) return false;
-  return query.melder === undefined || entry.melder === query.melder;
+/** Teiltreffer der Gruppe erst ab so vielen Ziffern — „3" passte sonst fast überall. */
+const PARTIAL_GROUP_MIN_DIGITS = 2;
+
+/**
+ * Wie gut ein Melder zur Suche passt, kleiner ist besser: 0 die Gruppe genau,
+ * 1 sie beginnt mit der Eingabe, 2 sie endet darauf, 3 die Eingabe steht in
+ * der Mitte („10" → 10, 105, 310, 3101). `null` passt nicht. Die Meldernummer
+ * muss immer genau passen.
+ */
+export function melderMatchRank(entry: MelderEntry, query: MelderQuery): number | null {
+  if (query.melder !== undefined && entry.melder !== query.melder) return null;
+  if (entry.gruppe === query.gruppe) return 0;
+  const needle = String(query.gruppe);
+  if (needle.length < PARTIAL_GROUP_MIN_DIGITS) return null;
+  const hay = String(entry.gruppe);
+  if (hay.startsWith(needle)) return 1;
+  if (hay.endsWith(needle)) return 2;
+  if (hay.includes(needle)) return 3;
+  return null;
 }
 
 export interface PageTextHit {
