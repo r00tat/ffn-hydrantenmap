@@ -4995,6 +4995,8 @@
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fitWidth": "Fit width",
+    "expandPlan": "Enlarge plan (hide search)",
+    "collapsePlan": "Show search and documents",
     "openExternal": "Open in new tab",
     "loadFailed": "The document could not be loaded.",
     "driveSource": "Drive",

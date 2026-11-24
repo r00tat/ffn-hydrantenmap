@@ -121,4 +121,36 @@ describe('withOcrIndex', () => {
     const result = withOcrIndex(dokument, { seiten: 2, seitenText: ['', ''], melder: [], textGekuerzt: false });
     expect(result).toMatchObject({ indexStatus: 'ohneText', ocr: true });
   });
+
+  it('ergänzt die Textebene um den erkannten Text und die Melder', () => {
+    const withLayer: ObjektDokument = {
+      ...dokument,
+      indexStatus: 'ok',
+      seitenText: ['LEGENDE', 'ERDGESCHOSS'],
+      melder: [],
+    };
+    const melder = { kennung: '1003/04', gruppe: 1003, melder: 4, seite: 2, box: [0, 0, 0.1, 0.1] as [number, number, number, number] };
+    const result = withOcrIndex(withLayer, {
+      seiten: 2,
+      seitenText: ['', '1003/04 Archiv'],
+      melder: [melder],
+      textGekuerzt: false,
+    });
+    expect(result.indexStatus).toBe('ok');
+    expect(result.ocr).toBe(true);
+    expect(result.seitenText).toEqual(['LEGENDE', 'ERDGESCHOSS\n1003/04 Archiv']);
+    expect(result.melder).toEqual([melder]);
+  });
+
+  it('kürzt Textebene und erkannten Text gemeinsam', () => {
+    const withLayer: ObjektDokument = { ...dokument, indexStatus: 'ok', seitenText: ['abcd', 'ef'] };
+    const result = withOcrIndex(
+      withLayer,
+      { seiten: 2, seitenText: ['1234', '5678'], melder: [], textGekuerzt: false },
+      12,
+    );
+    expect(result.seitenText!.join('').length).toBeLessThanOrEqual(12);
+    expect(result.seitenText![0]).toBe('abcd\n1234');
+    expect(result.textGekuerzt).toBe(true);
+  });
 });

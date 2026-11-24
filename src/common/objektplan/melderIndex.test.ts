@@ -34,6 +34,19 @@ describe('findMelderInText', () => {
     expect(findMelderInText('17/05/2011')).toEqual([]);
   });
 
+  it('erkennt vierstellige Meldergruppen (Siemens-Pläne)', () => {
+    expect(findMelderInText('1003/04 1009/04( 1004/01E').map((h) => h.kennung)).toEqual([
+      '1003/04',
+      '1009/04',
+      '1004/01E',
+    ]);
+    expect(findMelderInText('1003/04')[0]).toMatchObject({ gruppe: 1003, melder: 4 });
+  });
+
+  it('ignoriert fünfstellige Gruppen', () => {
+    expect(findMelderInText('12345/01')).toEqual([]);
+  });
+
   it('ignoriert Melder- oder Gruppennummer 0', () => {
     expect(findMelderInText('0/5 3/0')).toEqual([]);
   });
@@ -56,11 +69,13 @@ describe('parseMelderQuery', () => {
     ['MG 12', { gruppe: 12 }],
     ['Gruppe 12', { gruppe: 12 }],
     ['12', { gruppe: 12 }],
+    ['1003/04', { gruppe: 1003, melder: 4 }],
+    ['1003', { gruppe: 1003 }],
   ])('%s', (input, expected) => {
     expect(parseMelderQuery(input)).toEqual(expected);
   });
 
-  it.each(['', 'Heizraum', '3/5/7', '1234', 'MG'])('kein Melder: %s', (input) => {
+  it.each(['', 'Heizraum', '3/5/7', '12345', 'MG'])('kein Melder: %s', (input) => {
     expect(parseMelderQuery(input)).toBeNull();
   });
 });

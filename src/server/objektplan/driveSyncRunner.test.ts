@@ -185,7 +185,23 @@ describe('runDriveSync', () => {
     expect(written[0].ocr).toBeUndefined();
   });
 
-  it('ruft die Texterkennung nicht für PDFs mit Textebene auf', async () => {
+  it('liest auch PDFs mit Textebene, aber ohne Melder (Kennungen als Linien)', async () => {
+    const { deps, written } = fakeDeps([pdf]);
+    deps.index.mockResolvedValue({ seiten: 1, seitenText: ['LEGENDE'], melder: [], textGekuerzt: false });
+    const box: [number, number, number, number] = [0.1, 0.1, 0.2, 0.2];
+    const ocr = vi.fn(async () => ({
+      seiten: 1,
+      seitenText: ['1003/04'],
+      melder: [{ kennung: '1003/04', gruppe: 1003, melder: 4, seite: 1, box }],
+      textGekuerzt: false,
+    }));
+    await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
+    expect(ocr).toHaveBeenCalled();
+    expect(written[0]).toMatchObject({ indexStatus: 'ok', ocr: true, seitenText: ['LEGENDE\n1003/04'] });
+    expect(written[0].melder).toHaveLength(1);
+  });
+
+  it('ruft die Texterkennung nicht für PDFs mit gefundenen Meldern auf', async () => {
     const { deps } = fakeDeps([pdf]);
     const ocr = vi.fn();
     await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);

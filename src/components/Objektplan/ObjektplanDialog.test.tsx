@@ -72,9 +72,12 @@ vi.mock('./PlanViewer', () => ({
     page: number;
     highlights?: unknown[];
     jumpKey?: number;
+    expanded?: boolean;
+    onToggleExpanded?: () => void;
   }) => (
-    <div data-testid="viewer" data-jump={props.jumpKey ?? 0}>
+    <div data-testid="viewer" data-jump={props.jumpKey ?? 0} data-expanded={String(!!props.expanded)}>
       {props.dokument.id}|{props.page}|{JSON.stringify(props.highlights ?? [])}
+      <button onClick={props.onToggleExpanded}>toggle</button>
     </div>
   ),
 }));
@@ -108,6 +111,16 @@ beforeEach(() => {
 const DRIVE = 'https://drive.google.com/drive/folders/1ZZGoCghcnWT-rPviKC2wAEjIBvIHZk3N';
 
 describe('ObjektplanDialog', () => {
+  it('blendet Suche und Liste aus, wenn der Plan vergrößert wird', () => {
+    renderWithIntl(<ObjektplanDialog open onClose={vi.fn()} objekt={objekt} />);
+    expect(screen.getByTestId('objektplan-sidebar')).toBeVisible();
+    fireEvent.click(screen.getByText('toggle'));
+    expect(screen.getByTestId('objektplan-sidebar')).not.toBeVisible();
+    expect(screen.getByTestId('viewer')).toHaveAttribute('data-expanded', 'true');
+    fireEvent.click(screen.getByText('toggle'));
+    expect(screen.getByTestId('objektplan-sidebar')).toBeVisible();
+  });
+
   it('zeigt die erste Unterlage und die Liste mit Status', () => {
     renderWithIntl(<ObjektplanDialog open onClose={vi.fn()} objekt={objekt} />);
     expect(screen.getByTestId('viewer')).toHaveTextContent('eg|1|[]');

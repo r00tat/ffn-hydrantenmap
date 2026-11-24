@@ -26,6 +26,16 @@ export async function loadPdfjsLib() {
   return pdfjs;
 }
 
+/**
+ * Wo pdfjs seine WebAssembly-Decoder findet (JBIG2, JPEG 2000, Farbprofile).
+ * `scripts/copyPdfjsAssets.mjs` legt sie vor `dev` und `build` aus
+ * `pdfjs-dist/wasm` nach `public/pdfjs/wasm/`. Absolut, weil pdfjs im Worker
+ * auflöst, dessen Adresse unter `/_next/` liegt.
+ */
+export function pdfjsWasmUrl(): string {
+  return new URL('/pdfjs/wasm/', window.location.origin).toString();
+}
+
 export async function loadPdfjsInBrowser(): Promise<PdfjsLike> {
   return (await loadPdfjsLib()) as unknown as PdfjsLike;
 }

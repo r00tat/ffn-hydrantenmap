@@ -4995,6 +4995,8 @@
     "zoomIn": "Vergrößern",
     "zoomOut": "Verkleinern",
     "fitWidth": "Breite einpassen",
+    "expandPlan": "Plan vergrößern (Suche ausblenden)",
+    "collapsePlan": "Suche und Unterlagen einblenden",
     "openExternal": "In neuem Tab öffnen",
     "loadFailed": "Die Unterlage konnte nicht geladen werden.",
     "driveSource": "Drive",

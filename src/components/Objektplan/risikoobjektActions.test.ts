@@ -12,7 +12,7 @@ const store = vi.hoisted(() => ({
   dokumentDeleted: [] as string[],
   dokumente: new Map<
     string,
-    { id: string; quelle?: 'drive'; storagePath: string; contentType?: string; indexStatus?: string; ocr?: boolean }
+    { id: string; quelle?: 'drive'; storagePath: string; contentType?: string; indexStatus?: string; ocr?: boolean; seitenText?: string[]; melder?: unknown[] }
   >(),
   dokumentWritten: [] as Array<Record<string, unknown>>,
 }));
@@ -250,9 +250,26 @@ describe('ocrObjektDokumentAction', () => {
     expect(store.dokumentWritten[0]).toMatchObject({ indexStatus: 'ok', ocr: true });
   });
 
-  it('nimmt nur PDFs ohne Textebene, die noch nicht erkannt wurden', async () => {
+  it('erkennt auch ein PDF mit Textebene ohne Melder und behält dessen Text', async () => {
     store.objekte.set('g', gis('g', ['a']));
-    store.dokumente.set('d1', { ...scan, indexStatus: 'ok' });
+    store.dokumente.set('d1', { ...scan, indexStatus: 'ok', seitenText: ['LEGENDE'], melder: [] });
+    ocr.run.mockResolvedValue({
+      seiten: 1,
+      seitenText: ['1003/04'],
+      melder: [{ kennung: '1003/04', gruppe: 1003, melder: 4, seite: 1, box: [0, 0, 0.1, 0.1] }],
+      textGekuerzt: false,
+    });
+    expect(await ocrObjektDokumentAction('g', 'd1')).toEqual({ ok: true, id: 'd1', hasText: true, melder: 1 });
+    expect(store.dokumentWritten[0]).toMatchObject({ seitenText: ['LEGENDE\n1003/04'], ocr: true });
+  });
+
+  it('nimmt nur PDFs ohne Melder, die noch nicht erkannt wurden', async () => {
+    store.objekte.set('g', gis('g', ['a']));
+    store.dokumente.set('d1', {
+      ...scan,
+      indexStatus: 'ok',
+      melder: [{ kennung: '1/02', gruppe: 1, melder: 2, seite: 1, box: [0, 0, 1, 1] }],
+    });
     store.dokumente.set('d2', { ...scan, id: 'd2', ocr: true });
     store.dokumente.set('d3', { ...scan, id: 'd3', contentType: 'image/jpeg', indexStatus: 'bild' });
     for (const id of ['d1', 'd2', 'd3']) {

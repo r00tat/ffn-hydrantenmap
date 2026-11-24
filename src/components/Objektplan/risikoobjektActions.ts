@@ -15,7 +15,7 @@ import {
   type RisikoObjektInput,
   type RisikoObjektInputError,
 } from '../../common/objektplan/risikoobjektAccess';
-import { objektDokumentKind } from '../../common/objektplan/objektDokument';
+import { wantsOcr } from '../../common/objektplan/objektDokument';
 import { withOcrIndex } from '../../common/objektplan/ocrIndex';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import { ocrStoragePdf } from '../../server/objektplan/ocrDokument';
@@ -186,8 +186,9 @@ export async function deleteObjektDokumentAction(
 }
 
 /**
- * Texterkennung für einen gescannten Plan (PDF ohne Textebene): nach dem
- * Upload aus dem Dialog und nachträglich für ältere Scans. Einmal je
+ * Texterkennung für einen gescannten Plan (PDF ohne Textebene) oder einen
+ * Plan, dessen Textebene keinen Melder enthält (siehe `wantsOcr`): nach dem
+ * Upload aus dem Dialog und nachträglich für ältere Unterlagen. Einmal je
  * Dokument — `ocr` vermerkt den Versuch, auch wenn kein Text herauskam.
  */
 export async function ocrObjektDokumentAction(
@@ -203,13 +204,7 @@ export async function ocrObjektDokumentAction(
   if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
   const dokument = await loadObjektDokument(objektId, dokumentId);
   if (!dokument) return { ok: false, error: 'notFound' };
-  if (
-    objektDokumentKind(dokument.contentType) !== 'pdf' ||
-    dokument.indexStatus !== 'ohneText' ||
-    dokument.ocr
-  ) {
-    return { ok: false, error: 'notScan' };
-  }
+  if (!wantsOcr(dokument)) return { ok: false, error: 'notScan' };
   try {
     const index = await ocrStoragePdf(dokument.storagePath, `${objektId}_${dokumentId}`);
     const result = withOcrIndex(dokument, index);

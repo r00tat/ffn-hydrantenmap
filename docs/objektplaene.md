@@ -35,7 +35,9 @@ den Text jeder Seite und sucht darin Melderkennungen
   Legacy-Build. Den Status (`ok`, `ohneText`, `fehler`, `bild`) vergeben beide
   Wege über dieselbe Funktion
   ([describeDokument.ts](../src/common/objektplan/describeDokument.ts)).
-- **Kennung `Gruppe/Melder[Zusatz]`**, z.B. `4/01E`. In den CAD-Exporten steht
+- **Kennung `Gruppe/Melder[Zusatz]`**, z.B. `4/01E`. Die Gruppe hat bis zu vier
+  Stellen — Siemens-Anlagen zählen ihre Gruppen ab `1001` (Hotel Wende:
+  `1003/04`) —, der Melder bis zu zwei. In den CAD-Exporten steht
   jede Kennung als eigenes Textstück in der Textebene, samt Lage. Ausgeschlossen
   werden Ziffern oder `/` direkt davor bzw. Ziffer, Buchstabe oder `/` danach —
   das hält Telefonnummern, Maßstäbe und Daten heraus. Melder- und Gruppennummer
@@ -53,8 +55,10 @@ den Text jeder Seite und sucht darin Melderkennungen
 
 Bestand Brandschutzpläne (Stand 2026-11): von 269 PDFs haben 94 eine
 Textebene. Erkennung je Plan unter einer Sekunde; Volksschule Tabor 22 Melder,
-Eurospar 90, HAK/Pannoneum 1613. Pläne mit Meldersymbolen ohne Nummer (Hotel
-Wende) liefern keine Melder, sind aber im Text durchsuchbar.
+Eurospar 90, HAK/Pannoneum 1613. Manche CAD-Exporte zeichnen die Kennungen als
+Linien (AutoCAD-SHX-Schriften, Hotel Wende): Die Textebene enthält dann nur
+Legende und Raumnamen, keinen Melder. Solche Pläne gehen zusätzlich durch die
+Texterkennung (siehe unten).
 
 ## Suche und Markierung
 
@@ -88,11 +92,28 @@ Cache lesen und verhält sich auf iOS und Android verschieden.
   ein Plan mit 25 A0-Seiten als volle Canvas sprengte das Handy.
 - „Seite x von y" folgt der Seite in der Bildschirmmitte; die Pfeile springen
   zur Nachbarseite. Ein Suchtreffer springt auf seine Seite und zur Markierung.
-- Beim Zoomen bleibt die Stelle: die Scrollposition wächst mit der Spalte.
+- **Beim Zoomen bleibt die Stelle stehen**, an der gezoomt wird: zwischen den
+  Fingern, unter dem Mauszeiger (Strg + Mausrad) oder, bei den Knöpfen, in der
+  Bildschirmmitte. `mapPointBetweenLayouts` rechnet den Punkt auf dieselbe
+  Stelle derselben Seite im neuen Layout um — der Abstand zwischen den Seiten
+  wächst nicht mit —, danach rückt die Scrollposition so nach, dass er wieder
+  am selben Bildschirmpunkt liegt.
+- **Plan vergrößern** (Knopf ganz rechts) blendet Suche und Unterlagenliste
+  aus, damit der Plan auf dem Handy den ganzen Bildschirm hat; der Zoom bleibt.
+  „Breite einpassen" ist davon getrennt und setzt nur den Zoom zurück — beide
+  in einem Knopf hatten Benutzer verwechselt.
+- **WebAssembly-Decoder:** pdfjs dekodiert JBIG2- und JPEG-2000-Bilder per
+  WebAssembly und bekommt dafür `wasmUrl`. Fehlt sie, lässt pdfjs diese Bilder
+  still weg — bei Scans aus Kopierern sind das oft gerade Linien und Schrift
+  (OBI: nur der farbige Hintergrund blieb). `scripts/copyPdfjsAssets.mjs` legt
+  die Dateien vor `dev` und `build` nach `public/pdfjs/wasm/` (gitignored, damit
+  sie zur installierten pdfjs-Version passen); der Service Worker nimmt sie mit
+  `public/**` in den Precache.
 
 - Die Canvas-Fläche ist auf 16 Mio. Pixel begrenzt (iOS verweigert mehr);
   darüber wird mit geringerer Auflösung gerendert und gestreckt.
-- Zwei-Finger-Zoom skaliert während der Geste nur per CSS und rendert beim
+- Zwei-Finger-Zoom skaliert während der Geste nur per CSS (um den Punkt
+  zwischen den Fingern, der mit den Fingern wandert) und rendert beim
   Loslassen neu, sonst rendert pdfjs bei jeder Bewegung.
 - **Offline:** Jede geöffnete Datei landet im Cache `objektplaene-v1` (Cache
   API, nicht der Precache des Service Workers), Schlüssel mit der SHA-256 der
@@ -197,9 +218,10 @@ Von den Brandschutzplänen haben rund zwei Drittel keine Textebene — Scans.
 Ohne Text gibt es weder Volltextsuche noch Melder. Die Texterkennung macht
 Cloud Vision ([visionOcr.ts](../src/server/objektplan/visionOcr.ts)).
 
-- **Wann:** gleich nach dem Hochladen eines PDFs mit Status `ohneText`, beim
-  Drive-Abgleich ebenso; für vorhandene Scans per Knopf „Text erkennen (OCR)"
-  in der Unterlagenliste. Nur wer das Objekt pflegt, löst sie aus
+- **Wann:** gleich nach dem Hochladen eines PDFs mit Status `ohneText` — oder
+  eines PDFs mit Textebene, in der kein einziger Melder steht (`wantsOcr`) —,
+  beim Drive-Abgleich ebenso; für vorhandene Unterlagen per Knopf „Text
+  erkennen (OCR)" in der Unterlagenliste. Nur wer das Objekt pflegt, löst sie aus
   (`ocrObjektDokumentAction`), und nur einmal je Dokument: `ocr: true`
   vermerkt den Versuch, auch wenn kein Text herauskam.
 - **`files:asyncBatchAnnotate` statt des synchronen Aufrufs**, weil dieser nur
@@ -218,7 +240,11 @@ Cloud Vision ([visionOcr.ts](../src/server/objektplan/visionOcr.ts)).
   Unterschied. Die Ausschlüsse der Melderkennung gelten unverändert.
 - **Ergebnis:** Mit Text wird das Dokument `ok` und trägt ein Chip „OCR" —
   erkannter Text ist nicht so verlässlich wie eine Textebene. Ohne Text bleibt
-  es `ohneText`.
+  es `ohneText`. Hatte das PDF schon eine Textebene, bleibt sie stehen; der
+  erkannte Text kommt je Seite dazu (beides zusammen unter der Obergrenze), die
+  Melder ebenso. Die Textebene allein verlieren hieße Wörter verlieren, die
+  Vision schlechter liest; nur die Erkennung allein fände die Linien-Kennungen
+  nicht.
 - **Voraussetzung:** API `vision.googleapis.com` im Projekt (terraform,
   `project-base`). Der Dienst ruft sie mit seinem Service Account auf, der
   ohnehin den Bucket lesen und schreiben darf.

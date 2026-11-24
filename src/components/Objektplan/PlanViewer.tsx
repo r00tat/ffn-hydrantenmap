@@ -2,7 +2,9 @@
 
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
+import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
@@ -20,9 +22,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { textItemBox, type Box as PlanBox } from '../../common/objektplan/melderIndex';
 import {
   layoutPages,
+  mapPointBetweenLayouts,
   pageAtScroll,
   pagesToRender,
   zoomForMark,
+  type PageLayout,
   type PageSize,
   type PlacedPage,
 } from '../../common/objektplan/pageLayout';
@@ -31,7 +35,7 @@ import {
   type ObjektDokument,
 } from '../../common/objektplan/objektDokument';
 import { loadObjektDokumentBlob } from './objektDokumente';
-import { loadPdfjsLib } from './pdfPlanIndex';
+import { loadPdfjsLib, pdfjsWasmUrl } from './pdfPlanIndex';
 
 export interface PlanViewerProps {
   dokument: ObjektDokument;
@@ -50,6 +54,35 @@ export interface PlanViewerProps {
    * und der Benutzer inzwischen selbst gezoomt oder gescrollt hat.
    */
   jumpKey?: number;
+  /** Plan über die ganze Breite — Suche und Unterlagen sind ausgeblendet. */
+  expanded?: boolean;
+  /** Ohne Rückruf gibt es keinen Knopf zum Vergrößern. */
+  onToggleExpanded?: () => void;
+}
+
+/**
+ * Stelle, die beim Zoomen stehen bleibt: Punkt in der Spalte (`x`, `y`, im
+ * Layout `layout`) und wo er auf dem Bildschirm landen soll.
+ */
+interface ZoomAnchor {
+  x: number;
+  y: number;
+  clientX: number;
+  clientY: number;
+  layout: PageLayout;
+}
+
+interface PinchState {
+  dist: number;
+  scale: number;
+  /** Punkt zwischen den Fingern beim Ansetzen, in der Spalte. */
+  originX: number;
+  originY: number;
+  startX: number;
+  startY: number;
+  /** Punkt zwischen den Fingern jetzt, auf dem Bildschirm. */
+  midX: number;
+  midY: number;
 }
 
 const MIN_ZOOM = 0.5;
@@ -111,11 +144,14 @@ export default function PlanViewer({
   highlights = [],
   textTerm,
   jumpKey,
+  expanded = false,
+  onToggleExpanded,
 }: PlanViewerProps) {
   const t = useTranslations('objektplan');
   const kind = objektDokumentKind(dokument.contentType);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pagesRef = useRef<HTMLDivElement>(null);
 
   const [blob, setBlob] = useState<{ id: string; blob: Blob } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -163,7 +199,9 @@ export default function PlanViewer({
       const pdfjs = await loadPdfjsLib();
       const data = new Uint8Array(await currentBlob.arrayBuffer());
       if (!current) return;
-      const task = pdfjs.getDocument({ data });
+      // Ohne `wasmUrl` fehlen JBIG2- und JPEG-2000-Bilder — in Scans
+      // liegen Linien und Schrift oft genau so vor (OBI-Plan).
+      const task = pdfjs.getDocument({ data, wasmUrl: pdfjsWasmUrl() });
       loadingTask = task;
       const opened = await task.promise;
       if (current) setPdf({ id: dokument.id, doc: opened });
@@ -236,18 +274,77 @@ export default function PlanViewer({
     if (el) setScroll({ top: el.scrollTop, height: el.clientHeight });
   };
 
-  // Beim Zoomen die Stelle halten: Spalte wächst, Scrollposition wächst mit.
-  const prevTotal = useRef(0);
+  // Beim Zoomen die Stelle halten: Der Anker (Finger, Mauszeiger oder die
+  // Mitte) bleibt, wo er war. Ohne Anker — etwa wenn sich die Breite
+  // ändert — wächst die Scrollposition einfach mit.
+  const prevLayout = useRef<PageLayout | null>(null);
+  const pendingAnchor = useRef<ZoomAnchor | null>(null);
+  const layoutRef = useRef(layout);
+  const zoomRef = useRef(zoom);
+  useLayoutEffect(() => {
+    layoutRef.current = layout;
+    zoomRef.current = zoom;
+  });
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    const prev = prevTotal.current;
-    prevTotal.current = layout.totalHeight;
-    if (!el || !prev || !layout.totalHeight || prev === layout.totalHeight) return;
-    const ratio = layout.totalHeight / prev;
-    el.scrollTop *= ratio;
-    el.scrollLeft *= ratio;
+    const prev = prevLayout.current;
+    prevLayout.current = layout;
+    const anchor = pendingAnchor.current;
+    pendingAnchor.current = null;
+    if (!el || !layout.totalHeight) return;
+    if (anchor) {
+      const mapped = mapPointBetweenLayouts(anchor.layout, layout, anchor.x, anchor.y);
+      const rect = pagesRef.current?.getBoundingClientRect();
+      if (rect) {
+        el.scrollLeft += rect.left + mapped.x - anchor.clientX;
+        el.scrollTop += rect.top + mapped.y - anchor.clientY;
+      }
+    } else if (prev?.totalHeight && prev.totalHeight !== layout.totalHeight) {
+      const ratio = layout.totalHeight / prev.totalHeight;
+      el.scrollTop *= ratio;
+      el.scrollLeft *= ratio;
+    } else {
+      return;
+    }
     updateScroll();
-  }, [layout.totalHeight]);
+  }, [layout]);
+
+  /**
+   * Zoomt so, dass der Punkt unter `clientX`/`clientY` stehen bleibt — ohne
+   * Angabe die Mitte des sichtbaren Bereichs. `target` ist der Bildschirmpunkt,
+   * an dem er danach liegen soll (beim Zwei-Finger-Zoom wandern die Finger).
+   */
+  const zoomAt = (
+    next: (z: number) => number,
+    point?: { clientX: number; clientY: number },
+    target?: { clientX: number; clientY: number },
+    origin?: { x: number; y: number },
+  ) => {
+    const newZoom = clampZoom(next(zoomRef.current));
+    if (Math.abs(newZoom - zoomRef.current) < 1e-6) return;
+    const el = scrollRef.current;
+    const pagesEl = pagesRef.current;
+    if (el && pagesEl) {
+      const box = el.getBoundingClientRect();
+      const at = point ?? {
+        clientX: box.left + box.width / 2,
+        clientY: box.top + box.height / 2,
+      };
+      const rect = pagesEl.getBoundingClientRect();
+      pendingAnchor.current = {
+        x: origin?.x ?? at.clientX - rect.left,
+        y: origin?.y ?? at.clientY - rect.top,
+        clientX: (target ?? at).clientX,
+        clientY: (target ?? at).clientY,
+        layout: layoutRef.current,
+      };
+    }
+    setZoom(newZoom);
+  };
+  const zoomAtRef = useRef(zoomAt);
+  useLayoutEffect(() => {
+    zoomAtRef.current = zoomAt;
+  });
 
   const scrollToPage = (n: number) => {
     const target = layout.pages[n - 1];
@@ -331,21 +428,38 @@ export default function PlanViewer({
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      setZoom((z) => clampZoom(z * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+      zoomAtRef.current((z) => z * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
   // Zwei-Finger-Zoom: während der Geste nur per CSS skaliert, gerendert wird
-  // erst beim Loslassen — sonst rendert pdfjs bei jeder Bewegung neu.
-  const pinch = useRef<{ dist: number; scale: number } | null>(null);
-  const [pinchScale, setPinchScale] = useState(1);
+  // erst beim Loslassen — sonst rendert pdfjs bei jeder Bewegung neu. Skaliert
+  // wird um den Punkt zwischen den Fingern, und er wandert mit den Fingern.
+  const pinch = useRef<PinchState | null>(null);
+  const [pinchView, setPinchView] = useState<PinchState | null>(null);
   const touchDist = (e: React.TouchEvent) =>
     Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY,
     );
+  const touchMid = (e: React.TouchEvent) => ({
+    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+    y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+  });
+  const endPinch = () => {
+    const state = pinch.current;
+    if (!state) return;
+    pinch.current = null;
+    setPinchView(null);
+    zoomAt(
+      (z) => z * state.scale,
+      undefined,
+      { clientX: state.midX, clientY: state.midY },
+      { x: state.originX, y: state.originY },
+    );
+  };
 
   const isLoadError = loadError === dokument.id;
   const isLoading = !isLoadError && (!currentBlob || (kind === 'pdf' && !hasLayout));
@@ -395,7 +509,7 @@ export default function PlanViewer({
         )}
         <Box sx={{ flex: 1 }} />
         <Tooltip title={t('zoomOut')}>
-          <IconButton size="small" aria-label={t('zoomOut')} onClick={() => setZoom((z) => clampZoom(z / 1.4))}>
+          <IconButton size="small" aria-label={t('zoomOut')} onClick={() => zoomAt((z) => z / 1.4)}>
             <ZoomOutIcon />
           </IconButton>
         </Tooltip>
@@ -403,12 +517,12 @@ export default function PlanViewer({
           {Math.round(zoom * 100)}%
         </Typography>
         <Tooltip title={t('zoomIn')}>
-          <IconButton size="small" onClick={() => setZoom((z) => clampZoom(z * 1.4))}>
+          <IconButton size="small" aria-label={t('zoomIn')} onClick={() => zoomAt((z) => z * 1.4)}>
             <ZoomInIcon />
           </IconButton>
         </Tooltip>
         <Tooltip title={t('fitWidth')}>
-          <IconButton size="small" onClick={() => setZoom(1)}>
+          <IconButton size="small" aria-label={t('fitWidth')} onClick={() => zoomAt(() => 1)}>
             <FitScreenIcon />
           </IconButton>
         </Tooltip>
@@ -426,27 +540,55 @@ export default function PlanViewer({
             </IconButton>
           </span>
         </Tooltip>
+        {onToggleExpanded && (
+          <Tooltip title={expanded ? t('collapsePlan') : t('expandPlan')}>
+            <IconButton
+              size="small"
+              aria-label={expanded ? t('collapsePlan') : t('expandPlan')}
+              aria-pressed={expanded}
+              onClick={onToggleExpanded}
+            >
+              {expanded ? <CloseFullscreenIcon /> : <OpenInFullIcon />}
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
 
       <Box
         ref={scrollRef}
         onScroll={updateScroll}
         onTouchStart={(e) => {
-          if (e.touches.length === 2) pinch.current = { dist: touchDist(e), scale: 1 };
+          if (e.touches.length !== 2) return;
+          const rect = pagesRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          const mid = touchMid(e);
+          pinch.current = {
+            dist: touchDist(e),
+            scale: 1,
+            originX: mid.x - rect.left,
+            originY: mid.y - rect.top,
+            startX: mid.x,
+            startY: mid.y,
+            midX: mid.x,
+            midY: mid.y,
+          };
         }}
         onTouchMove={(e) => {
           if (e.touches.length !== 2 || !pinch.current) return;
-          const scale = touchDist(e) / pinch.current.dist;
-          pinch.current.scale = scale;
-          setPinchScale(scale);
+          const mid = touchMid(e);
+          const next = {
+            ...pinch.current,
+            scale: touchDist(e) / pinch.current.dist,
+            midX: mid.x,
+            midY: mid.y,
+          };
+          pinch.current = next;
+          setPinchView(next);
         }}
-        onTouchEnd={() => {
-          if (!pinch.current) return;
-          const { scale } = pinch.current;
-          pinch.current = null;
-          setPinchScale(1);
-          setZoom((z) => clampZoom(z * scale));
+        onTouchEnd={(e) => {
+          if (e.touches.length < 2) endPinch();
         }}
+        onTouchCancel={endPinch}
         sx={{
           flex: 1,
           minHeight: 0,
@@ -468,14 +610,19 @@ export default function PlanViewer({
         )}
         {kind === 'pdf' && !isLoadError && currentPdf && hasLayout && (
           <Box
+            ref={pagesRef}
             data-testid="plan-pages"
             sx={{
               position: 'relative',
               width: layout.pages[0]?.width,
               height: layout.totalHeight,
               mx: 'auto',
-              transform: pinchScale !== 1 ? `scale(${pinchScale})` : undefined,
-              transformOrigin: 'top left',
+              transform: pinchView
+                ? `translate(${pinchView.midX - pinchView.startX}px, ${pinchView.midY - pinchView.startY}px) scale(${pinchView.scale})`
+                : undefined,
+              transformOrigin: pinchView
+                ? `${pinchView.originX}px ${pinchView.originY}px`
+                : undefined,
             }}
           >
             {layout.pages.map((placed, i) => (

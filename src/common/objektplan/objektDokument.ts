@@ -56,6 +56,18 @@ export interface ObjektDokument {
 
 export type ObjektDokumentKind = 'pdf' | 'bild';
 
+/**
+ * Lohnt die Texterkennung? Für einen Scan ohne Textebene ohnehin, aber auch
+ * für ein PDF mit Textebene ohne einen einzigen Melder: CAD-Exporte zeichnen
+ * die Melderkennungen oft als Linien (SHX-Schriften), die Textebene hat dann
+ * nur Legende und Raumnamen. Einmal je Dokument, `ocr` merkt sich den Versuch.
+ */
+export function wantsOcr(dokument: ObjektDokument): boolean {
+  if (dokument.ocr || objektDokumentKind(dokument.contentType) !== 'pdf') return false;
+  if (dokument.indexStatus === 'ohneText') return true;
+  return dokument.indexStatus === 'ok' && (dokument.melder?.length ?? 0) === 0;
+}
+
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export function isAllowedObjektDokumentType(contentType: string): boolean {

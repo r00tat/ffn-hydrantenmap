@@ -36,6 +36,7 @@ import type { Box as PlanBox } from '../../common/objektplan/melderIndex';
 import {
   OBJEKT_DOKUMENT_MAX_MB,
   objektDokumentKind,
+  wantsOcr,
   type ObjektDokument,
 } from '../../common/objektplan/objektDokument';
 import {
@@ -104,6 +105,8 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [toDelete, setToDelete] = useState<ObjektDokument | null>(null);
   const [ocrRunning, setOcrRunning] = useState<string[]>([]);
+  /** Plan über die ganze Breite, Suche und Liste ausgeblendet. */
+  const [planExpanded, setPlanExpanded] = useState(false);
 
   /** Texterkennung eines Scans; das Ergebnis kommt über die Dokumentliste. */
   const runOcr = async (dokumentId: string): Promise<OcrActionResult> => {
@@ -193,8 +196,9 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
           },
           (p) => update(i, { progress: p }),
         );
-        if (dok.indexStatus === 'ohneText') {
-          // Ein Scan: Text und Melder erkennt Cloud Vision auf dem Server.
+        if (wantsOcr(dok)) {
+          // Ein Scan oder ein Plan ohne Melder in der Textebene: Text und
+          // Melder erkennt Cloud Vision auf dem Server.
           update(i, { status: 'running', progress: 1, message: t('ocrRunning') });
           const ocr = await runOcr(dok.id);
           update(i, {
@@ -271,7 +275,9 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
         }}
       >
         <Box
+          data-testid="objektplan-sidebar"
           sx={{
+            display: planExpanded ? 'none' : undefined,
             width: { md: 360 },
             maxHeight: { xs: '40vh', md: 'none' },
             overflow: 'auto',
@@ -404,9 +410,7 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
                 secondaryAction={
                   canManage ? (
                     <>
-                      {d.indexStatus === 'ohneText' &&
-                        !d.ocr &&
-                        objektDokumentKind(d.contentType) === 'pdf' && (
+                      {wantsOcr(d) && (
                           <Tooltip title={t('ocrRun')}>
                             <span>
                               <IconButton
@@ -525,6 +529,8 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
               highlights={view.highlights}
               textTerm={view.textTerm}
               jumpKey={view.jumpKey}
+              expanded={planExpanded}
+              onToggleExpanded={() => setPlanExpanded((e) => !e)}
             />
           ) : (
             !loading &&
