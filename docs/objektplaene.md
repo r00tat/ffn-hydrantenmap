@@ -111,7 +111,14 @@ Cache lesen und verhält sich auf iOS und Android verschieden.
   die Dateien samt ihren JavaScript-Rückfällen (`*_nowasm_fallback.js`) vor
   `dev`, `dev:https` und `build` nach `public/pdfjs/wasm/` (gitignored, damit
   sie zur installierten pdfjs-Version passen); der Service Worker nimmt sie mit
-  `public/**` in den Precache.
+  `public/**` in den Precache. Der Aufruf steht **im Skript selbst**
+  (`node scripts/copyPdfjsAssets.mjs && next build`), nicht in einem
+  `prebuild`-Hook: `.npmrc` setzt `ignore-scripts=true`, und damit laufen
+  `pre*`/`post*`-Hooks bei `npm run` nicht — auch nicht im Docker-Build. Mit
+  dem Hook fehlten die Dateien in dev und prod (404), und gescannte Pläne mit
+  Farbebene und JBIG2-Maske (Autohaus Eisner) zeigten nur verwaschene Blöcke.
+  `scripts/packageScripts.test.ts` hält das fest. Wer lokal `npx next build`
+  statt `npm run build` aufruft, kopiert nichts.
 
 - Die Canvas-Fläche ist auf 16 Mio. Pixel begrenzt (iOS verweigert mehr);
   darüber wird mit geringerer Auflösung gerendert und gestreckt.
