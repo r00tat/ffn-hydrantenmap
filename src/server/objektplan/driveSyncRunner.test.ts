@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DriveFileInfo } from '../../common/objektplan/driveSync';
+import type { ObjektRef } from '../../common/objektplan/objektArt';
 import type { ObjektDokument } from '../../common/objektplan/objektDokument';
 import { runDriveSync, type DriveSyncDeps } from './driveSyncRunner';
 
 const FOLDER = 'https://drive.google.com/drive/folders/1ZZGoCghcnWT-rPviKC2wAEjIBvIHZk3N';
 const NOW = '2026-11-23T10:00:00.000Z';
+const OBJ: ObjektRef = { art: 'risikoobjekt', id: 'obj' };
 
 function fakeDeps(files: DriveFileInfo[], existing: ObjektDokument[] = []) {
   const written: ObjektDokument[] = [];
@@ -29,7 +31,7 @@ function fakeDeps(files: DriveFileInfo[], existing: ObjektDokument[] = []) {
     saveFile: vi.fn(async () => {}),
     deleteFile: vi.fn(async () => {}),
     loadDokumente: vi.fn(async () => existing),
-    writeDokument: vi.fn(async (_o: string, d: ObjektDokument) => {
+    writeDokument: vi.fn(async (_o: ObjektRef, d: ObjektDokument) => {
       written.push(d);
     }),
     deleteDokument: vi.fn(async () => {}),
@@ -48,14 +50,14 @@ const pdf: DriveFileInfo = {
 describe('runDriveSync', () => {
   it('meldet einen Link, der nicht auf Drive zeigt', async () => {
     const { deps } = fakeDeps([]);
-    const result = await runDriveSync('obj', 'https://example.com/plan.pdf', deps, NOW);
+    const result = await runDriveSync(OBJ, 'https://example.com/plan.pdf', deps, NOW);
     expect(result).toEqual({ status: 'keinDriveLink' });
     expect(deps.listFiles).not.toHaveBeenCalled();
   });
 
   it('holt eine neue Datei, indiziert sie und legt das Dokument an', async () => {
     const { deps, written } = fakeDeps([pdf]);
-    const result = await runDriveSync('obj', FOLDER, deps, NOW);
+    const result = await runDriveSync(OBJ, FOLDER, deps, NOW);
 
     expect(result).toMatchObject({ status: 'ok', imported: 1, removed: 0, failed: 0 });
     expect(deps.download).toHaveBeenCalledWith(pdf.id);
@@ -79,6 +81,18 @@ describe('runDriveSync', () => {
     expect(written[0].sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('legt die Pläne eines gefährdeten Objekts unter dessen Collection ab', async () => {
+    const { deps, written } = fakeDeps([pdf]);
+    const gefahr: ObjektRef = { art: 'gefahrobjekt', id: 'g1' };
+    await runDriveSync(gefahr, FOLDER, deps, NOW);
+
+    const path = `gefahrobjekt/g1/drive-${pdf.id}-Brandschutzplan_gesamt.pdf`;
+    expect(deps.loadDokumente).toHaveBeenCalledWith(gefahr);
+    expect(deps.saveFile).toHaveBeenCalledWith(path, expect.any(Uint8Array), 'application/pdf');
+    expect(deps.writeDokument).toHaveBeenCalledWith(gefahr, expect.objectContaining({ storagePath: path }));
+    expect(written[0].storagePath).toBe(path);
+  });
+
   it('schreibt das Dokument erst nach der Datei', async () => {
     const order: string[] = [];
     const { deps } = fakeDeps([pdf]);
@@ -88,7 +102,7 @@ describe('runDriveSync', () => {
     deps.writeDokument.mockImplementation(async () => {
       order.push('dokument');
     });
-    await runDriveSync('obj', FOLDER, deps, NOW);
+    await runDriveSync(OBJ, FOLDER, deps, NOW);
     expect(order).toEqual(['datei', 'dokument']);
   });
 
@@ -108,7 +122,7 @@ describe('runDriveSync', () => {
       driveMd5: 'md5-0',
     };
     const { deps } = fakeDeps([pdf], [alt]);
-    const result = await runDriveSync('obj', FOLDER, deps, NOW);
+    const result = await runDriveSync(OBJ, FOLDER, deps, NOW);
     expect(result).toMatchObject({ imported: 1 });
     expect(deps.deleteFile).toHaveBeenCalledWith(alt.storagePath);
   });
@@ -129,9 +143,9 @@ describe('runDriveSync', () => {
       driveMd5: 'm',
     };
     const { deps } = fakeDeps([], [weg]);
-    const result = await runDriveSync('obj', FOLDER, deps, NOW);
+    const result = await runDriveSync(OBJ, FOLDER, deps, NOW);
     expect(result).toMatchObject({ status: 'ok', imported: 0, removed: 1 });
-    expect(deps.deleteDokument).toHaveBeenCalledWith('obj', 'drive-weg');
+    expect(deps.deleteDokument).toHaveBeenCalledWith(OBJ, 'drive-weg');
     expect(deps.deleteFile).toHaveBeenCalledWith(weg.storagePath);
   });
 
@@ -142,7 +156,7 @@ describe('runDriveSync', () => {
       throw new Error('403');
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const result = await runDriveSync('obj', FOLDER, deps, NOW);
+    const result = await runDriveSync(OBJ, FOLDER, deps, NOW);
     expect(result).toMatchObject({ status: 'ok', imported: 1, failed: 1 });
     expect(written.map((d) => d.driveFileId)).toEqual([zweite.id]);
   });
@@ -151,7 +165,7 @@ describe('runDriveSync', () => {
     const { deps } = fakeDeps([]);
     deps.listFiles.mockRejectedValue(new Error('File not found'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const result = await runDriveSync('obj', FOLDER, deps, NOW);
+    const result = await runDriveSync(OBJ, FOLDER, deps, NOW);
     expect(result).toEqual({ status: 'nichtLesbar' });
     expect(deps.deleteDokument).not.toHaveBeenCalled();
   });
@@ -167,11 +181,11 @@ describe('runDriveSync', () => {
       order.push('ocr');
       return { seiten: 1, seitenText: ['Gruppe 2/07'], melder: [], textGekuerzt: false };
     });
-    deps.writeDokument.mockImplementation(async (_o: string, d: ObjektDokument) => {
+    deps.writeDokument.mockImplementation(async (_o: ObjektRef, d: ObjektDokument) => {
       order.push(d.ocr ? 'dokument mit Text' : 'dokument');
       written.push(d);
     });
-    await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
+    await runDriveSync(OBJ, FOLDER, { ...deps, ocr }, NOW);
     // Der Plan steht sofort in der Liste, der Text kommt nach.
     expect(order).toEqual(['datei', 'dokument', 'ocr', 'dokument mit Text']);
     expect(ocr).toHaveBeenCalledWith(`risikoobjekt/obj/drive-${pdf.id}-Brandschutzplan_gesamt.pdf`, 1);
@@ -192,7 +206,7 @@ describe('runDriveSync', () => {
             ),
         ),
     );
-    const done = runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
+    const done = runDriveSync(OBJ, FOLDER, { ...deps, ocr }, NOW);
     // Beide Erkennungen laufen, bevor die erste fertig ist.
     await vi.waitFor(() => expect(pending).toHaveLength(2));
     expect(deps.saveFile).toHaveBeenCalledTimes(2);
@@ -210,7 +224,7 @@ describe('runDriveSync', () => {
     const ocr = vi.fn(async () => {
       throw new Error('Vision nicht erreichbar');
     });
-    const result = await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
+    const result = await runDriveSync(OBJ, FOLDER, { ...deps, ocr }, NOW);
     expect(result).toMatchObject({ imported: 1, failed: 0 });
     expect(written).toHaveLength(1);
     expect(written[0]).toMatchObject({ indexStatus: 'ohneText' });
@@ -227,7 +241,7 @@ describe('runDriveSync', () => {
       melder: [{ kennung: '1003/04', gruppe: 1003, melder: 4, seite: 1, box }],
       textGekuerzt: false,
     }));
-    await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
+    await runDriveSync(OBJ, FOLDER, { ...deps, ocr }, NOW);
     expect(ocr).toHaveBeenCalled();
     expect(written.at(-1)).toMatchObject({ indexStatus: 'ok', ocr: true, seitenText: ['LEGENDE\n1003/04'] });
     expect(written.at(-1)?.melder).toHaveLength(1);
@@ -236,7 +250,7 @@ describe('runDriveSync', () => {
   it('ruft die Texterkennung nicht für PDFs mit gefundenen Meldern auf', async () => {
     const { deps } = fakeDeps([pdf]);
     const ocr = vi.fn();
-    await runDriveSync('obj', FOLDER, { ...deps, ocr }, NOW);
+    await runDriveSync(OBJ, FOLDER, { ...deps, ocr }, NOW);
     expect(ocr).not.toHaveBeenCalled();
   });
 
@@ -248,7 +262,7 @@ describe('runDriveSync', () => {
       version: '42',
     };
     const { deps, written } = fakeDeps([doc]);
-    const result = await runDriveSync('obj', FOLDER, deps, NOW);
+    const result = await runDriveSync(OBJ, FOLDER, deps, NOW);
 
     expect(result).toMatchObject({ status: 'ok', imported: 1, failed: 0 });
     expect(deps.exportPdf).toHaveBeenCalledWith(doc.id);

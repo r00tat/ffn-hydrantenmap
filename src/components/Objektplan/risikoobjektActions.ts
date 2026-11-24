@@ -18,6 +18,13 @@ import {
 } from '../../common/objektplan/risikoobjektAccess';
 import { objektDokumentKind, wantsOcr, type ObjektDokumentIndexStatus } from '../../common/objektplan/objektDokument';
 import { parseDriveLink } from '../../common/objektplan/driveSync';
+import {
+  isObjektArt,
+  isObjektId,
+  isObjektRef,
+  type ObjektArt,
+  type ObjektRef,
+} from '../../common/objektplan/objektArt';
 import { withOcrIndex } from '../../common/objektplan/ocrIndex';
 import { isTenantGroupId } from '../../common/tenantGroups';
 import { driveSyncDeps } from '../../server/objektplan/driveSyncDeps';
@@ -27,21 +34,24 @@ import { reindexDeps } from '../../server/objektplan/reindexDeps';
 import { reindexDokument } from '../../server/objektplan/reindexRunner';
 import {
   deleteObjektDokumentCompletely,
-  deleteRisikoObjektCompletely,
-  loadAllRisikoObjekte,
+  deletePlanObjektCompletely,
+  loadAllPlanObjekte,
   loadObjektDokument,
   loadObjektDokumentSummaries,
-  loadRisikoObjekt,
+  loadPlanObjekt,
   newRisikoObjektId,
-  saveRisikoObjekt,
+  savePlanObjekt,
   writeObjektDokument,
   writeStorageGroups,
+  type PlanObjektWithId,
 } from '../../server/objektplan/risikoobjektStore';
 
 /**
- * Risikoobjekte anlegen und pflegen, Freigabe an Gruppen. Geprüft wird das
- * Recht `risikoobjekte.manage` in einer der freigegebenen Gruppen; der
- * globale Admin darf alles. Hintergrund: docs/objektplaene.md.
+ * Risikoobjekte und gefährdete Objekte pflegen, Freigabe an Gruppen. Geprüft
+ * wird das Recht `risikoobjekte.manage` in einer der freigegebenen Gruppen;
+ * der globale Admin darf alles. Die Objektart (`ObjektArt`) kommt vom Client
+ * und wird Teil eines Pfads — sie wird deshalb vor jedem Zugriff geprüft.
+ * Hintergrund: docs/objektplaene.md.
  */
 
 export type RisikoObjektActionError =
@@ -70,6 +80,7 @@ export type ReindexActionResult =
 
 /** Eine Zeile der Admin-Übersicht zum Neu-Einlesen. */
 export interface ReindexCandidate {
+  art: ObjektArt;
   objektId: string;
   objektName: string;
   dokumentId: string;
@@ -79,10 +90,23 @@ export interface ReindexCandidate {
   ocr: boolean;
 }
 
-const ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
-
 function sortedGroups(groups: string[]): string[] {
   return [...new Set(groups)].sort();
+}
+
+type Session = Awaited<ReturnType<typeof actionUserRequired>>;
+
+/** Lädt das Objekt, wenn Art und ID gültig sind und der Benutzer es pflegen darf. */
+async function loadManagedObjekt(
+  session: Session,
+  art: unknown,
+  id: unknown,
+): Promise<{ ok: true; objekt: PlanObjektWithId } | { ok: false; error: 'notFound' | 'forbidden' }> {
+  if (!isObjektArt(art) || !isObjektId(id)) return { ok: false, error: 'notFound' };
+  const objekt = await loadPlanObjekt(art, id);
+  if (!objekt) return { ok: false, error: 'notFound' };
+  if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
+  return { ok: true, objekt };
 }
 
 export async function createRisikoObjekt(
@@ -94,7 +118,7 @@ export async function createRisikoObjekt(
   if (!checked.ok) return checked;
   const now = new Date().toISOString();
   const id = newRisikoObjektId();
-  await saveRisikoObjekt(id, {
+  await savePlanObjekt('risikoobjekt', id, {
     ...checked.value,
     erfassungsdatum: now.slice(0, 10),
     groups: [groupId],
@@ -108,59 +132,62 @@ export async function createRisikoObjekt(
 /**
  * Objekte aus dem GIS-Import gehören dem Import: Name, Lage und Adresse
  * überschriebe der nächste Lauf wieder. Gruppen-Admins ändern dort nur den
- * Link — er führt zu den Plänen und kommt nicht aus dem GIS.
+ * Link — er führt zu den Plänen und kommt nicht aus dem GIS. Gefährdete
+ * Objekte stammen immer aus dem GIS.
  */
 export async function updateRisikoObjekt(
+  art: ObjektArt,
   id: string,
   input: Partial<RisikoObjektInput>,
 ): Promise<RisikoObjektActionResult> {
   const session = await actionUserRequired();
-  if (!ID_PATTERN.test(id)) return { ok: false, error: 'notFound' };
-  const objekt = await loadRisikoObjekt(id);
-  if (!objekt) return { ok: false, error: 'notFound' };
-  if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
+  const loaded = await loadManagedObjekt(session, art, id);
+  if (!loaded.ok) return loaded;
+  const { objekt } = loaded;
 
   if (objekt.quelle !== 'app' && !session.user.isAdmin) {
     const checked = normalizeRisikoObjektInput({ ...objekt, link: input.link });
     if (!checked.ok) return checked;
-    await saveRisikoObjekt(id, { link: checked.value.link });
+    await savePlanObjekt(objekt.art, id, { link: checked.value.link });
     return { ok: true, id };
   }
 
   const checked = normalizeRisikoObjektInput(input);
   if (!checked.ok) return checked;
-  await saveRisikoObjekt(id, checked.value);
+  await savePlanObjekt(objekt.art, id, checked.value);
   return { ok: true, id };
 }
 
 /** Nur in der App angelegte Objekte; die aus dem GIS brächte der Import zurück. */
-export async function deleteRisikoObjekt(id: string): Promise<RisikoObjektActionResult> {
+export async function deleteRisikoObjekt(
+  art: ObjektArt,
+  id: string,
+): Promise<RisikoObjektActionResult> {
   const session = await actionUserRequired();
-  if (!ID_PATTERN.test(id)) return { ok: false, error: 'notFound' };
-  const objekt = await loadRisikoObjekt(id);
-  if (!objekt) return { ok: false, error: 'notFound' };
-  if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
-  if (objekt.quelle !== 'app') return { ok: false, error: 'notApp' };
-  await deleteRisikoObjektCompletely(objekt);
+  const loaded = await loadManagedObjekt(session, art, id);
+  if (!loaded.ok) return loaded;
+  if (loaded.objekt.quelle !== 'app') return { ok: false, error: 'notApp' };
+  await deletePlanObjektCompletely(loaded.objekt);
   return { ok: true, id };
 }
 
 export async function setRisikoObjektGroups(
+  art: ObjektArt,
   id: string,
   groups: string[],
 ): Promise<RisikoObjektActionResult> {
   const session = await actionUserRequired();
-  if (!ID_PATTERN.test(id) || !Array.isArray(groups)) return { ok: false, error: 'notFound' };
-  const objekt = await loadRisikoObjekt(id);
-  if (!objekt) return { ok: false, error: 'notFound' };
-  if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
+  if (!Array.isArray(groups)) return { ok: false, error: 'notFound' };
+  const loaded = await loadManagedObjekt(session, art, id);
+  if (!loaded.ok) return loaded;
+  const { objekt } = loaded;
 
   const next = sortedGroups(groups.map(String));
   const check = checkGroupsChange(session.user, objektGroups(objekt), next);
   if (check !== 'ok') return { ok: false, error: check };
 
-  await saveRisikoObjekt(id, { groups: next });
-  await writeStorageGroups(id, next);
+  await savePlanObjekt(objekt.art, id, { groups: next });
+  await writeStorageGroups(objekt.art, id, next);
   return { ok: true, id };
 }
 
@@ -177,10 +204,10 @@ export async function shareUnsharedRisikoObjekte(
   if (groups.some((g) => !isTenantGroupId(g))) return { ok: false, error: 'forbidden' };
 
   let count = 0;
-  for (const objekt of await loadAllRisikoObjekte()) {
+  for (const objekt of await loadAllPlanObjekte()) {
     if (objektGroups(objekt).length > 0) continue;
-    await saveRisikoObjekt(objekt.id, { groups } satisfies Partial<RisikoObjekt>);
-    await writeStorageGroups(objekt.id, groups);
+    await savePlanObjekt(objekt.art, objekt.id, { groups } satisfies Partial<RisikoObjekt>);
+    await writeStorageGroups(objekt.art, objekt.id, groups);
     count += 1;
   }
   return { ok: true, count };
@@ -192,20 +219,18 @@ export async function shareUnsharedRisikoObjekte(
  * nicht im Token. Unterlagen aus Drive löscht man im Drive.
  */
 export async function deleteObjektDokumentAction(
+  art: ObjektArt,
   objektId: string,
   dokumentId: string,
 ): Promise<RisikoObjektActionResult> {
   const session = await actionUserRequired();
-  if (!ID_PATTERN.test(objektId) || !ID_PATTERN.test(dokumentId)) {
-    return { ok: false, error: 'notFound' };
-  }
-  const objekt = await loadRisikoObjekt(objektId);
-  if (!objekt) return { ok: false, error: 'notFound' };
-  if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
-  const dokument = await loadObjektDokument(objektId, dokumentId);
+  if (!isObjektId(dokumentId)) return { ok: false, error: 'notFound' };
+  const loaded = await loadManagedObjekt(session, art, objektId);
+  if (!loaded.ok) return loaded;
+  const dokument = await loadObjektDokument(loaded.objekt.art, objektId, dokumentId);
   if (!dokument) return { ok: false, error: 'notFound' };
   if (dokument.quelle === 'drive') return { ok: false, error: 'forbidden' };
-  await deleteObjektDokumentCompletely(objektId, dokument);
+  await deleteObjektDokumentCompletely(loaded.objekt.art, objektId, dokument);
   return { ok: true, id: dokumentId };
 }
 
@@ -216,27 +241,26 @@ export async function deleteObjektDokumentAction(
  * Dokument — `ocr` vermerkt den Versuch, auch wenn kein Text herauskam.
  */
 export async function ocrObjektDokumentAction(
+  art: ObjektArt,
   objektId: string,
   dokumentId: string,
 ): Promise<OcrActionResult> {
   const session = await actionUserRequired();
-  if (!ID_PATTERN.test(objektId) || !ID_PATTERN.test(dokumentId)) {
-    return { ok: false, error: 'notFound' };
-  }
-  const objekt = await loadRisikoObjekt(objektId);
-  if (!objekt) return { ok: false, error: 'notFound' };
-  if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
-  const dokument = await loadObjektDokument(objektId, dokumentId);
+  if (!isObjektId(dokumentId)) return { ok: false, error: 'notFound' };
+  const loaded = await loadManagedObjekt(session, art, objektId);
+  if (!loaded.ok) return loaded;
+  const objektArt = loaded.objekt.art;
+  const dokument = await loadObjektDokument(objektArt, objektId, dokumentId);
   if (!dokument) return { ok: false, error: 'notFound' };
   if (!wantsOcr(dokument)) return { ok: false, error: 'notScan' };
   try {
     const index = await ocrStoragePdf(
       dokument.storagePath,
-      `${objektId}_${dokumentId}`,
+      ocrKey(objektArt, objektId, dokumentId),
       dokument.seiten,
     );
     const result = withOcrIndex(dokument, index);
-    await writeObjektDokument(objektId, result);
+    await writeObjektDokument(objektArt, objektId, result);
     return {
       ok: true,
       id: dokumentId,
@@ -255,21 +279,23 @@ export async function ocrObjektDokumentAction(
  * indiziert wurden. Hintergrund: docs/objektplaene.md, „Neu einlesen".
  */
 export async function reindexObjektDokumentAction(
+  art: ObjektArt,
   objektId: string,
   dokumentId: string,
 ): Promise<ReindexActionResult> {
   const session = await actionUserRequired();
-  if (!ID_PATTERN.test(objektId) || !ID_PATTERN.test(dokumentId)) {
-    return { ok: false, error: 'notFound' };
-  }
-  const objekt = await loadRisikoObjekt(objektId);
-  if (!objekt) return { ok: false, error: 'notFound' };
-  if (!canManageRisikoObjekt(session.user, objekt)) return { ok: false, error: 'forbidden' };
-  const dokument = await loadObjektDokument(objektId, dokumentId);
+  if (!isObjektId(dokumentId)) return { ok: false, error: 'notFound' };
+  const loaded = await loadManagedObjekt(session, art, objektId);
+  if (!loaded.ok) return loaded;
+  const objektArt = loaded.objekt.art;
+  const dokument = await loadObjektDokument(objektArt, objektId, dokumentId);
   if (!dokument) return { ok: false, error: 'notFound' };
   try {
-    const result = await reindexDokument(dokument, reindexDeps(`${objektId}_${dokumentId}`));
-    await writeObjektDokument(objektId, result);
+    const result = await reindexDokument(
+      dokument,
+      reindexDeps(ocrKey(objektArt, objektId, dokumentId)),
+    );
+    await writeObjektDokument(objektArt, objektId, result);
     return {
       ok: true,
       id: dokumentId,
@@ -284,16 +310,17 @@ export async function reindexObjektDokumentAction(
 }
 
 /**
- * Alle PDFs aller Risikoobjekte für das Neu-Einlesen unter Admin Actions.
- * Die ohne Melder zuerst — bei ihnen lohnt es am ehesten.
+ * Alle PDFs aller Risikoobjekte und gefährdeten Objekte für das Neu-Einlesen
+ * unter Admin Actions. Die ohne Melder zuerst — bei ihnen lohnt es am ehesten.
  */
 export async function listObjektDokumenteForReindex(): Promise<ReindexCandidate[]> {
   await actionAdminRequired();
   const result: ReindexCandidate[] = [];
-  for (const objekt of await loadAllRisikoObjekte()) {
-    for (const d of await loadObjektDokumentSummaries(objekt.id)) {
+  for (const objekt of await loadAllPlanObjekte()) {
+    for (const d of await loadObjektDokumentSummaries(objekt.art, objekt.id)) {
       if (objektDokumentKind(d.contentType) !== 'pdf') continue;
       result.push({
+        art: objekt.art,
         objektId: objekt.id,
         objektName: objekt.name || objekt.id,
         dokumentId: d.id,
@@ -313,22 +340,24 @@ export async function listObjektDokumenteForReindex(): Promise<ReindexCandidate[
 }
 
 /**
- * Alle Risikoobjekte mit einem Drive-Link, für den Abgleich aller Objekte
- * unter Admin Actions. Abgeglichen wird je Objekt vom Browser aus
- * (`syncObjektDokumenteFromDrive`), damit kein Aufruf ins Zeitlimit läuft.
+ * Alle Risikoobjekte und gefährdeten Objekte mit einem Drive-Link, für den
+ * Abgleich aller Objekte unter Admin Actions. Der Browser schickt sie in
+ * kleinen Blöcken an `syncPlanObjekteFromDrive`, damit kein Aufruf ins
+ * Zeitlimit läuft.
  */
-export async function listRisikoObjekteWithDriveLink(): Promise<Array<{ id: string; name: string }>> {
+export async function listPlanObjekteWithDriveLink(): Promise<
+  Array<ObjektRef & { name: string }>
+> {
   await actionAdminRequired();
-  return (await loadAllRisikoObjekte())
+  return (await loadAllPlanObjekte())
     .filter((o) => parseDriveLink(o.link) !== null)
-    .map((o) => ({ id: o.id, name: o.name || o.id }))
+    .map((o) => ({ art: o.art, id: o.id, name: o.name || o.id }))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
 
 /** Ergebnis des Abgleichs je Objekt: das Ergebnis oder die Fehlermeldung. */
-export type DriveSyncBatchEntry =
-  | { id: string; result: DriveSyncResult }
-  | { id: string; error: string };
+export type DriveSyncBatchEntry = ObjektRef &
+  ({ result: DriveSyncResult } | { error: string });
 
 /**
  * Höchstzahl Objekte je Aufruf. Der Client schickt kleinere Blöcke; die
@@ -338,35 +367,45 @@ export type DriveSyncBatchEntry =
 const DRIVE_SYNC_MAX_BATCH = 8;
 
 /**
- * Mehrere Risikoobjekte gleichzeitig mit Drive abgleichen — für „Sync all
+ * Mehrere Objekte gleichzeitig mit Drive abgleichen — für „Sync all
  * from Drive" unter Admin Actions. Gleichzeitig nur hier im Server: Next.js
  * schickt Server Actions eines Clients nacheinander ab, ein `Promise.all` im
  * Browser liefe also doch seriell. Ein Fehler betrifft nur sein Objekt.
  * Hintergrund: docs/objektplaene.md, „Neu einlesen".
  */
-export async function syncRisikoObjekteFromDrive(ids: string[]): Promise<DriveSyncBatchEntry[]> {
+export async function syncPlanObjekteFromDrive(refs: ObjektRef[]): Promise<DriveSyncBatchEntry[]> {
   await actionAdminRequired();
-  if (!Array.isArray(ids) || ids.length > DRIVE_SYNC_MAX_BATCH) {
+  if (!Array.isArray(refs) || refs.length > DRIVE_SYNC_MAX_BATCH) {
     throw new Error(`at most ${DRIVE_SYNC_MAX_BATCH} objects per call`);
   }
   return Promise.all(
-    ids.map(async (id): Promise<DriveSyncBatchEntry> => {
+    refs.map(async (ref): Promise<DriveSyncBatchEntry> => {
+      if (!isObjektRef(ref)) {
+        const id = String((ref as { id?: unknown } | null)?.id);
+        return { art: 'risikoobjekt', id, result: { status: 'keinDriveLink' } };
+      }
+      const { art, id } = ref;
       try {
-        if (typeof id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(id)) {
-          return { id, result: { status: 'keinDriveLink' } };
-        }
-        const objekt = await loadRisikoObjekt(id);
-        if (!objekt) return { id, result: { status: 'keinDriveLink' } };
+        const objekt = await loadPlanObjekt(art, id);
+        if (!objekt) return { art, id, result: { status: 'keinDriveLink' } };
         const result = await runDriveSync(
-          id,
+          { art, id },
           objekt.link,
           driveSyncDeps(storageGroupsMetadata(objektGroups(objekt))),
         );
-        return { id, result };
+        return { art, id, result };
       } catch (err) {
-        console.warn('Drive-Abgleich fehlgeschlagen', id, err);
-        return { id, error: err instanceof Error ? err.message : String(err) };
+        console.warn('Drive-Abgleich fehlgeschlagen', art, id, err);
+        return { art, id, error: err instanceof Error ? err.message : String(err) };
       }
     }),
   );
+}
+
+/**
+ * Ablage der Vision-Ausgabe, je Dokument eindeutig. Risikoobjekte behalten
+ * den bisherigen Schlüssel ohne Art.
+ */
+function ocrKey(art: ObjektArt, objektId: string, dokumentId: string): string {
+  return art === 'risikoobjekt' ? `${objektId}_${dokumentId}` : `${art}_${objektId}_${dokumentId}`;
 }

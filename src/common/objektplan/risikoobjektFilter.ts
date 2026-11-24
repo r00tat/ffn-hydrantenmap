@@ -1,4 +1,4 @@
-import type { RisikoObjekt } from '../gis-objects';
+import type { WgsObject } from '../gis-objects';
 
 function normalize(value: unknown): string {
   return String(value ?? '')
@@ -7,11 +7,11 @@ function normalize(value: unknown): string {
 }
 
 /**
- * Risikoobjekte nach Ortschaft und Name sortiert, gefiltert auf Objekte, die
+ * Risikoobjekte und gefährdete Objekte nach Ortschaft und Name sortiert, gefiltert auf Objekte, die
  * jedes Wort des Suchbegriffs in Name, Adresse, Ortschaft, Risikogruppe oder
  * Einsatzplannummer enthalten. Die Nummer liegt im Import teils als Zahl vor.
  */
-export function filterRisikoObjekte(objekte: RisikoObjekt[], term: string): RisikoObjekt[] {
+export function filterRisikoObjekte<T extends WgsObject>(objekte: T[], term: string): T[] {
   const words = normalize(term).split(/\s+/).filter(Boolean);
   return objekte
     .filter((o) => {

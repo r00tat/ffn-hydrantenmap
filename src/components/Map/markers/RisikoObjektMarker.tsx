@@ -74,7 +74,11 @@ export default function RisikoObjektMarker({
       </Popup>
       {/* Außerhalb des Popups: schließt Leaflet das Popup, bleibt der Dialog offen. */}
       {r.id && plansOpen && (
-        <ObjektplanDialog open onClose={() => setPlansOpen(false)} objekt={r} />
+        <ObjektplanDialog
+          open
+          onClose={() => setPlansOpen(false)}
+          objekt={{ ...r, art: 'risikoobjekt' }}
+        />
       )}
       {children}
     </Marker>

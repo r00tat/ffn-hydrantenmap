@@ -44,15 +44,19 @@ const dokumente: ObjektDokument[] = [
 
 // Upload, Storage und Firestore sind hier nicht Gegenstand; die Liste kommt fest.
 const uploadMock = vi.fn();
+const listMock = vi.fn();
 vi.mock('./objektDokumente', () => ({
-  useObjektDokumente: () => ({ dokumente, loading: false, fromCache: false }),
+  useObjektDokumente: (art: string, id: string | undefined) => {
+    listMock(art, id);
+    return { dokumente, loading: false, fromCache: false };
+  },
   uploadObjektDokument: (...args: unknown[]) => uploadMock(...args),
   checkObjektDokumentFile: vi.fn(() => null),
 }));
 
 const syncMock = vi.fn();
 vi.mock('./objektplanActions', () => ({
-  syncObjektDokumenteFromDrive: (id: string) => syncMock(id),
+  syncObjektDokumenteFromDrive: (art: string, id: string) => syncMock(art, id),
 }));
 
 const deleteActionMock = vi.fn();
@@ -84,9 +88,11 @@ vi.mock('./PlanViewer', () => ({
   ),
 }));
 
+import type { PlanObjekt } from '../../common/objektplan/objektArt';
 import ObjektplanDialog from './ObjektplanDialog';
 
-const objekt = {
+const objekt: PlanObjekt = {
+  art: 'risikoobjekt',
   id: 'ro1',
   name: 'Volksschule',
   ortschaft: 'Neusiedl',
@@ -196,7 +202,7 @@ describe('ObjektplanDialog', () => {
     renderWithIntl(
       <ObjektplanDialog open onClose={vi.fn()} objekt={{ ...objekt, link: DRIVE }} />,
     );
-    await waitFor(() => expect(syncMock).toHaveBeenCalledWith('ro1'));
+    await waitFor(() => expect(syncMock).toHaveBeenCalledWith('risikoobjekt', 'ro1'));
     expect(syncMock).toHaveBeenCalledTimes(1);
   });
 
@@ -252,7 +258,7 @@ describe('ObjektplanDialog', () => {
     // Nur der Scan, nicht das PDF mit Textebene.
     expect(screen.getAllByRole('button', { name: 'Text erkennen (OCR)' })).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Text erkennen (OCR)' }));
-    await waitFor(() => expect(ocrActionMock).toHaveBeenCalledWith('ro1', 'scan'));
+    await waitFor(() => expect(ocrActionMock).toHaveBeenCalledWith('risikoobjekt', 'ro1', 'scan'));
   });
 
   it('bietet keine zweite Texterkennung an und kennzeichnet erkannten Text', () => {
@@ -278,7 +284,7 @@ describe('ObjektplanDialog', () => {
       target: { files: [new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' })] },
     });
     expect(await screen.findByText('Text erkannt, 3 Melder gefunden')).toBeInTheDocument();
-    expect(ocrActionMock).toHaveBeenCalledWith('ro1', 'neu');
+    expect(ocrActionMock).toHaveBeenCalledWith('risikoobjekt', 'ro1', 'neu');
   });
 
   it('meldet, wenn die Texterkennung scheitert', async () => {
@@ -311,7 +317,7 @@ describe('ObjektplanDialog', () => {
     expect(
       await screen.findByText('Lageplan.pdf: neu eingelesen, 4 Melder gefunden (mit OCR).'),
     ).toBeInTheDocument();
-    expect(reindexActionMock).toHaveBeenCalledWith('ro1', 'scan');
+    expect(reindexActionMock).toHaveBeenCalledWith('risikoobjekt', 'ro1', 'scan');
   });
 
   it('meldet, wenn das Neu-Einlesen scheitert', async () => {
@@ -322,5 +328,17 @@ describe('ObjektplanDialog', () => {
     expect(
       await screen.findByText('Erdgeschoss.pdf: Neu einlesen fehlgeschlagen.'),
     ).toBeInTheDocument();
+  });
+
+  it('liest und gleicht die Pläne eines gefährdeten Objekts unter dessen Art ab', async () => {
+    renderWithIntl(
+      <ObjektplanDialog
+        open
+        onClose={vi.fn()}
+        objekt={{ ...objekt, art: 'gefahrobjekt', id: 'nd_markt', link: DRIVE }}
+      />,
+    );
+    expect(listMock).toHaveBeenCalledWith('gefahrobjekt', 'nd_markt');
+    await waitFor(() => expect(syncMock).toHaveBeenCalledWith('gefahrobjekt', 'nd_markt'));
   });
 });

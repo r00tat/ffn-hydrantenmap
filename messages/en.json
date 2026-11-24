@@ -5016,7 +5016,7 @@
     "reindexFailed": "{name}: re-reading failed."
   },
   "risikoobjekte": {
-    "title": "High-risk sites",
+    "title": "High-risk and endangered sites",
     "searchLabel": "Search site",
     "searchHelper": "Name, address, town, risk group or plan no.",
     "count": "{count, plural, one {# site} other {# sites}}",
@@ -5025,7 +5025,7 @@
     "new": "New site",
     "edit": "Edit",
     "newTitle": "New high-risk site",
-    "editTitle": "Edit high-risk site",
+    "editTitle": "Edit site",
     "fields": {
       "name": "Name",
       "ortschaft": "Town",
@@ -5066,10 +5066,14 @@
     "unshared": "{count, plural, one {# site is} other {# sites are}} not shared with any group yet. Only admins see their plans.",
     "unsharedGroups": "Share with",
     "unsharedButton": "Share all",
-    "unsharedDone": "{count, plural, one {# site} other {# sites}} shared."
+    "unsharedDone": "{count, plural, one {# site} other {# sites}} shared.",
+    "art": {
+      "risikoobjekt": "High-risk site",
+      "gefahrobjekt": "Endangered site"
+    }
   },
   "risikoobjektMatch": {
-    "title": "Possible risk sites",
+    "title": "Possible high-risk or endangered sites",
     "hint": "Found automatically by location, address and name – please check.",
     "reasonAddress": "Address",
     "reasonStreet": "Street",

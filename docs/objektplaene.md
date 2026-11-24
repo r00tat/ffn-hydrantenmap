@@ -1,15 +1,42 @@
 # Objektunterlagen und Meldersuche
 
-Zu einem Risikoobjekt lassen sich Brandschutzpläne, Laufkarten und Fotos
-hinterlegen. Im Popup des Objekts öffnet „Pläne öffnen" einen Vollbild-Dialog
+Zu einem Risikoobjekt oder gefährdeten Objekt lassen sich Brandschutzpläne,
+Laufkarten und Fotos hinterlegen (siehe „Risikoobjekte und gefährdete
+Objekte"). Im Popup des Objekts öffnet „Pläne öffnen" einen Vollbild-Dialog
 mit Suche, Unterlagenliste und Viewer. Die Suche findet Melder („3/05",
 „MG 3 M 5") und Text; ein Treffer öffnet die Seite und markiert die Stelle.
 
+## Risikoobjekte und gefährdete Objekte
+
+Beide Arten kommen aus dem GIS in eigenen Collections (`risikoobjekt`,
+`gefahrobjekt`), haben dieselben Felder und beide Pläne. Überall, wo Pläne
+vorkommen, stehen sie gemeinsam: Seite `/risikoobjekte`, „Mögliche
+Risikoobjekte und gefährdete Objekte" am Einsatz, Popup auf der Karte,
+Drive-Abgleich und „Neu einlesen".
+
+- **Die Art ist der Pfad.** `ObjektArt` in
+  [objektArt.ts](../src/common/objektplan/objektArt.ts) ist zugleich Name der
+  Collection und des Felds im Cluster. Jede Server Action bekommt Art und ID
+  und prüft beide (`isObjektArt`, `isObjektId`), bevor sie damit einen
+  Firestore- oder Storage-Pfad baut.
+- **Eine Regel für beide.** Firestore und Storage matchen `/{art}/…` und
+  lassen nur die beiden Arten zu; andere Collections mit einer Untersammlung
+  `dokument` bleiben zu (Regeltests in `firebase/`).
+- **Im Browser** liest `usePlanObjekte` beide Collections und kennzeichnet jedes
+  Objekt mit seiner Art (`PlanObjekt`). Gefährdete Objekte tragen in den Listen
+  einen Hinweis „Gefährdetes Objekt".
+- **Neu angelegt** werden in der App nur Risikoobjekte; gefährdete Objekte
+  kommen aus dem GIS und lassen sich verknüpfen und freigeben.
+- **Schlüssel der Texterkennung:** Risikoobjekte behalten
+  `{objektId}_{dokumentId}`, gefährdete Objekte bekommen das Präfix
+  `gefahrobjekt_`, damit sich gleiche IDs beider Arten nicht treffen.
+
 ## Ablage
 
-- **Datei in Storage** unter `risikoobjekt/{objektId}/{dokumentId}-{name}`,
-  **Daten in Firestore** unter `risikoobjekt/{objektId}/dokument/{dokumentId}`
-  ([objektDokument.ts](../src/common/objektplan/objektDokument.ts)).
+- **Datei in Storage** unter `{art}/{objektId}/{dokumentId}-{name}`,
+  **Daten in Firestore** unter `{art}/{objektId}/dokument/{dokumentId}`
+  ([objektDokument.ts](../src/common/objektplan/objektDokument.ts)); `{art}`
+  ist `risikoobjekt` oder `gefahrobjekt`.
 - **Unter dem Objekt, nicht im Cluster.** Die Cluster (`clusters6`) baut der
   GIS-Import neu; was dort hinge, wäre beim nächsten Import weg. Die
   Unterdokumente hängen an der stabilen ID des Objekts.
@@ -201,7 +228,7 @@ in der App bleibt daneben möglich.
 Die Pläne zeigen Grundrisse, Zugänge und Schlüsseldepots. Sie sieht deshalb
 nicht jeder Benutzer, sondern nur die Feuerwehren, die das Objekt betreuen.
 
-- **`groups` am Objekt** (`risikoobjekt/{id}.groups`) ist die Freigabeliste.
+- **`groups` am Objekt** (`{art}/{id}.groups`) ist die Freigabeliste.
   Die Daten des Objekts (Name, Adresse, Lage) bleiben für alle lesbar — die
   Karte braucht sie, und sie stehen ohnehin im GIS. Nur Unterlagen und Index
   hängen an der Freigabe. Ein Objekt **ohne** Gruppen sieht nur der globale
@@ -218,6 +245,11 @@ nicht jeder Benutzer, sondern nur die Feuerwehren, die das Objekt betreuen.
   Gruppe hat, lädt hoch, löscht hochgeladene Unterlagen, bearbeitet das Objekt
   und gibt es weiteren Gruppen frei — nur für Gruppen, in denen er das Recht
   selbst hat, und keine entziehen, die er nicht pflegt.
+- **Auswahl als Gruppenbaum**, wie bei den Rollen eines Benutzers
+  (`GroupTreeChecklist`). Anders als dort wird eine Elterngruppe beim
+  Freigeben nicht mitgeschrieben (`implyAncestors={false}`) — freigegeben ist
+  genau, was angehakt ist. Gruppen, in denen der Bearbeitende das Recht nicht
+  hat, sind gesperrt (`isDisabled`).
 - **Neue Objekte** legt ein Gruppen-Admin auf `/risikoobjekte` für seine Gruppe
   an (`quelle: 'app'`); das Objekt ist gleich für sie freigegeben und landet in
   derselben Transaktion in `clusters6`, sonst fehlte es auf der Karte. Objekte
@@ -226,7 +258,7 @@ nicht jeder Benutzer, sondern nur die Feuerwehren, die das Objekt betreuen.
   lassen sich nur Objekte aus der App.
 - **Bestand:** Objekte von vor der Freigabe haben keine Gruppen. Der Admin
   sieht auf `/risikoobjekte` einen Hinweis und gibt sie mit „Alle freigeben"
-  auf einmal frei.
+  auf einmal frei — Risikoobjekte und gefährdete Objekte.
 - **Hochladen im Browser:** Das Dokument trägt `gruppe` — die freigegebene
   Gruppe, in der der Hochladende das Recht hat; daran prüft die Firestore-Regel
   das Recht per `hasPerm`. Ändern und Löschen nur Admin oder Server Action,
@@ -331,7 +363,7 @@ noch den alten Stand — der Drive-Abgleich holt sie erst bei einer neuen md5.
 ## Risikoobjekte zum Einsatz
 
 Die Einsatzseite (Abschnitt „Details“) zeigt unter der Übersicht „Mögliche
-Risikoobjekte“, ein Klick öffnet die Pläne. Ohne Treffer bleibt der Block weg.
+Risikoobjekte und gefährdete Objekte“, ein Klick öffnet die Pläne. Ohne Treffer bleibt der Block weg.
 Das Matching liegt in
 [risikoobjektMatch.ts](../src/common/objektplan/risikoobjektMatch.ts), die
 Anzeige in
@@ -360,7 +392,7 @@ Anzeige in
   Hälfte des Gewichts. **Ortsnamen** (Feuerwehr des Einsatzes, Ort der
   Einsatzorte) zählen nicht, sonst passte „BH Neusiedl am See“ auf jeden
   Alarm.
-- **Gelesen wird `risikoobjekt`**, nicht die Cluster, wie auf der Seite
+- **Gelesen werden `risikoobjekt` und `gefahrobjekt`**, nicht die Cluster, wie auf der Seite
   `/risikoobjekte`; der Firestore-Cache hält die Liste offline. Name und Lage
   sehen alle, die Pläne nur die freigegebenen Gruppen — das zeigt der Dialog.
 - **Grenzen:** Zwei ähnliche Straßen („Obere“ und „Untere Hauptstraße“)

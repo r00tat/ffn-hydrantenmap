@@ -20,6 +20,14 @@ export interface GroupTreeChecklistProps {
   onChange: (selected: string[]) => void;
   /** Hinweis an Elterngruppen, die sich aus einer Untergruppe ergeben. */
   impliedLabel: string;
+  /**
+   * Elterngruppen einer gewählten Untergruppe mit anhaken (Standard). Für
+   * Mitgliedschaften richtig; bei einer Freigabe dagegen hieße es, auch die
+   * Elterngruppe sähe das Objekt — dort aus.
+   */
+  implyAncestors?: boolean;
+  /** Einzelne Gruppen sperren, etwa die, in denen das Recht fehlt. */
+  isDisabled?: (groupId: string) => boolean;
   'aria-label'?: string;
 }
 
@@ -35,16 +43,18 @@ export default function GroupTreeChecklist({
   selected,
   onChange,
   impliedLabel,
+  implyAncestors = true,
+  isDisabled,
   'aria-label': ariaLabel,
 }: GroupTreeChecklistProps) {
   const tree = useMemo(() => orderGroupsAsTree(groups), [groups]);
   const effective = useMemo(
-    () => new Set(withAncestorGroups(selected, groups)),
-    [selected, groups]
+    () => new Set(implyAncestors ? withAncestorGroups(selected, groups) : selected),
+    [selected, groups, implyAncestors]
   );
   const implied = useMemo(
-    () => impliedGroupIds(selected, groups),
-    [selected, groups]
+    () => (implyAncestors ? impliedGroupIds(selected, groups) : new Set<string>()),
+    [selected, groups, implyAncestors]
   );
 
   const toggle = (groupId: string, checked: boolean) =>
@@ -95,7 +105,7 @@ export default function GroupTreeChecklist({
                 <Checkbox
                   size="small"
                   checked={effective.has(id)}
-                  disabled={locked}
+                  disabled={locked || !!isDisabled?.(id)}
                   onChange={(e) => toggle(id, e.target.checked)}
                 />
               }

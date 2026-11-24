@@ -32,8 +32,8 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useMemo, useRef, useState } from 'react';
-import type { RisikoObjekt } from '../../common/gis-objects';
 import type { Box as PlanBox } from '../../common/objektplan/melderIndex';
+import type { PlanObjekt } from '../../common/objektplan/objektArt';
 import {
   OBJEKT_DOKUMENT_MAX_MB,
   objektDokumentKind,
@@ -67,7 +67,7 @@ import { useDriveSync } from './useDriveSync';
 export interface ObjektplanDialogProps {
   open: boolean;
   onClose: () => void;
-  objekt: RisikoObjekt;
+  objekt: PlanObjekt;
 }
 
 interface Selection {
@@ -105,11 +105,11 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
   // Die Freigabe steht am Objekt; ohne sie gäbe die Regel nichts heraus.
   const canSee = canSeeObjektPlans(user, objekt);
   const canManage = canManageRisikoObjekt(user, objekt);
-  const listed = useObjektDokumente(open && canSee ? objekt.id : undefined);
+  const listed = useObjektDokumente(objekt.art, open && canSee ? objekt.id : undefined);
   const { loading, fromCache } = listed;
   const dokumente = canSee ? listed.dokumente : NO_DOKUMENTE;
 
-  const driveSync = useDriveSync(objekt.id, objekt.link, open && canSee);
+  const driveSync = useDriveSync(objekt.art, objekt.id, objekt.link, open && canSee);
 
   const [term, setTerm] = useState('');
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -124,7 +124,7 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
     if (!objekt.id) return { ok: false, error: 'notFound' };
     setOcrRunning((prev) => [...prev, dokumentId]);
     try {
-      return await ocrObjektDokumentAction(objekt.id, dokumentId);
+      return await ocrObjektDokumentAction(objekt.art, objekt.id, dokumentId);
     } catch (err) {
       console.error('Texterkennung fehlgeschlagen', dokumentId, err);
       return { ok: false, error: 'ocrFailed' };
@@ -147,7 +147,7 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
     setOcrRunning((prev) => [...prev, dokument.id]);
     setReindexNotice(null);
     try {
-      const result = await reindexObjektDokumentAction(objekt.id, dokument.id);
+      const result = await reindexObjektDokumentAction(objekt.art, objekt.id, dokument.id);
       setReindexNotice(
         result.ok
           ? {
@@ -231,6 +231,7 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
       }
       try {
         const dok = await uploadObjektDokument(
+          objekt.art,
           objekt.id,
           file,
           email ?? '',
@@ -630,7 +631,7 @@ export default function ObjektplanDialog({ open, onClose, objekt }: ObjektplanDi
             const target = toDelete;
             setToDelete(null);
             if (confirmed && objekt.id) {
-              deleteObjektDokumentAction(objekt.id, target.id)
+              deleteObjektDokumentAction(objekt.art, objekt.id, target.id)
                 .then((res) => {
                   if (!res.ok) console.error('Löschen abgelehnt', res.error);
                 })

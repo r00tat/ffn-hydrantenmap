@@ -57,4 +57,41 @@ describe('GroupTreeChecklist', () => {
     expect(parent).not.toBeChecked();
     expect(parent).toBeEnabled();
   });
+
+  it('hakt ohne implyAncestors keine Elterngruppe an — für Freigaben', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <GroupTreeChecklist
+        groups={GROUPS}
+        selected={['ffa']}
+        onChange={onChange}
+        impliedLabel="über eine Untergruppe"
+        implyAncestors={false}
+      />,
+    );
+
+    const parent = screen.getByRole('checkbox', { name: 'Abschnitt' });
+    expect(parent).not.toBeChecked();
+    expect(parent).toBeEnabled();
+    expect(screen.queryByText('über eine Untergruppe')).not.toBeInTheDocument();
+    await user.click(parent);
+    expect(onChange).toHaveBeenLastCalledWith(['ffa', 'abschnitt']);
+  });
+
+  it('sperrt einzelne Gruppen über isDisabled', () => {
+    render(
+      <GroupTreeChecklist
+        groups={GROUPS}
+        selected={['solo']}
+        onChange={vi.fn()}
+        impliedLabel="über eine Untergruppe"
+        isDisabled={(id) => id === 'solo'}
+      />,
+    );
+
+    expect(screen.getByRole('checkbox', { name: 'Solo' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Solo' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'FF Alpha' })).toBeEnabled();
+  });
 });

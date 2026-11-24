@@ -122,18 +122,18 @@ export function driveSyncDeps(storageGroups: string): DriveSyncDeps {
       const bucket = await getDefaultStorageBucket();
       await bucket.file(path).delete({ ignoreNotFound: true });
     },
-    async loadDokumente(objektId) {
-      const snap = await firestore.collection(objektDokumentCollectionPath(objektId)).get();
+    async loadDokumente({ art, id }) {
+      const snap = await firestore.collection(objektDokumentCollectionPath(art, id)).get();
       return snap.docs.map((d) => ({ ...(d.data() as ObjektDokument), id: d.id }));
     },
-    async writeDokument(objektId, dokument) {
+    async writeDokument({ art, id }, dokument) {
       await firestore
-        .collection(objektDokumentCollectionPath(objektId))
+        .collection(objektDokumentCollectionPath(art, id))
         .doc(dokument.id)
         .set(dokument);
     },
-    async deleteDokument(objektId, dokumentId) {
-      await firestore.collection(objektDokumentCollectionPath(objektId)).doc(dokumentId).delete();
+    async deleteDokument({ art, id }, dokumentId) {
+      await firestore.collection(objektDokumentCollectionPath(art, id)).doc(dokumentId).delete();
     },
   };
 }

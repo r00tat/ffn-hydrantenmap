@@ -4,23 +4,21 @@ import MapIcon from '@mui/icons-material/Map';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControl from '@mui/material/FormControl';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormGroup from '@mui/material/FormGroup';
 import FormHelperText from '@mui/material/FormHelperText';
-import FormLabel from '@mui/material/FormLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
-import type { RisikoObjekt } from '../../common/gis-objects';
+import type { HierarchyGroup } from '../../common/groupHierarchy';
+import type { PlanObjekt } from '../../common/objektplan/objektArt';
 import { can } from '../../common/permissions';
 import {
   objektGroups,
@@ -29,6 +27,7 @@ import {
 } from '../../common/objektplan/risikoobjektAccess';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import GroupTreeChecklist from '../groups/GroupTreeChecklist';
 import {
   createRisikoObjekt,
   deleteRisikoObjekt,
@@ -56,12 +55,14 @@ interface Props {
   open: boolean;
   onClose: () => void;
   /** Ohne Objekt wird ein neues angelegt. */
-  objekt?: RisikoObjekt;
+  objekt?: PlanObjekt;
   /** Namen aller Gruppen, für die Freigabe. */
   groupNames: Record<string, string>;
+  /** Elterngruppen, damit die Freigabe als Baum erscheint wie beim Benutzer. */
+  groupHierarchy?: HierarchyGroup[];
 }
 
-function initialText(objekt: RisikoObjekt | undefined): Record<TextKey, string> {
+function initialText(objekt: PlanObjekt | undefined): Record<TextKey, string> {
   const value = (v: unknown) => (v === undefined || v === null ? '' : String(v));
   return {
     name: value(objekt?.name),
@@ -81,11 +82,18 @@ function parseCoordinate(raw: string): number {
 }
 
 /**
- * Anlegen und Bearbeiten eines Risikoobjekts samt Freigabe an Gruppen. Die
- * Entscheidung, was erlaubt ist, treffen die Server Actions; der Dialog sperrt
- * nur, was ohnehin abgewiesen würde. Hintergrund: docs/objektplaene.md.
+ * Anlegen eines Risikoobjekts und Bearbeiten eines Risikoobjekts oder
+ * gefährdeten Objekts samt Freigabe an Gruppen. Die Entscheidung, was erlaubt
+ * ist, treffen die Server Actions; der Dialog sperrt nur, was ohnehin
+ * abgewiesen würde. Hintergrund: docs/objektplaene.md.
  */
-export default function RisikoObjektEditDialog({ open, onClose, objekt, groupNames }: Props) {
+export default function RisikoObjektEditDialog({
+  open,
+  onClose,
+  objekt,
+  groupNames,
+  groupHierarchy = [],
+}: Props) {
   const t = useTranslations('risikoobjekte');
   const { isAdmin, groupRoles } = useFirebaseLogin();
   const { groups: createGroups, groupId: defaultGroupId } = useFahrtenbuchGroup(RISIKOOBJEKT_MANAGE);
@@ -118,6 +126,18 @@ export default function RisikoObjektEditDialog({ open, onClose, objekt, groupNam
       .sort((a, b) => (groupNames[a] ?? a).localeCompare(groupNames[b] ?? b));
   }, [isAdmin, groupNames, groupRoles, initialGroups]);
 
+  // Die Freigabe als Baum wie in der Benutzerverwaltung; eine fehlende
+  // Elterngruppe (keine Option) macht die Untergruppe zur Wurzel.
+  const sharingTree = useMemo<HierarchyGroup[]>(
+    () =>
+      sharingOptions.map((id) => ({
+        id,
+        name: groupNames[id] ?? id,
+        parentId: groupHierarchy.find((g) => g.id === id)?.parentId,
+      })),
+    [sharingOptions, groupNames, groupHierarchy],
+  );
+
   const selectedGroupId = groupId ?? defaultGroupId;
 
   const run = async (action: () => Promise<{ ok: boolean; error?: RisikoObjektActionError }>) => {
@@ -146,18 +166,20 @@ export default function RisikoObjektEditDialog({ open, onClose, objekt, groupNam
         return createRisikoObjekt(selectedGroupId, input);
       }
       if (!objekt.id) return { ok: false, error: 'notFound' };
-      const updated = await updateRisikoObjekt(objekt.id, input);
+      const updated = await updateRisikoObjekt(objekt.art, objekt.id, input);
       if (!updated.ok) return updated;
       const next = [...shared].sort();
       if (next.join(',') !== [...initialGroups].sort().join(',')) {
-        return setRisikoObjektGroups(objekt.id, next);
+        return setRisikoObjektGroups(objekt.art, objekt.id, next);
       }
       return updated;
     });
 
   const remove = () =>
     run(async () =>
-      objekt?.id ? deleteRisikoObjekt(objekt.id) : { ok: false, error: 'notFound' as const },
+      objekt?.id
+        ? deleteRisikoObjekt(objekt.art, objekt.id)
+        : { ok: false, error: 'notFound' as const },
     );
 
   return (
@@ -223,27 +245,19 @@ export default function RisikoObjektEditDialog({ open, onClose, objekt, groupNam
           </Box>
 
           {!isNew && (
-            <FormControl component="fieldset">
-              <FormLabel component="legend">{t('sharing')}</FormLabel>
-              <FormGroup row>
-                {sharingOptions.map((g) => (
-                  <FormControlLabel
-                    key={g}
-                    label={groupNames[g] ?? g}
-                    control={
-                      <Checkbox
-                        checked={shared.includes(g)}
-                        disabled={busy || !mayManage(g)}
-                        onChange={(e) =>
-                          setShared((prev) =>
-                            e.target.checked ? [...prev, g] : prev.filter((x) => x !== g),
-                          )
-                        }
-                      />
-                    }
-                  />
-                ))}
-              </FormGroup>
+            <FormControl fullWidth>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                {t('sharing')}
+              </Typography>
+              <GroupTreeChecklist
+                groups={sharingTree}
+                selected={shared}
+                onChange={setShared}
+                impliedLabel=""
+                implyAncestors={false}
+                isDisabled={(g) => busy || !mayManage(g)}
+                aria-label={t('sharing')}
+              />
               <FormHelperText>{t('sharingHelper')}</FormHelperText>
             </FormControl>
           )}

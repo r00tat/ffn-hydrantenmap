@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { parseDriveLink } from '../../common/objektplan/driveSync';
+import type { ObjektArt } from '../../common/objektplan/objektArt';
 import useOnline from '../../hooks/useOnline';
 import type { DriveSyncResult } from '../../server/objektplan/driveSyncRunner';
 import { syncObjektDokumenteFromDrive } from './objektplanActions';
@@ -25,18 +26,19 @@ interface Finished {
  * Pläne bleiben, wie sie sind.
  */
 export function useDriveSync(
+  art: ObjektArt,
   objektId: string | undefined,
   link: string | undefined,
   active: boolean,
 ): DriveSyncState {
   const online = useOnline();
   const [finished, setFinished] = useState<Finished | null>(null);
-  const key = active && online && objektId && parseDriveLink(link) ? objektId : undefined;
+  const key = active && online && objektId && parseDriveLink(link) ? `${art}/${objektId}` : undefined;
 
   useEffect(() => {
-    if (!key) return;
+    if (!key || !objektId) return;
     let cancelled = false;
-    syncObjektDokumenteFromDrive(key)
+    syncObjektDokumenteFromDrive(art, objektId)
       .then((result) => {
         if (!cancelled) setFinished({ key, result });
       })
@@ -47,7 +49,7 @@ export function useDriveSync(
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [key, art, objektId]);
 
   if (!key) return { running: false };
   // Läuft, solange für diesen Schlüssel kein Ergebnis da ist. Wird der Dialog

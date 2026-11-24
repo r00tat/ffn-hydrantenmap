@@ -8,15 +8,15 @@ import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
-import type { RisikoObjekt } from '../../common/gis-objects';
+import type { PlanObjekt } from '../../common/objektplan/objektArt';
 import {
   matchRisikoObjekte,
   type RisikoObjektMatchQuery,
 } from '../../common/objektplan/risikoobjektMatch';
-import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import type { Firecall, FirecallLocation } from '../firebase/firestore';
 import ObjektplanDialog from './ObjektplanDialog';
+import { usePlanObjekte } from './usePlanObjekte';
 
 /** Abfrage aus Einsatz und Einsatzorten: Lagen, Texte, Adressen. */
 export function buildMatchQuery(
@@ -41,18 +41,17 @@ export function buildMatchQuery(
 }
 
 /**
- * Mögliche Risikoobjekte zum Einsatz, gefunden über Lage, Adresse und Name.
- * Gelesen wird `risikoobjekt` direkt wie auf der Seite /risikoobjekte; der
- * Firestore-Cache hält die Liste auch offline. Ohne Treffer zeigt die
- * Komponente nichts. Hintergrund: docs/objektplaene.md.
+ * Mögliche Risikoobjekte und gefährdete Objekte zum Einsatz, gefunden über
+ * Lage, Adresse und Name. Gelesen wie auf der Seite /risikoobjekte
+ * (`usePlanObjekte`); der Firestore-Cache hält die Liste auch offline. Ohne
+ * Treffer zeigt die Komponente nichts. Hintergrund: docs/objektplaene.md.
  */
 export default function RisikoobjektMatches({ firecall }: { firecall: Firecall }) {
   const t = useTranslations('risikoobjektMatch');
-  const { records } = useFirebaseCollectionState<RisikoObjekt>({
-    collectionName: 'risikoobjekt',
-  });
+  const tObjekte = useTranslations('risikoobjekte');
+  const { records } = usePlanObjekte();
   const { locations } = useFirecallLocations();
-  const [selected, setSelected] = useState<RisikoObjekt | null>(null);
+  const [selected, setSelected] = useState<PlanObjekt | null>(null);
 
   const matches = useMemo(
     () => matchRisikoObjekte(records, buildMatchQuery(firecall, locations)),
@@ -78,10 +77,15 @@ export default function RisikoobjektMatches({ firecall }: { firecall: Firecall }
       </Typography>
       <List dense>
         {matches.map((m) => (
-          <ListItemButton key={m.objekt.id} divider onClick={() => setSelected(m.objekt)}>
+          <ListItemButton key={`${m.objekt.art}/${m.objekt.id}`} divider onClick={() => setSelected(m.objekt)}>
             <ListItemText
               primary={m.objekt.name}
-              secondary={[m.objekt.adresse, m.objekt.risikogruppe].filter(Boolean).join(' · ')}
+              secondary={[
+                m.objekt.adresse,
+                m.objekt.art === 'gefahrobjekt' ? tObjekte('art.gefahrobjekt') : m.objekt.risikogruppe,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             />
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', ml: 1 }}>
               {m.address && (

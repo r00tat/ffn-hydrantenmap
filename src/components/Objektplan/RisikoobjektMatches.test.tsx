@@ -33,14 +33,35 @@ const objekte: RisikoObjekt[] = [
 
 let locations: Partial<FirecallLocation>[] = [];
 
+const gefahrObjekte = [
+  {
+    id: 'nd_markt',
+    name: 'Hofer Markt',
+    adresse: 'Kurzes Hirschfeld 1',
+    einsatzplanummer: '511',
+    erfassungsdatum: '',
+    ortschaft: 'ND',
+    lat: 47.9672,
+    lng: 16.837,
+  },
+];
+
 vi.mock('../../hooks/useFirebaseCollection', () => ({
-  useFirebaseCollectionState: () => ({ records: objekte, loading: false, fromCache: false }),
+  useFirebaseCollectionState: ({ collectionName }: { collectionName: string }) => ({
+    records: collectionName === 'gefahrobjekt' ? gefahrObjekte : objekte,
+    loading: false,
+    fromCache: false,
+  }),
 }));
 vi.mock('../../hooks/useFirecallLocations', () => ({
   default: () => ({ locations, loading: false }),
 }));
 vi.mock('./ObjektplanDialog', () => ({
-  default: ({ objekt }: { objekt: RisikoObjekt }) => <div>Dialog {objekt.name}</div>,
+  default: ({ objekt }: { objekt: RisikoObjekt & { art: string } }) => (
+    <div>
+      Dialog {objekt.art} {objekt.name}
+    </div>
+  ),
 }));
 
 function firecall(partial: Partial<Firecall>): Firecall {
@@ -60,13 +81,23 @@ describe('RisikoobjektMatches', () => {
         })}
       />,
     );
-    expect(screen.getByText('Mögliche Risikoobjekte')).toBeInTheDocument();
+    expect(screen.getByText('Mögliche Risikoobjekte und gefährdete Objekte')).toBeInTheDocument();
     expect(screen.getByText('Metro')).toBeInTheDocument();
     expect(screen.getByText('Adresse')).toBeInTheDocument();
     expect(screen.queryByText('Volksschule')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Metro'));
-    expect(screen.getByText('Dialog Metro')).toBeInTheDocument();
+    expect(screen.getByText('Dialog risikoobjekt Metro')).toBeInTheDocument();
+  });
+
+  it('findet auch gefährdete Objekte und kennzeichnet sie', () => {
+    renderWithIntl(
+      <RisikoobjektMatches firecall={firecall({ name: 'BMA Hofer Markt', lat: 47.9672, lng: 16.837 })} />,
+    );
+    expect(screen.getByText('Hofer Markt')).toBeInTheDocument();
+    expect(screen.getByText(/Gefährdetes Objekt/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Hofer Markt'));
+    expect(screen.getByText('Dialog gefahrobjekt Hofer Markt')).toBeInTheDocument();
   });
 
   it('zieht Lage und Adresse der Einsatzorte heran', () => {

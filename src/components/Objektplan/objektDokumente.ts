@@ -29,6 +29,7 @@ import {
 // Bewusst die wartenden Varianten, nicht `setDocLocal`: Hochladen und Löschen
 // brauchen ohnehin Netz (Storage), und der Admin soll sehen, ob es geklappt hat.
 import { setDoc } from '../../lib/firestoreClient';
+import type { ObjektArt } from '../../common/objektplan/objektArt';
 import { storageGroupsMetadata } from '../../common/objektplan/risikoobjektAccess';
 import { describeObjektDokument } from '../../common/objektplan/describeDokument';
 import app, { firestore } from '../firebase/firebase';
@@ -53,6 +54,7 @@ export interface UploadAccess {
 }
 
 export async function uploadObjektDokument(
+  art: ObjektArt,
   objektId: string,
   file: File,
   createdBy: string,
@@ -61,7 +63,7 @@ export async function uploadObjektDokument(
 ): Promise<ObjektDokument> {
   const id = uuid();
   const data = new Uint8Array(await file.arrayBuffer());
-  const storagePath = objektDokumentStoragePath(objektId, id, file.name);
+  const storagePath = objektDokumentStoragePath(art, objektId, id, file.name);
   const dokument = await describeObjektDokument(
     {
       id,
@@ -87,7 +89,7 @@ export async function uploadObjektDokument(
   });
   await task;
 
-  await setDoc(doc(firestore, objektDokumentCollectionPath(objektId), id), dokument);
+  await setDoc(doc(firestore, objektDokumentCollectionPath(art, objektId), id), dokument);
   return dokument;
 }
 
@@ -97,33 +99,38 @@ export interface ObjektDokumenteState {
   fromCache: boolean;
 }
 
-export function useObjektDokumente(objektId: string | undefined): ObjektDokumenteState {
-  const [state, setState] = useState<ObjektDokumenteState & { objektId?: string }>({
+export function useObjektDokumente(
+  art: ObjektArt,
+  objektId: string | undefined,
+): ObjektDokumenteState {
+  // Art und ID zusammen: dieselbe ID kann es in beiden Collections geben.
+  const key = objektId ? `${art}/${objektId}` : undefined;
+  const [state, setState] = useState<ObjektDokumenteState & { key?: string }>({
     dokumente: [],
     loading: true,
     fromCache: false,
   });
 
   useEffect(() => {
-    if (!objektId) return;
+    if (!objektId || !key) return;
     return onSnapshot(
-      collection(firestore, objektDokumentCollectionPath(objektId)),
+      collection(firestore, objektDokumentCollectionPath(art, objektId)),
       { includeMetadataChanges: true },
       (snap) => {
         const dokumente = snap.docs
           .map((d) => ({ ...(d.data() as ObjektDokument), id: d.id }))
           .sort((a, b) => a.name.localeCompare(b.name, 'de'));
-        setState({ objektId, dokumente, loading: false, fromCache: snap.metadata.fromCache });
+        setState({ key, dokumente, loading: false, fromCache: snap.metadata.fromCache });
       },
       (err) => {
         console.error('Unterlagen konnten nicht geladen werden', err);
-        setState({ objektId, dokumente: [], loading: false, fromCache: false });
+        setState({ key, dokumente: [], loading: false, fromCache: false });
       },
     );
-  }, [objektId]);
+  }, [art, objektId, key]);
 
   // Ein Wechsel des Objekts zeigt nicht kurz die Liste des vorigen.
-  if (!objektId || state.objektId !== objektId) {
+  if (!key || state.key !== key) {
     return { dokumente: [], loading: !!objektId, fromCache: false };
   }
   return state;
