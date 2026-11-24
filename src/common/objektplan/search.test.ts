@@ -63,6 +63,40 @@ describe('searchObjektDokumente', () => {
     expect(r.text.map((x) => [x.dokumentId, x.seite])).toEqual([['og', 1]]);
   });
 
+  it('findet die Gruppe, solange die Meldernummer noch fehlt', () => {
+    const r = searchObjektDokumente(docs, '3/');
+    expect(r.query).toEqual({ gruppe: 3 });
+    expect(r.melder.map((x) => [x.dokumentId, x.seite, x.entries.length])).toEqual([
+      ['eg', 1, 2],
+      ['og', 1, 1],
+    ]);
+  });
+
+  it('findet Gruppen, die die Nummer enthalten, genaue Treffer zuerst', () => {
+    const plan = [
+      dok('a', { melder: [m('310/1', 1), m('10/1', 2), m('105/2', 1), m('10/2', 1)] }),
+      dok('b', { melder: [m('10/3', 4), m('210/1', 1)] }),
+    ];
+    const r = searchObjektDokumente(plan, '10');
+    expect(r.melder.map((x) => [x.dokumentId, x.seite, x.entries.map((e) => e.kennung)])).toEqual([
+      ['a', 1, ['10/2']],
+      ['a', 2, ['10/1']],
+      ['b', 4, ['10/3']],
+      ['a', 1, ['105/2']],
+      ['a', 1, ['310/1']],
+      ['b', 1, ['210/1']],
+    ]);
+  });
+
+  it('sucht mit Melder nur in der genauen Gruppe', () => {
+    const plan = [
+      dok('a', { melder: [m('10/1E', 1), m('100/1E', 1), m('101/1E', 2), m('310/1E', 2)] }),
+    ];
+    const r = searchObjektDokumente(plan, '10/1E');
+    expect(r.melder.map((x) => x.entries.map((e) => e.kennung))).toEqual([['10/1E']]);
+    expect(searchObjektDokumente(plan, '10/').melder).toHaveLength(1);
+  });
+
   it('sucht Wörter nur im Text', () => {
     const r = searchObjektDokumente(docs, 'heizraum');
     expect(r.query).toBeNull();

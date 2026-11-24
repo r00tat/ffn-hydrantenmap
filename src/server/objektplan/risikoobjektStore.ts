@@ -3,6 +3,11 @@ import 'server-only';
 import { geohashForLocation } from 'geofire-common';
 import { GEOHASH_PRECISION, type RisikoObjekt } from '../../common/gis-objects';
 import {
+  OBJEKT_ARTEN,
+  type ObjektArt,
+  type PlanObjekt,
+} from '../../common/objektplan/objektArt';
+import {
   objektDokumentCollectionPath,
   type ObjektDokument,
 } from '../../common/objektplan/objektDokument';
@@ -15,34 +20,43 @@ import { firestore } from '../firebase/admin';
 import { getDefaultStorageBucket } from '../firebase/storageBucket';
 
 /**
- * Schreibzugriffe auf Risikoobjekte für die Server Actions. Jede Änderung am
- * Objekt zieht die Kopie im Cluster nach: Die Karte liest `clusters6`, und
- * ein in der App angelegtes Objekt soll dort sofort stehen, nicht erst nach
- * `updateClusters`. Hintergrund: docs/objektplaene.md.
+ * Schreibzugriffe auf Objekte mit Plänen (Risikoobjekte und gefährdete
+ * Objekte) für die Server Actions. Die Art ist zugleich Collection und Feld
+ * im Cluster. Jede Änderung am Objekt zieht die Kopie im Cluster nach: Die
+ * Karte liest `clusters6`, und ein in der App angelegtes Objekt soll dort
+ * sofort stehen, nicht erst nach `updateClusters`. Hintergrund:
+ * docs/objektplaene.md.
  */
 
-const COLLECTION = 'risikoobjekt';
 const CLUSTER_COLLECTION = `clusters${GEOHASH_PRECISION}`;
 
-export type RisikoObjektWithId = RisikoObjekt & { id: string };
+export type PlanObjektWithId = PlanObjekt & { id: string };
 
 function hashOf(o: { lat?: number; lng?: number }): string {
   return geohashForLocation([o.lat || 0, o.lng || 0], GEOHASH_PRECISION);
 }
 
-export async function loadRisikoObjekt(id: string): Promise<RisikoObjektWithId | undefined> {
-  const snap = await firestore.collection(COLLECTION).doc(id).get();
-  return snap.exists ? ({ ...(snap.data() as RisikoObjekt), id: snap.id }) : undefined;
+export async function loadPlanObjekt(
+  art: ObjektArt,
+  id: string,
+): Promise<PlanObjektWithId | undefined> {
+  const snap = await firestore.collection(art).doc(id).get();
+  return snap.exists ? ({ ...(snap.data() as RisikoObjekt), id: snap.id, art }) : undefined;
 }
 
-export async function loadAllRisikoObjekte(): Promise<RisikoObjektWithId[]> {
-  const snap = await firestore.collection(COLLECTION).get();
-  return snap.docs.map((d) => ({ ...(d.data() as RisikoObjekt), id: d.id }));
+/** Alle Objekte beider Arten. */
+export async function loadAllPlanObjekte(): Promise<PlanObjektWithId[]> {
+  const result: PlanObjektWithId[] = [];
+  for (const art of OBJEKT_ARTEN) {
+    const snap = await firestore.collection(art).get();
+    result.push(...snap.docs.map((d) => ({ ...(d.data() as RisikoObjekt), id: d.id, art })));
+  }
+  return result;
 }
 
-/** Neue ID für ein in der App angelegtes Objekt. */
+/** Neue ID für ein in der App angelegtes Risikoobjekt. */
 export function newRisikoObjektId(): string {
-  return firestore.collection(COLLECTION).doc().id;
+  return firestore.collection('risikoobjekt').doc().id;
 }
 
 /**
@@ -50,19 +64,21 @@ export function newRisikoObjektId(): string {
  * Cluster, in einer Transaktion. Wandert das Objekt in ein anderes
  * Geohash-Feld, verschwindet es aus dem alten.
  */
-export async function saveRisikoObjekt(
+export async function savePlanObjekt(
+  art: ObjektArt,
   id: string,
   patch: Partial<RisikoObjekt>,
-): Promise<RisikoObjektWithId> {
-  const ref = firestore.collection(COLLECTION).doc(id);
+): Promise<PlanObjektWithId> {
+  const ref = firestore.collection(art).doc(id);
   return firestore.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const before = snap.exists ? (snap.data() as RisikoObjekt) : undefined;
     const merged = { ...before, ...patch } as RisikoObjekt;
     delete (merged as { id?: string }).id;
-    const after: RisikoObjektWithId = { ...merged, id };
+    delete (merged as { art?: string }).art;
+    const entry = { ...merged, id };
 
-    const newHash = hashOf(after);
+    const newHash = hashOf(entry);
     const oldHash = before ? hashOf(before) : undefined;
     const newClusterRef = firestore.collection(CLUSTER_COLLECTION).doc(newHash);
     const oldClusterRef =
@@ -77,7 +93,7 @@ export async function saveRisikoObjekt(
     if (oldClusterRef && oldCluster?.exists) {
       tx.set(
         oldClusterRef,
-        { risikoobjekt: removeClusterEntry(oldCluster.get('risikoobjekt'), id) },
+        { [art]: removeClusterEntry(oldCluster.get(art), id) },
         { merge: true },
       );
     }
@@ -85,53 +101,55 @@ export async function saveRisikoObjekt(
       newClusterRef,
       {
         ...(newCluster.exists ? {} : { geohash: newHash, hydranten: [] }),
-        risikoobjekt: upsertClusterEntry(
-          newCluster.exists ? newCluster.get('risikoobjekt') : undefined,
-          after,
-        ),
+        [art]: upsertClusterEntry(newCluster.exists ? newCluster.get(art) : undefined, entry),
       },
       { merge: true },
     );
-    return after;
+    return { ...entry, art };
   });
 }
 
 /** Entfernt Objekt, Cluster-Eintrag, alle Unterlagen und ihre Dateien. */
-export async function deleteRisikoObjektCompletely(objekt: RisikoObjektWithId): Promise<void> {
-  const dokumente = await firestore.collection(objektDokumentCollectionPath(objekt.id)).get();
+export async function deletePlanObjektCompletely(objekt: PlanObjektWithId): Promise<void> {
+  const { art } = objekt;
+  const dokumente = await firestore.collection(objektDokumentCollectionPath(art, objekt.id)).get();
   for (const d of dokumente.docs) await d.ref.delete();
-  await deleteStorageFolder(objekt.id);
+  await deleteStorageFolder(art, objekt.id);
 
   const clusterRef = firestore.collection(CLUSTER_COLLECTION).doc(hashOf(objekt));
   await firestore.runTransaction(async (tx) => {
     const cluster = await tx.get(clusterRef);
-    tx.delete(firestore.collection(COLLECTION).doc(objekt.id));
+    tx.delete(firestore.collection(art).doc(objekt.id));
     if (cluster.exists) {
       tx.set(
         clusterRef,
-        { risikoobjekt: removeClusterEntry(cluster.get('risikoobjekt'), objekt.id) },
+        { [art]: removeClusterEntry(cluster.get(art), objekt.id) },
         { merge: true },
       );
     }
   });
 }
 
-function storagePrefix(objektId: string): string {
-  return `risikoobjekt/${objektId}/`;
+function storagePrefix(art: ObjektArt, objektId: string): string {
+  return `${art}/${objektId}/`;
 }
 
-async function deleteStorageFolder(objektId: string): Promise<void> {
+async function deleteStorageFolder(art: ObjektArt, objektId: string): Promise<void> {
   const bucket = await getDefaultStorageBucket();
-  await bucket.deleteFiles({ prefix: storagePrefix(objektId) });
+  await bucket.deleteFiles({ prefix: storagePrefix(art, objektId) });
 }
 
 /**
  * Schreibt die Freigabe an alle Dateien des Objekts — die Storage-Regel liest
  * sie dort. Nötig nach jeder Änderung von `groups`.
  */
-export async function writeStorageGroups(objektId: string, groups: string[]): Promise<number> {
+export async function writeStorageGroups(
+  art: ObjektArt,
+  objektId: string,
+  groups: string[],
+): Promise<number> {
   const bucket = await getDefaultStorageBucket();
-  const [files] = await bucket.getFiles({ prefix: storagePrefix(objektId) });
+  const [files] = await bucket.getFiles({ prefix: storagePrefix(art, objektId) });
   const value = storageGroupsMetadata(groups);
   for (const file of files) {
     await file.setMetadata({ metadata: { groups: value } });
@@ -140,11 +158,12 @@ export async function writeStorageGroups(objektId: string, groups: string[]): Pr
 }
 
 export async function loadObjektDokument(
+  art: ObjektArt,
   objektId: string,
   dokumentId: string,
 ): Promise<ObjektDokument | undefined> {
   const snap = await firestore
-    .collection(objektDokumentCollectionPath(objektId))
+    .collection(objektDokumentCollectionPath(art, objektId))
     .doc(dokumentId)
     .get();
   return snap.exists ? ({ ...(snap.data() as ObjektDokument), id: snap.id }) : undefined;
@@ -152,10 +171,11 @@ export async function loadObjektDokument(
 
 /** Löscht eine Unterlage samt Datei; eine fehlende Datei ist kein Fehler. */
 export async function deleteObjektDokumentCompletely(
+  art: ObjektArt,
   objektId: string,
   dokument: ObjektDokument,
 ): Promise<void> {
-  await firestore.collection(objektDokumentCollectionPath(objektId)).doc(dokument.id).delete();
+  await firestore.collection(objektDokumentCollectionPath(art, objektId)).doc(dokument.id).delete();
   try {
     const bucket = await getDefaultStorageBucket();
     await bucket.file(dokument.storagePath).delete({ ignoreNotFound: true });
@@ -164,16 +184,24 @@ export async function deleteObjektDokumentCompletely(
   }
 }
 
-export async function writeObjektDokument(objektId: string, dokument: ObjektDokument): Promise<void> {
-  await firestore.collection(objektDokumentCollectionPath(objektId)).doc(dokument.id).set(dokument);
+export async function writeObjektDokument(
+  art: ObjektArt,
+  objektId: string,
+  dokument: ObjektDokument,
+): Promise<void> {
+  await firestore
+    .collection(objektDokumentCollectionPath(art, objektId))
+    .doc(dokument.id)
+    .set(dokument);
 }
 
 /** Überblick der Unterlagen eines Objekts — ohne den Seitentext, der groß sein kann. */
 export async function loadObjektDokumentSummaries(
+  art: ObjektArt,
   objektId: string,
 ): Promise<Array<Pick<ObjektDokument, 'id' | 'name' | 'contentType' | 'indexStatus' | 'ocr' | 'melder'>>> {
   const snap = await firestore
-    .collection(objektDokumentCollectionPath(objektId))
+    .collection(objektDokumentCollectionPath(art, objektId))
     .select('name', 'contentType', 'indexStatus', 'ocr', 'melder')
     .get();
   return snap.docs.map((d) => ({

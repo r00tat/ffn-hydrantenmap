@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isAllowedObjektDokumentType,
   OBJEKT_DOKUMENT_MAX_MB,
+  objektDokumentCollectionPath,
   objektDokumentKind,
   objektDokumentStoragePath,
   wantsOcr,
@@ -26,9 +27,17 @@ describe('objektDokument', () => {
   });
 
   it('legt die Datei unter dem Risikoobjekt ab, mit sicherem Namen', () => {
-    expect(objektDokumentStoragePath('ro1', 'd1', 'Plan EG (neu).pdf')).toBe(
+    expect(objektDokumentStoragePath('risikoobjekt', 'ro1', 'd1', 'Plan EG (neu).pdf')).toBe(
       'risikoobjekt/ro1/d1-Plan_EG__neu_.pdf',
     );
+  });
+
+  it('legt Datei und Dokument eines gefährdeten Objekts unter dessen Collection ab', () => {
+    expect(objektDokumentStoragePath('gefahrobjekt', 'g1', 'd1', 'Plan.pdf')).toBe(
+      'gefahrobjekt/g1/d1-Plan.pdf',
+    );
+    expect(objektDokumentCollectionPath('gefahrobjekt', 'g1')).toBe('gefahrobjekt/g1/dokument');
+    expect(objektDokumentCollectionPath('risikoobjekt', 'r1')).toBe('risikoobjekt/r1/dokument');
   });
 });
 
@@ -65,7 +74,7 @@ describe('wantsOcr', () => {
 
 describe('Schranken spiegeln die storage.rules', () => {
   const rules = fs.readFileSync(path.join(process.cwd(), 'storage.rules'), 'utf8');
-  const rule = rules.split('match /risikoobjekt/')[1]?.split('match ')[0] ?? '';
+  const rule = rules.split('match /{art}/{objektId}/{fileName}')[1]?.split('match ')[0] ?? '';
 
   it('kennt dieselbe Höchstgröße wie die Regel', () => {
     const match = rule.match(/request\.resource\.size < (\d+) \* 1024 \* 1024/);
@@ -74,6 +83,10 @@ describe('Schranken spiegeln die storage.rules', () => {
   });
 
   // Das Verhalten selbst prüft firebase/storage.rules.test.ts im Emulator.
+  it('gilt für beide Arten von Objekten mit Plänen', () => {
+    expect(rule.match(/art in \['risikoobjekt', 'gefahrobjekt'\]/g)).toHaveLength(4);
+  });
+
   it('lesen und anlegen über die Freigabe im Metadatum', () => {
     expect(rule).toContain('objektFileGroups(resource.metadata)');
     expect(rule).toContain('objektFileGroups(request.resource.metadata)');

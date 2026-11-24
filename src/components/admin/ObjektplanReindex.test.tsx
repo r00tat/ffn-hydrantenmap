@@ -7,18 +7,18 @@ const reindexMock = vi.fn();
 const driveListMock = vi.fn();
 const syncMock = vi.fn();
 vi.mock('../Objektplan/risikoobjektActions', () => ({
-  listRisikoObjekteWithDriveLink: () => driveListMock(),
+  listPlanObjekteWithDriveLink: () => driveListMock(),
   listObjektDokumenteForReindex: () => listMock(),
   reindexObjektDokumentAction: (...args: unknown[]) => reindexMock(...args),
-  syncRisikoObjekteFromDrive: (ids: string[]) => syncMock(ids),
+  syncPlanObjekteFromDrive: (refs: unknown[]) => syncMock(refs),
 }));
 
 import ObjektplanReindex from './ObjektplanReindex';
 
 const candidates = [
-  { objektId: 'o1', objektName: 'Hotel', dokumentId: 'd1', name: 'BSP.pdf', indexStatus: 'ok', melder: 0, ocr: true },
-  { objektId: 'o2', objektName: 'Markt', dokumentId: 'd2', name: 'Plan.pdf', indexStatus: 'ohneText', melder: 0, ocr: false },
-  { objektId: 'o3', objektName: 'Schule', dokumentId: 'd3', name: 'EG.pdf', indexStatus: 'ok', melder: 12, ocr: false },
+  { art: 'risikoobjekt', objektId: 'o1', objektName: 'Hotel', dokumentId: 'd1', name: 'BSP.pdf', indexStatus: 'ok', melder: 0, ocr: true },
+  { art: 'gefahrobjekt', objektId: 'o2', objektName: 'Markt', dokumentId: 'd2', name: 'Plan.pdf', indexStatus: 'ohneText', melder: 0, ocr: false },
+  { art: 'risikoobjekt', objektId: 'o3', objektName: 'Schule', dokumentId: 'd3', name: 'EG.pdf', indexStatus: 'ok', melder: 12, ocr: false },
 ];
 
 beforeEach(() => {
@@ -38,8 +38,8 @@ describe('ObjektplanReindex', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Re-read 2 without detectors' }));
     expect(await screen.findByText('Done: 1 re-read, 1 failed.')).toBeInTheDocument();
     expect(reindexMock.mock.calls).toEqual([
-      ['o1', 'd1'],
-      ['o2', 'd2'],
+      ['risikoobjekt', 'o1', 'd1'],
+      ['gefahrobjekt', 'o2', 'd2'],
     ]);
     expect(screen.getByText('Hotel – BSP.pdf: 61 detectors (OCR)')).toBeInTheDocument();
     expect(screen.getByText('Markt – Plan.pdf: failed (reindexFailed)')).toBeInTheDocument();
@@ -56,24 +56,33 @@ describe('ObjektplanReindex', () => {
 
   it('gleicht die Objekte mit Drive-Link in Dreierblöcken ab und lädt danach die Liste', async () => {
     driveListMock.mockResolvedValue([
-      { id: 'o1', name: 'Hotel' },
-      { id: 'o2', name: 'Markt' },
-      { id: 'o3', name: 'Schule' },
-      { id: 'o4', name: 'Lager' },
+      { art: 'risikoobjekt', id: 'o1', name: 'Hotel' },
+      { art: 'gefahrobjekt', id: 'o2', name: 'Markt' },
+      { art: 'risikoobjekt', id: 'o3', name: 'Schule' },
+      { art: 'risikoobjekt', id: 'o4', name: 'Lager' },
     ]);
     syncMock
       .mockResolvedValueOnce([
-        { id: 'o1', result: { status: 'ok', imported: 3, removed: 1, skipped: 2, failed: 0 } },
-        { id: 'o2', result: { status: 'nichtLesbar' } },
-        { id: 'o3', error: 'Drive kaputt' },
+        { art: 'risikoobjekt', id: 'o1', result: { status: 'ok', imported: 3, removed: 1, skipped: 2, failed: 0 } },
+        { art: 'gefahrobjekt', id: 'o2', result: { status: 'nichtLesbar' } },
+        { art: 'risikoobjekt', id: 'o3', error: 'Drive kaputt' },
       ])
       .mockResolvedValueOnce([
-        { id: 'o4', result: { status: 'ok', imported: 1, removed: 0, skipped: 0, failed: 1 } },
+        { art: 'risikoobjekt', id: 'o4', result: { status: 'ok', imported: 1, removed: 0, skipped: 0, failed: 1 } },
       ]);
     render(<ObjektplanReindex />);
     fireEvent.click(screen.getByRole('button', { name: 'Sync all from Drive' }));
     expect(await screen.findByText('Drive sync done: 4 imported, 1 removed, 3 failed.')).toBeInTheDocument();
-    expect(syncMock.mock.calls).toEqual([[['o1', 'o2', 'o3']], [['o4']]]);
+    expect(syncMock.mock.calls).toEqual([
+      [
+        [
+          { art: 'risikoobjekt', id: 'o1' },
+          { art: 'gefahrobjekt', id: 'o2' },
+          { art: 'risikoobjekt', id: 'o3' },
+        ],
+      ],
+      [[{ art: 'risikoobjekt', id: 'o4' }]],
+    ]);
     expect(screen.getByText('Hotel: 3 imported, 1 removed, 2 unchanged, 0 failed')).toBeInTheDocument();
     expect(screen.getByText('Markt: Drive folder not readable')).toBeInTheDocument();
     expect(screen.getByText('Schule: failed (Drive kaputt)')).toBeInTheDocument();
@@ -84,8 +93,8 @@ describe('ObjektplanReindex', () => {
 
   it('zählt einen abgebrochenen Block als fehlgeschlagen', async () => {
     driveListMock.mockResolvedValue([
-      { id: 'o1', name: 'Hotel' },
-      { id: 'o2', name: 'Markt' },
+      { art: 'risikoobjekt', id: 'o1', name: 'Hotel' },
+      { art: 'gefahrobjekt', id: 'o2', name: 'Markt' },
     ]);
     syncMock.mockRejectedValueOnce(new Error('timeout'));
     render(<ObjektplanReindex />);

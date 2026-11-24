@@ -11,6 +11,7 @@ import {
   type DriveFileInfo,
   type DriveLink,
 } from '../../common/objektplan/driveSync';
+import type { ObjektRef } from '../../common/objektplan/objektArt';
 import {
   objektDokumentStoragePath,
   wantsOcr,
@@ -27,9 +28,9 @@ export interface DriveSyncDeps {
   index(data: Uint8Array): Promise<PdfPlanIndex>;
   saveFile(path: string, data: Uint8Array, contentType: string): Promise<void>;
   deleteFile(path: string): Promise<void>;
-  loadDokumente(objektId: string): Promise<ObjektDokument[]>;
-  writeDokument(objektId: string, dokument: ObjektDokument): Promise<void>;
-  deleteDokument(objektId: string, dokumentId: string): Promise<void>;
+  loadDokumente(objekt: ObjektRef): Promise<ObjektDokument[]>;
+  writeDokument(objekt: ObjektRef, dokument: ObjektDokument): Promise<void>;
+  deleteDokument(objekt: ObjektRef, dokumentId: string): Promise<void>;
   /**
    * Texterkennung der abgelegten Datei für Scans ohne Textebene. Fehlt sie,
    * bleibt der Scan unindiziert. `pageCount` wählt den schnellen direkten Weg
@@ -55,7 +56,7 @@ async function deleteFileQuietly(deps: DriveSyncDeps, path: string) {
 }
 
 export async function runDriveSync(
-  objektId: string,
+  objekt: ObjektRef,
   link: string | undefined,
   deps: DriveSyncDeps,
   now: string = new Date().toISOString(),
@@ -69,11 +70,11 @@ export async function runDriveSync(
   } catch (err) {
     // Ohne Liste wird nichts gelöscht: ein fehlendes Recht darf die
     // vorhandenen Pläne nicht verschwinden lassen.
-    console.error('Drive-Ordner nicht lesbar', objektId, err);
+    console.error('Drive-Ordner nicht lesbar', objekt.art, objekt.id, err);
     return { status: 'nichtLesbar' };
   }
 
-  const plan = planDriveSync(files, await deps.loadDokumente(objektId));
+  const plan = planDriveSync(files, await deps.loadDokumente(objekt));
   let imported = 0;
   let failed = 0;
 
@@ -88,7 +89,7 @@ export async function runDriveSync(
       const data = format.exportPdf
         ? await deps.exportPdf(file.id)
         : await deps.download(file.id);
-      const storagePath = objektDokumentStoragePath(objektId, dokumentId, format.name);
+      const storagePath = objektDokumentStoragePath(objekt.art, objekt.id, dokumentId, format.name);
       const dokument = await describeObjektDokument(
         {
           id: dokumentId,
@@ -116,7 +117,7 @@ export async function runDriveSync(
       await deps.saveFile(storagePath, data, format.contentType);
       // Sofort anlegen: der Plan steht gleich in der Liste und lässt sich
       // öffnen, auch wenn die Texterkennung noch läuft.
-      await deps.writeDokument(objektId, dokument);
+      await deps.writeDokument(objekt, dokument);
       if (replaces && replaces.storagePath !== storagePath) {
         await deleteFileQuietly(deps, replaces.storagePath);
       }
@@ -131,22 +132,22 @@ export async function runDriveSync(
           (async () => {
             try {
               const index = await ocr(storagePath, dokument.seiten);
-              await deps.writeDokument(objektId, withOcrIndex(dokument, index));
+              await deps.writeDokument(objekt, withOcrIndex(dokument, index));
             } catch (err) {
-              console.error('Texterkennung fehlgeschlagen', objektId, file.name, err);
+              console.error('Texterkennung fehlgeschlagen', objekt.id, file.name, err);
             }
           })(),
         );
       }
     } catch (err) {
-      console.error('Drive-Datei nicht übernommen', objektId, file.id, file.name, err);
+      console.error('Drive-Datei nicht übernommen', objekt.id, file.id, file.name, err);
       failed += 1;
     }
   }
   await Promise.all(pending);
 
   for (const dokument of plan.remove) {
-    await deps.deleteDokument(objektId, dokument.id);
+    await deps.deleteDokument(objekt, dokument.id);
     await deleteFileQuietly(deps, dokument.storagePath);
   }
 

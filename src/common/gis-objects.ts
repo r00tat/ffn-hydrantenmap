@@ -66,6 +66,8 @@ export interface GefahrObjekt extends WgsObject {
   erfassungsdatum: string;
   ortschaft: string;
   link?: string;
+  /** Gruppen, die die Unterlagen sehen — wie beim Risikoobjekt. */
+  groups?: string[];
 }
 
 export interface Loeschteich extends WgsObject {

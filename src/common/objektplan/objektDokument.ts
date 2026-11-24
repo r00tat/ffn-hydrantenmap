@@ -1,9 +1,11 @@
 /**
- * Unterlagen zu einem Risikoobjekt (Brandschutzpläne, Laufkarten, Fotos).
- * Je Datei ein Dokument unter `risikoobjekt/{objektId}/dokument/{id}`, die
- * Datei selbst in Storage. Hintergrund: docs/objektplaene.md.
+ * Unterlagen zu einem Risikoobjekt oder gefährdeten Objekt (Brandschutzpläne,
+ * Laufkarten, Fotos). Je Datei ein Dokument unter
+ * `{art}/{objektId}/dokument/{id}`, die Datei selbst in Storage. Hintergrund:
+ * docs/objektplaene.md.
  */
 import type { MelderEntry } from './melderIndex';
+import type { ObjektArt } from './objektArt';
 
 /**
  * Höchstgröße einer Datei. Steht ebenso in `storage.rules`; ein Test
@@ -79,14 +81,15 @@ export function objektDokumentKind(contentType: string): ObjektDokumentKind {
 }
 
 export function objektDokumentStoragePath(
+  art: ObjektArt,
   objektId: string,
   dokumentId: string,
   fileName: string,
 ): string {
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-  return `risikoobjekt/${objektId}/${dokumentId}-${safeName}`;
+  return `${art}/${objektId}/${dokumentId}-${safeName}`;
 }
 
-export function objektDokumentCollectionPath(objektId: string): string {
-  return `risikoobjekt/${objektId}/dokument`;
+export function objektDokumentCollectionPath(art: ObjektArt, objektId: string): string {
+  return `${art}/${objektId}/dokument`;
 }

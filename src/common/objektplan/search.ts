@@ -4,7 +4,7 @@
  * Firestore-Daten und damit auch offline.
  */
 import {
-  matchesMelderQuery,
+  melderMatchRank,
   parseMelderQuery,
   searchPageTexts,
   type MelderEntry,
@@ -16,8 +16,10 @@ export interface MelderResult {
   dokumentId: string;
   dokumentName: string;
   seite: number;
-  /** Alle passenden Melder dieser Seite — sie werden gemeinsam markiert. */
+  /** Alle passenden Melder einer Gruppe auf dieser Seite — sie werden gemeinsam markiert. */
   entries: MelderEntry[];
+  /** Güte des Treffers (`melderMatchRank`), 0 = Gruppe genau. */
+  rank: number;
 }
 
 export interface TextResult {
@@ -44,16 +46,30 @@ export function searchObjektDokumente(
   const query = parseMelderQuery(trimmed);
   const melder: MelderResult[] = [];
   if (query) {
-    for (const d of dokumente) {
-      const byPage = new Map<number, MelderEntry[]>();
+    // Je Seite und Gruppe ein Treffer: „10" findet auch 310, und die soll
+    // nicht mit 10 zusammen markiert werden. Genaue Treffer zuerst, sonst in
+    // der Reihenfolge der Unterlagen und Seiten.
+    const ordered: Array<MelderResult & { order: number }> = [];
+    dokumente.forEach((d, dokIndex) => {
+      const byPageGroup = new Map<string, MelderResult>();
       for (const entry of d.melder ?? []) {
-        if (!matchesMelderQuery(entry, query)) continue;
-        byPage.set(entry.seite, [...(byPage.get(entry.seite) ?? []), entry]);
+        const rank = melderMatchRank(entry, query);
+        if (rank === null) continue;
+        const key = `${entry.seite}/${entry.gruppe}`;
+        const hit = byPageGroup.get(key);
+        if (hit) hit.entries.push(entry);
+        else byPageGroup.set(key, { dokumentId: d.id, dokumentName: d.name, seite: entry.seite, entries: [entry], rank });
       }
-      for (const [seite, entries] of [...byPage.entries()].sort((a, b) => a[0] - b[0])) {
-        melder.push({ dokumentId: d.id, dokumentName: d.name, seite, entries });
-      }
-    }
+      for (const hit of byPageGroup.values()) ordered.push({ ...hit, order: dokIndex });
+    });
+    ordered.sort(
+      (a, b) =>
+        a.rank - b.rank ||
+        a.order - b.order ||
+        a.seite - b.seite ||
+        a.entries[0].gruppe - b.entries[0].gruppe,
+    );
+    for (const { order: _order, ...hit } of ordered) melder.push(hit);
   }
 
   // Ein vollständiger Melder („3/05") stünde im Text noch einmal — als

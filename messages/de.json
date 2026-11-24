@@ -5016,7 +5016,7 @@
     "reindexFailed": "{name}: Neu einlesen fehlgeschlagen."
   },
   "risikoobjekte": {
-    "title": "Risikoobjekte",
+    "title": "Risikoobjekte und gefährdete Objekte",
     "searchLabel": "Objekt suchen",
     "searchHelper": "Name, Adresse, Ortschaft, Risikogruppe oder Einsatzplan-Nr.",
     "count": "{count, plural, one {# Objekt} other {# Objekte}}",
@@ -5025,7 +5025,7 @@
     "new": "Neues Objekt",
     "edit": "Bearbeiten",
     "newTitle": "Neues Risikoobjekt",
-    "editTitle": "Risikoobjekt bearbeiten",
+    "editTitle": "Objekt bearbeiten",
     "fields": {
       "name": "Name",
       "ortschaft": "Ortschaft",
@@ -5066,10 +5066,14 @@
     "unshared": "{count, plural, one {# Objekt ist} other {# Objekte sind}} noch keiner Gruppe freigegeben. Ihre Pläne sehen nur Admins.",
     "unsharedGroups": "Freigeben für",
     "unsharedButton": "Alle freigeben",
-    "unsharedDone": "{count, plural, one {# Objekt} other {# Objekte}} freigegeben."
+    "unsharedDone": "{count, plural, one {# Objekt} other {# Objekte}} freigegeben.",
+    "art": {
+      "risikoobjekt": "Risikoobjekt",
+      "gefahrobjekt": "Gefährdetes Objekt"
+    }
   },
   "risikoobjektMatch": {
-    "title": "Mögliche Risikoobjekte",
+    "title": "Mögliche Risikoobjekte und gefährdete Objekte",
     "hint": "Automatisch über Lage, Adresse und Name gefunden – bitte prüfen.",
     "reasonAddress": "Adresse",
     "reasonStreet": "Straße",

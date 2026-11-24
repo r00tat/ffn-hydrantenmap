@@ -6,8 +6,9 @@ vi.mock('server-only', () => ({}));
 
 const store = vi.hoisted(() => ({
   objekte: new Map<string, RisikoObjekt & { id: string }>(),
+  gefahr: new Map<string, RisikoObjekt & { id: string }>(),
   saved: [] as Array<{ id: string; patch: Partial<RisikoObjekt> }>,
-  storageGroups: [] as Array<{ id: string; groups: string[] }>,
+  storageGroups: [] as Array<{ art: string; id: string; groups: string[] }>,
   deleted: [] as string[],
   dokumentDeleted: [] as string[],
   dokumente: new Map<
@@ -41,40 +42,49 @@ vi.mock('../../server/objektplan/driveSyncDeps', () => ({
   },
 }));
 vi.mock('../../server/objektplan/driveSyncRunner', () => ({
-  runDriveSync: (id: string, link: string | undefined, deps: unknown) =>
-    driveSync.run(id, link, deps),
+  runDriveSync: (ref: { art: string; id: string }, link: string | undefined, deps: unknown) =>
+    driveSync.run(ref, link, deps),
 }));
 
-vi.mock('../../server/objektplan/risikoobjektStore', () => ({
-  loadObjektDokumentSummaries: async (objektId: string) =>
-    [...store.dokumente.values()]
-      .filter((d) => d.storagePath.startsWith(`risikoobjekt/${objektId}/`))
-      .map((d) => ({ ...d, name: `${d.id}.pdf` })),
-  loadRisikoObjekt: async (id: string) => store.objekte.get(id),
-  loadAllRisikoObjekte: async () => [...store.objekte.values()],
-  newRisikoObjektId: () => 'neu1',
-  saveRisikoObjekt: async (id: string, patch: Partial<RisikoObjekt>) => {
-    store.saved.push({ id, patch });
-    const next = { ...store.objekte.get(id), ...patch, id } as RisikoObjekt & { id: string };
-    store.objekte.set(id, next);
-    return next;
-  },
-  writeStorageGroups: async (id: string, groups: string[]) => {
-    store.storageGroups.push({ id, groups });
-    return 1;
-  },
-  deleteRisikoObjektCompletely: async (o: { id: string }) => {
-    store.deleted.push(o.id);
-  },
-  loadObjektDokument: async (_objektId: string, dokumentId: string) =>
-    store.dokumente.get(dokumentId),
-  deleteObjektDokumentCompletely: async (_objektId: string, d: { id: string }) => {
-    store.dokumentDeleted.push(d.id);
-  },
-  writeObjektDokument: async (_objektId: string, d: Record<string, unknown>) => {
-    store.dokumentWritten.push(d);
-  },
-}));
+vi.mock('../../server/objektplan/risikoobjektStore', () => {
+  const objekteOf = (art: string) => (art === 'gefahrobjekt' ? store.gefahr : store.objekte);
+  return {
+    loadObjektDokumentSummaries: async (art: string, objektId: string) =>
+      [...store.dokumente.values()]
+        .filter((d) => d.storagePath.startsWith(`${art}/${objektId}/`))
+        .map((d) => ({ ...d, name: `${d.id}.pdf` })),
+    loadPlanObjekt: async (art: string, id: string) => {
+      const o = objekteOf(art).get(id);
+      return o && { ...o, art };
+    },
+    loadAllPlanObjekte: async () => [
+      ...[...store.objekte.values()].map((o) => ({ ...o, art: 'risikoobjekt' })),
+      ...[...store.gefahr.values()].map((o) => ({ ...o, art: 'gefahrobjekt' })),
+    ],
+    newRisikoObjektId: () => 'neu1',
+    savePlanObjekt: async (art: string, id: string, patch: Partial<RisikoObjekt>) => {
+      store.saved.push({ id, patch });
+      const next = { ...objekteOf(art).get(id), ...patch, id } as RisikoObjekt & { id: string };
+      objekteOf(art).set(id, next);
+      return { ...next, art };
+    },
+    writeStorageGroups: async (art: string, id: string, groups: string[]) => {
+      store.storageGroups.push({ art, id, groups });
+      return 1;
+    },
+    deletePlanObjektCompletely: async (o: { id: string }) => {
+      store.deleted.push(o.id);
+    },
+    loadObjektDokument: async (_art: string, _objektId: string, dokumentId: string) =>
+      store.dokumente.get(dokumentId),
+    deleteObjektDokumentCompletely: async (_art: string, _objektId: string, d: { id: string }) => {
+      store.dokumentDeleted.push(d.id);
+    },
+    writeObjektDokument: async (_art: string, _objektId: string, d: Record<string, unknown>) => {
+      store.dokumentWritten.push(d);
+    },
+  };
+});
 
 const session = vi.hoisted(() => ({
   user: { isAdmin: false, groupRoles: {} as GroupRoles, email: 'gruppenadmin@example.org' },
@@ -99,13 +109,13 @@ import {
   createRisikoObjekt,
   deleteObjektDokumentAction,
   deleteRisikoObjekt,
-  listRisikoObjekteWithDriveLink,
+  listPlanObjekteWithDriveLink,
   listObjektDokumenteForReindex,
   ocrObjektDokumentAction,
   reindexObjektDokumentAction,
   setRisikoObjektGroups,
   shareUnsharedRisikoObjekte,
-  syncRisikoObjekteFromDrive,
+  syncPlanObjekteFromDrive,
   updateRisikoObjekt,
 } from './risikoobjektActions';
 
@@ -138,6 +148,7 @@ function gis(id: string, groups?: string[]): RisikoObjekt & { id: string } {
 
 beforeEach(() => {
   store.objekte.clear();
+  store.gefahr.clear();
   store.saved.length = 0;
   store.storageGroups.length = 0;
   store.deleted.length = 0;
@@ -177,19 +188,19 @@ describe('createRisikoObjekt', () => {
 describe('updateRisikoObjekt', () => {
   it('ändert ein in der App angelegtes Objekt vollständig', async () => {
     store.objekte.set('x', { ...gis('x', ['a']), quelle: 'app' });
-    expect(await updateRisikoObjekt('x', { ...input, name: 'Neu' })).toEqual({ ok: true, id: 'x' });
+    expect(await updateRisikoObjekt('risikoobjekt', 'x', { ...input, name: 'Neu' })).toEqual({ ok: true, id: 'x' });
     expect(store.objekte.get('x')?.name).toBe('Neu');
   });
 
   it('ändert bei Objekten aus dem GIS-Import nur den Link', async () => {
     store.objekte.set('g', gis('g', ['a']));
-    await updateRisikoObjekt('g', { ...input, name: 'Anders', link: 'https://drive.google.com/x' });
+    await updateRisikoObjekt('risikoobjekt', 'g', { ...input, name: 'Anders', link: 'https://drive.google.com/x' });
     expect(store.saved).toEqual([{ id: 'g', patch: { link: 'https://drive.google.com/x' } }]);
   });
 
   it('weist ab, wer das Objekt nicht pflegt', async () => {
     store.objekte.set('x', { ...gis('x', ['b']), quelle: 'app' });
-    expect(await updateRisikoObjekt('x', input)).toEqual({ ok: false, error: 'forbidden' });
+    expect(await updateRisikoObjekt('risikoobjekt', 'x', input)).toEqual({ ok: false, error: 'forbidden' });
   });
 });
 
@@ -197,8 +208,8 @@ describe('deleteRisikoObjekt', () => {
   it('löscht nur in der App angelegte Objekte', async () => {
     store.objekte.set('x', { ...gis('x', ['a']), quelle: 'app' });
     store.objekte.set('g', gis('g', ['a']));
-    expect(await deleteRisikoObjekt('x')).toEqual({ ok: true, id: 'x' });
-    expect(await deleteRisikoObjekt('g')).toEqual({ ok: false, error: 'notApp' });
+    expect(await deleteRisikoObjekt('risikoobjekt', 'x')).toEqual({ ok: true, id: 'x' });
+    expect(await deleteRisikoObjekt('risikoobjekt', 'g')).toEqual({ ok: false, error: 'notApp' });
     expect(store.deleted).toEqual(['x']);
   });
 });
@@ -207,25 +218,25 @@ describe('setRisikoObjektGroups', () => {
   it('ändert die Freigabe und schreibt sie an die Dateien', async () => {
     session.user.groupRoles = { a: ['gruppenadmin'], b: ['gruppenadmin'] };
     store.objekte.set('g', gis('g', ['a']));
-    expect(await setRisikoObjektGroups('g', ['b', 'a'])).toEqual({ ok: true, id: 'g' });
+    expect(await setRisikoObjektGroups('risikoobjekt', 'g', ['b', 'a'])).toEqual({ ok: true, id: 'g' });
     expect(store.objekte.get('g')?.groups).toEqual(['a', 'b']);
-    expect(store.storageGroups).toEqual([{ id: 'g', groups: ['a', 'b'] }]);
+    expect(store.storageGroups).toEqual([{ art: 'risikoobjekt', id: 'g', groups: ['a', 'b'] }]);
   });
 
   it('lässt keine Gruppe ohne eigenes Recht hinzufügen', async () => {
     store.objekte.set('g', gis('g', ['a']));
-    expect(await setRisikoObjektGroups('g', ['a', 'c'])).toEqual({ ok: false, error: 'forbidden' });
+    expect(await setRisikoObjektGroups('risikoobjekt', 'g', ['a', 'c'])).toEqual({ ok: false, error: 'forbidden' });
     expect(store.storageGroups).toHaveLength(0);
   });
 
   it('lässt die letzte Freigabe nicht entfernen', async () => {
     store.objekte.set('g', gis('g', ['a']));
-    expect(await setRisikoObjektGroups('g', [])).toEqual({ ok: false, error: 'empty' });
+    expect(await setRisikoObjektGroups('risikoobjekt', 'g', [])).toEqual({ ok: false, error: 'empty' });
   });
 
   it('verlangt, dass der Benutzer das Objekt pflegt', async () => {
     store.objekte.set('g', gis('g', ['c']));
-    expect(await setRisikoObjektGroups('g', ['a', 'c'])).toEqual({ ok: false, error: 'forbidden' });
+    expect(await setRisikoObjektGroups('risikoobjekt', 'g', ['a', 'c'])).toEqual({ ok: false, error: 'forbidden' });
   });
 });
 
@@ -237,7 +248,7 @@ describe('shareUnsharedRisikoObjekte', () => {
     expect(await shareUnsharedRisikoObjekte(['a'])).toEqual({ ok: true, count: 1 });
     expect(store.objekte.get('g1')?.groups).toEqual(['a']);
     expect(store.objekte.get('g2')?.groups).toEqual(['c']);
-    expect(store.storageGroups).toEqual([{ id: 'g1', groups: ['a'] }]);
+    expect(store.storageGroups).toEqual([{ art: 'risikoobjekt', id: 'g1', groups: ['a'] }]);
   });
 
   it('ist dem Admin vorbehalten', async () => {
@@ -250,15 +261,15 @@ describe('deleteObjektDokumentAction', () => {
     store.objekte.set('g', gis('g', ['a']));
     store.dokumente.set('d1', { id: 'd1', storagePath: 'risikoobjekt/g/d1-x.pdf' });
     store.dokumente.set('d2', { id: 'd2', quelle: 'drive', storagePath: 'risikoobjekt/g/d2-x.pdf' });
-    expect(await deleteObjektDokumentAction('g', 'd1')).toEqual({ ok: true, id: 'd1' });
-    expect(await deleteObjektDokumentAction('g', 'd2')).toEqual({ ok: false, error: 'forbidden' });
+    expect(await deleteObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({ ok: true, id: 'd1' });
+    expect(await deleteObjektDokumentAction('risikoobjekt', 'g', 'd2')).toEqual({ ok: false, error: 'forbidden' });
     expect(store.dokumentDeleted).toEqual(['d1']);
   });
 
   it('verlangt das Pflegerecht am Objekt', async () => {
     store.objekte.set('g', gis('g', ['b']));
     store.dokumente.set('d1', { id: 'd1', storagePath: 'risikoobjekt/g/d1-x.pdf' });
-    expect(await deleteObjektDokumentAction('g', 'd1')).toEqual({ ok: false, error: 'forbidden' });
+    expect(await deleteObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({ ok: false, error: 'forbidden' });
   });
 });
 
@@ -274,7 +285,7 @@ describe('ocrObjektDokumentAction', () => {
     store.objekte.set('g', gis('g', ['a']));
     store.dokumente.set('d1', scan);
     ocr.run.mockResolvedValue({ seiten: 1, seitenText: ['Melder 1/02'], melder: [], textGekuerzt: false });
-    expect(await ocrObjektDokumentAction('g', 'd1')).toEqual({
+    expect(await ocrObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({
       ok: true,
       id: 'd1',
       hasText: true,
@@ -293,7 +304,7 @@ describe('ocrObjektDokumentAction', () => {
       melder: [{ kennung: '1003/04', gruppe: 1003, melder: 4, seite: 1, box: [0, 0, 0.1, 0.1] }],
       textGekuerzt: false,
     });
-    expect(await ocrObjektDokumentAction('g', 'd1')).toEqual({ ok: true, id: 'd1', hasText: true, melder: 1 });
+    expect(await ocrObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({ ok: true, id: 'd1', hasText: true, melder: 1 });
     expect(store.dokumentWritten[0]).toMatchObject({ seitenText: ['LEGENDE\n1003/04'], ocr: true });
   });
 
@@ -307,7 +318,7 @@ describe('ocrObjektDokumentAction', () => {
     store.dokumente.set('d2', { ...scan, id: 'd2', ocr: true });
     store.dokumente.set('d3', { ...scan, id: 'd3', contentType: 'image/jpeg', indexStatus: 'bild' });
     for (const id of ['d1', 'd2', 'd3']) {
-      expect(await ocrObjektDokumentAction('g', id)).toEqual({ ok: false, error: 'notScan' });
+      expect(await ocrObjektDokumentAction('risikoobjekt', 'g', id)).toEqual({ ok: false, error: 'notScan' });
     }
     expect(ocr.run).not.toHaveBeenCalled();
   });
@@ -316,13 +327,13 @@ describe('ocrObjektDokumentAction', () => {
     store.objekte.set('g', gis('g', ['a']));
     store.dokumente.set('d1', scan);
     ocr.run.mockRejectedValue(new Error('Vision'));
-    expect(await ocrObjektDokumentAction('g', 'd1')).toEqual({ ok: false, error: 'ocrFailed' });
+    expect(await ocrObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({ ok: false, error: 'ocrFailed' });
   });
 
   it('verlangt das Pflegerecht am Objekt', async () => {
     store.objekte.set('g', gis('g', ['b']));
     store.dokumente.set('d1', scan);
-    expect(await ocrObjektDokumentAction('g', 'd1')).toEqual({ ok: false, error: 'forbidden' });
+    expect(await ocrObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({ ok: false, error: 'forbidden' });
   });
 });
 
@@ -344,7 +355,7 @@ describe('reindexObjektDokumentAction', () => {
       ocr: true,
       melder: [{ kennung: '1003/04' }, { kennung: '1003/05' }],
     });
-    expect(await reindexObjektDokumentAction('g', 'd1')).toEqual({
+    expect(await reindexObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({
       ok: true,
       id: 'd1',
       indexStatus: 'ok',
@@ -361,20 +372,20 @@ describe('reindexObjektDokumentAction', () => {
     store.objekte.set('g', gis('g', ['a']));
     store.dokumente.set('d1', plan);
     reindex.run.mockRejectedValue(new Error('No such object'));
-    expect(await reindexObjektDokumentAction('g', 'd1')).toEqual({ ok: false, error: 'reindexFailed' });
+    expect(await reindexObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({ ok: false, error: 'reindexFailed' });
     expect(store.dokumentWritten).toHaveLength(0);
   });
 
   it('verlangt das Pflegerecht am Objekt', async () => {
     store.objekte.set('g', gis('g', ['b']));
     store.dokumente.set('d1', plan);
-    expect(await reindexObjektDokumentAction('g', 'd1')).toEqual({ ok: false, error: 'forbidden' });
+    expect(await reindexObjektDokumentAction('risikoobjekt', 'g', 'd1')).toEqual({ ok: false, error: 'forbidden' });
     expect(reindex.run).not.toHaveBeenCalled();
   });
 
   it('kennt kein fehlendes Dokument', async () => {
     store.objekte.set('g', gis('g', ['a']));
-    expect(await reindexObjektDokumentAction('g', 'dx')).toEqual({ ok: false, error: 'notFound' });
+    expect(await reindexObjektDokumentAction('risikoobjekt', 'g', 'dx')).toEqual({ ok: false, error: 'notFound' });
   });
 });
 
@@ -407,15 +418,15 @@ describe('listObjektDokumenteForReindex', () => {
       indexStatus: 'bild',
     });
     expect(await listObjektDokumenteForReindex()).toEqual([
-      { objektId: 'g', objektName: 'g', dokumentId: 'd2', name: 'd2.pdf', indexStatus: 'ohneText', melder: 0, ocr: true },
-      { objektId: 'g', objektName: 'g', dokumentId: 'd1', name: 'd1.pdf', indexStatus: 'ok', melder: 2, ocr: false },
+      { art: 'risikoobjekt', objektId: 'g', objektName: 'g', dokumentId: 'd2', name: 'd2.pdf', indexStatus: 'ohneText', melder: 0, ocr: true },
+      { art: 'risikoobjekt', objektId: 'g', objektName: 'g', dokumentId: 'd1', name: 'd1.pdf', indexStatus: 'ok', melder: 2, ocr: false },
     ]);
   });
 });
 
-describe('listRisikoObjekteWithDriveLink', () => {
+describe('listPlanObjekteWithDriveLink', () => {
   it('ist dem Admin vorbehalten', async () => {
-    await expect(listRisikoObjekteWithDriveLink()).rejects.toThrow();
+    await expect(listPlanObjekteWithDriveLink()).rejects.toThrow();
   });
 
   it('listet nur Objekte mit einem Drive-Link, nach Namen sortiert', async () => {
@@ -425,19 +436,20 @@ describe('listRisikoObjekteWithDriveLink', () => {
     store.objekte.set('a', { ...gis('a', ['a']), name: 'Hotel', link: drive });
     store.objekte.set('c', { ...gis('c', ['a']), name: 'Schule', link: 'https://example.com/plan.pdf' });
     store.objekte.set('d', gis('d', ['a']));
-    expect(await listRisikoObjekteWithDriveLink()).toEqual([
-      { id: 'a', name: 'Hotel' },
-      { id: 'b', name: 'Markt' },
+    expect(await listPlanObjekteWithDriveLink()).toEqual([
+      { art: 'risikoobjekt', id: 'a', name: 'Hotel' },
+      { art: 'risikoobjekt', id: 'b', name: 'Markt' },
     ]);
   });
 });
 
-describe('syncRisikoObjekteFromDrive', () => {
+describe('syncPlanObjekteFromDrive', () => {
+  const refs = (ids: string[]) => ids.map((id) => ({ art: 'risikoobjekt' as const, id }));
   const drive = 'https://drive.google.com/drive/folders/1ZZGoCghcnWT-rPviKC2wAEjIBvIHZk3N';
   const ok = { status: 'ok', imported: 1, removed: 0, skipped: 2, failed: 0 } as const;
 
   it('ist dem Admin vorbehalten', async () => {
-    await expect(syncRisikoObjekteFromDrive(['a'])).rejects.toThrow();
+    await expect(syncPlanObjekteFromDrive(refs(['a']))).rejects.toThrow();
     expect(driveSync.run).not.toHaveBeenCalled();
   });
 
@@ -448,16 +460,16 @@ describe('syncRisikoObjekteFromDrive', () => {
     driveSync.run.mockImplementation(
       () => new Promise((resolve) => pending.push(() => resolve(ok))),
     );
-    const done = syncRisikoObjekteFromDrive(['a', 'b', 'c']);
+    const done = syncPlanObjekteFromDrive(refs(['a', 'b', 'c']));
     // Alle drei laufen, bevor der erste fertig ist.
     await vi.waitFor(() => expect(pending).toHaveLength(3));
     pending.forEach((resolve) => resolve());
     expect(await done).toEqual([
-      { id: 'a', result: ok },
-      { id: 'b', result: ok },
-      { id: 'c', result: ok },
+      { art: 'risikoobjekt', id: 'a', result: ok },
+      { art: 'risikoobjekt', id: 'b', result: ok },
+      { art: 'risikoobjekt', id: 'c', result: ok },
     ]);
-    expect(driveSync.run).toHaveBeenCalledWith('a', drive, { marker: 'driveDeps' });
+    expect(driveSync.run).toHaveBeenCalledWith({ art: 'risikoobjekt', id: 'a' }, drive, { marker: 'driveDeps' });
     expect(driveSync.groups).toEqual(['a', 'a', 'a']);
   });
 
@@ -465,25 +477,114 @@ describe('syncRisikoObjekteFromDrive', () => {
     session.user.isAdmin = true;
     store.objekte.set('a', { ...gis('a', ['a']), link: drive });
     store.objekte.set('b', { ...gis('b', ['a']), link: drive });
-    driveSync.run.mockImplementation(async (id: string) => {
-      if (id === 'a') throw new Error('Drive kaputt');
+    driveSync.run.mockImplementation(async (ref: { id: string }) => {
+      if (ref.id === 'a') throw new Error('Drive kaputt');
       return ok;
     });
-    expect(await syncRisikoObjekteFromDrive(['a', 'b', 'fehlt'])).toEqual([
-      { id: 'a', error: 'Drive kaputt' },
-      { id: 'b', result: ok },
-      { id: 'fehlt', result: { status: 'keinDriveLink' } },
+    expect(await syncPlanObjekteFromDrive(refs(['a', 'b', 'fehlt']))).toEqual([
+      { art: 'risikoobjekt', id: 'a', error: 'Drive kaputt' },
+      { art: 'risikoobjekt', id: 'b', result: ok },
+      { art: 'risikoobjekt', id: 'fehlt', result: { status: 'keinDriveLink' } },
     ]);
   });
 
   it('nimmt nur kleine Blöcke und gültige IDs an', async () => {
     session.user.isAdmin = true;
     await expect(
-      syncRisikoObjekteFromDrive(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']),
+      syncPlanObjekteFromDrive(refs(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'])),
     ).rejects.toThrow();
-    expect(await syncRisikoObjekteFromDrive(['../x'])).toEqual([
-      { id: '../x', result: { status: 'keinDriveLink' } },
+    expect(await syncPlanObjekteFromDrive(refs(['../x']))).toEqual([
+      { art: 'risikoobjekt', id: '../x', result: { status: 'keinDriveLink' } },
     ]);
     expect(driveSync.run).not.toHaveBeenCalled();
+  });
+});
+
+describe('gefährdete Objekte', () => {
+  const drive = 'https://drive.google.com/drive/folders/1ZZGoCghcnWT-rPviKC2wAEjIBvIHZk3N';
+
+  it('weist eine unbekannte Objektart ab — sie würde Teil eines Pfads', async () => {
+    store.objekte.set('g', gis('g', ['a']));
+    expect(
+      await setRisikoObjektGroups('call' as 'risikoobjekt', 'g', ['a']),
+    ).toEqual({ ok: false, error: 'notFound' });
+    expect(
+      await reindexObjektDokumentAction('../risikoobjekt' as 'risikoobjekt', 'g', 'd1'),
+    ).toEqual({ ok: false, error: 'notFound' });
+    expect(store.storageGroups).toHaveLength(0);
+  });
+
+  it('sucht das Objekt in der Collection seiner Art', async () => {
+    store.objekte.set('g', gis('g', ['a']));
+    expect(await setRisikoObjektGroups('gefahrobjekt', 'g', ['a'])).toEqual({
+      ok: false,
+      error: 'notFound',
+    });
+  });
+
+  it('pflegt Freigabe und Link eines gefährdeten Objekts', async () => {
+    session.user.groupRoles = { a: ['gruppenadmin'], b: ['gruppenadmin'] };
+    store.gefahr.set('markt', gis('markt', ['a']));
+    expect(await setRisikoObjektGroups('gefahrobjekt', 'markt', ['a', 'b'])).toEqual({
+      ok: true,
+      id: 'markt',
+    });
+    expect(store.gefahr.get('markt')?.groups).toEqual(['a', 'b']);
+    expect(store.storageGroups).toEqual([{ art: 'gefahrobjekt', id: 'markt', groups: ['a', 'b'] }]);
+
+    await updateRisikoObjekt('gefahrobjekt', 'markt', { ...input, name: 'Anders', link: drive });
+    expect(store.gefahr.get('markt')).toMatchObject({ name: 'markt', link: drive });
+    expect(store.objekte.size).toBe(0);
+  });
+
+  it('liest Pläne eines gefährdeten Objekts mit eigenem Schlüssel neu ein', async () => {
+    store.gefahr.set('markt', gis('markt', ['a']));
+    const plan = {
+      id: 'd1',
+      storagePath: 'gefahrobjekt/markt/d1-plan.pdf',
+      contentType: 'application/pdf',
+      indexStatus: 'ok',
+    };
+    store.dokumente.set('d1', plan);
+    reindex.run.mockResolvedValue({ ...plan, melder: [] });
+    expect(await reindexObjektDokumentAction('gefahrobjekt', 'markt', 'd1')).toMatchObject({ ok: true });
+    expect(reindex.key).toBe('gefahrobjekt_markt_d1');
+  });
+
+  it('gibt auch gefährdete Objekte ohne Freigabe frei', async () => {
+    session.user.isAdmin = true;
+    store.objekte.set('r1', gis('r1'));
+    store.gefahr.set('g1', gis('g1'));
+    expect(await shareUnsharedRisikoObjekte(['a'])).toEqual({ ok: true, count: 2 });
+    expect(store.gefahr.get('g1')?.groups).toEqual(['a']);
+    expect(store.storageGroups).toContainEqual({ art: 'gefahrobjekt', id: 'g1', groups: ['a'] });
+  });
+
+  it('nimmt gefährdete Objekte in Neu-Einlesen und Drive-Abgleich auf', async () => {
+    session.user.isAdmin = true;
+    store.gefahr.set('markt', { ...gis('markt', ['a']), name: 'Markt', link: drive });
+    store.dokumente.set('d9', {
+      id: 'd9',
+      storagePath: 'gefahrobjekt/markt/d9.pdf',
+      contentType: 'application/pdf',
+      indexStatus: 'ohneText',
+    });
+    expect(await listObjektDokumenteForReindex()).toEqual([
+      expect.objectContaining({ art: 'gefahrobjekt', objektId: 'markt', dokumentId: 'd9' }),
+    ]);
+    expect(await listPlanObjekteWithDriveLink()).toEqual([
+      { art: 'gefahrobjekt', id: 'markt', name: 'Markt' },
+    ]);
+
+    const ok = { status: 'ok', imported: 1, removed: 0, skipped: 0, failed: 0 } as const;
+    driveSync.run.mockResolvedValue(ok);
+    expect(await syncPlanObjekteFromDrive([{ art: 'gefahrobjekt', id: 'markt' }])).toEqual([
+      { art: 'gefahrobjekt', id: 'markt', result: ok },
+    ]);
+    expect(driveSync.run).toHaveBeenCalledWith(
+      { art: 'gefahrobjekt', id: 'markt' },
+      drive,
+      { marker: 'driveDeps' },
+    );
   });
 });

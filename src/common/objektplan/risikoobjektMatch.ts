@@ -1,4 +1,4 @@
-import type { RisikoObjekt } from '../gis-objects';
+import type { RisikoObjekt, WgsObject } from '../gis-objects';
 
 /**
  * Mögliche Risikoobjekte zu einem Einsatz — unscharf über Lage, Adresse und
@@ -34,7 +34,7 @@ export interface RisikoObjektMatchQuery {
   placeNames?: string[];
 }
 
-export interface RisikoObjektMatch<T extends RisikoObjekt = RisikoObjekt> {
+export interface RisikoObjektMatch<T extends WgsObject = RisikoObjekt> {
   objekt: T;
   /** 0..1, höher ist wahrscheinlicher. */
   score: number;
@@ -308,7 +308,7 @@ function distanceScore(d: number): number {
   return Math.max(0, 1 - (d - DISTANCE_FULL_M) / (DISTANCE_ZERO_M - DISTANCE_FULL_M));
 }
 
-export function matchRisikoObjekte<T extends RisikoObjekt>(
+export function matchRisikoObjekte<T extends WgsObject>(
   objekte: T[],
   query: RisikoObjektMatchQuery,
   options: MatchOptions = {},

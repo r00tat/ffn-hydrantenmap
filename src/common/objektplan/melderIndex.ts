@@ -36,6 +36,12 @@ export interface MelderMatch {
 export interface MelderQuery {
   gruppe: number;
   melder?: number;
+  /**
+   * Nur eine Gruppennummer ohne Trennzeichen („10", „MG 10"): Die Gruppe darf
+   * auch Teil einer längeren sein. Mit „10/" oder „10/1" ist sie vollständig
+   * getippt und muss genau passen.
+   */
+  partialGroup?: true;
 }
 
 /**
@@ -72,24 +78,45 @@ export function findMelderInText(text: string): MelderMatch[] {
  * Melder, sondern ein Suchbegriff für den Volltext.
  */
 export function parseMelderQuery(input: string): MelderQuery | null {
-  const normalized = input
+  const cleaned = input
     .toLowerCase()
     .replace(/meldergruppe|gruppe|mg/g, ' ')
     .replace(/melder|\bm(?=\s*\d)|\bm\b/g, ' ')
     .trim();
+  // „310/" beim Tippen: Gruppe steht vollständig, Meldernummer fehlt noch.
+  const normalized = cleaned.replace(/\s*[/\-.]$/, '');
+  const groupComplete = normalized !== cleaned;
   const m = normalized.match(/^(\d{1,4})(?:\s*[/\-.\s]\s*(\d{1,2})\s*[a-z]?)?$/);
   if (!m) return null;
   const gruppe = Number(m[1]);
   if (gruppe < 1) return null;
-  if (m[2] === undefined) return { gruppe };
+  if (m[2] === undefined) return groupComplete ? { gruppe } : { gruppe, partialGroup: true };
   const melder = Number(m[2]);
   if (melder < 1) return null;
   return { gruppe, melder };
 }
 
-export function matchesMelderQuery(entry: MelderEntry, query: MelderQuery): boolean {
-  if (entry.gruppe !== query.gruppe) return false;
-  return query.melder === undefined || entry.melder === query.melder;
+/** Teiltreffer der Gruppe erst ab so vielen Ziffern — „3" passte sonst fast überall. */
+const PARTIAL_GROUP_MIN_DIGITS = 2;
+
+/**
+ * Wie gut ein Melder zur Suche passt, kleiner ist besser: 0 die Gruppe genau,
+ * 1 sie beginnt mit der Eingabe, 2 sie endet darauf, 3 die Eingabe steht in
+ * der Mitte („10" → 10, 105, 310, 3101). `null` passt nicht. Teiltreffer nur
+ * bei einer bloßen Gruppennummer (`partialGroup`); „10/1E" findet nur Gruppe
+ * 10. Die Meldernummer muss immer genau passen, der Zusatz („E") zählt nicht.
+ */
+export function melderMatchRank(entry: MelderEntry, query: MelderQuery): number | null {
+  if (query.melder !== undefined && entry.melder !== query.melder) return null;
+  if (entry.gruppe === query.gruppe) return 0;
+  if (!query.partialGroup) return null;
+  const needle = String(query.gruppe);
+  if (needle.length < PARTIAL_GROUP_MIN_DIGITS) return null;
+  const hay = String(entry.gruppe);
+  if (hay.startsWith(needle)) return 1;
+  if (hay.endsWith(needle)) return 2;
+  if (hay.includes(needle)) return 3;
+  return null;
 }
 
 export interface PageTextHit {

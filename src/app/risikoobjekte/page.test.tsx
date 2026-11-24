@@ -32,14 +32,32 @@ const objekte: RisikoObjekt[] = [
   },
 ];
 
+const gefahrObjekte = [
+  {
+    id: 'nd_markt',
+    name: 'Hofer Markt',
+    ortschaft: 'ND',
+    adresse: 'Kurzes Hirschfeld',
+    einsatzplanummer: '511',
+    erfassungsdatum: '',
+    lat: 47.96,
+    lng: 16.83,
+    groups: ['ffa'],
+  },
+];
+
 const collectionMock = vi.fn();
 vi.mock('../../hooks/useFirebaseCollection', () => ({
   useFirebaseCollectionState: (opts: { collectionName: string }) => collectionMock(opts),
 }));
 vi.mock('../../components/site/OfflineListHint', () => ({ default: () => null }));
 vi.mock('../../components/Objektplan/ObjektplanDialog', () => ({
-  default: (props: { open: boolean; objekt: RisikoObjekt }) =>
-    props.open ? <div data-testid="plan-dialog">{props.objekt.id}</div> : null,
+  default: (props: { open: boolean; objekt: RisikoObjekt & { art: string } }) =>
+    props.open ? (
+      <div data-testid="plan-dialog">
+        {props.objekt.art}/{props.objekt.id}
+      </div>
+    ) : null,
 }));
 
 vi.mock('../../components/Objektplan/RisikoObjektEditDialog', () => ({
@@ -69,7 +87,11 @@ import RisikoobjektePage from './page';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  collectionMock.mockReturnValue({ records: objekte, loading: false, fromCache: false });
+  collectionMock.mockImplementation(({ collectionName }: { collectionName: string }) => ({
+    records: collectionName === 'gefahrobjekt' ? gefahrObjekte : objekte,
+    loading: false,
+    fromCache: false,
+  }));
   login.isAdmin = false;
   login.groupRoles = { ffa: [] };
   login.myGroups = [{ id: 'ffa', name: 'FF Alpha' }];
@@ -97,12 +119,25 @@ describe('Risikoobjekte', () => {
   it('öffnet die Pläne des angetippten Objekts', () => {
     renderWithIntl(<RisikoobjektePage />);
     fireEvent.click(screen.getByText('Spar Wr. Strasse'));
-    expect(screen.getByTestId('plan-dialog')).toHaveTextContent('spar');
+    expect(screen.getByTestId('plan-dialog')).toHaveTextContent('risikoobjekt/spar');
+  });
+
+  it('listet gefährdete Objekte gemeinsam mit den Risikoobjekten und öffnet ihre Pläne', () => {
+    renderWithIntl(<RisikoobjektePage />);
+    expect(collectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ collectionName: 'gefahrobjekt' }),
+    );
+    expect(screen.getByText('Hofer Markt')).toBeInTheDocument();
+    expect(screen.getByText('Gefährdetes Objekt')).toBeInTheDocument();
+    expect(screen.getByText('3 Objekte')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Hofer Markt'));
+    expect(screen.getByTestId('plan-dialog')).toHaveTextContent('gefahrobjekt/nd_markt');
   });
 
   it('zeigt die Freigabe als Gruppenname', async () => {
     renderWithIntl(<RisikoobjektePage />);
-    expect(await screen.findByText('FF Alpha')).toBeInTheDocument();
+    // Spar und das gefährdete Objekt sind FF Alpha freigegeben.
+    expect(await screen.findAllByText('FF Alpha')).toHaveLength(2);
     expect(screen.getByText('nicht freigegeben')).toBeInTheDocument();
   });
 
@@ -118,7 +153,7 @@ describe('Risikoobjekte', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Neues Objekt' }));
     expect(screen.getByTestId('edit-dialog')).toHaveTextContent('neu');
     const edits = screen.getAllByRole('button', { name: 'Bearbeiten' });
-    expect(edits).toHaveLength(1);
+    expect(edits).toHaveLength(2);
   });
 
   it('gibt als Admin alle Objekte ohne Freigabe auf einmal frei', async () => {

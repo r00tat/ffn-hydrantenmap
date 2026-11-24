@@ -36,6 +36,14 @@ beforeEach(async () => {
     await uploadBytes(ref(storage, 'risikoobjekt/ro3/d1-plan.pdf'), PDF, {
       contentType: 'application/pdf',
     });
+    await uploadBytes(ref(storage, 'gefahrobjekt/g1/d1-plan.pdf'), PDF, {
+      contentType: 'application/pdf',
+      customMetadata: { groups: 'ffnd' },
+    });
+    await uploadBytes(ref(storage, 'hydrant/h1/d1-plan.pdf'), PDF, {
+      contentType: 'application/pdf',
+      customMetadata: { groups: 'ffnd' },
+    });
   });
 });
 
@@ -102,5 +110,31 @@ describe('Storage: risikoobjekt', () => {
     await assertFails(deleteObject(ref(member, 'risikoobjekt/ro1/d1-plan.pdf')));
     const admin = storageAs(adminToken(), 'admin');
     await assertSucceeds(deleteObject(ref(admin, 'risikoobjekt/ro1/d1-plan.pdf')));
+  });
+});
+
+describe('Storage: gefahrobjekt', () => {
+  it('gilt wie bei Risikoobjekten', async () => {
+    const member = storageAs(memberToken('m@example.com', ['ffnd']));
+    await assertSucceeds(getBytes(ref(member, 'gefahrobjekt/g1/d1-plan.pdf')));
+    const fremd = storageAs(memberToken('m@example.com', ['fremd']));
+    await assertFails(getBytes(ref(fremd, 'gefahrobjekt/g1/d1-plan.pdf')));
+    await assertSucceeds(
+      uploadBytes(ref(member, 'gefahrobjekt/g1/d2-neu.pdf'), PDF, {
+        contentType: 'application/pdf',
+        customMetadata: { groups: 'ffnd' },
+      }),
+    );
+  });
+
+  it('öffnet keine anderen Pfade mit drei Teilen', async () => {
+    const member = storageAs(memberToken('m@example.com', ['ffnd']));
+    await assertFails(getBytes(ref(member, 'hydrant/h1/d1-plan.pdf')));
+    await assertFails(
+      uploadBytes(ref(member, 'hydrant/h1/d2-neu.pdf'), PDF, {
+        contentType: 'application/pdf',
+        customMetadata: { groups: 'ffnd' },
+      }),
+    );
   });
 });

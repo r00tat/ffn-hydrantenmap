@@ -20,7 +20,8 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
-import type { RisikoObjekt } from '../../common/gis-objects';
+import type { HierarchyGroup } from '../../common/groupHierarchy';
+import type { PlanObjekt } from '../../common/objektplan/objektArt';
 import { parseDriveLink } from '../../common/objektplan/driveSync';
 import {
   canManageRisikoObjekt,
@@ -31,34 +32,32 @@ import { filterRisikoObjekte } from '../../common/objektplan/risikoobjektFilter'
 import ObjektplanDialog from '../../components/Objektplan/ObjektplanDialog';
 import RisikoObjektEditDialog from '../../components/Objektplan/RisikoObjektEditDialog';
 import UnsharedRisikoObjekteBanner from '../../components/Objektplan/UnsharedRisikoObjekteBanner';
+import { usePlanObjekte } from '../../components/Objektplan/usePlanObjekte';
 import OfflineListHint from '../../components/site/OfflineListHint';
-import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
+import ObjektArtChip from '../../components/Objektplan/ObjektArtChip';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useCanAny } from '../../hooks/usePermissions';
 import { getGroupsAction } from '../groups/GroupAction';
 
 /**
- * Alle Risikoobjekte als Liste, mit dem Weg zu ihren Plänen — für die
- * Vorbereitung und für Objekte, die man auf der Karte erst suchen müsste.
- * Gelesen wird `risikoobjekt` direkt, nicht die Cluster der Karte: dort
- * steht der Drive-Link erst nach `updateClusters`.
+ * Alle Risikoobjekte und gefährdeten Objekte als eine Liste, mit dem Weg zu
+ * ihren Plänen — für die Vorbereitung und für Objekte, die man auf der Karte
+ * erst suchen müsste (`usePlanObjekte`).
  *
- * Wer `risikoobjekte.manage` in einer Gruppe hat, legt hier Objekte an und
- * pflegt die, die seiner Gruppe freigegeben sind (docs/objektplaene.md,
- * „Freigabe an Gruppen").
+ * Wer `risikoobjekte.manage` in einer Gruppe hat, legt hier Risikoobjekte an
+ * und pflegt die Objekte, die seiner Gruppe freigegeben sind
+ * (docs/objektplaene.md, „Freigabe an Gruppen").
  */
 export default function RisikoobjektePage() {
   const t = useTranslations('risikoobjekte');
   const { isAdmin, groupRoles, myGroups } = useFirebaseLogin();
   const canCreate = useCanAny(RISIKOOBJEKT_MANAGE);
-  const { records, loading, fromCache } = useFirebaseCollectionState<RisikoObjekt>({
-    collectionName: 'risikoobjekt',
-    includeMetadataChanges: true,
-  });
+  const { records, loading, fromCache } = usePlanObjekte({ includeMetadataChanges: true });
   const [term, setTerm] = useState('');
-  const [selected, setSelected] = useState<RisikoObjekt | null>(null);
-  const [editing, setEditing] = useState<RisikoObjekt | 'new' | null>(null);
+  const [selected, setSelected] = useState<PlanObjekt | null>(null);
+  const [editing, setEditing] = useState<PlanObjekt | 'new' | null>(null);
   const [allGroups, setAllGroups] = useState<Record<string, string>>({});
+  const [groupHierarchy, setGroupHierarchy] = useState<HierarchyGroup[]>([]);
 
   // Namen fremder Gruppen kommen vom Server; offline bleiben die eigenen.
   useEffect(() => {
@@ -66,6 +65,7 @@ export default function RisikoobjektePage() {
     getGroupsAction()
       .then((groups) => {
         if (!active) return;
+        setGroupHierarchy(groups);
         setAllGroups(
           Object.fromEntries(groups.filter((g) => g.id).map((g) => [g.id as string, g.name])),
         );
@@ -143,7 +143,7 @@ export default function RisikoobjektePage() {
               const groups = objektGroups(o);
               return (
                 <ListItem
-                  key={o.id}
+                  key={`${o.art}/${o.id}`}
                   divider
                   disablePadding
                   secondaryAction={
@@ -163,6 +163,7 @@ export default function RisikoobjektePage() {
                         <>
                           {[o.ortschaft, o.adresse, o.risikogruppe].filter(Boolean).join(' · ')}
                           <Box component="span" sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                            <ObjektArtChip art={o.art} />
                             {groups.length === 0 ? (
                               <Chip size="small" color="warning" variant="outlined" label={t('notShared')} component="span" />
                             ) : (
@@ -205,6 +206,7 @@ export default function RisikoobjektePage() {
           onClose={() => setEditing(null)}
           objekt={editing === 'new' ? undefined : editing}
           groupNames={groupNames}
+          groupHierarchy={groupHierarchy}
         />
       )}
     </Container>

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RisikoObjekt } from '../../common/gis-objects';
+import type { PlanObjekt } from '../../common/objektplan/objektArt';
 import type { GroupRoles } from '../../common/permissions';
 import { renderWithIntl } from '../../test-utils/intlRender';
 
@@ -27,7 +27,8 @@ import RisikoObjektEditDialog from './RisikoObjektEditDialog';
 
 const groupNames = { ffa: 'FF Alpha', ffb: 'FF Beta', ffc: 'FF Gamma' };
 
-const gisObjekt: RisikoObjekt = {
+const gisObjekt: PlanObjekt = {
+  art: 'risikoobjekt',
   id: 'g1',
   name: 'Lagerhalle',
   ortschaft: 'ND',
@@ -97,8 +98,8 @@ describe('RisikoObjektEditDialog', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'FF Beta' }));
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(actions.updateRisikoObjekt).toHaveBeenCalledWith('g1', expect.any(Object));
-    expect(actions.setRisikoObjektGroups).toHaveBeenCalledWith('g1', ['ffa', 'ffb', 'ffc']);
+    expect(actions.updateRisikoObjekt).toHaveBeenCalledWith('risikoobjekt', 'g1', expect.any(Object));
+    expect(actions.setRisikoObjektGroups).toHaveBeenCalledWith('risikoobjekt', 'g1', ['ffa', 'ffb', 'ffc']);
   });
 
   it('ruft die Freigabe nicht auf, wenn sie gleich bleibt', async () => {
@@ -125,6 +126,48 @@ describe('RisikoObjektEditDialog', () => {
     expect(actions.deleteRisikoObjekt).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Endgültig löschen' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(actions.deleteRisikoObjekt).toHaveBeenCalledWith('a1');
+    expect(actions.deleteRisikoObjekt).toHaveBeenCalledWith('risikoobjekt', 'a1');
+  });
+
+  it('zeigt die Freigabe als Baum wie beim Benutzer, ohne Elterngruppen mitzuhaken', () => {
+    renderWithIntl(
+      <RisikoObjektEditDialog
+        open
+        onClose={vi.fn()}
+        objekt={gisObjekt}
+        groupNames={groupNames}
+        groupHierarchy={[{ id: 'ffb', name: 'FF Beta', parentId: 'ffa' }]}
+      />,
+    );
+    expect(screen.getByRole('group', { name: 'Freigegeben für' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'FF Beta' })).not.toBeChecked();
+  });
+
+  it('pflegt Link und Freigabe eines gefährdeten Objekts', async () => {
+    const onClose = vi.fn();
+    renderWithIntl(
+      <RisikoObjektEditDialog
+        open
+        onClose={onClose}
+        objekt={{ ...gisObjekt, art: 'gefahrobjekt', id: 'nd_markt' }}
+        groupNames={groupNames}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/^Link zu den Plänen/), {
+      target: { value: 'https://drive.google.com/drive/folders/abc' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'FF Beta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(actions.updateRisikoObjekt).toHaveBeenCalledWith(
+      'gefahrobjekt',
+      'nd_markt',
+      expect.objectContaining({ link: 'https://drive.google.com/drive/folders/abc' }),
+    );
+    expect(actions.setRisikoObjektGroups).toHaveBeenCalledWith('gefahrobjekt', 'nd_markt', [
+      'ffa',
+      'ffb',
+      'ffc',
+    ]);
   });
 });

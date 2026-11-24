@@ -119,8 +119,8 @@ service firebase.storage {
     //
     // Geschrieben wird ausschließlich über das Admin-SDK im Import-Skript
     // (`npm run terrainImport`), nie aus der App.
-    // Unterlagen zu Risikoobjekten (Brandschutzpläne, Laufkarten, Fotos),
-    // siehe docs/objektplaene.md, „Freigabe an Gruppen".
+    // Unterlagen zu Risikoobjekten und gefährdeten Objekten (Brandschutzpläne,
+    // Laufkarten, Fotos), siehe docs/objektplaene.md, „Freigabe an Gruppen".
     //
     // Lesen nur, wer Mitglied einer freigegebenen Gruppe ist. Die Freigabe
     // steht als Metadatum `groups` (Komma-Liste) an jeder Datei, nicht nur am
@@ -146,23 +146,25 @@ service firebase.storage {
     function tokenGroups() {
       return request.auth.token.get('groups', []);
     }
-    match /risikoobjekt/{objektId}/{fileName} {
-      allow read: if authorizedUser() && (
+    // Dieselbe Regel für Risikoobjekte und gefährdete Objekte; die Art ist der
+    // erste Pfadteil.
+    match /{art}/{objektId}/{fileName} {
+      allow read: if art in ['risikoobjekt', 'gefahrobjekt'] && authorizedUser() && (
         request.auth.token.get('isAdmin', false) == true
         || tokenGroups().hasAny(objektFileGroups(resource.metadata))
       );
-      allow create: if authorizedUser()
+      allow create: if art in ['risikoobjekt', 'gefahrobjekt'] && authorizedUser()
         && request.resource.size < 100 * 1024 * 1024
         && request.resource.contentType.matches('application/pdf|image/(jpeg|png|webp|gif)')
         && (
           request.auth.token.get('isAdmin', false) == true
           || tokenGroups().hasAny(objektFileGroups(request.resource.metadata))
         );
-      allow update: if authorizedUser()
+      allow update: if art in ['risikoobjekt', 'gefahrobjekt'] && authorizedUser()
         && request.auth.token.get('isAdmin', false) == true
         && request.resource.size < 100 * 1024 * 1024
         && request.resource.contentType.matches('application/pdf|image/(jpeg|png|webp|gif)');
-      allow delete: if authorizedUser() && request.auth.token.get('isAdmin', false) == true;
+      allow delete: if art in ['risikoobjekt', 'gefahrobjekt'] && authorizedUser() && request.auth.token.get('isAdmin', false) == true;
     }
 
     match /terrain/{allPaths=**} {

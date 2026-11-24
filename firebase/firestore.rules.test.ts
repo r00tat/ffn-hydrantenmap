@@ -476,6 +476,44 @@ describe('Unterlagen zu Risikoobjekten (risikoobjekt/{id}/dokument)', () => {
   });
 });
 
+describe('Unterlagen zu gefährdeten Objekten (gefahrobjekt/{id}/dokument)', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, 'gefahrobjekt/g1'), { name: 'Markt', groups: ['ffnd'] });
+      await setDoc(doc(fs, 'gefahrobjekt/g2'), { name: 'Schule' });
+    });
+  });
+
+  const upload = (objekt: string, id: string, prefix = 'gefahrobjekt') => ({
+    name: 'plan.pdf',
+    gruppe: 'ffnd',
+    storagePath: `${prefix}/${objekt}/${id}-plan.pdf`,
+  });
+
+  it('liest nach der Freigabe am gefährdeten Objekt', async () => {
+    await assertSucceeds(getDocs(collection(db(USERS.mitglied), 'gefahrobjekt/g1/dokument')));
+    await assertFails(getDocs(collection(db(USERS.mitglied), 'gefahrobjekt/g2/dokument')));
+    await assertSucceeds(getDocs(collection(admin(), 'gefahrobjekt/g2/dokument')));
+  });
+
+  it('verlangt den Dateipfad unter dem gefährdeten Objekt', async () => {
+    const fs = db(USERS.gruppenadmin);
+    await assertSucceeds(setDoc(doc(fs, 'gefahrobjekt/g1/dokument/d1'), upload('g1', 'd1')));
+    await assertFails(
+      setDoc(doc(fs, 'gefahrobjekt/g1/dokument/d2'), upload('g1', 'd2', 'risikoobjekt')),
+    );
+    await assertFails(write(db(USERS.gruppenadmin), 'gefahrobjekt/g1/dokument/d1'));
+  });
+
+  it('gilt nicht für andere Collections mit einer Untersammlung dokument', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'hydrant/h1'), { groups: ['ffnd'] });
+    });
+    await assertFails(getDocs(collection(db(USERS.mitglied), 'hydrant/h1/dokument')));
+  });
+});
+
 describe('Benutzerdokument', () => {
   it('nur das eigene ist lesbar, schreiben kann der Benutzer es nicht', async () => {
     await assertSucceeds(read(db(USERS.kostenersatz), 'user/kostenersatz'));

@@ -8,9 +8,9 @@ import { useRef, useState } from 'react';
 import type { DriveSyncResult } from '../../server/objektplan/driveSyncRunner';
 import {
   listObjektDokumenteForReindex,
-  listRisikoObjekteWithDriveLink,
+  listPlanObjekteWithDriveLink,
   reindexObjektDokumentAction,
-  syncRisikoObjekteFromDrive,
+  syncPlanObjekteFromDrive,
   type ReindexCandidate,
 } from '../Objektplan/risikoobjektActions';
 
@@ -68,7 +68,7 @@ export default function ObjektplanReindex() {
     setLog([]);
     setSummary('');
     setCandidates(null);
-    const objekte = await listRisikoObjekteWithDriveLink();
+    const objekte = await listPlanObjekteWithDriveLink();
     let imported = 0;
     let removed = 0;
     let failed = 0;
@@ -80,9 +80,11 @@ export default function ObjektplanReindex() {
       const block = objekte.slice(start, start + DRIVE_SYNC_PARALLEL);
       let lines: string[];
       try {
-        const entries = await syncRisikoObjekteFromDrive(block.map((o) => o.id));
+        const entries = await syncPlanObjekteFromDrive(
+          block.map(({ art, id }) => ({ art, id })),
+        );
         lines = block.map((o) => {
-          const entry = entries.find((e) => e.id === o.id);
+          const entry = entries.find((e) => e.art === o.art && e.id === o.id);
           if (!entry || 'error' in entry) {
             failed += 1;
             return `${o.name}: failed (${entry?.error ?? 'no result'})`;
@@ -122,7 +124,7 @@ export default function ObjektplanReindex() {
       const label = `${c.objektName} – ${c.name}`;
       let line: string;
       try {
-        const result = await reindexObjektDokumentAction(c.objektId, c.dokumentId);
+        const result = await reindexObjektDokumentAction(c.art, c.objektId, c.dokumentId);
         if (result.ok) {
           ok += 1;
           line = `${label}: ${result.melder} detectors${result.ocr ? ' (OCR)' : ''}`;

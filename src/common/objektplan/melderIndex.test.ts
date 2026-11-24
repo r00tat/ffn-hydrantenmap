@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findMelderInText,
-  matchesMelderQuery,
+  melderMatchRank,
   parseMelderQuery,
   searchPageTexts,
   textItemBox,
@@ -66,34 +66,60 @@ describe('parseMelderQuery', () => {
     ['MG 3 M 5', { gruppe: 3, melder: 5 }],
     ['MG3/M5', { gruppe: 3, melder: 5 }],
     ['Meldergruppe 12 Melder 3', { gruppe: 12, melder: 3 }],
-    ['MG 12', { gruppe: 12 }],
-    ['Gruppe 12', { gruppe: 12 }],
-    ['12', { gruppe: 12 }],
+    ['MG 12', { gruppe: 12, partialGroup: true }],
+    ['Gruppe 12', { gruppe: 12, partialGroup: true }],
+    ['12', { gruppe: 12, partialGroup: true }],
     ['1003/04', { gruppe: 1003, melder: 4 }],
-    ['1003', { gruppe: 1003 }],
+    ['1003', { gruppe: 1003, partialGroup: true }],
+    // Gruppe eingetippt, Meldernummer noch nicht
+    ['310/', { gruppe: 310 }],
+    ['310 / ', { gruppe: 310 }],
+    ['3-', { gruppe: 3 }],
+    ['MG 3 M', { gruppe: 3, partialGroup: true }],
   ])('%s', (input, expected) => {
     expect(parseMelderQuery(input)).toEqual(expected);
   });
 
-  it.each(['', 'Heizraum', '3/5/7', '12345', 'MG'])('kein Melder: %s', (input) => {
+  it.each(['', 'Heizraum', '3/5/7', '12345', 'MG', '/', '3//'])('kein Melder: %s', (input) => {
     expect(parseMelderQuery(input)).toBeNull();
   });
 });
 
-describe('matchesMelderQuery', () => {
-  const entry: MelderEntry = {
-    kennung: '3/05E',
-    gruppe: 3,
-    melder: 5,
-    zusatz: 'E',
-    seite: 2,
+describe('melderMatchRank', () => {
+  const at = (gruppe: number, melder = 1): MelderEntry => ({
+    kennung: `${gruppe}/${melder}`,
+    gruppe,
+    melder,
+    seite: 1,
     box: [0, 0, 0.1, 0.1],
-  };
-  it('passt auf Gruppe und Melder', () => {
-    expect(matchesMelderQuery(entry, { gruppe: 3, melder: 5 })).toBe(true);
-    expect(matchesMelderQuery(entry, { gruppe: 3 })).toBe(true);
-    expect(matchesMelderQuery(entry, { gruppe: 3, melder: 6 })).toBe(false);
-    expect(matchesMelderQuery(entry, { gruppe: 30 })).toBe(false);
+  });
+
+  const bare = { gruppe: 10, partialGroup: true } as const;
+
+  it('reiht genau vor Anfang vor Ende vor Mitte', () => {
+    expect(melderMatchRank(at(10), bare)).toBe(0);
+    expect(melderMatchRank(at(105), bare)).toBe(1);
+    expect(melderMatchRank(at(310), bare)).toBe(2);
+    expect(melderMatchRank(at(3101), bare)).toBe(3);
+    expect(melderMatchRank(at(12), bare)).toBeNull();
+  });
+
+  it('sucht Teiltreffer erst ab zwei Ziffern', () => {
+    expect(melderMatchRank(at(3), { gruppe: 3, partialGroup: true })).toBe(0);
+    expect(melderMatchRank(at(13), { gruppe: 3, partialGroup: true })).toBeNull();
+    expect(melderMatchRank(at(30), { gruppe: 3, partialGroup: true })).toBeNull();
+  });
+
+  it('verlangt die Gruppe genau, sobald Trennzeichen oder Melder folgen', () => {
+    expect(melderMatchRank(at(10, 1), { gruppe: 10, melder: 1 })).toBe(0);
+    expect(melderMatchRank(at(100, 1), { gruppe: 10, melder: 1 })).toBeNull();
+    expect(melderMatchRank(at(101, 1), { gruppe: 10, melder: 1 })).toBeNull();
+    expect(melderMatchRank(at(310, 1), { gruppe: 10, melder: 1 })).toBeNull();
+    expect(melderMatchRank(at(310), { gruppe: 10 })).toBeNull();
+  });
+
+  it('verlangt die Meldernummer genau', () => {
+    expect(melderMatchRank(at(10, 6), { gruppe: 10, melder: 5 })).toBeNull();
   });
 });
 
