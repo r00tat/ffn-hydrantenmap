@@ -10,6 +10,24 @@ updates:
         patterns:
           - '*'
 
+  # Provider und Module der OpenTofu-Roots samt .terraform.lock.hcl. Die
+  # Version des tofu-Binaries selbst steht in .tool-versions (auch die
+  # Pipelines lesen sie dort); das Format kennt Dependabot nicht, sie bleibt
+  # Handarbeit. Die Module stehen mit drin, damit ein Major-Sprung des
+  # Providers (~> 7 → ~> 8) die Einschränkung überall anhebt; sonst scheitert
+  # `tofu init` an widersprüchlichen Constraints.
+  - package-ecosystem: 'opentofu'
+    directories:
+      - '/terraform/environments/*'
+      - '/terraform/projects/*'
+      - '/terraform/modules/*'
+    schedule:
+      interval: 'weekly'
+    groups:
+      providers:
+        patterns:
+          - '*'
+
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:

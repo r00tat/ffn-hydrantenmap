@@ -43,9 +43,9 @@ on:
       - deploy
 
 env:
-  # Muss zu terraform/.tool-versions und zu .github/workflows/terraform.yml
-  # passen, damit lokal und beide Pipelines identisch rechnen.
-  TOFU_VERSION: 1.12.5
+  # TOFU_VERSION setzt der Schritt „OpenTofu-Version aus .tool-versions“ in
+  # jedem Job aus der .tool-versions im Repo-Root — eine Quelle für lokal
+  # und beide Pipelines.
 
   # Zuordnung Environment -> Projekt-Root. Die Projekt-Basis gibt es einmal je
   # GCP-Projekt, nicht je Environment; dev und prod teilen sich eines,
@@ -433,6 +433,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: OpenTofu-Version aus .tool-versions
+        run: |
+          version=$(awk '$1 == "opentofu" { print $2 }' .tool-versions)
+          if [ -z "$version" ]; then
+            echo "::error file=.tool-versions::Kein Eintrag 'opentofu <version>' gefunden"
+            exit 1
+          fi
+          echo "TOFU_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Setup OpenTofu
         if: ${{ env.gcp_ready == 'true' }}
         uses: opentofu/setup-opentofu@v2
@@ -523,6 +532,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: OpenTofu-Version aus .tool-versions
+        run: |
+          version=$(awk '$1 == "opentofu" { print $2 }' .tool-versions)
+          if [ -z "$version" ]; then
+            echo "::error file=.tool-versions::Kein Eintrag 'opentofu <version>' gefunden"
+            exit 1
+          fi
+          echo "TOFU_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v2

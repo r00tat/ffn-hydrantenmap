@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Opentofu 1.12 (genaue Version in `.tool-versions`, identisch mit `TOFU_VERSION` im Workflow)
+- Opentofu 1.12 (genaue Version in `.tool-versions` im Repo-Root; die Pipelines lesen sie von dort)
 - direnv
 
 ## Environments
