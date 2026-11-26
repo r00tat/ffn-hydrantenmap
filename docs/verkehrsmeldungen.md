@@ -112,3 +112,15 @@ Die Ebene lädt den Kartenausschnitt plus je Seite eine Ausschnittsbreite.
 Neu geladen wird erst, wenn die Ansicht diesen Bereich verlässt, oder nach
 5 Minuten. Kleines Verschieben löst also keinen Abruf aus. Offline wird nichts
 abgerufen; die Ebene sagt das.
+
+## Übereinanderliegende Meldungen
+
+Sperre und Baustelle desselben Abschnitts kommen oft aus beiden Paketen
+gleichzeitig — am Arlberg etwa die Totalsperre aus `unplannedevents` und die
+Baustelle dazu aus `roadworks_detailed`. Die Linien liegen dann genau
+übereinander, die rote verdeckt die orange vollständig. Ein Klick öffnet
+deshalb nicht das Popup der obersten Linie, sondern listet alle Meldungen im
+Umkreis von 10 Bildschirmpixeln, die schwerste zuerst (`eventsAtPoint` in
+`roadEventsHit.ts`). Eine Situation mit mehreren Abschnitten erscheint dabei
+nur einmal. Zusammengeführt werden die Meldungen bewusst nicht: Es sind zwei
+eigenständige Mitteilungen der ASFINAG mit eigenem Wortlaut und Zeitraum.

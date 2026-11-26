@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, screen } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 
@@ -20,6 +20,11 @@ const fakeMap = {
   off: (name: string, fn: (event: unknown) => void) => {
     handlers.get(name)?.delete(fn);
   },
+  // Gerade Projektion: 1 Grad = 1000 px.
+  latLngToContainerPoint: ([lat, lng]: [number, number]) => ({
+    x: lng * 1000,
+    y: -lat * 1000,
+  }),
 };
 
 const fire = (name: string, event: unknown) => {
@@ -41,15 +46,54 @@ vi.mock('react-leaflet', () => ({
       {children}
     </div>
   ),
-  Polyline: () => null,
+  Polyline: ({
+    eventHandlers,
+  }: {
+    eventHandlers: { click: (e: unknown) => void };
+  }) => (
+    <button
+      data-testid="line"
+      onClick={() =>
+        eventHandlers.click({
+          latlng: [47.13, 10.2],
+          containerPoint: { x: 10200, y: -47130 },
+          originalEvent: new MouseEvent('click'),
+        })
+      }
+    />
+  ),
   CircleMarker: () => null,
-  Popup: () => null,
+  Popup: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="popup">{children}</div>
+  ),
 }));
 
 vi.mock('./RoadEventsAction', () => ({
   fetchRoadEvents: vi.fn(async () => ({
     configured: true,
-    events: [],
+    // Wie am Arlberg: Sperre und Baustelle auf demselben Abschnitt.
+    events: [
+      {
+        key: 'c',
+        id: 'sperre',
+        kind: 'closure',
+        description: 'Tunnel Arlberg gesperrt',
+        path: [
+          [47.13, 10.1],
+          [47.13, 10.3],
+        ],
+      },
+      {
+        key: 'r',
+        id: 'baustelle',
+        kind: 'restriction',
+        description: 'veränderte Verkehrsführung im Baustellenbereich',
+        path: [
+          [47.13, 10.12],
+          [47.13, 10.31],
+        ],
+      },
+    ],
     failedFeeds: [],
   })),
 }));
@@ -81,5 +125,22 @@ describe('RoadEventsLayer', () => {
     renderWithIntl(<RoadEventsLayer />);
     fire('overlayadd', { name: 'Stromausfälle' });
     expect(screen.getByTestId('layergroup').dataset.attribution).toBe('');
+  });
+
+  it('zeigt beim Klick alle übereinanderliegenden Meldungen', async () => {
+    renderWithIntl(<RoadEventsLayer />);
+    fire('overlayadd', { name: ROAD_EVENTS_LAYER_NAME });
+    const lines = await screen.findAllByTestId('line');
+    expect(lines).toHaveLength(2);
+
+    // Die Sperre liegt oben; ein Klick auf sie muss die Baustelle mitzeigen.
+    fireEvent.click(lines[1]);
+    await waitFor(() => expect(screen.getByTestId('popup')).toBeTruthy());
+    const popup = screen.getByTestId('popup').textContent ?? '';
+    expect(popup).toContain('Tunnel Arlberg gesperrt');
+    expect(popup).toContain('Baustellenbereich');
+    expect(popup.indexOf('gesperrt')).toBeLessThan(
+      popup.indexOf('Baustellenbereich')
+    );
   });
 });

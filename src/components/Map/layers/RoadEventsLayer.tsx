@@ -1,10 +1,11 @@
 'use client';
 
 import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import L from 'leaflet';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   CircleMarker,
   LayerGroup,
@@ -18,6 +19,7 @@ import {
   RoadEventWithPath,
 } from '../../../common/roadEvents';
 import { boundsContain, padBounds } from '../../../common/roadEventsBounds';
+import { eventsAtPoint } from '../../../common/roadEventsHit';
 import useOnline from '../../../hooks/useOnline';
 import { recordError } from '../../firebase/crashlytics';
 import { fetchRoadEvents } from './RoadEventsAction';
@@ -28,6 +30,8 @@ export const ROAD_EVENTS_LAYER_NAME = 'Verkehrsmeldungen';
 const REFRESH_MS = 5 * 60 * 1000;
 /** Geladen wird je Seite eine Ausschnittsbreite mehr. */
 const PADDING_FACTOR = 1;
+/** Trefferfläche um die Linie (halbe Linienbreite plus Spielraum für Finger). */
+const HIT_TOLERANCE_PX = 10;
 
 export const ROAD_EVENT_COLORS: Record<RoadEventKind, string> = {
   closure: '#d32f2f',
@@ -36,6 +40,11 @@ export const ROAD_EVENT_COLORS: Record<RoadEventKind, string> = {
 };
 
 type Status = 'idle' | 'ready' | 'notConfigured' | 'failed';
+
+interface Selection {
+  at: L.LatLngExpression;
+  events: RoadEventWithPath[];
+}
 
 function useLayerVisible(): boolean {
   const map = useMap();
@@ -123,7 +132,7 @@ function useRoadEvents(visible: boolean, online: boolean) {
   return { events, status, failedFeeds };
 }
 
-function EventPopup({ event }: { event: RoadEventWithPath }) {
+function EventDetails({ event }: { event: RoadEventWithPath }) {
   const t = useTranslations('roadEvents');
   const locale = useLocale();
   const format = (value?: string) => {
@@ -141,65 +150,85 @@ function EventPopup({ event }: { event: RoadEventWithPath }) {
   const title = [event.road, event.roadName].filter(Boolean).join(' ');
 
   return (
-    <Popup>
-      <Box sx={{ maxWidth: 300 }}>
-        <Typography
-          variant="caption"
-          sx={{ color: ROAD_EVENT_COLORS[event.kind], fontWeight: 700 }}
-        >
-          {t(`kind.${event.kind}`)}
+    <Box>
+      <Typography
+        variant="caption"
+        sx={{ color: ROAD_EVENT_COLORS[event.kind], fontWeight: 700 }}
+      >
+        {t(`kind.${event.kind}`)}
+      </Typography>
+      {title && (
+        <Typography variant="subtitle2" component="div">
+          {title}
         </Typography>
-        {title && (
-          <Typography variant="subtitle2" component="div">
-            {title}
-          </Typography>
-        )}
-        {event.direction && (
-          <Typography variant="body2" component="div">
-            {event.direction}
-          </Typography>
-        )}
-        {event.description && (
-          <Typography
-            variant="body2"
-            component="div"
-            sx={{ mt: 0.5, whiteSpace: 'pre-line' }}
-          >
-            {event.description}
-          </Typography>
-        )}
-        {(start || end) && (
-          <Typography variant="body2" component="div" sx={{ mt: 0.5 }}>
-            {start && end
-              ? t('timeRange', { start, end })
-              : start
-                ? t('since', { start })
-                : t('until', { end: end ?? '' })}
-          </Typography>
-        )}
-        {event.url && /^https:\/\//.test(event.url) && (
-          <Typography variant="body2" component="div" sx={{ mt: 0.5 }}>
-            <a href={event.url} target="_blank" rel="noopener noreferrer">
-              {t('details')}
-            </a>
-          </Typography>
-        )}
-        {event.approximate && (
-          <Typography
-            variant="caption"
-            component="div"
-            sx={{ mt: 0.5, color: 'text.secondary' }}
-          >
-            {t('approximate')}
-          </Typography>
-        )}
+      )}
+      {event.direction && (
+        <Typography variant="body2" component="div">
+          {event.direction}
+        </Typography>
+      )}
+      {event.description && (
+        <Typography
+          variant="body2"
+          component="div"
+          sx={{ mt: 0.5, whiteSpace: 'pre-line' }}
+        >
+          {event.description}
+        </Typography>
+      )}
+      {(start || end) && (
+        <Typography variant="body2" component="div" sx={{ mt: 0.5 }}>
+          {start && end
+            ? t('timeRange', { start, end })
+            : start
+              ? t('since', { start })
+              : t('until', { end: end ?? '' })}
+        </Typography>
+      )}
+      {event.url && /^https:\/\//.test(event.url) && (
+        <Typography variant="body2" component="div" sx={{ mt: 0.5 }}>
+          <a href={event.url} target="_blank" rel="noopener noreferrer">
+            {t('details')}
+          </a>
+        </Typography>
+      )}
+      {event.approximate && (
         <Typography
           variant="caption"
           component="div"
           sx={{ mt: 0.5, color: 'text.secondary' }}
         >
-          {t('source')}
+          {t('approximate')}
         </Typography>
+      )}
+      <Typography
+        variant="caption"
+        component="div"
+        sx={{ mt: 0.5, color: 'text.secondary' }}
+      >
+        {t('source')}
+      </Typography>
+    </Box>
+  );
+}
+
+/** Alle Meldungen an der angeklickten Stelle, die schwerste zuerst. */
+function EventsPopup({
+  selection,
+  onClose,
+}: {
+  selection: Selection;
+  onClose: () => void;
+}) {
+  return (
+    <Popup position={selection.at} eventHandlers={{ remove: onClose }}>
+      <Box sx={{ maxWidth: 300, maxHeight: 360, overflowY: 'auto' }}>
+        {selection.events.map((event, index) => (
+          <Fragment key={event.key}>
+            {index > 0 && <Divider sx={{ my: 1 }} />}
+            <EventDetails event={event} />
+          </Fragment>
+        ))}
       </Box>
     </Popup>
   );
@@ -210,6 +239,22 @@ export default function RoadEventsLayer() {
   const visible = useLayerVisible();
   const online = useOnline();
   const { events, status, failedFeeds } = useRoadEvents(visible, online);
+  const map = useMap();
+  const [selection, setSelection] = useState<Selection>();
+
+  // Sperre und Baustelle liegen oft genau übereinander, die obere Linie
+  // verdeckt die untere. Ein Klick zeigt deshalb alle Meldungen an der
+  // Stelle, nicht nur die oberste.
+  const select = (e: L.LeafletMouseEvent) => {
+    L.DomEvent.stopPropagation(e);
+    const hits = eventsAtPoint(
+      events,
+      e.containerPoint,
+      (latLng) => map.latLngToContainerPoint(latLng),
+      HIT_TOLERANCE_PX
+    );
+    if (hits.length > 0) setSelection({ at: e.latlng, events: hits });
+  };
 
   // Leichtere Meldungen zuerst, damit Sperren obenauf liegen.
   const ordered = [...events].reverse();
@@ -251,9 +296,8 @@ export default function RoadEventsLayer() {
                   fillColor: color,
                   fillOpacity: 1,
                 }}
-              >
-                <EventPopup event={event} />
-              </CircleMarker>
+                eventHandlers={{ click: select }}
+              />
             );
           }
           return (
@@ -267,12 +311,17 @@ export default function RoadEventsLayer() {
                 lineCap: 'round',
                 dashArray: event.approximate ? '8 8' : undefined,
               }}
-            >
-              <EventPopup event={event} />
-            </Polyline>
+              eventHandlers={{ click: select }}
+            />
           );
         })}
       </LayerGroup>
+      {visible && selection && (
+        <EventsPopup
+          selection={selection}
+          onClose={() => setSelection(undefined)}
+        />
+      )}
       {notice && (
         <Box
           sx={{
