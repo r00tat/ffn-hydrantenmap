@@ -30,10 +30,13 @@ ASFINAG.
 
 ## Einrichtung
 
-Im Content-Portal (<https://content.asfinag.at>) ein Konto anlegen, die Lizenz
-annehmen und beide Pakete freischalten. Jedes Paket hat einen eigenen
-Zugriffsschlüssel; abgerufen wird
-`https://content.asfinag.at/services/resource/<Schlüssel>`.
+Im Content-Portal (<https://contentportal.asfinag.at/data>) mit einem
+ASFINAG-Benutzerkonto anmelden, beide Pakete auswählen, die Lizenz annehmen
+und „Zugriff freischalten“. Unter dem Profil zeigt jedes Paket seinen
+Zugangsschlüssel; abgerufen wird
+`https://content.asfinag.at/services/resource/<Schlüssel>`. Im selben Dialog
+gibt es ein Client-Zertifikat: Der private Schlüssel kommt nur beim ersten
+Download mit, das Passwort wird nur einmal angezeigt.
 
 | Variable | Inhalt |
 | --- | --- |
