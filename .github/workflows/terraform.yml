@@ -76,7 +76,7 @@ jobs:
 
       - name: OpenTofu-Version aus .tool-versions
         run: |
-          version=$(awk '$1 == "opentofu" { print $2 }' .tool-versions)
+          version=$(awk '$1 == "opentofu" { print $2 }' "$GITHUB_WORKSPACE/.tool-versions")
           if [ -z "$version" ]; then
             echo "::error file=.tool-versions::Kein Eintrag 'opentofu <version>' gefunden"
             exit 1
@@ -235,7 +235,7 @@ jobs:
 
       - name: OpenTofu-Version aus .tool-versions
         run: |
-          version=$(awk '$1 == "opentofu" { print $2 }' .tool-versions)
+          version=$(awk '$1 == "opentofu" { print $2 }' "$GITHUB_WORKSPACE/.tool-versions")
           if [ -z "$version" ]; then
             echo "::error file=.tool-versions::Kein Eintrag 'opentofu <version>' gefunden"
             exit 1
@@ -412,7 +412,7 @@ jobs:
 
       - name: OpenTofu-Version aus .tool-versions
         run: |
-          version=$(awk '$1 == "opentofu" { print $2 }' .tool-versions)
+          version=$(awk '$1 == "opentofu" { print $2 }' "$GITHUB_WORKSPACE/.tool-versions")
           if [ -z "$version" ]; then
             echo "::error file=.tool-versions::Kein Eintrag 'opentofu <version>' gefunden"
             exit 1
