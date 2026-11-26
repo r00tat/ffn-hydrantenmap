@@ -228,7 +228,10 @@ export default function RoadEventsLayer() {
 
   return (
     <>
-      <LayerGroup attribution={t('attribution')}>
+      {/* t.raw: Die Attribution ist HTML für Leaflet; t() hielte die <a> für
+          Rich-Text-Tags und würfe INVALID_TAG. Der Text kommt aus dem eigenen
+          Katalog, nicht von außen. */}
+      <LayerGroup attribution={t.raw('attribution') as string}>
         {ordered.map((event) => {
           const color = ROAD_EVENT_COLORS[event.kind];
           if (event.path.length < 2) {
