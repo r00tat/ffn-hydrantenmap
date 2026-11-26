@@ -228,10 +228,15 @@ export default function RoadEventsLayer() {
 
   return (
     <>
-      {/* t.raw: Die Attribution ist HTML für Leaflet; t() hielte die <a> für
-          Rich-Text-Tags und würfe INVALID_TAG. Der Text kommt aus dem eigenen
+      {/* Attribution nur, solange die Ebene eingeschaltet ist: react-leaflet
+          trägt sie bei jeder Änderung des Props direkt am Kartensteuerelement
+          ein, ohne zu prüfen, ob das Overlay auf der Karte liegt.
+          t.raw: Der Text ist HTML für Leaflet; t() hielte die <a> für
+          Rich-Text-Tags und würfe INVALID_TAG. Er kommt aus dem eigenen
           Katalog, nicht von außen. */}
-      <LayerGroup attribution={t.raw('attribution') as string}>
+      <LayerGroup
+        attribution={visible ? (t.raw('attribution') as string) : undefined}
+      >
         {ordered.map((event) => {
           const color = ROAD_EVENT_COLORS[event.kind];
           if (event.path.length < 2) {
