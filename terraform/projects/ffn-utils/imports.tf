@@ -66,6 +66,9 @@ import {
   id = "projects/${var.project}/locations/${var.run_region}/repositories/dockerhub"
 }
 
+# Deckt jedes Secret in `local.secrets` ab, auch die von Hand samt Version
+# angelegten ASFINAG-Schlüssel (Verkehrsmeldungen). Einen eigenen Import-Block
+# für ein Secret aus dieser Liste lehnt tofu als doppelt ab.
 import {
   for_each = toset(local.secrets)
   to       = module.project_base.google_secret_manager_secret.secrets[each.key]
@@ -113,18 +116,4 @@ import {
 import {
   to = module.project_base.google_iam_workload_identity_pool_provider.github
   id = "projects/${var.project}/locations/global/workloadIdentityPools/github/providers/github"
-}
-
-# ASFINAG-Zugangsschlüssel (Verkehrsmeldungen): Die Secrets wurden samt
-# Version von Hand angelegt, bevor sie in `secret_env` gemappt wurden — so
-# findet der erste Rollout mit dem Mapping schon eine Version vor. Ohne Import
-# scheiterte das Anlegen hier mit 409.
-import {
-  to = module.project_base.google_secret_manager_secret.secrets["ASFINAG_UNPLANNED_RESOURCE_KEY"]
-  id = "projects/${var.project}/secrets/ASFINAG_UNPLANNED_RESOURCE_KEY"
-}
-
-import {
-  to = module.project_base.google_secret_manager_secret.secrets["ASFINAG_PLANNED_RESOURCE_KEY"]
-  id = "projects/${var.project}/secrets/ASFINAG_PLANNED_RESOURCE_KEY"
 }
