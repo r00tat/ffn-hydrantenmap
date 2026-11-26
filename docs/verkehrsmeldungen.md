@@ -32,11 +32,12 @@ ASFINAG.
 
 Im Content-Portal (<https://contentportal.asfinag.at/data>) mit einem
 ASFINAG-Benutzerkonto anmelden, beide Pakete auswählen, die Lizenz annehmen
-und „Zugriff freischalten“. Unter dem Profil zeigt jedes Paket seinen
-Zugangsschlüssel; abgerufen wird
-`https://content.asfinag.at/services/resource/<Schlüssel>`. Im selben Dialog
-gibt es ein Client-Zertifikat: Der private Schlüssel kommt nur beim ersten
-Download mit, das Passwort wird nur einmal angezeigt.
+und „Zugriff freischalten“. Auf der Detailseite jedes Pakets (z. B.
+`/data/details/unplannedevents`) zeigt „Daten abrufen“ den Zugangsschlüssel;
+abgerufen wird `https://content.asfinag.at/services/resource/<Schlüssel>`.
+Ein Client-Zertifikat ist derzeit nicht nötig — beide Schlüssel liefern ohne
+eines HTTP 200. Die Unterstützung dafür bleibt für den Fall, dass die ASFINAG
+es später verlangt.
 
 | Variable | Inhalt |
 | --- | --- |
@@ -50,10 +51,18 @@ Ein Paket ohne Schlüssel wird übersprungen; fehlen beide, zeigt die Ebene
 Abruf über `node:https`, weil `fetch` keines mitschicken kann
 (`asfinagHttp.ts`).
 
-In der Cloud liegen die Schlüssel im Secret Manager. Terraform legt nur die
-Hüllen an (`terraform/projects/ffn-utils`). **Erst eine Version anlegen, dann
-das Secret in `secret_env` der Environments eintragen** — ein gemapptes Secret
-ohne Version lässt den Rollout scheitern.
+In der Cloud liegen die beiden Schlüssel im Secret Manager von ffn-utils, für
+dev und prod gemeinsam, und sind in `secret_env` beider Environments gemappt.
+Terraform verwaltet nur die Hüllen (`terraform/projects/ffn-utils`); die
+Secrets wurden samt Version von Hand angelegt und per `imports.tf`
+übernommen, weil ein gemapptes Secret ohne Version den Rollout scheitern
+lässt. Einen neuen Schlüssel spielt man so ein:
+
+```bash
+gcloud secrets versions add ASFINAG_PLANNED_RESOURCE_KEY --project ffn-utils --data-file=-
+```
+
+Danach neu deployen; der Dienst liest `latest` nur beim Start.
 
 ## Verlauf entlang der Straße
 

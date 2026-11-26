@@ -114,3 +114,17 @@ import {
   to = module.project_base.google_iam_workload_identity_pool_provider.github
   id = "projects/${var.project}/locations/global/workloadIdentityPools/github/providers/github"
 }
+
+# ASFINAG-Zugangsschlüssel (Verkehrsmeldungen): Die Secrets wurden samt
+# Version von Hand angelegt, bevor sie in `secret_env` gemappt wurden — so
+# findet der erste Rollout mit dem Mapping schon eine Version vor. Ohne Import
+# scheiterte das Anlegen hier mit 409.
+import {
+  to = module.project_base.google_secret_manager_secret.secrets["ASFINAG_UNPLANNED_RESOURCE_KEY"]
+  id = "projects/${var.project}/secrets/ASFINAG_UNPLANNED_RESOURCE_KEY"
+}
+
+import {
+  to = module.project_base.google_secret_manager_secret.secrets["ASFINAG_PLANNED_RESOURCE_KEY"]
+  id = "projects/${var.project}/secrets/ASFINAG_PLANNED_RESOURCE_KEY"
+}

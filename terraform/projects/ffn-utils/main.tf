@@ -36,9 +36,9 @@ locals {
     "SUMUP_AFFILIATE_KEY_DEV",
     "SUMUP_MERCHANT_CODE",
     "SUMUP_MERCHANT_CODE_DEV",
-    # Zugriffsschlüssel des ASFINAG-Content-Portals (Verkehrsmeldungen). Erst
-    # in `secret_env` der Environments eintragen, wenn eine Version angelegt
-    # ist — sonst scheitert der Rollout. Siehe docs/verkehrsmeldungen.md.
+    # Zugriffsschlüssel des ASFINAG-Content-Portals (Verkehrsmeldungen). Von
+    # Hand samt Version angelegt und importiert (imports.tf), in `secret_env`
+    # beider Environments gemappt. Siehe docs/verkehrsmeldungen.md.
     "ASFINAG_UNPLANNED_RESOURCE_KEY",
     "ASFINAG_PLANNED_RESOURCE_KEY",
   ]
