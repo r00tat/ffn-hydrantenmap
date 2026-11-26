@@ -5081,5 +5081,24 @@
     "distanceNear": "< 50 m",
     "distance": "{meters} m",
     "distanceKm": "{km} km"
+  },
+  "roadEvents": {
+    "layerName": "Traffic reports",
+    "kind": {
+      "closure": "Closure",
+      "restriction": "Roadworks / restriction",
+      "incident": "Incident"
+    },
+    "timeRange": "{start} to {end}",
+    "since": "since {start}",
+    "until": "until {end}",
+    "details": "Details at ASFINAG",
+    "approximate": "Course simplified as a straight line.",
+    "source": "Source: ASFINAG (CC BY 4.0). No guarantee of accuracy.",
+    "attribution": "Traffic reports: <a href=\"https://www.asfinag.at/verkehr-sicherheit/verkehrsinformation/\" target=\"_blank\" rel=\"noopener noreferrer\">ASFINAG</a> (CC BY 4.0), road network: <a href=\"https://www.gip.gv.at/\" target=\"_blank\" rel=\"noopener noreferrer\">gip.gv.at</a> (CC BY 4.0)",
+    "offline": "Traffic reports are not available offline.",
+    "notConfigured": "Traffic reports are not set up (ASFINAG access missing).",
+    "failed": "Traffic reports could not be loaded.",
+    "partial": "Some traffic reports are currently unavailable; showing the last known state."
   }
 }

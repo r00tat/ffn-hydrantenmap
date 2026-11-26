@@ -38,6 +38,9 @@ import LiveLocationLayer from './layers/LiveLocationLayer';
 import LocationsLayer from './layers/LocationsLayer';
 import DistanceMarker from './markers/DistanceMarker';
 import PowerOutageLayer from './layers/PowerOutageLayer';
+import RoadEventsLayer, {
+  ROAD_EVENTS_LAYER_NAME,
+} from './layers/RoadEventsLayer';
 import PegelstandLayer from './layers/PegelstandLayer';
 import StreckenkilometerLayer, {
   STRECKENKILOMETER_LAYER_NAME,
@@ -168,6 +171,11 @@ export default function Map() {
           <LayersControl.Overlay name="Stromausfälle">
             <LayerErrorBoundary name="Stromausfälle">
               <PowerOutageLayer />
+            </LayerErrorBoundary>
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name={ROAD_EVENTS_LAYER_NAME}>
+            <LayerErrorBoundary name={ROAD_EVENTS_LAYER_NAME}>
+              <RoadEventsLayer />
             </LayerErrorBoundary>
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Pegelstände">
