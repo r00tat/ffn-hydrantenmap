@@ -5081,5 +5081,24 @@
     "distanceNear": "< 50 m",
     "distance": "{meters} m",
     "distanceKm": "{km} km"
+  },
+  "roadEvents": {
+    "layerName": "Verkehrsmeldungen",
+    "kind": {
+      "closure": "Sperre",
+      "restriction": "Baustelle / Einschränkung",
+      "incident": "Ereignis"
+    },
+    "timeRange": "{start} bis {end}",
+    "since": "seit {start}",
+    "until": "bis {end}",
+    "details": "Details bei der ASFINAG",
+    "approximate": "Verlauf vereinfacht als Gerade dargestellt.",
+    "source": "Quelle: ASFINAG (CC BY 4.0). Angaben ohne Gewähr.",
+    "attribution": "Verkehrsmeldungen: <a href=\"https://www.asfinag.at/verkehr-sicherheit/verkehrsinformation/\" target=\"_blank\" rel=\"noopener noreferrer\">ASFINAG</a> (CC BY 4.0), Straßennetz: <a href=\"https://www.gip.gv.at/\" target=\"_blank\" rel=\"noopener noreferrer\">gip.gv.at</a> (CC BY 4.0)",
+    "offline": "Verkehrsmeldungen sind offline nicht verfügbar.",
+    "notConfigured": "Verkehrsmeldungen sind nicht eingerichtet (ASFINAG-Zugang fehlt).",
+    "failed": "Verkehrsmeldungen konnten nicht geladen werden.",
+    "partial": "Ein Teil der Verkehrsmeldungen ist gerade nicht abrufbar; es wird der letzte Stand gezeigt."
   }
 }

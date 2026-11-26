@@ -38,9 +38,9 @@ on:
         default: plan
 
 env:
-  # Muss zu terraform/.tool-versions und zu .github/workflows/cloud-run.yml
-  # passen, damit lokal und beide Pipelines identisch rechnen.
-  TOFU_VERSION: 1.12.5
+  # TOFU_VERSION setzt der Schritt „OpenTofu-Version aus .tool-versions“ in
+  # jedem Job aus der .tool-versions im Repo-Root — eine Quelle für lokal
+  # und beide Pipelines.
 
   # Zuordnung Environment -> Projekt-Root. Die Projekt-Basis gibt es einmal je
   # GCP-Projekt, nicht je Environment; dev und prod teilen sich eines,
@@ -74,6 +74,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: OpenTofu-Version aus .tool-versions
+        run: |
+          version=$(awk '$1 == "opentofu" { print $2 }' "$GITHUB_WORKSPACE/.tool-versions")
+          if [ -z "$version" ]; then
+            echo "::error file=.tool-versions::Kein Eintrag 'opentofu <version>' gefunden"
+            exit 1
+          fi
+          echo "TOFU_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v2
         with:
@@ -101,8 +110,10 @@ jobs:
         working-directory: ${{ env.BASE_ROOT }}
         run: |
           set -o pipefail
-          tofu init -input=false
-          tofu validate
+          # Jede Ausgabe geht zusätzlich nach plan.log: Scheitert ein Schritt,
+          # zeigt der PR-Kommentar die Fehlermeldung daraus.
+          tofu init -input=false -no-color 2>&1 | tee plan.log
+          tofu validate -no-color 2>&1 | tee -a plan.log
           # -detailed-exitcode: 0 = keine Änderungen, 2 = Änderungen, alles
           # andere ist ein Fehler. Damit muss der Kommentar-Step den Plantext
           # nicht nach "No changes." absuchen.
@@ -111,8 +122,8 @@ jobs:
           # Mit Lock scheitert er sofort mit 412, sobald irgendwo ein apply
           # läuft — und der Apply der Projekt-Basis läuft bei jedem Push auf
           # main, traf also wiederholt die Plans offener PRs (#702).
-          tofu plan -input=false -no-color -detailed-exitcode -lock=false -out=tfplan
-          code=$?
+          tofu plan -input=false -no-color -detailed-exitcode -lock=false -out=tfplan 2>&1 | tee -a plan.log
+          code=${PIPESTATUS[0]}
           set -e
           case "$code" in
             0) echo "changes=false" >>"$GITHUB_OUTPUT" ;;
@@ -120,37 +131,52 @@ jobs:
             *) exit "$code" ;;
           esac
           tofu show -no-color tfplan > plan.txt
+          # Nur für die Übersicht im PR-Kommentar. Das JSON enthält sensible
+          # Werte im Klartext — es bleibt auf dem Runner, das Skript liest
+          # daraus nur Adressen und Aktionen.
+          tofu show -json tfplan > plan.json
 
-      - name: Step summary
-        if: ${{ env.gcp_ready == 'true' }}
+      - name: Setup Node
+        if: ${{ !cancelled() && env.gcp_ready == 'true' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+
+      # Läuft auch, wenn der Plan scheitert: Dann zeigt die Übersicht ❌ und die
+      # Fehlermeldung statt gar nichts.
+      - name: Plan-Übersicht
+        id: overview
+        if: ${{ !cancelled() && env.gcp_ready == 'true' }}
         working-directory: ${{ env.BASE_ROOT }}
+        env:
+          TITLE: Projekt-Basis
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          {
-            echo "## Terraform plan — Projekt-Basis (${{ env.BASE_ROOT }})"
-            echo
-            echo '```terraform'
-            head -c 60000 plan.txt
-            echo
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PLAN_OUTCOME" = "success" ]; then
+            node "$GITHUB_WORKSPACE/scripts/tofuPlanSummary.mts" \
+              --title "$TITLE" --json plan.json --text plan.txt > plan.md
+          else
+            node "$GITHUB_WORKSPACE/scripts/tofuPlanSummary.mts" \
+              --title "$TITLE" --failed --log plan.log --run-url "$RUN_URL" > plan.md
+          fi
+          cat plan.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment plan on PR
-        if: ${{ env.gcp_ready == 'true' && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && env.gcp_ready == 'true' && github.event_name == 'pull_request' && steps.overview.outcome == 'success' }}
         uses: actions/github-script@v9
         env:
-          ROOT: ${{ env.BASE_ROOT }}
+          PLAN_MD: ${{ env.BASE_ROOT }}/plan.md
+          MARKER_KEY: base
           HAS_CHANGES: ${{ steps.plan.outputs.changes }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
         with:
           script: |
             const fs = require('fs');
-            const marker = '<!-- tofu-plan:base -->';
+            const marker = `<!-- tofu-plan:${process.env.MARKER_KEY} -->`;
+            const failed = process.env.PLAN_OUTCOME !== 'success';
             const hasChanges = process.env.HAS_CHANGES === 'true';
-            const plan = fs
-              .readFileSync(`${process.env.ROOT}/plan.txt`, 'utf8')
-              .slice(0, 60000);
-            const body = hasChanges
-              ? `${marker}\n### Terraform plan — \`Projekt-Basis\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`
-              : `${marker}\n### Terraform plan — \`Projekt-Basis\`\n\nKeine Änderungen.`;
+            const body = `${marker}\n${fs.readFileSync(process.env.PLAN_MD, 'utf8')}`;
 
             const { data: comments } = await github.rest.issues.listComments({
               ...context.repo,
@@ -160,10 +186,11 @@ jobs:
 
             // Der Plan läuft auf jedem PR, auch auf solchen, die terraform
             // nicht anfassen. Ein leerer Plan bekommt deshalb keinen eigenen
-            // Kommentar — sonst trägt jeder Dependabot-PR drei Klappboxen mit
-            // "No changes.". Ein bereits vorhandener wird aber aktualisiert,
-            // damit kein überholter Plan stehen bleibt.
-            if (!hasChanges && !existing) {
+            // Kommentar — sonst trägt jeder Dependabot-PR drei Kommentare mit
+            // "Keine Änderungen". Ein bereits vorhandener wird aber
+            // aktualisiert, damit kein überholter Plan stehen bleibt. Ein
+            // gescheiterter Plan kommentiert immer.
+            if (!failed && !hasChanges && !existing) {
               core.info('Keine Änderungen und kein bestehender Kommentar — nichts zu tun.');
               return;
             }
@@ -224,6 +251,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: OpenTofu-Version aus .tool-versions
+        run: |
+          version=$(awk '$1 == "opentofu" { print $2 }' "$GITHUB_WORKSPACE/.tool-versions")
+          if [ -z "$version" ]; then
+            echo "::error file=.tool-versions::Kein Eintrag 'opentofu <version>' gefunden"
+            exit 1
+          fi
+          echo "TOFU_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v2
         with:
@@ -274,11 +310,11 @@ jobs:
 
       - name: Init
         if: ${{ env.gcp_ready == 'true' }}
-        run: tofu init -input=false
+        run: tofu init -input=false -no-color 2>&1 | tee plan.log
 
       - name: Validate
         if: ${{ env.gcp_ready == 'true' }}
-        run: tofu validate
+        run: tofu validate -no-color 2>&1 | tee -a plan.log
 
       - name: Plan
         id: plan
@@ -288,8 +324,8 @@ jobs:
           # Siehe plan-base: 0 = keine Änderungen, 2 = Änderungen.
           set +e
           # -lock=false wie bei plan-base: ein Plan liest nur.
-          tofu plan -input=false -no-color -detailed-exitcode -lock=false -out=tfplan
-          code=$?
+          tofu plan -input=false -no-color -detailed-exitcode -lock=false -out=tfplan 2>&1 | tee -a plan.log
+          code=${PIPESTATUS[0]}
           set -e
           case "$code" in
             0) echo "changes=false" >>"$GITHUB_OUTPUT" ;;
@@ -297,37 +333,52 @@ jobs:
             *) exit "$code" ;;
           esac
           tofu show -no-color tfplan > plan.txt
+          # Nur für die Übersicht im PR-Kommentar. Das JSON enthält sensible
+          # Werte im Klartext — es bleibt auf dem Runner, das Skript liest
+          # daraus nur Adressen und Aktionen.
+          tofu show -json tfplan > plan.json
 
-      - name: Step summary
-        if: ${{ env.gcp_ready == 'true' }}
+      - name: Setup Node
+        if: ${{ !cancelled() && env.gcp_ready == 'true' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+
+      # Läuft auch, wenn der Plan scheitert: Dann zeigt die Übersicht ❌ und die
+      # Fehlermeldung statt gar nichts.
+      - name: Plan-Übersicht
+        id: overview
+        if: ${{ !cancelled() && env.gcp_ready == 'true' }}
+        working-directory: terraform/environments/${{ matrix.environment }}
+        env:
+          TITLE: ${{ matrix.environment }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          {
-            echo "## Terraform plan — ${{ matrix.environment }}"
-            echo
-            echo '```terraform'
-            head -c 60000 plan.txt
-            echo
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PLAN_OUTCOME" = "success" ]; then
+            node "$GITHUB_WORKSPACE/scripts/tofuPlanSummary.mts" \
+              --title "$TITLE" --json plan.json --text plan.txt > plan.md
+          else
+            node "$GITHUB_WORKSPACE/scripts/tofuPlanSummary.mts" \
+              --title "$TITLE" --failed --log plan.log --run-url "$RUN_URL" > plan.md
+          fi
+          cat plan.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment plan on PR
-        if: ${{ env.gcp_ready == 'true' && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && env.gcp_ready == 'true' && github.event_name == 'pull_request' && steps.overview.outcome == 'success' }}
         uses: actions/github-script@v9
         env:
-          ENVIRONMENT: ${{ matrix.environment }}
+          PLAN_MD: terraform/environments/${{ matrix.environment }}/plan.md
+          MARKER_KEY: ${{ matrix.environment }}
           HAS_CHANGES: ${{ steps.plan.outputs.changes }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
         with:
           script: |
             const fs = require('fs');
-            const env = process.env.ENVIRONMENT;
-            const marker = `<!-- tofu-plan:${env} -->`;
+            const marker = `<!-- tofu-plan:${process.env.MARKER_KEY} -->`;
+            const failed = process.env.PLAN_OUTCOME !== 'success';
             const hasChanges = process.env.HAS_CHANGES === 'true';
-            const plan = fs
-              .readFileSync(`terraform/environments/${env}/plan.txt`, 'utf8')
-              .slice(0, 60000);
-            const body = hasChanges
-              ? `${marker}\n### Terraform plan — \`${env}\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`
-              : `${marker}\n### Terraform plan — \`${env}\`\n\nKeine Änderungen.`;
+            const body = `${marker}\n${fs.readFileSync(process.env.PLAN_MD, 'utf8')}`;
 
             const { data: comments } = await github.rest.issues.listComments({
               ...context.repo,
@@ -335,9 +386,13 @@ jobs:
             });
             const existing = comments.find((c) => c.body?.includes(marker));
 
-            // Siehe plan-base: ein leerer Plan kommentiert nur dann, wenn
-            // schon ein Kommentar steht, der sonst überholt wäre.
-            if (!hasChanges && !existing) {
+            // Der Plan läuft auf jedem PR, auch auf solchen, die terraform
+            // nicht anfassen. Ein leerer Plan bekommt deshalb keinen eigenen
+            // Kommentar — sonst trägt jeder Dependabot-PR drei Kommentare mit
+            // "Keine Änderungen". Ein bereits vorhandener wird aber
+            // aktualisiert, damit kein überholter Plan stehen bleibt. Ein
+            // gescheiterter Plan kommentiert immer.
+            if (!failed && !hasChanges && !existing) {
               core.info('Keine Änderungen und kein bestehender Kommentar — nichts zu tun.');
               return;
             }
@@ -391,6 +446,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: OpenTofu-Version aus .tool-versions
+        run: |
+          version=$(awk '$1 == "opentofu" { print $2 }' "$GITHUB_WORKSPACE/.tool-versions")
+          if [ -z "$version" ]; then
+            echo "::error file=.tool-versions::Kein Eintrag 'opentofu <version>' gefunden"
+            exit 1
+          fi
+          echo "TOFU_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v2

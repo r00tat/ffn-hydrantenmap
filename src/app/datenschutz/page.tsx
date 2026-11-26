@@ -355,9 +355,13 @@ export default function Datenschutz() {
           marginBottom: '16px',
         }}
       >
-        Pegelstände, Stromausfälle und Rettungskarten (Euro NCAP) werden vom
-        Server der Einsatzkarte abgefragt. Dabei werden keine Daten über Sie an
-        diese Anbieter übermittelt.
+        Pegelstände, Stromausfälle, Verkehrsmeldungen der ASFINAG und
+        Rettungskarten (Euro NCAP) werden vom Server der Einsatzkarte
+        abgefragt. Dabei werden keine Daten über Sie an diese Anbieter
+        übermittelt. Den Verlauf der Verkehrsmeldungen entlang der Autobahn
+        berechnet die Einsatzkarte selbst aus dem Straßennetz der Graphenintegrations-Plattform
+        (GIP, Datenquelle: gip.gv.at – CC BY 4.0); dafür geht keine Anfrage an
+        die GIP.
       </Typography>
       <Typography
         component="div"

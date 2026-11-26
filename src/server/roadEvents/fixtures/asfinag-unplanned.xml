@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ns0:d2LogicalModel modelBaseVersion="2" xmlns:ns0="http://datex2.eu/schema/2/2_0">
+    <ns0:exchange>
+        <ns0:supplierIdentification>
+            <ns0:country>at</ns0:country>
+            <ns0:nationalIdentifier>ASFINAG</ns0:nationalIdentifier>
+        </ns0:supplierIdentification>
+    </ns0:exchange>
+    <ns0:payloadPublication p2:type="ns0:SituationPublication" lang="de-at"
+        xmlns:p2="http://www.w3.org/2001/XMLSchema-instance">
+        <ns0:publicationTime>2026-02-18T14:38:30.553716Z</ns0:publicationTime>
+        <ns0:publicationCreator>
+            <ns0:country>at</ns0:country>
+            <ns0:nationalIdentifier>ASFINAG</ns0:nationalIdentifier>
+        </ns0:publicationCreator>
+        <ns0:situation id="ezeiDZgRGHnbviCKeDzk/Q_A10_1" version="3">
+            <ns0:headerInformation>
+                <ns0:confidentiality>noRestriction</ns0:confidentiality>
+                <ns0:informationStatus>real</ns0:informationStatus>
+                <ns0:urgency>normalUrgency</ns0:urgency>
+            </ns0:headerInformation>
+            <ns0:situationRecord p2:type="ns0:MaintenanceWorks"
+                id="ezeiDZgRGHnbviCKeDzk/Q_A10_1ezeiDZgRGHnbviCKeDzk/Q_A10_1" version="3">
+                <ns0:situationRecordCreationTime>2026-02-11T14:45:00Z</ns0:situationRecordCreationTime>
+                <ns0:situationRecordVersionTime>2026-02-13T18:35:19.991Z</ns0:situationRecordVersionTime>
+                <ns0:probabilityOfOccurrence>certain</ns0:probabilityOfOccurrence>
+                <ns0:source>
+                    <ns0:sourceCountry>at</ns0:sourceCountry>
+                    <ns0:sourceIdentification>ASFINAG</ns0:sourceIdentification>
+                    <ns0:sourceName>
+                        <ns0:values>
+                            <ns0:value lang="en">ASFINAG</ns0:value>
+                            <ns0:value lang="de-at">ASFINAG</ns0:value>
+                        </ns0:values>
+                    </ns0:sourceName>
+                </ns0:source>
+                <ns0:validity>
+                    <ns0:validityStatus>suspended</ns0:validityStatus>
+                    <ns0:validityTimeSpecification>
+                        <ns0:overallStartTime>2026-02-11T14:45:00Z</ns0:overallStartTime>
+                        <ns0:overallEndTime>2026-02-13T18:35:22.232Z</ns0:overallEndTime>
+                    </ns0:validityTimeSpecification>
+                </ns0:validity>
+                <ns0:generalPublicComment>
+                    <ns0:comment>
+                        <ns0:values>
+                            <ns0:value lang="de-at">A10 Tauern Autobahn, Salzburg Richtung Villach,
+                                zwischen Spittal Ost (km 147.0) und Paternion-Feistritz (km 159.6),
+                                Verkehrsbehinderung aufgrund von Aufräumarbeiten, zweiter
+                                Fahrstreifen gesperrt</ns0:value>
+                        </ns0:values>
+                    </ns0:comment>
+                    <ns0:commentType>description</ns0:commentType>
+                </ns0:generalPublicComment>
+                <ns0:groupOfLocations p2:type="ns0:Linear">
+                    <ns0:groupOfLocationsExtension>
+                        <ns0:groupOfLocationsExtended>
+                            <ns0:roadInfo>
+                                <ns0:roadNumber>A10</ns0:roadNumber>
+                                <ns0:roadName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Tauern Autobahn</ns0:value>
+                                    </ns0:values>
+                                </ns0:roadName>
+                                <ns0:roadOperator>ASFINAG</ns0:roadOperator>
+                            </ns0:roadInfo>
+                            <ns0:locationInfo>
+                                <ns0:country>at</ns0:country>
+                                <ns0:region>K</ns0:region>
+                                <ns0:locationName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Salzburg Richtung Villach</ns0:value>
+                                    </ns0:values>
+                                </ns0:locationName>
+                            </ns0:locationInfo>
+                        </ns0:groupOfLocationsExtended>
+                    </ns0:groupOfLocationsExtension>
+                    <ns0:locationForDisplay>
+                        <ns0:latitude>46.752316</ns0:latitude>
+                        <ns0:longitude>13.572677</ns0:longitude>
+                    </ns0:locationForDisplay>
+                    <ns0:supplementaryPositionalDescription>
+                        <ns0:affectedCarriagewayAndLanes>
+                            <ns0:carriageway>mainCarriageway</ns0:carriageway>
+                            <ns0:lane>lane2</ns0:lane>
+                        </ns0:affectedCarriagewayAndLanes>
+                    </ns0:supplementaryPositionalDescription>
+                    <ns0:alertCLinear p2:type="ns0:AlertCMethod4Linear">
+                        <ns0:alertCLocationCountryCode>A</ns0:alertCLocationCountryCode>
+                        <ns0:alertCLocationTableNumber>1</ns0:alertCLocationTableNumber>
+                        <ns0:alertCLocationTableVersion>3.8</ns0:alertCLocationTableVersion>
+                        <ns0:alertCDirection>
+                            <ns0:alertCDirectionCoded>positive</ns0:alertCDirectionCoded>
+                        </ns0:alertCDirection>
+                        <ns0:alertCMethod4PrimaryPointLocation>
+                            <ns0:alertCLocation>
+                                <ns0:specificLocation>44301</ns0:specificLocation>
+                            </ns0:alertCLocation>
+                            <ns0:offsetDistance>
+                                <ns0:offsetDistance>2480</ns0:offsetDistance>
+                            </ns0:offsetDistance>
+                        </ns0:alertCMethod4PrimaryPointLocation>
+                        <ns0:alertCMethod4SecondaryPointLocation>
+                            <ns0:alertCLocation>
+                                <ns0:specificLocation>31284</ns0:specificLocation>
+                            </ns0:alertCLocation>
+                            <ns0:offsetDistance>
+                                <ns0:offsetDistance>4080</ns0:offsetDistance>
+                            </ns0:offsetDistance>
+                        </ns0:alertCMethod4SecondaryPointLocation>
+                    </ns0:alertCLinear>
+                    <ns0:linearWithinLinearElement>
+                        <ns0:directionRelativeOnLinearSection>aligned</ns0:directionRelativeOnLinearSection>
+                        <ns0:linearElement>
+                            <ns0:roadName>
+                                <ns0:values>
+                                    <ns0:value lang="de-at">Tauern Autobahn</ns0:value>
+                                </ns0:values>
+                            </ns0:roadName>
+                            <ns0:roadNumber>A10</ns0:roadNumber>
+                        </ns0:linearElement>
+                        <ns0:fromPoint p2:type="ns0:DistanceFromLinearElementStart">
+                            <ns0:distanceAlong>151120</ns0:distanceAlong>
+                        </ns0:fromPoint>
+                        <ns0:toPoint p2:type="ns0:DistanceFromLinearElementStart">
+                            <ns0:distanceAlong>151840</ns0:distanceAlong>
+                        </ns0:toPoint>
+                    </ns0:linearWithinLinearElement>
+                    <ns0:linearExtension>
+                        <ns0:extendedLinear>
+                            <ns0:linearByCoordinates>
+                                <ns0:roadName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Tauern Autobahn</ns0:value>
+                                    </ns0:values>
+                                </ns0:roadName>
+                                <ns0:roadNumber>A10</ns0:roadNumber>
+                                <ns0:start>
+                                    <ns0:latitude>46.752316</ns0:latitude>
+                                    <ns0:longitude>13.572677</ns0:longitude>
+                                </ns0:start>
+                                <ns0:end>
+                                    <ns0:latitude>46.746773</ns0:latitude>
+                                    <ns0:longitude>13.577482</ns0:longitude>
+                                </ns0:end>
+                            </ns0:linearByCoordinates>
+                        </ns0:extendedLinear>
+                        <ns0:extendedLinearForGipLink>
+                            <ns0:gipLinkLinearLocationReference version="GIPAT2509" name="gip_at">
+                                <ns0:gipLink index="0">
+                                    <ns0:gipLink>
+                                        <ns0:linkId>461006661</ns0:linkId>
+                                        <ns0:linkPercentageFrom>
+                                            <ns0:percentageDistanceAlong>3.73</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageFrom>
+                                        <ns0:linkPercentageTo>
+                                            <ns0:percentageDistanceAlong>14.62</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageTo>
+                                        <ns0:referenceDirection>fromTo</ns0:referenceDirection>
+                                    </ns0:gipLink>
+                                </ns0:gipLink>
+                            </ns0:gipLinkLinearLocationReference>
+                        </ns0:extendedLinearForGipLink>
+                    </ns0:linearExtension>
+                </ns0:groupOfLocations>
+                <ns0:situationRecordExtension>
+                    <ns0:situationRecordExtended>
+                        <ns0:affectedModesOfTransport>
+                            <ns0:affectedMode>allMotorizedTraffic</ns0:affectedMode>
+                        </ns0:affectedModesOfTransport>
+                    </ns0:situationRecordExtended>
+                    <ns0:situationRecordExtendedApproved>
+                        <ns0:safetyRelatedMessage>true</ns0:safetyRelatedMessage>
+                    </ns0:situationRecordExtendedApproved>
+                </ns0:situationRecordExtension>
+                <ns0:roadMaintenanceType>maintenanceWork</ns0:roadMaintenanceType>
+            </ns0:situationRecord>
+            <ns0:situationRecord p2:type="ns0:RoadOrCarriagewayOrLaneManagement"
+                id="ezeiDZgRGHnbviCKeDzk/Q_A10_1ezeiDZgRGHnbviCKeDzk/Q_A10_1_LaneClosures"
+                version="3">
+                <ns0:situationRecordCreationTime>2026-02-11T14:45:00Z</ns0:situationRecordCreationTime>
+                <ns0:situationRecordVersionTime>2026-02-13T18:35:19.991Z</ns0:situationRecordVersionTime>
+                <ns0:probabilityOfOccurrence>certain</ns0:probabilityOfOccurrence>
+                <ns0:source>
+                    <ns0:sourceCountry>at</ns0:sourceCountry>
+                    <ns0:sourceIdentification>ASFINAG</ns0:sourceIdentification>
+                    <ns0:sourceName>
+                        <ns0:values>
+                            <ns0:value lang="en">ASFINAG</ns0:value>
+                            <ns0:value lang="de-at">ASFINAG</ns0:value>
+                        </ns0:values>
+                    </ns0:sourceName>
+                </ns0:source>
+                <ns0:validity>
+                    <ns0:validityStatus>suspended</ns0:validityStatus>
+                    <ns0:validityTimeSpecification>
+                        <ns0:overallStartTime>2026-02-11T14:45:00Z</ns0:overallStartTime>
+                        <ns0:overallEndTime>2026-02-13T18:35:22.232Z</ns0:overallEndTime>
+                    </ns0:validityTimeSpecification>
+                </ns0:validity>
+                <ns0:generalPublicComment>
+                    <ns0:comment>
+                        <ns0:values>
+                            <ns0:value lang="de-at">A10 Tauern Autobahn, Salzburg Richtung Villach,
+                                zwischen Spittal Ost (km 147.0) und Paternion-Feistritz (km 159.6),
+                                Verkehrsbehinderung aufgrund von Aufräumarbeiten, zweiter
+                                Fahrstreifen gesperrt</ns0:value>
+                        </ns0:values>
+                    </ns0:comment>
+                    <ns0:commentType>description</ns0:commentType>
+                </ns0:generalPublicComment>
+                <ns0:groupOfLocations p2:type="ns0:Linear">
+                    <ns0:groupOfLocationsExtension>
+                        <ns0:groupOfLocationsExtended>
+                            <ns0:roadInfo>
+                                <ns0:roadNumber>A10</ns0:roadNumber>
+                                <ns0:roadName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Tauern Autobahn</ns0:value>
+                                    </ns0:values>
+                                </ns0:roadName>
+                                <ns0:roadOperator>ASFINAG</ns0:roadOperator>
+                            </ns0:roadInfo>
+                            <ns0:locationInfo>
+                                <ns0:country>at</ns0:country>
+                                <ns0:region>K</ns0:region>
+                                <ns0:locationName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Salzburg Richtung Villach</ns0:value>
+                                    </ns0:values>
+                                </ns0:locationName>
+                            </ns0:locationInfo>
+                        </ns0:groupOfLocationsExtended>
+                    </ns0:groupOfLocationsExtension>
+                    <ns0:locationForDisplay>
+                        <ns0:latitude>46.752316</ns0:latitude>
+                        <ns0:longitude>13.572677</ns0:longitude>
+                    </ns0:locationForDisplay>
+                    <ns0:supplementaryPositionalDescription>
+                        <ns0:affectedCarriagewayAndLanes>
+                            <ns0:carriageway>mainCarriageway</ns0:carriageway>
+                            <ns0:lane>lane2</ns0:lane>
+                        </ns0:affectedCarriagewayAndLanes>
+                    </ns0:supplementaryPositionalDescription>
+                    <ns0:alertCLinear p2:type="ns0:AlertCMethod4Linear">
+                        <ns0:alertCLocationCountryCode>A</ns0:alertCLocationCountryCode>
+                        <ns0:alertCLocationTableNumber>1</ns0:alertCLocationTableNumber>
+                        <ns0:alertCLocationTableVersion>3.8</ns0:alertCLocationTableVersion>
+                        <ns0:alertCDirection>
+                            <ns0:alertCDirectionCoded>positive</ns0:alertCDirectionCoded>
+                        </ns0:alertCDirection>
+                        <ns0:alertCMethod4PrimaryPointLocation>
+                            <ns0:alertCLocation>
+                                <ns0:specificLocation>44301</ns0:specificLocation>
+                            </ns0:alertCLocation>
+                            <ns0:offsetDistance>
+                                <ns0:offsetDistance>2480</ns0:offsetDistance>
+                            </ns0:offsetDistance>
+                        </ns0:alertCMethod4PrimaryPointLocation>
+                        <ns0:alertCMethod4SecondaryPointLocation>
+                            <ns0:alertCLocation>
+                                <ns0:specificLocation>31284</ns0:specificLocation>
+                            </ns0:alertCLocation>
+                            <ns0:offsetDistance>
+                                <ns0:offsetDistance>4080</ns0:offsetDistance>
+                            </ns0:offsetDistance>
+                        </ns0:alertCMethod4SecondaryPointLocation>
+                    </ns0:alertCLinear>
+                    <ns0:linearWithinLinearElement>
+                        <ns0:directionRelativeOnLinearSection>aligned</ns0:directionRelativeOnLinearSection>
+                        <ns0:linearElement>
+                            <ns0:roadName>
+                                <ns0:values>
+                                    <ns0:value lang="de-at">Tauern Autobahn</ns0:value>
+                                </ns0:values>
+                            </ns0:roadName>
+                            <ns0:roadNumber>A10</ns0:roadNumber>
+                        </ns0:linearElement>
+                        <ns0:fromPoint p2:type="ns0:DistanceFromLinearElementStart">
+                            <ns0:distanceAlong>151120</ns0:distanceAlong>
+                        </ns0:fromPoint>
+                        <ns0:toPoint p2:type="ns0:DistanceFromLinearElementStart">
+                            <ns0:distanceAlong>151840</ns0:distanceAlong>
+                        </ns0:toPoint>
+                    </ns0:linearWithinLinearElement>
+                    <ns0:linearExtension>
+                        <ns0:extendedLinear>
+                            <ns0:linearByCoordinates>
+                                <ns0:roadName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Tauern Autobahn</ns0:value>
+                                    </ns0:values>
+                                </ns0:roadName>
+                                <ns0:roadNumber>A10</ns0:roadNumber>
+                                <ns0:start>
+                                    <ns0:latitude>46.752316</ns0:latitude>
+                                    <ns0:longitude>13.572677</ns0:longitude>
+                                </ns0:start>
+                                <ns0:end>
+                                    <ns0:latitude>46.746773</ns0:latitude>
+                                    <ns0:longitude>13.577482</ns0:longitude>
+                                </ns0:end>
+                            </ns0:linearByCoordinates>
+                        </ns0:extendedLinear>
+                        <ns0:extendedLinearForGipLink>
+                            <ns0:gipLinkLinearLocationReference version="GIPAT2509" name="gip_at">
+                                <ns0:gipLink index="0">
+                                    <ns0:gipLink>
+                                        <ns0:linkId>461006661</ns0:linkId>
+                                        <ns0:linkPercentageFrom>
+                                            <ns0:percentageDistanceAlong>3.73</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageFrom>
+                                        <ns0:linkPercentageTo>
+                                            <ns0:percentageDistanceAlong>14.62</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageTo>
+                                        <ns0:referenceDirection>fromTo</ns0:referenceDirection>
+                                    </ns0:gipLink>
+                                </ns0:gipLink>
+                            </ns0:gipLinkLinearLocationReference>
+                        </ns0:extendedLinearForGipLink>
+                    </ns0:linearExtension>
+                </ns0:groupOfLocations>
+                <ns0:situationRecordExtension>
+                    <ns0:situationRecordExtended>
+                        <ns0:affectedModesOfTransport>
+                            <ns0:affectedMode>allMotorizedTraffic</ns0:affectedMode>
+                        </ns0:affectedModesOfTransport>
+                    </ns0:situationRecordExtended>
+                    <ns0:situationRecordExtendedApproved>
+                        <ns0:safetyRelatedMessage>true</ns0:safetyRelatedMessage>
+                    </ns0:situationRecordExtendedApproved>
+                </ns0:situationRecordExtension>
+                <ns0:complianceOption>mandatory</ns0:complianceOption>
+                <ns0:roadOrCarriagewayOrLaneManagementType>laneClosures</ns0:roadOrCarriagewayOrLaneManagementType>
+            </ns0:situationRecord>
+        </ns0:situation>
+        <ns0:situation id="XH5dIRYWS+IEjMflN+GqtQ_A11_2" version="5">
+            <ns0:headerInformation>
+                <ns0:confidentiality>noRestriction</ns0:confidentiality>
+                <ns0:informationStatus>real</ns0:informationStatus>
+                <ns0:urgency>normalUrgency</ns0:urgency>
+            </ns0:headerInformation>
+            <ns0:situationRecord p2:type="ns0:RoadOrCarriagewayOrLaneManagement"
+                id="XH5dIRYWS+IEjMflN+GqtQ_A11_2XH5dIRYWS+IEjMflN+GqtQ_A11_2" version="3">
+                <ns0:situationRecordCreationTime>2026-02-12T12:18:00Z</ns0:situationRecordCreationTime>
+                <ns0:situationRecordVersionTime>2026-02-17T06:46:01.05Z</ns0:situationRecordVersionTime>
+                <ns0:probabilityOfOccurrence>certain</ns0:probabilityOfOccurrence>
+                <ns0:source>
+                    <ns0:sourceCountry>at</ns0:sourceCountry>
+                    <ns0:sourceIdentification>ASFINAG</ns0:sourceIdentification>
+                    <ns0:sourceName>
+                        <ns0:values>
+                            <ns0:value lang="en">ASFINAG</ns0:value>
+                            <ns0:value lang="de-at">ASFINAG</ns0:value>
+                        </ns0:values>
+                    </ns0:sourceName>
+                </ns0:source>
+                <ns0:validity>
+                    <ns0:validityStatus>definedByValidityTimeSpec</ns0:validityStatus>
+                    <ns0:validityTimeSpecification>
+                        <ns0:overallStartTime>2026-02-18T21:00:00Z</ns0:overallStartTime>
+                        <ns0:overallEndTime>2026-02-19T04:00:00Z</ns0:overallEndTime>
+                    </ns0:validityTimeSpecification>
+                </ns0:validity>
+                <ns0:impact>
+                    <ns0:trafficConstrictionType>roadBlocked</ns0:trafficConstrictionType>
+                </ns0:impact>
+                <ns0:generalPublicComment>
+                    <ns0:comment>
+                        <ns0:values>
+                            <ns0:value lang="de-at">A11 Karawanken Autobahn, Ljubljana (SLO)
+                                Richtung Villach, zwischen Karawankentunnel A/SLO Staatsgrenze und
+                                St. Jakob/Rosental (km 11.5), Tunnel Karawanken, Totalsperre
+                                aufgrund von Baustelle, Voraussichtliche Dauer: 18.02.2026 22:00 -
+                                19.02.2026 05:00</ns0:value>
+                        </ns0:values>
+                    </ns0:comment>
+                    <ns0:commentType>description</ns0:commentType>
+                </ns0:generalPublicComment>
+                <ns0:groupOfLocations p2:type="ns0:Linear">
+                    <ns0:groupOfLocationsExtension>
+                        <ns0:groupOfLocationsExtended>
+                            <ns0:roadInfo>
+                                <ns0:roadNumber>A11</ns0:roadNumber>
+                                <ns0:roadName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Karawanken Autobahn</ns0:value>
+                                    </ns0:values>
+                                </ns0:roadName>
+                                <ns0:roadOperator>ASFINAG</ns0:roadOperator>
+                            </ns0:roadInfo>
+                            <ns0:locationInfo>
+                                <ns0:country>at</ns0:country>
+                                <ns0:region>K</ns0:region>
+                                <ns0:locationName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Ljubljana (SLO) Richtung Villach</ns0:value>
+                                    </ns0:values>
+                                </ns0:locationName>
+                            </ns0:locationInfo>
+                        </ns0:groupOfLocationsExtended>
+                    </ns0:groupOfLocationsExtension>
+                    <ns0:locationForDisplay>
+                        <ns0:latitude>46.483078</ns0:latitude>
+                        <ns0:longitude>14.008999</ns0:longitude>
+                    </ns0:locationForDisplay>
+                    <ns0:supplementaryPositionalDescription>
+                        <ns0:locationDescriptor>inTunnel</ns0:locationDescriptor>
+                        <ns0:affectedCarriagewayAndLanes>
+                            <ns0:carriageway>mainCarriageway</ns0:carriageway>
+                            <ns0:lane>allLanesCompleteCarriageway</ns0:lane>
+                        </ns0:affectedCarriagewayAndLanes>
+                    </ns0:supplementaryPositionalDescription>
+                    <ns0:alertCLinear p2:type="ns0:AlertCMethod4Linear">
+                        <ns0:alertCLocationCountryCode>A</ns0:alertCLocationCountryCode>
+                        <ns0:alertCLocationTableNumber>1</ns0:alertCLocationTableNumber>
+                        <ns0:alertCLocationTableVersion>3.8</ns0:alertCLocationTableVersion>
+                        <ns0:alertCDirection>
+                            <ns0:alertCDirectionCoded>negative</ns0:alertCDirectionCoded>
+                        </ns0:alertCDirection>
+                        <ns0:alertCMethod4PrimaryPointLocation>
+                            <ns0:alertCLocation>
+                                <ns0:specificLocation>35845</ns0:specificLocation>
+                            </ns0:alertCLocation>
+                            <ns0:offsetDistance>
+                                <ns0:offsetDistance>2500</ns0:offsetDistance>
+                            </ns0:offsetDistance>
+                        </ns0:alertCMethod4PrimaryPointLocation>
+                        <ns0:alertCMethod4SecondaryPointLocation>
+                            <ns0:alertCLocation>
+                                <ns0:specificLocation>32740</ns0:specificLocation>
+                            </ns0:alertCLocation>
+                            <ns0:offsetDistance>
+                                <ns0:offsetDistance>190</ns0:offsetDistance>
+                            </ns0:offsetDistance>
+                        </ns0:alertCMethod4SecondaryPointLocation>
+                    </ns0:alertCLinear>
+                    <ns0:linearWithinLinearElement>
+                        <ns0:directionRelativeOnLinearSection>opposite</ns0:directionRelativeOnLinearSection>
+                        <ns0:linearElement>
+                            <ns0:roadName>
+                                <ns0:values>
+                                    <ns0:value lang="de-at">Karawanken Autobahn</ns0:value>
+                                </ns0:values>
+                            </ns0:roadName>
+                            <ns0:roadNumber>A11</ns0:roadNumber>
+                        </ns0:linearElement>
+                        <ns0:fromPoint p2:type="ns0:DistanceFromLinearElementStart">
+                            <ns0:distanceAlong>21000</ns0:distanceAlong>
+                        </ns0:fromPoint>
+                        <ns0:toPoint p2:type="ns0:DistanceFromLinearElementStart">
+                            <ns0:distanceAlong>15000</ns0:distanceAlong>
+                        </ns0:toPoint>
+                    </ns0:linearWithinLinearElement>
+                    <ns0:linearExtension>
+                        <ns0:extendedLinear>
+                            <ns0:linearByCoordinates>
+                                <ns0:roadName>
+                                    <ns0:values>
+                                        <ns0:value lang="de-at">Karawanken Autobahn</ns0:value>
+                                    </ns0:values>
+                                </ns0:roadName>
+                                <ns0:roadNumber>A11</ns0:roadNumber>
+                                <ns0:start>
+                                    <ns0:latitude>46.483078</ns0:latitude>
+                                    <ns0:longitude>14.008999</ns0:longitude>
+                                </ns0:start>
+                                <ns0:end>
+                                    <ns0:latitude>46.533497</ns0:latitude>
+                                    <ns0:longitude>14.030346</ns0:longitude>
+                                </ns0:end>
+                            </ns0:linearByCoordinates>
+                        </ns0:extendedLinear>
+                        <ns0:extendedLinearForGipLink>
+                            <ns0:gipLinkLinearLocationReference version="GIPAT2509" name="gip_at">
+                                <ns0:gipLink index="0">
+                                    <ns0:gipLink>
+                                        <ns0:linkId>461006800</ns0:linkId>
+                                        <ns0:linkPercentageFrom>
+                                            <ns0:percentageDistanceAlong>0</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageFrom>
+                                        <ns0:linkPercentageTo>
+                                            <ns0:percentageDistanceAlong>95.37</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageTo>
+                                        <ns0:referenceDirection>toFrom</ns0:referenceDirection>
+                                    </ns0:gipLink>
+                                </ns0:gipLink>
+                                <ns0:gipLink index="1">
+                                    <ns0:gipLink>
+                                        <ns0:linkId>461006799</ns0:linkId>
+                                        <ns0:linkPercentageFrom>
+                                            <ns0:percentageDistanceAlong>0</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageFrom>
+                                        <ns0:linkPercentageTo>
+                                            <ns0:percentageDistanceAlong>100</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageTo>
+                                        <ns0:referenceDirection>toFrom</ns0:referenceDirection>
+                                    </ns0:gipLink>
+                                </ns0:gipLink>
+                                <ns0:gipLink index="2">
+                                    <ns0:gipLink>
+                                        <ns0:linkId>461029652</ns0:linkId>
+                                        <ns0:linkPercentageFrom>
+                                            <ns0:percentageDistanceAlong>0</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageFrom>
+                                        <ns0:linkPercentageTo>
+                                            <ns0:percentageDistanceAlong>100</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageTo>
+                                        <ns0:referenceDirection>toFrom</ns0:referenceDirection>
+                                    </ns0:gipLink>
+                                </ns0:gipLink>
+                                <ns0:gipLink index="3">
+                                    <ns0:gipLink>
+                                        <ns0:linkId>461029651</ns0:linkId>
+                                        <ns0:linkPercentageFrom>
+                                            <ns0:percentageDistanceAlong>0</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageFrom>
+                                        <ns0:linkPercentageTo>
+                                            <ns0:percentageDistanceAlong>100</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageTo>
+                                        <ns0:referenceDirection>toFrom</ns0:referenceDirection>
+                                    </ns0:gipLink>
+                                </ns0:gipLink>
+                                <ns0:gipLink index="4">
+                                    <ns0:gipLink>
+                                        <ns0:linkId>461006797</ns0:linkId>
+                                        <ns0:linkPercentageFrom>
+                                            <ns0:percentageDistanceAlong>0</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageFrom>
+                                        <ns0:linkPercentageTo>
+                                            <ns0:percentageDistanceAlong>100</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageTo>
+                                        <ns0:referenceDirection>toFrom</ns0:referenceDirection>
+                                    </ns0:gipLink>
+                                </ns0:gipLink>
+                                <ns0:gipLink index="5">
+                                    <ns0:gipLink>
+                                        <ns0:linkId>461006796</ns0:linkId>
+                                        <ns0:linkPercentageFrom>
+                                            <ns0:percentageDistanceAlong>91.48</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageFrom>
+                                        <ns0:linkPercentageTo>
+                                            <ns0:percentageDistanceAlong>100</ns0:percentageDistanceAlong>
+                                        </ns0:linkPercentageTo>
+                                        <ns0:referenceDirection>toFrom</ns0:referenceDirection>
+                                    </ns0:gipLink>
+                                </ns0:gipLink>
+                            </ns0:gipLinkLinearLocationReference>
+                        </ns0:extendedLinearForGipLink>
+                    </ns0:linearExtension>
+                </ns0:groupOfLocations>
+                <ns0:situationRecordExtension>
+                    <ns0:situationRecordExtended>
+                        <ns0:affectedModesOfTransport>
+                            <ns0:affectedMode>allMotorizedTraffic</ns0:affectedMode>
+                        </ns0:affectedModesOfTransport>
+                    </ns0:situationRecordExtended>
+                </ns0:situationRecordExtension>
+                <ns0:complianceOption>mandatory</ns0:complianceOption>
+                <ns0:roadOrCarriagewayOrLaneManagementType>roadClosed</ns0:roadOrCarriagewayOrLaneManagementType>
+            </ns0:situationRecord>
+        </ns0:situation>
+    </ns0:payloadPublication>
+</ns0:d2LogicalModel>
