@@ -318,3 +318,28 @@ describe('createRoadEventsSource mit EVIS', () => {
     expect(result.events.length).toBeGreaterThan(0);
   });
 });
+
+describe('createRoadEventsSource über mehrere Regionen', () => {
+  it('zeigt eine Meldung über die Landesgrenze nur einmal', async () => {
+    // Eine Baustelle zwischen Sommerein (NÖ) und Bruckneudorf (Bgld) steht
+    // in den Paketen beider Länder.
+    const xml = fixture('evis-planned.xml');
+    const feed = (region: string): FeedConfig => ({
+      name: `evis-planned-${region}`,
+      source: 'evis',
+      fetchXml: async () => xml,
+    });
+    const source = createRoadEventsSource({
+      feeds: [feed('AT-1'), feed('AT-3')],
+      loadGraph: async () => ({}) as never,
+      findPath: vi.fn(),
+      now: () => new Date('2026-11-25T09:00:00Z'),
+    });
+
+    const { events } = await source.get();
+
+    const keys = events.map((e) => e.key);
+    expect(keys.length).toBeGreaterThan(0);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});

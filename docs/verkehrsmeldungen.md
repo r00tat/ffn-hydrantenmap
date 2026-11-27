@@ -106,6 +106,11 @@ die kommen weiter vom Content-Portal, so gibt es keine Doppelungen. Wer
 `AT-ASF` oder `AT` einträgt, bekommt Autobahnmeldungen doppelt, solange das
 Portal auch eingerichtet ist.
 
+Eine Baustelle über eine Landesgrenze (etwa Sommerein–Bruckneudorf) steht in
+den Paketen beider Länder. Die Quelle führt die Meldungen aller Pakete
+deshalb über ihren Schlüssel (Situation und Ort) zusammen und behält die
+neueste Version.
+
 `EVIS_API_KEY` liegt wie die ASFINAG-Schlüssel im Secret Manager von
 ffn-utils, von Hand samt Version angelegt und in `secret_env` beider
 Environments gemappt:

@@ -214,7 +214,18 @@ export function createRoadEventsSource({
     const failedFeeds = feeds
       .filter((feed) => states.get(feed.name)?.failed)
       .map((feed) => feed.name);
-    const events = feeds.flatMap((feed) => states.get(feed.name)?.events ?? []);
+    // Eine Situation über eine Landesgrenze steht in den Paketen beider
+    // Länder. Je Situation und Ort bleibt die neueste Version.
+    const unique = new Map<string, RoadEvent>();
+    for (const event of feeds.flatMap(
+      (feed) => states.get(feed.name)?.events ?? []
+    )) {
+      const known = unique.get(event.key);
+      if (!known || Number(event.version) > Number(known.version)) {
+        unique.set(event.key, event);
+      }
+    }
+    const events = [...unique.values()];
     const withPaths = await Promise.all(events.map(withPath));
     withPaths.sort(
       (a, b) =>
