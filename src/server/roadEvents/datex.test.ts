@@ -1,7 +1,13 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, expect, it } from 'vitest';
-import { classifyRecord, parseDatexEvents } from './datex';
+import {
+  classifyRecord,
+  currentEvents,
+  parseDatexEvents,
+  parseDatexRecords,
+  stripUnusedBlocks,
+} from './datex';
 
 const fixture = (name: string) =>
   readFileSync(join(__dirname, 'fixtures', name), 'utf8');
@@ -126,5 +132,156 @@ describe('classifyRecord', () => {
     expect(classifyRecord({ type: 'PoorEnvironmentConditions' })).toBe(
       'incident'
     );
+  });
+});
+
+describe('parseDatexEvents mit EVIS.AT (Landesstraßen)', () => {
+  const evisPlanned = fixture('evis-planned.xml');
+  const evisUnplanned = fixture('evis-unplanned.xml');
+  // Mittwoch, 25.11.2026, 10:00 Ortszeit (MEZ)
+  const WEDNESDAY_MORNING = new Date('2026-11-25T09:00:00Z');
+  const parse = (xml: string, now: Date) =>
+    parseDatexEvents(xml, { now, source: 'evis' });
+
+  it('liest jede Richtung einer Route als eigenen Abschnitt mit mitgeliefertem Verlauf', () => {
+    const b50 = parse(evisPlanned, WEDNESDAY_MORNING).filter(
+      (e) => e.road === 'B50'
+    );
+
+    expect(b50).toHaveLength(2);
+    expect(new Set(b50.map((e) => e.key)).size).toBe(2);
+    for (const event of b50) {
+      expect(event.source).toBe('evis');
+      expect(event.kind).toBe('restriction');
+      expect(event.roadName).toBe('Burgenland Straße');
+      // Anfang, zwei Zwischenpunkte, Ende
+      expect(event.path).toHaveLength(4);
+      expect(event.path?.[0]).toEqual(event.from);
+      expect(event.path?.[3]).toEqual(event.to);
+    }
+    expect(b50[0].path).toEqual([
+      [47.60647, 16.4062767],
+      [47.60623, 16.40641],
+      [47.60596, 16.40656],
+      [47.60588, 16.4066086],
+    ]);
+  });
+
+  it('liest auch einen einzelnen Abschnitt (Linear) samt Zwischenpunkten', () => {
+    const b62 = parse(evisPlanned, WEDNESDAY_MORNING).filter(
+      (e) => e.road === 'B62'
+    );
+    expect(b62).toHaveLength(1);
+    expect(b62[0].path!.length).toBeGreaterThan(2);
+  });
+
+  it('stuft eine gesperrte Landesstraße als Sperre ein und zeigt alle Kommentare', () => {
+    const l219 = parse(evisPlanned, WEDNESDAY_MORNING).filter(
+      (e) => e.road === 'L219'
+    );
+    expect(l219.length).toBeGreaterThan(0);
+    expect(l219[0].kind).toBe('closure');
+    expect(l219[0].description).toMatch(/^L219 - Mattersburger Straße/);
+    expect(l219[0].description).toContain('Umbau Bahnhof Neudörfl');
+  });
+
+  it('entfernt die UUIDs, die EVIS statt Ortsnamen in den Text schreibt', () => {
+    const [b50] = parse(evisPlanned, WEDNESDAY_MORNING).filter(
+      (e) => e.road === 'B50'
+    );
+    expect(b50.description).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
+    expect(b50.description).toMatch(
+      /^B50 - Burgenland Straße: Im Gemeindegebiet/
+    );
+    expect(b50.description).toContain('Kilometer 81.571');
+  });
+
+  it('zeigt Baustellen mit Zeitfenster nur innerhalb des Fensters', () => {
+    const roads = (now: Date) =>
+      new Set(parse(evisPlanned, now).map((e) => e.road));
+
+    // Mittwoch 19:00 Ortszeit: B50 (07:30–17:00) und B62 (08:00–17:00) ruhen,
+    // die durchgehende Sperre der L219 gilt weiter.
+    expect(roads(new Date('2026-11-25T18:00:00Z'))).toEqual(new Set(['L219']));
+    // Mittwoch 07:00 Ortszeit: vor beiden Fenstern
+    expect(roads(new Date('2026-11-25T06:00:00Z'))).toEqual(new Set(['L219']));
+    // Samstag 10:00 Ortszeit: nur werktags
+    expect(roads(new Date('2026-11-28T09:00:00Z'))).toEqual(new Set(['L219']));
+    // Mittwoch 16:59 Ortszeit: noch im Fenster
+    expect(roads(new Date('2026-11-25T15:59:00Z')).has('B50')).toBe(true);
+  });
+
+  it('liest die ungeplanten Ereignisse', () => {
+    const events = parse(evisUnplanned, new Date('2026-11-27T10:00:00Z'));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ road: 'L221', source: 'evis' });
+    expect(events[0].description).toContain('Bergungsarbeiten');
+  });
+});
+
+describe('stripUnusedBlocks', () => {
+  it('entfernt Erweiterung, GIP-Links und ALERT-C, auch mit Namensraum-Präfix', () => {
+    const xml =
+      '<a><ns0:situationExtension><x>1</x></ns0:situationExtension><b>1</b>' +
+      '<extendedLinearForGipLink id="7"><y/></extendedLinearForGipLink>' +
+      '<alertCLinear xsi:type="AlertCMethod4Linear"><z/></alertCLinear></a>';
+    expect(stripUnusedBlocks(xml)).toBe('<a><b>1</b></a>');
+  });
+
+  it('lässt leere Elemente stehen, statt bis zum nächsten Block zu löschen', () => {
+    const xml =
+      '<a><alertCLinear/><b>1</b><alertCLinear><z/></alertCLinear></a>';
+    expect(stripUnusedBlocks(xml)).toBe('<a><alertCLinear/><b>1</b></a>');
+  });
+
+  it('macht die Pakete kleiner, ohne die Meldungen zu ändern', () => {
+    const xml = fixture('evis-planned.xml');
+    const stripped = stripUnusedBlocks(xml);
+    expect(stripped.length).toBeLessThan(xml.length);
+    expect(stripped).not.toContain('extendedLinearForGipLink');
+    expect(stripped).not.toContain('alertCLinear');
+  });
+});
+
+describe('parseDatexRecords und currentEvents', () => {
+  const evisPlanned = fixture('evis-planned.xml');
+  const roads = (records: ReturnType<typeof parseDatexRecords>, now: Date) =>
+    new Set(currentEvents(records, now, 'evis').map((e) => e.road));
+
+  it('liest ein Paket einmal und wertet die Zeitfenster je Zeitpunkt neu aus', () => {
+    const records = parseDatexRecords(evisPlanned);
+
+    // Mittwoch 10:00 und 19:00 Ortszeit
+    expect(roads(records, new Date('2026-11-25T09:00:00Z'))).toEqual(
+      new Set(['B50', 'B62', 'L219'])
+    );
+    expect(roads(records, new Date('2026-11-25T18:00:00Z'))).toEqual(
+      new Set(['L219'])
+    );
+  });
+
+  it('hält nur einfache Werte, keine Knoten aus dem XML', () => {
+    const records = parseDatexRecords(evisPlanned);
+
+    expect(records.length).toBeGreaterThan(0);
+    expect(JSON.parse(JSON.stringify(records))).toEqual(records);
+    for (const record of records) {
+      expect(record).not.toHaveProperty('validity');
+    }
+  });
+
+  it('liefert bei kaputtem XML keine Datensätze', () => {
+    expect(parseDatexRecords('<kein xml')).toEqual([]);
+  });
+});
+
+describe('classifyRecord (Richtungsfahrbahn)', () => {
+  it('stuft eine gesperrte Richtungsfahrbahn als Sperre ein', () => {
+    expect(
+      classifyRecord({
+        type: 'MaintenanceWorks',
+        trafficConstrictionType: 'carriagewayBlocked',
+      })
+    ).toBe('closure');
   });
 });

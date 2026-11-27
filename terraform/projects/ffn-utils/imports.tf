@@ -67,7 +67,7 @@ import {
 }
 
 # Deckt jedes Secret in `local.secrets` ab, auch die von Hand samt Version
-# angelegten ASFINAG-Schlüssel (Verkehrsmeldungen). Einen eigenen Import-Block
+# angelegten Schlüssel für ASFINAG und EVIS.AT (Verkehrsmeldungen). Einen eigenen Import-Block
 # für ein Secret aus dieser Liste lehnt tofu als doppelt ab.
 import {
   for_each = toset(local.secrets)

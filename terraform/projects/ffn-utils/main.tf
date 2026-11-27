@@ -36,11 +36,10 @@ locals {
     "SUMUP_AFFILIATE_KEY_DEV",
     "SUMUP_MERCHANT_CODE",
     "SUMUP_MERCHANT_CODE_DEV",
-    # Zugriffsschlüssel des ASFINAG-Content-Portals (Verkehrsmeldungen). Von
-    # Hand samt Version angelegt und importiert (imports.tf), in `secret_env`
-    # beider Environments gemappt. Siehe docs/verkehrsmeldungen.md.
-    "ASFINAG_UNPLANNED_RESOURCE_KEY",
-    "ASFINAG_PLANNED_RESOURCE_KEY",
+    # Persönlicher Schlüssel für EVIS.AT (Verkehrsmeldungen). Von Hand samt
+    # Version angelegt und importiert (imports.tf), in `secret_env` beider
+    # Environments gemappt. Siehe docs/verkehrsmeldungen.md.
+    "EVIS_API_KEY",
   ]
 }
 

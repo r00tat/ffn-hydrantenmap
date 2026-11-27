@@ -206,7 +206,7 @@ function EventDetails({ event }: { event: RoadEventWithPath }) {
         component="div"
         sx={{ mt: 0.5, color: 'text.secondary' }}
       >
-        {t('source')}
+        {t(`source.${event.source}`)}
       </Typography>
     </Box>
   );
