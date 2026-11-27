@@ -14,13 +14,19 @@ export const ROAD_EVENT_KIND_ORDER: RoadEventKind[] = [
 
 export type LatLng = [number, number];
 
+/**
+ * Herkunft: `asfinag` ist das Content-Portal der ASFINAG (Autobahnen und
+ * Schnellstraßen), `evis` die Landesstraßen aus EVIS.AT.
+ */
+export type RoadEventSource = 'asfinag' | 'evis';
+
 export interface RoadEvent {
   /** Eindeutig je Situation und Ort. */
   key: string;
   /** ID der DATEX-II-Situation. */
   id: string;
   version: string;
-  source: 'asfinag';
+  source: RoadEventSource;
   kind: RoadEventKind;
   /** `Typ:Untertyp` je Eintrag, z. B. `RoadOrCarriagewayOrLaneManagement:roadClosed`. */
   recordTypes: string[];
@@ -34,6 +40,8 @@ export interface RoadEvent {
   end?: string;
   from: LatLng;
   to: LatLng;
+  /** Verlauf samt Zwischenpunkten, wenn die Quelle ihn mitliefert (EVIS). */
+  path?: LatLng[];
 }
 
 export interface RoadEventWithPath extends RoadEvent {

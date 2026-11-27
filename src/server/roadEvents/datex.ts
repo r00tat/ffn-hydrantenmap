@@ -1,6 +1,6 @@
 /**
- * Liest DATEX-II-2.3-Situationen (ASFINAG-Profil) und macht daraus
- * Verkehrsmeldungen für die Karte. Siehe docs/verkehrsmeldungen.md.
+ * Liest DATEX-II-2.3-Situationen (ASFINAG-Content-Portal und EVIS.AT) und
+ * macht daraus Verkehrsmeldungen für die Karte. Siehe docs/verkehrsmeldungen.md.
  *
  * Ausgewertet werden nur die direkten `situationRecord` einer Situation. Die
  * `situationExtension` der geplanten Ereignisse enthält eine Übersicht über
@@ -12,11 +12,23 @@ import {
   ROAD_EVENT_KIND_ORDER,
   RoadEvent,
   RoadEventKind,
+  RoadEventSource,
 } from '../../common/roadEvents';
 
 type XmlNode = Record<string, unknown>;
 
-const ARRAY_TAGS = new Set(['situation', 'situationRecord', 'value', 'lane']);
+const ARRAY_TAGS = new Set([
+  'situation',
+  'situationRecord',
+  'value',
+  'lane',
+  'generalPublicComment',
+  'locationContainedInItinerary',
+  'intermediate',
+  'validPeriod',
+  'exceptionPeriod',
+  'applicableDay',
+]);
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -73,7 +85,12 @@ export interface RecordClassification {
 
 export function classifyRecord(record: RecordClassification): RoadEventKind {
   if (record.subtype && CLOSURE_SUBTYPES.has(record.subtype)) return 'closure';
-  if (record.trafficConstrictionType === 'roadBlocked') return 'closure';
+  if (
+    record.trafficConstrictionType === 'roadBlocked' ||
+    record.trafficConstrictionType === 'carriagewayBlocked'
+  ) {
+    return 'closure';
+  }
   if (RESTRICTION_TYPES.has(record.type)) return 'restriction';
   return 'incident';
 }
@@ -135,6 +152,7 @@ interface ParsedRecord {
   status?: string;
   start?: string;
   end?: string;
+  validity: unknown;
   description?: string;
   url?: string;
   road?: string;
@@ -142,25 +160,106 @@ interface ParsedRecord {
   direction?: string;
   from: LatLng;
   to: LatLng;
+  path?: LatLng[];
 }
 
-function parseRecord(
+interface ParsedLocation {
+  from: LatLng;
+  to: LatLng;
+  /** Verlauf samt Zwischenpunkten, wenn die Quelle ihn mitliefert. */
+  path?: LatLng[];
+  linear: unknown;
+}
+
+/**
+ * Abschnitte eines `groupOfLocations`. Das ASFINAG-Portal liefert einen
+ * einzelnen Abschnitt (`Linear`), EVIS meist eine Route aus mehreren
+ * (`ItineraryByIndexedLocations`), z. B. je Fahrtrichtung einen.
+ */
+function locationsOf(group: unknown): ParsedLocation[] {
+  const itinerary = child(group, 'locationContainedInItinerary');
+  const nodes = Array.isArray(itinerary)
+    ? [...itinerary]
+        .sort(
+          (a, b) =>
+            Number(asNode(a)?.['@_index']) - Number(asNode(b)?.['@_index'])
+        )
+        .map((entry) => child(entry, 'location'))
+    : [group];
+
+  return nodes.flatMap((node): ParsedLocation[] => {
+    const linear = child(
+      node,
+      'linearExtension',
+      'extendedLinear',
+      'linearByCoordinates'
+    );
+    const display = point(child(node, 'locationForDisplay'));
+    const from = point(child(linear, 'start')) ?? display;
+    const to = point(child(linear, 'end')) ?? from;
+    if (!from || !to) return [];
+
+    const raw = child(linear, 'intermediate');
+    const intermediates = (Array.isArray(raw) ? [...raw] : [])
+      .sort(
+        (a, b) =>
+          Number(asNode(a)?.['@_index']) - Number(asNode(b)?.['@_index'])
+      )
+      .map((entry) => point(child(entry, 'pointCoordinates')))
+      .filter((p): p is LatLng => p !== undefined);
+
+    return [
+      {
+        from,
+        to,
+        path:
+          intermediates.length > 0 ? [from, ...intermediates, to] : undefined,
+        linear,
+      },
+    ];
+  });
+}
+
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+/** Eine ID oder zwei, durch Gedanken- oder Bindestrich getrennt. */
+const UUID_RUN = new RegExp(`\\s*${UUID}(?:\\s*[–-]\\s*${UUID})?`, 'gi');
+
+/**
+ * EVIS schreibt bei manchen Landesstraßen statt der Ortsnamen interne IDs in
+ * den Text („B50 - Burgenland Straße 9c0c…-… – 1cac…-…:"). Die IDs samt dem
+ * Bindestrich dazwischen fallen weg; am Inhalt der Meldung ändert das nichts.
+ */
+function cleanDescription(value: string): string {
+  return value.replace(UUID_RUN, '').replace(/\s+:/g, ':').trim();
+}
+
+/** Alle Kommentare eines Eintrags, die Beschreibung zuerst, ohne Dopplungen. */
+function comments(record: XmlNode): string | undefined {
+  const raw = record['generalPublicComment'];
+  const entries = Array.isArray(raw) ? raw : [];
+  const sorted = [...entries].sort(
+    (a, b) =>
+      Number(text(child(b, 'commentType')) === 'description') -
+      Number(text(child(a, 'commentType')) === 'description')
+  );
+  const texts = sorted
+    .map((entry) => multilingual(child(entry, 'comment')))
+    .filter((t): t is string => !!t)
+    .map(cleanDescription)
+    .filter((t) => t.length > 0);
+  const unique = [...new Set(texts)];
+  return unique.length > 0 ? unique.join('\n') : undefined;
+}
+
+function parseRecords(
   record: XmlNode,
   situationId: string,
   situationVersion: string
-): ParsedRecord | undefined {
+): ParsedRecord[] {
   const type = stripPrefix(record['@_type']);
   const location = child(record, 'groupOfLocations');
-  const linear = child(
-    location,
-    'linearExtension',
-    'extendedLinear',
-    'linearByCoordinates'
-  );
-  const display = point(child(location, 'locationForDisplay'));
-  const from = point(child(linear, 'start')) ?? display;
-  const to = point(child(linear, 'end')) ?? from;
-  if (!from || !to) return undefined;
+  const locations = locationsOf(location);
+  if (locations.length === 0) return [];
 
   const subtypeTag = SUBTYPE_TAGS.find((tag) => record[tag] !== undefined);
   const subtype = subtypeTag ? text(record[subtypeTag]) : undefined;
@@ -172,30 +271,95 @@ function parseRecord(
     'groupOfLocationsExtended'
   );
   const validity = child(record, 'validity');
-
-  return {
+  const common = {
     situationId,
     situationVersion,
     type,
     subtype,
     kind: classifyRecord({ type, subtype, trafficConstrictionType }),
     status: text(child(validity, 'validityStatus')),
-    start: text(child(validity, 'validityTimeSpecification', 'overallStartTime')),
-    end: text(child(validity, 'validityTimeSpecification', 'overallEndTime')),
-    description: multilingual(
-      child(record, 'generalPublicComment', 'comment')
+    start: text(
+      child(validity, 'validityTimeSpecification', 'overallStartTime')
     ),
+    end: text(child(validity, 'validityTimeSpecification', 'overallEndTime')),
+    validity,
+    description: comments(record),
     url: text(child(record, 'urlLink', 'urlLinkAddress')),
+    direction: multilingual(child(extended, 'locationInfo', 'locationName')),
+  };
+
+  return locations.map(({ from, to, path, linear }) => ({
+    ...common,
     road:
       text(child(extended, 'roadInfo', 'roadNumber')) ??
       text(child(linear, 'roadNumber')),
     roadName:
       multilingual(child(extended, 'roadInfo', 'roadName')) ??
       multilingual(child(linear, 'roadName')),
-    direction: multilingual(child(extended, 'locationInfo', 'locationName')),
     from,
     to,
-  };
+    path,
+  }));
+}
+
+const WEEKDAYS = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+
+/** `07:30:00.0000000+01:00` → Minuten seit Mitternacht und Versatz in Minuten. */
+function timeOfDay(value: string | undefined) {
+  const match = value?.match(
+    /^(\d{2}):(\d{2})(?::[\d.]+)?(Z|([+-])(\d{2}):(\d{2}))?$/
+  );
+  if (!match) return undefined;
+  const offset =
+    !match[3] || match[3] === 'Z'
+      ? 0
+      : (match[4] === '-' ? -1 : 1) *
+        (Number(match[5]) * 60 + Number(match[6]));
+  return { minutes: Number(match[1]) * 60 + Number(match[2]), offset };
+}
+
+/**
+ * Liegt `now` in diesem Zeitraum? Ein Zeitraum hat optional Anfang und Ende,
+ * eine Tageszeit (`recurringTimePeriodOfDay`) und Wochentage
+ * (`recurringDayWeekMonthPeriod`). Tageszeit und Wochentag gelten in der
+ * Zeitzone, die bei der Uhrzeit steht (EVIS: `+01:00`).
+ */
+function inPeriod(period: unknown, now: Date): boolean {
+  const time = now.getTime();
+  const startOf = text(child(period, 'startOfPeriod'));
+  const endOf = text(child(period, 'endOfPeriod'));
+  if (startOf && Date.parse(startOf) > time) return false;
+  if (endOf && Date.parse(endOf) <= time) return false;
+
+  const daily = child(period, 'recurringTimePeriodOfDay');
+  const from = timeOfDay(text(child(daily, 'startTimeOfPeriod')));
+  const to = timeOfDay(text(child(daily, 'endTimeOfPeriod')));
+  const offset = from?.offset ?? to?.offset ?? 0;
+  const local = new Date(time + offset * 60_000);
+
+  const days = child(period, 'recurringDayWeekMonthPeriod', 'applicableDay');
+  if (Array.isArray(days) && days.length > 0) {
+    const today = WEEKDAYS[local.getUTCDay()];
+    if (!days.some((day) => text(day) === today)) return false;
+  }
+
+  if (from && to) {
+    const minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+    const inside =
+      from.minutes <= to.minutes
+        ? minutes >= from.minutes && minutes < to.minutes
+        : minutes >= from.minutes || minutes < to.minutes;
+    if (!inside) return false;
+  }
+  return true;
 }
 
 function isCurrent(record: ParsedRecord, now: Date): boolean {
@@ -204,6 +368,16 @@ function isCurrent(record: ParsedRecord, now: Date): boolean {
   const time = now.getTime();
   if (record.start && Date.parse(record.start) > time) return false;
   if (record.end && Date.parse(record.end) <= time) return false;
+
+  const spec = child(record.validity, 'validityTimeSpecification');
+  const periods = child(spec, 'validPeriod');
+  if (Array.isArray(periods) && periods.length > 0) {
+    if (!periods.some((period) => inPeriod(period, now))) return false;
+  }
+  const exceptions = child(spec, 'exceptionPeriod');
+  if (Array.isArray(exceptions)) {
+    if (exceptions.some((period) => inPeriod(period, now))) return false;
+  }
   return true;
 }
 
@@ -215,7 +389,7 @@ function locationKey(record: ParsedRecord): string {
   return `${record.situationId}|${record.from.join(',')}|${record.to.join(',')}`;
 }
 
-function merge(records: ParsedRecord[]): RoadEvent {
+function merge(records: ParsedRecord[], source: RoadEventSource): RoadEvent {
   const sorted = [...records].sort(
     (a, b) => severity(a.kind) - severity(b.kind)
   );
@@ -226,7 +400,7 @@ function merge(records: ParsedRecord[]): RoadEvent {
     key: locationKey(lead),
     id: lead.situationId,
     version: lead.situationVersion,
-    source: 'asfinag',
+    source,
     kind: lead.kind,
     recordTypes: [
       ...new Set(
@@ -242,11 +416,14 @@ function merge(records: ParsedRecord[]): RoadEvent {
     end: first('end') as string | undefined,
     from: lead.from,
     to: lead.to,
+    ...(lead.path ? { path: lead.path } : {}),
   };
 }
 
 export interface ParseOptions {
   now: Date;
+  /** Herkunft der Meldungen, Vorgabe `asfinag`. */
+  source?: RoadEventSource;
 }
 
 /**
@@ -256,7 +433,7 @@ export interface ParseOptions {
  */
 export function parseDatexEvents(
   xml: string,
-  { now }: ParseOptions
+  { now, source = 'asfinag' }: ParseOptions
 ): RoadEvent[] {
   let document: XmlNode;
   try {
@@ -287,15 +464,20 @@ export function parseDatexEvents(
       const record = asNode(raw);
       if (!record) continue;
       try {
-        const parsed = parseRecord(record, situationId, situationVersion);
-        if (!parsed || !isCurrent(parsed, now)) continue;
-        const key = locationKey(parsed);
-        groups.set(key, [...(groups.get(key) ?? []), parsed]);
+        for (const parsed of parseRecords(
+          record,
+          situationId,
+          situationVersion
+        )) {
+          if (!isCurrent(parsed, now)) continue;
+          const key = locationKey(parsed);
+          groups.set(key, [...(groups.get(key) ?? []), parsed]);
+        }
       } catch (err) {
         console.warn(`DATEX-II-Eintrag in ${situationId} übersprungen`, err);
       }
     }
   }
 
-  return [...groups.values()].map(merge);
+  return [...groups.values()].map((records) => merge(records, source));
 }

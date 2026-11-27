@@ -1,10 +1,12 @@
-# Verkehrsmeldungen (ASFINAG)
+# Verkehrsmeldungen (ASFINAG und EVIS.AT)
 
 Die Kartenebene „Verkehrsmeldungen" zeigt Sperren, Baustellen und Ereignisse
-auf Autobahnen und Schnellstraßen. Die Linien sind nach Art eingefärbt:
-Sperren rot, Baustellen und Fahrstreifensperren orange, sonstige Ereignisse
-ocker. Ein Klick öffnet den Wortlaut der Meldung samt Zeitraum und Link zur
-ASFINAG.
+auf Autobahnen und Schnellstraßen (ASFINAG) und auf Landes- und
+Bundesstraßen (EVIS.AT). Es ist **eine** Ebene; weitere Quellen kommen in
+dasselbe `RoadEvent`-Format und erscheinen dort mit. Die Linien sind nach Art
+eingefärbt: Sperren rot, Baustellen und Fahrstreifensperren orange, sonstige
+Ereignisse ocker. Ein Klick öffnet den Wortlaut der Meldung samt Zeitraum und
+Quelle.
 
 ## Quellen und warum nur diese
 
@@ -12,7 +14,8 @@ ASFINAG.
 | --- | --- | --- |
 | ASFINAG Content-Portal, Pakete `unplannedevents` und `roadworks_detailed` | ja | Maschinenlesbar (DATEX II 2.3), CC BY 4.0, Koordinaten je Abschnitt |
 | Land Burgenland | nein | Sperren erscheinen nur als Pressetext ohne Koordinaten; Weiterverwendung wäre erlaubt, das Auslesen aber unzuverlässig |
-| EVIS.AT / Landesstraßen | später | Eigener Zugang nötig; passt als zweite Quelle in dasselbe `RoadEvent`-Format |
+| EVIS.AT Data Supply, Pakete `EventsUnplanned` und `EventsPlanned` je Bundesland | ja | Landesstraßen aller Länder, DATEX II 2.3 mit fertigem Verlauf, CC BY 4.0 ASFINAG, kostenlose Registrierung |
+| EVIS.AT, Paket `TrafficRegulations` | nein, offen | Nur als DATEX II 3.3 oder GeoJSON; siehe „Bedingungen von EVIS.AT" |
 
 ### Bedingungen der ASFINAG
 
@@ -27,6 +30,22 @@ ASFINAG.
   60 s je Paket **auch nach einem Fehler**: Ein Ausfall führt nicht zu
   Dauerabrufen.
 - Keine Gewähr für Richtigkeit, steht im Popup.
+
+### Bedingungen von EVIS.AT
+
+- Lizenz „CC BY 4.0 ASFINAG", Namensnennung steht in der Attribution und je
+  Meldung im Popup („Quelle: EVIS.AT").
+- Der Zugang ist **persönlich**: Der Schlüssel steht in der Adresse
+  (`?apiKey=`), und die Links dürfen laut Registrierungsmail nicht
+  weitergegeben werden. Abgerufen wird deshalb nur am Server; Fehlermeldungen
+  nennen den HTTP-Status, nie die Adresse (`evisHttp.ts`).
+- Punkt 4 der Lizenz: Behördlich angeordnete Regelungen sind zu übernehmen
+  und in ihrer Verkehrswirkung unverändert darzustellen. Gemeint sind alle
+  Einträge mit `complianceOption = mandatory` und das ganze Paket
+  `TrafficRegulations`. Ersteres erfüllt die Regel „nie herabstufen" oben.
+  `TrafficRegulations` (Abfahrtssperren, Lkw-Fahrverbote) gibt es nur als
+  DATEX II 3.3 oder GeoJSON und ist noch nicht eingebunden; im Burgenland war
+  das Paket beim Einbau leer.
 
 ## Einrichtung
 
@@ -64,10 +83,82 @@ gcloud secrets versions add ASFINAG_PLANNED_RESOURCE_KEY --project ffn-utils --d
 
 Danach neu deployen; der Dienst liest `latest` nur beim Start.
 
-## Verlauf entlang der Straße
+### EVIS.AT
 
-Eine Meldung bringt nur Anfangs- und Endpunkt mit. Daraus wird der Verlauf auf
-einem eigenen Netz der Autobahnen und Schnellstraßen berechnet
+Registrierung unter <https://evis.asfinag.at/UserManagement/Subscribe>; die
+Mail danach enthält je Paket, Format und Region einen Link der Form
+
+```text
+https://datasupply-evis.asfinag.at/1.0/getdata/<Paket>/<Region>/2.2.3?apiKey=<Schlüssel>
+https://datasupply-evis.asfinag.at/1.0/getchecksum/<Paket>/<Region>/2.2.3?apiKey=<Schlüssel>
+```
+
+Der Schlüssel ist für alle Links derselbe.
+
+| Variable | Inhalt |
+| --- | --- |
+| `EVIS_API_KEY` | `apiKey` aus den Links |
+| `EVIS_REGIONS` (optional) | Regionen, kommagetrennt; Vorgabe `AT-1,AT-3` |
+
+Regionen: `AT-1` Burgenland bis `AT-9` Wien (ISO 3166-2), `AT-ASF` nur
+ASFINAG, `AT` alles. Die Länderpakete enthalten **keine** ASFINAG-Strecken;
+die kommen weiter vom Content-Portal, so gibt es keine Doppelungen. Wer
+`AT-ASF` oder `AT` einträgt, bekommt Autobahnmeldungen doppelt, solange das
+Portal auch eingerichtet ist.
+
+`EVIS_API_KEY` liegt wie die ASFINAG-Schlüssel im Secret Manager von
+ffn-utils, von Hand samt Version angelegt und in `secret_env` beider
+Environments gemappt:
+
+```bash
+gcloud secrets versions add EVIS_API_KEY --project ffn-utils --data-file=-
+```
+
+Eigenheiten des Data Supply:
+
+- Die Antwort ist gzip als `application/gzip`, **ohne**
+  `Content-Encoding` — `fetch` entpackt sie nicht. Erkannt wird gzip an den
+  ersten beiden Bytes (`decodeBody`).
+- HTTP 204 heißt: Für Paket und Region gibt es gerade nichts.
+- Jeder Abruf liefert den ganzen Datensatz, keine Änderungen. Der Leitfaden
+  empfiehlt, vorher die Prüfsumme zu fragen (`getchecksum`, JSON mit
+  `"Checksum"` als **Zahl**). Die Quelle fragt nach Ablauf der 60 s nur die
+  Prüfsumme und lädt das Paket nur bei Änderung neu. Das zuletzt geladene XML
+  wird trotzdem jede Minute neu ausgewertet, weil Zeitfenster an der Uhrzeit
+  hängen, nicht an den Daten. Ist die Prüfsumme nicht abrufbar, wird das
+  Paket geladen.
+
+## Landesstraßen (EVIS.AT)
+
+Die Meldungen der Länder unterscheiden sich in drei Punkten von denen des
+Portals; `datex.ts` liest beide:
+
+- **Route statt Abschnitt.** Die meisten Einträge beschreiben ihren Ort als
+  `ItineraryByIndexedLocations`, meist mit einem Abschnitt je Fahrtrichtung.
+  Jeder Abschnitt wird eine eigene Linie; ein Klick zeigt die Situation
+  trotzdem nur einmal (`eventsAtPoint`).
+- **Verlauf mitgeliefert.** `linearByCoordinates` enthält neben Anfang und
+  Ende die Zwischenpunkte (`intermediate`), dazu GIP-Link-IDs. Die Linie wird
+  so gezeichnet, ohne Netz und ohne Suche. Eine Landesstraßenmeldung ohne
+  Zwischenpunkte wird **nicht** auf das Autobahnnetz geschnappt, sondern als
+  gestrichelte Gerade gezeichnet — das Netz kennt nur A und S.
+- **Zeitfenster.** Viele Baustellen gelten nur zu bestimmten Zeiten, z. B.
+  werktags 07:30–17:00 (`validPeriod` mit `recurringTimePeriodOfDay` und
+  `recurringDayWeekMonthPeriod`). Außerhalb des Fensters ist die Meldung
+  nicht auf der Karte. Tageszeit und Wochentag gelten in der Zeitzone, die
+  bei der Uhrzeit steht (EVIS: `+01:00`). `exceptionPeriod` blendet aus.
+
+Außerdem: Ein Eintrag kann mehrere Kommentare haben (Beschreibung und
+„sonstiges"); alle werden gezeigt, die Beschreibung zuerst. Manche Texte
+enthalten statt der Ortsnamen interne IDs („B50 - Burgenland Straße 9c0c…
+– 1cac…:"); die IDs fallen weg, sonst bleibt der Wortlaut unverändert.
+`trafficConstrictionType = carriagewayBlocked` (Richtungsfahrbahn gesperrt)
+gilt als Sperre.
+
+## Verlauf entlang der Autobahn
+
+Eine Meldung des Portals bringt nur Anfangs- und Endpunkt mit. Daraus wird
+der Verlauf auf einem eigenen Netz der Autobahnen und Schnellstraßen berechnet
 (`motorwayPath.ts`), nicht über einen Routing-Dienst: Google und Co. kennen die
 Sperre und fahren um sie herum — genau den gesperrten Abschnitt würden sie
 nicht zeichnen.

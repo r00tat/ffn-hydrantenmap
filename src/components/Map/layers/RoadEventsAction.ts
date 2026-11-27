@@ -4,6 +4,7 @@ import { actionUserRequired } from '../../../app/auth';
 import { BoundingBox, RoadEventsResult } from '../../../common/roadEvents';
 import { filterEventsByBounds } from '../../../common/roadEventsBounds';
 import { fetchAsfinagXml } from '../../../server/roadEvents/asfinagHttp';
+import { evisClient } from '../../../server/roadEvents/evisHttp';
 import {
   buildMotorwayGraph,
   findMotorwayPath,
@@ -12,16 +13,20 @@ import {
 import {
   asfinagFeedsFromEnv,
   createRoadEventsSource,
+  evisFeedsFromEnv,
 } from '../../../server/roadEvents/roadEventsSource';
 
 let source: ReturnType<typeof createRoadEventsSource> | undefined;
 
 function roadEventsSource() {
   source ??= createRoadEventsSource({
-    feeds: asfinagFeedsFromEnv(process.env),
-    fetchXml: fetchAsfinagXml,
+    feeds: [
+      ...asfinagFeedsFromEnv(process.env, fetchAsfinagXml),
+      ...evisFeedsFromEnv(process.env, evisClient),
+    ],
     loadGraph: async () => {
-      const network = await import('../../../server/roadEvents/data/gip-motorways.json');
+      const network =
+        await import('../../../server/roadEvents/data/gip-motorways.json');
       return buildMotorwayGraph(
         (network.default ?? network) as unknown as MotorwayNetworkFile
       );
@@ -40,7 +45,10 @@ function isValidBounds(bounds: BoundingBox): boolean {
   );
 }
 
-/** Verkehrsmeldungen der ASFINAG im Bereich, siehe docs/verkehrsmeldungen.md. */
+/**
+ * Verkehrsmeldungen im Bereich: Autobahnen vom ASFINAG-Content-Portal,
+ * Landesstraßen von EVIS.AT. Siehe docs/verkehrsmeldungen.md.
+ */
 export async function fetchRoadEvents(
   bounds: BoundingBox
 ): Promise<RoadEventsResult> {

@@ -41,6 +41,9 @@ locals {
     # beider Environments gemappt. Siehe docs/verkehrsmeldungen.md.
     "ASFINAG_UNPLANNED_RESOURCE_KEY",
     "ASFINAG_PLANNED_RESOURCE_KEY",
+    # Persönlicher Schlüssel für EVIS.AT (Verkehrsmeldungen der Landesstraßen),
+    # ebenso von Hand samt Version angelegt.
+    "EVIS_API_KEY",
   ]
 }
 
