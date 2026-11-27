@@ -242,6 +242,25 @@ nach einer Minute wieder mit Live versucht. Der Handshake hat dazu eine Frist
 von zehn Sekunden (`LIVE_HANDSHAKE_TIMEOUT_MS`) — ohne sie hing ein Aufbau im
 Funkloch unbegrenzt im Zustand „hört zu", und der Rückfall griff nie.
 
+**Abrechnung und Kontingent des API-Projekts sind ebenfalls dauerhaft.** Am
+2026-11-26 fiel Live auf einem Tablet bei jedem Tipp zurück. Das Token kam ohne
+Fehler, erst die Live-API schloss den WebSocket vor `setupComplete` mit Code
+1011 und „Your prepayment credits are depleted": Das Prepaid-Guthaben des
+Projekts in AI Studio war aufgebraucht. Abhilfe schafft nur Aufladen oder
+Umstellen der Abrechnung in AI Studio, kein Code. Der Einzelaufruf lief weiter,
+weil er über Vertex AI abgerechnet wird. Eine solche Abweisung trägt
+[liveConnection.ts](../src/hooks/aiAssistant/liveConnection.ts) als
+`LiveRejectedError` mit Code und Grund weiter. Nennt der Grund Guthaben,
+Abrechnung oder Kontingent, gilt sie als dauerhaft — sonst versprach der Knopf
+jede Minute einen neuen Versuch, der ebenso scheiterte.
+
+**Wo der Grund landet.** Gescheitert wird im Browser, also dort, wo niemand
+nachsieht: Im Cloud-Run-Log stand nichts, und im Bug-Report fehlte der Grund,
+weil `console.*` dort nur bei eingeschaltetem Debug-Logging mitgeschnitten
+wird. Der Knopf schreibt den Grund deshalb über `warn` des Debug-Loggings (steht
+immer im Bug-Report) und schickt ihn über `reportLiveFailure` ins Serverlog
+(`[AI] Live-Sitzung im Browser gescheitert: …`).
+
 Dass es diesen Weg weiterhin gibt, ist Absicht: Die kurzlebigen Tokens sind
 als Preview gekennzeichnet, das Live-Modell ebenfalls, und beides steht ohne
 Zusagen zu Verfügbarkeit und Abkündigung. Ohne gesetztes `GEMINI_LIVE_API_KEY`

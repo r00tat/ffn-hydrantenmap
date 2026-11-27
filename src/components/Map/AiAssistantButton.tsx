@@ -24,6 +24,8 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import { speakMessage } from '../../common/speech';
 import { LatencyRun, startLatencyRun } from '../../hooks/aiAssistant/latency';
 import { createLiveAvailability } from '../../hooks/aiAssistant/liveAvailability';
+import { useDebugLogging } from '../../hooks/useDebugging';
+import { reportLiveFailure } from '../../app/actions/aiLiveToken';
 
 interface AiAssistantButtonProps {
   firecallItems: FirecallItem[];
@@ -70,6 +72,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const { processAudio, processText, undoLastAction, processingStatus } = useAiAssistant(firecallItems);
   const { confirmAllDrafts, discardAllDrafts } = useHoseLineDraft();
   const { offline, hint: offlineHint } = useOnlineOnly();
+  const { warn: logWarn } = useDebugLogging();
 
   const [toast, setToast] = useState<AiToastState>({
     open: false,
@@ -200,8 +203,17 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         // Der Benutzer will sprechen — deshalb geht es sofort im Einzelaufruf
         // weiter. Der Hinweis sagt nur, *dass* umgeschaltet wurde: Ohne ihn
         // sah es aus, als sei Live für diesen Benutzer gesperrt.
-        console.warn('[AI] Live-Gespräch nicht verfügbar, weiter im Einzelaufruf:', error);
+        // Über `warn` des Debug-Loggings, nicht `console.warn`: Nur so steht der
+        // Grund auch ohne eingeschaltetes Debug-Logging im Bug-Report. Und
+        // zusätzlich im Serverlog, denn gescheitert wird im Browser — dort, wo
+        // niemand nachsieht (siehe `reportLiveFailure`).
         const kind = liveAvailability.recordFailure(error);
+        const detail = error instanceof Error ? error.message : String(error);
+        void logWarn('[AI] Live-Gespräch nicht verfügbar, weiter im Einzelaufruf', {
+          error: detail,
+          kind,
+        });
+        void reportLiveFailure(`${kind}: ${detail}`).catch(() => undefined);
         await live.endConversation();
         setToast({
           open: true,
@@ -216,7 +228,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
     maxRecordingTimerRef.current = setTimeout(() => {
       void stopAndProcess('sprachbefehl (zeitlimit)');
     }, MAX_RECORDING_TIME_MS);
-  }, [live, liveAvailability, recorderState, startRecording, stopAndProcess, t]);
+  }, [live, liveAvailability, logWarn, recorderState, startRecording, stopAndProcess, t]);
 
   /**
    * „Fertig" — schließt den gesprochenen Beitrag sofort. Ohne das wartet der

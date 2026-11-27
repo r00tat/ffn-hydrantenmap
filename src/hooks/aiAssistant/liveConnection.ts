@@ -1,5 +1,6 @@
 import { FunctionResponse } from 'firebase/ai';
 import { liveModelPath } from '../../common/aiLiveToken';
+import { LiveRejectedError } from './liveAvailability';
 import { LiveMessage } from './liveConversation';
 
 /**
@@ -179,12 +180,8 @@ export async function connectLiveSession(
       finished = true;
       wake();
       if (!handshakeDone) {
-        const { reason } = event as CloseEvent;
-        reject(
-          new Error(
-            `Live-Sitzung: Verbindung vom Server abgewiesen${reason ? `: ${reason}` : ''}`,
-          ),
-        );
+        const { code, reason } = event as CloseEvent;
+        reject(new LiveRejectedError(code, reason ?? ''));
       }
     };
 
