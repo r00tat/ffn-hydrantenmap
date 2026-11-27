@@ -14,13 +14,19 @@ export const ROAD_EVENT_KIND_ORDER: RoadEventKind[] = [
 
 export type LatLng = [number, number];
 
+/**
+ * Herkunft der Meldung. Bisher nur EVIS.AT (Autobahnen und Landesstraßen);
+ * weitere Quellen landen in derselben Ebene.
+ */
+export type RoadEventSource = 'evis';
+
 export interface RoadEvent {
   /** Eindeutig je Situation und Ort. */
   key: string;
   /** ID der DATEX-II-Situation. */
   id: string;
   version: string;
-  source: 'asfinag';
+  source: RoadEventSource;
   kind: RoadEventKind;
   /** `Typ:Untertyp` je Eintrag, z. B. `RoadOrCarriagewayOrLaneManagement:roadClosed`. */
   recordTypes: string[];
@@ -34,12 +40,14 @@ export interface RoadEvent {
   end?: string;
   from: LatLng;
   to: LatLng;
+  /** Verlauf samt Zwischenpunkten, wenn die Quelle ihn mitliefert. */
+  path?: LatLng[];
 }
 
 export interface RoadEventWithPath extends RoadEvent {
   /** Verlauf entlang der Straße, `[lat, lng]`. */
   path: LatLng[];
-  /** true, wenn kein Weg im Netz gefunden wurde und die Linie gerade ist. */
+  /** true, wenn die Quelle keinen Verlauf liefert und die Linie gerade ist. */
   approximate: boolean;
 }
 
@@ -51,7 +59,7 @@ export interface BoundingBox {
 }
 
 export interface RoadEventsResult {
-  /** false, wenn keine Zugangsdaten hinterlegt sind. */
+  /** false, wenn kein Zugangsschlüssel hinterlegt ist. */
   configured: boolean;
   events: RoadEventWithPath[];
   /** Pakete, deren Abruf fehlgeschlagen ist. */

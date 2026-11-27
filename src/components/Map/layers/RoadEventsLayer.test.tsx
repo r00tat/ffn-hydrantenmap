@@ -76,6 +76,7 @@ vi.mock('./RoadEventsAction', () => ({
       {
         key: 'c',
         id: 'sperre',
+        source: 'evis',
         kind: 'closure',
         description: 'Tunnel Arlberg gesperrt',
         path: [
@@ -86,6 +87,7 @@ vi.mock('./RoadEventsAction', () => ({
       {
         key: 'r',
         id: 'baustelle',
+        source: 'evis',
         kind: 'restriction',
         description: 'veränderte Verkehrsführung im Baustellenbereich',
         path: [
@@ -114,7 +116,7 @@ describe('RoadEventsLayer', () => {
     expect(group().dataset.attribution).toBe('');
 
     fire('overlayadd', { name: ROAD_EVENTS_LAYER_NAME });
-    expect(group().dataset.attribution).toContain('ASFINAG');
+    expect(group().dataset.attribution).toContain('EVIS.AT');
     expect(group().dataset.attribution).toContain('<a ');
 
     fire('overlayremove', { name: ROAD_EVENTS_LAYER_NAME });
@@ -142,5 +144,7 @@ describe('RoadEventsLayer', () => {
     expect(popup.indexOf('gesperrt')).toBeLessThan(
       popup.indexOf('Baustellenbereich')
     );
+    // Jede Meldung nennt ihre Quelle.
+    expect(popup.match(/Quelle: EVIS\.AT/g)).toHaveLength(2);
   });
 });

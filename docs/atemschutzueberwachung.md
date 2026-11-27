@@ -748,8 +748,15 @@ Details des Laufs selbst, die nicht offensichtlich sind:
   auf die Sekunde. Er fängt den Fall, dass beim Abmarsch gar keine Aufgabe
   entstanden ist: Funkloch, geschlossene App, ein Fehler in der Queue.
 - **Die Abfrage ist eine Collection-Group-Abfrage** auf `atemschutzTrupp` mit
-  `where('status','==','imEinsatz')`. Ein einzelnes Feld, deshalb genügt der
-  automatische Index; außerhalb eines Einsatzes liefert sie null Dokumente.
+  `where('status','==','imEinsatz')`; außerhalb eines Einsatzes liefert sie
+  null Dokumente. **Sie braucht eine Feld-Ausnahme** in
+  `firebase/{dev,prod}/firestore.indexes.json` (`fieldOverrides`,
+  `atemschutzTrupp.status` mit Scope `COLLECTION_GROUP`): Firestore legt
+  Einzelfeld-Indexe automatisch nur für Abfragen *innerhalb* einer Sammlung an.
+  Ohne die Ausnahme scheitert der Lauf mit `FAILED_PRECONDITION` (500), und
+  keine Warnung geht per Zeitplan hinaus. Die Ausnahme ersetzt die
+  Indexeinstellung des Feldes vollständig, deshalb stehen die drei
+  automatischen `COLLECTION`-Indexe mit darin.
 - **Empfänger sind `ueberwachungUids`** — wer die Zeitkontrolle übernommen oder
   eine Druckabfrage erfasst hat. Bewusst nicht alle Gruppenmitglieder: Eine
   Warnung, die jede Feuerwehrfrau und jeden Feuerwehrmann erreicht, ist nach dem
