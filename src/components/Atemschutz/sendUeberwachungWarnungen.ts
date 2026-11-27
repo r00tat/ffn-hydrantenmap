@@ -154,9 +154,11 @@ export async function sendUeberwachungWarnungen({
   t,
   uhrzeit,
 }: SendUeberwachungWarnungenOptions): Promise<SendUeberwachungWarnungenResult> {
-  // Collection-Group-Abfrage über alle Einsätze. Ein einzelnes Feld, deshalb
-  // genügt der automatische Index — ein `orderBy` käme nicht ohne
-  // zusammengesetzten Index aus und brächte hier nichts: Sortiert wird nichts,
+  // Collection-Group-Abfrage über alle Einsätze. Der automatische
+  // Einzelfeld-Index gilt nur innerhalb einer Sammlung; für die Collection
+  // Group steht eine Feld-Ausnahme in `firebase/{dev,prod}/firestore.indexes.json`
+  // — ohne sie scheitert die Abfrage mit FAILED_PRECONDITION. Ein `orderBy`
+  // bräuchte zusätzlich einen zusammengesetzten Index und brächte hier nichts:
   // gefiltert wird auf einen Zustand, den nur wenige Dokumente tragen.
   const snap = await firestore
     .collectionGroup(ATEMSCHUTZ_TRUPP_COLLECTION_ID)
