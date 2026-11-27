@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createLiveAvailability,
   LIVE_RETRY_AFTER_MS,
+  LiveRejectedError,
   LiveUnavailableError,
   classifyLiveFailure,
 } from './liveAvailability';
@@ -20,6 +21,27 @@ describe('classifyLiveFailure', () => {
       'transient',
     );
     expect(classifyLiveFailure(new LiveUnavailableError('failed', 'HTTP 503'))).toBe('transient');
+  });
+
+  it('hält ein aufgebrauchtes Guthaben der API für dauerhaft', () => {
+    // So schließt die Live-API den Socket, wenn das Prepaid-Guthaben des
+    // Projekts leer ist (beobachtet 2026-11-26 im Einsatz).
+    const error = new LiveRejectedError(
+      1011,
+      'Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing.',
+    );
+    expect(classifyLiveFailure(error)).toBe('permanent');
+  });
+
+  it('hält ein erschöpftes Kontingent der API für dauerhaft', () => {
+    expect(
+      classifyLiveFailure(new LiveRejectedError(1011, 'RESOURCE_EXHAUSTED: Quota exceeded')),
+    ).toBe('permanent');
+  });
+
+  it('hält eine sonstige Abweisung für vorübergehend', () => {
+    expect(classifyLiveFailure(new LiveRejectedError(1011, 'Internal error'))).toBe('transient');
+    expect(classifyLiveFailure(new LiveRejectedError(1006, ''))).toBe('transient');
   });
 });
 

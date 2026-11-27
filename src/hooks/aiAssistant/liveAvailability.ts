@@ -27,6 +27,30 @@ export class LiveUnavailableError extends Error {
   }
 }
 
+/**
+ * Der Server hat das Token ausgegeben, die Live-API aber den WebSocket vor
+ * `setupComplete` geschlossen. Code und Grund kommen aus dem `CloseEvent` —
+ * nur dort steht, *warum*; der Server der App sieht davon nichts.
+ */
+export class LiveRejectedError extends Error {
+  constructor(
+    public readonly code: number,
+    public readonly reason: string,
+  ) {
+    super(`Live-Sitzung: Verbindung vom Server abgewiesen${reason ? `: ${reason}` : ''}`);
+    this.name = 'LiveRejectedError';
+  }
+}
+
+/**
+ * Abweisungen, die sich nicht in einer Minute bessern: Abrechnung und
+ * Kontingent des API-Projekts. Beobachtet am 2026-11-26 mit Code 1011 und
+ * „Your prepayment credits are depleted" — das Token wurde ohne Fehler
+ * ausgegeben, erst der Handshake scheiterte. Als vorübergehend eingestuft
+ * versprach der Knopf jede Minute einen neuen Versuch, der ebenso scheiterte.
+ */
+const PERMANENT_REJECTION = /prepayment credits|billing|quota|RESOURCE_EXHAUSTED/i;
+
 export type LiveFailureKind = 'permanent' | 'transient';
 
 /** Pause nach einem vorübergehenden Fehler, bevor Live erneut versucht wird. */
@@ -37,6 +61,9 @@ export function classifyLiveFailure(error: unknown): LiveFailureKind {
     error instanceof LiveUnavailableError &&
     (error.reason === 'unconfigured' || error.reason === 'quota')
   ) {
+    return 'permanent';
+  }
+  if (error instanceof LiveRejectedError && PERMANENT_REJECTION.test(error.reason)) {
     return 'permanent';
   }
   return 'transient';

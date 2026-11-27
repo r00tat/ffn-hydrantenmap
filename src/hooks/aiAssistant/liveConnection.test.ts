@@ -5,6 +5,7 @@ import {
   LIVE_API_VERSION,
   liveWebSocketUrl,
 } from './liveConnection';
+import { LiveRejectedError } from './liveAvailability';
 
 /**
  * Ein WebSocket, der nicht ins Netz geht. Die Tests steuern ihn von aussen:
@@ -56,8 +57,8 @@ class FakeWebSocket {
     this.fire('message', { data: new Blob([JSON.stringify(message)]) });
   }
 
-  fail(reason: string) {
-    this.fire('close', { reason });
+  fail(reason: string, code = 1008) {
+    this.fire('close', { reason, code });
   }
 
   private fire(type: string, event: unknown) {
@@ -146,6 +147,15 @@ describe('connectLiveSession', () => {
     FakeWebSocket.instances.at(-1)!.fail('Invalid token');
 
     await expect(pending).rejects.toThrow(/Invalid token/);
+  });
+
+  it('reicht Code und Grund der Abweisung als LiveRejectedError weiter', async () => {
+    const pending = connectLiveSession('auth_tokens/abc', 'gemini-live');
+    FakeWebSocket.instances.at(-1)!.fail('Your prepayment credits are depleted.', 1011);
+
+    const error = await pending.catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(LiveRejectedError);
+    expect(error).toMatchObject({ code: 1011, reason: 'Your prepayment credits are depleted.' });
   });
 
   it('schickt Beitraege als clientContent mit turnComplete', async () => {

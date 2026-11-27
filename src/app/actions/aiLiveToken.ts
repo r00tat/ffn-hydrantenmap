@@ -49,6 +49,20 @@ function apiReason(body: string): string {
   return body.slice(0, 300) || 'ohne Begründung';
 }
 
+/**
+ * Schreibt ins Serverlog, dass eine Live-Sitzung im Browser gescheitert ist.
+ *
+ * Warum es das braucht: Das Token wird hier ausgegeben, gescheitert wird aber
+ * erst danach beim WebSocket-Handshake zwischen Browser und Live-API. Der Grund
+ * steht nur im `CloseEvent` im Browser. Am 2026-11-26 war das Prepaid-Guthaben
+ * des API-Projekts aufgebraucht; im Cloud-Run-Log stand nichts, im Bug-Report
+ * auch nicht, und gefunden wurde es erst durch Nachstellen des Handshakes.
+ */
+export async function reportLiveFailure(detail: string): Promise<void> {
+  await actionUserRequired();
+  console.error(`[AI] Live-Sitzung im Browser gescheitert: ${String(detail).slice(0, 300)}`);
+}
+
 export async function createLiveToken(): Promise<LiveTokenResult> {
   const session = await actionUserRequired();
 
