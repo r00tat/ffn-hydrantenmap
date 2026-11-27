@@ -1,10 +1,16 @@
 /**
- * Liest DATEX-II-2.3-Situationen (ASFINAG-Content-Portal und EVIS.AT) und
- * macht daraus Verkehrsmeldungen für die Karte. Siehe docs/verkehrsmeldungen.md.
+ * Liest DATEX-II-2.3-Situationen von EVIS.AT und macht daraus
+ * Verkehrsmeldungen für die Karte. Siehe docs/verkehrsmeldungen.md.
+ *
+ * Zwei Schritte: `parseDatexRecords` liest ein Paket einmal in kompakte
+ * Datensätze (nur bei geänderter Prüfsumme), `currentEvents` wählt daraus
+ * zu jedem Zeitpunkt die gültigen Meldungen. Zeitfenster wie „werktags
+ * 07:30–17:00“ hängen an der Uhr, nicht an den Daten.
  *
  * Ausgewertet werden nur die direkten `situationRecord` einer Situation. Die
  * `situationExtension` der geplanten Ereignisse enthält eine Übersicht über
- * das ganze Bauvorhaben und würde Abschnitte doppelt zeigen.
+ * das ganze Bauvorhaben und würde Abschnitte doppelt zeigen; sie fällt schon
+ * vor dem Parsen weg.
  */
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -143,7 +149,25 @@ function stripPrefix(type: unknown): string {
   return String(type ?? '').replace(/^.*:/, '');
 }
 
-interface ParsedRecord {
+/** Ein Zeitraum aus `validPeriod`/`exceptionPeriod`, vorab ausgewertet. */
+interface Period {
+  /** Anfang und Ende in ms seit 1970. */
+  start?: number;
+  end?: number;
+  /** Wochentage, englisch klein (`monday`). */
+  days?: string[];
+  /** Tageszeit in Minuten seit Mitternacht, in der Zeitzone `offset`. */
+  from?: number;
+  to?: number;
+  /** Versatz der Tageszeit gegen UTC in Minuten. */
+  offset: number;
+}
+
+/**
+ * Ein Eintrag einer Situation an einem Ort, ohne Knoten aus dem XML: Ein
+ * ganzes Paket bleibt so nur als diese Datensätze im Speicher.
+ */
+export interface DatexRecord {
   situationId: string;
   situationVersion: string;
   type: string;
@@ -152,7 +176,8 @@ interface ParsedRecord {
   status?: string;
   start?: string;
   end?: string;
-  validity: unknown;
+  periods?: Period[];
+  exceptions?: Period[];
   description?: string;
   url?: string;
   road?: string;
@@ -172,9 +197,9 @@ interface ParsedLocation {
 }
 
 /**
- * Abschnitte eines `groupOfLocations`. Das ASFINAG-Portal liefert einen
- * einzelnen Abschnitt (`Linear`), EVIS meist eine Route aus mehreren
- * (`ItineraryByIndexedLocations`), z. B. je Fahrtrichtung einen.
+ * Abschnitte eines `groupOfLocations`: ein einzelner (`Linear`) oder eine
+ * Route aus mehreren (`ItineraryByIndexedLocations`), z. B. je Fahrtrichtung
+ * einen.
  */
 function locationsOf(group: unknown): ParsedLocation[] {
   const itinerary = child(group, 'locationContainedInItinerary');
@@ -255,7 +280,7 @@ function parseRecords(
   record: XmlNode,
   situationId: string,
   situationVersion: string
-): ParsedRecord[] {
+): DatexRecord[] {
   const type = stripPrefix(record['@_type']);
   const location = child(record, 'groupOfLocations');
   const locations = locationsOf(location);
@@ -271,6 +296,7 @@ function parseRecords(
     'groupOfLocationsExtended'
   );
   const validity = child(record, 'validity');
+  const spec = child(validity, 'validityTimeSpecification');
   const common = {
     situationId,
     situationVersion,
@@ -282,7 +308,8 @@ function parseRecords(
       child(validity, 'validityTimeSpecification', 'overallStartTime')
     ),
     end: text(child(validity, 'validityTimeSpecification', 'overallEndTime')),
-    validity,
+    periods: periods(child(spec, 'validPeriod')),
+    exceptions: periods(child(spec, 'exceptionPeriod')),
     description: comments(record),
     url: text(child(record, 'urlLink', 'urlLinkAddress')),
     direction: multilingual(child(extended, 'locationInfo', 'locationName')),
@@ -326,58 +353,72 @@ function timeOfDay(value: string | undefined) {
   return { minutes: Number(match[1]) * 60 + Number(match[2]), offset };
 }
 
+function timestamp(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : undefined;
+}
+
 /**
- * Liegt `now` in diesem Zeitraum? Ein Zeitraum hat optional Anfang und Ende,
- * eine Tageszeit (`recurringTimePeriodOfDay`) und Wochentage
+ * Zeiträume eines Eintrags. Einer hat optional Anfang und Ende, eine
+ * Tageszeit (`recurringTimePeriodOfDay`) und Wochentage
  * (`recurringDayWeekMonthPeriod`). Tageszeit und Wochentag gelten in der
  * Zeitzone, die bei der Uhrzeit steht (EVIS: `+01:00`).
  */
-function inPeriod(period: unknown, now: Date): boolean {
+function periods(raw: unknown): Period[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  return raw.map((node): Period => {
+    const daily = child(node, 'recurringTimePeriodOfDay');
+    const from = timeOfDay(text(child(daily, 'startTimeOfPeriod')));
+    const to = timeOfDay(text(child(daily, 'endTimeOfPeriod')));
+    const days = child(node, 'recurringDayWeekMonthPeriod', 'applicableDay');
+    const dayList = Array.isArray(days)
+      ? days.map((day) => text(day)).filter((d): d is string => !!d)
+      : [];
+    return {
+      start: timestamp(text(child(node, 'startOfPeriod'))),
+      end: timestamp(text(child(node, 'endOfPeriod'))),
+      days: dayList.length > 0 ? dayList : undefined,
+      // Nur ein vollständiges Tageszeitfenster schränkt ein.
+      from: from && to ? from.minutes : undefined,
+      to: from && to ? to.minutes : undefined,
+      offset: from?.offset ?? to?.offset ?? 0,
+    };
+  });
+}
+
+function inPeriod(period: Period, now: Date): boolean {
   const time = now.getTime();
-  const startOf = text(child(period, 'startOfPeriod'));
-  const endOf = text(child(period, 'endOfPeriod'));
-  if (startOf && Date.parse(startOf) > time) return false;
-  if (endOf && Date.parse(endOf) <= time) return false;
+  if (period.start !== undefined && period.start > time) return false;
+  if (period.end !== undefined && period.end <= time) return false;
 
-  const daily = child(period, 'recurringTimePeriodOfDay');
-  const from = timeOfDay(text(child(daily, 'startTimeOfPeriod')));
-  const to = timeOfDay(text(child(daily, 'endTimeOfPeriod')));
-  const offset = from?.offset ?? to?.offset ?? 0;
-  const local = new Date(time + offset * 60_000);
-
-  const days = child(period, 'recurringDayWeekMonthPeriod', 'applicableDay');
-  if (Array.isArray(days) && days.length > 0) {
-    const today = WEEKDAYS[local.getUTCDay()];
-    if (!days.some((day) => text(day) === today)) return false;
+  const local = new Date(time + period.offset * 60_000);
+  if (period.days && !period.days.includes(WEEKDAYS[local.getUTCDay()])) {
+    return false;
   }
 
-  if (from && to) {
+  if (period.from !== undefined && period.to !== undefined) {
     const minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
     const inside =
-      from.minutes <= to.minutes
-        ? minutes >= from.minutes && minutes < to.minutes
-        : minutes >= from.minutes || minutes < to.minutes;
+      period.from <= period.to
+        ? minutes >= period.from && minutes < period.to
+        : minutes >= period.from || minutes < period.to;
     if (!inside) return false;
   }
   return true;
 }
 
-function isCurrent(record: ParsedRecord, now: Date): boolean {
+function isCurrent(record: DatexRecord, now: Date): boolean {
   if (record.status === 'suspended') return false;
   if (record.status === 'active') return true;
   const time = now.getTime();
   if (record.start && Date.parse(record.start) > time) return false;
   if (record.end && Date.parse(record.end) <= time) return false;
 
-  const spec = child(record.validity, 'validityTimeSpecification');
-  const periods = child(spec, 'validPeriod');
-  if (Array.isArray(periods) && periods.length > 0) {
-    if (!periods.some((period) => inPeriod(period, now))) return false;
+  if (record.periods && !record.periods.some((p) => inPeriod(p, now))) {
+    return false;
   }
-  const exceptions = child(spec, 'exceptionPeriod');
-  if (Array.isArray(exceptions)) {
-    if (exceptions.some((period) => inPeriod(period, now))) return false;
-  }
+  if (record.exceptions?.some((p) => inPeriod(p, now))) return false;
   return true;
 }
 
@@ -385,16 +426,16 @@ function severity(kind: RoadEventKind): number {
   return ROAD_EVENT_KIND_ORDER.indexOf(kind);
 }
 
-function locationKey(record: ParsedRecord): string {
+function locationKey(record: DatexRecord): string {
   return `${record.situationId}|${record.from.join(',')}|${record.to.join(',')}`;
 }
 
-function merge(records: ParsedRecord[], source: RoadEventSource): RoadEvent {
+function merge(records: DatexRecord[], source: RoadEventSource): RoadEvent {
   const sorted = [...records].sort(
     (a, b) => severity(a.kind) - severity(b.kind)
   );
   const lead = sorted[0];
-  const first = <K extends keyof ParsedRecord>(key: K) =>
+  const first = <K extends keyof DatexRecord>(key: K) =>
     sorted.find((r) => r[key] !== undefined)?.[key];
   return {
     key: locationKey(lead),
@@ -420,40 +461,43 @@ function merge(records: ParsedRecord[], source: RoadEventSource): RoadEvent {
   };
 }
 
-export interface ParseOptions {
-  now: Date;
-  /** Herkunft der Meldungen, Vorgabe `asfinag`. */
-  source?: RoadEventSource;
-}
+/** Blöcke, die die Karte nicht braucht; sie machen ein Paket fast halb so groß. */
+// Ein leeres Element (`<x/>`) passt nicht, sonst reichte der Treffer bis
+// zum nächsten schließenden Tag gleichen Namens.
+const UNUSED_BLOCKS =
+  /<((?:[\w.-]+:)?(?:situationExtension|extendedLinearForGipLink|alertCLinear))\b(?:\s[^>]*[^/>])?>[\s\S]*?<\/\1>/g;
 
 /**
- * Aktuell gültige Meldungen einer DATEX-II-SituationPublication. Einträge
- * einer Situation am selben Ort werden zusammengefasst; der schwerste
- * bestimmt die Einstufung.
+ * Entfernt vor dem Parsen die Übersicht über das Bauvorhaben
+ * (`situationExtension`), die GIP-Kanten (`extendedLinearForGipLink`) und
+ * die ALERT-C-Orte (`alertCLinear`). Bei den Autobahnen spart das gut die
+ * Hälfte der Parse-Zeit.
  */
-export function parseDatexEvents(
-  xml: string,
-  { now, source = 'asfinag' }: ParseOptions
-): RoadEvent[] {
-  let document: XmlNode;
-  try {
-    document = parser.parse(xml) as XmlNode;
-  } catch (err) {
-    console.error('DATEX II konnte nicht gelesen werden', err);
-    return [];
-  }
+export function stripUnusedBlocks(xml: string): string {
+  return xml.replace(UNUSED_BLOCKS, '');
+}
 
-  const situations = child(
-    document,
-    'd2LogicalModel',
-    'payloadPublication',
-    'situation'
-  );
-  if (!Array.isArray(situations)) return [];
+/** Eine Situation samt Inhalt; Situationen sind nicht verschachtelt. */
+const SITUATION = /<((?:[\w.-]+:)?situation)\b(?:\s[^>]*)?>[\s\S]*?<\/\1>/g;
 
-  const groups = new Map<string, ParsedRecord[]>();
-  for (const situation of situations) {
-    const node = asNode(situation);
+/**
+ * Alle Einträge einer DATEX-II-SituationPublication, je Ort einer.
+ *
+ * Gelesen wird Situation für Situation, nicht das ganze Dokument auf einmal:
+ * Ganz Österreich sind über 50 MB, als ein Objektbaum belegt das mehrere
+ * hundert MB. So lebt immer nur der Baum einer Situation.
+ */
+export function parseDatexRecords(xml: string): DatexRecord[] {
+  const result: DatexRecord[] = [];
+  for (const [chunk] of xml.matchAll(SITUATION)) {
+    let situations: unknown;
+    try {
+      situations = child(parser.parse(stripUnusedBlocks(chunk)), 'situation');
+    } catch (err) {
+      console.warn('DATEX-II-Situation nicht lesbar, übersprungen', err);
+      continue;
+    }
+    const node = Array.isArray(situations) ? asNode(situations[0]) : undefined;
     if (!node) continue;
     const situationId = String(node['@_id'] ?? '');
     const situationVersion = String(node['@_version'] ?? '');
@@ -464,20 +508,47 @@ export function parseDatexEvents(
       const record = asNode(raw);
       if (!record) continue;
       try {
-        for (const parsed of parseRecords(
-          record,
-          situationId,
-          situationVersion
-        )) {
-          if (!isCurrent(parsed, now)) continue;
-          const key = locationKey(parsed);
-          groups.set(key, [...(groups.get(key) ?? []), parsed]);
-        }
+        result.push(...parseRecords(record, situationId, situationVersion));
       } catch (err) {
         console.warn(`DATEX-II-Eintrag in ${situationId} übersprungen`, err);
       }
     }
   }
+  // Texte aus dem Parser sind in V8 oft nur Ausschnitte des Dokuments und
+  // hielten es ganz im Speicher. Der Umweg über JSON legt eigene Kopien an.
+  return JSON.parse(JSON.stringify(result)) as DatexRecord[];
+}
 
-  return [...groups.values()].map((records) => merge(records, source));
+/**
+ * Zum Zeitpunkt `now` gültige Meldungen. Einträge einer Situation am selben
+ * Ort werden zusammengefasst; der schwerste bestimmt die Einstufung.
+ */
+export function currentEvents(
+  records: DatexRecord[],
+  now: Date,
+  source: RoadEventSource
+): RoadEvent[] {
+  const groups = new Map<string, DatexRecord[]>();
+  for (const record of records) {
+    if (!isCurrent(record, now)) continue;
+    const key = locationKey(record);
+    const group = groups.get(key);
+    if (group) group.push(record);
+    else groups.set(key, [record]);
+  }
+  return [...groups.values()].map((group) => merge(group, source));
+}
+
+export interface ParseOptions {
+  now: Date;
+  /** Herkunft der Meldungen, Vorgabe `evis`. */
+  source?: RoadEventSource;
+}
+
+/** Beide Schritte auf einmal: aktuell gültige Meldungen eines Pakets. */
+export function parseDatexEvents(
+  xml: string,
+  { now, source = 'evis' }: ParseOptions
+): RoadEvent[] {
+  return currentEvents(parseDatexRecords(xml), now, source);
 }

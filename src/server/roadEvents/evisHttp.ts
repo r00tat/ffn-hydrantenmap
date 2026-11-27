@@ -12,8 +12,11 @@ const BASE_URL = 'https://datasupply-evis.asfinag.at/1.0';
 /** DATEX II 2.3 der Ereignisse (die Verkehrsbeschränkungen wären 3.3). */
 const DATEX_VERSION = '2.2.3';
 const TIMEOUT_MS = 20_000;
-/** Österreich gesamt sind wenige MB; mehr deutet auf einen Fehler hin. */
-const MAX_BYTES = 50 * 1024 * 1024;
+/**
+ * Ganz Österreich (`AT`) sind bei den geplanten Ereignissen gut 50 MB, davon
+ * über 40 MB Autobahnen; ein Vielfaches davon deutet auf einen Fehler hin.
+ */
+const MAX_BYTES = 200 * 1024 * 1024;
 
 export function evisUrl(
   kind: 'getdata' | 'getchecksum',

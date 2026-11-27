@@ -5095,12 +5095,11 @@
     "details": "Details of the report",
     "approximate": "Course simplified as a straight line.",
     "source": {
-      "asfinag": "Source: ASFINAG (CC BY 4.0). No guarantee of accuracy.",
       "evis": "Source: EVIS.AT, licence CC BY 4.0 ASFINAG. No guarantee of accuracy."
     },
-    "attribution": "Traffic reports: <a href=\"https://www.asfinag.at/verkehr-sicherheit/verkehrsinformation/\" target=\"_blank\" rel=\"noopener noreferrer\">ASFINAG</a>, <a href=\"https://evis.asfinag.at/\" target=\"_blank\" rel=\"noopener noreferrer\">EVIS.AT</a> (CC BY 4.0 ASFINAG), road network: <a href=\"https://www.gip.gv.at/\" target=\"_blank\" rel=\"noopener noreferrer\">gip.gv.at</a> (CC BY 4.0)",
+    "attribution": "Traffic reports: <a href=\"https://evis.asfinag.at/\" target=\"_blank\" rel=\"noopener noreferrer\">EVIS.AT</a> (CC BY 4.0 ASFINAG)",
     "offline": "Traffic reports are not available offline.",
-    "notConfigured": "Traffic reports are not set up (access to ASFINAG or EVIS.AT missing).",
+    "notConfigured": "Traffic reports are not set up (access to EVIS.AT missing).",
     "failed": "Traffic reports could not be loaded.",
     "partial": "Some traffic reports are currently unavailable; showing the last known state."
   }

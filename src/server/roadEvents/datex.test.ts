@@ -1,7 +1,13 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, expect, it } from 'vitest';
-import { classifyRecord, parseDatexEvents } from './datex';
+import {
+  classifyRecord,
+  currentEvents,
+  parseDatexEvents,
+  parseDatexRecords,
+  stripUnusedBlocks,
+} from './datex';
 
 const fixture = (name: string) =>
   readFileSync(join(__dirname, 'fixtures', name), 'utf8');
@@ -211,12 +217,61 @@ describe('parseDatexEvents mit EVIS.AT (Landesstraßen)', () => {
     expect(events[0]).toMatchObject({ road: 'L221', source: 'evis' });
     expect(events[0].description).toContain('Bergungsarbeiten');
   });
+});
 
-  it('kennzeichnet Meldungen der ASFINAG ohne Angabe als asfinag', () => {
-    const events = parseDatexEvents(unplanned, {
-      now: new Date('2026-02-18T22:00:00Z'),
-    });
-    expect(events[0].source).toBe('asfinag');
+describe('stripUnusedBlocks', () => {
+  it('entfernt Erweiterung, GIP-Links und ALERT-C, auch mit Namensraum-Präfix', () => {
+    const xml =
+      '<a><ns0:situationExtension><x>1</x></ns0:situationExtension><b>1</b>' +
+      '<extendedLinearForGipLink id="7"><y/></extendedLinearForGipLink>' +
+      '<alertCLinear xsi:type="AlertCMethod4Linear"><z/></alertCLinear></a>';
+    expect(stripUnusedBlocks(xml)).toBe('<a><b>1</b></a>');
+  });
+
+  it('lässt leere Elemente stehen, statt bis zum nächsten Block zu löschen', () => {
+    const xml =
+      '<a><alertCLinear/><b>1</b><alertCLinear><z/></alertCLinear></a>';
+    expect(stripUnusedBlocks(xml)).toBe('<a><alertCLinear/><b>1</b></a>');
+  });
+
+  it('macht die Pakete kleiner, ohne die Meldungen zu ändern', () => {
+    const xml = fixture('evis-planned.xml');
+    const stripped = stripUnusedBlocks(xml);
+    expect(stripped.length).toBeLessThan(xml.length);
+    expect(stripped).not.toContain('extendedLinearForGipLink');
+    expect(stripped).not.toContain('alertCLinear');
+  });
+});
+
+describe('parseDatexRecords und currentEvents', () => {
+  const evisPlanned = fixture('evis-planned.xml');
+  const roads = (records: ReturnType<typeof parseDatexRecords>, now: Date) =>
+    new Set(currentEvents(records, now, 'evis').map((e) => e.road));
+
+  it('liest ein Paket einmal und wertet die Zeitfenster je Zeitpunkt neu aus', () => {
+    const records = parseDatexRecords(evisPlanned);
+
+    // Mittwoch 10:00 und 19:00 Ortszeit
+    expect(roads(records, new Date('2026-11-25T09:00:00Z'))).toEqual(
+      new Set(['B50', 'B62', 'L219'])
+    );
+    expect(roads(records, new Date('2026-11-25T18:00:00Z'))).toEqual(
+      new Set(['L219'])
+    );
+  });
+
+  it('hält nur einfache Werte, keine Knoten aus dem XML', () => {
+    const records = parseDatexRecords(evisPlanned);
+
+    expect(records.length).toBeGreaterThan(0);
+    expect(JSON.parse(JSON.stringify(records))).toEqual(records);
+    for (const record of records) {
+      expect(record).not.toHaveProperty('validity');
+    }
+  });
+
+  it('liefert bei kaputtem XML keine Datensätze', () => {
+    expect(parseDatexRecords('<kein xml')).toEqual([]);
   });
 });
 

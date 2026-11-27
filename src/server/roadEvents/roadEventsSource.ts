@@ -1,54 +1,33 @@
 /**
- * Verkehrsmeldungen aus mehreren Quellen (ASFINAG-Content-Portal, EVIS.AT):
- * Abruf je Paket, kurzer Cache, Verlauf entlang der Straße. Siehe
- * docs/verkehrsmeldungen.md.
+ * Verkehrsmeldungen von EVIS.AT: Abruf je Paket, Prüfsumme vor den Daten,
+ * Auswertung der Zeitfenster je Minute. Siehe docs/verkehrsmeldungen.md.
  *
- * Abruf, Netz und Uhr werden übergeben, damit sich Cache und Teilausfälle
- * ohne Netz prüfen lassen; die Server Action setzt die echten ein.
+ * Abruf und Uhr werden übergeben, damit sich Cache und Teilausfälle ohne
+ * Netz prüfen lassen; die Server Action setzt die echten ein.
  */
 import {
-  LatLng,
   ROAD_EVENT_KIND_ORDER,
   RoadEvent,
   RoadEventSource,
   RoadEventsResult,
   RoadEventWithPath,
 } from '../../common/roadEvents';
-import { parseDatexEvents } from './datex';
-import type { MotorwayGraph, PathResult } from './motorwayPath';
+import { currentEvents, DatexRecord, parseDatexRecords } from './datex';
 
 export interface FeedConfig {
-  /** Paketname für Meldungen und Log, z. B. `unplanned`. */
+  /** Paketname für Meldungen und Log, z. B. `evis-planned-AT`. */
   name: string;
   source: RoadEventSource;
   /** DATEX-II-XML des Pakets; leer, wenn es nichts zu melden gibt. */
   fetchXml: () => Promise<string>;
   /**
-   * Prüfsumme des Pakets (EVIS). Ist sie unverändert, wird das Paket nicht
-   * erneut geladen.
+   * Prüfsumme des Pakets. Ist sie unverändert, wird das Paket weder geladen
+   * noch neu gelesen.
    */
   fetchChecksum?: () => Promise<string>;
 }
 
 type Env = Record<string, string | undefined>;
-
-const ASFINAG_FEED_ENV: [string, string][] = [
-  ['unplanned', 'ASFINAG_UNPLANNED_RESOURCE_KEY'],
-  ['planned', 'ASFINAG_PLANNED_RESOURCE_KEY'],
-];
-
-/** Pakete des ASFINAG-Content-Portals, für die ein Schlüssel hinterlegt ist. */
-export function asfinagFeedsFromEnv(
-  env: Env,
-  fetchXml: (resourceKey: string) => Promise<string>
-): FeedConfig[] {
-  return ASFINAG_FEED_ENV.flatMap(([name, variable]): FeedConfig[] => {
-    const resourceKey = env[variable]?.trim();
-    return resourceKey
-      ? [{ name, source: 'asfinag', fetchXml: () => fetchXml(resourceKey) }]
-      : [];
-  });
-}
 
 export type EvisPackage = 'EventsUnplanned' | 'EventsPlanned';
 
@@ -61,8 +40,8 @@ export interface EvisClient {
   ): Promise<string>;
 }
 
-/** Burgenland und Niederösterreich; ohne ASFINAG-Strecken, die kommen vom Portal. */
-export const EVIS_DEFAULT_REGIONS = ['AT-1', 'AT-3'];
+/** Ganz Österreich, Landesstraßen und ASFINAG-Strecken. */
+export const EVIS_DEFAULT_REGIONS = ['AT'];
 const EVIS_REGION = /^AT(-[1-9]|-ASF)?$/;
 const EVIS_PACKAGES: [string, EvisPackage][] = [
   ['unplanned', 'EventsUnplanned'],
@@ -71,7 +50,7 @@ const EVIS_PACKAGES: [string, EvisPackage][] = [
 
 /**
  * Pakete von EVIS.AT je Region (`EVIS_REGIONS`, kommagetrennt, Vorgabe
- * Burgenland und Niederösterreich). Ohne `EVIS_API_KEY` keine.
+ * ganz Österreich). Ohne `EVIS_API_KEY` keine.
  */
 export function evisFeedsFromEnv(env: Env, client: EvisClient): FeedConfig[] {
   const apiKey = env.EVIS_API_KEY?.trim();
@@ -98,50 +77,52 @@ export function evisFeedsFromEnv(env: Env, client: EvisClient): FeedConfig[] {
 
 export interface RoadEventsSourceOptions {
   feeds: FeedConfig[];
-  loadGraph: () => Promise<MotorwayGraph>;
-  findPath: (graph: MotorwayGraph, from: LatLng, to: LatLng) => PathResult;
   now?: () => Date;
-  /** Wie lange ein Paket als frisch gilt. */
+  /** Wie lange ein Paket und das Ergebnis als frisch gelten. */
   ttlMs?: number;
 }
 
 interface FeedState {
   fetchedAt: number;
-  /** Zuletzt geladenes XML; bei gleicher Prüfsumme wird es neu ausgewertet. */
-  xml?: string;
   checksum?: string;
-  events: RoadEvent[];
+  /**
+   * Gelesene Einträge des Pakets. Das XML selbst wird nicht behalten: ganz
+   * Österreich sind über 50 MB.
+   */
+  records: DatexRecord[];
   failed: boolean;
 }
 
-/** Obergrenze des Verlaufs-Caches; darüber wird er geleert (alte Versionen). */
-const PATH_CACHE_MAX = 5000;
+/**
+ * Eine Meldung ohne mitgelieferten Verlauf wird als Gerade gezeichnet und
+ * als ungefähr gekennzeichnet (gestrichelt).
+ */
+function withPath(event: RoadEvent): RoadEventWithPath {
+  if (event.path && event.path.length >= 2) {
+    return { ...event, path: event.path, approximate: false };
+  }
+  const point = event.from.join() === event.to.join();
+  return {
+    ...event,
+    path: point ? [event.from] : [event.from, event.to],
+    approximate: !point,
+  };
+}
 
 export function createRoadEventsSource({
   feeds,
-  loadGraph,
-  findPath,
   now = () => new Date(),
   ttlMs = 60_000,
 }: RoadEventsSourceOptions) {
   const states = new Map<string, FeedState>();
-  const pathCache = new Map<string, PathResult>();
-  let graphPromise: Promise<MotorwayGraph | undefined> | undefined;
+  let cached: { at: number; result: RoadEventsResult } | undefined;
   let pending: Promise<RoadEventsResult> | undefined;
 
-  function graph(): Promise<MotorwayGraph | undefined> {
-    graphPromise ??= loadGraph().catch((err) => {
-      console.error('Autobahnnetz für Verkehrsmeldungen nicht geladen', err);
-      return undefined;
-    });
-    return graphPromise;
-  }
-
-  async function refreshFeed(feed: FeedConfig, time: Date): Promise<void> {
+  async function refreshFeed(feed: FeedConfig, time: number): Promise<void> {
     const previous = states.get(feed.name);
     // Auch nach einem Fehler erst nach Ablauf erneut: die ASFINAG behält
     // sich Lastgrenzen vor, ein Ausfall soll nicht zu Dauerabrufen führen.
-    if (previous && time.getTime() - previous.fetchedAt < ttlMs) return;
+    if (previous && time - previous.fetchedAt < ttlMs) return;
     try {
       // Die Prüfsumme kommt vor den Daten: Ändern sie sich dazwischen, passt
       // die gespeicherte Prüfsumme nicht mehr und der nächste Abruf lädt neu.
@@ -149,18 +130,15 @@ export function createRoadEventsSource({
         console.warn(`Prüfsumme für ${feed.name} nicht abrufbar`, err);
         return undefined;
       });
-      const unchanged =
-        checksum !== undefined &&
-        previous?.xml !== undefined &&
-        previous.checksum === checksum;
-      const xml = unchanged ? previous.xml! : await feed.fetchXml();
+      if (checksum !== undefined && previous?.checksum === checksum) {
+        states.set(feed.name, { ...previous, fetchedAt: time });
+        return;
+      }
+      const records = parseDatexRecords(await feed.fetchXml());
       states.set(feed.name, {
-        fetchedAt: time.getTime(),
-        xml: feed.fetchChecksum ? xml : undefined,
+        fetchedAt: time,
         checksum,
-        // Auch bei gleicher Prüfsumme neu auswerten: Zeitfenster wie
-        // „werktags 07:30–17:00“ hängen an der Uhrzeit, nicht an den Daten.
-        events: parseDatexEvents(xml, { now: time, source: feed.source }),
+        records,
         failed: false,
       });
     } catch (err) {
@@ -169,70 +147,41 @@ export function createRoadEventsSource({
         err
       );
       states.set(feed.name, {
-        ...previous,
-        fetchedAt: time.getTime(),
-        events: previous?.events ?? [],
+        fetchedAt: time,
+        // Ohne Prüfsumme lädt der nächste Abruf sicher neu.
+        checksum: undefined,
+        records: previous?.records ?? [],
         failed: true,
       });
     }
   }
 
-  async function withPath(event: RoadEvent): Promise<RoadEventWithPath> {
-    // Liefert die Quelle den Verlauf mit (EVIS), gilt er so.
-    if (event.path && event.path.length >= 2) {
-      return { ...event, path: event.path, approximate: false };
-    }
-    // Das Netz kennt nur Autobahnen und Schnellstraßen; eine Landesstraße
-    // ohne Verlauf würde auf die nächste Autobahn geschnappt.
-    if (event.source !== 'asfinag') {
-      const point = event.from.join() === event.to.join();
-      return {
-        ...event,
-        path: point ? [event.from] : [event.from, event.to],
-        approximate: !point,
-      };
-    }
-    const cacheKey = `${event.key}@${event.version}`;
-    let result = pathCache.get(cacheKey);
-    if (!result) {
-      const g = await graph();
-      result = g
-        ? findPath(g, event.from, event.to)
-        : { path: [event.from, event.to], approximate: true };
-      if (g) {
-        if (pathCache.size >= PATH_CACHE_MAX) pathCache.clear();
-        pathCache.set(cacheKey, result);
-      }
-    }
-    return { ...event, ...result };
-  }
-
-  async function load(): Promise<RoadEventsResult> {
-    const time = now();
-    await Promise.all(feeds.map((feed) => refreshFeed(feed, time)));
+  async function load(time: Date): Promise<RoadEventsResult> {
+    await Promise.all(feeds.map((feed) => refreshFeed(feed, time.getTime())));
 
     const failedFeeds = feeds
       .filter((feed) => states.get(feed.name)?.failed)
       .map((feed) => feed.name);
     // Eine Situation über eine Landesgrenze steht in den Paketen beider
-    // Länder. Je Situation und Ort bleibt die neueste Version.
+    // Länder, falls mehrere Regionen eingestellt sind. Je Situation und Ort
+    // bleibt die neueste Version.
     const unique = new Map<string, RoadEvent>();
-    for (const event of feeds.flatMap(
-      (feed) => states.get(feed.name)?.events ?? []
-    )) {
-      const known = unique.get(event.key);
-      if (!known || Number(event.version) > Number(known.version)) {
-        unique.set(event.key, event);
+    for (const feed of feeds) {
+      const records = states.get(feed.name)?.records ?? [];
+      for (const event of currentEvents(records, time, feed.source)) {
+        const known = unique.get(event.key);
+        if (!known || Number(event.version) > Number(known.version)) {
+          unique.set(event.key, event);
+        }
       }
     }
-    const events = [...unique.values()];
-    const withPaths = await Promise.all(events.map(withPath));
-    withPaths.sort(
+    const events = [...unique.values()].map(withPath);
+    events.sort(
       (a, b) =>
         ROAD_EVENT_KIND_ORDER.indexOf(a.kind) -
         ROAD_EVENT_KIND_ORDER.indexOf(b.kind)
     );
-    return { configured: true, events: withPaths, failedFeeds };
+    return { configured: true, events, failedFeeds };
   }
 
   return {
@@ -240,9 +189,18 @@ export function createRoadEventsSource({
       if (feeds.length === 0) {
         return { configured: false, events: [], failedFeeds: [] };
       }
-      pending ??= load().finally(() => {
-        pending = undefined;
-      });
+      const time = now();
+      // Ein Ergebnis gilt eine Minute; so werden die Zeitfenster je Minute
+      // neu ausgewertet, nicht bei jedem Kartenausschnitt.
+      if (cached && time.getTime() - cached.at < ttlMs) return cached.result;
+      pending ??= load(time)
+        .then((result) => {
+          cached = { at: time.getTime(), result };
+          return result;
+        })
+        .finally(() => {
+          pending = undefined;
+        });
       return pending;
     },
   };

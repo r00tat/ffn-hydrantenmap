@@ -76,7 +76,7 @@ vi.mock('./RoadEventsAction', () => ({
       {
         key: 'c',
         id: 'sperre',
-        source: 'asfinag',
+        source: 'evis',
         kind: 'closure',
         description: 'Tunnel Arlberg gesperrt',
         path: [
@@ -116,7 +116,7 @@ describe('RoadEventsLayer', () => {
     expect(group().dataset.attribution).toBe('');
 
     fire('overlayadd', { name: ROAD_EVENTS_LAYER_NAME });
-    expect(group().dataset.attribution).toContain('ASFINAG');
+    expect(group().dataset.attribution).toContain('EVIS.AT');
     expect(group().dataset.attribution).toContain('<a ');
 
     fire('overlayremove', { name: ROAD_EVENTS_LAYER_NAME });
@@ -144,16 +144,7 @@ describe('RoadEventsLayer', () => {
     expect(popup.indexOf('gesperrt')).toBeLessThan(
       popup.indexOf('Baustellenbereich')
     );
-    // Jede Meldung nennt ihre eigene Quelle.
-    expect(popup).toContain('Quelle: ASFINAG');
-    expect(popup).toContain('Quelle: EVIS.AT');
-  });
-
-  it('nennt EVIS.AT in der Attribution', () => {
-    renderWithIntl(<RoadEventsLayer />);
-    fire('overlayadd', { name: ROAD_EVENTS_LAYER_NAME });
-    expect(screen.getByTestId('layergroup').dataset.attribution).toContain(
-      'EVIS.AT'
-    );
+    // Jede Meldung nennt ihre Quelle.
+    expect(popup.match(/Quelle: EVIS\.AT/g)).toHaveLength(2);
   });
 });
