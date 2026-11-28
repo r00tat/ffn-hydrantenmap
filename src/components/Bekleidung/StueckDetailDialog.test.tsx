@@ -1,23 +1,30 @@
 // @vitest-environment jsdom
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import { sampleView } from './bekleidungFixtures';
 
-const { setStueckStatus, setStueckBemerkung, reassignItems, returnItems } = vi.hoisted(() => ({
-  setStueckStatus: vi.fn(),
-  setStueckBemerkung: vi.fn(),
-  reassignItems: vi.fn(),
-  returnItems: vi.fn(),
-}));
+const { setStueckStatus, setStueckBemerkung, reassignItems, returnItems, issue } = vi.hoisted(
+  () => ({
+    setStueckStatus: vi.fn(),
+    setStueckBemerkung: vi.fn(),
+    reassignItems: vi.fn(),
+    returnItems: vi.fn(),
+    issue: vi.fn(),
+  }),
+);
 vi.mock('./bekleidungActions', () => ({
   setStueckStatus,
   setStueckBemerkung,
   reassignItems,
   returnItems,
+  issue,
 }));
 vi.mock('../../hooks/useOnline', () => ({ default: () => true }));
+vi.mock('../../hooks/useBarcodeScanner', () => ({
+  default: () => ({ videoRef: { current: null }, status: 'unsupported', frames: 0 }),
+}));
 
 import StueckDetailDialog from './StueckDetailDialog';
 
@@ -151,5 +158,33 @@ describe('StueckDetailDialog', () => {
       '2026-09-30',
       'verbrannt',
     );
+  });
+
+  it('gibt ein Stück aus dem Lager direkt aus', async () => {
+    issue.mockResolvedValue({ ausgabeIds: ['x'] });
+    const user = userEvent.setup();
+    renderWithIntl(
+      <StueckDetailDialog open view={sampleView()} stueckId="s1" onClose={vi.fn()} onEdit={vi.fn()} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Ausgeben' }));
+
+    const dialogs = screen.getAllByRole('dialog');
+    const ausgabe = dialogs[dialogs.length - 1];
+    expect(within(ausgabe).getByText('Einsatzjacke · L · #1001')).toBeInTheDocument();
+    await user.click(within(ausgabe).getByRole('combobox', { name: 'Person' }));
+    await user.click(screen.getByRole('option', { name: 'Max Mustermann' }));
+    await user.click(within(ausgabe).getByRole('button', { name: 'Ausgeben' }));
+
+    expect(issue).toHaveBeenCalledWith(
+      'ffnd',
+      expect.objectContaining({ personId: 'p1', stueckIds: ['s1'], mengen: [] }),
+    );
+  });
+
+  it('bietet Ausgeben nur für ein Stück im Lager', () => {
+    renderWithIntl(
+      <StueckDetailDialog open view={sampleView()} stueckId="s2" onClose={vi.fn()} onEdit={vi.fn()} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Ausgeben' })).toBeNull();
   });
 });

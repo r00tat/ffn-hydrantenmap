@@ -5,9 +5,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import { sampleView } from './bekleidungFixtures';
 
-const { adjustBestand } = vi.hoisted(() => ({ adjustBestand: vi.fn() }));
-vi.mock('./bekleidungActions', () => ({ adjustBestand }));
+const { adjustBestand, issue, returnItems } = vi.hoisted(() => ({
+  adjustBestand: vi.fn(),
+  issue: vi.fn(),
+  returnItems: vi.fn(),
+}));
+vi.mock('./bekleidungActions', () => ({ adjustBestand, issue, returnItems }));
 vi.mock('../../hooks/useOnline', () => ({ default: () => true }));
+vi.mock('../../hooks/useBarcodeScanner', () => ({
+  default: () => ({ videoRef: { current: null }, status: 'unsupported', frames: 0 }),
+}));
 
 import LagerstandTab from './LagerstandTab';
 
@@ -122,6 +129,54 @@ describe('LagerstandTab', () => {
       charge: 'Technisch',
       delta: 6,
       bemerkung: undefined,
+    });
+  });
+
+  describe('Ausgeben aus dem Lagerstand', () => {
+    beforeEach(() => {
+      issue.mockResolvedValue({ ausgabeIds: ['x'] });
+    });
+
+    it('gibt einen Mengenartikel aus der Größenzeile aus', async () => {
+      const user = userEvent.setup();
+      renderWithIntl(<LagerstandTab view={sampleView()} />);
+      await user.click(screen.getByRole('button', { name: 'Details zu Poloshirt' }));
+      await user.click(within(rowOf('M')[0]).getByRole('button', { name: 'Ausgeben' }));
+
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByText('Im Lager: 5')).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('combobox', { name: 'Person' }));
+      await user.click(screen.getByRole('option', { name: 'Max Mustermann' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Ausgeben' }));
+
+      expect(issue).toHaveBeenCalledWith(
+        'ffnd',
+        expect.objectContaining({
+          personId: 'p1',
+          stueckIds: [],
+          mengen: [{ artikelId: 'polo', groesse: 'M', menge: 1 }],
+        }),
+      );
+    });
+
+    it('wählt das einzige Stück der Größe im Lager vor', async () => {
+      const user = userEvent.setup();
+      renderWithIntl(<LagerstandTab view={sampleView()} />);
+      await user.click(screen.getByRole('button', { name: 'Details zu Einsatzjacke' }));
+      // M liegt nicht im Lager: nichts auszugeben.
+      expect(within(rowOf('M')[0]).queryByRole('button', { name: 'Ausgeben' })).toBeNull();
+      await user.click(within(rowOf('L')[0]).getByRole('button', { name: 'Ausgeben' }));
+
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByText('Einsatzjacke · L · #1001')).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('combobox', { name: 'Person' }));
+      await user.click(screen.getByRole('option', { name: 'Max Mustermann' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Ausgeben' }));
+
+      expect(issue).toHaveBeenCalledWith(
+        'ffnd',
+        expect.objectContaining({ personId: 'p1', stueckIds: ['s1'], mengen: [] }),
+      );
     });
   });
 });

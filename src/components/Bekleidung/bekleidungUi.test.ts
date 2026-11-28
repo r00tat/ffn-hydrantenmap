@@ -11,12 +11,14 @@ import {
   chargenInStock,
   daysBetween,
   findStueckByCode,
+  issuePresetFor,
   knownSizes,
   mengeLabel,
   personItems,
   stueckLabel,
   todayLocalDate,
 } from './bekleidungUi';
+import { makeStueck, sampleView } from './bekleidungFixtures';
 
 const stamps = { createdAt: '', createdBy: '', updatedAt: '', updatedBy: '' };
 
@@ -168,5 +170,57 @@ describe('chargeCounts', () => {
   it('ist leer, wenn kein Stück eine Charge hat', () => {
     expect(chargeCounts([piece(), piece()])).toEqual([]);
     expect(chargeCounts([])).toEqual([]);
+  });
+});
+
+describe('issuePresetFor', () => {
+  it('belegt bei einem Mengenartikel die Zeile mit Artikel und Größe vor', () => {
+    expect(issuePresetFor(sampleView(), { artikelId: 'polo', groesse: 'M' })).toEqual({
+      lines: [{ artikelId: 'polo', groesse: 'M', menge: '1' }],
+    });
+  });
+
+  it('nimmt in einer Chargenzeile die Charge mit, auch „ohne Charge"', () => {
+    const view = sampleView();
+    expect(issuePresetFor(view, { artikelId: 'polo', groesse: 'M', charge: 'Brand 2024' }))
+      .toEqual({
+        lines: [{ artikelId: 'polo', groesse: 'M', menge: '1', charge: 'BRAND 2024' }],
+      });
+    expect(issuePresetFor(view, { artikelId: 'polo', groesse: 'M', charge: '' })).toEqual({
+      lines: [{ artikelId: 'polo', groesse: 'M', menge: '1', charge: '\u0000' }],
+    });
+  });
+
+  it('wählt bei Einzelstücken das einzige passende Stück im Lager', () => {
+    expect(issuePresetFor(sampleView(), { artikelId: 'jacke', groesse: 'L' })).toEqual({
+      stueckIds: ['s1'],
+    });
+  });
+
+  it('lässt bei mehreren passenden Stücken wählen und füllt die Suche vor', () => {
+    const view = sampleView({
+      stuecke: [
+        makeStueck({ id: 's1', tagNummer: '1001' }),
+        makeStueck({ id: 's4', tagNummer: '1004', groesse: 'l' }),
+        // Ausgegeben, privat oder andere Charge zählen nicht.
+        makeStueck({ id: 's5', status: 'ausgegeben' }),
+        makeStueck({ id: 's6', eigentum: 'privat' }),
+      ],
+    });
+    expect(issuePresetFor(view, { artikelId: 'jacke', groesse: 'L' })).toEqual({
+      search: 'Einsatzjacke · L',
+    });
+  });
+
+  it('grenzt Einzelstücke in einer Chargenzeile auf die Charge ein', () => {
+    const view = sampleView({
+      stuecke: [
+        makeStueck({ id: 's1', charge: 'Brand' }),
+        makeStueck({ id: 's4', charge: 'Texport' }),
+      ],
+    });
+    expect(issuePresetFor(view, { artikelId: 'jacke', groesse: 'L', charge: 'texport' })).toEqual(
+      { stueckIds: ['s4'] },
+    );
   });
 });

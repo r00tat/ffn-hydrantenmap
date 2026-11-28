@@ -335,6 +335,21 @@ der Stückliste die Stücke, je Artikel seitenweise zu 100. Engen Suche,
 Artikel- oder Personenfilter die Stückliste ein, sind die Treffer gleich
 aufgeklappt, denn wer sucht, will das Stück sehen.
 
+## Ausgeben aus Lagerstand und Stück-Detail
+
+Wer im Lager steht, sieht erst den Artikel und dann die Person. Deshalb gibt es
+„Ausgeben" nicht nur im Personen-Reiter, sondern auch an jeder Größen- bzw.
+Chargenzeile des Lagerstands mit Bestand und im Detail eines Stücks im Lager.
+Alle Wege öffnen denselben Ausgabe-Dialog und buchen über dieselbe Server
+Action; vorbelegt wird nur (`issuePresetFor`):
+
+- **Mengenartikel:** eine Zeile mit Artikel, Größe und Menge 1, in einer
+  Chargenzeile samt Charge.
+- **Einzelstücke:** das Stück, wenn genau eines der Feuerwehr in Größe (und
+  Charge) im Lager liegt. Bei mehreren wird keines vorgewählt — welches aus dem
+  Regal kommt, weiß nur, wer davorsteht —, sondern die Suche mit Artikel und
+  Größe vorbelegt, damit man nur noch die Tag-Nummer wählt oder scannt.
+
 ## Weitergeben und Bemerkungen
 
 Eine Ausgabe lässt sich aus dem Stück-Detail und im Personen-Reiter direkt

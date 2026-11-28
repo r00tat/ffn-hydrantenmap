@@ -11,20 +11,24 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
-import { chargeKey, type BekleidungBestand } from '../../common/bekleidung';
+import type { BekleidungBestand } from '../../common/bekleidung';
 import type { MengeLine } from './bekleidungActions';
-import { chargenInStock, knownSizes, type BekleidungView } from './bekleidungUi';
+import {
+  chargenInStock,
+  chargeSelectionKey,
+  knownSizes,
+  NO_CHARGE_KEY,
+  type BekleidungView,
+} from './bekleidungUi';
 
 export interface MengeLineDraft {
   key: number;
   artikelId: string;
   groesse: string;
   menge: string;
-  /** Gewählte Charge als `chargeKey`, `NO_CHARGE` für Bestand ohne Charge. */
+  /** Gewählte Charge als `chargeKey`, `NO_CHARGE_KEY` für Bestand ohne Charge. */
   charge?: string;
 }
-
-const NO_CHARGE = '\u0000';
 
 export function emptyMengeLine(key: number): MengeLineDraft {
   return { key, artikelId: '', groesse: '', menge: '1' };
@@ -41,7 +45,7 @@ function resolveCharge(
   const options = chargenInStock(line.artikelId, line.groesse, bestand);
   if (options.length <= 1) return options[0];
   if (line.charge === undefined) return null;
-  return options.find((o) => (o.charge ? chargeKey(o.charge) : NO_CHARGE) === line.charge) ?? null;
+  return options.find((o) => chargeSelectionKey(o.charge) === line.charge) ?? null;
 }
 
 /**
@@ -165,8 +169,8 @@ export default function MengeLinesEditor({
               >
                 {chargen.map((o) => (
                   <MenuItem
-                    key={o.charge ?? NO_CHARGE}
-                    value={o.charge ? chargeKey(o.charge) : NO_CHARGE}
+                    key={o.charge ?? NO_CHARGE_KEY}
+                    value={chargeSelectionKey(o.charge)}
                   >
                     {t('ausgabe.chargeOption', {
                       charge: o.charge ?? t('ausgabe.noCharge'),
