@@ -405,8 +405,8 @@ describe('BugReportDialog', () => {
     );
 
     const hint = await screen.findByTestId('bug-report-shortcut-hint');
+    expect(hint).toHaveTextContent(/Alt\+B/);
     expect(hint).toHaveTextContent(/Alt\+Shift\+B/);
-    expect(hint).toHaveTextContent(/Alt\+Shift\+S/);
   });
 
   it('hides the shortcut hint on touch-only devices', () => {
@@ -437,8 +437,8 @@ describe('BugReportDialog', () => {
 
     await act(async () => {
       fireEvent.keyDown(screen.getByLabelText(/titel/i), {
-        key: 'S',
-        code: 'KeyS',
+        key: 'ı',
+        code: 'KeyB',
         altKey: true,
         shiftKey: true,
       });

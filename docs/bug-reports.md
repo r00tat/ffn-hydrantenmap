@@ -198,8 +198,8 @@ Kürzel (Katalog in [hotkeys.ts](../src/common/hotkeys.ts), beide
 
 | Kürzel | Vorbelegung | Ablauf |
 | --- | --- | --- |
-| `bugReport.open` | Alt+Shift+B (⌥⇧B) | Bildschirm aufnehmen → Bug-Report mit diesem Screenshot öffnen |
-| `bugReport.region` | Alt+Shift+S (⌥⇧S) | aufnehmen → Bereich auswählen → Bug-Report mit Ausschnitt öffnen |
+| `bugReport.open` | Alt+B (⌥B) | Bildschirm aufnehmen → Bug-Report mit diesem Screenshot öffnen |
+| `bugReport.region` | Alt+Shift+B (⌥⇧B) | aufnehmen → Bereich auswählen → Bug-Report mit Ausschnitt öffnen |
 
 Im Dialog selbst gibt es dasselbe als Knopf „Bereich auswählen" neben
 „Bildschirmaufnahme machen", und jeder angehängte Screenshot lässt sich über das

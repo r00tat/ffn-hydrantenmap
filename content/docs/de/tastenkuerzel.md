@@ -32,7 +32,8 @@ Am PC erreichst du die wichtigsten Funktionen der Einsatzkarte mit der Tastatur 
 | Umschalt + O | Zu den Einsatzorten |
 | Umschalt + L | Zu den Ebenen |
 | Umschalt + H | Zur Einsatzliste |
-| Alt + Umschalt + B | Bug-Report mit Screenshot |
+| Alt + B | Bug-Report mit Screenshot |
+| Alt + Umschalt + B | Bildschirmbereich für den Bug-Report auswählen |
 
 Auf dem Mac heißt Alt „Option" (⌥) und Umschalt „⇧".
 

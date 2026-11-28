@@ -28,7 +28,7 @@ export function isTouchOnlyDevice(): boolean {
 const noopSubscribe = () => () => {};
 
 /**
- * „Tipp: ⌥⇧B öffnet den Bug-Report auch über offenen Dialogen, ⌥⇧S wählt
+ * „Tipp: ⌥B öffnet den Bug-Report auch über offenen Dialogen, ⌥⇧B wählt
  * direkt einen Bereich aus." — mit der eingestellten Belegung. Fehlt, wenn
  * Kürzel abgeschaltet sind oder das Gerät nur Touch kann.
  */

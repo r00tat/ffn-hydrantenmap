@@ -41,14 +41,14 @@ export const HOTKEY_ACTIONS = [
   {
     id: 'bugReport.open',
     group: 'bugReport',
-    defaultBinding: 'Alt+Shift+B',
+    defaultBinding: 'Alt+B',
     whileDialogOpen: true,
     allowInInputs: true,
   },
   {
     id: 'bugReport.region',
     group: 'bugReport',
-    defaultBinding: 'Alt+Shift+S',
+    defaultBinding: 'Alt+Shift+B',
     whileDialogOpen: true,
     allowInInputs: true,
   },

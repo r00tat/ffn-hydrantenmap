@@ -32,7 +32,8 @@ On a PC you can reach the most important functions of the operations map with th
 | Shift + O | Go to operation sites |
 | Shift + L | Go to layers |
 | Shift + H | Go to operation list |
-| Alt + Shift + B | Bug report with screenshot |
+| Alt + B | Bug report with screenshot |
+| Alt + Shift + B | Select a screen area for a bug report |
 
 On a Mac, Alt is called Option (⌥) and Shift is shown as ⇧.
 

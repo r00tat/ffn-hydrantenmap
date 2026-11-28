@@ -56,10 +56,9 @@ describe('HotkeyProvider', () => {
     fireEvent.keyDown(input, { key: 'm', code: 'KeyM' });
     expect(onMarker).not.toHaveBeenCalled();
     fireEvent.keyDown(input, {
-      key: 'B',
+      key: '∫',
       code: 'KeyB',
       altKey: true,
-      shiftKey: true,
     });
     expect(onBug).toHaveBeenCalledTimes(1);
   });
@@ -76,10 +75,9 @@ describe('HotkeyProvider', () => {
     fireEvent.keyDown(window, { key: 'm', code: 'KeyM' });
     expect(onMarker).not.toHaveBeenCalled();
     fireEvent.keyDown(window, {
-      key: 'B',
+      key: '∫',
       code: 'KeyB',
       altKey: true,
-      shiftKey: true,
     });
     expect(onBug).toHaveBeenCalledTimes(1);
   });

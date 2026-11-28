@@ -22,7 +22,7 @@ export function useIsMac(): boolean {
 }
 
 /**
- * Das aktuelle Kürzel einer Aktion zur Anzeige („N", „⌥⇧B"), leer wenn es
+ * Das aktuelle Kürzel einer Aktion zur Anzeige („N", „⌥B"), leer wenn es
  * abgeschaltet ist oder die Kürzel insgesamt aus sind.
  */
 export function useHotkeyLabel(id: HotkeyActionId): string {

@@ -92,17 +92,16 @@ function renderProvider(children: React.ReactNode = <Consumer />) {
 
 function pressOpenHotkey() {
   fireEvent.keyDown(window, {
-    key: 'B',
+    key: '∫',
     code: 'KeyB',
     altKey: true,
-    shiftKey: true,
   });
 }
 
 function pressRegionHotkey() {
   fireEvent.keyDown(window, {
-    key: 'S',
-    code: 'KeyS',
+    key: 'ı',
+    code: 'KeyB',
     altKey: true,
     shiftKey: true,
   });
@@ -170,10 +169,9 @@ describe('BugReportProvider', () => {
 
     await act(async () => {
       fireEvent.keyDown(screen.getByLabelText('other-field'), {
-        key: 'B',
+        key: '∫',
         code: 'KeyB',
         altKey: true,
-        shiftKey: true,
       });
     });
 

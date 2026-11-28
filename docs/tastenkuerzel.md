@@ -3,7 +3,7 @@
 Tastenkürzel für die Arbeit am PC: Suche (`/`), Übersicht (`?`), neue Einträge in
 Einsatztagebuch und Geschäftsbuch (`T`, `G`), Elemente auf der Karte (`M`, `F`, `O`,
 `L`, `A`, `N`, `E`), Navigation (`Umschalt` + Buchstabe) und der Bug-Report
-(`Alt+Umschalt+B`). Die Benutzerdoku steht in
+(`Alt+B`, mit Umschalt für einen Bereich). Die Benutzerdoku steht in
 [content/docs/de/tastenkuerzel.md](../content/docs/de/tastenkuerzel.md).
 
 ## Aufbau
@@ -50,7 +50,7 @@ Ein Kürzel ohne Modifikator (`M`, `/`, `?`) feuert nicht,
   Seite dahinter.
 
 Aktionen mit `allowInInputs` bzw. `whileDialogOpen` sind davon ausgenommen. Das
-gilt für den Bug-Report: Er liegt deshalb auf `Alt+Umschalt+B`, damit er auch aus
+gilt für den Bug-Report: Er liegt deshalb auf `Alt+B` bzw. `Alt+Umschalt+B`, damit er auch aus
 einem Formular heraus geht, ohne ein Zeichen zu verschlucken.
 
 ## Alt auf dem Mac: die physische Taste
