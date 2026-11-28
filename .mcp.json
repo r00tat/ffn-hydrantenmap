@@ -11,6 +11,10 @@
         "--only",
         "core,firestore,storage,auth,messaging,functions,remoteconfig,database,developerknowledge,crashlytics"
       ]
+    },
+    "einsatzkarte-local": {
+      "type": "http",
+      "url": "https://localhost:3000/api/mcp"
     }
   }
 }

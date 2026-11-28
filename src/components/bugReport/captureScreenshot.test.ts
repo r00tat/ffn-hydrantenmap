@@ -64,6 +64,78 @@ describe('captureScreenshot', () => {
     expect(opts.scale).toBeCloseTo(0.5, 2);
   });
 
+  describe('highResolution (region selection)', () => {
+    afterEach(() => {
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: 1,
+      });
+    });
+
+    function setBody(width: number, height: number) {
+      Object.defineProperty(document.body, 'scrollWidth', {
+        configurable: true,
+        value: width,
+      });
+      Object.defineProperty(document.body, 'scrollHeight', {
+        configurable: true,
+        value: height,
+      });
+    }
+
+    it('captures at the device pixel ratio so a small region stays legible', async () => {
+      domToBlobMock.mockResolvedValueOnce(new Blob(['x'], { type: 'image/png' }));
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: 2,
+      });
+      setBody(1000, 600);
+
+      await captureScreenshot({ highResolution: true });
+
+      expect(domToBlobMock.mock.calls[0][1].scale).toBeCloseTo(2, 5);
+    });
+
+    it('caps the pixel ratio at 2', async () => {
+      domToBlobMock.mockResolvedValueOnce(new Blob(['x'], { type: 'image/png' }));
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: 3,
+      });
+      setBody(400, 800);
+
+      await captureScreenshot({ highResolution: true });
+
+      expect(domToBlobMock.mock.calls[0][1].scale).toBeCloseTo(2, 5);
+    });
+
+    it('still limits the longest side, at 2560 instead of 1280', async () => {
+      domToBlobMock.mockResolvedValueOnce(new Blob(['x'], { type: 'image/png' }));
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: 2,
+      });
+      setBody(2560, 1323);
+
+      await captureScreenshot({ highResolution: true });
+
+      expect(domToBlobMock.mock.calls[0][1].scale).toBeCloseTo(1, 5);
+    });
+
+    it('keeps the standard capture at scale <= 1 regardless of the pixel ratio', async () => {
+      domToBlobMock.mockResolvedValueOnce(new Blob(['x'], { type: 'image/png' }));
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: 2,
+      });
+      setBody(1000, 600);
+
+      await captureScreenshot();
+
+      expect(domToBlobMock.mock.calls[0][1].scale).toBeCloseTo(1, 5);
+    });
+  });
+
   it('filters out googleusercontent avatars, scripts, and data-skip-screenshot nodes', async () => {
     domToBlobMock.mockResolvedValueOnce(new Blob(['x'], { type: 'image/png' }));
     await captureScreenshot();

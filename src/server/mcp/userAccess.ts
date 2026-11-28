@@ -24,6 +24,9 @@ export interface McpUser {
   /** Mitgliedsgruppen plus `allUsers` — dieselbe Ableitung wie in der Sitzung. */
   groups: string[];
   groupRoles: GroupRoles;
+  /** Aus dem Benutzerdokument — für `createdBy` an Bug-Report-Einträgen. */
+  email?: string;
+  displayName?: string;
 }
 
 export class McpUserAccessError extends Error {
@@ -54,10 +57,16 @@ export async function loadMcpUser(uid: string): Promise<McpUser> {
   // Die Mitgliedschaft kommt aus `groupRoles`: Das alte Feld `groups` pflegt
   // `writeUserRoles()` nicht mehr, ein Austritt stünde dort noch drin.
   const groupRoles = data.groupRoles ?? {};
+  const profile = data as FirebaseUserInfo & {
+    email?: string;
+    displayName?: string;
+  };
   return {
     uid,
     isAdmin: !!data.isAdmin,
     groups: [ALL_USERS_GROUP_ID, ...memberGroupIds({ groupRoles })],
     groupRoles,
+    ...(profile.email ? { email: profile.email } : {}),
+    ...(profile.displayName ? { displayName: profile.displayName } : {}),
   };
 }

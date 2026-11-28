@@ -19,8 +19,12 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import Checkbox from '@mui/material/Checkbox';
 import Divider from '@mui/material/Divider';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
@@ -31,6 +35,7 @@ import {
   type BugReport,
   type BugReportChange,
   type BugReportComment,
+  type BugReportCommentVisibility,
   type BugReportStatus,
   type BugReportTrackedField,
 } from '../../../common/bugReport';
@@ -39,6 +44,7 @@ import {
   parseBugReportIssueRef,
 } from '../../../common/bugReportTracking';
 import { formatBugReportDate } from '../../../common/bugReportDate';
+import { mcpClientLabel } from '../../../common/mcp/provenance';
 import { useSnackbar } from '../../../components/providers/SnackbarProvider';
 import {
   addBugReportCommentAction,
@@ -46,6 +52,7 @@ import {
   listBugReportCommentsAction,
   updateBugReportAction,
   updateBugReportStatusAction,
+  type BugReportWriteResult,
 } from './bugReportAdminActions';
 
 interface BugReportDetailDialogProps {
@@ -78,6 +85,7 @@ const STATUS_TKEY = {
 
 const FIELD_TKEY = {
   status: 'fieldStatus',
+  resolution: 'fieldResolution',
   githubIssue: 'fieldGithubIssue',
   assignee: 'fieldAssignee',
   internalNote: 'fieldInternalNote',
@@ -140,8 +148,12 @@ function ChangeLine({ change }: { change: BugReportChange }) {
 }
 
 function HistoryEntry({ entry }: { entry: BugReportComment }) {
+  const t = useTranslations('bugReport');
   const author =
     entry.createdBy?.displayName || entry.createdBy?.email || '-';
+  const client = entry.source === 'mcp' ? mcpClientLabel(entry) : undefined;
+  const forReporter =
+    entry.entryType === 'comment' && entry.visibility === 'reporter';
   return (
     <Box
       sx={{
@@ -154,6 +166,17 @@ function HistoryEntry({ entry }: { entry: BugReportComment }) {
       <Typography variant="caption" color="text.secondary" component="div">
         {formatBugReportDate(entry.createdAt, { withSeconds: true })} ·{' '}
         {author}
+        {entry.source === 'mcp' &&
+          ` · ${t('historyViaMcp', { client: client ?? 'MCP' })}`}
+        {entry.entryType === 'comment' && (
+          <Chip
+            size="small"
+            variant="outlined"
+            color={forReporter ? 'success' : 'default'}
+            label={t(forReporter ? 'visibilityReporter' : 'visibilityInternal')}
+            sx={{ ml: 1, height: 18 }}
+          />
+        )}
       </Typography>
       {entry.entryType === 'change' ? (
         (entry.changes ?? []).map((change, index) => (
@@ -183,6 +206,10 @@ export default function BugReportDetailDialog({
   const [githubIssue, setGithubIssue] = useState('');
   const [assignee, setAssignee] = useState('');
   const [internalNote, setInternalNote] = useState('');
+  const [resolution, setResolution] = useState('');
+  const [notifyReporter, setNotifyReporter] = useState(false);
+  const [commentVisibility, setCommentVisibility] =
+    useState<BugReportCommentVisibility>('internal');
   const [trackingSaving, setTrackingSaving] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
@@ -192,7 +219,30 @@ export default function BugReportDetailDialog({
     setGithubIssue(result.report.githubIssue ?? '');
     setAssignee(result.report.assignee ?? '');
     setInternalNote(result.report.internalNote ?? '');
+    setResolution(result.report.resolution ?? '');
   }, []);
+
+  /** Sagt dem Bearbeiter, ob der Melder eine Mail bekommen hat. */
+  const reportNotification = useCallback(
+    (result: BugReportWriteResult | undefined) => {
+      const notification = result?.notification;
+      if (!notification) return;
+      if (notification.status === 'sent') {
+        showSnackbar(t('notificationSent', { to: notification.to }), 'success');
+      } else if (notification.status === 'skipped') {
+        showSnackbar(
+          t('notificationSkipped', { reason: notification.reason }),
+          'info',
+        );
+      } else {
+        showSnackbar(
+          t('notificationFailed', { error: notification.error }),
+          'warning',
+        );
+      }
+    },
+    [showSnackbar, t],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -226,7 +276,11 @@ export default function BugReportDetailDialog({
       if (!data) return;
       setStatusSaving(true);
       try {
-        await updateBugReportStatusAction(reportId, status);
+        reportNotification(
+          await updateBugReportStatusAction(reportId, status, {
+            notifyReporter,
+          }),
+        );
         // Neu laden statt lokal setzen: die Änderung erzeugt einen
         // Verlaufseintrag, der sonst erst beim nächsten Öffnen auftaucht.
         applyResult(await getBugReportAction(reportId));
@@ -241,20 +295,30 @@ export default function BugReportDetailDialog({
         setStatusSaving(false);
       }
     },
-    [data, reportId, onStatusChanged, showSnackbar, t, applyResult],
+    [
+      data,
+      reportId,
+      onStatusChanged,
+      showSnackbar,
+      t,
+      applyResult,
+      notifyReporter,
+      reportNotification,
+    ],
   );
 
   const handleSaveTracking = useCallback(async () => {
     if (!data) return;
     setTrackingSaving(true);
     try {
-      await updateBugReportAction(reportId, {
-        githubIssue,
-        assignee,
-        internalNote,
-      });
+      const result = await updateBugReportAction(
+        reportId,
+        { resolution, githubIssue, assignee, internalNote },
+        { notifyReporter },
+      );
       applyResult(await getBugReportAction(reportId));
       showSnackbar(t('trackingSaved'), 'success');
+      reportNotification(result);
       onStatusChanged();
     } catch (err) {
       showSnackbar(
@@ -267,9 +331,12 @@ export default function BugReportDetailDialog({
   }, [
     data,
     reportId,
+    resolution,
     githubIssue,
     assignee,
     internalNote,
+    notifyReporter,
+    reportNotification,
     applyResult,
     onStatusChanged,
     showSnackbar,
@@ -280,11 +347,15 @@ export default function BugReportDetailDialog({
     if (!commentText.trim()) return;
     setCommentSaving(true);
     try {
-      await addBugReportCommentAction(reportId, commentText);
+      const result = await addBugReportCommentAction(reportId, commentText, {
+        visibility: commentVisibility,
+        notifyReporter: commentVisibility === 'reporter' && notifyReporter,
+      });
       const comments = await listBugReportCommentsAction(reportId);
       setData((prev) => (prev ? { ...prev, comments } : prev));
       setCommentText('');
       showSnackbar(t('commentAdded'), 'success');
+      reportNotification(result);
     } catch (err) {
       showSnackbar(
         `${t('commentAddFailed')}: ${err instanceof Error ? err.message : String(err)}`,
@@ -293,12 +364,21 @@ export default function BugReportDetailDialog({
     } finally {
       setCommentSaving(false);
     }
-  }, [commentText, reportId, showSnackbar, t]);
+  }, [
+    commentText,
+    commentVisibility,
+    notifyReporter,
+    reportId,
+    reportNotification,
+    showSnackbar,
+    t,
+  ]);
 
   const issueRef = parseBugReportIssueRef(githubIssue);
   const trackingDirty =
     !!data &&
-    (githubIssue !== (data.report.githubIssue ?? '') ||
+    (resolution !== (data.report.resolution ?? '') ||
+      githubIssue !== (data.report.githubIssue ?? '') ||
       assignee !== (data.report.assignee ?? '') ||
       internalNote !== (data.report.internalNote ?? ''));
 
@@ -367,6 +447,29 @@ export default function BugReportDetailDialog({
                     ))}
                   </TextField>
                 }
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={notifyReporter}
+                    onChange={(e) => setNotifyReporter(e.target.checked)}
+                  />
+                }
+                label={
+                  <Typography variant="body2" component="span">
+                    {t('notifyReporterLabel')}
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      component="span"
+                      sx={{ display: 'block' }}
+                    >
+                      {t('notifyReporterHint')}
+                    </Typography>
+                  </Typography>
+                }
+                sx={{ my: 0.5 }}
               />
               <MetadataRow
                 label={t('metaDate')}
@@ -445,6 +548,20 @@ export default function BugReportDetailDialog({
                 {t('trackingHeader')}
               </Typography>
               <Stack spacing={2}>
+                <TextField
+                  label={t('resolutionLabel')}
+                  helperText={t('resolutionHelper')}
+                  size="small"
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  value={resolution}
+                  onChange={(e) => setResolution(e.target.value)}
+                  disabled={trackingSaving}
+                  slotProps={{
+                    htmlInput: { maxLength: BUG_REPORT_COMMENT_MAX_LENGTH },
+                  }}
+                />
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
                   spacing={1}
@@ -547,10 +664,31 @@ export default function BugReportDetailDialog({
                   ))}
                 </Stack>
               )}
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={commentVisibility}
+                onChange={(_, value: BugReportCommentVisibility | null) => {
+                  if (value) setCommentVisibility(value);
+                }}
+                aria-label={t('commentVisibilityLabel')}
+                sx={{ mb: 1 }}
+              >
+                <ToggleButton value="internal">
+                  {t('visibilityInternal')}
+                </ToggleButton>
+                <ToggleButton value="reporter">
+                  {t('visibilityReporter')}
+                </ToggleButton>
+              </ToggleButtonGroup>
               <TextField
                 label={t('commentAdd')}
                 placeholder={t('commentPlaceholder')}
-                helperText={t('commentInternalHint')}
+                helperText={t(
+                  commentVisibility === 'reporter'
+                    ? 'commentReporterHint'
+                    : 'commentInternalHint',
+                )}
                 size="small"
                 fullWidth
                 multiline

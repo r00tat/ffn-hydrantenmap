@@ -15,6 +15,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import useMapEditor, { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 import LiveLocationFab from '../LiveLocation/LiveLocationFab';
+import { useHotkey } from '../hotkeys/HotkeyProvider';
+import { useHotkeyLabel, withHotkey } from '../hotkeys/useHotkeyLabel';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import AddFirecallItem from './AddFirecallItem';
 import AiAssistantButton from './AiAssistantButton';
@@ -84,6 +86,18 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   } = useMapEditor();
   const canEdit = useMapEditorCanEdit();
   const firecallItems = useFirecallItems();
+  const addElementKey = useHotkeyLabel('map.addElement');
+  const toggleEditKey = useHotkeyLabel('map.toggleEdit');
+
+  useHotkey('map.toggleEdit', () => setEditable((prev) => !prev), canEdit);
+  useHotkey(
+    'map.addElement',
+    () => {
+      setEditable(true);
+      openFirecallItemDialog();
+    },
+    canEdit,
+  );
   const firecallLayers = useFirecallLayers();
   const [show3d, setShow3d] = useState(false);
   const [baseLayerName, setBaseLayerName] = useState(
@@ -136,7 +150,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         }}
       >
         {editable && (
-          <Tooltip title={t('addElement')}>
+          <Tooltip title={withHotkey(t('addElement'), addElementKey)}>
             <Fab
               color="primary"
               aria-label="add"
@@ -154,7 +168,12 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         {/* Ohne Schreibrecht bliebe der Umschalter wirkungslos: der Provider
             erzwingt für Nur-Lese-Gäste `editable: false`. */}
         {historyId === undefined && canEdit && (
-          <Tooltip title={editable ? t('disableEdit') : t('editMap')}>
+          <Tooltip
+            title={withHotkey(
+              editable ? t('disableEdit') : t('editMap'),
+              toggleEditKey,
+            )}
+          >
             <Fab
               color={editable ? 'default' : 'primary'}
               aria-label="edit"
@@ -191,7 +210,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           <SearchButton />
         </>
       )}
-      <AddFirecallItem />
+      <AddFirecallItem firecallItems={firecallItems} />
       {editable && <AiAssistantButton firecallItems={firecallItems} />}
 
       {/* Eigener Platz über dem Assistenten und nicht in der Gruppe unten

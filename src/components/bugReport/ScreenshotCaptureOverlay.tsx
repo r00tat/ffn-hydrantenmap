@@ -4,7 +4,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
-import Portal from '@mui/material/Portal';
+import Modal from '@mui/material/Modal';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
@@ -12,6 +12,11 @@ import { useTranslations } from 'next-intl';
 export interface ScreenshotCaptureOverlayProps {
   open: boolean;
   onCancel: () => void;
+  /**
+   * `dialog`: der Bug-Report ist kurz ausgeblendet (Knopf im Dialog).
+   * `hotkey`: per Tastenkürzel ausgelöst, der Bug-Report öffnet sich danach.
+   */
+  variant?: 'dialog' | 'hotkey';
 }
 
 /**
@@ -23,24 +28,39 @@ export interface ScreenshotCaptureOverlayProps {
  *
  * It is excluded from the capture itself via `data-skip-screenshot` — see the
  * filter in `captureScreenshot.ts`.
+ *
+ * A MUI `Modal` rather than a plain fixed box: when the capture is started by
+ * hotkey, another app dialog is usually open underneath, and only the topmost
+ * modal enforces focus (MUI's ModalManager). As a plain element the cancel
+ * button would lose focus to that dialog's focus trap. No scroll lock — its
+ * scrollbar padding would shift the page that is being captured.
  */
 export default function ScreenshotCaptureOverlay({
   open,
   onCancel,
+  variant = 'dialog',
 }: ScreenshotCaptureOverlayProps) {
   const t = useTranslations('bugReport');
 
   if (!open) return null;
 
   return (
-    <Portal>
+    <Modal
+      open
+      onClose={(_event, reason) => {
+        if (reason === 'escapeKeyDown') onCancel();
+      }}
+      hideBackdrop
+      disableScrollLock
+      data-skip-screenshot="true"
+      // Above the (hidden) dialog, any other dialog and any map overlay.
+      sx={{ zIndex: (theme) => theme.zIndex.modal + 10 }}
+    >
       <Box
-        data-skip-screenshot="true"
         sx={{
           position: 'fixed',
           inset: 0,
-          // Above the (hidden) dialog and any map overlay.
-          zIndex: (theme) => theme.zIndex.modal + 10,
+          outline: 'none',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'center',
@@ -52,15 +72,11 @@ export default function ScreenshotCaptureOverlay({
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
             <CircularProgress size={28} />
             <Box role="status" aria-live="assertive" sx={{ minWidth: 0 }}>
-              <Typography variant="subtitle2">
-                {t('screenshotInProgress')}
-              </Typography>
-              <Typography
-                variant="caption"
-                component="div"
-                sx={{ color: 'text.secondary' }}
-              >
-                {t('screenshotInProgressHint')}
+              <Typography variant="subtitle2">{t('screenshotInProgress')}</Typography>
+              <Typography variant="caption" component="div" sx={{ color: 'text.secondary' }}>
+                {variant === 'hotkey'
+                  ? t('screenshotInProgressHintHotkey')
+                  : t('screenshotInProgressHint')}
               </Typography>
             </Box>
           </Stack>
@@ -71,6 +87,6 @@ export default function ScreenshotCaptureOverlay({
           </Stack>
         </Paper>
       </Box>
-    </Portal>
+    </Modal>
   );
 }

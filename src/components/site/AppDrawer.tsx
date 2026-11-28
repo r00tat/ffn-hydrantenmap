@@ -17,6 +17,7 @@ import CheckroomIcon from '@mui/icons-material/Checkroom';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DescriptionIcon from '@mui/icons-material/Description';
+import FeedbackIcon from '@mui/icons-material/Feedback';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import EditRoadIcon from '@mui/icons-material/EditRoad';
 import ExpandLess from '@mui/icons-material/ExpandLess';
@@ -31,6 +32,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutlined';
 import HistoryIcon from '@mui/icons-material/History';
 import HubIcon from '@mui/icons-material/Hub';
 import InfoIcon from '@mui/icons-material/Info';
+import KeyboardIcon from '@mui/icons-material/Keyboard';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import LayersIcon from '@mui/icons-material/Layers';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
@@ -615,10 +617,24 @@ export default function AppDrawer({
           onClick: () => bugReport.open(),
         },
         {
+          // Die eigenen Bug-Reports samt Bearbeitungsstand.
+          text: t('myBugReports'),
+          icon: <FeedbackIcon />,
+          href: '/meine-meldungen',
+          signedInOnly: true,
+        },
+        {
           text: t('profile'),
           icon: <AccountCircleIcon />,
           href: '/profile',
           signedInOnly: true,
+        },
+        {
+          // Gilt je Gerät (localStorage), deshalb neben dem Profil und nicht
+          // darin — das Profil liegt am Benutzer.
+          text: t('hotkeys'),
+          icon: <KeyboardIcon />,
+          href: '/tastenkuerzel',
         },
         { text: t('about'), icon: <InfoIcon />, href: '/about' },
         { text: t('login'), icon: <LoginIcon />, href: '/login' },

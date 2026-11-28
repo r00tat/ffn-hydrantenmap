@@ -192,6 +192,12 @@ Consent-Screen benennt das ausdrücklich.
 | `einsatz:write` | Items anlegen/ändern/löschen, Tagebuch- und GB-Einträge schreiben |
 | `hydranten:read` | Hydranten, Wasserversorgung |
 | `berechnung` | reine Rechner-Tools, kein Datenzugriff |
+| `bugreport:read` | Bug-Reports lesen: Admins alle, sonst nur die eigenen |
+| `bugreport:write` | Bug-Reports bearbeiten — nur für Admins wirksam |
+
+Ohne `scope`-Angabe bekommt ein Client `DEFAULT_MCP_SCOPES` — ohne `einsatz:write`
+und ohne die `bugreport:*`-Scopes. Bug-Reports gehören nicht zur Einsatzarbeit; wer sie
+bearbeiten will, verlangt die Scopes ausdrücklich.
 
 **Scopes schneiden nur ein, sie erweitern nie.** Die effektiven Rechte eines
 Tool-Calls sind die Schnittmenge aus Scope und den Rechten des Benutzers aus
@@ -202,6 +208,44 @@ Tool-Calls sind die Schnittmenge aus Scope und den Rechten des Benutzers aus
 sieht die schreibenden Tools gar nicht erst in `tools/list` — ehrlicher als ein
 Tool, das bei jedem Aufruf „nicht erlaubt" sagt, und es hält den Werkzeugkasten
 des Modells klein.
+
+## Bug-Reports
+
+`src/server/mcp/bugReportTools.ts`, Grundlage ist derselbe Dienst wie im
+Admin-Bereich (`src/server/bugReport/bugReportService.ts`). Fachlicher Hintergrund:
+[docs/bug-reports.md](bug-reports.md).
+
+| Tool | Scope | Wer | Was |
+| --- | --- | --- | --- |
+| `list_bug_reports` | `bugreport:read` | alle | Filter `status`, `kind`, `limit`, `onlyMine`; Nicht-Admins immer nur eigene |
+| `get_bug_report` | `bugreport:read` | alle | Report und Verlauf; `includeScreenshots` hängt Bilder an |
+| `update_bug_report` | `bugreport:write` | Admins | `status`, `resolution`, `githubIssue`, `assignee`, `internalNote`, `notifyReporter` |
+| `add_bug_report_comment` | `bugreport:write` | Admins | `text`, `visibility` (`internal`/`reporter`), `notifyReporter` |
+
+- **Der Scope schneidet ein, das Adminflag bestimmt den Umfang.** Ein Admin sieht
+  alle Reports samt Logs, Kontext und internen Feldern. Jeder andere sieht nur die
+  eigenen und davon nur die Melder-Projektion (`toReporterView`) — dieselbe wie auf
+  „Meine Meldungen". Ein fremder Report antwortet wie ein fehlender.
+- **Schreibende Tools werden für Nicht-Admins gar nicht registriert**, auch mit
+  `bugreport:write`, und der Aufruf prüft das Adminflag erneut. Das Flag kommt bei
+  jeder Anfrage frisch aus dem Benutzerdokument (`loadMcpUser`).
+- **Sie hängen nicht an `MCP_WRITE_ENABLED`.** Der Schalter hält Schreibzugriffe auf
+  *Einsatzdaten* aus prod heraus, bis der Weg in der Praxis steht — Einsatzdaten sind
+  einsatzkritisch und können Grundlage eines Berichts werden. Bug-Reports sind das
+  nicht, nur Admins können sie ändern, jede Änderung steht im Verlauf, und Zweck der
+  Tools ist gerade, die produktiven Reports zu bearbeiten. Hinge das am Schalter,
+  müsste man für Bug-Reports auch das Schreiben in Einsätze freigeben.
+- **Screenshots kommen als MCP-Bildinhalt** (base64 aus Storage über das Admin SDK),
+  damit das Modell sie ansehen kann: höchstens vier je Aufruf und je 1,5 MB, nur Dateien
+  unter `bugReports/<id>/` und nur `image/*`. Eine größere Antwort sprengt den Kontext
+  des Clients; was ausgelassen wird, steht als Text dabei.
+- **Herkunft:** Verlaufseinträge und Kommentare tragen `source: 'mcp'`, `mcpClientId`
+  und `mcpClientName` wie Einsatz-Elemente (siehe unten), `createdBy` ist der Benutzer.
+  `loadMcpUser` liest dafür zusätzlich `email` und `displayName` aus dem
+  Benutzerdokument.
+- **`notifyReporter`** schickt dem Melder eine Mail — nur bei Abschluss, neuer Lösung
+  oder einem Kommentar mit `visibility: 'reporter'`. Das Ergebnis steht als
+  `notification` in der Antwort.
 
 ## Ein Tool-Set, zwei Aufrufer
 
@@ -278,7 +322,7 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out mcp-key.pem
 
 **Schreibende Tools stehen hinter `MCP_WRITE_ENABLED`** — in dev an, in prod
 zunächst aus. Ohne den Schalter registriert der Server sie nicht, unabhängig
-vom Scope.
+vom Scope. Ausgenommen sind die Bug-Report-Tools, siehe „Bug-Reports".
 
 **Der Proxy (`src/proxy.ts`) lässt `/api/mcp` und `/api/oauth/` in Ruhe.** Er
 setzt sonst `Access-Control-Allow-Origin` auf die eigene Adresse und beantwortet

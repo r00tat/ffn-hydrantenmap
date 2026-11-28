@@ -23,7 +23,8 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/api-keys.md](docs/api-keys.md) | API-Keys des Firebase-Projekts: warum der Browser-Key öffentlich ist und Referrer nicht schützen, die begründete Freigabeliste je Key, die drei Android-SHA-1 und ihre Verteilwege, App-Check-Erzwingung für Gemini unter `firebaseml` statt `firebasevertexai`, Debug-Token lokal, Drift-Prüfung |
 | [docs/berechtigungen.md](docs/berechtigungen.md) | Gruppenrollen und Rechte: Rechte-Katalog und Rollen (`gruppenadmin`, `geraetemeister`, `bekleidungswart`, `kostenersatz`, `kennzeichenabfrage`) in `src/common/permissions.ts`, warum Rechte und nicht Rollen geprüft werden, was jedes Mitglied ohne Recht darf, globaler Admin und Einsatz-Gast außerhalb der Gruppenrollen, wer was vergibt (Teilmengenregel), Gruppenhierarchie (`parentId`, Elterngruppen werden beim Vergeben mitgeschrieben, nicht ausgewertet), Ablage `groupRoles`/`groupPerms`/`permsAny` am Benutzerdokument, Mitgliedschaft im Claim gegen Fachrechte per `get()`, `writeUserRoles` als einziger Schreibweg, Katalogänderung und Neuableitung, Guards (`actionPermissionRequired`, `actionFirecallPermissionRequired`) und Hooks (`useCan`), Kostenersatz je Gruppe samt Berechnungen am Einsatz, Kennzeichenabfrage als Recht und einmaliger Umzug des ÖBFV-Tokens, Migrationsseite `/admin/berechtigungen` und Zeitfenster nach dem Deploy, Offline-Zwischenspeicher der Anmeldung, Heimatgruppe (`homeGroup`) als Vorauswahl der Gruppenseiten |
 | [docs/audit-log-und-wiederherstellen.md](docs/audit-log-und-wiederherstellen.md) | Audit-Log und Wiederherstellen: weiches Löschen und welche Aktion protokolliert wird (`auditActionForUpdate`), Vorzustand aus dem lokalen Cache, warum jeder Eintrag bereinigt wird (kein `ignoreUndefinedProperties` im Browser), `deletedWithLayer` beim Löschen einer Ebene, die drei Wege zum Wiederherstellen (gelöschte Elemente für Admins, Verlauf-Snapshot, Audit-Log) und wann ersetzt bzw. zusammengeführt wird, bekannte Lücken |
-| [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Screenshot-Aufnahme |
+| [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Lösung und Sichtbarkeit (`internal`/`reporter`), „Meine Meldungen“, Benachrichtigung des Melders, MCP-Zugriff, Screenshot-Aufnahme |
+| [docs/tastenkuerzel.md](docs/tastenkuerzel.md) | Tastenkürzel: Katalog in `src/common/hotkeys.ts` und `useHotkey`, warum je Gerät im localStorage, Listener in der Capture-Phase, wann einfache Tasten ruhen (Eingabefeld, offenes Modal), Alt auf dem Mac über die physische Taste, Satzzeichen ohne Umschalt, der zuletzt angemeldete Handler gewinnt, gemeinsamer Dialog für Tagebuch-/Geschäftsbuch-Einträge, Marker ohne Dialog, globale Suche und Übergabe an Karte bzw. Tagebuch ohne Query |
 | [docs/ai-sprachassistent.md](docs/ai-sprachassistent.md) | Sprach-Assistent auf der Karte: Live-Gespräch gegen Einzelaufruf, warum der Kartenkontext zu Beginn hinausgeht und nicht am Ende, warum die Sitzung ein ganzes Gespräch lang lebt, warum die Mikrofonblöcke gesammelt werden, warum nicht `startAudioConversation`, warum die Verbindung ohne Firebase-SDK gebaut ist, kurzlebige Tokens und was darin festgenagelt ist, Tageskontingent, Rückfall, Abschrift, Werkzeuge außerhalb der Karte (Fahrtenbuch per Server Action, Atemschutztrupps im Browser), wann Werkzeuge zusammengelegt werden (`createMarker` mit `kind`, `calculateStrahlenschutz` mit `formel`), was das Modell von einem Element sieht und ändern kann (Richtung bei `nearItem`, Drehung, Felder je Typ), Ebenen und Messwerte per Sprache (aktive Ebene, Einheitenumrechnung, Himmelsrichtung vom letzten Messpunkt), Ebenen anlegen und ändern samt Datenfeldern (`editLayer`: Schlüssel, Einheit bei vorhandenen Werten, Formelprüfung), warum der Kontext nur ein Überblick ist und Details über `findItems` kommen, Gedächtnis über das Gespräch hinaus (Notizen per `remember`, Protokoll des vorigen Gesprächs, warum localStorage je Gerät und warum erst am Ende gespeichert) |
 | [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, eine Fahrt diktieren (Sprach-Assistent), Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle und welches Recht welche Aufgabe verlangt (Rollen allgemein: docs/berechtigungen.md), Fahrzeugkategorie und Anzeigereihenfolge |
 | [docs/einsatz-drive-fotos.md](docs/einsatz-drive-fotos.md) | Einsatz-Fotos im Google Shared Drive |
@@ -44,7 +45,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/hoehenmodell.md](docs/hoehenmodell.md) | Eigenes Höhenmodell: BEV-Datenquelle, Höhendatum und Kalibrierung, Kachelschema, Import und Höhenlinien |
 | [docs/gelaende-3d.md](docs/gelaende-3d.md) | 3D-Ansicht des Geländes: Mesh in Mercator, lokal-metrische Szene, Überhöhung, Textur aus den Kartenkacheln |
 | [docs/wasserstandsmodell.md](docs/wasserstandsmodell.md) | Wasserstandsmodell: Flutfüllung, Bänder am Element, Signatur, Kopplung an den Sandsackrechner |
-| [docs/mcp-server.md](docs/mcp-server.md) | MCP-Server und OAuth 2.1: eigener Authorization Server, DCR und CIMD, Scopes, Tool-Set mit zwei Aufrufern, Signaturschlüssel und Betrieb |
+| [docs/mcp-server.md](docs/mcp-server.md) | MCP-Server und OAuth 2.1: eigener Authorization Server, DCR und CIMD, Scopes, Tool-Set mit zwei Aufrufern, Bug-Report-Tools (Admin-Umfang, warum nicht hinter `MCP_WRITE_ENABLED`), Signaturschlüssel und Betrieb |
 | [docs/lagekarte-austausch.md](docs/lagekarte-austausch.md) | Import und Export für lagekarte.info: beobachtetes Format, Kupplungsmarker, `ffnd`-Block, Symbolkatalog und seine Lücken |
 | [docs/eigene-kartenebenen.md](docs/eigene-kartenebenen.md) | Eigene WMS-/WMTS-Kartenebenen je Einsatz: Abgrenzung „Kartenebene" gegen „Ebene", Berechtigungen und warum die Firestore-Regeln nichts prüfen, GetCapabilities über den Server, Darstellung im Layer-Control |
 | [docs/atemschutz-ablauf.md](docs/atemschutz-ablauf.md) | Wer macht was — mit und ohne Atemschutzsammelplatz: Zuteilung gegen Einsatzauftrag, wo die Uhr startet, was ins Einsatztagebuch geht |
@@ -363,8 +364,11 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 In-App-Bug-Reports und Feature-Requests landen in der Firestore-Collection `bugReport`
 ([src/components/bugReport/](src/components/bugReport/)), verwaltet unter `/admin/bug-reports`.
 **Produktive Reports liegen in der Default-Datenbank `(default)` des Prod-Projekts**, nicht in
-`ffndev`. Abfrage über den Firebase MCP, Bearbeitung, Verlauf und Screenshot-Aufnahme:
-[docs/bug-reports.md](docs/bug-reports.md).
+`ffndev`. Der Melder sieht seine Reports unter `/meine-meldungen` (nur Status, Lösung
+`resolution` und Kommentare mit `visibility: 'reporter'`). Firestore-Zugriff nur über
+`src/server/bugReport/bugReportService.ts`. Abfrage über den Firebase MCP oder den eigenen
+MCP-Server (Scopes `bugreport:read`/`bugreport:write`), Bearbeitung, Verlauf und
+Screenshot-Aufnahme: [docs/bug-reports.md](docs/bug-reports.md).
 
 ## German Terminology
 
@@ -406,8 +410,8 @@ Required environment variables (see `.env.local`):
 - `MCP_OAUTH_SIGNING_KEY` — RSA-Privatschlüssel (PKCS#8 PEM) des
   OAuth-Authorization-Servers. In der Cloud aus dem Secret Manager, lokal als
   Umgebungsvariable. Siehe [docs/mcp-server.md](docs/mcp-server.md).
-- `MCP_WRITE_ENABLED` — schaltet die schreibenden MCP-Tools frei. In dev an,
-  in prod zunächst aus.
+- `MCP_WRITE_ENABLED` — schaltet die schreibenden MCP-Tools für Einsatzdaten frei. In
+  dev an, in prod zunächst aus. Die Bug-Report-Tools (nur Admins) hängen nicht daran.
 - `GEMINI_LIVE_API_KEY` (optional) — API-Key der Gemini Developer API, aus dem
   die Server Action die kurzlebigen Tokens der Live-Sitzung prägt. **Nicht** der
   öffentliche Browser-Key, sondern ein eigener, ausschließlich auf

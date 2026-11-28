@@ -50,6 +50,11 @@ vi.mock('firebase-admin/firestore', () => ({
   },
 }));
 
+const notifyReporterMock = vi.fn();
+vi.mock('../../../server/bugReport/reporterNotification', () => ({
+  notifyReporter: (...args: unknown[]) => notifyReporterMock(...args),
+}));
+
 const actionAdminRequiredMock = vi.fn();
 vi.mock('../../auth', () => ({
   actionAdminRequired: () => actionAdminRequiredMock(),
@@ -111,6 +116,7 @@ describe('bugReportAdminActions', () => {
     actionAdminRequiredMock.mockResolvedValue(adminSession);
     mockCommentAdd.mockResolvedValue({ id: 'c1' });
     mockCommentsGet.mockResolvedValue({ docs: [] });
+    notifyReporterMock.mockResolvedValue({ status: 'sent', to: 'melder@x' });
     wireCollectionDoc();
   });
 
@@ -290,6 +296,35 @@ describe('bugReportAdminActions', () => {
       expect(mockUpdate).not.toHaveBeenCalled();
     });
 
+    it('writes the resolution and notifies the reporter on request', async () => {
+      wireExisting({ status: 'in_progress', title: 'T' });
+      const result = await updateBugReportAction(
+        'r1',
+        { status: 'closed', resolution: 'Behoben in 2.0' },
+        { notifyReporter: true },
+      );
+      const payload = mockUpdate.mock.calls[0][0];
+      expect(payload.resolution).toBe('Behoben in 2.0');
+      expect(notifyReporterMock).toHaveBeenCalledTimes(1);
+      const arg = notifyReporterMock.mock.calls[0][0];
+      expect(arg.report).toMatchObject({
+        id: 'r1',
+        status: 'closed',
+        resolution: 'Behoben in 2.0',
+      });
+      expect(arg.changes).toEqual([
+        { field: 'status', from: 'in_progress', to: 'closed' },
+        { field: 'resolution', from: '', to: 'Behoben in 2.0' },
+      ]);
+      expect(result.notification).toEqual({ status: 'sent', to: 'melder@x' });
+    });
+
+    it('does not notify without the flag', async () => {
+      wireExisting({ status: 'in_progress' });
+      await updateBugReportAction('r1', { status: 'closed' });
+      expect(notifyReporterMock).not.toHaveBeenCalled();
+    });
+
     it('throws when the report does not exist', async () => {
       mockGet.mockResolvedValueOnce({ exists: false });
       await expect(
@@ -335,6 +370,48 @@ describe('bugReportAdminActions', () => {
         createdBy: { uid: 'admin1', email: 'admin@x' },
       });
       expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('writes a reporter-visible comment and notifies only on request', async () => {
+      const result = await addBugReportCommentAction('r1', 'ist behoben', {
+        visibility: 'reporter',
+      });
+      expect(mockCommentAdd.mock.calls[0][0].visibility).toBe('reporter');
+      expect(notifyReporterMock).not.toHaveBeenCalled();
+      expect(result).toEqual({});
+    });
+
+    it('notifies the reporter about a reporter-visible comment', async () => {
+      mockGet.mockResolvedValueOnce({
+        exists: true,
+        id: 'r1',
+        data: () => ({ title: 'T', status: 'open' }),
+      });
+      const result = await addBugReportCommentAction('r1', 'ist behoben', {
+        visibility: 'reporter',
+        notifyReporter: true,
+      });
+      expect(notifyReporterMock).toHaveBeenCalledWith(
+        expect.objectContaining({ comment: 'ist behoben' }),
+      );
+      expect(result.notification).toEqual({ status: 'sent', to: 'melder@x' });
+    });
+
+    it('never notifies about an internal comment', async () => {
+      await addBugReportCommentAction('r1', 'intern', {
+        visibility: 'internal',
+        notifyReporter: true,
+      });
+      expect(notifyReporterMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown visibility', async () => {
+      await expect(
+        addBugReportCommentAction('r1', 'x', {
+          visibility: 'public' as never,
+        }),
+      ).rejects.toThrow(/Sichtbarkeit/);
+      expect(mockCommentAdd).not.toHaveBeenCalled();
     });
 
     it('rejects an empty comment', async () => {
