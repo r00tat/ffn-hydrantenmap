@@ -411,7 +411,7 @@ Required environment variables (see `.env.local`):
   OAuth-Authorization-Servers. In der Cloud aus dem Secret Manager, lokal als
   Umgebungsvariable. Siehe [docs/mcp-server.md](docs/mcp-server.md).
 - `MCP_WRITE_ENABLED` — schaltet die schreibenden MCP-Tools für Einsatzdaten frei. In
-  dev an, in prod zunächst aus. Die Bug-Report-Tools (nur Admins) hängen nicht daran.
+  dev und prod an; `"false"` dient als Notaus. Die Bug-Report-Tools (nur Admins) hängen nicht daran.
 - `GEMINI_LIVE_API_KEY` (optional) — API-Key der Gemini Developer API, aus dem
   die Server Action die kurzlebigen Tokens der Live-Sitzung prägt. **Nicht** der
   öffentliche Browser-Key, sondern ein eigener, ausschließlich auf

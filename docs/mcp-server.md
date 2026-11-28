@@ -229,12 +229,12 @@ Admin-Bereich (`src/server/bugReport/bugReportService.ts`). Fachlicher Hintergru
 - **Schreibende Tools werden für Nicht-Admins gar nicht registriert**, auch mit
   `bugreport:write`, und der Aufruf prüft das Adminflag erneut. Das Flag kommt bei
   jeder Anfrage frisch aus dem Benutzerdokument (`loadMcpUser`).
-- **Sie hängen nicht an `MCP_WRITE_ENABLED`.** Der Schalter hält Schreibzugriffe auf
-  *Einsatzdaten* aus prod heraus, bis der Weg in der Praxis steht — Einsatzdaten sind
-  einsatzkritisch und können Grundlage eines Berichts werden. Bug-Reports sind das
+- **Sie hängen nicht an `MCP_WRITE_ENABLED`.** Der Schalter ist der Notaus für
+  Schreibzugriffe auf *Einsatzdaten* — Einsatzdaten sind einsatzkritisch und können
+  Grundlage eines Berichts werden. Bug-Reports sind das
   nicht, nur Admins können sie ändern, jede Änderung steht im Verlauf, und Zweck der
   Tools ist gerade, die produktiven Reports zu bearbeiten. Hinge das am Schalter,
-  müsste man für Bug-Reports auch das Schreiben in Einsätze freigeben.
+  würde der Notaus für Einsätze auch die Bug-Reports sperren.
 - **Screenshots kommen als MCP-Bildinhalt** (base64 aus Storage über das Admin SDK),
   damit das Modell sie ansehen kann: höchstens vier je Aufruf und je 1,5 MB, nur Dateien
   unter `bugReports/<id>/` und nur `image/*`. Eine größere Antwort sprengt den Kontext
@@ -320,9 +320,10 @@ darf escaped sein):
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out mcp-key.pem
 ```
 
-**Schreibende Tools stehen hinter `MCP_WRITE_ENABLED`** — in dev an, in prod
-zunächst aus. Ohne den Schalter registriert der Server sie nicht, unabhängig
-vom Scope. Ausgenommen sind die Bug-Report-Tools, siehe „Bug-Reports".
+**Schreibende Tools stehen hinter `MCP_WRITE_ENABLED`** — in dev und prod an.
+Der Schalter bleibt als Notaus: Ohne ihn registriert der Server sie nicht,
+unabhängig vom Scope, und `"false"` in `terraform/environments/<env>/main.tf`
+schaltet sie mit dem nächsten Rollout ab. Ausgenommen sind die Bug-Report-Tools, siehe „Bug-Reports".
 
 **Der Proxy (`src/proxy.ts`) lässt `/api/mcp` und `/api/oauth/` in Ruhe.** Er
 setzt sonst `Access-Control-Allow-Origin` auf die eigene Adresse und beantwortet
