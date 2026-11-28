@@ -36,7 +36,6 @@ import PendingSyncIcon from '../site/PendingSyncIcon';
 import OfflineListHint from '../site/OfflineListHint';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import AiAssistantButton from '../Map/AiAssistantButton';
-import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { downloadRowsAsCsv } from '../firebase/download';
 import {
   Diary,
@@ -49,6 +48,9 @@ import { DownloadButton } from '../inputs/DownloadButton';
 import { buildDiaries } from './diary-entries';
 import DiaryButtons from './DiaryButtons';
 import McpOriginChip from '../mcp/McpOriginChip';
+import { useHotkey } from '../hotkeys/HotkeyProvider';
+import useHighlightedEntry from '../hotkeys/useHighlightedEntry';
+import { useDocumentEntryDialog } from './useDocumentEntryDialog';
 import {
   useHistoryPathSegments,
   useMapEditorCanEdit,
@@ -65,8 +67,12 @@ export function useDiaries(
   const historyPathSegments = useHistoryPathSegments();
   const { crewAssignments } = useContext(FirecallContext);
 
-  const { records: firecallItems, fromCache } =
-    useFirebaseCollectionState<FirecallItem>({
+  const [loaded, setLoaded] = useState(false);
+  const {
+    records: firecallItems,
+    fromCache,
+    loading: collectionLoading,
+  } = useFirebaseCollectionState<FirecallItem>({
       collectionName: FIRECALL_COLLECTION_ID,
       pathSegments: [
         firecallId,
@@ -85,9 +91,12 @@ export function useDiaries(
     (async () => {
       setDiaries(diaries);
       setDiaryCounter(diaries.length + 1);
+      // Im selben Durchgang wie der Zähler, damit `loading: false` nie mit
+      // dem Zähler eines leeren Einsatzes zusammenfällt.
+      setLoaded(!collectionLoading);
     })();
-  }, [firecallItems, sortAscending, crewAssignments, t]);
-  return { diaries, diaryCounter, fromCache };
+  }, [firecallItems, sortAscending, crewAssignments, t, collectionLoading]);
+  return { diaries, diaryCounter, fromCache, loading: !loaded };
 }
 
 function downloadDiaries(
@@ -204,10 +213,13 @@ export function EinsatzTagebuch({
   const firecall = useFirecall();
   const firecallId = useFirecallId();
   const historyPathSegments = useHistoryPathSegments();
-  const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter, fromCache } = useDiaries(sortAscending, {
     trackCache: true,
   });
+  const entryDialog = useDocumentEntryDialog('diary', diaryCounter);
+  // Auf der Seite selbst öffnet `T` deren Dialog statt des globalen.
+  useHotkey('documents.diary', entryDialog.open, showEditButton);
+  const highlightedId = useHighlightedEntry('diary', diaries.length > 0);
   // Einträge, die erst auf dem Gerät liegen — im Verlauf gibt es keine.
   const pendingIds = usePendingDocIds(
     historyPathSegments.length === 0
@@ -239,6 +251,16 @@ export function EinsatzTagebuch({
     [diaries, sortField, sortDirection]
   );
   const { query, resultHtml, isQuerying } = useFirecallAIQueryStream();
+
+  const rowSx = (e: Diary, index: number) => ({
+    backgroundColor:
+      e.id && e.id === highlightedId
+        ? 'warning.light'
+        : index % 2 === 1
+          ? '#eee'
+          : undefined,
+    transition: 'background-color 0.6s',
+  });
 
   const [inlineArt, setInlineArt] = useState<'M' | 'B' | 'F'>('M');
   const [inlineVon, setInlineVon] = useState('');
@@ -299,16 +321,6 @@ export function EinsatzTagebuch({
     t,
   ]);
 
-  const diaryClose = useCallback(
-    (item?: FirecallItem) => {
-      setTagebuchDialogIsOpen(false);
-      if (item) {
-        addEinsatzTagebuch(item);
-      }
-    },
-    [addEinsatzTagebuch]
-  );
-
   return (
     <>
       <Box sx={{ p: 2, m: 2 }}>
@@ -344,7 +356,7 @@ export function EinsatzTagebuch({
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => setTagebuchDialogIsOpen(true)}
+                onClick={entryDialog.open}
               >
                 {t('newEntry')}
               </Button>
@@ -493,33 +505,26 @@ export function EinsatzTagebuch({
             >
               <Grid
                 size={{ xs: 3, md: 2, lg: 1 }}
-                sx={(theme) => ({
-                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-                })}
+                sx={rowSx(e, index)}
+                id={e.id ? `diary-${e.id}` : undefined}
               >
                 {e.nummer}
               </Grid>
               <Grid
                 size={{ xs: 6, md: 5, lg: 2 }}
-                sx={(theme) => ({
-                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-                })}
+                sx={rowSx(e, index)}
               >
                 {e.datum}
               </Grid>
               <Grid
                 size={{ xs: 12, md: 5, lg: 2 }}
-                sx={(theme) => ({
-                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-                })}
+                sx={rowSx(e, index)}
               >
                 {e.art} {e.von} {(e.von || e.an) && '->'} {e.an}
               </Grid>
               <Grid
                 size={{ xs: 12, md: 5, lg: 3 }}
-                sx={(theme) => ({
-                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-                })}
+                sx={rowSx(e, index)}
               >
                 <b>
                   {e.name?.split(`\n`).map((line, index) => (
@@ -534,9 +539,7 @@ export function EinsatzTagebuch({
               </Grid>
               <Grid
                 size={{ xs: 12, md: 5, lg: 3 }}
-                sx={(theme) => ({
-                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-                })}
+                sx={rowSx(e, index)}
               >
                 {e.beschreibung?.split('\n').map((line, index) => (
                   <React.Fragment key={`beschreibung-${e.id}-${index}`}>
@@ -547,9 +550,7 @@ export function EinsatzTagebuch({
               </Grid>
               <Grid
                 size={{ xs: 12, md: 2, lg: 1 }}
-                sx={(theme) => ({
-                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-                })}
+                sx={rowSx(e, index)}
               >
                 {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
               </Grid>
@@ -572,21 +573,14 @@ export function EinsatzTagebuch({
             color="primary"
             aria-label="add"
             sx={{ position: 'fixed', bottom: 16, right: 16 }}
-            onClick={() => setTagebuchDialogIsOpen(true)}
+            onClick={entryDialog.open}
           >
             <AddIcon />
           </Fab>
         </>
       )}
 
-      {tagebuchDialogIsOpen && (
-        <FirecallItemDialog
-          type="diary"
-          item={{ type: 'diary', nummer: diaryCounter } as Diary}
-          onClose={diaryClose}
-          allowTypeChange={false}
-        />
-      )}
+      {entryDialog.dialog}
     </>
   );
 }

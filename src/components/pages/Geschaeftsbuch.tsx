@@ -29,7 +29,7 @@ import {
   formatTimestamp,
   parseTimestamp,
 } from '../../common/time-format';
-import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import { useFirebaseCollectionState } from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
@@ -38,18 +38,19 @@ import {
   useMapEditorCanEdit,
 } from '../../hooks/useMapEditor';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
-import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { downloadRowsAsCsv } from '../firebase/download';
 import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
-  FirecallItem,
   GeschaeftsbuchEintrag,
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
 import McpOriginChip from '../mcp/McpOriginChip';
+import { useHotkey } from '../hotkeys/HotkeyProvider';
+import useHighlightedEntry from '../hotkeys/useHighlightedEntry';
+import { useDocumentEntryDialog } from './useDocumentEntryDialog';
 
 interface GbDisplay extends GeschaeftsbuchEintrag {
   einaus: string;
@@ -63,7 +64,9 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
   const [diaryCounter, setDiaryCounter] = useState(1);
   const historyPathSegments = useHistoryPathSegments();
 
-  const firecallItems = useFirebaseCollection<GeschaeftsbuchEintrag>({
+  const [loaded, setLoaded] = useState(false);
+  const { records: firecallItems, loading: collectionLoading } =
+    useFirebaseCollectionState<GeschaeftsbuchEintrag>({
     collectionName: FIRECALL_COLLECTION_ID,
     pathSegments: [
       firecallId,
@@ -100,9 +103,11 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
     (async () => {
       setGeschaeftsbuchEintraege(diaries);
       setDiaryCounter(diaries.length + 1);
+      // Wie in `useDiaries`: erst fertig, wenn der Zähler zum Stand passt.
+      setLoaded(!collectionLoading);
     })();
-  }, [firecallItems, sortAscending, t]);
-  return { eintraege, diaryCounter };
+  }, [firecallItems, sortAscending, t, collectionLoading]);
+  return { eintraege, diaryCounter, loading: !loaded };
 }
 
 export function DiaryButtons({
@@ -319,6 +324,7 @@ function GbEntries({
   sortField,
   sortDirection,
   onSortClick,
+  highlightedId,
 }: {
   eintraege: GbDisplay[];
   showEditButton?: boolean;
@@ -326,8 +332,19 @@ function GbEntries({
   sortField: GbSortField;
   sortDirection: 'asc' | 'desc';
   onSortClick: (field: GbSortField) => void;
+  /** Nur im Reiter „Alle“: Zeile mit Anker für die Suche. */
+  highlightedId?: string;
 }) {
   const t = useTranslations('geschaeftsbuch.col');
+  const rowSx = (e: GbDisplay, index: number) => ({
+    backgroundColor:
+      highlightedId !== undefined && e.id === highlightedId
+        ? 'warning.light'
+        : index % 2 === 1
+          ? '#eee'
+          : undefined,
+    transition: 'background-color 0.6s',
+  });
   const sortedEintraege = useMemo(
     () =>
       [...eintraege].sort((a, b) =>
@@ -361,33 +378,26 @@ function GbEntries({
         <React.Fragment key={'gb-' + e.id}>
           <Grid
             size={{ xs: 3, md: 2, lg: 1 }}
-            sx={(theme) => ({
-              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-            })}
+            sx={rowSx(e, index)}
+            id={highlightedId !== undefined && e.id ? `gb-${e.id}` : undefined}
           >
             {e.nummer}
           </Grid>
           <Grid
             size={{ xs: 6, md: 4, lg: 2 }}
-            sx={(theme) => ({
-              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-            })}
+            sx={rowSx(e, index)}
           >
             {e.datum}
           </Grid>
           <Grid
             size={{ xs: 12, md: 4, lg: 2 }}
-            sx={(theme) => ({
-              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-            })}
+            sx={rowSx(e, index)}
           >
             {e.einaus} {e.von} -&gt; {e.an} ({e.weiterleitung})
           </Grid>
           <Grid
             size={{ xs: 12, md: 5, lg: 2 }}
-            sx={(theme) => ({
-              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-            })}
+            sx={rowSx(e, index)}
           >
             <b>
               {e.name?.split(`\n`).map((line, index) => (
@@ -401,9 +411,7 @@ function GbEntries({
           </Grid>
           <Grid
             size={{ xs: 12, md: 5, lg: 3 }}
-            sx={(theme) => ({
-              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-            })}
+            sx={rowSx(e, index)}
           >
             {e.beschreibung?.split('\n').map((line, index) => (
               <React.Fragment key={`beschreibung-${e.id}-${index}`}>
@@ -414,18 +422,14 @@ function GbEntries({
           </Grid>
           <Grid
             size={{ xs: 12, md: 2, lg: 1 }}
-            sx={(theme) => ({
-              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-            })}
+            sx={rowSx(e, index)}
           >
             {e.erledigt && formatTimestamp(e.erledigt)}
           </Grid>
 
           <Grid
             size={{ xs: 12, md: 2, lg: 1 }}
-            sx={(theme) => ({
-              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
-            })}
+            sx={rowSx(e, index)}
           >
             {showEditButton && (
               <DiaryButtons diary={e} funktion={funktion}></DiaryButtons>
@@ -448,9 +452,11 @@ export default function Geschaeftsbuch({
   sortAscending = false,
 }: GeschaeftsbuchOptions) {
   const t = useTranslations('geschaeftsbuch');
-  const [dialogIsOpen, setDialogIsOpen] = useState(false);
   const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege(sortAscending);
   const canEdit = useMapEditorCanEdit();
+  const entryDialog = useDocumentEntryDialog('gb', diaryCounter);
+  // Auf der Seite selbst öffnet `G` deren Dialog statt des globalen.
+  useHotkey('documents.geschaeftsbuch', entryDialog.open, showEditButton && canEdit);
 
   const addFirecallGb = useFirecallItemAdd();
 
@@ -497,15 +503,6 @@ export default function Geschaeftsbuch({
     resetInlineForm,
   ]);
 
-  const diaryClose = useCallback(
-    (item?: FirecallItem) => {
-      setDialogIsOpen(false);
-      if (item) {
-        addFirecallGb(item);
-      }
-    },
-    [addFirecallGb]
-  );
 
   const [sortField, setSortField] = useState<GbSortField>('datum');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
@@ -522,6 +519,9 @@ export default function Geschaeftsbuch({
   }, [sortField]);
 
   const [tabValue, setTabValue] = React.useState('all');
+  const highlightedId = useHighlightedEntry('gb', eintraege.length > 0, () =>
+    setTabValue('all'),
+  );
 
   const handleTabSelect = (event: React.SyntheticEvent, newValue: string) => {
     setTabValue(newValue);
@@ -689,6 +689,7 @@ export default function Geschaeftsbuch({
 
           <TabPanel value="all">
             <GbEntries
+              highlightedId={highlightedId ?? ''}
               eintraege={eintraege}
               showEditButton={showEditButton && canEdit}
               sortField={sortField}
@@ -722,19 +723,12 @@ export default function Geschaeftsbuch({
           color="primary"
           aria-label="add"
           sx={{ position: 'fixed', bottom: 16, right: 16 }}
-          onClick={() => setDialogIsOpen(true)}
+          onClick={entryDialog.open}
         >
           <AddIcon />
         </Fab>
       )}
-      {dialogIsOpen && (
-        <FirecallItemDialog
-          type="gb"
-          item={{ type: 'gb', nummer: diaryCounter } as GeschaeftsbuchEintrag}
-          onClose={diaryClose}
-          allowTypeChange={false}
-        />
-      )}
+      {entryDialog.dialog}
     </>
   );
 }

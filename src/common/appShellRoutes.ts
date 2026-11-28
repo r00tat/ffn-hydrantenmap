@@ -49,6 +49,8 @@ export const APP_SHELL_PAGES: readonly string[] = [
   '/blaulicht-sms',
   '/ai',
   '/profile',
+  '/tastenkuerzel',
+  '/meine-meldungen',
   '/groups',
   '/users',
   '/tokens',
@@ -80,6 +82,7 @@ export const APP_SHELL_PAGES: readonly string[] = [
   '/docs/strahlenschutz',
   '/docs/sybos',
   '/docs/tagebuch',
+  '/docs/tastenkuerzel',
   '/docs/wetter',
   '/offline',
 ];

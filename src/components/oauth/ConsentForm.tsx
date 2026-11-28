@@ -68,7 +68,8 @@ export default function ConsentForm({
     }
   };
 
-  const writesData = scopes.includes('einsatz:write');
+  const writesData =
+    scopes.includes('einsatz:write') || scopes.includes('bugreport:write');
 
   return (
     <Paper sx={{ p: 3, maxWidth: 640, mx: 'auto' }}>

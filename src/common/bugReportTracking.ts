@@ -163,6 +163,14 @@ export function normalizeBugReportUpdate(
     );
   }
 
+  if (patch.resolution !== undefined) {
+    out.resolution = normalizeText(
+      'Lösung',
+      patch.resolution,
+      BUG_REPORT_COMMENT_MAX_LENGTH,
+    );
+  }
+
   if (patch.internalNote !== undefined) {
     out.internalNote = normalizeText(
       'Interne Notiz',

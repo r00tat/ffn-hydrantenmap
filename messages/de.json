@@ -1249,7 +1249,9 @@
     "fuellprotokoll": "Füllprotokoll",
     "sybos": "Sybos-Übertrag",
     "personal": "Personal",
-    "risikoobjekte": "Risikoobjekte"
+    "risikoobjekte": "Risikoobjekte",
+    "hotkeys": "Tastenkürzel",
+    "myBugReports": "Meine Meldungen"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -2895,7 +2897,8 @@
     "admin": "Administration",
     "mcp": "MCP / Claude",
     "sybos": "Sybos-Übertrag",
-    "geraete": "Geräte & Material"
+    "geraete": "Geräte & Material",
+    "tastenkuerzel": "Tastenkürzel"
   },
   "users": {
     "notMigrated": "{name} ist noch nicht migriert (alte Kostenersatz-Freischaltung); die Gruppen wurden nicht geändert. Führe zuerst unter „Berechtigungen (Migration)“ Schritt 2 aus.",
@@ -3354,13 +3357,40 @@
     "commentAdd": "Kommentar hinzufügen",
     "commentAdded": "Kommentar gespeichert",
     "commentAddFailed": "Kommentar konnte nicht gespeichert werden",
-    "commentInternalHint": "Kommentare sind nur im Admin-Bereich sichtbar, nicht für den Melder.",
+    "commentInternalHint": "Interne Kommentare sind nur im Admin-Bereich sichtbar, nicht für den Melder.",
     "changeLine": "{field}: {from} → {to}",
     "fieldStatus": "Status",
     "fieldGithubIssue": "GitHub-Issue",
     "fieldAssignee": "Zuständig",
     "fieldInternalNote": "Interne Notiz",
-    "valueEmpty": "—"
+    "valueEmpty": "—",
+    "selectRegion": "Bereich auswählen",
+    "cropScreenshot": "Screenshot zuschneiden",
+    "screenshotInProgressHintHotkey": "Danach öffnet sich der Bug-Report. Bitte nicht wegnavigieren.",
+    "regionTitle": "Bereich für den Bug-Report auswählen",
+    "regionHint": "Mit Maus, Stift oder Finger einen Rahmen aufziehen. Neu aufziehen ersetzt die Auswahl.",
+    "regionConfirm": "Bereich übernehmen",
+    "regionFullScreen": "Ganzer Bildschirm",
+    "regionKeepWhole": "Ganzes Bild behalten",
+    "regionCancel": "Abbrechen",
+    "regionImageAlt": "Eingefrorene Bildschirmaufnahme",
+    "regionCropFailed": "Zuschneiden fehlgeschlagen",
+    "shortcutHintPrefix": "Tipp:",
+    "shortcutHintOpen": "{key} öffnet den Bug-Report auch über offenen Dialogen",
+    "shortcutHintRegion": "{key} wählt direkt einen Bereich aus",
+    "fieldResolution": "Lösung",
+    "resolutionLabel": "Lösung / Rückmeldung an den Melder",
+    "resolutionHelper": "Sieht der Melder unter „Meine Meldungen“.",
+    "commentReporterHint": "Der Melder sieht diesen Kommentar unter „Meine Meldungen“.",
+    "commentVisibilityLabel": "Sichtbarkeit des Kommentars",
+    "visibilityInternal": "intern",
+    "visibilityReporter": "für Melder sichtbar",
+    "notifyReporterLabel": "Melder per E-Mail benachrichtigen",
+    "notifyReporterHint": "Nur bei Abschluss, neuer Lösung oder einem Kommentar für den Melder.",
+    "notificationSent": "Melder benachrichtigt ({to})",
+    "notificationSkipped": "Keine Mail an den Melder: {reason}",
+    "notificationFailed": "Mail an den Melder fehlgeschlagen: {error}",
+    "historyViaMcp": "über {client}"
   },
   "firecallShare": {
     "title": "Einsatz teilen",
@@ -3740,7 +3770,9 @@
     "revokeHint": "Du kannst den Zugriff jederzeit unter „Verbundene Anwendungen“ widerrufen.",
     "errorTitle": "Verbindung nicht möglich",
     "errorFallback": "Die Anfrage der Anwendung konnte nicht verarbeitet werden.",
-    "backToApp": "Zurück zur Einsatzkarte"
+    "backToApp": "Zurück zur Einsatzkarte",
+    "scopeBugreportRead": "Bug-Reports lesen (eigene; als Administrator alle, samt Logs und Screenshots)",
+    "scopeBugreportWrite": "Bug-Reports bearbeiten: Status, Lösung und Kommentare (nur für Administratoren)"
   },
   "connectedApps": {
     "pageTitle": "Verbundene Anwendungen",
@@ -5102,5 +5134,94 @@
     "notConfigured": "Verkehrsmeldungen sind nicht eingerichtet (Zugang zu EVIS.AT fehlt).",
     "failed": "Verkehrsmeldungen konnten nicht geladen werden.",
     "partial": "Ein Teil der Verkehrsmeldungen ist gerade nicht abrufbar; es wird der letzte Stand gezeigt."
+  },
+  "hotkeys": {
+    "groups": {
+      "general": "Allgemein",
+      "bugReport": "Bug-Report",
+      "map": "Karte",
+      "documents": "Einsatz-Dokumentation",
+      "navigation": "Navigation"
+    },
+    "actions": {
+      "general": {
+        "search": "Suche öffnen (Elemente, Tagebuch, Seiten)",
+        "help": "Übersicht der Tastenkürzel"
+      },
+      "bugReport": {
+        "open": "Bug-Report öffnen (mit Screenshot)",
+        "region": "Bildschirmbereich für Bug-Report auswählen"
+      },
+      "documents": {
+        "diary": "Neuer Einsatztagebuch-Eintrag",
+        "geschaeftsbuch": "Neuer Geschäftsbuch-Eintrag"
+      },
+      "map": {
+        "marker": "Marker setzen",
+        "vehicle": "Fahrzeug hinzufügen",
+        "connection": "Leitung zeichnen",
+        "area": "Fläche zeichnen",
+        "location": "Einsatzort setzen",
+        "addElement": "Element hinzufügen (Auswahl)",
+        "toggleEdit": "Bearbeiten ein/aus"
+      },
+      "navigation": {
+        "map": "Zur Karte",
+        "diary": "Zum Einsatztagebuch",
+        "geschaeftsbuch": "Zum Geschäftsbuch",
+        "einsatzmittel": "Zu den Einsatzmitteln",
+        "einsatzorte": "Zu den Einsatzorten",
+        "ebenen": "Zu den Ebenen",
+        "einsaetze": "Zur Einsatzliste"
+      }
+    },
+    "help": {
+      "title": "Tastenkürzel",
+      "disabled": "Tastenkürzel sind auf diesem Gerät ausgeschaltet.",
+      "rules": "Einfache Tasten wirken nicht, solange in einem Eingabefeld getippt wird oder ein Dialog offen ist. Die Kürzel der Karte gelten nur auf der Karte und nur mit Schreibrecht im Einsatz.",
+      "customize": "Anpassen"
+    },
+    "search": {
+      "label": "Suche",
+      "placeholder": "Elemente, Einsatzorte, Tagebuch, Geschäftsbuch, Seiten …",
+      "placeholderNoFirecall": "Seiten suchen …",
+      "noResults": "Keine Treffer",
+      "hint": "↑ ↓ wählen · Enter öffnen · Esc schließen",
+      "page": "Seite"
+    },
+    "settings": {
+      "title": "Tastenkürzel",
+      "intro": "Mit Tastenkürzeln erreichst du die wichtigsten Funktionen ohne Maus. Mit ? siehst du jederzeit eine Übersicht.",
+      "perDevice": "Die Einstellungen gelten nur für dieses Gerät und diesen Browser.",
+      "enabled": "Tastenkürzel verwenden",
+      "resetAll": "Alle zurücksetzen",
+      "conflict": "{binding} ist mehrfach belegt: {actions}. Wo mehrere gerade verfügbar sind, gewinnt die zuerst genannte.",
+      "defaultIs": "Vorgabe: {binding}",
+      "recording": "Tastenkombination drücken … (Esc bricht ab)",
+      "off": "aus",
+      "change": "Ändern",
+      "cancel": "Abbrechen",
+      "disable": "Ausschalten",
+      "reset": "Auf Vorgabe zurücksetzen"
+    }
+  },
+  "myBugReports": {
+    "pageTitle": "Meine Meldungen",
+    "description": "Deine gemeldeten Fehler und Wünsche — und was daraus geworden ist.",
+    "empty": "Du hast noch nichts gemeldet.",
+    "loadFailed": "Deine Meldungen konnten nicht geladen werden: {message}",
+    "createdAt": "gemeldet am {date}",
+    "updatedAt": "zuletzt bearbeitet am {date}",
+    "resolutionHeader": "Lösung",
+    "noResolution": "Noch keine Rückmeldung.",
+    "historyHeader": "Rückmeldungen",
+    "descriptionHeader": "Deine Beschreibung",
+    "filesHeader": "Screenshots und Anhänge",
+    "filesFailed": "Die Bilder konnten nicht geladen werden: {message}",
+    "screenshotAlt": "Screenshot",
+    "statusChange": "Status: {from} → {to}",
+    "resolutionChanged": "Lösung aktualisiert",
+    "resolutionRemoved": "Lösung entfernt",
+    "authorFallback": "Bearbeitung"
   }
 }

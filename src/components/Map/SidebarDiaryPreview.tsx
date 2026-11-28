@@ -19,14 +19,13 @@ import {
 import moment from 'moment';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import React, { useCallback, useState } from 'react';
-import { Diary, FirecallItem } from '../firebase/firestore';
+import React, { useState } from 'react';
+import { Diary } from '../firebase/firestore';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
-import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
-import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { useDiaryEntries } from '../../hooks/useDiaryEntries';
 import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
+import { useDocumentEntryDialog } from '../pages/useDocumentEntryDialog';
 
 const STORAGE_KEY = 'sidebar-diary-collapsed';
 const DISPLAY_LIMIT = 5;
@@ -205,10 +204,11 @@ export default function SidebarDiaryPreview() {
   const t = useTranslations('sidebar');
   const { entries, totalCount, diaryCounter } = useDiaryEntries(DISPLAY_LIMIT);
   const canEdit = useMapEditorCanEdit();
-  const addFirecallItem = useFirecallItemAdd();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [accordionExpanded, setAccordionExpanded] = useState(getInitialAccordionState);
-  const [showAddDialog, setShowAddDialog] = useState(false);
+  const entryDialog = useDocumentEntryDialog('diary', diaryCounter, {
+    autoFocusField: 'von',
+  });
 
   const handleAccordionChange = (_: React.SyntheticEvent, expanded: boolean) => {
     setAccordionExpanded(expanded);
@@ -218,16 +218,6 @@ export default function SidebarDiaryPreview() {
   const handleEntryClick = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
   };
-
-  const handleAddClose = useCallback(
-    (item?: FirecallItem) => {
-      setShowAddDialog(false);
-      if (item) {
-        addFirecallItem(item);
-      }
-    },
-    [addFirecallItem]
-  );
 
   return (
     <Box sx={{ mt: 1.5 }}>
@@ -267,13 +257,13 @@ export default function SidebarDiaryPreview() {
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowAddDialog(true);
+                  entryDialog.open();
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.stopPropagation();
                     e.preventDefault();
-                    setShowAddDialog(true);
+                    entryDialog.open();
                   }
                 }}
               >
@@ -315,15 +305,7 @@ export default function SidebarDiaryPreview() {
         </AccordionDetails>
       </Accordion>
 
-      {showAddDialog && (
-        <FirecallItemDialog
-          type="diary"
-          item={{ type: 'diary', nummer: diaryCounter } as Diary}
-          allowTypeChange={false}
-          onClose={handleAddClose}
-          autoFocusField="von"
-        />
-      )}
+      {entryDialog.dialog}
     </Box>
   );
 }

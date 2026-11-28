@@ -225,3 +225,34 @@ describe('computeBugReportChanges', () => {
     expect(computeBugReportChanges(before, { status: 'open' })).toEqual([]);
   });
 });
+
+describe('resolution', () => {
+  it('trims the resolution and keeps a cleared one as empty string', () => {
+    expect(normalizeBugReportUpdate({ resolution: '  behoben in 1.2  ' })).toEqual(
+      { resolution: 'behoben in 1.2' },
+    );
+    expect(normalizeBugReportUpdate({ resolution: '   ' })).toEqual({
+      resolution: '',
+    });
+  });
+
+  it('rejects an overlong resolution', () => {
+    expect(() =>
+      normalizeBugReportUpdate({
+        resolution: 'x'.repeat(BUG_REPORT_COMMENT_MAX_LENGTH + 1),
+      }),
+    ).toThrow(/lang/i);
+  });
+
+  it('tracks a changed resolution in the history, after the status', () => {
+    expect(
+      computeBugReportChanges({ status: 'open' } as BugReport, {
+        resolution: 'Behoben',
+        status: 'closed',
+      }),
+    ).toEqual([
+      { field: 'status', from: 'open', to: 'closed' },
+      { field: 'resolution', from: '', to: 'Behoben' },
+    ]);
+  });
+});

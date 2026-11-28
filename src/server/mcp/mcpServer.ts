@@ -3,6 +3,10 @@ import 'server-only';
 import { McpServer } from '@modelcontextprotocol/server';
 import { hasScopes } from '../../common/mcp/scopes';
 import type { McpAuthContext } from './mcpUserRequired';
+import {
+  registerBugReportReadTools,
+  registerBugReportWriteTools,
+} from './bugReportTools';
 import { registerCalculationTools } from './calcTools';
 import { registerDocsResources, registerPrompts } from './resources';
 import { registerReadTools, registerWaterSupplyTools } from './readTools';
@@ -42,6 +46,10 @@ export function createMcpServerForAuth(auth: McpAuthContext): McpServer {
         'Pendelverkehr, Sandsackbedarf, Strahlenschutz) gehören in die `calc_*`- und',
         '`strahlenschutz_*`-Tools und nicht in eine eigene Überschlagsrechnung —',
         'dort stecken die geprüften Tabellenwerte der Lehrunterlagen.',
+        '',
+        'Bug-Reports der App: `list_bug_reports` und `get_bug_report`. Was der Melder',
+        'lesen soll, gehört in `resolution` oder einen Kommentar mit',
+        '`visibility: "reporter"` — interne Notizen sieht er nie.',
       ].join('\n'),
     },
   );
@@ -60,6 +68,20 @@ export function createMcpServerForAuth(auth: McpAuthContext): McpServer {
 
   if (hasScopes(auth.scopes, ['einsatz:write']) && mcpWriteEnabled()) {
     registerWriteTools(server, {
+      user: auth.user,
+      clientId: auth.clientId,
+      clientName: auth.clientName,
+    });
+  }
+
+  if (hasScopes(auth.scopes, ['bugreport:read'])) {
+    registerBugReportReadTools(server, auth.user);
+  }
+
+  // Bug-Reports bearbeiten nur Admins, und zwar ohne MCP_WRITE_ENABLED: Der
+  // Schalter schützt Einsatzdaten, siehe bugReportTools.ts.
+  if (hasScopes(auth.scopes, ['bugreport:write']) && auth.user.isAdmin) {
+    registerBugReportWriteTools(server, {
       user: auth.user,
       clientId: auth.clientId,
       clientName: auth.clientName,

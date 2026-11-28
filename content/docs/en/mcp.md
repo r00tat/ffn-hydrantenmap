@@ -72,6 +72,19 @@ Everything written through MCP is marked as such: diary and logbook entries
 carry an “AI” chip naming the application, and the operation's audit log
 records who wrote what with which application.
 
+**Bug reports** (only if requested when connecting)
+
+- Read your own bug reports and feature requests: status, resolution and the
+  comments meant for you — the same as on the **My reports** page
+- Administrators read all reports including logs and screenshots, and can set
+  status and resolution, write comments (internal or visible to the reporter)
+  and notify the reporter by email. These writes are not tied to the write
+  switch for operations.
+
+Bug reports are not part of the default access. A client has to request the
+scopes `bugreport:read` and, for administrators, `bugreport:write`; the
+consent screen lists them.
+
 Two ready-made tasks come with it: **operation summary** and **social media
 post**. The operations map's user documentation is available to Claude as well —
 it answers questions about how to use the app from that.

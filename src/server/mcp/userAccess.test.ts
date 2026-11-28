@@ -37,6 +37,18 @@ describe('loadMcpUser', () => {
     });
   });
 
+  it('übernimmt E-Mail und Anzeigename für Bug-Report-Einträge', async () => {
+    userDoc({
+      authorized: true,
+      email: 'admin@example.org',
+      displayName: 'Erika Beispiel',
+    });
+    await expect(loadMcpUser('uid-1')).resolves.toMatchObject({
+      email: 'admin@example.org',
+      displayName: 'Erika Beispiel',
+    });
+  });
+
   it('ergänzt allUsers auch ohne Gruppen', async () => {
     userDoc({ authorized: true });
     await expect(loadMcpUser('uid-1')).resolves.toMatchObject({

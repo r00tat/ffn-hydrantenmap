@@ -1249,7 +1249,9 @@
     "fuellprotokoll": "Filling log",
     "sybos": "Sybos transfer",
     "personal": "Personnel",
-    "risikoobjekte": "High-risk sites"
+    "risikoobjekte": "High-risk sites",
+    "hotkeys": "Keyboard shortcuts",
+    "myBugReports": "My reports"
   },
   "fahrtenbuch": {
     "title": "Trip log",
@@ -2895,7 +2897,8 @@
     "admin": "Administration",
     "mcp": "MCP / Claude",
     "sybos": "Sybos transfer",
-    "geraete": "Equipment & supplies"
+    "geraete": "Equipment & supplies",
+    "tastenkuerzel": "Keyboard shortcuts"
   },
   "users": {
     "notMigrated": "{name} has not been migrated yet (old cost recovery flag); the groups were not changed. Run step 2 under “Permissions (migration)” first.",
@@ -3354,13 +3357,40 @@
     "commentAdd": "Add comment",
     "commentAdded": "Comment saved",
     "commentAddFailed": "Could not save the comment",
-    "commentInternalHint": "Comments are only visible in the admin area, not to the reporter.",
+    "commentInternalHint": "Internal comments are only visible in the admin area, not to the reporter.",
     "changeLine": "{field}: {from} → {to}",
     "fieldStatus": "Status",
     "fieldGithubIssue": "GitHub issue",
     "fieldAssignee": "Assigned to",
     "fieldInternalNote": "Internal note",
-    "valueEmpty": "—"
+    "valueEmpty": "—",
+    "selectRegion": "Select region",
+    "cropScreenshot": "Crop screenshot",
+    "screenshotInProgressHintHotkey": "The bug report opens right after. Please don't navigate away.",
+    "regionTitle": "Select a region for the bug report",
+    "regionHint": "Drag a rectangle with mouse, pen or finger. Dragging again replaces the selection.",
+    "regionConfirm": "Use region",
+    "regionFullScreen": "Whole screen",
+    "regionKeepWhole": "Keep whole image",
+    "regionCancel": "Cancel",
+    "regionImageAlt": "Frozen screenshot",
+    "regionCropFailed": "Cropping failed",
+    "shortcutHintPrefix": "Tip:",
+    "shortcutHintOpen": "{key} opens the bug report even above open dialogs",
+    "shortcutHintRegion": "{key} selects a region directly",
+    "fieldResolution": "Resolution",
+    "resolutionLabel": "Resolution / feedback to the reporter",
+    "resolutionHelper": "The reporter sees this under “My reports”.",
+    "commentReporterHint": "The reporter sees this comment under “My reports”.",
+    "commentVisibilityLabel": "Comment visibility",
+    "visibilityInternal": "internal",
+    "visibilityReporter": "visible to reporter",
+    "notifyReporterLabel": "Notify the reporter by email",
+    "notifyReporterHint": "Only when closed, on a new resolution or a comment for the reporter.",
+    "notificationSent": "Reporter notified ({to})",
+    "notificationSkipped": "No email to the reporter: {reason}",
+    "notificationFailed": "Email to the reporter failed: {error}",
+    "historyViaMcp": "via {client}"
   },
   "firecallShare": {
     "title": "Share operation",
@@ -3740,7 +3770,9 @@
     "revokeHint": "You can revoke access at any time under “Connected applications”.",
     "errorTitle": "Cannot connect",
     "errorFallback": "The application's request could not be processed.",
-    "backToApp": "Back to the operations map"
+    "backToApp": "Back to the operations map",
+    "scopeBugreportRead": "Read bug reports (your own; as administrator all of them, including logs and screenshots)",
+    "scopeBugreportWrite": "Process bug reports: status, resolution and comments (administrators only)"
   },
   "connectedApps": {
     "pageTitle": "Connected applications",
@@ -5102,5 +5134,94 @@
     "notConfigured": "Traffic reports are not set up (access to EVIS.AT missing).",
     "failed": "Traffic reports could not be loaded.",
     "partial": "Some traffic reports are currently unavailable; showing the last known state."
+  },
+  "hotkeys": {
+    "groups": {
+      "general": "General",
+      "bugReport": "Bug report",
+      "map": "Map",
+      "documents": "Operation records",
+      "navigation": "Navigation"
+    },
+    "actions": {
+      "general": {
+        "search": "Open search (items, diary, pages)",
+        "help": "Keyboard shortcut overview"
+      },
+      "bugReport": {
+        "open": "Open bug report (with screenshot)",
+        "region": "Select screen area for a bug report"
+      },
+      "documents": {
+        "diary": "New operational diary entry",
+        "geschaeftsbuch": "New business logbook entry"
+      },
+      "map": {
+        "marker": "Place marker",
+        "vehicle": "Add vehicle",
+        "connection": "Draw hose line",
+        "area": "Draw area",
+        "location": "Place operation site",
+        "addElement": "Add element (choose type)",
+        "toggleEdit": "Toggle editing"
+      },
+      "navigation": {
+        "map": "Go to map",
+        "diary": "Go to operational diary",
+        "geschaeftsbuch": "Go to business logbook",
+        "einsatzmittel": "Go to resources",
+        "einsatzorte": "Go to operation sites",
+        "ebenen": "Go to layers",
+        "einsaetze": "Go to operation list"
+      }
+    },
+    "help": {
+      "title": "Keyboard shortcuts",
+      "disabled": "Keyboard shortcuts are switched off on this device.",
+      "rules": "Single keys do nothing while you type in an input field or while a dialog is open. Map shortcuts only work on the map and only with write access to the operation.",
+      "customize": "Customize"
+    },
+    "search": {
+      "label": "Search",
+      "placeholder": "Items, operation sites, diary, business logbook, pages …",
+      "placeholderNoFirecall": "Search pages …",
+      "noResults": "No results",
+      "hint": "↑ ↓ select · Enter open · Esc close",
+      "page": "Page"
+    },
+    "settings": {
+      "title": "Keyboard shortcuts",
+      "intro": "Keyboard shortcuts take you to the most important functions without a mouse. Press ? for an overview at any time.",
+      "perDevice": "These settings apply to this device and this browser only.",
+      "enabled": "Use keyboard shortcuts",
+      "resetAll": "Reset all",
+      "conflict": "{binding} is assigned more than once: {actions}. Where several are available, the first one listed wins.",
+      "defaultIs": "Default: {binding}",
+      "recording": "Press a key combination … (Esc cancels)",
+      "off": "off",
+      "change": "Change",
+      "cancel": "Cancel",
+      "disable": "Switch off",
+      "reset": "Reset to default"
+    }
+  },
+  "myBugReports": {
+    "pageTitle": "My reports",
+    "description": "The bugs and wishes you reported — and what became of them.",
+    "empty": "You have not reported anything yet.",
+    "loadFailed": "Your reports could not be loaded: {message}",
+    "createdAt": "reported on {date}",
+    "updatedAt": "last processed on {date}",
+    "resolutionHeader": "Resolution",
+    "noResolution": "No feedback yet.",
+    "historyHeader": "Feedback",
+    "descriptionHeader": "Your description",
+    "filesHeader": "Screenshots and attachments",
+    "filesFailed": "The images could not be loaded: {message}",
+    "screenshotAlt": "Screenshot",
+    "statusChange": "Status: {from} → {to}",
+    "resolutionChanged": "Resolution updated",
+    "resolutionRemoved": "Resolution removed",
+    "authorFallback": "Team"
   }
 }

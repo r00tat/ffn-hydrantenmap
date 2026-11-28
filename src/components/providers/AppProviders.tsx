@@ -30,6 +30,7 @@ import ConnectivityProvider from './ConnectivityProvider';
 import ErrorBoundary from './ErrorBoundary';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
+import HotkeyProvider from '../hotkeys/HotkeyProvider';
 import HoseLineDraftProvider from './HoseLineDraftProvider';
 import MapEditorProvider from './MapEditorProvider';
 import NativeNotificationTaps from './NativeNotificationTaps';
@@ -48,20 +49,21 @@ const GpsProvider = dynamic(() => import('./GpsProvider'), {
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
 });
-const BugReportProvider = dynamic(
-  () => import('../bugReport/BugReportProvider'),
-  { ssr: false }
-);
+const BugReportProvider = dynamic(() => import('../bugReport/BugReportProvider'), { ssr: false });
+// Ohne SSR: Suche und Dokument-Dialoge ziehen Leaflet nach.
+const GlobalHotkeys = dynamic(() => import('../hotkeys/GlobalHotkeys'), {
+  ssr: false,
+});
 const LiveLocationProvider = dynamic(() => import('./LiveLocationProvider'), {
   ssr: false,
 });
 const PermissionOnboardingProvider = dynamic(
   () => import('../permissions/PermissionOnboardingProvider'),
-  { ssr: false }
+  { ssr: false },
 );
 const SettingsRedirectDialogProvider = dynamic(
   () => import('../permissions/SettingsRedirectDialogProvider'),
-  { ssr: false }
+  { ssr: false },
 );
 
 interface AppProps {
@@ -82,44 +84,44 @@ function OfflineWarmup() {
 function LogedinApp({ children }: AppProps) {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   return (
-    <FirecallProvider>
-      <PositionProvider>
-        <RadiacodeProvider>
-          <GpsProvider>
-            <LiveLocationProvider>
-              <DebugLoggingProvider>
-                <BugReportProvider>
-                  <MapEditorProvider>
-                    <FirecallLayerProvider>
-                      <HoseLineDraftProvider>
-                        <AppDrawer
-                          isOpen={isDrawerOpen}
-                          setIsOpen={setIsDrawerOpen}
-                        />
+    <HotkeyProvider>
+      <FirecallProvider>
+        <PositionProvider>
+          <RadiacodeProvider>
+            <GpsProvider>
+              <LiveLocationProvider>
+                <DebugLoggingProvider>
+                  <BugReportProvider>
+                    <MapEditorProvider>
+                      <FirecallLayerProvider>
+                        <HoseLineDraftProvider>
+                          <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
-                        <HeaderBar
-                          isDrawerOpen={isDrawerOpen}
-                          setIsDrawerOpen={setIsDrawerOpen}
-                        />
-                        <ChatMessageDisplay />
-                        <NativeNotificationTaps />
-                        <OfflineWarmup />
-                        <Box
-                          className="print-content-root"
-                          sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
-                        >
-                          {children}
-                        </Box>
-                      </HoseLineDraftProvider>
-                    </FirecallLayerProvider>
-                  </MapEditorProvider>
-                </BugReportProvider>
-              </DebugLoggingProvider>
-            </LiveLocationProvider>
-          </GpsProvider>
-        </RadiacodeProvider>
-      </PositionProvider>
-    </FirecallProvider>
+                          <HeaderBar
+                            isDrawerOpen={isDrawerOpen}
+                            setIsDrawerOpen={setIsDrawerOpen}
+                          />
+                          <ChatMessageDisplay />
+                          <NativeNotificationTaps />
+                          <OfflineWarmup />
+                          <GlobalHotkeys />
+                          <Box
+                            className="print-content-root"
+                            sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+                          >
+                            {children}
+                          </Box>
+                        </HoseLineDraftProvider>
+                      </FirecallLayerProvider>
+                    </MapEditorProvider>
+                  </BugReportProvider>
+                </DebugLoggingProvider>
+              </LiveLocationProvider>
+            </GpsProvider>
+          </RadiacodeProvider>
+        </PositionProvider>
+      </FirecallProvider>
+    </HotkeyProvider>
   );
 }
 
@@ -141,10 +143,7 @@ function AuthorizationApp({ children }: AppProps) {
   }
   return (
     <>
-      <HeaderBar
-        isDrawerOpen={isDrawerOpen}
-        setIsDrawerOpen={setIsDrawerOpen}
-      />
+      <HeaderBar isDrawerOpen={isDrawerOpen} setIsDrawerOpen={setIsDrawerOpen} />
       <DynamicLogin />
       <About />
     </>

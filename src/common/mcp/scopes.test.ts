@@ -91,6 +91,8 @@ describe('coversScopes', () => {
 describe('DEFAULT_MCP_SCOPES', () => {
   it('enthält kein Schreibrecht', () => {
     expect(DEFAULT_MCP_SCOPES).not.toContain('einsatz:write');
+    expect(DEFAULT_MCP_SCOPES).not.toContain('bugreport:read');
+    expect(DEFAULT_MCP_SCOPES).not.toContain('bugreport:write');
   });
 });
 

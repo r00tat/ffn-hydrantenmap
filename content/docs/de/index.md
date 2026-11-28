@@ -10,6 +10,7 @@ Willkommen zur Dokumentation der Einsatzkarte. Hier findest du Anleitungen zu al
 
 - **Karte** [Hydranten anzeigen, Basiskarten und Overlays wechseln, Bearbeitungsmodus, Zeichenwerkzeuge](/docs/karte)
 - **Ebenen** [Eigene Ebenen erstellen, Elemente gruppieren, Heatmaps und Interpolation konfigurieren](/docs/ebenen)
+- **Tastenkürzel** [Suche mit /, neue Tagebuch- und Geschäftsbuch-Einträge, Marker und Elemente auf der Karte, Navigation, eigene Belegung je Gerät](/docs/tastenkuerzel)
 
 ## Einsatzmanagement
 

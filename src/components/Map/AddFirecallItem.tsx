@@ -11,7 +11,9 @@ import {
 } from '../firebase/firestore';
 import { useLeitungen } from './Leitungen/context';
 import { useDrawing } from './Drawing/DrawingContext';
-import useMapEditor from '../../hooks/useMapEditor';
+import useMapEditor, { useMapEditorCanEdit } from '../../hooks/useMapEditor';
+import { useHotkey } from '../hotkeys/HotkeyProvider';
+import MapFocusHandler from '../hotkeys/MapFocusHandler';
 import { usePositionContext } from '../providers/PositionProvider';
 import {
   merkeFrischAngelegt,
@@ -24,7 +26,24 @@ export interface MapActionButtonsOptions {
   map: L.Map;
 }
 
-export default function AddFirecallItem() {
+/**
+ * Name eines per Kürzel gesetzten Markers: wie im Dialog „Marker 3", nur über
+ * den ganzen Einsatz gezählt statt je Ebene.
+ */
+export function nextMarkerName(
+  typeName: string,
+  firecallItems: readonly FirecallItem[],
+): string {
+  const count = firecallItems.filter((item) => item.type === 'marker').length;
+  return `${typeName} ${count + 1}`;
+}
+
+export default function AddFirecallItem({
+  firecallItems = [],
+}: {
+  /** Für den Namen eines per Kürzel gesetzten Markers. */
+  firecallItems?: FirecallItem[];
+}) {
   const map = useMap();
   const [userPosition, gotPosition, , enableTracking] = usePositionContext();
   const leitungen = useLeitungen();
@@ -38,7 +57,10 @@ export default function AddFirecallItem() {
     editFirecallItem,
     lastSelectedLayer,
     setLastSelectedLayer,
+    setEditable,
+    openFirecallItemDialog,
   } = useMapEditor();
+  const canEdit = useMapEditorCanEdit();
 
   const getDefaultPosition = useCallback((): L.LatLng => {
     if (gotPosition && map.getBounds().contains([userPosition.lat, userPosition.lng])) {
@@ -191,8 +213,61 @@ export default function AddFirecallItem() {
     [leitungen, drawingCtx, saveItem, getDefaultPosition, setEditFirecallItemIsOpen, setLastSelectedLayer]
   );
 
+  // Escape bricht das Setzen ab, solange der Marker an der Maus hängt.
+  useEffect(() => {
+    if (!fzgDrawing) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFzgDrawing(undefined);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [fzgDrawing]);
+
+  // `M`: Marker ohne Typdialog. Er hängt an der Maus und fällt beim Klick;
+  // auf Touch-Geräten gibt es keine Maus, dort fällt er gleich an der
+  // Vorgabeposition. Name und Ebene wie im Dialog, bearbeitet wird er danach
+  // wie jeder andere.
+  const placeMarker = useCallback(() => {
+    const instance = getItemInstance({
+      type: 'marker',
+      layer: lastSelectedLayer || undefined,
+    } as FirecallItem);
+    const position = getDefaultPosition();
+    const marker: FirecallItem = {
+      ...instance.filteredData(),
+      name: nextMarkerName(instance.markerName(), firecallItems),
+      lat: position.lat,
+      lng: position.lng,
+    };
+    if (navigator.maxTouchPoints > 0) {
+      void saveItem(marker);
+    } else {
+      setFzgDrawing(marker);
+    }
+  }, [firecallItems, getDefaultPosition, lastSelectedLayer, saveItem]);
+
+  useHotkey(
+    'map.marker',
+    () => {
+      setEditable(true);
+      placeMarker();
+    },
+    canEdit,
+  );
+  const openDialogFor = (type: string) => {
+    setEditable(true);
+    openFirecallItemDialog({ type } as FirecallItem);
+  };
+  // Diese Kürzel öffnen den Elementdialog mit vorgewähltem Typ; Leitung und
+  // Fläche gehen danach wie gewohnt ins Zeichnen über.
+  useHotkey('map.vehicle', () => openDialogFor('vehicle'), canEdit);
+  useHotkey('map.location', () => openDialogFor('location'), canEdit);
+  useHotkey('map.connection', () => openDialogFor('connection'), canEdit);
+  useHotkey('map.area', () => openDialogFor('area'), canEdit);
+
   return (
     <>
+      <MapFocusHandler />
       {editFirecallItemIsOpen && (
         <FirecallItemDialog
           onClose={fzgDialogClose}
