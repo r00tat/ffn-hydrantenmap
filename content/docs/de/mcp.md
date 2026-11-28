@@ -73,6 +73,19 @@ Alles, was über MCP geschrieben wird, ist als solches gekennzeichnet: Im
 Einsatztagebuch und im Geschäftsbuch steht am Eintrag ein Zeichen „KI" mit dem
 Namen der Anwendung, und im Auditlog des Einsatzes steht, wer und womit.
 
+**Bug-Reports** (nur wenn beim Verbinden verlangt)
+
+- Die eigenen Bug-Reports und Wünsche lesen: Status, Lösung und die Kommentare,
+  die für dich bestimmt sind — dasselbe wie auf der Seite **Meine Meldungen**
+- Administratoren lesen alle Reports samt Logs und Screenshots und können
+  Status und Lösung setzen, Kommentare schreiben (intern oder für den Melder
+  sichtbar) und den Melder per E-Mail benachrichtigen. Das hängt nicht am
+  Schalter für das Schreiben in Einsätze.
+
+Bug-Reports gehören nicht zum Standardzugriff. Eine Anwendung muss die Scopes
+`bugreport:read` und, für Administratoren, `bugreport:write` ausdrücklich
+verlangen; der Bildschirm zur Einwilligung führt sie dann auf.
+
 Dazu kommen zwei fertige Aufgaben, die Claude direkt anbietet:
 **Einsatz-Zusammenfassung** und **Social-Media-Beitrag**. Auch die
 Benutzerdokumentation der Einsatzkarte steht Claude zur Verfügung — Fragen zur

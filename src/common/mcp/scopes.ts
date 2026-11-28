@@ -18,6 +18,16 @@ export const MCP_SCOPES = [
   'hydranten:read',
   /** Reine Rechner-Tools, kein Datenzugriff. */
   'berechnung',
+  /**
+   * Bug-Reports lesen. Ein Admin sieht alle samt Logs, Kontext und
+   * Screenshots, alle anderen nur die eigenen in der Melder-Ansicht.
+   */
+  'bugreport:read',
+  /**
+   * Bug-Reports bearbeiten (Status, Lösung, Kommentare). Wirkt nur für
+   * Admins — für alle anderen registriert der Server die Tools gar nicht.
+   */
+  'bugreport:write',
 ] as const;
 
 export type McpScope = (typeof MCP_SCOPES)[number];
@@ -26,7 +36,9 @@ export type McpScope = (typeof MCP_SCOPES)[number];
  * Was ein Client bekommt, der bei der Autorisierung keinen `scope` angibt.
  *
  * Bewusst ohne `einsatz:write`: Wer schreiben will, muss es verlangen, und der
- * Consent-Screen benennt es dann ausdrücklich.
+ * Consent-Screen benennt es dann ausdrücklich. Ebenso ohne die
+ * `bugreport:*`-Scopes — Bug-Reports gehören nicht zur Einsatzarbeit, und wer
+ * sie über MCP bearbeiten will, verlangt sie ausdrücklich.
  */
 export const DEFAULT_MCP_SCOPES: McpScope[] = [
   'einsatz:read',

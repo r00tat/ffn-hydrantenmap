@@ -326,8 +326,10 @@ service cloud.firestore {
     }
 
     // Kommentare und Verlaufseinträge zu einem Bug-Report. Sie enthalten
-    // interne Notizen und laufen ausschließlich über die Server-Actions
-    // (Admin SDK, actionAdminRequired) — kein Client liest oder schreibt hier.
+    // interne Notizen und laufen ausschließlich über den Server
+    // (Admin SDK, src/server/bugReport/bugReportService.ts) — kein Client liest
+    // oder schreibt hier. Auch der Melder sieht seine Kommentare nur gefiltert
+    // über eine Server Action, weil die Sichtbarkeit feldgenau gilt.
     match /bugReport/{doc}/comments/{comment} {
       allow read, write: if false;
     }

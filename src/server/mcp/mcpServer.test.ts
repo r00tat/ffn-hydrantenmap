@@ -16,9 +16,9 @@ const user = {
   groupRoles: { ffnd: [] },
 };
 
-function auth(scopes: McpScope[]): McpAuthContext {
+function auth(scopes: McpScope[], isAdmin = false): McpAuthContext {
   return {
-    user,
+    user: { ...user, isAdmin },
     scopes,
     clientId: 'mcp_abc',
     clientName: 'Claude',
@@ -28,9 +28,10 @@ function auth(scopes: McpScope[]): McpAuthContext {
 }
 
 /** `toolInputSchemaJson` liefert `undefined`, wenn kein solches Tool registriert ist. */
-function hasTool(scopes: McpScope[], name: string): boolean {
+function hasTool(scopes: McpScope[], name: string, isAdmin = false): boolean {
   return (
-    createMcpServerForAuth(auth(scopes)).toolInputSchemaJson(name) !== undefined
+    createMcpServerForAuth(auth(scopes, isAdmin)).toolInputSchemaJson(name) !==
+    undefined
   );
 }
 
@@ -71,6 +72,32 @@ describe('createMcpServerForAuth', () => {
     expect(hasTool(['einsatz:write'], 'create_item')).toBe(false);
   });
 
+  it('registriert lesende Bug-Report-Tools nur mit bugreport:read', () => {
+    expect(hasTool(['bugreport:read'], 'list_bug_reports')).toBe(true);
+    expect(hasTool(['bugreport:read'], 'get_bug_report')).toBe(true);
+    expect(hasTool(['einsatz:read'], 'list_bug_reports')).toBe(false);
+    expect(hasTool(['bugreport:write'], 'get_bug_report', true)).toBe(false);
+  });
+
+  it('registriert schreibende Bug-Report-Tools nur für Admins mit bugreport:write', () => {
+    expect(hasTool(['bugreport:write'], 'update_bug_report', true)).toBe(true);
+    expect(hasTool(['bugreport:write'], 'add_bug_report_comment', true)).toBe(
+      true,
+    );
+    // Ohne Adminflag hilft auch der Scope nicht.
+    expect(hasTool(['bugreport:write'], 'update_bug_report')).toBe(false);
+    expect(hasTool(['bugreport:write'], 'add_bug_report_comment')).toBe(false);
+    // Und ohne Scope hilft das Adminflag nicht.
+    expect(hasTool(['bugreport:read', 'einsatz:write'], 'update_bug_report', true)).toBe(
+      false,
+    );
+  });
+
+  it('registriert Bug-Report-Schreibtools unabhängig von MCP_WRITE_ENABLED', () => {
+    process.env.MCP_WRITE_ENABLED = 'false';
+    expect(hasTool(['bugreport:write'], 'update_bug_report', true)).toBe(true);
+  });
+
   it('registriert ohne jeden Scope kein einziges Tool', () => {
     const server = createMcpServerForAuth(auth([]));
     for (const name of [
@@ -78,6 +105,8 @@ describe('createMcpServerForAuth', () => {
       'search_wasserversorgung',
       'calc_sandsackbedarf',
       'create_item',
+      'list_bug_reports',
+      'update_bug_report',
     ]) {
       expect(server.toolInputSchemaJson(name)).toBeUndefined();
     }

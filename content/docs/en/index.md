@@ -10,6 +10,7 @@ Welcome to the operations map documentation. Here you will find guides for every
 
 - **Map** [Display hydrants, switch base maps and overlays, editing mode, drawing tools](/docs/karte)
 - **Layers** [Create your own layers, group elements, configure heatmaps and interpolation](/docs/ebenen)
+- **Keyboard shortcuts** [Search with /, new diary and business logbook entries, markers and items on the map, navigation, your own assignment per device](/docs/tastenkuerzel)
 
 ## Operation management
 

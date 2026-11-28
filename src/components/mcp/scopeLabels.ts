@@ -10,4 +10,6 @@ export const MCP_SCOPE_LABEL_KEYS = {
   'einsatz:write': 'scopeEinsatzWrite',
   'hydranten:read': 'scopeHydrantenRead',
   berechnung: 'scopeBerechnung',
+  'bugreport:read': 'scopeBugreportRead',
+  'bugreport:write': 'scopeBugreportWrite',
 } as const;

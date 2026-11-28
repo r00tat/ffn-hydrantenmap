@@ -28,26 +28,48 @@ export const BUG_REPORT_STATUSES = [
 export type BugReportEntryType = 'comment' | 'change';
 
 /**
- * `internal` sieht nur der Admin-Bereich. `reporter` ist für eine künftige
- * Ansicht des Melders vorgesehen; geschrieben wird derzeit ausschließlich
- * `internal`. Das Feld steht von Anfang an am Kommentar, weil sich die
- * Sichtbarkeit eines bereits geschriebenen Kommentars nachträglich nicht
- * mehr feststellen lässt.
+ * `internal` sieht nur der Admin-Bereich (und ein Admin über MCP).
+ * `reporter` sieht zusätzlich der Melder auf „Meine Meldungen“
+ * (`/meine-meldungen`) und über MCP. Fehlt das Feld an einem alten Eintrag,
+ * gilt `internal` — im Zweifel bleibt ein Kommentar intern.
+ *
+ * Gilt nur für Kommentare (`entryType: 'comment'`). Verlaufseinträge einer
+ * Feldänderung werden immer `internal` geschrieben, weil ein Eintrag mehrere
+ * Felder umfassen kann; was der Melder davon sieht, entscheidet die Liste
+ * `BUG_REPORT_REPORTER_VISIBLE_FIELDS` beim Lesen.
  */
 export type BugReportCommentVisibility = 'internal' | 'reporter';
+
+export const BUG_REPORT_COMMENT_VISIBILITIES = [
+  'internal',
+  'reporter',
+] as const satisfies readonly BugReportCommentVisibility[];
 
 /** Felder, deren Änderung im Verlauf festgehalten wird. */
 export type BugReportTrackedField =
   | 'status'
+  | 'resolution'
   | 'githubIssue'
   | 'assignee'
   | 'internalNote';
 
 export const BUG_REPORT_TRACKED_FIELDS = [
   'status',
+  'resolution',
   'githubIssue',
   'assignee',
   'internalNote',
+] as const satisfies readonly BugReportTrackedField[];
+
+/**
+ * Feldänderungen, die der Melder im Verlauf sieht. Status und Lösung sind
+ * genau das, was er wissen will („wurde es behoben?“), und enthalten nichts
+ * Internes. Zuständigkeit, GitHub-Issue und interne Notiz bleiben intern —
+ * auch wenn sie im selben Verlaufseintrag stehen.
+ */
+export const BUG_REPORT_REPORTER_VISIBLE_FIELDS = [
+  'status',
+  'resolution',
 ] as const satisfies readonly BugReportTrackedField[];
 
 export interface BugReportChange {
@@ -64,6 +86,12 @@ export interface BugReportComment {
   visibility: BugReportCommentVisibility;
   createdAt: Timestamp | Date | string;
   createdBy: BugReportCreatedBy;
+  /** `'mcp'`, wenn der Eintrag über den MCP-Server entstanden ist. */
+  source?: string;
+  /** `client_id` der MCP-Anwendung, die geschrieben hat. */
+  mcpClientId?: string;
+  /** Anzeigename der MCP-Anwendung. */
+  mcpClientName?: string;
 }
 
 export interface BugReportLogEntry {
@@ -113,11 +141,19 @@ export interface BugReport {
   assignee?: string;
   /** Interne Einordnung, unabhängig vom Kommentar-Verlauf. */
   internalNote?: string;
+  /**
+   * Lösung bzw. Rückmeldung an den Melder — sichtbar auf „Meine Meldungen“.
+   * Anders als `internalNote` ist das ausdrücklich für den Melder geschrieben.
+   */
+  resolution?: string;
 }
 
 /** Änderbare Felder eines Reports. Was fehlt, bleibt unangetastet. */
 export type BugReportUpdateInput = Partial<
-  Pick<BugReport, 'status' | 'githubIssue' | 'assignee' | 'internalNote'>
+  Pick<
+    BugReport,
+    'status' | 'resolution' | 'githubIssue' | 'assignee' | 'internalNote'
+  >
 >;
 
 export interface BugReportSubmitInput {

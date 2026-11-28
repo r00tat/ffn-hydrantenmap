@@ -1,10 +1,12 @@
 'use client';
 
 import BugReportIcon from '@mui/icons-material/BugReport';
+import CropIcon from '@mui/icons-material/Crop';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import ScreenshotMonitorIcon from '@mui/icons-material/ScreenshotMonitor';
+import HighlightAltIcon from '@mui/icons-material/HighlightAlt';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
@@ -25,14 +27,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
-import {
-  ChangeEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuid } from 'uuid';
 import { useDebugLogging } from '../../hooks/useDebugging';
 import { useFirecall } from '../../hooks/useFirecall';
@@ -42,9 +37,12 @@ import {
   type BugReportKind,
   type BugReportLogEntry,
 } from '../../common/bugReport';
+import { useHotkey } from '../hotkeys/HotkeyProvider';
 import { useSnackbar } from '../providers/SnackbarProvider';
+import BugReportShortcutHint from './BugReportShortcutHint';
 import { captureScreenshot, isScreenshotSupported } from './captureScreenshot';
 import { collectContext } from './collectContext';
+import RegionSelector from './RegionSelector';
 import ScreenshotCaptureOverlay from './ScreenshotCaptureOverlay';
 import { submitBugReportAction } from './submitBugReportAction';
 import { uploadBugReportFile } from './uploadBugReportFile';
@@ -52,14 +50,32 @@ import { uploadBugReportFile } from './uploadBugReportFile';
 export interface BugReportDialogProps {
   open: boolean;
   onClose: () => void;
+  /**
+   * Screenshots, die beim Öffnen schon angehängt sind — aufgenommen per
+   * Tastenkürzel, bevor der Dialog aufging. Gelesen nur beim Öffnen.
+   */
+  initialScreenshots?: Blob[];
 }
+
+/** Bereichsauswahl: auf einer frischen Aufnahme oder einem angehängten Bild. */
+interface RegionTarget {
+  image: Blob;
+  /** Gesetzt beim Zuschneiden eines angehängten Screenshots. */
+  replaceIndex?: number;
+}
+
+const NO_SCREENSHOTS: Blob[] = [];
 
 interface FrozenSnapshot {
   context: BugReportContext;
   logs: BugReportLogEntry[];
 }
 
-export default function BugReportDialog({ open, onClose }: BugReportDialogProps) {
+export default function BugReportDialog({
+  open,
+  onClose,
+  initialScreenshots = NO_SCREENSHOTS,
+}: BugReportDialogProps) {
   const pathname = usePathname() ?? '';
   const firecall = useFirecall();
   const { messages, displayMessages, setDisplayMessages } = useDebugLogging();
@@ -74,6 +90,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
   const [submitting, setSubmitting] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [snapshot, setSnapshot] = useState<FrozenSnapshot | null>(null);
+  const [regionTarget, setRegionTarget] = useState<RegionTarget | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Bumped on every capture start and on cancel, so a capture that finishes
@@ -96,12 +113,11 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
         .map((m) => ({
           message: m.message,
           level:
-            typeof m.properties?.level === 'string'
-              ? (m.properties.level as string)
-              : undefined,
+            typeof m.properties?.level === 'string' ? (m.properties.level as string) : undefined,
           properties: m.properties,
         }));
       setSnapshot({ context: ctx, logs });
+      setPendingScreenshots(initialScreenshots);
     } else {
       // Reset transient form state when closing.
       setSnapshot(null);
@@ -112,6 +128,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
       setPendingAttachments([]);
       setSubmitting(false);
       setCapturing(false);
+      setRegionTarget(null);
       captureRunRef.current += 1;
     }
     // We deliberately only re-run when `open` toggles.
@@ -134,46 +151,101 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
     };
   }, [screenshotPreviews, attachmentPreviews]);
 
-  const handleCaptureScreenshot = useCallback(async () => {
-    const run = (captureRunRef.current += 1);
-    setCapturing(true);
-    try {
+  /**
+   * Blendet den Dialog aus und nimmt auf. `undefined` = abgebrochen (oder
+   * der Dialog wurde inzwischen geschlossen), `null` = fehlgeschlagen.
+   */
+  const runCapture = useCallback(
+    async (highResolution: boolean): Promise<Blob | null | undefined> => {
+      const run = (captureRunRef.current += 1);
+      setCapturing(true);
       let blob: Blob | null = null;
       try {
-        blob = await captureScreenshot();
+        blob = await captureScreenshot({ highResolution });
       } catch (err) {
         // e.g. the lazily loaded capture chunk is unavailable offline.
         console.warn('bug-report: screenshot capture threw', err);
       }
       // User cancelled or closed the dialog in the meantime.
-      if (captureRunRef.current !== run) return;
-      if (blob) {
+      if (captureRunRef.current !== run) return undefined;
+      setCapturing(false);
+      return blob;
+    },
+    [],
+  );
+
+  const handleCaptureScreenshot = useCallback(async () => {
+    const blob = await runCapture(false);
+    if (blob === undefined) return;
+    if (blob) {
+      setPendingScreenshots((prev) => [...prev, blob]);
+      showSnackbar(t('screenshotAdded'), 'success');
+    } else {
+      showSnackbar(t('screenshotFailed'), 'error');
+    }
+  }, [runCapture, showSnackbar, t]);
+
+  const busy = capturing || regionTarget !== null;
+
+  const handleSelectRegion = useCallback(async () => {
+    if (busy) return;
+    const blob = await runCapture(true);
+    if (blob === undefined) return;
+    if (blob) {
+      setRegionTarget({ image: blob });
+    } else {
+      showSnackbar(t('screenshotFailed'), 'error');
+    }
+  }, [busy, runCapture, showSnackbar, t]);
+
+  const handleCropScreenshot = (idx: number) => {
+    const image = pendingScreenshots[idx];
+    if (image) setRegionTarget({ image, replaceIndex: idx });
+  };
+
+  const handleRegionConfirm = useCallback(
+    (blob: Blob) => {
+      const target = regionTarget;
+      setRegionTarget(null);
+      if (!target) return;
+      if (target.replaceIndex !== undefined) {
+        const index = target.replaceIndex;
+        setPendingScreenshots((prev) => prev.map((b, i) => (i === index ? blob : b)));
+      } else {
         setPendingScreenshots((prev) => [...prev, blob]);
         showSnackbar(t('screenshotAdded'), 'success');
-      } else {
-        showSnackbar(t('screenshotFailed'), 'error');
       }
-    } finally {
-      if (captureRunRef.current === run) setCapturing(false);
-    }
-  }, [showSnackbar, t]);
+    },
+    [regionTarget, showSnackbar, t],
+  );
+
+  const handleRegionCancel = useCallback(() => setRegionTarget(null), []);
+
+  // Solange der Dialog offen ist, hat er bei den Bug-Report-Kürzeln Vorrang
+  // vor dem Provider (zuletzt angemeldet): der Bereich landet bei den
+  // Anhängen dieses Reports, ein zweites Öffnen gibt es nicht.
+  useHotkey(
+    'bugReport.region',
+    () => {
+      if (!submitting) void handleSelectRegion();
+    },
+    open,
+  );
+  useHotkey('bugReport.open', () => {}, open);
 
   const handleCancelCapture = useCallback(() => {
     captureRunRef.current += 1;
     setCapturing(false);
   }, []);
 
-  const handleFileInputChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const files = event.target.files;
-      if (!files) return;
-      const list = Array.from(files);
-      setPendingAttachments((prev) => [...prev, ...list]);
-      // Reset so picking the same file twice still fires onChange.
-      event.target.value = '';
-    },
-    [],
-  );
+  const handleFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+    const list = Array.from(files);
+    setPendingAttachments((prev) => [...prev, ...list]);
+    // Reset so picking the same file twice still fires onChange.
+    event.target.value = '';
+  }, []);
 
   const removeScreenshot = (idx: number) => {
     setPendingScreenshots((prev) => prev.filter((_, i) => i !== idx));
@@ -244,23 +316,28 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
 
   return (
     <>
-      <ScreenshotCaptureOverlay
-        open={open && capturing}
-        onCancel={handleCancelCapture}
+      <ScreenshotCaptureOverlay open={open && capturing} onCancel={handleCancelCapture} />
+      <RegionSelector
+        open={open && regionTarget !== null}
+        image={regionTarget?.image ?? null}
+        mode={regionTarget?.replaceIndex !== undefined ? 'crop' : 'capture'}
+        onConfirm={handleRegionConfirm}
+        onCancel={handleRegionCancel}
       />
       <Dialog
         open={open}
         onClose={() => {
-          if (!submitting && !capturing) onClose();
+          if (!submitting && !busy) onClose();
         }}
         fullWidth
         maxWidth="sm"
-        // Hidden — not unmounted — during the capture so the form state and the
-        // frozen context survive it. The overlay above keeps the user informed.
-        sx={{ display: capturing ? 'none' : undefined }}
+        // Hidden — not unmounted — during the capture and the region selection
+        // so the form state and the frozen context survive it. The overlay or
+        // the selector above keeps the user informed.
+        sx={{ display: busy ? 'none' : undefined }}
         // The dialog is still open while hidden, so its focus trap would drag
         // focus back out of the overlay and make the cancel button unreachable.
-        disableEnforceFocus={capturing}
+        disableEnforceFocus={busy}
       >
         <DialogTitle>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -333,12 +410,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
               <Typography variant="subtitle2" gutterBottom>
                 {t('attachments')}
               </Typography>
-              <Stack
-                direction="row"
-                spacing={1}
-                useFlexGap
-                sx={{ flexWrap: 'wrap' }}
-              >
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                 {screenshotSupported && (
                   <Button
                     startIcon={<ScreenshotMonitorIcon />}
@@ -348,6 +420,17 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
                     disabled={submitting}
                   >
                     {t('captureScreenshot')}
+                  </Button>
+                )}
+                {screenshotSupported && (
+                  <Button
+                    startIcon={<HighlightAltIcon />}
+                    variant="outlined"
+                    size="small"
+                    onClick={handleSelectRegion}
+                    disabled={submitting}
+                  >
+                    {t('selectRegion')}
                   </Button>
                 )}
                 <Button
@@ -368,15 +451,14 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
                   />
                 </Button>
               </Stack>
+              {screenshotSupported && (
+                <Box sx={{ mt: 1 }}>
+                  <BugReportShortcutHint />
+                </Box>
+              )}
 
-              {(pendingScreenshots.length > 0 ||
-                pendingAttachments.length > 0) && (
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  useFlexGap
-                  sx={{ mt: 2, flexWrap: 'wrap' }}
-                >
+              {(pendingScreenshots.length > 0 || pendingAttachments.length > 0) && (
+                <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 2, flexWrap: 'wrap' }}>
                   {pendingScreenshots.map((blob, idx) => (
                     <Box
                       key={`ss-${idx}`}
@@ -397,6 +479,20 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
                           objectFit: 'cover',
                         }}
                       />
+                      <IconButton
+                        size="small"
+                        aria-label={t('cropScreenshot')}
+                        onClick={() => handleCropScreenshot(idx)}
+                        disabled={submitting}
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          bgcolor: 'background.paper',
+                        }}
+                      >
+                        <CropIcon fontSize="small" />
+                      </IconButton>
                       <IconButton
                         size="small"
                         aria-label={t('removeScreenshot')}
@@ -485,9 +581,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
                         p: 1,
                       }}
                     >
-                      {snapshot.logs
-                        .map((l) => `[${l.level ?? '-'}] ${l.message}`)
-                        .join('\n')}
+                      {snapshot.logs.map((l) => `[${l.level ?? '-'}] ${l.message}`).join('\n')}
                     </Box>
                   </Box>
                 ) : (
@@ -501,11 +595,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
           <Button onClick={onClose} disabled={submitting}>
             {t('cancel')}
           </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            disabled={!isValid || submitting}
-          >
+          <Button onClick={handleSubmit} variant="contained" disabled={!isValid || submitting}>
             {t('submit')}
           </Button>
         </DialogActions>

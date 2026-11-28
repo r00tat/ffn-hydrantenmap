@@ -5,11 +5,7 @@ const TRANSPARENT_PIXEL =
 
 // Origins that respond with HTML error pages (e.g. Google avatar CDN's 429)
 // and thus poison the DOM-to-image pipeline.
-const EXCLUDED_IMAGE_HOSTS = [
-  'googleusercontent.com',
-  'lh3.googleusercontent.com',
-  'gravatar.com',
-];
+const EXCLUDED_IMAGE_HOSTS = ['googleusercontent.com', 'lh3.googleusercontent.com', 'gravatar.com'];
 
 // Tags that bring no visual content and risk confusing the SVG/foreignObject
 // serialiser used internally by modern-screenshot. <style>/<link> stay in so
@@ -45,9 +41,36 @@ export function isScreenshotSupported(): boolean {
 // waits with it. 15s is far above a normal capture (<2s even on old phones).
 export const SCREENSHOT_TIMEOUT_MS = 15_000;
 
+/** Longest side of a standard capture, in output pixels. */
+export const MAX_DIM = 1280;
+/**
+ * Longest side when a region will be cut out of the capture. A region of a
+ * 1280px screenshot is often only a few hundred pixels wide and unreadable;
+ * twice the size keeps small text legible while the intermediate data URL
+ * still loads in mobile WebViews.
+ */
+export const HIGH_RES_MAX_DIM = 2560;
+/** Upper bound for the device pixel ratio used by high-resolution captures. */
+const MAX_PIXEL_RATIO = 2;
+
 export interface CaptureScreenshotOptions {
   /** Overridable for tests. */
   timeoutMs?: number;
+  /**
+   * Capture at the device pixel ratio (max. 2) and with a larger size cap,
+   * for the region selection: the user crops a small part of the image.
+   */
+  highResolution?: boolean;
+}
+
+/** Scale factor for `domToBlob`, see `CaptureScreenshotOptions`. */
+export function screenshotScale(srcW: number, srcH: number, highResolution: boolean): number {
+  const maxDim = highResolution ? HIGH_RES_MAX_DIM : MAX_DIM;
+  const ratio =
+    highResolution && typeof window !== 'undefined'
+      ? Math.min(MAX_PIXEL_RATIO, Math.max(1, window.devicePixelRatio || 1))
+      : 1;
+  return Math.min(ratio, maxDim / srcW, maxDim / srcH);
 }
 
 /**
@@ -64,6 +87,7 @@ function waitForNextPaint(): Promise<void> {
 
 export async function captureScreenshot({
   timeoutMs = SCREENSHOT_TIMEOUT_MS,
+  highResolution = false,
 }: CaptureScreenshotOptions = {}): Promise<Blob | null> {
   if (!isScreenshotSupported()) return null;
 
@@ -74,11 +98,10 @@ export async function captureScreenshot({
 
   // Downscale very large layouts so the intermediate SVG/data URL stays
   // small enough for the browser to load.
-  const MAX_DIM = 1280;
   const body = document.body;
   const srcW = body.scrollWidth || body.clientWidth || window.innerWidth;
   const srcH = body.scrollHeight || body.clientHeight || window.innerHeight;
-  const scale = Math.min(1, MAX_DIM / srcW, MAX_DIM / srcH);
+  const scale = screenshotScale(srcW, srcH, highResolution);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<null>((resolve) => {
