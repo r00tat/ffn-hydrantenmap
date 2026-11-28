@@ -6,7 +6,7 @@ Am PC erreichst du die wichtigsten Funktionen der Einsatzkarte mit der Tastatur 
 
 - **Suche mit /** über Elemente der Karte, Einsatzorte, Einsatztagebuch, Geschäftsbuch und Seiten
 - **Neue Einträge** im Einsatztagebuch (**T**) und Geschäftsbuch (**G**) von jeder Seite aus
-- **Karte**: Marker setzen, Fahrzeug, Einsatzort, Leitung und Fläche anlegen, Bearbeiten ein und aus
+- **Karte**: Marker setzen, Fahrzeug, taktische Einheit, Einsatzort, Leitung, Linie, Fläche, Kreis und Ebene anlegen, Bearbeiten ein und aus
 - **Navigation** mit Umschalt + Buchstabe zu Karte, Tagebuch, Geschäftsbuch und weiteren Seiten
 - **Eigene Belegung** je Gerät unter Menü → Hilfe & Konto → Tastenkürzel
 
@@ -23,6 +23,10 @@ Am PC erreichst du die wichtigsten Funktionen der Einsatzkarte mit der Tastatur 
 | O | Einsatzort setzen (auf der Karte) |
 | L | Leitung zeichnen (auf der Karte) |
 | A | Fläche zeichnen (auf der Karte) |
+| I | Linie zeichnen (auf der Karte) |
+| U | Taktische Einheit hinzufügen (auf der Karte) |
+| K | Kreis setzen (auf der Karte) |
+| B | Neue Ebene anlegen (auf der Karte) |
 | N | Element hinzufügen mit Typauswahl (auf der Karte) |
 | E | Bearbeiten ein/aus (auf der Karte) |
 | Umschalt + K | Zur Karte |
@@ -54,9 +58,9 @@ Ein Element der Karte wird angezeigt und ausgewählt, ein Tagebuch- oder Geschä
 
 Der Marker bekommt einen Namen wie „Marker 4" und landet auf der zuletzt gewählten Ebene. Name, Symbol und Beschreibung änderst du danach wie gewohnt. Auf einem Tablet wird er gleich in der Kartenmitte bzw. an deiner Position gesetzt.
 
-### Fahrzeug, Einsatzort, Leitung oder Fläche anlegen
+### Fahrzeug, Einheit, Einsatzort, Leitung, Linie, Fläche, Kreis oder Ebene anlegen
 
-Auf der Karte **F**, **O**, **L** oder **A** drücken: Der Dialog öffnet sich gleich mit dem passenden Typ. Leitungen und Flächen zeichnest du danach wie gewohnt auf der Karte.
+Auf der Karte **F**, **U**, **O**, **L**, **I**, **A**, **K** oder **B** drücken: Der Dialog öffnet sich gleich mit dem passenden Typ. Leitungen, Linien und Flächen zeichnest du danach wie gewohnt auf der Karte.
 
 Ist der Bearbeitungsmodus aus, schaltet ihn das Kürzel selbst ein.
 

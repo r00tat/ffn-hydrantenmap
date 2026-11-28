@@ -23,6 +23,10 @@ On a PC you can reach the most important functions of the operations map with th
 | O | Place operation site (on the map) |
 | L | Draw hose line (on the map) |
 | A | Draw area (on the map) |
+| I | Draw line (on the map) |
+| U | Add tactical unit (on the map) |
+| K | Place circle (on the map) |
+| B | Create layer (on the map) |
 | N | Add element, choosing the type (on the map) |
 | E | Toggle editing (on the map) |
 | Shift + K | Go to map |
@@ -54,9 +58,9 @@ A map item is shown and selected; a diary or business logbook entry is highlight
 
 The marker gets a name like "Marker 4" and lands on the layer you chose last. Change name, symbol and description afterwards as usual. On a tablet it is dropped right away at the map centre or your position.
 
-### Add a vehicle, operation site, hose line or area
+### Add a vehicle, unit, operation site, hose line, line, area, circle or layer
 
-Press **F**, **O**, **L** or **A** on the map: the dialog opens with the matching type. Draw hose lines and areas on the map afterwards as usual.
+Press **F**, **U**, **O**, **L**, **I**, **A**, **K** or **B** on the map: the dialog opens with the matching type. Draw hose lines, lines and areas on the map afterwards as usual.
 
 If editing is off, the shortcut switches it on.
 

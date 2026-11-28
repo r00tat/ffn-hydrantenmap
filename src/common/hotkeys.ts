@@ -63,6 +63,10 @@ export const HOTKEY_ACTIONS = [
   { id: 'map.connection', group: 'map', defaultBinding: 'L' },
   { id: 'map.area', group: 'map', defaultBinding: 'A' },
   { id: 'map.location', group: 'map', defaultBinding: 'O' },
+  { id: 'map.line', group: 'map', defaultBinding: 'I' },
+  { id: 'map.tacticalUnit', group: 'map', defaultBinding: 'U' },
+  { id: 'map.circle', group: 'map', defaultBinding: 'K' },
+  { id: 'map.layer', group: 'map', defaultBinding: 'B' },
   { id: 'map.addElement', group: 'map', defaultBinding: 'N' },
   { id: 'map.toggleEdit', group: 'map', defaultBinding: 'E' },
 

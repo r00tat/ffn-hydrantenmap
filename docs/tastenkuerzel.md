@@ -104,8 +104,11 @@ markieren will, will keinen Dialog; Name und Symbol lassen sich danach wie bei
 jedem Element ändern. Auf Touch-Geräten gibt es keine Maus, dort fällt der Marker
 gleich an der Vorgabeposition — wie beim Dialogweg.
 
-`F`, `O`, `L` und `A` öffnen dagegen den Dialog mit vorgewähltem Typ: Fahrzeug und
-Einsatzort brauchen Angaben, Leitung und Fläche gehen danach ins Zeichnen über.
+`F`, `U`, `O`, `L`, `I`, `A`, `K` und `B` öffnen dagegen den Dialog mit vorgewähltem
+Typ: Fahrzeug, taktische Einheit, Einsatzort, Kreis und Ebene brauchen Angaben,
+Leitung, Linie und Fläche gehen danach ins Zeichnen über. Die naheliegenden
+Buchstaben sind belegt (`L` Leitung, `T` Tagebuch, `E` Bearbeiten), daher `I` für
+L**i**nie, `U` für Unit, `K` für Kreis und `B` für E**b**ene.
 Ist der Bearbeitungsmodus aus, schalten die Kürzel ihn ein.
 
 ## Suche

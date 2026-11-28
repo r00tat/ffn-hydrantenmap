@@ -5163,7 +5163,11 @@
         "area": "Draw area",
         "location": "Place operation site",
         "addElement": "Add element (choose type)",
-        "toggleEdit": "Toggle editing"
+        "toggleEdit": "Toggle editing",
+        "line": "Draw line",
+        "tacticalUnit": "Add tactical unit",
+        "circle": "Place circle",
+        "layer": "Create layer"
       },
       "navigation": {
         "map": "Go to map",

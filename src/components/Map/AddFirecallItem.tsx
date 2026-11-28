@@ -258,12 +258,16 @@ export default function AddFirecallItem({
     setEditable(true);
     openFirecallItemDialog({ type } as FirecallItem);
   };
-  // Diese Kürzel öffnen den Elementdialog mit vorgewähltem Typ; Leitung und
-  // Fläche gehen danach wie gewohnt ins Zeichnen über.
+  // Diese Kürzel öffnen den Elementdialog mit vorgewähltem Typ; Leitung,
+  // Linie und Fläche gehen danach wie gewohnt ins Zeichnen über.
   useHotkey('map.vehicle', () => openDialogFor('vehicle'), canEdit);
   useHotkey('map.location', () => openDialogFor('location'), canEdit);
   useHotkey('map.connection', () => openDialogFor('connection'), canEdit);
   useHotkey('map.area', () => openDialogFor('area'), canEdit);
+  useHotkey('map.line', () => openDialogFor('line'), canEdit);
+  useHotkey('map.tacticalUnit', () => openDialogFor('tacticalUnit'), canEdit);
+  useHotkey('map.circle', () => openDialogFor('circle'), canEdit);
+  useHotkey('map.layer', () => openDialogFor('layer'), canEdit);
 
   return (
     <>

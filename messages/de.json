@@ -5163,7 +5163,11 @@
         "area": "Fläche zeichnen",
         "location": "Einsatzort setzen",
         "addElement": "Element hinzufügen (Auswahl)",
-        "toggleEdit": "Bearbeiten ein/aus"
+        "toggleEdit": "Bearbeiten ein/aus",
+        "line": "Linie zeichnen",
+        "tacticalUnit": "Taktische Einheit hinzufügen",
+        "circle": "Kreis setzen",
+        "layer": "Neue Ebene anlegen"
       },
       "navigation": {
         "map": "Zur Karte",
