@@ -142,10 +142,9 @@ module "cloud_run" {
 
     EINSATZMAPPE_IMPERSONATION_ACCOUNT = var.einsatzmappe_impersonation_account
 
-    # Schreibende MCP-Tools. In dev an, in prod zunächst aus — der Flow soll
-    # sich erst in der Praxis bewähren, bevor eine verbundene Anwendung in
-    # echte Einsatzdaten schreibt. Siehe docs/mcp-server.md.
-    MCP_WRITE_ENABLED = "false"
+    # Schreibende MCP-Tools für Einsatzdaten. Auf "false" setzen, um sie
+    # ohne Code-Änderung wieder abzuschalten. Siehe docs/mcp-server.md.
+    MCP_WRITE_ENABLED = "true"
   }
 
   secret_env = {

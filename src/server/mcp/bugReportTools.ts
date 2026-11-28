@@ -37,8 +37,8 @@ import type { McpUser } from './userAccess';
  *
  * Die schreibenden Tools registriert der Server **nur für Admins** und prüft
  * das beim Aufruf noch einmal. Sie hängen bewusst nicht an
- * `MCP_WRITE_ENABLED`: Der Schalter hält Einsatzdaten aus prod heraus, bis der
- * Schreibweg in der Praxis steht. Bug-Reports sind keine Einsatzdaten, nur
+ * `MCP_WRITE_ENABLED`: Der Schalter ist der Notaus für Schreibzugriffe auf
+ * Einsatzdaten. Bug-Reports sind keine Einsatzdaten, nur
  * Admins können sie ändern, und gerade die produktiven Reports sollen über
  * MCP bearbeitet werden (siehe docs/mcp-server.md).
  */

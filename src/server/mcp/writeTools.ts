@@ -22,9 +22,9 @@ import type { McpUser } from './userAccess';
  * Tool-Set nebenher wäre die sichere Zusage, dass die beiden Wege irgendwann
  * verschiedene Elemente erzeugen.
  *
- * Zusätzlich zum Scope steht ein Schalter davor: `MCP_WRITE_ENABLED`. In prod
- * bleibt er zunächst aus, bis der Flow in der Praxis steht — siehe
- * `docs/mcp-server.md`.
+ * Zusätzlich zum Scope steht ein Schalter davor: `MCP_WRITE_ENABLED`. Er ist
+ * in dev und prod an und dient als Notaus, der die Tools ohne Code-Änderung
+ * wieder abschaltet — siehe `docs/mcp-server.md`.
  */
 
 export function mcpWriteEnabled(): boolean {
