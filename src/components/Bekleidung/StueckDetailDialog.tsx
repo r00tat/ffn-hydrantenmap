@@ -23,6 +23,7 @@ import OnlineOnly from '../site/OnlineOnly';
 import BemerkungEditor from './BemerkungEditor';
 import { setStueckBemerkung, setStueckStatus } from './bekleidungActions';
 import { useBekleidungErrorText } from './bekleidungErrors';
+import AusgabeDialog from './AusgabeDialog';
 import IssueActionPanel, { type IssueAction } from './IssueActionPanel';
 import {
   buildStueckTimeline,
@@ -67,6 +68,7 @@ export default function StueckDetailDialog({
   const stueck = view.stueckById.get(stueckId);
   const [target, setTarget] = useState<TargetStatus>();
   const [issueAction, setIssueAction] = useState<IssueAction>();
+  const [issueOpen, setIssueOpen] = useState(false);
   const [datum, setDatum] = useState(todayLocalDate);
   const [bemerkung, setBemerkung] = useState('');
   const [busy, setBusy] = useState(false);
@@ -269,6 +271,13 @@ export default function StueckDetailDialog({
         </Stack>
       </DialogContent>
       <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+        {stueck.status === 'lager' && (
+          <OnlineOnly>
+            <Button size="small" onClick={() => setIssueOpen(true)}>
+              {t('actions.ausgeben')}
+            </Button>
+          </OnlineOnly>
+        )}
         {stueck.status === 'ausgegeben' &&
           !issueAction &&
           (['return', 'reassign'] as const).map((action) => (
@@ -292,6 +301,14 @@ export default function StueckDetailDialog({
         </OnlineOnly>
         <Button onClick={onClose}>{t('actions.close')}</Button>
       </DialogActions>
+      {issueOpen && (
+        <AusgabeDialog
+          open
+          view={view}
+          preset={{ stueckIds: [stueckId] }}
+          onClose={() => setIssueOpen(false)}
+        />
+      )}
     </Dialog>
   );
 }

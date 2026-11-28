@@ -14,13 +14,16 @@ import { Fragment, useMemo, useState } from 'react';
 import type { BekleidungKategorie } from '../../common/bekleidung';
 import { computeLagerstand, type LagerstandRow } from '../../common/bekleidungLagerstand';
 import OnlineOnly from '../site/OnlineOnly';
+import AusgabeDialog from './AusgabeDialog';
 import BestandAdjustDialog from './BestandAdjustDialog';
-import type { BekleidungView } from './bekleidungUi';
+import { issuePresetFor, type BekleidungView } from './bekleidungUi';
 import ExpandToggle, { toggleKey } from './ExpandToggle';
 
 const KATEGORIEN: BekleidungKategorie[] = ['einsatz', 'dienst'];
 
 type AdjustTarget = { artikelId?: string; groesse?: string; charge?: string };
+/** Zeile, aus der ausgegeben wird; `charge` nur in einer Chargenzeile. */
+type IssueTarget = { artikelId: string; groesse: string; charge?: string };
 
 /** Die Größenzeilen eines Artikels, in der Reihenfolge von `computeLagerstand`. */
 function groupByArtikel(rows: LagerstandRow[]): { artikelId: string; rows: LagerstandRow[] }[] {
@@ -42,10 +45,12 @@ const sum = (rows: LagerstandRow[], key: 'imLager' | 'ausgegeben') =>
  * Chargen vorkommen, je Charge eine eingerückte Zeile — ein Artikel wie die
  * Bootshose hat sonst ein Dutzend Zeilen. Bei Mengenartikeln gibt es Zugang
  * und Korrektur — mit Chargen je Charge, weil jede ihren eigenen Bestand hat.
+ * Wo etwas im Lager liegt, lässt es sich gleich von hier ausgeben.
  */
 export default function LagerstandTab({ view }: { view: BekleidungView }) {
   const t = useTranslations('bekleidung');
   const [adjust, setAdjust] = useState<AdjustTarget>();
+  const [issueTarget, setIssueTarget] = useState<IssueTarget>();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const rows = useMemo(
     () => computeLagerstand(view.artikel, view.stuecke, view.bestand, view.ausgaben),
@@ -96,6 +101,13 @@ export default function LagerstandTab({ view }: { view: BekleidungView }) {
                       </Button>
                     </OnlineOnly>
                   );
+                  const issueButton = (target: IssueTarget) => (
+                    <OnlineOnly>
+                      <Button size="small" onClick={() => setIssueTarget(target)}>
+                        {t('actions.ausgeben')}
+                      </Button>
+                    </OnlineOnly>
+                  );
                   return (
                     <Fragment key={group.artikelId}>
                       <TableRow
@@ -127,6 +139,9 @@ export default function LagerstandTab({ view }: { view: BekleidungView }) {
                               <TableCell align="right">{row.imLager}</TableCell>
                               <TableCell align="right">{row.ausgegeben}</TableCell>
                               <TableCell align="right">
+                                {!row.chargen &&
+                                  row.imLager > 0 &&
+                                  issueButton({ artikelId: row.artikelId, groesse: row.groesse })}
                                 {isMenge &&
                                   !row.chargen &&
                                   adjustButton({ artikelId: row.artikelId, groesse: row.groesse })}
@@ -143,6 +158,12 @@ export default function LagerstandTab({ view }: { view: BekleidungView }) {
                                 <TableCell align="right">{c.imLager}</TableCell>
                                 <TableCell align="right">{c.ausgegeben}</TableCell>
                                 <TableCell align="right">
+                                  {c.imLager > 0 &&
+                                    issueButton({
+                                      artikelId: row.artikelId,
+                                      groesse: row.groesse,
+                                      charge: c.charge ?? '',
+                                    })}
                                   {isMenge &&
                                     adjustButton({
                                       artikelId: row.artikelId,
@@ -170,6 +191,14 @@ export default function LagerstandTab({ view }: { view: BekleidungView }) {
           groesse={adjust.groesse}
           charge={adjust.charge}
           onClose={() => setAdjust(undefined)}
+        />
+      )}
+      {issueTarget && (
+        <AusgabeDialog
+          open
+          view={view}
+          preset={issuePresetFor(view, issueTarget)}
+          onClose={() => setIssueTarget(undefined)}
         />
       )}
     </>

@@ -19,7 +19,12 @@ import { callAction } from '../Geraete/admin/actionResult';
 import OnlineOnly from '../site/OnlineOnly';
 import { issue, returnItems } from './bekleidungActions';
 import { parseBekleidungError, useBekleidungErrorText } from './bekleidungErrors';
-import { stueckLabel, todayLocalDate, type BekleidungView } from './bekleidungUi';
+import {
+  stueckLabel,
+  todayLocalDate,
+  type AusgabePreset,
+  type BekleidungView,
+} from './bekleidungUi';
 import MengeLinesEditor, {
   completeMengeLines,
   linesMissingCharge,
@@ -31,6 +36,8 @@ export interface AusgabeDialogProps {
   open: boolean;
   view: BekleidungView;
   initialPersonId?: string;
+  /** Vorbelegte Stücke und Mengen, etwa aus dem Lagerstand oder einem Stück. */
+  preset?: AusgabePreset;
   onClose: () => void;
 }
 
@@ -47,6 +54,7 @@ export default function AusgabeDialog({
   open,
   view,
   initialPersonId,
+  preset,
   onClose,
 }: AusgabeDialogProps) {
   const t = useTranslations('bekleidung');
@@ -57,8 +65,10 @@ export default function AusgabeDialog({
   );
   const [personId, setPersonId] = useState(initialPersonId ?? '');
   const [datum, setDatum] = useState(todayLocalDate);
-  const [stueckIds, setStueckIds] = useState<string[]>([]);
-  const [lines, setLines] = useState<MengeLineDraft[]>([]);
+  const [stueckIds, setStueckIds] = useState<string[]>(() => preset?.stueckIds ?? []);
+  const [lines, setLines] = useState<MengeLineDraft[]>(
+    () => preset?.lines?.map((line, i) => ({ ...line, key: i + 1 })) ?? [],
+  );
   const [bemerkung, setBemerkung] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -176,6 +186,7 @@ export default function AusgabeDialog({
             onChange={setStueckIds}
             offer={offerLager}
             accept={acceptScanned}
+            initialSearch={preset?.search}
             renderExtra={(s) =>
               s.status === 'ausgegeben' ? (
                 <Chip

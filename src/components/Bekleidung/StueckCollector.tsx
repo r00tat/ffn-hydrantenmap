@@ -29,6 +29,8 @@ export interface StueckCollectorProps {
   /** Zusatz je gewähltem Stück, etwa ein Warnchip. */
   renderExtra?: (stueck: BekleidungStueck) => ReactNode;
   label?: string;
+  /** Vorbelegter Suchtext, etwa Artikel und Größe aus dem Lagerstand. */
+  initialSearch?: string;
 }
 
 /**
@@ -44,11 +46,12 @@ export default function StueckCollector({
   accept = offer,
   renderExtra,
   label,
+  initialSearch,
 }: StueckCollectorProps) {
   const t = useTranslations('bekleidung');
   const [scanOpen, setScanOpen] = useState(false);
   const [message, setMessage] = useState<string>();
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(initialSearch ?? '');
 
   const selected = useMemo(
     () =>

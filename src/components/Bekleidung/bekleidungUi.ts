@@ -235,3 +235,58 @@ export function chargeCounts(stuecke: BekleidungStueck[]): { charge?: string; co
     !x.charge ? 1 : !y.charge ? -1 : collator.compare(x.charge, y.charge),
   );
 }
+
+/** Auswahlwert der Charge im Ausgabe-Dialog für Bestand ohne Charge. */
+export const NO_CHARGE_KEY = '\u0000';
+
+/** Auswahlwert einer Charge im Ausgabe-Dialog. */
+export function chargeSelectionKey(charge: string | undefined): string {
+  return chargeKey(charge) || NO_CHARGE_KEY;
+}
+
+/** Vorbelegung des Ausgabe-Dialogs. */
+export interface AusgabePreset {
+  stueckIds?: string[];
+  lines?: { artikelId: string; groesse: string; menge: string; charge?: string }[];
+  /** Suchtext der Stückauswahl, wenn mehrere Stücke passen. */
+  search?: string;
+}
+
+/**
+ * Vorbelegung für „Ausgeben" aus einer Zeile des Lagerstands. `charge`
+ * fehlt in der Größenzeile; in einer Chargenzeile steht sie, leer für
+ * „ohne Charge". Bei Einzelstücken wird das Stück nur vorgewählt, wenn genau
+ * eines passt — welches von mehreren aus dem Regal kommt, weiß nur, wer davor
+ * steht; dann ist die Suche vorbelegt.
+ */
+export function issuePresetFor(
+  view: BekleidungView,
+  target: { artikelId: string; groesse: string; charge?: string },
+): AusgabePreset {
+  const { artikelId, groesse, charge } = target;
+  const artikel = view.artikelById.get(artikelId);
+  if (artikel?.fuehrung === 'menge') {
+    return {
+      lines: [
+        {
+          artikelId,
+          groesse,
+          menge: '1',
+          ...(charge !== undefined ? { charge: chargeSelectionKey(charge) } : {}),
+        },
+      ],
+    };
+  }
+  const size = normalizeGroesse(groesse);
+  const matching = view.stuecke.filter(
+    (s) =>
+      s.id &&
+      s.artikelId === artikelId &&
+      s.status === 'lager' &&
+      s.eigentum === 'feuerwehr' &&
+      normalizeGroesse(s.groesse) === size &&
+      (charge === undefined || chargeKey(s.charge) === chargeKey(charge)),
+  );
+  if (matching.length === 1) return { stueckIds: [matching[0].id!] };
+  return { search: [artikel?.bezeichnung ?? artikelId, size].join(' · ') };
+}
